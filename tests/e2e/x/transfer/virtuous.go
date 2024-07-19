@@ -20,11 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -90,10 +93,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				}
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
-				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
+				nodeURI := e2e.Env.GetRandomNodeURI()
+				baseWallet := e2e.NewWallet(keychain, nodeURI)
 				xWallet := baseWallet.X()
 				xBuilder := xWallet.Builder()
 				xContext := xBuilder.Context()
+				xChainClient := avm.NewClient(nodeURI.URI, "X")
 				avaxAssetID := xContext.AVAXAssetID
 
 				wallets := make([]primary.Wallet, len(testKeys))
@@ -108,6 +113,10 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 						)),
 					)
 				}
+
+				feeCfg, err := xChainClient.GetDynamicFeeConfig(e2e.DefaultContext())
+				require.NoError(err)
+				tests.Outf("{{green}} fee config: %v {{/}}\n", feeCfg)
 
 				metricsBeforeTx, err := tests.GetNodesMetrics(
 					e2e.DefaultContext(),
@@ -161,9 +170,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				amountToTransfer := senderOrigBal / 10
 
-				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
-				receiverNewBal := receiverOrigBal + amountToTransfer
-
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
 					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
@@ -183,28 +189,8 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
-				fmt.Printf(`===
-TRANSFERRING
-
-FROM [%q]
-SENDER    CURRENT BALANCE     : %21d AVAX
-SENDER    NEW BALANCE (AFTER) : %21d AVAX
-
-TRANSFER AMOUNT FROM SENDER   : %21d AVAX
-
-TO [%q]
-RECEIVER  CURRENT BALANCE     : %21d AVAX
-RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
-===
-`,
-					shortAddrs[fromIdx],
-					senderOrigBal,
-					senderNewBal,
-					amountToTransfer,
-					shortAddrs[toIdx],
-					receiverOrigBal,
-					receiverNewBal,
-				)
+				nextGasPrice, nextGasCap, err := xChainClient.GetNextGasData(e2e.DefaultContext())
+				require.NoError(err)
 
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
@@ -222,6 +208,37 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					e2e.WithDefaultContext(),
 				)
 				require.NoError(err)
+
+				// retrieve fee paid for the BaseTx
+				commonCalc := commonfee.NewCalculator(feeCfg.FeeDimensionWeights, nextGasPrice, nextGasCap)
+				feeCalc := fee.NewDynamicCalculator(commonCalc, xbuilder.Parser.Codec())
+				fee, err := feeCalc.CalculateFee(tx)
+				require.NoError(err)
+				senderNewBal := senderOrigBal - amountToTransfer - fee
+				receiverNewBal := receiverOrigBal + amountToTransfer
+
+				fmt.Printf(`===
+				TRANSFERRING
+				
+				FROM [%q]
+				SENDER    CURRENT BALANCE     : %21d AVAX
+				SENDER    NEW BALANCE (AFTER) : %21d AVAX
+				
+				TRANSFER AMOUNT FROM SENDER   : %21d AVAX
+				
+				TO [%q]
+				RECEIVER  CURRENT BALANCE     : %21d AVAX
+				RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
+				===
+				`,
+					shortAddrs[fromIdx],
+					senderOrigBal,
+					senderNewBal,
+					amountToTransfer,
+					shortAddrs[toIdx],
+					receiverOrigBal,
+					receiverNewBal,
+				)
 
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
 				require.NoError(err)

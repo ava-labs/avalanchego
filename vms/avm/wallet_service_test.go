@@ -9,9 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/linked"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
 func TestWalletService_SendMultiple(t *testing.T) {
@@ -29,11 +26,6 @@ func TestWalletService_SendMultiple(t *testing.T) {
 				}},
 			})
 			env.vm.ctx.Lock.Unlock()
-
-			walletService := &WalletService{
-				vm:         env.vm,
-				pendingTxs: linked.NewHashmap[ids.ID, *txs.Tx](),
-			}
 
 			assetID := env.genesisTx.ID()
 			addr := keys[0].PublicKey().Address()
@@ -67,7 +59,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 				},
 			}
 			reply := &api.JSONTxIDChangeAddr{}
-			require.NoError(walletService.SendMultiple(nil, args, reply))
+			require.NoError(env.walletService.SendMultiple(nil, args, reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)

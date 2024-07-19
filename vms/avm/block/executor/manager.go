@@ -159,11 +159,20 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if err != nil {
 		return err
 	}
+	chainTime := m.state.GetTimestamp()
+	nextTimestamp := state.NextBlockTime(chainTime, m.clk)
+	stateDiff.SetTimestamp(nextTimestamp)
+
+	feeCalc, err := state.PickFeeCalculator(m.backend.Config, m.backend.Codec, stateDiff, chainTime)
+	if err != nil {
+		return err
+	}
 
 	err = tx.Unsigned.Visit(&executor.SemanticVerifier{
-		Backend: m.backend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       m.backend,
+		FeeCalculator: feeCalc,
+		State:         stateDiff,
+		Tx:            tx,
 	})
 	if err != nil {
 		return err

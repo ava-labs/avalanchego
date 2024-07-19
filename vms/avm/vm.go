@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -36,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -110,7 +110,7 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	txBackend *txexecutor.Backend
+	txExecutorBackend *txexecutor.Backend
 
 	// Cancelled on shutdown
 	onShutdownCtx context.Context
@@ -172,6 +172,9 @@ func (vm *VM) Initialize(
 	ctx.Log.Info("VM config initialized",
 		zap.Reflect("config", avmConfig),
 	)
+	if err := fee.ResetDynamicConfig(ctx, avmConfig.DynamicFeesConfig); err != nil {
+		return fmt.Errorf("failed resetting dynamic fees config: %w", err)
+	}
 
 	vm.registerer, err = metrics.MakeAndRegister(ctx.Metrics, "")
 	if err != nil {
@@ -244,8 +247,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.walletService.vm = vm
-	vm.walletService.pendingTxs = linked.NewHashmap[ids.ID, *txs.Tx]()
+	vm.walletService.walletServiceBackend = NewWalletServiceBackend(vm)
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
@@ -262,7 +264,7 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.txBackend = &txexecutor.Backend{
+	vm.txExecutorBackend = &txexecutor.Backend{
 		Ctx:           ctx,
 		Config:        &vm.Config,
 		Fxs:           vm.fxs,
@@ -279,7 +281,7 @@ func (vm *VM) Initialize(
 
 // onBootstrapStarted is called by the consensus engine when it starts bootstrapping this chain
 func (vm *VM) onBootstrapStarted() error {
-	vm.txBackend.Bootstrapped = false
+	vm.txExecutorBackend.Bootstrapped = false
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -289,7 +291,7 @@ func (vm *VM) onBootstrapStarted() error {
 }
 
 func (vm *VM) onNormalOperationsStarted() error {
-	vm.txBackend.Bootstrapped = true
+	vm.txExecutorBackend.Bootstrapped = true
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -338,7 +340,18 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 	// name this service "avm"
-	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
+	if err := rpcServer.RegisterService(&Service{
+		vm: vm,
+		txBuilderBackend: newServiceBackend(
+			vm.feeAssetID,
+			vm.ctx,
+			&vm.Config,
+			vm.state,
+			vm.ctx.SharedMemory,
+			vm.parser.Codec(),
+			&vm.clock,
+		),
+	}, "avm"); err != nil {
 		return nil, err
 	}
 
@@ -410,13 +423,13 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<
 		mempool,
 		vm.metrics,
 		vm.state,
-		vm.txBackend,
+		vm.txExecutorBackend,
 		&vm.clock,
 		vm.onAccept,
 	)
 
 	vm.Builder = blockbuilder.New(
-		vm.txBackend,
+		vm.txExecutorBackend,
 		vm.chainManager,
 		&vm.clock,
 		mempool,
@@ -479,7 +492,7 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	}
 
 	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
-		Backend: vm.txBackend,
+		Backend: vm.txExecutorBackend,
 		Tx:      tx,
 	})
 	if err != nil {

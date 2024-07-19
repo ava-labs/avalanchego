@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -47,15 +46,12 @@ import (
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	txArgs := &api.FormattedTx{}
 	txReply := &api.JSONTxID{}
-	err := service.IssueTx(nil, txArgs, txReply)
+	err := env.service.IssueTx(nil, txArgs, txReply)
 	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 
 	tx := newTx(t, env.genesisBytes, env.vm.ctx.ChainID, env.vm.parser, "AVAX")
@@ -63,22 +59,19 @@ func TestServiceIssueTx(t *testing.T) {
 	require.NoError(err)
 	txArgs.Encoding = formatting.Hex
 	txReply = &api.JSONTxID{}
-	require.NoError(service.IssueTx(nil, txArgs, txReply))
+	require.NoError(env.service.IssueTx(nil, txArgs, txReply))
 	require.Equal(tx.ID(), txReply.TxID)
 }
 
 func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	statusArgs := &api.JSONTxID{}
 	statusReply := &GetTxStatusReply{}
-	err := service.GetTxStatus(nil, statusArgs, statusReply)
+	err := env.service.GetTxStatus(nil, statusArgs, statusReply)
 	require.ErrorIs(err, errNilTxID)
 
 	newTx := newAvaxBaseTxWithOutputs(t, env)
@@ -88,13 +81,13 @@ func TestServiceGetTxStatus(t *testing.T) {
 		TxID: txID,
 	}
 	statusReply = &GetTxStatusReply{}
-	require.NoError(service.GetTxStatus(nil, statusArgs, statusReply))
+	require.NoError(env.service.GetTxStatus(nil, statusArgs, statusReply))
 	require.Equal(choices.Unknown, statusReply.Status)
 
 	issueAndAccept(require, env.vm, env.issuer, newTx)
 
 	statusReply = &GetTxStatusReply{}
-	require.NoError(service.GetTxStatus(nil, statusArgs, statusReply))
+	require.NoError(env.service.GetTxStatus(nil, statusArgs, statusReply))
 	require.Equal(choices.Accepted, statusReply.Status)
 }
 
@@ -102,10 +95,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -141,7 +131,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply := &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(env.service.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 1)
@@ -152,7 +142,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(env.service.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(balanceReply.Balance)
 	require.Empty(balanceReply.UTXOIDs)
@@ -188,7 +178,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(env.service.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337+1337), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 2)
@@ -199,7 +189,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(env.service.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(balanceReply.Balance)
 	require.Empty(balanceReply.UTXOIDs)
@@ -237,7 +227,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(env.service.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Equal(uint64(1337*3), uint64(balanceReply.Balance))
 	require.Len(balanceReply.UTXOIDs, 3)
@@ -248,7 +238,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(service.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(env.service.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Zero(balanceReply.Balance)
 	require.Empty(balanceReply.UTXOIDs)
@@ -256,10 +246,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
@@ -282,14 +269,14 @@ func TestServiceGetTxs(t *testing.T) {
 		AssetID:     assetID.String(),
 	}
 	getTxsReply := &GetAddressTxsReply{}
-	require.NoError(service.GetAddressTxs(nil, getTxsArgs, getTxsReply))
+	require.NoError(env.service.GetAddressTxs(nil, getTxsArgs, getTxsReply))
 	require.Len(getTxsReply.TxIDs, 10)
 	require.Equal(getTxsReply.TxIDs, testTxs[:10])
 
 	// get the second page
 	getTxsArgs.Cursor = getTxsReply.Cursor
 	getTxsReply = &GetAddressTxsReply{}
-	require.NoError(service.GetAddressTxs(nil, getTxsArgs, getTxsReply))
+	require.NoError(env.service.GetAddressTxs(nil, getTxsArgs, getTxsReply))
 	require.Len(getTxsReply.TxIDs, 10)
 	require.Equal(getTxsReply.TxIDs, testTxs[10:20])
 }
@@ -297,10 +284,7 @@ func TestServiceGetTxs(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
@@ -334,7 +318,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply := &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 1)
 	require.Equal(assetID.String(), reply.Balances[0].AssetID)
@@ -345,7 +329,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	require.Empty(reply.Balances)
 
 	env.vm.ctx.Lock.Lock()
@@ -378,7 +362,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 1)
 	require.Equal(assetID.String(), reply.Balances[0].AssetID)
@@ -389,7 +373,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Empty(reply.Balances)
 
@@ -425,7 +409,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 1)
@@ -436,7 +420,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	require.Empty(reply.Balances)
 
@@ -470,7 +454,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Len(reply.Balances, 2)
 	gotAssetIDs := []string{reply.Balances[0].AssetID, reply.Balances[1].AssetID}
@@ -485,7 +469,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(service.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(env.service.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	require.Empty(reply.Balances)
 }
@@ -493,16 +477,13 @@ func TestServiceGetAllBalances(t *testing.T) {
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	txID := env.genesisTx.ID()
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
 	}, &reply))
@@ -518,17 +499,14 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	newTx := newAvaxBaseTxWithOutputs(t, env)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     newTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -547,7 +525,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		"blockchainID": %q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
@@ -559,13 +537,13 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 				}
 			},
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd"
 					],
-					"amount": 48000,
+					"amount": 999997280,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -573,12 +551,12 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"txID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 50000,
+					"amount": 1000000000,
 					"signatureIndices": [
 						0
 					]
@@ -599,24 +577,20 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	],
 	"id": %q
 }`, newTx.Unsigned.(*txs.BaseTx).BlockchainID, sigStr, newTx.ID())
-
 	require.Equal(expectedReplyTxString, string(replyTxBytes))
 }
 
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	newTx := buildTestExportTx(t, env, env.vm.ctx.CChainID)
 	issueAndAccept(require, env.vm, env.issuer, newTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     newTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -634,13 +608,13 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		"blockchainID": %q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999997250,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -648,12 +622,12 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"txID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 50000,
+					"amount": 1000000000,
 					"signatureIndices": [
 						0
 					]
@@ -664,7 +638,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 		"destinationChain": "2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w",
 		"exportedOutputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
@@ -703,7 +677,6 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	initialStates := map[uint32][]verify.State{
@@ -755,7 +728,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     createAssetTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -774,13 +747,13 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		"blockchainID": %q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 49000,
+					"amount": 999998150,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -788,12 +761,12 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"txID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"outputIndex": 2,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 50000,
+					"amount": 1000000000,
 					"signatureIndices": [
 						0
 					]
@@ -896,7 +869,6 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -922,11 +894,11 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildNFTxMintOp(createAssetTx, key, 1, 1)
-	mintNFTTx := buildOperationTxWithOps(t, env, op)
+	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     mintNFTTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -946,13 +918,13 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		"blockchainID": %[1]q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999996560,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -960,12 +932,12 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "rSiY2aqcahSU5vyJeMiNBnwtPwfJFxsxskAGbU3HxHvAkrdpy",
+				"txID": "2duEndKLApqnbfo1SZsHL87Se4QJAps96Xt7koYGhLS3aqk2GE",
 				"outputIndex": 0,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 49000,
+					"amount": 999998330,
 					"signatureIndices": [
 						0
 					]
@@ -1038,7 +1010,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -1067,11 +1038,11 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 1, 0)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 2, 1)
-	mintNFTTx := buildOperationTxWithOps(t, env, mintOp1, mintOp2)
+	mintNFTTx := buildOperationTxWithOp(t, env, []*txs.Operation{mintOp1, mintOp2})
 	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     mintNFTTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -1091,13 +1062,13 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		"blockchainID": %[1]q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999982390,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1105,12 +1076,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "BBhSA95iv6ueXc7xrMSka1bByBqcwJxyvMiyjy5H8ccAgxy4P",
+				"txID": "Pbg8AVMJUZUzPiFnnBvNKvW6Ljjobr43udPirFbfEYuW7t49z",
 				"outputIndex": 0,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 49000,
+					"amount": 999991575,
 					"signatureIndices": [
 						0
 					]
@@ -1219,7 +1190,6 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -1242,11 +1212,11 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildSecpMintOp(createAssetTx, key, 1)
-	mintSecpOpTx := buildOperationTxWithOps(t, env, op)
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     mintSecpOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -1266,13 +1236,13 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		"blockchainID": %[1]q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999983000,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1280,12 +1250,12 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2YhAg3XUdub5syHHePZG7q3yFjKAy7ahsvQDxq5SMrYbN1s5Gn",
+				"txID": "2MBRmBRnKGXkCe7Byc5g9xArAW24qjpKL9fDVNEWJht156xYKp",
 				"outputIndex": 0,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 49000,
+					"amount": 999991635,
 					"signatureIndices": [
 						0
 					]
@@ -1356,13 +1326,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: eUpgrade,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -1389,11 +1358,11 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	op1 := buildSecpMintOp(createAssetTx, key, 1)
 	op2 := buildSecpMintOp(createAssetTx, key, 2)
-	mintSecpOpTx := buildOperationTxWithOps(t, env, op1, op2)
+	mintSecpOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
 	issueAndAccept(require, env.vm, env.issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     mintSecpOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -1413,13 +1382,13 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		"blockchainID": %[1]q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999982160,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1427,12 +1396,12 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "2vxorPLUw5sneb7Mdhhjuws3H5AqaDp1V8ETz6fEuzvn835rVX",
+				"txID": "rS3zk6KTARY8H6njFhYbMs2tdCqgCnyRXBUUu1ta5jyqfXVq",
 				"outputIndex": 0,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 49000,
+					"amount": 999991615,
 					"signatureIndices": [
 						0
 					]
@@ -1549,7 +1518,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -1567,11 +1535,11 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	op := buildPropertyFxMintOp(createAssetTx, key, 1)
-	mintPropertyFxOpTx := buildOperationTxWithOps(t, env, op)
+	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op})
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     mintPropertyFxOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -1591,13 +1559,13 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		"blockchainID": %[1]q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999983360,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1605,12 +1573,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		],
 		"inputs": [
 			{
-				"txID": "nNUGBjszswU3ZmhCb8hBNWmg335UZqGWmNrYTAGyMF4bFpMXm",
+				"txID": "2JE2HjEceadRG2nPvZP3iaPdcG9N9zLhXy3t7RpDqNKFYitJuE",
 				"outputIndex": 0,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 49000,
+					"amount": 999991855,
 					"signatureIndices": [
 						0
 					]
@@ -1684,7 +1652,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 			Fx: &propertyfx.Fx{},
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	key := keys[0]
@@ -1709,11 +1676,11 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 1)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 2)
-	mintPropertyFxOpTx := buildOperationTxWithOps(t, env, op1, op2)
+	mintPropertyFxOpTx := buildOperationTxWithOp(t, env, []*txs.Operation{op1, op2})
 	issueAndAccept(require, env.vm, env.issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
-	require.NoError(service.GetTx(nil, &api.GetTxArgs{
+	require.NoError(env.service.GetTx(nil, &api.GetTxArgs{
 		TxID:     mintPropertyFxOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
@@ -1733,13 +1700,13 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		"blockchainID": %[1]q,
 		"outputs": [
 			{
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"output": {
 					"addresses": [
 						"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e"
 					],
-					"amount": 48000,
+					"amount": 999982480,
 					"locktime": 0,
 					"threshold": 1
 				}
@@ -1747,12 +1714,12 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		],
 		"inputs": [
 			{
-				"txID": "2NV5AGoQQHVRY6VkT8sht8bhZDHR7uwta7fk7JwAZpacqMRWCa",
+				"txID": "2nDskbBWwToZFJ4F2PaTds76ET7UkNuhsmAsmtPpVyodWBZXS7",
 				"outputIndex": 0,
-				"assetID": "2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ",
+				"assetID": "tvLKci3hNoCX4NijS6TfiT6XJJY3gGKd2git6SSVTG5J8Nfby",
 				"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
 				"input": {
-					"amount": 49000,
+					"amount": 999991655,
 					"signatureIndices": [
 						0
 					]
@@ -1861,7 +1828,8 @@ func newAvaxBaseTxWithOutputs(t *testing.T, env *environment) *txs.Tx {
 		kc        = secp256k1fx.NewKeychain(key)
 	)
 
-	tx, err := env.txBuilder.BaseTx(
+	tx, _, err := buildBaseTx(
+		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -1886,7 +1854,8 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, env *environment, initialStat
 		kc  = secp256k1fx.NewKeychain(key)
 	)
 
-	tx, err := env.txBuilder.CreateAssetTx(
+	tx, _, err := buildCreateAssetTx(
+		env.service.txBuilderBackend,
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -1905,7 +1874,8 @@ func buildTestExportTx(t *testing.T, env *environment, chainID ids.ID) *txs.Tx {
 		to  = key.PublicKey().Address()
 	)
 
-	tx, err := env.txBuilder.ExportTx(
+	tx, _, err := buildExportTx(
+		env.service.txBuilderBackend,
 		chainID,
 		to,
 		env.vm.feeAssetID,
@@ -1990,14 +1960,15 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 	}
 }
 
-func buildOperationTxWithOps(t *testing.T, env *environment, op ...*txs.Operation) *txs.Tx {
+func buildOperationTxWithOp(t *testing.T, env *environment, ops []*txs.Operation) *txs.Tx {
 	var (
 		key = keys[0]
 		kc  = secp256k1fx.NewKeychain(key)
 	)
 
-	tx, err := env.txBuilder.Operation(
-		op,
+	tx, err := buildOperation(
+		env.service.txBuilderBackend,
+		ops,
 		kc,
 		key.Address(),
 	)
@@ -2008,36 +1979,27 @@ func buildOperationTxWithOps(t *testing.T, env *environment, op ...*txs.Operatio
 func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
-	err := service.GetTx(nil, &api.GetTxArgs{}, &reply)
+	err := env.service.GetTx(nil, &api.GetTxArgs{}, &reply)
 	require.ErrorIs(err, errNilTxID)
 }
 
 func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	reply := api.GetTxReply{}
-	err := service.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
+	err := env.service.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	rawAddr := ids.GenerateTestShortID()
@@ -2273,7 +2235,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		t.Run(test.label, func(t *testing.T) {
 			require := require.New(t)
 			reply := &api.GetUTXOsReply{}
-			err := service.GetUTXOs(nil, test.args, reply)
+			err := env.service.GetUTXOs(nil, test.args, reply)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
 				return
@@ -2286,16 +2248,13 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	avaxAssetID := env.genesisTx.ID()
 
 	reply := GetAssetDescriptionReply{}
-	require.NoError(service.GetAssetDescription(nil, &GetAssetDescriptionArgs{
+	require.NoError(env.service.GetAssetDescription(nil, &GetAssetDescriptionArgs{
 		AssetID: avaxAssetID.String(),
 	}, &reply))
 
@@ -2306,10 +2265,7 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		fork: latest,
-	})
-	service := &Service{vm: env.vm}
+	env := setup(t, &envConfig{fork: latest})
 	env.vm.ctx.Lock.Unlock()
 
 	avaxAssetID := env.genesisTx.ID()
@@ -2317,7 +2273,7 @@ func TestGetBalance(t *testing.T) {
 	reply := GetBalanceReply{}
 	addrStr, err := env.vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	require.NoError(err)
-	require.NoError(service.GetBalance(nil, &GetBalanceArgs{
+	require.NoError(env.service.GetBalance(nil, &GetBalanceArgs{
 		Address: addrStr,
 		AssetID: avaxAssetID.String(),
 	}, &reply))
@@ -2338,7 +2294,6 @@ func TestCreateFixedCapAsset(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
-			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
 
 			reply := AssetIDChangeAddr{}
@@ -2349,7 +2304,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 
-			require.NoError(service.CreateFixedCapAsset(nil, &CreateAssetArgs{
+			require.NoError(env.service.CreateFixedCapAsset(nil, &CreateAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
 					UserPass: api.UserPass{
 						Username: username,
@@ -2384,7 +2339,6 @@ func TestCreateVariableCapAsset(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
-			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
 
 			reply := AssetIDChangeAddr{}
@@ -2393,7 +2347,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			_, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
 			changeAddrStr := fromAddrsStr[0]
 
-			require.NoError(service.CreateVariableCapAsset(nil, &CreateAssetArgs{
+			require.NoError(env.service.CreateVariableCapAsset(nil, &CreateAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
 					UserPass: api.UserPass{
 						Username: username,
@@ -2432,7 +2386,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				To:      minterAddrStr, // Send newly minted tokens to this address
 			}
 			mintReply := &api.JSONTxIDChangeAddr{}
-			require.NoError(service.Mint(nil, mintArgs, mintReply))
+			require.NoError(env.service.Mint(nil, mintArgs, mintReply))
 			require.Equal(changeAddrStr, mintReply.ChangeAddr)
 
 			buildAndAccept(require, env.vm, env.issuer, mintReply.TxID)
@@ -2453,7 +2407,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
-			require.NoError(service.Send(nil, sendArgs, sendReply))
+			require.NoError(env.service.Send(nil, sendArgs, sendReply))
 			require.Equal(changeAddrStr, sendReply.ChangeAddr)
 		})
 	}
@@ -2465,6 +2419,7 @@ func TestNFTWorkflow(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             eUpgrade,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2472,7 +2427,6 @@ func TestNFTWorkflow(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
-			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
 
 			fromAddrs, fromAddrsStr := sampleAddrs(t, env.vm.AddressManager, addrs)
@@ -2502,7 +2456,7 @@ func TestNFTWorkflow(t *testing.T) {
 				},
 			}
 			createReply := &AssetIDChangeAddr{}
-			require.NoError(service.CreateNFTAsset(nil, createArgs, createReply))
+			require.NoError(env.service.CreateNFTAsset(nil, createArgs, createReply))
 			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
 			buildAndAccept(require, env.vm, env.issuer, createReply.AssetID)
@@ -2515,7 +2469,7 @@ func TestNFTWorkflow(t *testing.T) {
 				require.NoError(err)
 
 				reply := &GetBalanceReply{}
-				require.NoError(service.GetBalance(nil,
+				require.NoError(env.service.GetBalance(nil,
 					&GetBalanceArgs{
 						Address: addrStr,
 						AssetID: env.vm.feeAssetID.String(),
@@ -2531,8 +2485,22 @@ func TestNFTWorkflow(t *testing.T) {
 				fromAddrsTotalBalance += balances[addr]
 			}
 
+			// retrieve tx fee
+			lastAcceptedBlkID := env.vm.chainManager.LastAccepted()
+			lastAcceptedBlk, err := env.vm.chainManager.GetStatelessBlock(lastAcceptedBlkID)
+			require.NoError(err)
+			txs := lastAcceptedBlk.Txs()
+			require.Len(txs, 1)
+			createAssetTx := txs[0]
+
+			feeCalc, err := state.PickFeeCalculator(&env.vm.Config, env.vm.parser.Codec(), env.vm.state, env.vm.state.GetTimestamp())
+			require.NoError(err)
+
+			expectedFee, err := feeCalc.CalculateFee(createAssetTx)
+			require.NoError(err)
+
 			fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
-			require.Equal(fromAddrsStartBalance-env.vm.TxFee, fromAddrsTotalBalance)
+			require.Equal(fromAddrsStartBalance-expectedFee, fromAddrsTotalBalance)
 
 			assetID := createReply.AssetID
 			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
@@ -2553,7 +2521,7 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 			mintReply := &api.JSONTxIDChangeAddr{}
 
-			require.NoError(service.MintNFT(nil, mintArgs, mintReply))
+			require.NoError(env.service.MintNFT(nil, mintArgs, mintReply))
 			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
 			// Accept the transaction so that we can send the newly minted NFT
@@ -2573,7 +2541,7 @@ func TestNFTWorkflow(t *testing.T) {
 				To:      addrStr,
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
-			require.NoError(service.SendNFT(nil, sendArgs, sendReply))
+			require.NoError(env.service.SendNFT(nil, sendArgs, sendReply))
 			require.Equal(fromAddrsStr[0], sendReply.ChangeAddr)
 		})
 	}
@@ -2588,7 +2556,6 @@ func TestImportExportKey(t *testing.T) {
 			password: password,
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	sk, err := secp256k1.NewPrivateKey()
@@ -2602,7 +2569,7 @@ func TestImportExportKey(t *testing.T) {
 		PrivateKey: sk,
 	}
 	importReply := &api.JSONAddress{}
-	require.NoError(service.ImportKey(nil, importArgs, importReply))
+	require.NoError(env.service.ImportKey(nil, importArgs, importReply))
 
 	addrStr, err := env.vm.FormatLocalAddress(sk.PublicKey().Address())
 	require.NoError(err)
@@ -2614,7 +2581,7 @@ func TestImportExportKey(t *testing.T) {
 		Address: addrStr,
 	}
 	exportReply := &ExportKeyReply{}
-	require.NoError(service.ExportKey(nil, exportArgs, exportReply))
+	require.NoError(env.service.ExportKey(nil, exportArgs, exportReply))
 	require.Equal(sk.Bytes(), exportReply.PrivateKey.Bytes())
 }
 
@@ -2627,7 +2594,6 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 			password: password,
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	sk, err := secp256k1.NewPrivateKey()
@@ -2640,7 +2606,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		PrivateKey: sk,
 	}
 	reply := api.JSONAddress{}
-	require.NoError(service.ImportKey(nil, &args, &reply))
+	require.NoError(env.service.ImportKey(nil, &args, &reply))
 
 	expectedAddress, err := env.vm.FormatLocalAddress(sk.PublicKey().Address())
 	require.NoError(err)
@@ -2648,7 +2614,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	require.Equal(expectedAddress, reply.Address)
 
 	reply2 := api.JSONAddress{}
-	require.NoError(service.ImportKey(nil, &args, &reply2))
+	require.NoError(env.service.ImportKey(nil, &args, &reply2))
 
 	require.Equal(expectedAddress, reply2.Address)
 
@@ -2657,7 +2623,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		Password: password,
 	}
 	addrsReply := api.JSONAddresses{}
-	require.NoError(service.ListAddresses(nil, &addrsArgs, &addrsReply))
+	require.NoError(env.service.ListAddresses(nil, &addrsArgs, &addrsReply))
 
 	require.Len(addrsReply.Addresses, 1)
 	require.Equal(expectedAddress, addrsReply.Addresses[0])
@@ -2673,7 +2639,6 @@ func TestSend(t *testing.T) {
 			initialKeys: keys,
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	assetID := env.genesisTx.ID()
@@ -2701,7 +2666,7 @@ func TestSend(t *testing.T) {
 		},
 	}
 	reply := &api.JSONTxIDChangeAddr{}
-	require.NoError(service.Send(nil, args, reply))
+	require.NoError(env.service.Send(nil, args, reply))
 	require.Equal(changeAddrStr, reply.ChangeAddr)
 
 	buildAndAccept(require, env.vm, env.issuer, reply.TxID)
@@ -2720,10 +2685,9 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					EUpgradeTime: mockable.MaxTime,
+					EUpgradeTime: time.Time{},
 				},
 			})
-			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
 
 			assetID := env.genesisTx.ID()
@@ -2758,7 +2722,7 @@ func TestSendMultiple(t *testing.T) {
 				},
 			}
 			reply := &api.JSONTxIDChangeAddr{}
-			require.NoError(service.SendMultiple(nil, args, reply))
+			require.NoError(env.service.SendMultiple(nil, args, reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
@@ -2775,7 +2739,6 @@ func TestCreateAndListAddresses(t *testing.T) {
 			password: password,
 		}},
 	})
-	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
 
 	createArgs := &api.UserPass{
@@ -2784,7 +2747,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	}
 	createReply := &api.JSONAddress{}
 
-	require.NoError(service.CreateAddress(nil, createArgs, createReply))
+	require.NoError(env.service.CreateAddress(nil, createArgs, createReply))
 
 	newAddr := createReply.Address
 
@@ -2794,7 +2757,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	}
 	listReply := &api.JSONAddresses{}
 
-	require.NoError(service.ListAddresses(nil, listArgs, listReply))
+	require.NoError(env.service.ListAddresses(nil, listArgs, listReply))
 	require.Contains(listReply.Addresses, newAddr)
 }
 
@@ -2811,7 +2774,6 @@ func TestImport(t *testing.T) {
 					initialKeys: keys,
 				}},
 			})
-			service := &Service{vm: env.vm}
 			env.vm.ctx.Lock.Unlock()
 
 			assetID := env.genesisTx.ID()
@@ -2856,7 +2818,7 @@ func TestImport(t *testing.T) {
 				To:          addrStr,
 			}
 			reply := &api.JSONTxID{}
-			require.NoError(service.Import(nil, args, reply))
+			require.NoError(env.service.Import(nil, args, reply))
 		})
 	}
 }

@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -213,6 +215,14 @@ type Client interface {
 		assetID string,
 		options ...rpc.Option,
 	) (ids.ID, error)
+
+	// GetTimestamp returns the current chain timestamp
+	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
+	// GetDynamicFeeConfig returns DynamicFeesConfig
+	GetDynamicFeeConfig(ctx context.Context, options ...rpc.Option) (commonfee.DynamicFeesConfig, error)
+	// GetNextGasData returns the gas price that a transaction must pay to be accepted now
+	// and the gas cap, i.e. the maximum gas a transactions can consume
+	GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error)
 }
 
 // implementation for an AVM client for interacting with avm [chain]
@@ -775,4 +785,22 @@ func AwaitTxAccepted(
 			return ctx.Err()
 		}
 	}
+}
+
+func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error) {
+	res := &GetTimestampReply{}
+	err := c.requester.SendRequest(ctx, "platform.getTimestamp", struct{}{}, res, options...)
+	return res.Timestamp, err
+}
+
+func (c *client) GetDynamicFeeConfig(ctx context.Context, options ...rpc.Option) (commonfee.DynamicFeesConfig, error) {
+	res := &DynamicFeesConfigReply{}
+	err := c.requester.SendRequest(ctx, "platform.getDynamicFeeConfig", struct{}{}, res, options...)
+	return res.DynamicFeesConfig, err
+}
+
+func (c *client) GetNextGasData(ctx context.Context, options ...rpc.Option) (commonfee.GasPrice, commonfee.Gas, error) {
+	res := &GetGasPriceReply{}
+	err := c.requester.SendRequest(ctx, "platform.getNextGasData", struct{}{}, res, options...)
+	return res.NextGasPrice, res.NextGasCap, err
 }

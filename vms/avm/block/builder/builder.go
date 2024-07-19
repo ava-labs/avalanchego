@@ -74,24 +74,27 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	}
 
 	preferredHeight := preferred.Height()
-	preferredTimestamp := preferred.Timestamp()
+	parentBlkTime := preferred.Timestamp()
 
 	nextHeight := preferredHeight + 1
-	nextTimestamp := b.clk.Time() // [timestamp] = max(now, parentTime)
-	if preferredTimestamp.After(nextTimestamp) {
-		nextTimestamp = preferredTimestamp
-	}
+	nextTimestamp := state.NextBlockTime(parentBlkTime, b.clk)
 
 	stateDiff, err := state.NewDiff(preferredID, b.manager)
 	if err != nil {
 		return nil, err
 	}
+	stateDiff.SetTimestamp(nextTimestamp)
 
 	var (
 		blockTxs      []*txs.Tx
 		inputs        set.Set[ids.ID]
 		remainingSize = targetBlockSize
 	)
+	feeCalculator, err := state.PickFeeCalculator(b.backend.Config, b.backend.Codec, stateDiff, parentBlkTime)
+	if err != nil {
+		return nil, err
+	}
+
 	for {
 		tx, exists := b.mempool.Peek()
 		// Invariant: [mempool.MaxTxSize] < [targetBlockSize]. This guarantees
@@ -111,9 +114,10 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		}
 
 		err = tx.Unsigned.Visit(&txexecutor.SemanticVerifier{
-			Backend: b.backend,
-			State:   txDiff,
-			Tx:      tx,
+			Backend:       b.backend,
+			FeeCalculator: feeCalculator,
+			State:         txDiff,
+			Tx:            tx,
 		})
 		if err != nil {
 			txID := tx.ID()

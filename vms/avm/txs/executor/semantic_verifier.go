@@ -27,8 +27,9 @@ var (
 
 type SemanticVerifier struct {
 	*Backend
-	State state.ReadOnlyChain
-	Tx    *txs.Tx
+	FeeCalculator fee.Calculator
+	State         state.ReadOnlyChain
+	Tx            *txs.Tx
 }
 
 func (v *SemanticVerifier) BaseTx(tx *txs.BaseTx) error {
@@ -131,8 +132,7 @@ func (v *SemanticVerifier) verifyBaseTx(
 	importedIns []*avax.TransferableInput,
 	exportedOuts []*avax.TransferableOutput,
 ) error {
-	feeCalculator := fee.NewStaticCalculator(v.Backend.Config.StaticConfig)
-	fee, err := feeCalculator.CalculateFee(&txs.Tx{Unsigned: tx})
+	fee, err := v.FeeCalculator.CalculateFee(v.Tx)
 	if err != nil {
 		return err
 	}

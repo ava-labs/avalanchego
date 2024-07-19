@@ -48,7 +48,8 @@ func TestVerifyFxUsage(t *testing.T) {
 	}
 
 	// Create the asset
-	createAssetTx, err := env.txBuilder.CreateAssetTx(
+	createAssetTx, _, err := buildCreateAssetTx(
+		env.service.txBuilderBackend,
 		"Team Rocket", // name
 		"TR",          // symbol
 		0,             // denomination
@@ -60,7 +61,8 @@ func TestVerifyFxUsage(t *testing.T) {
 	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	// Mint the NFT
-	mintNFTTx, err := env.txBuilder.MintNFT(
+	mintNFTTx, err := mintNFT(
+		env.service.txBuilderBackend,
 		createAssetTx.ID(),
 		[]byte{'h', 'e', 'l', 'l', 'o'}, // payload
 		[]*secp256k1fx.OutputOwners{{
@@ -75,7 +77,8 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	// move the NFT
 	to := keys[2].PublicKey().Address()
-	spendTx, err := env.txBuilder.BaseTx(
+	spendTx, _, err := buildBaseTx(
+		env.service.txBuilderBackend,
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: createAssetTx.ID()},
 			Out: &secp256k1fx.TransferOutput{

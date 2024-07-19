@@ -27,17 +27,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
@@ -47,10 +48,10 @@ const (
 	durango fork = iota
 	eUpgrade
 
-	latest = durango
+	latest = eUpgrade
 
-	testTxFee    uint64 = 1000
-	startBalance uint64 = 50000
+	testTxFee    uint64 = units.MilliAvax
+	startBalance uint64 = 1000 * units.MilliAvax
 
 	username       = "bobby"
 	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
@@ -78,6 +79,13 @@ var (
 
 	keys  = secp256k1.TestKeys()[:3] // TODO: Remove [:3]
 	addrs []ids.ShortID              // addrs[i] corresponds to keys[i]
+
+	testFeesCfg = commonfee.DynamicFeesConfig{
+		GasPrice:            commonfee.GasPrice(10),
+		FeeDimensionWeights: commonfee.Dimensions{1, 1, 1, 1},
+		MaxGasPerSecond:     commonfee.Gas(1_000_000),
+		LeakGasCoeff:        commonfee.Gas(10),
+	}
 )
 
 func init() {
@@ -109,8 +117,10 @@ type environment struct {
 	genesisTx    *txs.Tx
 	sharedMemory *atomic.Memory
 	issuer       chan common.Message
-	vm           *VM
-	txBuilder    *txstest.Builder
+
+	vm            *VM
+	service       *Service
+	walletService *WalletService
 }
 
 // setup the testing environment
@@ -164,6 +174,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vmDynamicConfig := DefaultConfig
+	vmDynamicConfig.DynamicFeesConfig = &testFeesCfg
 	vmDynamicConfig.IndexTransactions = true
 	if c.vmDynamicConfig != nil {
 		vmDynamicConfig = *c.vmDynamicConfig
@@ -204,7 +215,21 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
-		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
+		service: &Service{
+			vm: vm,
+			txBuilderBackend: newServiceBackend(
+				vm.feeAssetID,
+				vm.ctx,
+				&vm.Config,
+				vm.state,
+				vm.ctx.SharedMemory,
+				vm.parser.Codec(),
+				&vm.clock,
+			),
+		},
+		walletService: &WalletService{
+			walletServiceBackend: NewWalletServiceBackend(vm),
+		},
 	}
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))

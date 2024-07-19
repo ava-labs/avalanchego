@@ -18,12 +18,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
+	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -50,6 +54,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xBuilder := xWallet.Builder()
 			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
+			xChainClient := avm.NewClient(nodeURI.URI, "X")
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			minValStake, minDelStake, err := pChainClient.GetMinStake(e2e.DefaultContext(), constants.PlatformChainID)
@@ -57,12 +62,16 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
 			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
-			tests.Outf("{{blue}} fetching tx fee {{/}}\n")
+			tests.Outf("{{blue}} fetching X-chain tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
-			fees, err := infoClient.GetTxFee(e2e.DefaultContext())
+			staticFees, err := infoClient.GetTxFee(e2e.DefaultContext())
 			require.NoError(err)
-			txFees := uint64(fees.TxFee)
-			tests.Outf("{{green}} txFee: %d {{/}}\n", txFees)
+			pChainTxFees := uint64(staticFees.TxFee)
+			tests.Outf("{{green}} P-chain TxFee: %d {{/}}\n", pChainTxFees)
+
+			feeCfg, err := xChainClient.GetDynamicFeeConfig(e2e.DefaultContext())
+			require.NoError(err)
+			tests.Outf("{{green}} fee config: %v {{/}}\n", feeCfg)
 
 			// amount to transfer from P to X chain
 			toTransfer := 1 * units.Avax
@@ -72,7 +81,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			ginkgo.By("check selected keys have sufficient funds", func() {
 				pBalances, err := pWallet.Builder().GetBalance()
 				pBalance := pBalances[avaxAssetID]
-				minBalance := minValStake + txFees + minDelStake + txFees + toTransfer + txFees
+				minBalance := minValStake + pChainTxFees + minDelStake + pChainTxFees + toTransfer + pChainTxFees
 				require.NoError(err)
 				require.GreaterOrEqual(pBalance, minBalance)
 			})
@@ -173,14 +182,24 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			tests.Outf("{{blue}} X-chain balance after P->X export: %d {{/}}\n", xPreImportBalance)
 
 			require.Equal(xPreImportBalance, xStartBalance) // import not performed yet
-			require.Equal(pPreImportBalance, pStartBalance-toTransfer-txFees)
+			require.Equal(pPreImportBalance, pStartBalance-toTransfer-pChainTxFees)
 
+			xChainExportFee := uint64(0)
 			ginkgo.By("import avax from P into X chain", func() {
-				_, err := xWallet.IssueImportTx(
+				nextGasPrice, nextGasCap, err := xChainClient.GetNextGasData(e2e.DefaultContext())
+				require.NoError(err)
+
+				tx, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					&outputOwner,
 					e2e.WithDefaultContext(),
 				)
+				require.NoError(err)
+
+				// retrieve fee paid for the tx
+				commonCalc := commonfee.NewCalculator(feeCfg.FeeDimensionWeights, nextGasPrice, nextGasCap)
+				feeCalc := fee.NewDynamicCalculator(commonCalc, xbuilder.Parser.Codec())
+				xChainExportFee, err = feeCalc.CalculateFee(tx)
 				require.NoError(err)
 			})
 
@@ -195,7 +214,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xFinalBalance := xBalances[avaxAssetID]
 			tests.Outf("{{blue}} X-chain balance after P->X import: %d {{/}}\n", xFinalBalance)
 
-			require.Equal(xFinalBalance, xPreImportBalance+toTransfer-txFees) // import not performed yet
+			require.Equal(xFinalBalance, xPreImportBalance+toTransfer-xChainExportFee) // import not performed yet
 			require.Equal(pFinalBalance, pPreImportBalance)
 		})
 })

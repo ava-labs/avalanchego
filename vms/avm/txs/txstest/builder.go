@@ -10,9 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -24,12 +26,18 @@ import (
 type Builder struct {
 	utxos *utxos
 	ctx   *builder.Context
+
+	chain state.State
+	cfg   *config.Config
+	codec codec.Manager
+	clk   *mockable.Clock
 }
 
 func New(
 	codec codec.Manager,
 	ctx *snow.Context,
 	cfg *config.Config,
+	clk *mockable.Clock,
 	feeAssetID ids.ID,
 	state state.State,
 ) *Builder {
@@ -37,6 +45,11 @@ func New(
 	return &Builder{
 		utxos: utxos,
 		ctx:   newContext(ctx, cfg, feeAssetID),
+
+		chain: state,
+		cfg:   cfg,
+		codec: codec,
+		clk:   clk,
 	}
 }
 
@@ -48,12 +61,17 @@ func (b *Builder) CreateAssetTx(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	utx, err := xBuilder.NewCreateAssetTx(
 		name,
 		symbol,
 		denomination,
 		initialStates,
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -73,9 +91,14 @@ func (b *Builder) BaseTx(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	utx, err := xBuilder.NewBaseTx(
 		outs,
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -97,11 +120,16 @@ func (b *Builder) MintNFT(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	utx, err := xBuilder.NewOperationTxMintNFT(
 		assetID,
 		payload,
 		owners,
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -120,9 +148,14 @@ func (b *Builder) MintFTs(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	utx, err := xBuilder.NewOperationTxMintFT(
 		outputs,
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -141,9 +174,14 @@ func (b *Builder) Operation(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	utx, err := xBuilder.NewOperationTx(
 		ops,
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -162,6 +200,10 @@ func (b *Builder) ImportTx(
 	kc *secp256k1fx.Keychain,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	outOwner := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -172,6 +214,7 @@ func (b *Builder) ImportTx(
 	utx, err := xBuilder.NewImportTx(
 		sourceChain,
 		outOwner,
+		feeCalc,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed building import tx: %w", err)
@@ -189,6 +232,10 @@ func (b *Builder) ExportTx(
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	xBuilder, xSigner := b.builders(kc)
+	feeCalc, err := b.feeCalculator()
+	if err != nil {
+		return nil, err
+	}
 
 	outputs := []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: exportedAssetID},
@@ -205,6 +252,7 @@ func (b *Builder) ExportTx(
 	utx, err := xBuilder.NewExportTx(
 		destinationChain,
 		outputs,
+		feeCalc,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{changeAddr},
@@ -228,4 +276,20 @@ func (b *Builder) builders(kc *secp256k1fx.Keychain) (builder.Builder, signer.Si
 		signer  = signer.New(kc, wa)
 	)
 	return builder, signer
+}
+
+func (b *Builder) feeCalculator() (fee.Calculator, error) {
+	var (
+		chain         = b.chain
+		parentBlkTime = chain.GetTimestamp()
+		nextBlkTime   = state.NextBlockTime(parentBlkTime, b.clk)
+	)
+
+	diff, err := state.NewDiffOn(chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed building diff: %w", err)
+	}
+	diff.SetTimestamp(nextBlkTime)
+
+	return state.PickBuildingFeeCalculator(b.cfg, b.codec, chain, parentBlkTime)
 }

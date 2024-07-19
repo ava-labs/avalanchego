@@ -13,13 +13,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	stdcontext "context"
+	commonfee "github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 var (
@@ -39,29 +45,32 @@ var (
 		BaseTxFee:        units.MicroAvax,
 		CreateAssetTxFee: 99 * units.MilliAvax,
 	}
+	testStaticConfig = staticFeesConfigFromContext(testContext)
+
+	testFeeWeights  = commonfee.Dimensions{1, 1, 1, 1}
+	testGasPrice    = commonfee.GasPrice(10 * units.MicroAvax)
+	testBlockMaxGas = commonfee.Gas(100_000)
 )
 
 // These tests create and sign a tx, then verify that utxos included
-// in the tx are exactly necessary to pay fees for it
+// in the tx are exactly necessary to pay fee for it
 
 func TestBaseTx(t *testing.T) {
 	var (
 		require = require.New(t)
-
 		// backend
-		utxosKey       = testKeys[1]
-		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
-			require,
-			map[ids.ID][]*avax.UTXO{
-				xChainID: utxos,
-			},
-		)
-		backend = NewBackend(testContext, genericBackend)
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			xChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, backend)
 
 		// data to build the transaction
 		outputsToMove = []*avax.TransferableOutput{{
@@ -76,21 +85,66 @@ func TestBaseTx(t *testing.T) {
 		}}
 	)
 
-	utx, err := builder.NewBaseTx(
-		outputsToMove,
-	)
-	require.NoError(err)
+	{ // Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewBaseTx(
+			outputsToMove,
+			feeCalc,
+		)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 2)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount() - outs[1].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
-	require.Equal(outputsToMove[0], outs[1])
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(buildGas, verifyGas)
+		require.Equal(3_060*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 2)
+		require.Len(outs, 2)
+
+		expectedConsumed := fee + outputsToMove[0].Out.Amount()
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+		require.Equal(outputsToMove[0], outs[1])
+	}
+
+	{ // Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+		utx, err := b.NewBaseTx(
+			outputsToMove,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 2)
+		require.Len(outs, 2)
+
+		expectedConsumed := fee + outputsToMove[0].Out.Amount()
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+		require.Equal(outputsToMove[0], outs[1])
+	}
 }
 
 func TestCreateAssetTx(t *testing.T) {
@@ -108,9 +162,11 @@ func TestCreateAssetTx(t *testing.T) {
 		)
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		assetName          = "Team Rocket"
@@ -163,23 +219,71 @@ func TestCreateAssetTx(t *testing.T) {
 		}
 	)
 
-	utx, err := builder.NewCreateAssetTx(
-		assetName,
-		symbol,
-		denomination,
-		initialState,
-	)
-	require.NoError(err)
+	{
+		// Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewCreateAssetTx(
+			assetName,
+			symbol,
+			denomination,
+			initialState,
+			feeCalc,
+		)
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	expectedConsumed := testContext.CreateAssetTxFee
-	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1850*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
+
+	{
+		// Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+		utx, err := b.NewCreateAssetTx(
+			assetName,
+			symbol,
+			denomination,
+			initialState,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(99*units.MilliAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
 }
 
 func TestMintNFTOperation(t *testing.T) {
@@ -197,9 +301,11 @@ func TestMintNFTOperation(t *testing.T) {
 		)
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		payload  = []byte{'h', 'e', 'l', 'l', 'o'}
@@ -209,22 +315,72 @@ func TestMintNFTOperation(t *testing.T) {
 		}
 	)
 
-	utx, err := builder.NewOperationTxMintNFT(
-		nftAssetID,
-		payload,
-		[]*secp256k1fx.OutputOwners{NFTOwner},
-	)
-	require.NoError(err)
+	{
+		// Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewOperationTxMintNFT(
+			nftAssetID,
+			payload,
+			[]*secp256k1fx.OutputOwners{NFTOwner},
+			feeCalc,
+		)
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1770*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
+
+	{
+		// Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+
+		utx, err := b.NewOperationTxMintNFT(
+			nftAssetID,
+			payload,
+			[]*secp256k1fx.OutputOwners{NFTOwner},
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
 }
 
 func TestMintFTOperation(t *testing.T) {
@@ -242,9 +398,11 @@ func TestMintFTOperation(t *testing.T) {
 		)
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		outputs = map[ids.ID]*secp256k1fx.TransferOutput{
@@ -258,20 +416,67 @@ func TestMintFTOperation(t *testing.T) {
 		}
 	)
 
-	utx, err := builder.NewOperationTxMintFT(
-		outputs,
-	)
-	require.NoError(err)
+	{
+		// Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewOperationTxMintFT(
+			outputs,
+			feeCalc,
+		)
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1800*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
+
+	{
+		// Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+		utx, err := b.NewOperationTxMintFT(
+			outputs,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := testContext.BaseTxFee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
 }
 
 func TestMintPropertyOperation(t *testing.T) {
@@ -289,9 +494,11 @@ func TestMintPropertyOperation(t *testing.T) {
 		)
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		propertyOwner = &secp256k1fx.OutputOwners{
@@ -300,21 +507,70 @@ func TestMintPropertyOperation(t *testing.T) {
 		}
 	)
 
-	utx, err := builder.NewOperationTxMintProperty(
-		propertyAssetID,
-		propertyOwner,
-	)
-	require.NoError(err)
+	{
+		// Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewOperationTxMintProperty(
+			propertyAssetID,
+			propertyOwner,
+			feeCalc,
+		)
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1790*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
+
+	{
+		// Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+
+		utx, err := b.NewOperationTxMintProperty(
+			propertyAssetID,
+			propertyOwner,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
 }
 
 func TestBurnPropertyOperation(t *testing.T) {
@@ -332,25 +588,75 @@ func TestBurnPropertyOperation(t *testing.T) {
 		)
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 	)
 
-	utx, err := builder.NewOperationTxBurnProperty(
-		propertyAssetID,
-	)
-	require.NoError(err)
+	{
+		// Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewOperationTxBurnProperty(
+			propertyAssetID,
+			feeCalc,
+		)
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1720*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
+
+	{
+		// Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+
+		utx, err := b.NewOperationTxBurnProperty(
+			propertyAssetID,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := ins[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
 }
 
 func TestImportTx(t *testing.T) {
@@ -372,9 +678,11 @@ func TestImportTx(t *testing.T) {
 
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		importKey = testKeys[0]
@@ -386,23 +694,71 @@ func TestImportTx(t *testing.T) {
 		}
 	)
 
-	utx, err := builder.NewImportTx(
-		sourceChainID,
-		importTo,
-	)
-	require.NoError(err)
+	{ // Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewImportTx(
+			sourceChainID,
+			importTo,
+			feeCalc,
+		)
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	importedIns := utx.ImportedIns
-	require.Empty(ins)
-	require.Len(importedIns, 1)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(1590*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		importedIns := utx.ImportedIns
+		require.Zero(ins)
+		require.Len(importedIns, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
+
+	{ // Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+		utx, err := b.NewImportTx(
+			sourceChainID,
+			importTo,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		importedIns := utx.ImportedIns
+		require.Empty(ins)
+		require.Len(importedIns, 1)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee
+		consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+	}
 }
 
 func TestExportTx(t *testing.T) {
@@ -420,9 +776,11 @@ func TestExportTx(t *testing.T) {
 		)
 		backend = NewBackend(testContext, genericBackend)
 
-		// builder
+		// builder and signer
 		utxoAddr = utxosKey.Address()
-		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
+		b        = builder.New(set.Of(utxoAddr), testContext, backend)
+		kc       = secp256k1fx.NewKeychain(utxosKey)
+		s        = signer.New(kc, genericBackend)
 
 		// data to build the transaction
 		subnetID        = ids.GenerateTestID()
@@ -438,22 +796,69 @@ func TestExportTx(t *testing.T) {
 		}}
 	)
 
-	utx, err := builder.NewExportTx(
-		subnetID,
-		exportedOutputs,
-	)
-	require.NoError(err)
+	{ // Post E-Upgrade
+		buildCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		feeCalc := fee.NewBuildingDynamicCalculator(buildCalc, builder.Parser.Codec())
+		utx, err := b.NewExportTx(
+			subnetID,
+			exportedOutputs,
+			feeCalc,
+		)
+		require.NoError(err)
+		buildGas, err := buildCalc.GetBlockGas()
+		require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 1)
+		tx, err := signer.SignUnsigned(stdcontext.Background(), s, utx)
+		require.NoError(err)
 
-	expectedConsumed := testContext.BaseTxFee + exportedOutputs[0].Out.Amount()
-	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
-	require.Equal(utx.ExportedOuts, exportedOutputs)
+		verifyCalc := commonfee.NewCalculator(testFeeWeights, testGasPrice, testBlockMaxGas)
+		fc := fee.NewDynamicCalculator(verifyCalc, builder.Parser.Codec())
+		fee, err := fc.CalculateFee(tx)
+		require.NoError(err)
+		verifyGas, err := verifyCalc.GetBlockGas()
+		require.NoError(err)
+
+		require.Equal(verifyGas, buildGas)
+		require.Equal(3090*units.MicroAvax, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 2)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+		require.Equal(utx.ExportedOuts, exportedOutputs)
+	}
+
+	{ // Pre E-Upgrade
+		feeCalc := fee.NewStaticCalculator(testStaticConfig)
+		utx, err := b.NewExportTx(
+			subnetID,
+			exportedOutputs,
+			feeCalc,
+		)
+		require.NoError(err)
+
+		fc := fee.NewStaticCalculator(testStaticConfig)
+		fee, err := fc.CalculateFee(&txs.Tx{Unsigned: utx, Creds: nil})
+		require.NoError(err)
+		require.NoError(err)
+		require.Equal(testContext.BaseTxFee, fee)
+
+		// check UTXOs selection and fee financing
+		ins := utx.Ins
+		outs := utx.Outs
+		require.Len(ins, 2)
+		require.Len(outs, 1)
+
+		expectedConsumed := fee + exportedOutputs[0].Out.Amount()
+		consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
+		require.Equal(expectedConsumed, consumed)
+		require.Equal(utx.ExportedOuts, exportedOutputs)
+	}
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
@@ -462,7 +867,7 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	const utxosOffset uint64 = 2024
 
 	return []*avax.UTXO{ // currently, the wallet scans UTXOs in the order provided here
-		{ // a small UTXO first, which should not be enough to pay fees
+		{ // a small UTXO first, which should not be enough to pay fee
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty.Prefix(utxosOffset),
 				OutputIndex: uint32(utxosOffset),
