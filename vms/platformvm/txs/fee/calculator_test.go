@@ -148,7 +148,7 @@ func TestTxFees(t *testing.T) {
 		{
 			name:       "BaseTx pre EUpgrade",
 			chainTime:  preEUpgradeTime,
-			unsignedTx: baseTxT,
+			unsignedTx: baseTx,
 			expected:   feeTestsDefaultCfg.TxFee,
 		},
 		{
@@ -240,7 +240,7 @@ func addPermissionlessDelegatorTx(subnetID ids.ID) txs.UnsignedTx {
 	}
 }
 
-func baseTxT() txs.UnsignedTx {
+func baseTx() txs.UnsignedTx {
 	return &txs.BaseTx{}
 }
 
