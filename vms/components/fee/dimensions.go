@@ -23,7 +23,7 @@ func (d Dimensions) Add(os ...Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
 		for i := range o {
-			d[i], err = math.Add64(d[i], o[i])
+			d[i], err = math.Add(d[i], o[i])
 			if err != nil {
 				return d, err
 			}
@@ -48,11 +48,11 @@ func (d Dimensions) Sub(os ...Dimensions) (Dimensions, error) {
 func (d Dimensions) ToGas(weights Dimensions) (Gas, error) {
 	var res uint64
 	for i := range d {
-		v, err := math.Mul64(d[i], weights[i])
+		v, err := math.Mul(d[i], weights[i])
 		if err != nil {
 			return 0, err
 		}
-		res, err = math.Add64(res, v)
+		res, err = math.Add(res, v)
 		if err != nil {
 			return 0, err
 		}
