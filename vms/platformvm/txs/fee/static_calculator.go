@@ -39,7 +39,7 @@ type staticCalculator struct {
 }
 
 func (c *staticCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
-	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
+	c.fee = 0 // zero fee among different calculateFee invocations
 	err := tx.Unsigned.Visit(c)
 	return c.fee, err
 }

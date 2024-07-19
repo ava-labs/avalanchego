@@ -5,6 +5,7 @@ package fee
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -138,6 +139,12 @@ func TestTxComplexity(t *testing.T) {
 
 			tx, err := txs.Parse(txs.Codec, txBytes)
 			require.NoError(err)
+
+			// If the test fails, logging the transaction can be helpful for
+			// debugging.
+			txJSON, err := json.MarshalIndent(tx, "", "\t")
+			require.NoError(err)
+			t.Log(string(txJSON))
 
 			actual, err := TxComplexity(tx.Unsigned)
 			require.NoError(err)
