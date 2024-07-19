@@ -129,11 +129,8 @@ func Test_State_ConsumeGas(t *testing.T) {
 				Capacity: 10,
 				Excess:   10,
 			},
-			gas: 11,
-			expected: State{
-				Capacity: 0,
-				Excess:   0,
-			},
+			gas:         11,
+			expected:    State{},
 			expectedErr: ErrInsufficientCapacity,
 		},
 		{

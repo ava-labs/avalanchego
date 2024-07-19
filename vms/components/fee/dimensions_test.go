@@ -99,6 +99,54 @@ func Test_Dimensions_Add(t *testing.T) {
 			expectedErr: safemath.ErrOverflow,
 		},
 		{
+			name: "db read overflow",
+			lhs: Dimensions{
+				Bandwidth: 1,
+				DBRead:    math.MaxUint64,
+				DBWrite:   3,
+				Compute:   4,
+			},
+			rhs: []Dimensions{
+				{
+					Bandwidth: 10,
+					DBRead:    20,
+					DBWrite:   30,
+					Compute:   40,
+				},
+			},
+			expected: Dimensions{
+				Bandwidth: 11,
+				DBRead:    0,
+				DBWrite:   3,
+				Compute:   4,
+			},
+			expectedErr: safemath.ErrOverflow,
+		},
+		{
+			name: "db write overflow",
+			lhs: Dimensions{
+				Bandwidth: 1,
+				DBRead:    2,
+				DBWrite:   math.MaxUint64,
+				Compute:   4,
+			},
+			rhs: []Dimensions{
+				{
+					Bandwidth: 10,
+					DBRead:    20,
+					DBWrite:   30,
+					Compute:   40,
+				},
+			},
+			expected: Dimensions{
+				Bandwidth: 11,
+				DBRead:    22,
+				DBWrite:   0,
+				Compute:   4,
+			},
+			expectedErr: safemath.ErrOverflow,
+		},
+		{
 			name: "compute overflow",
 			lhs: Dimensions{
 				Bandwidth: 1,
@@ -216,6 +264,54 @@ func Test_Dimensions_Sub(t *testing.T) {
 				Bandwidth: 0,
 				DBRead:    22,
 				DBWrite:   33,
+				Compute:   44,
+			},
+			expectedErr: safemath.ErrUnderflow,
+		},
+		{
+			name: "db read underflow",
+			lhs: Dimensions{
+				Bandwidth: 11,
+				DBRead:    22,
+				DBWrite:   33,
+				Compute:   44,
+			},
+			rhs: []Dimensions{
+				{
+					Bandwidth: 1,
+					DBRead:    math.MaxUint64,
+					DBWrite:   3,
+					Compute:   4,
+				},
+			},
+			expected: Dimensions{
+				Bandwidth: 10,
+				DBRead:    0,
+				DBWrite:   33,
+				Compute:   44,
+			},
+			expectedErr: safemath.ErrUnderflow,
+		},
+		{
+			name: "db write underflow",
+			lhs: Dimensions{
+				Bandwidth: 11,
+				DBRead:    22,
+				DBWrite:   33,
+				Compute:   44,
+			},
+			rhs: []Dimensions{
+				{
+					Bandwidth: 1,
+					DBRead:    2,
+					DBWrite:   math.MaxUint64,
+					Compute:   4,
+				},
+			},
+			expected: Dimensions{
+				Bandwidth: 10,
+				DBRead:    20,
+				DBWrite:   0,
 				Compute:   44,
 			},
 			expectedErr: safemath.ErrUnderflow,

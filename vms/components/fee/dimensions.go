@@ -19,6 +19,9 @@ type (
 	Dimensions [NumDimensions]uint64
 )
 
+// Add returns d + sum(os...).
+//
+// If overflow occurs, an error is returned.
 func (d Dimensions) Add(os ...Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
@@ -32,6 +35,9 @@ func (d Dimensions) Add(os ...Dimensions) (Dimensions, error) {
 	return d, nil
 }
 
+// Sub returns d - sum(os...).
+//
+// If underflow occurs, an error is returned.
 func (d Dimensions) Sub(os ...Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
@@ -45,6 +51,9 @@ func (d Dimensions) Sub(os ...Dimensions) (Dimensions, error) {
 	return d, nil
 }
 
+// ToGas returns d · weights.
+//
+// If overflow occurs, an error is returned.
 func (d Dimensions) ToGas(weights Dimensions) (Gas, error) {
 	var res uint64
 	for i := range d {
