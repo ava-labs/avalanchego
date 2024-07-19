@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -51,12 +52,17 @@ const (
 	intrinsicStakeableLockedInputBandwidth = wrappers.LongLen + // locktime
 		wrappers.IntLen // input typeID
 
-	intrinsicSECP256k1FxInputBandwidth = wrappers.LongLen + // amount
-		wrappers.IntLen + // num indices
+	intrinsicSECP256k1FxInputBandwidth = wrappers.IntLen + // num indices
 		wrappers.IntLen // num signatures
+
+	intrinsicSECP256k1FxTransferableInputBandwidth = wrappers.LongLen + // amount
+		intrinsicSECP256k1FxInputBandwidth
 
 	intrinsicSECP256k1FxSignatureBandwidth = wrappers.IntLen + // signature index
 		secp256k1.SignatureLen // signature length
+
+	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
+		bls.SignatureLen // signature
 )
 
 var (
@@ -71,27 +77,27 @@ var (
 			wrappers.IntLen + // validator rewards typeID
 			wrappers.IntLen + // delegator rewards typeID
 			wrappers.IntLen, // delegation shares
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
+		fee.DBRead:  1,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 	IntrinsicAddPermissionlessDelegatorTxComplexities = fee.Dimensions{
 		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
 			intrinsicValidatorBandwidth + // validator
 			ids.IDLen + // subnetID
-			wrappers.IntLen + // signer typeID
 			wrappers.IntLen + // num stake outs
 			wrappers.IntLen, // delegator rewards typeID
-		fee.DBRead:  0,
+		fee.DBRead:  1,
 		fee.DBWrite: 0,
 		fee.Compute: 0,
 	}
 	IntrinsicAddSubnetValidatorTxComplexities = fee.Dimensions{
 		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
 			intrinsicSubnetValidatorBandwidth + // subnetValidator
-			wrappers.IntLen, // subnetAuth typeID
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		fee.DBRead:  2,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 	IntrinsicBaseTxComplexities = fee.Dimensions{
@@ -114,16 +120,17 @@ var (
 			ids.IDLen + // vmID
 			wrappers.IntLen + // num fxIDs
 			wrappers.IntLen + // genesis length
-			wrappers.IntLen, // subnetAuth typeID
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		fee.DBRead:  1,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 	IntrinsicCreateSubnetTxComplexities = fee.Dimensions{
 		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
 			wrappers.IntLen, // owner typeID
 		fee.DBRead:  0,
-		fee.DBWrite: 0,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 	IntrinsicExportTxComplexities = fee.Dimensions{
@@ -146,18 +153,20 @@ var (
 		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
 			ids.NodeIDLen + // nodeID
 			ids.IDLen + // subnetID
-			wrappers.IntLen, // subnetAuth typeID
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		fee.DBRead:  2,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 	IntrinsicTransferSubnetOwnershipTxComplexities = fee.Dimensions{
 		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // subnetAuth typeID
-			wrappers.IntLen, // owner typeID
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
+			wrappers.IntLen + // owner typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		fee.DBRead:  1,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 
@@ -165,6 +174,8 @@ var (
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
+	errUnsupportedAuth   = errors.New("unsupported auth type")
+	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
 func TxComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
@@ -201,11 +212,11 @@ func OutputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
 	return complexity, err
 }
 
-// InputComplexity returns the complexity an input adds to a transaction. It
-// includes the complexity that the corresponding credential will add.
+// InputComplexity returns the complexity an input adds to a transaction.
+// It includes the complexity that the corresponding credential will add.
 func InputComplexity(in *avax.TransferableInput) (fee.Dimensions, error) {
 	complexity := fee.Dimensions{
-		fee.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxInputBandwidth,
+		fee.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
 		fee.DBRead:    1,
 		fee.DBWrite:   1,
 		fee.Compute:   0, // TODO
@@ -239,35 +250,70 @@ func OwnerComplexity(ownerIntf fx.Owner) (fee.Dimensions, error) {
 		return fee.Dimensions{}, errUnsupportedOwner
 	}
 
+	numAddresses := uint64(len(owner.Addrs))
+	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
+	if err != nil {
+		return fee.Dimensions{}, err
+	}
+
+	bandwidth, err := math.Add(addressBandwidth, intrinsicSECP256k1FxOutputOwnersBandwidth)
+	if err != nil {
+		return fee.Dimensions{}, err
+	}
+
 	return fee.Dimensions{
-		fee.Bandwidth: intrinsicSECP256k1FxOutputOwnersBandwidth, // TODO
+		fee.Bandwidth: bandwidth,
 		fee.DBRead:    0,
-		fee.DBWrite:   1,
-		fee.Compute:   0, // TODO
+		fee.DBWrite:   0,
+		fee.Compute:   0,
 	}, nil
 }
 
 // AuthComplexity returns the complexity an authorization adds to a transaction.
 // It does not include the typeID of the authorization.
 // It does includes the complexity that the corresponding credential will add.
-func AuthComplexity(_ verify.Verifiable) (fee.Dimensions, error) {
+// It does not include the typeID of the credential.
+func AuthComplexity(authIntf verify.Verifiable) (fee.Dimensions, error) {
+	auth, ok := authIntf.(*secp256k1fx.Input)
+	if !ok {
+		return fee.Dimensions{}, errUnsupportedAuth
+	}
+
+	numSignatures := uint64(len(auth.SigIndices))
+	signatureBandwidth, err := math.Mul(numSignatures, intrinsicSECP256k1FxSignatureBandwidth)
+	if err != nil {
+		return fee.Dimensions{}, err
+	}
+
+	bandwidth, err := math.Add(signatureBandwidth, intrinsicSECP256k1FxInputBandwidth)
+	if err != nil {
+		return fee.Dimensions{}, err
+	}
+
 	return fee.Dimensions{
-		fee.Bandwidth: 0, // TODO
-		fee.DBRead:    1,
+		fee.Bandwidth: bandwidth,
+		fee.DBRead:    0,
 		fee.DBWrite:   0,
-		fee.Compute:   0, // TODO
+		fee.Compute:   0,
 	}, nil
 }
 
 // SignerComplexity returns the complexity a signer adds to a transaction.
 // It does not include the typeID of the signer.
-func SignerComplexity(_ signer.Signer) (fee.Dimensions, error) {
-	return fee.Dimensions{
-		fee.Bandwidth: 0, // TODO
-		fee.DBRead:    0,
-		fee.DBWrite:   0,
-		fee.Compute:   0, // TODO
-	}, nil
+func SignerComplexity(s signer.Signer) (fee.Dimensions, error) {
+	switch s.(type) {
+	case *signer.Empty:
+		return fee.Dimensions{}, nil
+	case *signer.ProofOfPossession:
+		return fee.Dimensions{
+			fee.Bandwidth: intrinsicPoPBandwidth,
+			fee.DBRead:    0,
+			fee.DBWrite:   0,
+			fee.Compute:   0,
+		}, nil
+	default:
+		return fee.Dimensions{}, errUnsupportedSigner
+	}
 }
 
 type complexityCalculator struct {
