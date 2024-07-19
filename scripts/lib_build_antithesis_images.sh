@@ -34,7 +34,7 @@ function build_antithesis_images {
   local image_prefix=$2
   local base_image_name=$3
   local image_tag=$4
-  local builder_image_name=$5
+  local node_image_tag=$5
   local base_dockerfile=$6
   local uninstrumented_node_dockerfile=$7
   local target_path=$8
@@ -63,16 +63,9 @@ function build_antithesis_images {
   # Define default build command
   local docker_cmd="docker buildx build\
  --build-arg GO_VERSION=${go_version}\
- --build-arg NODE_IMAGE=${node_image_name}\
- --build-arg BUILDER_IMAGE=${builder_image_name}\
+ --build-arg BUILDER_IMAGE_TAG=${image_tag}\
  --build-arg BUILDER_WORKDIR=${builder_workdir}\
- --build-arg TAG=${image_tag}"
-
-  if [[ "${base_image_name}" != *"antithesis_avalanchego" ]]; then
-    # A VM node image is built on the avalanchego node image, which is assumed to have already been
-    # built. The image name doesn't include the image prefix because it is not intended to be pushed.
-    docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${image_tag}"
-  fi
+ --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${node_image_tag}"
 
   if [[ -n "${image_prefix}" && -z "${node_only}" ]]; then
     # Push images with an image prefix since the prefix defines a registry location, and only if building
