@@ -7,8 +7,6 @@ import (
 	"errors"
 
 	"golang.org/x/exp/constraints"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -26,9 +24,7 @@ var (
 func MaxUint[T constraints.Unsigned]() T {
 	// Unsigned integers will underflow to their max value.
 	// Ref: https://go.dev/ref/spec#Arithmetic_operators
-	var maxValue T
-	maxValue--
-	return maxValue
+	return T(0) - 1
 }
 
 // Add returns:
@@ -46,7 +42,7 @@ func Add[T constraints.Unsigned](a, b T) (T, error) {
 // 2) If there is underflow, an error
 func Sub[T constraints.Unsigned](a, b T) (T, error) {
 	if a < b {
-		return utils.Zero[T](), ErrUnderflow
+		return 0, ErrUnderflow
 	}
 	return a - b, nil
 }
