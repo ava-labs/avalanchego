@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -779,6 +780,10 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) fee.StaticConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
+func getUpgradeConfig(v *viper.Viper, networkID uint32) upgrade.Config {
+	return upgrade.GetConfig(networkID)
+}
+
 func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
 	if v.IsSet(GenesisFileContentKey) {
@@ -1293,6 +1298,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
+
+	// Upgrade config
+	nodeConfig.UpgradeConfig = getUpgradeConfig(v, nodeConfig.NetworkID)
 
 	// Network Config
 	nodeConfig.NetworkConfig, err = getNetworkConfig(

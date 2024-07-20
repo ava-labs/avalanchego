@@ -50,7 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
@@ -235,6 +234,9 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+	CortinaTime                  time.Time
+	CortinaXChainStopVertexID    ids.ID
+	DurangoTime                  time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -730,7 +732,7 @@ func (m *manager) createAvalancheChain(
 			VM:          dagVM,
 			DB:          vertexDB,
 			Log:         ctx.Log,
-			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
+			CortinaTime: m.CortinaTime,
 		},
 	)
 
@@ -795,7 +797,7 @@ func (m *manager) createAvalancheChain(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
-			DurangoTime:         version.GetDurangoTime(m.NetworkID),
+			DurangoTime:         m.DurangoTime,
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
@@ -1010,7 +1012,7 @@ func (m *manager) createAvalancheChain(
 		VM:                             linearizableVM,
 	}
 	if ctx.ChainID == m.XChainID {
-		avalancheBootstrapperConfig.StopVertexID = version.CortinaXChainStopVertexID[ctx.NetworkID]
+		avalancheBootstrapperConfig.StopVertexID = m.CortinaXChainStopVertexID
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
@@ -1192,7 +1194,7 @@ func (m *manager) createSnowmanChain(
 		vm,
 		proposervm.Config{
 			ActivationTime:      m.ApricotPhase4Time,
-			DurangoTime:         version.GetDurangoTime(m.NetworkID),
+			DurangoTime:         m.DurangoTime,
 			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
