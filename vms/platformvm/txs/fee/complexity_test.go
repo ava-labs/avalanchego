@@ -36,7 +36,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 691,
 				fee.DBRead:    2,
 				fee.DBWrite:   4,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -46,7 +46,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 499,
 				fee.DBRead:    2,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -56,7 +56,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 460,
 				fee.DBRead:    3,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -66,7 +66,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 399,
 				fee.DBRead:    1,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -76,7 +76,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 509,
 				fee.DBRead:    2,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -86,7 +86,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 339,
 				fee.DBRead:    1,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -96,7 +96,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 435,
 				fee.DBRead:    1,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -106,7 +106,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 335,
 				fee.DBRead:    1,
 				fee.DBWrite:   2,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -116,7 +116,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 436,
 				fee.DBRead:    3,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 		{
@@ -126,7 +126,7 @@ func TestTxComplexity(t *testing.T) {
 				fee.Bandwidth: 436,
 				fee.DBRead:    2,
 				fee.DBWrite:   3,
-				fee.Compute:   0,
+				fee.Compute:   0, // TODO: implement
 			},
 		},
 	}
