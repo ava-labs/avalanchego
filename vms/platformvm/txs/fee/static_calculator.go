@@ -13,7 +13,7 @@ import (
 
 var (
 	_ Calculator  = (*staticCalculator)(nil)
-	_ txs.Visitor = (*staticCalculator)(nil)
+	_ txs.Visitor = (*staticVisitor)(nil)
 )
 
 func NewStaticCalculator(
@@ -29,37 +29,47 @@ func NewStaticCalculator(
 }
 
 type staticCalculator struct {
+	staticCfg StaticConfig
+	upgrades  upgrade.Config
+	time      time.Time
+}
+
+func (c *staticCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
+	v := staticVisitor{
+		staticCfg: c.staticCfg,
+		upgrades:  c.upgrades,
+		time:      c.time,
+	}
+	err := tx.Visit(&v)
+	return v.fee, err
+}
+
+type staticVisitor struct {
 	// inputs
 	staticCfg StaticConfig
 	upgrades  upgrade.Config
 	time      time.Time
 
-	// outputs of visitor execution
+	// outputs
 	fee uint64
 }
 
-func (c *staticCalculator) CalculateFee(tx *txs.Tx) (uint64, error) {
-	c.fee = 0 // zero fee among different calculateFee invocations (unlike gas which gets cumulated)
-	err := tx.Unsigned.Visit(c)
-	return c.fee, err
-}
-
-func (c *staticCalculator) AddValidatorTx(*txs.AddValidatorTx) error {
+func (c *staticVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
 	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
-func (c *staticCalculator) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+func (c *staticVisitor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	c.fee = c.staticCfg.AddSubnetValidatorFee
 	return nil
 }
 
-func (c *staticCalculator) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (c *staticVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
-func (c *staticCalculator) CreateChainTx(*txs.CreateChainTx) error {
+func (c *staticVisitor) CreateChainTx(*txs.CreateChainTx) error {
 	if c.upgrades.IsApricotPhase3Activated(c.time) {
 		c.fee = c.staticCfg.CreateBlockchainTxFee
 	} else {
@@ -68,7 +78,7 @@ func (c *staticCalculator) CreateChainTx(*txs.CreateChainTx) error {
 	return nil
 }
 
-func (c *staticCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (c *staticVisitor) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	if c.upgrades.IsApricotPhase3Activated(c.time) {
 		c.fee = c.staticCfg.CreateSubnetTxFee
 	} else {
@@ -77,32 +87,32 @@ func (c *staticCalculator) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return nil
 }
 
-func (c *staticCalculator) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (c *staticVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	c.fee = 0 // no fees
 	return nil
 }
 
-func (c *staticCalculator) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (c *staticVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	c.fee = 0 // no fees
 	return nil
 }
 
-func (c *staticCalculator) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (c *staticVisitor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (c *staticCalculator) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (c *staticVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	c.fee = c.staticCfg.TransformSubnetTxFee
 	return nil
 }
 
-func (c *staticCalculator) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (c *staticVisitor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (c *staticCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+func (c *staticVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if tx.Subnet != constants.PrimaryNetworkID {
 		c.fee = c.staticCfg.AddSubnetValidatorFee
 	} else {
@@ -111,7 +121,7 @@ func (c *staticCalculator) AddPermissionlessValidatorTx(tx *txs.AddPermissionles
 	return nil
 }
 
-func (c *staticCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (c *staticVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if tx.Subnet != constants.PrimaryNetworkID {
 		c.fee = c.staticCfg.AddSubnetDelegatorFee
 	} else {
@@ -120,17 +130,17 @@ func (c *staticCalculator) AddPermissionlessDelegatorTx(tx *txs.AddPermissionles
 	return nil
 }
 
-func (c *staticCalculator) BaseTx(*txs.BaseTx) error {
+func (c *staticVisitor) BaseTx(*txs.BaseTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (c *staticCalculator) ImportTx(*txs.ImportTx) error {
+func (c *staticVisitor) ImportTx(*txs.ImportTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
 
-func (c *staticCalculator) ExportTx(*txs.ExportTx) error {
+func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
 	c.fee = c.staticCfg.TxFee
 	return nil
 }
