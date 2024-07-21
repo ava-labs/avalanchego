@@ -185,7 +185,24 @@ func TxComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
 	return c.output, err
 }
 
-func OutputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
+// OutputComplexity returns the complexity outputs adds to a transaction.
+func OutputComplexity(outs ...*avax.TransferableOutput) (fee.Dimensions, error) {
+	var complexity fee.Dimensions
+	for _, out := range outs {
+		outputComplexity, err := outputComplexity(out)
+		if err != nil {
+			return fee.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(outputComplexity)
+		if err != nil {
+			return fee.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func outputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
 	complexity := fee.Dimensions{
 		fee.Bandwidth: intrinsicOutputBandwidth + intrinsicSECP256k1FxOutputBandwidth,
 		fee.DBRead:    0,
@@ -213,9 +230,25 @@ func OutputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
 	return complexity, err
 }
 
-// InputComplexity returns the complexity an input adds to a transaction.
-// It includes the complexity that the corresponding credential will add.
-func InputComplexity(in *avax.TransferableInput) (fee.Dimensions, error) {
+// InputComplexity returns the complexity inputs adds to a transaction.
+// It includes the complexity that the corresponding credentials will add.
+func InputComplexity(ins ...*avax.TransferableInput) (fee.Dimensions, error) {
+	var complexity fee.Dimensions
+	for _, in := range ins {
+		inputComplexity, err := inputComplexity(in)
+		if err != nil {
+			return fee.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(inputComplexity)
+		if err != nil {
+			return fee.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func inputComplexity(in *avax.TransferableInput) (fee.Dimensions, error) {
 	complexity := fee.Dimensions{
 		fee.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
 		fee.DBRead:    1,
@@ -350,7 +383,7 @@ func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 	if err != nil {
 		return err
 	}
-	outputsComplexity, err := outputsComplexity(tx.StakeOuts)
+	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
 	if err != nil {
 		return err
 	}
@@ -381,7 +414,7 @@ func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	if err != nil {
 		return err
 	}
-	outputsComplexity, err := outputsComplexity(tx.StakeOuts)
+	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
 	if err != nil {
 		return err
 	}
@@ -475,7 +508,7 @@ func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	outputsComplexity, err := outputsComplexity(tx.ExportedOutputs)
+	outputsComplexity, err := OutputComplexity(tx.ExportedOutputs...)
 	if err != nil {
 		return err
 	}
@@ -491,7 +524,7 @@ func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
 	if err != nil {
 		return err
 	}
-	inputsComplexity, err := inputsComplexity(tx.ImportedInputs)
+	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
 	if err != nil {
 		return err
 	}
@@ -540,11 +573,11 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 }
 
 func baseTxComplexity(tx *txs.BaseTx) (fee.Dimensions, error) {
-	outputsComplexity, err := outputsComplexity(tx.Outs)
+	outputsComplexity, err := OutputComplexity(tx.Outs...)
 	if err != nil {
 		return fee.Dimensions{}, err
 	}
-	inputsComplexity, err := inputsComplexity(tx.Ins)
+	inputsComplexity, err := InputComplexity(tx.Ins...)
 	if err != nil {
 		return fee.Dimensions{}, err
 	}
@@ -557,36 +590,4 @@ func baseTxComplexity(tx *txs.BaseTx) (fee.Dimensions, error) {
 		uint64(len(tx.Memo)),
 	)
 	return complexity, err
-}
-
-func outputsComplexity(outs []*avax.TransferableOutput) (fee.Dimensions, error) {
-	var complexity fee.Dimensions
-	for _, out := range outs {
-		outputComplexity, err := OutputComplexity(out)
-		if err != nil {
-			return fee.Dimensions{}, err
-		}
-
-		complexity, err = complexity.Add(outputComplexity)
-		if err != nil {
-			return fee.Dimensions{}, err
-		}
-	}
-	return complexity, nil
-}
-
-func inputsComplexity(ins []*avax.TransferableInput) (fee.Dimensions, error) {
-	var complexity fee.Dimensions
-	for _, in := range ins {
-		inputComplexity, err := InputComplexity(in)
-		if err != nil {
-			return fee.Dimensions{}, err
-		}
-
-		complexity, err = complexity.Add(inputComplexity)
-		if err != nil {
-			return fee.Dimensions{}, err
-		}
-	}
-	return complexity, nil
 }
