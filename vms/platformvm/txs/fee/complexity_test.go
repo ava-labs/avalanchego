@@ -10,9 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -261,7 +261,7 @@ func TestOutputComplexity(t *testing.T) {
 			bytes, err := txs.Codec.Marshal(txs.CodecVersion, test.out)
 			require.NoError(err)
 
-			numBytesWithoutCodecVersion := uint64(len(bytes) - wrappers.ShortLen)
+			numBytesWithoutCodecVersion := uint64(len(bytes) - codec.VersionSize)
 			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
 		})
 	}
@@ -391,7 +391,7 @@ func TestInputComplexity(t *testing.T) {
 			credentialBytes, err := txs.Codec.Marshal(txs.CodecVersion, &cred)
 			require.NoError(err)
 
-			numBytesWithoutCodecVersion := uint64(len(inputBytes) + len(credentialBytes) - 2*wrappers.ShortLen)
+			numBytesWithoutCodecVersion := uint64(len(inputBytes) + len(credentialBytes) - 2*codec.VersionSize)
 			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
 		})
 	}
@@ -465,7 +465,7 @@ func TestOwnerComplexity(t *testing.T) {
 			ownerBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.owner)
 			require.NoError(err)
 
-			numBytesWithoutCodecVersion := uint64(len(ownerBytes) - wrappers.ShortLen)
+			numBytesWithoutCodecVersion := uint64(len(ownerBytes) - codec.VersionSize)
 			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
 		})
 	}
@@ -558,7 +558,7 @@ func TestAuthComplexity(t *testing.T) {
 			credentialBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.cred)
 			require.NoError(err)
 
-			numBytesWithoutCodecVersion := uint64(len(authBytes) + len(credentialBytes) - 2*wrappers.ShortLen)
+			numBytesWithoutCodecVersion := uint64(len(authBytes) + len(credentialBytes) - 2*codec.VersionSize)
 			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
 		})
 	}
@@ -620,7 +620,7 @@ func TestSignerComplexity(t *testing.T) {
 			signerBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.signer)
 			require.NoError(err)
 
-			numBytesWithoutCodecVersion := uint64(len(signerBytes) - wrappers.ShortLen)
+			numBytesWithoutCodecVersion := uint64(len(signerBytes) - codec.VersionSize)
 			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
 		})
 	}

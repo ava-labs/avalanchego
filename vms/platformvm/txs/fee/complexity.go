@@ -6,6 +6,7 @@ package fee
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -101,7 +102,7 @@ var (
 		fee.Compute: 0,
 	}
 	IntrinsicBaseTxComplexities = fee.Dimensions{
-		fee.Bandwidth: wrappers.ShortLen + // codecID
+		fee.Bandwidth: codec.VersionSize + // codecVersion
 			wrappers.IntLen + // typeID
 			wrappers.IntLen + // networkID
 			ids.IDLen + // blockchainID
