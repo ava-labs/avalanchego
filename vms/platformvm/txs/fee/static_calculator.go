@@ -22,23 +22,23 @@ func NewStaticCalculator(
 	chainTime time.Time,
 ) Calculator {
 	return &staticCalculator{
-		upgrades:  upgradeTimes,
-		staticCfg: config,
-		time:      chainTime,
+		upgrades: upgradeTimes,
+		config:   config,
+		time:     chainTime,
 	}
 }
 
 type staticCalculator struct {
-	staticCfg StaticConfig
-	upgrades  upgrade.Config
-	time      time.Time
+	config   StaticConfig
+	upgrades upgrade.Config
+	time     time.Time
 }
 
 func (c *staticCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 	v := staticVisitor{
-		staticCfg: c.staticCfg,
-		upgrades:  c.upgrades,
-		time:      c.time,
+		config:   c.config,
+		upgrades: c.upgrades,
+		time:     c.time,
 	}
 	err := tx.Visit(&v)
 	return v.fee, err
@@ -46,43 +46,43 @@ func (c *staticCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 
 type staticVisitor struct {
 	// inputs
-	staticCfg StaticConfig
-	upgrades  upgrade.Config
-	time      time.Time
+	config   StaticConfig
+	upgrades upgrade.Config
+	time     time.Time
 
 	// outputs
 	fee uint64
 }
 
 func (c *staticVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
-	c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
+	c.fee = c.config.AddPrimaryNetworkValidatorFee
 	return nil
 }
 
 func (c *staticVisitor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	c.fee = c.staticCfg.AddSubnetValidatorFee
+	c.fee = c.config.AddSubnetValidatorFee
 	return nil
 }
 
 func (c *staticVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
+	c.fee = c.config.AddPrimaryNetworkDelegatorFee
 	return nil
 }
 
 func (c *staticVisitor) CreateChainTx(*txs.CreateChainTx) error {
 	if c.upgrades.IsApricotPhase3Activated(c.time) {
-		c.fee = c.staticCfg.CreateBlockchainTxFee
+		c.fee = c.config.CreateBlockchainTxFee
 	} else {
-		c.fee = c.staticCfg.CreateAssetTxFee
+		c.fee = c.config.CreateAssetTxFee
 	}
 	return nil
 }
 
 func (c *staticVisitor) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	if c.upgrades.IsApricotPhase3Activated(c.time) {
-		c.fee = c.staticCfg.CreateSubnetTxFee
+		c.fee = c.config.CreateSubnetTxFee
 	} else {
-		c.fee = c.staticCfg.CreateAssetTxFee
+		c.fee = c.config.CreateAssetTxFee
 	}
 	return nil
 }
@@ -98,49 +98,49 @@ func (c *staticVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (c *staticVisitor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	c.fee = c.staticCfg.TxFee
+	c.fee = c.config.TxFee
 	return nil
 }
 
 func (c *staticVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	c.fee = c.staticCfg.TransformSubnetTxFee
+	c.fee = c.config.TransformSubnetTxFee
 	return nil
 }
 
 func (c *staticVisitor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	c.fee = c.staticCfg.TxFee
+	c.fee = c.config.TxFee
 	return nil
 }
 
 func (c *staticVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if tx.Subnet != constants.PrimaryNetworkID {
-		c.fee = c.staticCfg.AddSubnetValidatorFee
+		c.fee = c.config.AddSubnetValidatorFee
 	} else {
-		c.fee = c.staticCfg.AddPrimaryNetworkValidatorFee
+		c.fee = c.config.AddPrimaryNetworkValidatorFee
 	}
 	return nil
 }
 
 func (c *staticVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	if tx.Subnet != constants.PrimaryNetworkID {
-		c.fee = c.staticCfg.AddSubnetDelegatorFee
+		c.fee = c.config.AddSubnetDelegatorFee
 	} else {
-		c.fee = c.staticCfg.AddPrimaryNetworkDelegatorFee
+		c.fee = c.config.AddPrimaryNetworkDelegatorFee
 	}
 	return nil
 }
 
 func (c *staticVisitor) BaseTx(*txs.BaseTx) error {
-	c.fee = c.staticCfg.TxFee
+	c.fee = c.config.TxFee
 	return nil
 }
 
 func (c *staticVisitor) ImportTx(*txs.ImportTx) error {
-	c.fee = c.staticCfg.TxFee
+	c.fee = c.config.TxFee
 	return nil
 }
 
 func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
-	c.fee = c.staticCfg.TxFee
+	c.fee = c.config.TxFee
 	return nil
 }
