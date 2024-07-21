@@ -16,14 +16,14 @@ func NewDynamicCalculator(
 	excess fee.Gas,
 ) Calculator {
 	return &dynamicCalculator{
-		config: config,
-		price:  config.MinGasPrice.MulExp(excess, config.ExcessConversionConstant),
+		weights: config.Weights,
+		price:   config.MinGasPrice.MulExp(excess, config.ExcessConversionConstant),
 	}
 }
 
 type dynamicCalculator struct {
-	config fee.Config
-	price  fee.GasPrice
+	weights fee.Dimensions
+	price   fee.GasPrice
 }
 
 func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
@@ -31,7 +31,7 @@ func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	gas, err := complexity.ToGas(c.config.Weights)
+	gas, err := complexity.ToGas(c.weights)
 	if err != nil {
 		return 0, err
 	}
