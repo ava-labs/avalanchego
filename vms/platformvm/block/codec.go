@@ -36,6 +36,7 @@ func init() {
 			txs.RegisterUnsignedTxsTypes(c),
 			RegisterBanffBlockTypes(c),
 			txs.RegisterDUnsignedTxsTypes(c),
+			txs.RegisterEUnsignedTxsTypes(c),
 		)
 	}
 
