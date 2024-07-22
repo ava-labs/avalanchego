@@ -42,7 +42,7 @@ func init() {
 
 		c.SkipRegistrations(4)
 
-		errs.Add(RegisterDUnsignedTxsTypes(c))
+		errs.Add(RegisterDurangoUnsignedTxsTypes(c))
 	}
 
 	Codec = codec.NewDefaultManager()
@@ -103,7 +103,7 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 	return errs.Err
 }
 
-func RegisterDUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+func RegisterDurangoUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
 		targetCodec.RegisterType(&BaseTx{}),
