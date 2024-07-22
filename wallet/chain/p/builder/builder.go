@@ -21,6 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -324,7 +327,26 @@ func (b *builder) NewBaseTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	outputComplexity, err := txfee.OutputComplexity(outputs...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicBaseTxComplexities.Add(
+		dynamicComplexity,
+		outputComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +358,7 @@ func (b *builder) NewBaseTx(
 		BlockchainID: constants.PlatformChainID,
 		Ins:          inputs,
 		Outs:         outputs,
-		Memo:         ops.Memo(),
+		Memo:         memo,
 	}}
 	return tx, b.initCtx(tx)
 }
@@ -355,7 +377,12 @@ func (b *builder) NewAddValidatorTx(
 		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		feecomponent.Dimensions{},
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -385,13 +412,33 @@ func (b *builder) NewAddSubnetValidatorTx(
 		b.context.AVAXAssetID: b.context.AddSubnetValidatorFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicAddSubnetValidatorTxComplexities.Add(
+		dynamicComplexity,
+		authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +449,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		SubnetValidator: *vdr,
 		SubnetAuth:      subnetAuth,
@@ -419,13 +466,33 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		b.context.AVAXAssetID: b.context.BaseTxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicRemoveSubnetValidatorTxComplexities.Add(
+		dynamicComplexity,
+		authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +525,7 @@ func (b *builder) NewAddDelegatorTx(
 		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, feecomponent.Dimensions{}, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -487,17 +554,17 @@ func (b *builder) NewCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.CreateBlockchainTxFee,
-	}
-	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	toBurn := map[ids.ID]uint64{
+		b.context.AVAXAssetID: b.context.CreateBlockchainTxFee,
+	}
+	toStake := map[ids.ID]uint64{}
+	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -554,17 +621,17 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.BaseTxFee,
-	}
-	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	toBurn := map[ids.ID]uint64{
+		b.context.AVAXAssetID: b.context.BaseTxFee,
+	}
+	toStake := map[ids.ID]uint64{}
+	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -748,18 +815,18 @@ func (b *builder) NewTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
+	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
 	toBurn := map[ids.ID]uint64{
 		b.context.AVAXAssetID: b.context.TransformSubnetTxFee,
 		assetID:               maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
-	ops := common.NewOptions(options)
 	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -938,6 +1005,7 @@ func (b *builder) getBalance(
 func (b *builder) spend(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,
+	complexity feecomponent.Dimensions,
 	options *common.Options,
 ) (
 	inputs []*avax.TransferableInput,
