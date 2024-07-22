@@ -89,7 +89,7 @@ var (
 			wrappers.IntLen + // num stake outs
 			wrappers.IntLen, // delegator rewards typeID
 		fee.DBRead:  1,
-		fee.DBWrite: 0,
+		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
 	IntrinsicAddSubnetValidatorTxComplexities = fee.Dimensions{
