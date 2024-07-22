@@ -89,6 +89,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 		DurangoBlockTimestamp:           utils.NewUint64(0),
+		EUpgradeTime:                    utils.NewUint64(0),
 	}
 
 	TestLaunchConfig = &ChainConfig{
@@ -116,6 +117,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhase1Config = &ChainConfig{
@@ -143,6 +145,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhase2Config = &ChainConfig{
@@ -170,6 +173,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhase3Config = &ChainConfig{
@@ -197,6 +201,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhase4Config = &ChainConfig{
@@ -224,6 +229,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhase5Config = &ChainConfig{
@@ -251,6 +257,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhasePre6Config = &ChainConfig{
@@ -278,6 +285,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhase6Config = &ChainConfig{
@@ -305,6 +313,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestApricotPhasePost6Config = &ChainConfig{
@@ -332,6 +341,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestBanffChainConfig = &ChainConfig{
@@ -359,6 +369,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestCortinaChainConfig = &ChainConfig{
@@ -386,6 +397,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 		DurangoBlockTimestamp:           nil,
+		EUpgradeTime:                    nil,
 	}
 
 	TestDurangoChainConfig = &ChainConfig{
@@ -412,6 +424,36 @@ var (
 		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
+		DurangoBlockTimestamp:           utils.NewUint64(0),
+		EUpgradeTime:                    nil,
+	}
+
+	TestEUpgradeChainConfig = &ChainConfig{
+		AvalancheContext:                AvalancheContext{utils.TestSnowContext()},
+		ChainID:                         big.NewInt(1),
+		HomesteadBlock:                  big.NewInt(0),
+		DAOForkBlock:                    nil,
+		DAOForkSupport:                  false,
+		EIP150Block:                     big.NewInt(0),
+		EIP155Block:                     big.NewInt(0),
+		EIP158Block:                     big.NewInt(0),
+		ByzantiumBlock:                  big.NewInt(0),
+		ConstantinopleBlock:             big.NewInt(0),
+		PetersburgBlock:                 big.NewInt(0),
+		IstanbulBlock:                   big.NewInt(0),
+		MuirGlacierBlock:                big.NewInt(0),
+		ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
+		ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
+		ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
+		ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
+		ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
+		ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
+		ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
+		ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
+		BanffBlockTimestamp:             utils.NewUint64(0),
+		CortinaBlockTimestamp:           utils.NewUint64(0),
+		DurangoBlockTimestamp:           utils.NewUint64(0),
+		EUpgradeTime:                    utils.NewUint64(0),
 	}
 
 	TestRules = TestChainConfig.Rules(new(big.Int), 0)
@@ -442,6 +484,7 @@ func getChainConfig(networkID uint32, chainID *big.Int) *ChainConfig {
 		BanffBlockTimestamp:             getUpgradeTime(networkID, version.BanffTimes),
 		CortinaBlockTimestamp:           getUpgradeTime(networkID, version.CortinaTimes),
 		DurangoBlockTimestamp:           getUpgradeTime(networkID, version.DurangoTimes),
+		EUpgradeTime:                    getUpgradeTime(networkID, version.EUpgradeTimes),
 	}
 }
 
@@ -496,6 +539,10 @@ type ChainConfig struct {
 	// and Avalanche Warp Messaging. (nil = no fork, 0 = already activated)
 	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
 	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
+	// EUpgrade on the Avalanche network. (nil = no fork, 0 = already activated)
+	// It activates Cancun (TODO) and modifies the min base fee (TODO).
+	EUpgradeTime *uint64 `json:"eUpgradeTime,omitempty"`
+
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	CancunTime *uint64 `json:"cancunTime,omitempty"`
 	// Verkle activates the Verkle upgrade from Ethereum. (nil = no fork, 0 = already activated)
@@ -546,6 +593,7 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf(" - Banff Timestamp:                  @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", ptrToString(c.BanffBlockTimestamp))
 	banner += fmt.Sprintf(" - Cortina Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(c.CortinaBlockTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DurangoBlockTimestamp))
+	banner += fmt.Sprintf(" - EUpgrade Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.EUpgradeTime))
 	banner += "\n"
 
 	upgradeConfigBytes, err := json.Marshal(c.UpgradeConfig)
@@ -675,6 +723,12 @@ func (c *ChainConfig) IsCortina(time uint64) bool {
 // with a timestamp after the Durango upgrade time.
 func (c *ChainConfig) IsDurango(time uint64) bool {
 	return utils.IsTimestampForked(c.DurangoBlockTimestamp, time)
+}
+
+// IsEUpgrade returns whether [time] represents a block
+// with a timestamp after the EUpgrade upgrade time.
+func (c *ChainConfig) IsEUpgrade(time uint64) bool {
+	return utils.IsTimestampForked(c.EUpgradeTime, time)
 }
 
 // IsCancun returns whether [time] represents a block
@@ -907,8 +961,14 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 	if isForkTimestampIncompatible(c.DurangoBlockTimestamp, newcfg.DurangoBlockTimestamp, time) {
 		return newTimestampCompatError("Durango fork block timestamp", c.DurangoBlockTimestamp, newcfg.DurangoBlockTimestamp)
 	}
+	if isForkTimestampIncompatible(c.EUpgradeTime, newcfg.EUpgradeTime, time) {
+		return newTimestampCompatError("EUpgrade fork block timestamp", c.EUpgradeTime, newcfg.EUpgradeTime)
+	}
 	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
 		return newTimestampCompatError("Cancun fork block timestamp", c.CancunTime, newcfg.CancunTime)
+	}
+	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, time) {
+		return newTimestampCompatError("Verkle fork block timestamp", c.VerkleTime, newcfg.VerkleTime)
 	}
 
 	return nil
