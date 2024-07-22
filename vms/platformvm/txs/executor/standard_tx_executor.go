@@ -70,7 +70,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 
 	// Verify the flowcheck
-	fee, err := e.FeeCalculator.CalculateFee(e.Tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	}
 
 	// Verify the flowcheck
-	fee, err := e.FeeCalculator.CalculateFee(e.Tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		// Verify the flowcheck
-		fee, err := e.FeeCalculator.CalculateFee(e.Tx)
+		fee, err := e.FeeCalculator.CalculateFee(tx)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	}
 
 	// Verify the flowcheck
-	fee, err := e.FeeCalculator.CalculateFee(e.Tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -457,7 +457,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	}
 
 	// Verify the flowcheck
-	fee, err := e.FeeCalculator.CalculateFee(e.Tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -588,7 +588,7 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	}
 
 	// Verify the flowcheck
-	fee, err := e.FeeCalculator.CalculateFee(e.Tx)
+	fee, err := e.FeeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
