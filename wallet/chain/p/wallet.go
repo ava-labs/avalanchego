@@ -70,7 +70,6 @@ type Wallet interface {
 
 	// IssueRemoveSubnetValidatorTx creates, signs, and issues a transaction
 	// that removes a validator of a subnet.
-	// removes a validator of a subnet.
 	//
 	// - [nodeID] is the validator being removed from [subnetID].
 	IssueRemoveSubnetValidatorTx(
