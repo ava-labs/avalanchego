@@ -50,7 +50,7 @@ type Wallet interface {
 		options ...common.Option,
 	) (*evm.Tx, error)
 
-	// IssueUnsignedTx signs and issues the unsigned tx.
+	// IssueUnsignedAtomicTx signs and issues the unsigned tx.
 	IssueUnsignedAtomicTx(
 		utx evm.UnsignedAtomicTx,
 		options ...common.Option,
