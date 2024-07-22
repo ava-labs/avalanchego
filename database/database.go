@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // For ease of implementation, our database's interface matches Ethereum's
-// database implementation. This was to allow use to use Geth code as is for the
+// database implementation. This was to allow us to use Geth code as is for the
 // EVM chain.
 
 package database
@@ -49,13 +49,13 @@ type KeyValueDeleter interface {
 	Delete(key []byte) error
 }
 
-// KeyValueReaderWriter allows read/write acccess to a backing data store.
+// KeyValueReaderWriter allows read/write access to a backing data store.
 type KeyValueReaderWriter interface {
 	KeyValueReader
 	KeyValueWriter
 }
 
-// KeyValueWriterDeleter allows write/delete acccess to a backing data store.
+// KeyValueWriterDeleter allows write/delete access to a backing data store.
 type KeyValueWriterDeleter interface {
 	KeyValueWriter
 	KeyValueDeleter
