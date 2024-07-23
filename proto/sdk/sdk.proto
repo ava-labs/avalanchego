@@ -16,3 +16,12 @@ message PullGossipResponse {
 message PushGossip {
   repeated bytes gossip = 1;
 }
+
+message SignatureRequest {
+  bytes data = 1;
+  bytes justification = 2;
+}
+
+message SignatureResponse {
+  bytes signature = 1;
+}
