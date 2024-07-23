@@ -42,7 +42,6 @@ type Consensus interface {
 
 // Factory produces Nnary and Unary decision instances
 type Factory interface {
-	NewNnary(params Parameters, choice ids.ID) Nnary
 	NewUnary(params Parameters) Unary
 }
 

@@ -10,9 +10,10 @@ import (
 
 var _ Consensus = (*Flat)(nil)
 
-func NewFlat(factory Factory, params Parameters, choice ids.ID) Consensus {
+func NewFlat(_ Factory, params Parameters, choice ids.ID) Consensus {
+	nnary := newNnarySnowball(params.AlphaPreference, newSingleTerminationCondition(params.AlphaConfidence, params.Beta), choice)
 	return &Flat{
-		Nnary:  factory.NewNnary(params, choice),
+		Nnary:  &nnary,
 		params: params,
 	}
 }

@@ -20,7 +20,7 @@ func TestFlat(t *testing.T) {
 		AlphaConfidence: 3,
 		Beta:            2,
 	}
-	f := NewFlat(SnowballFactory, params, Red)
+	f := NewFlat(nil, params, Red)
 	f.Add(Green)
 	f.Add(Blue)
 
