@@ -20,17 +20,15 @@ var (
 
 type ConvertSubnetTx struct {
 	// Metadata, inputs and outputs
-	BaseTx
+	BaseTx `serialize:"true"`
 	// ID of the Subnet to transform
-	// Restrictions:
-	// - Must not be the Primary Network ID
-	Subnet ids.ID `json:"subnetID"`
+	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Chain where the Subnet manager lives
-	BlockchainID ids.ID `json:"blockchainID"`
+	BlockchainID ids.ID `serialize:"true" json:"chainID"`
 	// Address of the Subnet manager
-	Address []byte `json:"address"`
+	Address []byte `serialize:"true" json:"address"`
 	// Authorizes this conversion
-	SubnetAuth verify.Verifiable `json:"subnetAuthorization"`
+	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
