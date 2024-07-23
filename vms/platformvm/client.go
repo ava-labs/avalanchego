@@ -88,16 +88,6 @@ type Client interface {
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetTxStatus returns the status of the transaction corresponding to [txID]
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error)
-	// AwaitTxDecided polls [GetTxStatus] until a status is returned that
-	// implies the tx may be decided.
-	// TODO: Move this function off of the Client interface into a utility
-	// function.
-	AwaitTxDecided(
-		ctx context.Context,
-		txID ids.ID,
-		freq time.Duration,
-		options ...rpc.Option,
-	) (*GetTxStatusResponse, error)
 	// GetStake returns the amount of nAVAX that [addrs] have cumulatively
 	// staked on the Primary Network.
 	//
@@ -372,7 +362,7 @@ func (c *client) GetBlockchains(ctx context.Context, options ...rpc.Option) ([]A
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 
 	res := &api.JSONTxID{}
@@ -407,27 +397,6 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 		options...,
 	)
 	return res, err
-}
-
-func (c *client) AwaitTxDecided(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (*GetTxStatusResponse, error) {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-
-	for {
-		res, err := c.GetTxStatus(ctx, txID, options...)
-		if err == nil {
-			switch res.Status {
-			case status.Committed, status.Aborted, status.Dropped:
-				return res, nil
-			}
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
 }
 
 func (c *client) GetStake(
@@ -544,4 +513,33 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func AwaitTxAccepted(
+	c Client,
+	ctx context.Context,
+	txID ids.ID,
+	freq time.Duration,
+	options ...rpc.Option,
+) error {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		res, err := c.GetTxStatus(ctx, txID, options...)
+		if err != nil {
+			return err
+		}
+
+		switch res.Status {
+		case status.Committed, status.Aborted:
+			return nil
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

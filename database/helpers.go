@@ -36,7 +36,7 @@ func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 func GetID(db KeyValueReader, key []byte) (ids.ID, error) {
 	b, err := db.Get(key)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	return ids.ToID(b)
 }

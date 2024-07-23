@@ -88,7 +88,7 @@ func CalcWeightedPoW(exponent float64, size int) (uint64, []uint64, error) {
 		weight := uint64(math.Pow(float64(i+1), exponent))
 		weights[i] = weight
 
-		newWeight, err := safemath.Add64(totalWeight, weight)
+		newWeight, err := safemath.Add(totalWeight, weight)
 		if err != nil {
 			return 0, nil, err
 		}

@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -65,7 +64,6 @@ type Block interface {
 type PostForkBlock interface {
 	Block
 
-	setStatus(choices.Status)
 	getStatelessBlk() block.Block
 	setInnerBlk(snowman.Block)
 }
@@ -74,7 +72,6 @@ type PostForkBlock interface {
 type postForkCommonComponents struct {
 	vm       *VM
 	innerBlk snowman.Block
-	status   choices.Status
 }
 
 // Return the inner block's height
@@ -268,7 +265,6 @@ func (p *postForkCommonComponents) buildChild(
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       p.vm,
 			innerBlk: innerBlock,
-			status:   choices.Processing,
 		},
 	}
 
@@ -369,7 +365,10 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 		currentSlot  = proposer.TimeToSlot(parentTimestamp, blkTimestamp)
 		proposerID   = blk.Proposer()
 	)
+	// populate the slot for the block.
+	blk.slot = &currentSlot
 
+	// find the expected proposer
 	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
 		ctx,
 		blkHeight,
@@ -452,6 +451,11 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		)
 		return false, err
 	}
+
+	// report the build slot to the metrics.
+	p.vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+
+	// set the scheduler to let us know when the next block need to be built.
 	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
 
 	// In case the inner VM only issued one pendingTxs message, we should

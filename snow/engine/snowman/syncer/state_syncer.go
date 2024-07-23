@@ -310,7 +310,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 			continue
 		}
 
-		newWeight, err := safemath.Add64(nodeWeight, ws.weight)
+		newWeight, err := safemath.Add(nodeWeight, ws.weight)
 		if err != nil {
 			ss.Ctx.Log.Error("failed to calculate new summary weight",
 				zap.Stringer("nodeID", nodeID),

@@ -315,7 +315,7 @@ func (n *Network) Create(rootDir string) error {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
 		if err := n.EnsureNodeConfig(node); err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -409,7 +409,7 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, w, false /* restartRequired */); err != nil {
+	if err := n.CreateSubnets(ctx, w, bootstrapNode.URI, false /* restartRequired */); err != nil {
 		return err
 	}
 
@@ -580,7 +580,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Set fields including the network path
 	if len(n.Dir) > 0 {
 		defaultFlags := FlagsMap{
-			config.ChainConfigDirKey: n.getChainConfigDir(),
+			config.ChainConfigDirKey: n.GetChainConfigDir(),
 		}
 
 		if n.Genesis != nil {
@@ -588,7 +588,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		}
 
 		// Only set the subnet dir if it exists or the node won't start.
-		subnetDir := n.getSubnetDir()
+		subnetDir := n.GetSubnetDir()
 		if _, err := os.Stat(subnetDir); err == nil {
 			defaultFlags[config.SubnetConfigDirKey] = subnetDir
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -646,7 +646,7 @@ func (n *Network) GetSubnet(name string) *Subnet {
 
 // Ensure that each subnet on the network is created. If restartRequired is false, node restart
 // to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequired bool) error {
+func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
@@ -681,7 +681,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequire
 		}
 
 		// Persist the subnet configuration
-		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
 
@@ -748,7 +748,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequire
 			validatorNodes = append(validatorNodes, node)
 		}
 
-		if err := subnet.AddValidators(ctx, w, validatorNodes...); err != nil {
+		if err := subnet.AddValidators(ctx, w, apiURI, validatorNodes...); err != nil {
 			return err
 		}
 	}
@@ -757,7 +757,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequire
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
-		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
+		if err := WaitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
 			return err
 		}
 
@@ -767,7 +767,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, restartRequire
 		}
 
 		// Persist the chain configuration
-		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
 		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {

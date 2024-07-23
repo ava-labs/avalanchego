@@ -648,7 +648,7 @@ according to its router.
 
 #### `--public-ip` (string)
 
-If this argument is provided, the node assume this is its public IP.
+If this argument is provided, the node assumes this is its public IP.
 
 :::tip
 When running a local network it may be easiest to set this value to `127.0.0.1`.

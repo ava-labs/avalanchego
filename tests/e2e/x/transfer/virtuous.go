@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 // Implements X-chain transfer tests.
 package transfer
 
@@ -9,10 +11,11 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -28,9 +31,13 @@ import (
 const (
 	totalRounds = 50
 
-	xBlksProcessingMetric = "avalanche_X_blks_processing"
-	xBlksAcceptedMetric   = "avalanche_X_blks_accepted_count"
+	blksProcessingMetric = "avalanche_snowman_blks_processing"
+	blksAcceptedMetric   = "avalanche_snowman_blks_accepted_count"
 )
+
+var xChainMetricLabels = prometheus.Labels{
+	chains.ChainLabel: "X",
+}
 
 // This test requires that the network not have ongoing blocks and
 // cannot reliably be run in parallel.
@@ -55,7 +62,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 
 				for _, metrics := range allNodeMetrics {
-					xBlksProcessing, ok := tests.GetMetricValue(metrics, xBlksProcessingMetric, nil)
+					xBlksProcessing, ok := tests.GetMetricValue(metrics, blksProcessingMetric, xChainMetricLabels)
 					if !ok || xBlksProcessing > 0 {
 						return false
 					}
@@ -108,7 +115,9 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				)
 				require.NoError(err)
 				for _, uri := range rpcEps {
-					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", uri, metricsBeforeTx[uri])
+					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
+						tests.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
+					}
 				}
 
 				testBalances := make([]uint64, 0)
@@ -230,16 +239,12 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
-					require.NoError(err)
-					require.Equal(choices.Accepted, status)
+					require.NoError(avm.AwaitTxAccepted(xc, e2e.DefaultContext(), txID, 2*time.Second))
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					status, err := xc.ConfirmTx(e2e.DefaultContext(), txID, 2*time.Second)
-					require.NoError(err)
-					require.Equal(choices.Accepted, status)
+					require.NoError(avm.AwaitTxAccepted(xc, e2e.DefaultContext(), txID, 2*time.Second))
 
 					mm, err := tests.GetNodeMetrics(e2e.DefaultContext(), u)
 					require.NoError(err)
@@ -248,13 +253,13 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
-					currentXBlksProcessing, _ := tests.GetMetricValue(mm, xBlksProcessingMetric, nil)
-					previousXBlksProcessing, _ := tests.GetMetricValue(prev, xBlksProcessingMetric, nil)
+					currentXBlksProcessing, _ := tests.GetMetricValue(mm, blksProcessingMetric, xChainMetricLabels)
+					previousXBlksProcessing, _ := tests.GetMetricValue(prev, blksProcessingMetric, xChainMetricLabels)
 					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
 					// +1 since X-chain tx must have been accepted by now
-					currentXBlksAccepted, _ := tests.GetMetricValue(mm, xBlksAcceptedMetric, nil)
-					previousXBlksAccepted, _ := tests.GetMetricValue(prev, xBlksAcceptedMetric, nil)
+					currentXBlksAccepted, _ := tests.GetMetricValue(mm, blksAcceptedMetric, xChainMetricLabels)
+					previousXBlksAccepted, _ := tests.GetMetricValue(prev, blksAcceptedMetric, xChainMetricLabels)
 					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm

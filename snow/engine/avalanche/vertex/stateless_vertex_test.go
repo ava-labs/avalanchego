@@ -39,7 +39,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "valid vertex",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{},
@@ -51,7 +51,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "invalid vertex epoch",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     1,
 				ParentIDs: []ids.ID{},
@@ -63,7 +63,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "too many vertex parents",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: tooManyParents,
@@ -75,7 +75,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "no vertex txs",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{},
@@ -87,7 +87,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "too many vertex txs",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{},
@@ -99,7 +99,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "unsorted vertex parents",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{{1}, {0}},
@@ -111,7 +111,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "unsorted vertex txs",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{},
@@ -123,7 +123,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "duplicate vertex parents",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{{0}, {0}},
@@ -135,7 +135,7 @@ func TestVertexVerify(t *testing.T) {
 			name: "duplicate vertex txs",
 			vertex: statelessVertex{innerStatelessVertex: innerStatelessVertex{
 				Version:   0,
-				ChainID:   ids.ID{},
+				ChainID:   ids.Empty,
 				Height:    0,
 				Epoch:     0,
 				ParentIDs: []ids.ID{},

@@ -4,9 +4,9 @@
 package handler
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type metrics struct {
@@ -16,39 +16,35 @@ type metrics struct {
 	messageHandlingTime *prometheus.GaugeVec // op
 }
 
-func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
+func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		expired: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "expired",
-				Help:      "messages dropped because the deadline expired",
+				Name: "expired",
+				Help: "messages dropped because the deadline expired",
 			},
 			opLabels,
 		),
 		messages: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "messages",
-				Help:      "messages handled",
+				Name: "messages",
+				Help: "messages handled",
 			},
 			opLabels,
 		),
 		messageHandlingTime: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "message_handling_time",
-				Help:      "time spent handling messages",
+				Name: "message_handling_time",
+				Help: "time spent handling messages",
 			},
 			opLabels,
 		),
 		lockingTime: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "locking_time",
-			Help:      "time spent acquiring the context lock",
+			Name: "locking_time",
+			Help: "time spent acquiring the context lock",
 		}),
 	}
-	return m, utils.Err(
+	return m, errors.Join(
 		reg.Register(m.expired),
 		reg.Register(m.messages),
 		reg.Register(m.messageHandlingTime),

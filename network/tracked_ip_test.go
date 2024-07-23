@@ -4,7 +4,7 @@
 package network
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -17,6 +17,11 @@ import (
 var (
 	ip      *ips.ClaimedIPPort
 	otherIP *ips.ClaimedIPPort
+
+	defaultLoopbackAddrPort = netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{127, 0, 0, 1}),
+		9651,
+	)
 )
 
 func init() {
@@ -31,10 +36,7 @@ func init() {
 		}
 		ip = ips.NewClaimedIPPort(
 			stakingCert,
-			ips.IPPort{
-				IP:   net.IPv4(127, 0, 0, 1),
-				Port: 9651,
-			},
+			defaultLoopbackAddrPort,
 			1,   // timestamp
 			nil, // signature
 		)
@@ -51,10 +53,7 @@ func init() {
 		}
 		otherIP = ips.NewClaimedIPPort(
 			stakingCert,
-			ips.IPPort{
-				IP:   net.IPv4(127, 0, 0, 1),
-				Port: 9651,
-			},
+			defaultLoopbackAddrPort,
 			1,   // timestamp
 			nil, // signature
 		)

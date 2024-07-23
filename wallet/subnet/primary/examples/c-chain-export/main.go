@@ -42,7 +42,7 @@ func main() {
 	cWallet := wallet.C()
 
 	// Pull out useful constants to use when issuing transactions.
-	cChainID := cWallet.BlockchainID()
+	cChainID := cWallet.Builder().Context().BlockchainID
 	owner := secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{

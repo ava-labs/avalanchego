@@ -134,7 +134,7 @@ func TestPrefixGatherer_Register(t *testing.T) {
 			prefixGatherer:         firstPrefixGatherer(),
 			prefix:                 firstPrefixedGatherer.prefix,
 			gatherer:               secondPrefixedGatherer.gatherer,
-			expectedErr:            errDuplicateGatherer,
+			expectedErr:            errOverlappingNamespaces,
 			expectedPrefixGatherer: firstPrefixGatherer(),
 		},
 	}
@@ -145,6 +145,60 @@ func TestPrefixGatherer_Register(t *testing.T) {
 			err := test.prefixGatherer.Register(test.prefix, test.gatherer)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expectedPrefixGatherer, test.prefixGatherer)
+		})
+	}
+}
+
+func TestEitherIsPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        string
+		b        string
+		expected bool
+	}{
+		{
+			name:     "empty strings",
+			a:        "",
+			b:        "",
+			expected: true,
+		},
+		{
+			name:     "an empty string",
+			a:        "",
+			b:        "hello",
+			expected: true,
+		},
+		{
+			name:     "same strings",
+			a:        "x",
+			b:        "x",
+			expected: true,
+		},
+		{
+			name:     "different strings",
+			a:        "x",
+			b:        "y",
+			expected: false,
+		},
+		{
+			name:     "splits namespace",
+			a:        "hello",
+			b:        "hello_world",
+			expected: true,
+		},
+		{
+			name:     "is prefix before separator",
+			a:        "hello",
+			b:        "helloworld",
+			expected: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			require.Equal(test.expected, eitherIsPrefix(test.a, test.b))
+			require.Equal(test.expected, eitherIsPrefix(test.b, test.a))
 		})
 	}
 }

@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build test
+
 package snowtest
 
 import (
@@ -39,12 +41,12 @@ func (noOpAcceptor) Accept(*snow.ConsensusContext, ids.ID, []byte) error {
 
 func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 	return &snow.ConsensusContext{
-		Context:             ctx,
-		Registerer:          prometheus.NewRegistry(),
-		AvalancheRegisterer: prometheus.NewRegistry(),
-		BlockAcceptor:       noOpAcceptor{},
-		TxAcceptor:          noOpAcceptor{},
-		VertexAcceptor:      noOpAcceptor{},
+		Context:        ctx,
+		PrimaryAlias:   ctx.ChainID.String(),
+		Registerer:     prometheus.NewRegistry(),
+		BlockAcceptor:  noOpAcceptor{},
+		TxAcceptor:     noOpAcceptor{},
+		VertexAcceptor: noOpAcceptor{},
 	}
 }
 
@@ -90,7 +92,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 
 		Log:      logging.NoLog{},
 		BCLookup: aliaser,
-		Metrics:  metrics.NewMultiGatherer(),
+		Metrics:  metrics.NewPrefixGatherer(),
 
 		ValidatorState: validatorState,
 		ChainDataDir:   "",

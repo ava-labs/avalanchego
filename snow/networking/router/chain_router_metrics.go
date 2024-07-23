@@ -4,9 +4,9 @@
 package router
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // routerMetrics about router messages
@@ -16,31 +16,28 @@ type routerMetrics struct {
 	droppedRequests       prometheus.Counter
 }
 
-func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*routerMetrics, error) {
+func newRouterMetrics(registerer prometheus.Registerer) (*routerMetrics, error) {
 	rMetrics := &routerMetrics{}
 	rMetrics.outstandingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "outstanding",
-			Help:      "Number of outstanding requests (all types)",
+			Name: "outstanding",
+			Help: "Number of outstanding requests (all types)",
 		},
 	)
 	rMetrics.longestRunningRequest = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "longest_running",
-			Help:      "Time (in ns) the longest request took",
+			Name: "longest_running",
+			Help: "Time (in ns) the longest request took",
 		},
 	)
 	rMetrics.droppedRequests = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "dropped",
-			Help:      "Number of dropped requests (all types)",
+			Name: "dropped",
+			Help: "Number of dropped requests (all types)",
 		},
 	)
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(rMetrics.outstandingRequests),
 		registerer.Register(rMetrics.longestRunningRequest),
 		registerer.Register(rMetrics.droppedRequests),
