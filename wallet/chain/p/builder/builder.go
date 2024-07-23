@@ -554,17 +554,53 @@ func (b *builder) NewCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.context.AVAXAssetID: b.context.CreateBlockchainTxFee,
+	}
+	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.CreateBlockchainTxFee,
+	memo := ops.Memo()
+	bandwidth, err := math.Mul(uint64(len(fxIDs)), ids.IDLen)
+	if err != nil {
+		return nil, err
 	}
-	toStake := map[ids.ID]uint64{}
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	bandwidth, err = math.Add(bandwidth, uint64(len(chainName)))
+	if err != nil {
+		return nil, err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(genesis)))
+	if err != nil {
+		return nil, err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(memo)))
+	if err != nil {
+		return nil, err
+	}
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: bandwidth,
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicCreateChainTxComplexities.Add(
+		dynamicComplexity,
+		authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +612,7 @@ func (b *builder) NewCreateChainTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		SubnetID:    subnetID,
 		ChainName:   chainName,
@@ -596,8 +632,28 @@ func (b *builder) NewCreateSubnetTx(
 		b.context.AVAXAssetID: b.context.CreateSubnetTxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	ownerComplexity, err := txfee.OwnerComplexity(owner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicCreateChainTxComplexities.Add(
+		dynamicComplexity,
+		ownerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +665,7 @@ func (b *builder) NewCreateSubnetTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Owner: owner,
 	}
@@ -621,17 +677,42 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.context.AVAXAssetID: b.context.BaseTxFee,
+	}
+	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.BaseTxFee,
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
 	}
-	toStake := map[ids.ID]uint64{}
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	ownerComplexity, err := txfee.OwnerComplexity(owner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicTransferSubnetOwnershipTxComplexities.Add(
+		dynamicComplexity,
+		authComplexity,
+		ownerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +724,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Subnet:     subnetID,
 		Owner:      owner,
@@ -778,7 +859,26 @@ func (b *builder) NewExportTx(
 
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	outputComplexity, err := txfee.OutputComplexity(outputs...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicExportTxComplexities.Add(
+		dynamicComplexity,
+		outputComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -790,7 +890,7 @@ func (b *builder) NewExportTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         changeOutputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs:  outputs,
@@ -826,7 +926,7 @@ func (b *builder) NewTransformSubnetTx(
 		assetID:               maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, feecomponent.Dimensions{}, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -877,8 +977,38 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,
 	}
+
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	signerComplexity, err := txfee.SignerComplexity(signer)
+	if err != nil {
+		return nil, err
+	}
+	validatorOwnerComplexity, err := txfee.OwnerComplexity(validationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	delegatorOwnerComplexity, err := txfee.OwnerComplexity(delegationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+		dynamicComplexity,
+		signerComplexity,
+		validatorOwnerComplexity,
+		delegatorOwnerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -891,7 +1021,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Validator:             vdr.Validator,
 		Subnet:                vdr.Subnet,
@@ -920,8 +1050,27 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,
 	}
+
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	ownerComplexity, err := txfee.OwnerComplexity(rewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+		dynamicComplexity,
+		ownerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -933,7 +1082,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Validator:              vdr.Validator,
 		Subnet:                 vdr.Subnet,
