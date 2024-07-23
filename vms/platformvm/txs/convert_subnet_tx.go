@@ -24,7 +24,7 @@ type ConvertSubnetTx struct {
 	// ID of the Subnet to transform
 	Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// Chain where the Subnet manager lives
-	BlockchainID ids.ID `serialize:"true" json:"chainID"`
+	ChainID ids.ID `serialize:"true" json:"chainID"`
 	// Address of the Subnet manager
 	Address []byte `serialize:"true" json:"address"`
 	// Authorizes this conversion
