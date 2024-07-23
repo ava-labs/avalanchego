@@ -30,6 +30,8 @@
 // standalone go program. It provides an API that mirrors the standard library
 // testing API.
 
+//go:build test
+
 package blocktest
 
 import (

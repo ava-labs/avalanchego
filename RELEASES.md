@@ -1,5 +1,12 @@
 # Release Notes
 
+## [v0.13.7](https://github.com/ava-labs/coreth/releases/tag/v0.13.7)
+- Add EUpgrade base definitions
+- Remove Block Status
+- Fix and improve "GetBlockIDAtHeight"
+- Bump golang version requirement to 1.21.12
+- Bump AvalancheGo to v1.11.10-prerelease
+
 ## [v0.13.6](https://github.com/ava-labs/coreth/releases/tag/v0.13.6)
 - rpc: truncate call error data logs
 - logging: remove path prefix (up to coreth@version/) from logged file names.
