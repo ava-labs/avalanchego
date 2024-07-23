@@ -89,6 +89,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			ChainDBCacheSize:             7,
 			BlockIDCacheSize:             8,
 			FxOwnerCacheSize:             9,
+			SubnetManagerCacheSize:       10,
 			ChecksumsEnabled:             true,
 			MempoolPruneFrequency:        time.Minute,
 		}
