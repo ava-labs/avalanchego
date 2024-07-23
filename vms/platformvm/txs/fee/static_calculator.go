@@ -4,6 +4,7 @@
 package fee
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -14,6 +15,8 @@ import (
 var (
 	_ Calculator  = (*staticCalculator)(nil)
 	_ txs.Visitor = (*staticCalculator)(nil)
+
+	errUnsupportedTx = errors.New("unsupported tx type")
 )
 
 func NewStaticCalculator(
@@ -132,5 +135,9 @@ func (c *staticCalculator) ImportTx(*txs.ImportTx) error {
 
 func (c *staticCalculator) ExportTx(*txs.ExportTx) error {
 	c.fee = c.staticCfg.TxFee
+	return nil
+}
+func (c *staticCalculator) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+	c.fee = 0 // TODO: Fix
 	return nil
 }
