@@ -21,6 +21,11 @@ var (
 	_ Handler = (*ValidatorHandler)(nil)
 )
 
+const (
+	TxGossipHandlerID = iota
+	SignatureRequestHandlerID
+)
+
 // Handler is the server-side logic for virtual machine application protocols.
 type Handler interface {
 	// AppGossip is called when handling an AppGossip message.
