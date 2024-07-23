@@ -15,4 +15,4 @@ source "$CORETH_PATH"/scripts/constants.sh
 
 # We pass in the arguments to this script directly to enable easily passing parameters such as enabling race detection,
 # parallelism, and test coverage.
-go test -shuffle=on -race -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic ./... "$@"
+go test -tags test -shuffle=on -race -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic ./... "$@"

@@ -6,6 +6,10 @@ run:
   # default is true. Enables skipping of directories:
   #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
   skip-dirs-use-default: true
+  # Include non-test files tagged as test-only.
+  # Context: https://github.com/ava-labs/avalanchego/pull/3173
+  build-tags:
+    - test
 
 linters:
   disable-all: true
