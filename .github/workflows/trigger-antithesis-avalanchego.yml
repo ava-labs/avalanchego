@@ -35,6 +35,7 @@ jobs:
           config_image: antithesis-avalanchego-config:${{ github.event.inputs.image_tag || 'latest' }}
           images: antithesis-avalanchego-workload:${{ github.event.inputs.image_tag || 'latest' }};antithesis-avalanchego-node:${{ github.event.inputs.image_tag || 'latest' }}
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
+          # Duration is in hours
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '11.25' }} # Duration is in hours
+            custom.duration=${{ github.event.inputs.duration || '11.25' }}
             custom.workload=avalanchego
