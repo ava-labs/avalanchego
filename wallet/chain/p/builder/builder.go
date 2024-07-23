@@ -346,7 +346,7 @@ func (b *builder) NewBaseTx(
 		return nil, err
 	}
 
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -380,6 +380,7 @@ func (b *builder) NewAddValidatorTx(
 	inputs, baseOutputs, stakeOutputs, err := b.spend(
 		toBurn,
 		toStake,
+		0,
 		feecomponent.Dimensions{},
 		ops,
 	)
@@ -438,7 +439,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +493,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +526,7 @@ func (b *builder) NewAddDelegatorTx(
 		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, feecomponent.Dimensions{}, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, 0, feecomponent.Dimensions{}, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -600,7 +601,7 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -653,7 +654,7 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -712,7 +713,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -793,29 +794,12 @@ func (b *builder) NewImportTx(
 		)
 	}
 
-	var (
-		inputs       []*avax.TransferableInput
-		outputs      = make([]*avax.TransferableOutput, 0, len(importedAmounts))
-		importedAVAX = importedAmounts[avaxAssetID]
-	)
-	if importedAVAX > txFee {
-		importedAmounts[avaxAssetID] -= txFee
-	} else {
-		if importedAVAX < txFee { // imported amount goes toward paying tx fee
-			toBurn := map[ids.ID]uint64{
-				avaxAssetID: txFee - importedAVAX,
-			}
-			toStake := map[ids.ID]uint64{}
-			var err error
-			inputs, outputs, _, err = b.spend(toBurn, toStake, ops)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-			}
-		}
-		delete(importedAmounts, avaxAssetID)
-	}
-
+	outputs := make([]*avax.TransferableOutput, 0, len(importedAmounts))
 	for assetID, amount := range importedAmounts {
+		if assetID == avaxAssetID {
+			continue
+		}
+
 		outputs = append(outputs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -825,6 +809,51 @@ func (b *builder) NewImportTx(
 		})
 	}
 
+	memo := ops.Memo()
+	dynamicComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)),
+		feecomponent.DBRead:    0,
+		feecomponent.DBWrite:   0,
+		feecomponent.Compute:   0,
+	}
+	inputComplexity, err := txfee.InputComplexity(importedInputs...)
+	if err != nil {
+		return nil, err
+	}
+	outputComplexity, err := txfee.OutputComplexity(outputs...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicImportTxComplexities.Add(
+		dynamicComplexity,
+		inputComplexity,
+		outputComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		toBurn    map[ids.ID]uint64
+		toStake   = map[ids.ID]uint64{}
+		excessFee uint64
+	)
+	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX > txFee {
+		toBurn = map[ids.ID]uint64{}
+		excessFee = importedAVAX - txFee
+	} else {
+		toBurn = map[ids.ID]uint64{
+			avaxAssetID: txFee - importedAVAX,
+		}
+		excessFee = 0
+	}
+
+	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, excessFee, complexity, ops)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	outputs = append(outputs, changeOutputs...)
+
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort imported outputs
 	tx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -832,7 +861,7 @@ func (b *builder) NewImportTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		SourceChain:    sourceChainID,
 		ImportedInputs: importedInputs,
@@ -878,7 +907,7 @@ func (b *builder) NewExportTx(
 		return nil, err
 	}
 
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -926,7 +955,7 @@ func (b *builder) NewTransformSubnetTx(
 		assetID:               maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
-	inputs, outputs, _, err := b.spend(toBurn, toStake, feecomponent.Dimensions{}, ops)
+	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, feecomponent.Dimensions{}, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1008,7 +1037,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		return nil, err
 	}
 
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1070,7 +1099,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, complexity, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, 0, complexity, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1154,6 +1183,7 @@ func (b *builder) getBalance(
 func (b *builder) spend(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,
+	excessFee uint64,
 	complexity feecomponent.Dimensions,
 	options *common.Options,
 ) (
