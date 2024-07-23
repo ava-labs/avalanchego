@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-func BenchmarkUniform(b *testing.B) {
+// BenchmarkAllUniform
+func BenchmarkAllUniform(b *testing.B) {
 	sizes := []uint64{
 		30,
 		35,
@@ -16,16 +17,20 @@ func BenchmarkUniform(b *testing.B) {
 		10000,
 		100000,
 	}
-	for _, size := range sizes {
-		b.Run(fmt.Sprintf("%d elements uniformly", size), func(b *testing.B) {
-			s := NewUniform()
+	for _, s := range uniformSamplers {
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("sampler %s with %d elements uniformly", s.name, size), func(b *testing.B) {
+				UniformBenchmark(b, s.sampler, size, 30)
+			})
+		}
+	}
+}
 
-			s.Initialize(size)
+func UniformBenchmark(b *testing.B, s Uniform, size uint64, toSample int) {
+	s.Initialize(size)
 
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_, _ = s.Sample(30)
-			}
-		})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = s.Sample(toSample)
 	}
 }

@@ -27,14 +27,27 @@ var (
 			sampler: &weightedHeap{},
 		},
 		{
+			name:    "linear scan",
+			sampler: &weightedLinear{},
+		},
+		{
 			name: "lookup",
 			sampler: &weightedUniform{
 				maxWeight: 1024,
 			},
 		},
 		{
-			name:    "best with k=30",
-			sampler: NewWeighted(),
+			name: "best with k=30",
+			sampler: &weightedBest{
+				samplers: []Weighted{
+					&weightedArray{},
+					&weightedHeap{},
+					&weightedUniform{
+						maxWeight: 1024,
+					},
+				},
+				benchmarkIterations: 30,
+			},
 		},
 	}
 	weightedTests = []struct {

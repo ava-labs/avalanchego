@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func BenchmarkWeightedWithoutReplacement(b *testing.B) {
+// BenchmarkAllWeightedWithoutReplacement
+func BenchmarkAllWeightedWithoutReplacement(b *testing.B) {
 	sizes := []int{
 		1,
 		5,
@@ -19,16 +20,18 @@ func BenchmarkWeightedWithoutReplacement(b *testing.B) {
 		75,
 		100,
 	}
-	for _, size := range sizes {
-		b.Run(fmt.Sprintf("%d elements", size), func(b *testing.B) {
-			WeightedWithoutReplacementPowBenchmark(
-				b,
-				NewWeightedWithoutReplacement(),
-				0,
-				100000,
-				size,
-			)
-		})
+	for _, s := range weightedWithoutReplacementSamplers {
+		for _, size := range sizes {
+			b.Run(fmt.Sprintf("sampler %s with %d elements", s.name, size), func(b *testing.B) {
+				WeightedWithoutReplacementPowBenchmark(
+					b,
+					s.sampler,
+					0,
+					100000,
+					size,
+				)
+			})
+		}
 	}
 }
 
