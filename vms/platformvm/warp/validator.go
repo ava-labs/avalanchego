@@ -71,7 +71,7 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) (
 		err         error
 	)
 	for _, vdr := range vdrSet {
-		totalWeight, err = math.Add64(totalWeight, vdr.Weight)
+		totalWeight, err = math.Add(totalWeight, vdr.Weight)
 		if err != nil {
 			return nil, 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}
@@ -136,7 +136,7 @@ func SumWeight(vdrs []*Validator) (uint64, error) {
 		err    error
 	)
 	for _, vdr := range vdrs {
-		weight, err = math.Add64(weight, vdr.Weight)
+		weight, err = math.Add(weight, vdr.Weight)
 		if err != nil {
 			return 0, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
 		}

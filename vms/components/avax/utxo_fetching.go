@@ -24,7 +24,7 @@ func GetBalance(db UTXOReader, addrs set.Set[ids.ShortID]) (uint64, error) {
 	balance := uint64(0)
 	for _, utxo := range utxos {
 		if out, ok := utxo.Out.(Amounter); ok {
-			balance, err = safemath.Add64(out.Amount(), balance)
+			balance, err = safemath.Add(out.Amount(), balance)
 			if err != nil {
 				return 0, err
 			}
