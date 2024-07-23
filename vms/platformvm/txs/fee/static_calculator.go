@@ -4,7 +4,6 @@
 package fee
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -15,8 +14,6 @@ import (
 var (
 	_ Calculator  = (*staticCalculator)(nil)
 	_ txs.Visitor = (*staticVisitor)(nil)
-
-	errUnsupportedTx = errors.New("unsupported tx type")
 )
 
 func NewStaticCalculator(
