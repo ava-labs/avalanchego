@@ -1,5 +1,24 @@
 # Release Notes
 
+## [v1.11.10](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.10)
+
+This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
+
+The plugin version is updated to `36` all plugins must update to be compatible.
+
+### APIs
+
+- Renamed `avalanche_{vmName}_plugin_.*` metrics to `avalanche_{vmName}_.*`
+- Renamed `avalanche_{vmName}_rpcchainvm_.*` metrics to `avalanche_rpcchainvm_.*`
+
+### Fixes
+
+- Fixed block building timer recalculation when anyone can propose.
+
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.9...v1.11.10
+
 ## [v1.11.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.9)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
