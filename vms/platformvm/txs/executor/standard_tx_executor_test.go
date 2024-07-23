@@ -2426,6 +2426,36 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 
 	tests := []test{
 		{
+			name: "invalid prior to E-Upgrade",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
+				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
+
+				// Set dependency expectations.
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+
+				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg.MaxStakeDuration = math.MaxInt64
+
+				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
+				require.NoError(t, err)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config:       cfg,
+						Bootstrapped: &utils.Atomic[bool]{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					FeeCalculator: feeCalculator,
+					Tx:            env.tx,
+					State:         env.state,
+				}
+				e.Bootstrapped.Set(true)
+				return env.unsignedTx, e
+			},
+			err: errEUpgradeNotActive,
+		},
+		{
 			name: "tx fails syntactic verification",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
