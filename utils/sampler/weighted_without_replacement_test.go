@@ -4,7 +4,6 @@
 package sampler
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -14,72 +13,45 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	weightedWithoutReplacementSamplers = []struct {
-		name    string
-		sampler WeightedWithoutReplacement
-	}{
-		{
-			name: "generic with replacer and best",
-			sampler: &weightedWithoutReplacementGeneric{
-				u: &uniformReplacer{
-					rng: globalRNG,
-				},
-				w: &weightedBest{
-					samplers: []Weighted{
-						&weightedArray{},
-						&weightedHeap{},
-						&weightedUniform{
-							maxWeight: 1024,
-						},
-					},
-					benchmarkIterations: 30,
-				},
-			},
-		},
-	}
-	weightedWithoutReplacementTests = []struct {
-		name string
-		test func(*testing.T, WeightedWithoutReplacement)
-	}{
-		{
-			name: "initialize overflow",
-			test: WeightedWithoutReplacementInitializeOverflowTest,
-		},
-		{
-			name: "out of range",
-			test: WeightedWithoutReplacementOutOfRangeTest,
-		},
-		{
-			name: "empty without weight",
-			test: WeightedWithoutReplacementEmptyWithoutWeightTest,
-		},
-		{
-			name: "empty",
-			test: WeightedWithoutReplacementEmptyTest,
-		},
-		{
-			name: "singleton",
-			test: WeightedWithoutReplacementSingletonTest,
-		},
-		{
-			name: "with zero",
-			test: WeightedWithoutReplacementWithZeroTest,
-		},
-		{
-			name: "distribution",
-			test: WeightedWithoutReplacementDistributionTest,
-		},
-	}
-)
+var weightedWithoutReplacementTests = []struct {
+	name string
+	test func(*testing.T, WeightedWithoutReplacement)
+}{
+	{
+		name: "initialize overflow",
+		test: WeightedWithoutReplacementInitializeOverflowTest,
+	},
+	{
+		name: "out of range",
+		test: WeightedWithoutReplacementOutOfRangeTest,
+	},
+	{
+		name: "empty without weight",
+		test: WeightedWithoutReplacementEmptyWithoutWeightTest,
+	},
+	{
+		name: "empty",
+		test: WeightedWithoutReplacementEmptyTest,
+	},
+	{
+		name: "singleton",
+		test: WeightedWithoutReplacementSingletonTest,
+	},
+	{
+		name: "with zero",
+		test: WeightedWithoutReplacementWithZeroTest,
+	},
+	{
+		name: "distribution",
+		test: WeightedWithoutReplacementDistributionTest,
+	},
+}
 
-func TestAllWeightedWithoutReplacement(t *testing.T) {
-	for _, s := range weightedWithoutReplacementSamplers {
-		for _, test := range weightedWithoutReplacementTests {
-			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
-				test.test(t, s.sampler)
-			})
-		}
+func TestWeightedWithoutReplacement(t *testing.T) {
+	for _, test := range weightedWithoutReplacementTests {
+		t.Run(test.name, func(t *testing.T) {
+			test.test(t, NewWeightedWithoutReplacement())
+		})
 	}
 }
 
