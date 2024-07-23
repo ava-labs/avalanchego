@@ -41,7 +41,6 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
-	ErrEUpgradeNotActive               = errors.New("attempting to use a E-upgrade feature prior to activation")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary

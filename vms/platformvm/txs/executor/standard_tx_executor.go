@@ -28,6 +28,7 @@ var (
 	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
 	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEUpgradeNotActive          = errors.New("attempting to use a E-upgrade feature prior to activation")
 )
 
 type StandardTxExecutor struct {
@@ -497,7 +498,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		upgrades         = e.Backend.Config.UpgradeConfig
 	)
 	if !upgrades.IsEActivated(currentTimestamp) {
-		return ErrEUpgradeNotActive
+		return errEUpgradeNotActive
 	}
 
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
