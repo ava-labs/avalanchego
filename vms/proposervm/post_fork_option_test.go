@@ -454,7 +454,6 @@ func TestOptionTimestampValidity(t *testing.T) {
 		},
 	}
 
-	emptyParentBlockSig := []byte{}
 	oracleBlkTime := proVM.Time().Truncate(time.Second)
 	statelessBlock, err := block.BuildUnsigned(
 		snowmantest.GenesisID,

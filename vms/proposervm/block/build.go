@@ -69,7 +69,7 @@ func initializeID(bytes []byte, signature []byte) (ids.ID, error) {
 	var unsignedBytes []byte
 	// The serialized form of the block is the unsignedBytes followed by the
 	// signature, which is prefixed by a uint32. So, we need to strip off the
-	// signature as well as it's length prefix to get the unsigned bytes.
+	// signature as well as its length prefix to get the unsigned bytes.
 	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(signature)
 
 	if lenUnsignedBytes < 0 {

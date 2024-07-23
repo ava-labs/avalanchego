@@ -478,7 +478,6 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		return nil, errMarshallingFailed
 	}
 
-	emptyParentBlockSig := []byte{}
 	innerBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	slb, err := statelessblock.Build(
 		proVM.preferred,
@@ -528,7 +527,6 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	}
 
 	blkTimestamp := proVM.Time()
-	emptyParentBlockSig := []byte{}
 
 	slb1, err := statelessblock.Build(
 		proVM.preferred,
@@ -629,8 +627,6 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	pChainHeight, err := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
 	require.NoError(err)
-
-	emptyParentBlockSig := []byte{}
 
 	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
@@ -797,8 +793,6 @@ func TestExpiredBuildBlock(t *testing.T) {
 
 	coreVM := &block.TestVM{}
 	coreVM.T = t
-
-	emptyParentBlockSig := []byte{}
 
 	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
@@ -1172,7 +1166,6 @@ func TestInnerVMRollback(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	emptyParentBlockSig := []byte{}
 	statelessBlock, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		coreBlk.Timestamp(),
@@ -1281,7 +1274,6 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 
 	coreBlk0 := snowmantest.BuildChild(snowmantest.Genesis)
 	coreBlk1 := snowmantest.BuildChild(coreBlk0)
-	emptyParentBlockSig := []byte{}
 	statelessBlock0, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		proVM.Time(),
@@ -1374,7 +1366,6 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 	// use a different way to construct pre-fork block Y and post-fork block B
 	yBlock := snowmantest.BuildChild(snowmantest.Genesis)
-	emptyParentBlockSig := []byte{}
 	ySlb, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		proVM.Time(),
@@ -1709,8 +1700,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	// use a different way to construct inner block Y and outer block B
 	yBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
-	emptyParentBlockSig := []byte{}
-
 	ySlb, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
@@ -1981,7 +1970,6 @@ func TestVMInnerBlkCache(t *testing.T) {
 
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
-	emptyParentBlockSig := []byte{}
 	blkNearTip, err := statelessblock.Build(
 		ids.GenerateTestID(), // parent
 		time.Time{},          // timestamp
@@ -2456,7 +2444,6 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{}, nil
 	}
 
-	emptyParentBlockSig := []byte{}
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	statelessBlock, err := statelessblock.BuildUnsigned(
 		snowmantest.GenesisID,

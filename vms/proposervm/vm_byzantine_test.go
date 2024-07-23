@@ -338,7 +338,6 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	xInnerOptions, err := xBlock.Options(context.Background())
 	require.NoError(err)
 	xInnerOption := xInnerOptions[0]
-	emptyParentBlockSig := []byte{}
 
 	// create a non-Oracle pre-fork block Y
 	yBlock := snowmantest.BuildChild(snowmantest.Genesis)

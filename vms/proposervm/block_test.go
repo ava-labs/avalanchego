@@ -29,6 +29,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 )
 
+// emptyParentBlockSig is used by various tests as the empty parent block signature.
+var emptyParentBlockSig = []byte{}
+
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
 // and the proposervm is activated, we call the VM's BuildBlockWithContext
 // method to build a block rather than BuildBlockWithContext. If the proposervm
@@ -91,8 +94,6 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		innerBlk: innerBlk,
 		vm:       vm,
 	}
-
-	emptyParentBlockSig := []byte{}
 
 	// Should call BuildBlockWithContext since proposervm is activated
 	gotChild, err := blk.buildChild(
@@ -415,8 +416,6 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		proposer.MaxLookAheadWindow,
 		proposer.MaxLookAheadWindow + time.Minute,
 	}
-
-	emptyParentBlockSig := []byte{}
 
 	for _, delay := range delays {
 		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).

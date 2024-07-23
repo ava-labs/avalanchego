@@ -170,7 +170,6 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -259,7 +258,6 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -351,7 +349,6 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -428,7 +425,6 @@ func TestParseStateSummary(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-	emptyParentBlockSig := []byte{}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -488,7 +484,6 @@ func TestStateSummaryAccept(t *testing.T) {
 		HeightV: innerSummary.Height(),
 	}
 
-	emptyParentBlockSig := []byte{}
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
@@ -572,7 +567,6 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-	emptyParentBlockSig := []byte{}
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),

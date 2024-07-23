@@ -58,7 +58,8 @@ var (
 
 	originalStderr = os.Stderr
 
-	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
+	errExpectedBlockWithVerifyContext  = errors.New("expected block.WithVerifyContext")
+	errRequestHasInvalidRandomnessSeed = errors.New("build block request contained invalid randomness seed length")
 )
 
 // VMServer is a VM that is managed over RPC.
@@ -398,7 +399,7 @@ func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest)
 			blkContext.RandomnessSeed = [hashing.HashLen]byte(req.RandomnessSeed)
 		default:
 			// invalid input.
-			return nil, errors.New("build block request contained invalid randomness seed length")
+			return nil, errRequestHasInvalidRandomnessSeed
 		}
 		blk, err = vm.bVM.BuildBlockWithContext(ctx, blkContext)
 	}

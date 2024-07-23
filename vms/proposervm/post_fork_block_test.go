@@ -61,7 +61,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 			snowmantest.BuildChild(innerTestBlock),
 		},
 	}
-	emptyParentBlockSig := []byte{}
+
 	slb, err := block.Build(
 		ids.Empty, // refer unknown parent
 		time.Time{},
@@ -151,7 +151,6 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 
 	// set proVM to be able to build unsigned blocks
 	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
-	emptyParentBlockSig := []byte{}
 	{
 		// child block referring unknown parent does not verify
 		childSlb, err := block.BuildUnsigned(
@@ -241,7 +240,6 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	}
 
 	require.NoError(waitForProposerWindow(proVM, parentBlk, parentBlk.(*postForkBlock).PChainHeight()))
-	emptyParentBlockSig := []byte{}
 	{
 		// child block referring unknown parent does not verify
 		childSlb, err := block.Build(
@@ -370,7 +368,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			innerBlk: childCoreBlk,
 		},
 	}
-	emptyParentBlockSig := []byte{}
 	{
 		// child block timestamp cannot be lower than parent timestamp
 		newTime := parentTimestamp.Add(-1 * time.Second)
@@ -584,7 +581,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			innerBlk: childCoreBlk,
 		},
 	}
-	emptyParentBlockSig := []byte{}
 	{
 		// child P-Chain height must not precede parent P-Chain height
 		childSlb, err := block.Build(
@@ -792,7 +788,6 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			innerBlk: childCoreBlk,
 		},
 	}
-	emptyParentBlockSig := []byte{}
 	{
 		// child P-Chain height must not precede parent P-Chain height
 		childSlb, err := block.BuildUnsigned(
@@ -1131,8 +1126,6 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	require.NoError(opts[0].Verify(context.Background()))
 	require.NoError(opts[1].Verify(context.Background()))
 
-	emptyParentBlockSig := []byte{}
-
 	// Build the child
 	statelessChild, err := block.Build(
 		postForkOracleBlk.ID(),
@@ -1193,7 +1186,6 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	emptyParentBlockSig := []byte{}
 
 	statelessChild, err := block.BuildUnsigned(
 		snowmantest.GenesisID,

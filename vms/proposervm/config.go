@@ -43,7 +43,7 @@ type Config struct {
 	StakingBLSKey *bls.SecretKey
 
 	// e-upgrade activation time
-	EUpgradeActivationTime time.Time
+	EUpgradeTime time.Time
 }
 
 func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
@@ -51,5 +51,5 @@ func (c *Config) IsDurangoActivated(timestamp time.Time) bool {
 }
 
 func (c *Config) IsEActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.EUpgradeActivationTime)
+	return !timestamp.Before(c.EUpgradeTime)
 }
