@@ -46,6 +46,8 @@ const (
 	innerBlkCacheSize     = 64 * units.MiB
 )
 
+var errDurangoUpgradeNotActivated = errors.New("durango upgrade was not activated")
+
 var (
 	_ block.ChainVM         = (*VM)(nil)
 	_ block.BatchedChainVM  = (*VM)(nil)
@@ -253,6 +255,14 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	if err := vm.ChainVM.SetState(ctx, newState); err != nil {
 		return err
+	}
+
+	// make sure that once we get to normal operation, we already have the durango upgrade active.
+	if newState == snow.NormalOp {
+		// the P-chain is expected to be syncronized
+		if !vm.IsDurangoActivated(vm.lastAcceptedTime) {
+			return errDurangoUpgradeNotActivated
+		}
 	}
 
 	oldState := vm.consensusState

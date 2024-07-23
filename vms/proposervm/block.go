@@ -140,12 +140,7 @@ func (p *postForkCommonComponents) Verify(
 			)
 		}
 
-		var shouldHaveProposer bool
-		if p.vm.IsDurangoActivated(parentTimestamp) {
-			shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
-		} else {
-			shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
-		}
+		shouldHaveProposer, err := p.verifyBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		if err != nil {
 			return err
 		}
@@ -196,24 +191,13 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	var shouldBuildSignedBlock bool
-	if p.vm.IsDurangoActivated(parentTimestamp) {
-		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPostDurango(
-			ctx,
-			parentID,
-			parentTimestamp,
-			parentPChainHeight,
-			newTimestamp,
-		)
-	} else {
-		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPreDurango(
-			ctx,
-			parentID,
-			parentTimestamp,
-			parentPChainHeight,
-			newTimestamp,
-		)
-	}
+	shouldBuildSignedBlock, err := p.shouldBuildSignedBlock(
+		ctx,
+		parentID,
+		parentTimestamp,
+		parentPChainHeight,
+		newTimestamp,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -318,42 +302,7 @@ func verifyIsNotOracleBlock(ctx context.Context, b snowman.Block) error {
 	}
 }
 
-func (p *postForkCommonComponents) verifyPreDurangoBlockDelay(
-	ctx context.Context,
-	parentTimestamp time.Time,
-	parentPChainHeight uint64,
-	blk *postForkBlock,
-) (bool, error) {
-	var (
-		blkTimestamp = blk.Timestamp()
-		childHeight  = blk.Height()
-		proposerID   = blk.Proposer()
-	)
-	minDelay, err := p.vm.Windower.Delay(
-		ctx,
-		childHeight,
-		parentPChainHeight,
-		proposerID,
-		proposer.MaxVerifyWindows,
-	)
-	if err != nil {
-		p.vm.ctx.Log.Error("unexpected block verification failure",
-			zap.String("reason", "failed to calculate required timestamp delay"),
-			zap.Stringer("blkID", blk.ID()),
-			zap.Error(err),
-		)
-		return false, err
-	}
-
-	delay := blkTimestamp.Sub(parentTimestamp)
-	if delay < minDelay {
-		return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
-	}
-
-	return delay < proposer.MaxVerifyDelay, nil
-}
-
-func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
+func (p *postForkCommonComponents) verifyBlockDelay(
 	ctx context.Context,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
@@ -392,7 +341,7 @@ func (p *postForkCommonComponents) verifyPostDurangoBlockDelay(
 	}
 }
 
-func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
+func (p *postForkCommonComponents) shouldBuildSignedBlock(
 	ctx context.Context,
 	parentID ids.ID,
 	parentTimestamp time.Time,
@@ -462,49 +411,4 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 	// attempt to re-handle that once it is our turn to build the block.
 	p.vm.notifyInnerBlockReady()
 	return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, currentSlot, expectedProposerID)
-}
-
-func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
-	ctx context.Context,
-	parentID ids.ID,
-	parentTimestamp time.Time,
-	parentPChainHeight uint64,
-	newTimestamp time.Time,
-) (bool, error) {
-	delay := newTimestamp.Sub(parentTimestamp)
-	if delay >= proposer.MaxBuildDelay {
-		return false, nil // time for any node to build an unsigned block
-	}
-
-	parentHeight := p.innerBlk.Height()
-	proposerID := p.vm.ctx.NodeID
-	minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID, proposer.MaxBuildWindows)
-	if err != nil {
-		p.vm.ctx.Log.Error("unexpected build block failure",
-			zap.String("reason", "failed to calculate required timestamp delay"),
-			zap.Stringer("parentID", parentID),
-			zap.Error(err),
-		)
-		return false, err
-	}
-
-	if delay >= minDelay {
-		// it's time for this node to propose a block. It'll be signed or
-		// unsigned depending on the delay
-		return delay < proposer.MaxVerifyDelay, nil
-	}
-
-	// It's not our turn to propose a block yet. This is likely caused by having
-	// previously notified the consensus engine to attempt to build a block on
-	// top of a block that is no longer the preferred block.
-	p.vm.ctx.Log.Debug("build block dropped",
-		zap.Time("parentTimestamp", parentTimestamp),
-		zap.Duration("minDelay", minDelay),
-		zap.Time("blockTimestamp", newTimestamp),
-	)
-
-	// In case the inner VM only issued one pendingTxs message, we should
-	// attempt to re-handle that once it is our turn to build the block.
-	p.vm.notifyInnerBlockReady()
-	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
 }
