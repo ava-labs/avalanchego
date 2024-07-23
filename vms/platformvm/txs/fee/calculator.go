@@ -7,5 +7,5 @@ import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 // Calculator is the interfaces that any fee Calculator must implement
 type Calculator interface {
-	CalculateFee(tx *txs.Tx) (uint64, error)
+	CalculateFee(tx txs.UnsignedTx) (uint64, error)
 }

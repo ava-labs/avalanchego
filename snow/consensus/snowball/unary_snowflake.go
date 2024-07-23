@@ -33,7 +33,7 @@ type unarySnowflake struct {
 	// The corresponding beta values give the threshold required to finalize this instance.
 	terminationConditions []terminationCondition
 
-	// confidence is the number of consecutive succcessful polls for a given
+	// confidence is the number of consecutive successful polls for a given
 	// alphaConfidence threshold.
 	// This instance finalizes when confidence[i] >= terminationConditions[i].beta for any i
 	confidence []int
