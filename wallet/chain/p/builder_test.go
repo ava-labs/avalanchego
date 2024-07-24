@@ -605,7 +605,13 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
 
 		// data to build the transaction
-		rewardsOwner = &secp256k1fx.OutputOwners{
+		validationRewardsOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				rewardAddr,
+			},
+		}
+		delegationRewardsOwner = &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				rewardAddr,
@@ -628,8 +634,8 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		avaxAssetID,
-		rewardsOwner,
-		rewardsOwner,
+		validationRewardsOwner,
+		delegationRewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
