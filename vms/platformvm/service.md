@@ -1227,7 +1227,7 @@ platform.getSubnet({
   will be empty.
 - changes can not be made into the subnet until `locktime` is in the past.
 - `subnetTransformationTxID` is the ID of the transaction that changed the subnet into a elastic one, 
-  for when this was change was performed.
+  for when this change was performed.
 
 **Example Call:**
 
