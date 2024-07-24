@@ -1334,7 +1334,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+		newOutput := &avax.TransferableOutput{
 			Asset: avax.Asset{
 				ID: assetID,
 			},
@@ -1342,7 +1342,17 @@ func (b *builder) spend(
 				Amt:          amount,
 				OutputOwners: *changeOwner,
 			},
-		})
+		}
+		newOutputComplexity, err := txfee.OutputComplexity(newOutput)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		complexity, err = complexity.Add(newOutputComplexity)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		stakeOutputs = append(stakeOutputs, newOutput)
 	}
 
 	// Iterate over the unlocked UTXOs except AVAX
@@ -1382,7 +1392,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputs = append(inputs, &avax.TransferableInput{
+		newInput := &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &secp256k1fx.TransferInput{
@@ -1391,7 +1401,17 @@ func (b *builder) spend(
 					SigIndices: inputSigIndices,
 				},
 			},
-		})
+		}
+		newInputComplexity, err := txfee.InputComplexity(newInput)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		complexity, err = complexity.Add(newInputComplexity)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		inputs = append(inputs, newInput)
 
 		// Burn any value that should be burned
 		amountToBurn := min(
@@ -1408,14 +1428,24 @@ func (b *builder) spend(
 		)
 		amountsToStake[assetID] -= amountToStake
 		if remainingAmount := amountAvailableToStake - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
+			newOutput := &avax.TransferableOutput{
 				Asset: utxo.Asset,
 				Out: &secp256k1fx.TransferOutput{
 					Amt:          remainingAmount,
 					OutputOwners: *changeOwner,
 				},
-			})
+			}
+			newOutputComplexity, err := txfee.OutputComplexity(newOutput)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			complexity, err = complexity.Add(newOutputComplexity)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			// This input had extra value, so some of it must be returned
+			changeOutputs = append(changeOutputs, newOutput)
 		}
 	}
 
@@ -1529,7 +1559,7 @@ func (b *builder) spend(
 		}
 	}
 
-	if remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]; remainingAmountToStake > 0 {
+	if remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]; remainingAmountToStake != 0 {
 		return nil, nil, nil, fmt.Errorf(
 			"%w: provided UTXOs need %d more units of asset %q to stake",
 			ErrInsufficientFunds,
@@ -1537,7 +1567,7 @@ func (b *builder) spend(
 			b.context.AVAXAssetID,
 		)
 	}
-	if remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]; remainingAmountToBurn > 0 {
+	if remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]; remainingAmountToBurn != 0 {
 		return nil, nil, nil, fmt.Errorf(
 			"%w: provided UTXOs need %d more units of asset %q",
 			ErrInsufficientFunds,
@@ -1563,6 +1593,41 @@ func (b *builder) spend(
 			requiredFee-excessFee,
 			b.context.AVAXAssetID,
 		)
+	}
+
+	secpOutput := &secp256k1fx.TransferOutput{
+		Amt:          0, // Populated later if used
+		OutputOwners: *changeOwner,
+	}
+	newOutput := &avax.TransferableOutput{
+		Asset: avax.Asset{
+			ID: b.context.AVAXAssetID,
+		},
+		Out: secpOutput,
+	}
+	newOutputComplexity, err := txfee.OutputComplexity(newOutput)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	complexity, err = complexity.Add(newOutputComplexity)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	requiredGasWithChange, err := complexity.ToGas(feecomponent.Dimensions{})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// TODO: Multiply by price of gas
+	requiredFeeWithChange, err := math.Mul(0, uint64(requiredGasWithChange))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if excessFee > requiredFeeWithChange {
+		// It is worth adding the change output
+		secpOutput.Amt = excessFee - requiredFeeWithChange
+		changeOutputs = append(changeOutputs, newOutput)
 	}
 
 	utils.Sort(inputs)                                     // sort inputs
