@@ -1329,6 +1329,22 @@ func (b *builder) spend(
 		}
 	}
 
+	for assetID, amount := range amountsToStake {
+		if amount == 0 {
+			continue
+		}
+
+		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+			Asset: avax.Asset{
+				ID: assetID,
+			},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: *changeOwner,
+			},
+		})
+	}
+
 	// Iterate over the unlocked UTXOs except AVAX
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
@@ -1391,16 +1407,6 @@ func (b *builder) spend(
 			amountAvailableToStake, // Amount available to stake
 		)
 		amountsToStake[assetID] -= amountToStake
-		if amountToStake > 0 {
-			// Some of this input was put for staking
-			stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
-					OutputOwners: *changeOwner,
-				},
-			})
-		}
 		if remainingAmount := amountAvailableToStake - amountToStake; remainingAmount > 0 {
 			// This input had extra value, so some of it must be returned
 			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
@@ -1413,14 +1419,45 @@ func (b *builder) spend(
 		}
 	}
 
+	for assetID, amount := range amountsToStake {
+		if amount != 0 && assetID != b.context.AVAXAssetID {
+			return nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q to stake",
+				ErrInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
+	}
+	for assetID, amount := range amountsToBurn {
+		if amount != 0 && assetID != b.context.AVAXAssetID {
+			return nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q",
+				ErrInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
+	}
+
 	// Iterate over the unlocked AVAX UTXOs
 	for _, utxo := range utxos {
 		remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]
 		remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]
 
+		requiredGas, err := complexity.ToGas(feecomponent.Dimensions{})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		// TODO: Multiply by price of gas
+		requiredFee, err := math.Mul(0, uint64(requiredGas))
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
 		// If we have consumed enough of the asset, then we have no need burn
 		// more.
-		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 {
+		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 && excessFee >= requiredFee {
 			break
 		}
 
@@ -1484,53 +1521,48 @@ func (b *builder) spend(
 			amountAvailableToStake, // Amount available to stake
 		)
 		amountsToStake[b.context.AVAXAssetID] -= amountToStake
-		if amountToStake > 0 {
-			newOutput := &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
-					OutputOwners: *changeOwner,
-				},
-			}
-			newOutputComplexity, err := txfee.OutputComplexity(newOutput)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			complexity, err = complexity.Add(newOutputComplexity)
-			if err != nil {
-				return nil, nil, nil, err
-			}
 
-			// Some of this input was put for staking
-			stakeOutputs = append(stakeOutputs, newOutput)
-		}
 		remainingAmount := amountAvailableToStake - amountToStake
 		excessFee, err = math.Add(excessFee, remainingAmount)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-
 	}
 
-	for assetID, amount := range amountsToStake {
-		if amount != 0 {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q to stake",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
+	if remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]; remainingAmountToStake > 0 {
+		return nil, nil, nil, fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q to stake",
+			ErrInsufficientFunds,
+			remainingAmountToStake,
+			b.context.AVAXAssetID,
+		)
 	}
-	for assetID, amount := range amountsToBurn {
-		if amount != 0 {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
+	if remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]; remainingAmountToBurn > 0 {
+		return nil, nil, nil, fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q",
+			ErrInsufficientFunds,
+			remainingAmountToBurn,
+			b.context.AVAXAssetID,
+		)
+	}
+
+	requiredGas, err := complexity.ToGas(feecomponent.Dimensions{})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// TODO: Multiply by price of gas
+	requiredFee, err := math.Mul(0, uint64(requiredGas))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if excessFee < requiredFee {
+		return nil, nil, nil, fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q",
+			ErrInsufficientFunds,
+			requiredFee-excessFee,
+			b.context.AVAXAssetID,
+		)
 	}
 
 	utils.Sort(inputs)                                     // sort inputs
