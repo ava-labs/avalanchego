@@ -1251,7 +1251,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputs = append(inputs, &avax.TransferableInput{
+		newInput := &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &stakeable.LockIn{
@@ -1263,7 +1263,17 @@ func (b *builder) spend(
 					},
 				},
 			},
-		})
+		}
+		newInputComplexity, err := txfee.InputComplexity(newInput)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		complexity, err = complexity.Add(newInputComplexity)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		inputs = append(inputs, newInput)
 
 		// Stake any value that should be staked
 		amountToStake := min(
@@ -1271,8 +1281,7 @@ func (b *builder) spend(
 			out.Amt,                // Amount available to stake
 		)
 
-		// Add the output to the staked outputs
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+		newOutput := &avax.TransferableOutput{
 			Asset: utxo.Asset,
 			Out: &stakeable.LockOut{
 				Locktime: lockedOut.Locktime,
@@ -1281,12 +1290,22 @@ func (b *builder) spend(
 					OutputOwners: out.OutputOwners,
 				},
 			},
-		})
+		}
+		newOutputComplexity, err := txfee.OutputComplexity(newOutput)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		complexity, err = complexity.Add(newOutputComplexity)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// Add the output to the staked outputs
+		stakeOutputs = append(stakeOutputs, newOutput)
 
 		amountsToStake[assetID] -= amountToStake
 		if remainingAmount := out.Amt - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
+			newOutput := &avax.TransferableOutput{
 				Asset: utxo.Asset,
 				Out: &stakeable.LockOut{
 					Locktime: lockedOut.Locktime,
@@ -1295,13 +1314,28 @@ func (b *builder) spend(
 						OutputOwners: out.OutputOwners,
 					},
 				},
-			})
+			}
+			newOutputComplexity, err := txfee.OutputComplexity(newOutput)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			complexity, err = complexity.Add(newOutputComplexity)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			// This input had extra value, so some of it must be returned
+			changeOutputs = append(changeOutputs, newOutput)
 		}
 	}
 
-	// Iterate over the unlocked UTXOs
+	// Iterate over the unlocked UTXOs except AVAX
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
+		if assetID == b.context.AVAXAssetID {
+			continue
+		}
+
 		remainingAmountToStake := amountsToStake[assetID]
 		remainingAmountToBurn := amountsToBurn[assetID]
 
@@ -1350,11 +1384,11 @@ func (b *builder) spend(
 		)
 		amountsToBurn[assetID] -= amountToBurn
 
-		amountAvalibleToStake := out.Amt - amountToBurn
+		amountAvailableToStake := out.Amt - amountToBurn
 		// Burn any value that should be burned
 		amountToStake := min(
 			remainingAmountToStake, // Amount we still need to stake
-			amountAvalibleToStake,  // Amount available to stake
+			amountAvailableToStake, // Amount available to stake
 		)
 		amountsToStake[assetID] -= amountToStake
 		if amountToStake > 0 {
@@ -1367,7 +1401,7 @@ func (b *builder) spend(
 				},
 			})
 		}
-		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
+		if remainingAmount := amountAvailableToStake - amountToStake; remainingAmount > 0 {
 			// This input had extra value, so some of it must be returned
 			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
 				Asset: utxo.Asset,
@@ -1377,6 +1411,105 @@ func (b *builder) spend(
 				},
 			})
 		}
+	}
+
+	// Iterate over the unlocked AVAX UTXOs
+	for _, utxo := range utxos {
+		remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]
+		remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]
+
+		// If we have consumed enough of the asset, then we have no need burn
+		// more.
+		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 {
+			break
+		}
+
+		if assetID := utxo.AssetID(); assetID != b.context.AVAXAssetID {
+			continue
+		}
+
+		outIntf := utxo.Out
+		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
+			if lockedOut.Locktime > minIssuanceTime {
+				// This output is currently locked, so this output can't be
+				// burned.
+				continue
+			}
+			outIntf = lockedOut.TransferableOut
+		}
+
+		out, ok := outIntf.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return nil, nil, nil, ErrUnknownOutputType
+		}
+
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
+			continue
+		}
+
+		newInput := &avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  utxo.Asset,
+			In: &secp256k1fx.TransferInput{
+				Amt: out.Amt,
+				Input: secp256k1fx.Input{
+					SigIndices: inputSigIndices,
+				},
+			},
+		}
+		newInputComplexity, err := txfee.InputComplexity(newInput)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		complexity, err = complexity.Add(newInputComplexity)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		inputs = append(inputs, newInput)
+
+		// Burn any value that should be burned
+		amountToBurn := min(
+			remainingAmountToBurn, // Amount we still need to burn
+			out.Amt,               // Amount available to burn
+		)
+		amountsToBurn[b.context.AVAXAssetID] -= amountToBurn
+
+		amountAvailableToStake := out.Amt - amountToBurn
+		// Burn any value that should be burned
+		amountToStake := min(
+			remainingAmountToStake, // Amount we still need to stake
+			amountAvailableToStake, // Amount available to stake
+		)
+		amountsToStake[b.context.AVAXAssetID] -= amountToStake
+		if amountToStake > 0 {
+			newOutput := &avax.TransferableOutput{
+				Asset: utxo.Asset,
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          amountToStake,
+					OutputOwners: *changeOwner,
+				},
+			}
+			newOutputComplexity, err := txfee.OutputComplexity(newOutput)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			complexity, err = complexity.Add(newOutputComplexity)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			// Some of this input was put for staking
+			stakeOutputs = append(stakeOutputs, newOutput)
+		}
+		remainingAmount := amountAvailableToStake - amountToStake
+		excessFee, err = math.Add(excessFee, remainingAmount)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
 	}
 
 	for assetID, amount := range amountsToStake {
