@@ -6,6 +6,8 @@ package proposervm
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -23,7 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	blockbuilder "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 func TestCoreVMNotRemote(t *testing.T) {
@@ -52,8 +57,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 	require.ErrorIs(err, block.ErrRemoteVMNotImplemented)
 
 	var blks [][]byte
-	_, err = proVM.BatchedParseBlock(context.Background(), blks)
-	require.ErrorIs(err, block.ErrRemoteVMNotImplemented)
+	shouldBeEmpty, err := proVM.BatchedParseBlock(context.Background(), blks)
+	require.NoError(err)
+	require.Empty(shouldBeEmpty)
 }
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {
@@ -581,6 +587,102 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require.Equal(builtBlk1.ID(), res[0].ID())
 	require.Equal(builtBlk2.ID(), res[1].ID())
 	require.Equal(builtBlk3.ID(), res[2].ID())
+}
+
+func TestBatchedParseBlockParallel(t *testing.T) {
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	chainID := ids.GenerateTestID()
+
+	vm := VM{
+		ctx: &snow.Context{ChainID: chainID},
+		ChainVM: &block.TestVM{
+			ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
+				return &snowmantest.Block{BytesV: rawBlock}, nil
+			},
+		},
+	}
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(t, err)
+	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	blockThatCantBeParsed := snowmantest.BuildChild(snowmantest.Genesis)
+
+	blocksWithUnparsable := makeParseableBlocks(t, parentID, timestamp, pChainHeight, cert, chainID, key)
+	blocksWithUnparsable[50] = blockThatCantBeParsed.Bytes()
+
+	parsableBlocks := makeParseableBlocks(t, parentID, timestamp, pChainHeight, cert, chainID, key)
+
+	for _, testCase := range []struct {
+		name         string
+		preForkIndex int
+		rawBlocks    [][]byte
+	}{
+		{
+			name:      "empty input",
+			rawBlocks: [][]byte{},
+		},
+		{
+			name:         "pre-fork is somewhere in the middle",
+			rawBlocks:    blocksWithUnparsable,
+			preForkIndex: 50,
+		},
+		{
+			name:         "all blocks are post fork",
+			rawBlocks:    parsableBlocks,
+			preForkIndex: len(parsableBlocks),
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			require := require.New(t)
+			blocks, err := vm.BatchedParseBlock(context.Background(), testCase.rawBlocks)
+			require.NoError(err)
+
+			returnedBlockBytes := make([][]byte, len(blocks))
+			for i, block := range blocks {
+				returnedBlockBytes[i] = block.Bytes()
+			}
+			require.Equal(testCase.rawBlocks, returnedBlockBytes)
+
+			for i, block := range blocks {
+				if i < testCase.preForkIndex {
+					require.IsType(&postForkBlock{}, block)
+				} else {
+					require.IsType(&preForkBlock{}, block)
+				}
+			}
+		})
+	}
+}
+
+func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
+	makeSignedBlock := func(i int) []byte {
+		buff := binary.AppendVarint(nil, int64(i))
+
+		signedBlock, err := blockbuilder.Build(
+			parentID,
+			timestamp,
+			pChainHeight,
+			cert,
+			buff,
+			chainID,
+			key,
+		)
+		require.NoError(t, err)
+
+		return signedBlock.Bytes()
+	}
+
+	blockBytes := make([][]byte, 100)
+	for i := range blockBytes {
+		blockBytes[i] = makeSignedBlock(i)
+	}
+	return blockBytes
 }
 
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
