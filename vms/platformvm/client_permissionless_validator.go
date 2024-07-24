@@ -45,10 +45,10 @@ type ClientPermissionlessValidator struct {
 	AccruedDelegateeReward *uint64
 	DelegationFee          float32
 	// Deprecated: Uptime is deprecated for Subnet Validators.
-	// 						 It will be available only for Primary Network Validators.
+	//						 It will be available only for Primary Network Validators.
 	Uptime *float32
 	// Deprecated: Connected is deprecated for Subnet Validators.
-	// 						 It will be available only for Primary Network Validators.
+	//						 It will be available only for Primary Network Validators.
 	Connected *bool
 	Signer    *signer.ProofOfPossession
 	// The delegators delegating to this validator
