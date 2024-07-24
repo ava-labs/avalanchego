@@ -428,8 +428,6 @@ func Test_Dimensions_ToGas(t *testing.T) {
 }
 
 func Benchmark_Dimensions_Add(b *testing.B) {
-	require := require.New(b)
-
 	lhs := Dimensions{600, 10, 10, 1000}
 	rhs := []Dimensions{
 		{1, 1, 1, 1},
@@ -444,14 +442,13 @@ func Benchmark_Dimensions_Add(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := lhs.Add(rhs...)
-		require.NoError(err)
+		if err != nil {
+			b.Error(err)
+		}
 	}
-	b.StopTimer()
 }
 
 func Benchmark_Dimensions_Sub(b *testing.B) {
-	require := require.New(b)
-
 	lhs := Dimensions{10_000, 10_000, 10_000, 100_000}
 	rhs := []Dimensions{
 		{1, 1, 1, 1},
@@ -465,7 +462,8 @@ func Benchmark_Dimensions_Sub(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := lhs.Sub(rhs...)
-		require.NoError(err)
+		if err != nil {
+			b.Error(err)
+		}
 	}
-	b.StopTimer()
 }
