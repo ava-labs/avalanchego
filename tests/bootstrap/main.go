@@ -28,6 +28,7 @@ func main() {
 	maxDuration := flag.Duration("max-duration", time.Hour*72, "The maximum duration the network should run for")
 	dataDir := flag.String("data-dir", "", "The directory to store the node's data")
 	useDynamicPorts := flag.Bool("use-dynamic-ports", false, "Whether the bootstrapping node should bind to dynamic ports")
+	wipeDataDir := flag.Bool("wipe-data-dir", false, "Whether to wipe the data dir in preparation for testing")
 
 	flag.Parse()
 
@@ -40,8 +41,11 @@ func main() {
 	if *maxDuration == 0 {
 		log.Fatal("max-duration is required")
 	}
+	if len(*dataDir) == 0 && *wipeDataDir {
+		log.Fatal("unable to wipe the data dir when a path is not provided")
+	}
 
-	if err := checkBootstrap(*dataDir, *avalanchegoPath, uint32(*networkID), *useDynamicPorts, *stateSyncEnabled, *maxDuration); err != nil {
+	if err := checkBootstrap(*dataDir, *avalanchegoPath, uint32(*networkID), *useDynamicPorts, *wipeDataDir, *stateSyncEnabled, *maxDuration); err != nil {
 		log.Fatalf("Failed to check bootstrap: %v\n", err)
 	}
 }
@@ -51,6 +55,7 @@ func checkBootstrap(
 	avalanchegoPath string,
 	networkID uint32,
 	useDynamicPorts bool,
+	wipeDataDir bool,
 	stateSyncEnabled bool,
 	maxDuration time.Duration,
 ) error {
@@ -65,6 +70,12 @@ func checkBootstrap(
 			config.HTTPPortKey:    config.DefaultHTTPPort,
 			config.StakingPortKey: config.DefaultStakingPort,
 		})
+	}
+
+	if wipeDataDir && len(dataDir) > 0 {
+		if err := os.RemoveAll(dataDir); err != nil {
+			return fmt.Errorf("failed to remove data dir: %w", err)
+		}
 	}
 
 	networkName := constants.NetworkName(networkID)
