@@ -11,20 +11,29 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
 
-const CodecVersion = 0
+const (
+	CodecVersion0Tag = "v0"
+	CodecVersionV0   = 0
+
+	CodecVersion1Tag = "v1"
+	CodecVersion     = 1
+)
 
 var Codec codec.Manager
 
 func init() {
-	lc := linearcodec.NewDefault()
+	lcV0 := linearcodec.New([]string{CodecVersion0Tag})
+	lc := linearcodec.New([]string{CodecVersion0Tag, CodecVersion1Tag})
+
 	// The maximum block size is enforced by the p2p message size limit.
 	// See: [constants.DefaultMaxMessageSize]
 	Codec = codec.NewManager(math.MaxInt)
 
 	err := errors.Join(
-		lc.RegisterType(&statelessBlock[statelessUnsignedBlockV0]{}),
-		lc.RegisterType(&option{}),
-		lc.RegisterType(&statelessBlock[statelessUnsignedBlock]{}),
+		lcV0.RegisterType(&statelessBlock{}),
+		lcV0.RegisterType(&option{}),
+		lc.RegisterType(&statelessBlock{}),
+		Codec.RegisterCodec(CodecVersionV0, lcV0),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {

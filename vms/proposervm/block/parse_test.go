@@ -54,7 +54,7 @@ func TestParse(t *testing.T) {
 
 	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(t, err)
-	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock[statelessUnsignedBlock])
+	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock)
 	signedWithoutCertBlock.Signature = []byte{5}
 
 	signedWithoutCertBlock.bytes, err = Codec.Marshal(CodecVersion, &signedWithoutCertBlockIntf)
@@ -131,8 +131,8 @@ func TestParseBytes(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:        "gibberish",
-			hex:         "000102030405",
+			name:        "unsupported codec version",
+			hex:         "000402030405",
 			expectedErr: codec.ErrUnknownVersion,
 		},
 	}

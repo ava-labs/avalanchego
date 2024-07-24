@@ -156,7 +156,7 @@ func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock, 
 		}
 
 		// get the validator for this proposer
-		if childValidator, ok := validatorSet[childProposer]; ok && childValidator != nil {
+		if childValidator, ok := validatorSet[childProposer]; !ok || childValidator == nil {
 			return errProposersNotActivated
 		} else {
 			proposerPublicKey = childValidator.PublicKey

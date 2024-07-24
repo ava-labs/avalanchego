@@ -221,7 +221,7 @@ func TestNextBlockVRFSig(t *testing.T) {
 func TestVerifySignature(t *testing.T) {
 	signKey, err := bls.NewSecretKey()
 	require.NoError(t, err)
-	var block statelessBlock[statelessUnsignedBlock]
+	var block statelessBlock
 	block.StatelessBlock.VRFSig = NextBlockVRFSig(nil, signKey, [32]byte{0}, 8888)
 	block.vrfSig, err = bls.SignatureFromBytes(block.StatelessBlock.VRFSig)
 	require.NoError(t, err)

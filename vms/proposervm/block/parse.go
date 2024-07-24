@@ -27,8 +27,8 @@ func ParseWithoutVerification(bytes []byte) (Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	if parsedVersion != CodecVersion {
-		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
+	if parsedVersion > CodecVersion {
+		return nil, fmt.Errorf("expected codec version up to %d but got %d", CodecVersion, parsedVersion)
 	}
 	return block, block.initialize(bytes)
 }
@@ -39,8 +39,8 @@ func ParseHeader(bytes []byte) (Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	if parsedVersion != CodecVersion {
-		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersion, parsedVersion)
+	if parsedVersion != CodecVersionV0 {
+		return nil, fmt.Errorf("expected codec version %d but got %d", CodecVersionV0, parsedVersion)
 	}
 	header.bytes = bytes
 	return &header, nil

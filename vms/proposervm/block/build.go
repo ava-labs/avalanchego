@@ -29,7 +29,7 @@ func BuildUnsigned(
 	blockBytes []byte,
 	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	block := &statelessBlock[statelessUnsignedBlock]{
+	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -84,22 +84,13 @@ func initializeID(bytes []byte, signature []byte) (ids.ID, error) {
 // coping the exported fields into statelessBlockV0 and then marshaling it.
 // this allows the marsheler to produce encoded blocks that match the old style blocks as long as
 // the VRFSig feature was not enabled.
-func marshalBlock(block *statelessBlock[statelessUnsignedBlock]) ([]byte, error) {
-	if len(block.StatelessBlock.VRFSig) == 0 {
-		// create a backward compatible block ( without VRFSig ) and use the statelessBlockV0 encoder for the encoding.
-		var preBlockSigBlock SignedBlock = &statelessBlock[statelessUnsignedBlockV0]{
-			StatelessBlock: statelessUnsignedBlockV0{
-				ParentID:     block.StatelessBlock.ParentID,
-				Timestamp:    block.StatelessBlock.Timestamp,
-				PChainHeight: block.StatelessBlock.PChainHeight,
-				Certificate:  block.StatelessBlock.Certificate,
-				Block:        block.StatelessBlock.Block,
-			},
-			Signature: block.Signature,
-		}
-		return Codec.Marshal(CodecVersion, &preBlockSigBlock)
-	}
+func marshalBlock(block *statelessBlock) ([]byte, error) {
 	var blockIntf SignedBlock = block
+	if len(block.StatelessBlock.VRFSig) == 0 {
+		// create a backward compatible block ( without VRFSig ) and use the codec version 0 encoder for the encoding.
+		return Codec.Marshal(CodecVersionV0, &blockIntf)
+	}
+
 	return Codec.Marshal(CodecVersion, &blockIntf)
 }
 
@@ -162,7 +153,7 @@ func Build(
 	key crypto.Signer,
 	blockVrfSig []byte,
 ) (SignedBlock, error) {
-	block := &statelessBlock[statelessUnsignedBlock]{
+	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -227,7 +218,7 @@ func BuildHeader(
 		Body:   bodyID,
 	}
 
-	bytes, err := Codec.Marshal(CodecVersion, &header)
+	bytes, err := Codec.Marshal(CodecVersionV0, &header)
 	header.bytes = bytes
 	return &header, err
 }
@@ -244,7 +235,7 @@ func BuildOption(
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := Codec.Marshal(CodecVersion, &block)
+	bytes, err := Codec.Marshal(CodecVersionV0, &block)
 	if err != nil {
 		return nil, err
 	}
