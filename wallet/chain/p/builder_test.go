@@ -547,51 +547,31 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		utxosOffset uint64 = 2024
 		utxosKey           = testKeys[1]
 		utxosAddr          = utxosKey.Address()
-		utxos              = []*avax.UTXO{
-			{ // UTXO to pay the fee
-				UTXOID: avax.UTXOID{
-					TxID:        ids.Empty.Prefix(),
-					OutputIndex: uint32(utxosOffset),
-				},
-				Asset: avax.Asset{ID: avaxAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: testContext.AddPrimaryNetworkValidatorFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Addrs:     []ids.ShortID{utxosAddr},
-						Threshold: 1,
-					},
+	)
+	makeUTXO := func(amount uint64) *avax.UTXO {
+		utxosOffset++
+		return &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(utxosOffset),
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{utxosAddr},
+					Threshold: 1,
 				},
 			},
-			{ // small UTXO
-				UTXOID: avax.UTXOID{
-					TxID:        ids.Empty.Prefix(utxosOffset + 1),
-					OutputIndex: uint32(utxosOffset + 1),
-				},
-				Asset: avax.Asset{ID: avaxAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 1 * units.NanoAvax,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{utxosAddr},
-					},
-				},
-			},
-			{ // large UTXO
-				UTXOID: avax.UTXOID{
-					TxID:        ids.Empty.Prefix(utxosOffset + 2),
-					OutputIndex: uint32(utxosOffset + 2),
-				},
-				Asset: avax.Asset{ID: avaxAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 9 * units.Avax,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Addrs:     []ids.ShortID{utxosAddr},
-						Threshold: 1,
-					},
-				},
-			},
+		}
+	}
+
+	var (
+		utxos = []*avax.UTXO{
+			makeUTXO(testContext.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
+			makeUTXO(1 * units.NanoAvax),                        // small UTXO
+			makeUTXO(9 * units.Avax),                            // large UTXO
 		}
 		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
