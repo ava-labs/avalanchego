@@ -56,7 +56,8 @@ type statelessUnsignedBlock struct {
 	PChainHeight uint64 `v0:"true"`
 	Certificate  []byte `v0:"true"`
 	Block        []byte `v0:"true"`
-	VRFSig       []byte `v1:"true"`
+
+	VRFSig []byte `v1:"true"`
 }
 
 type statelessBlock struct {
