@@ -1213,7 +1213,6 @@ platform.getSubnet({
     subnetID: string
 }) ->
 {
-    id: string,
     isPermissioned: bool,
     controlKeys: []string,
     threshold: string,
