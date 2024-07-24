@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: Git checkout
         uses: actions/checkout@v4
-        with:
-          ref: 'dev'
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run merkledb fuzz tests
