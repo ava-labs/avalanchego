@@ -498,7 +498,7 @@ type Ping struct {
 
 	// Uptime percentage on the primary network [0, 100]
 	Uptime uint32 `protobuf:"varint,1,opt,name=uptime,proto3" json:"uptime,omitempty"`
-	// Uptime percentage on subnets
+	// Deprecated
 	SubnetUptimes []*SubnetUptime `protobuf:"bytes,2,rep,name=subnet_uptimes,json=subnetUptimes,proto3" json:"subnet_uptimes,omitempty"`
 }
 
