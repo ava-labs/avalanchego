@@ -312,11 +312,20 @@ type UptimeRequest struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
+// Deprecated: Uptime is deprecated for Subnet Validators.
+// It will be available only for Primary Network Validators.
 func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
-	i.log.Debug("API called",
-		zap.String("service", "info"),
-		zap.String("method", "uptime"),
-	)
+	if args.SubnetID != constants.PrimaryNetworkID {
+		i.log.Warn("Deprecated API called",
+			zap.String("service", "info"),
+			zap.String("method", "uptime"),
+		)
+	} else {
+		i.log.Debug("API called",
+			zap.String("service", "info"),
+			zap.String("method", "uptime"),
+		)
+	}
 
 	result, err := i.networking.NodeUptime(args.SubnetID)
 	if err != nil {

@@ -1098,6 +1098,8 @@ func (n *network) StartClose() {
 	})
 }
 
+// Deprecated: NodeUptime is deprecated for Subnet Validators.
+// It will be available only for Primary Network Validators.
 func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 	if subnetID != constants.PrimaryNetworkID && !n.config.TrackedSubnets.Contains(subnetID) {
 		return UptimeResult{}, errNotTracked
