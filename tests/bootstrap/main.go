@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -25,6 +26,8 @@ func main() {
 	networkID := flag.Int64("network-id", 0, "The ID of the network to bootstrap from")
 	stateSyncEnabled := flag.Bool("state-sync-enabled", false, "Whether state syncing should be enabled")
 	maxDuration := flag.Duration("max-duration", time.Hour*72, "The maximum duration the network should run for")
+	dataDir := flag.String("data-dir", "", "The directory to store the node's data")
+	useDynamicPorts := flag.Bool("use-dynamic-ports", false, "Whether the bootstrapping node should bind to dynamic ports")
 
 	flag.Parse()
 
@@ -38,25 +41,43 @@ func main() {
 		log.Fatal("max-duration is required")
 	}
 
-	if err := checkBootstrap(*avalanchegoPath, uint32(*networkID), *stateSyncEnabled, *maxDuration); err != nil {
+	if err := checkBootstrap(*dataDir, *avalanchegoPath, uint32(*networkID), *useDynamicPorts, *stateSyncEnabled, *maxDuration); err != nil {
 		log.Fatalf("Failed to check bootstrap: %v\n", err)
 	}
 }
 
-func checkBootstrap(avalanchegoPath string, networkID uint32, stateSyncEnabled bool, maxDuration time.Duration) error {
+func checkBootstrap(
+	dataDir string,
+	avalanchegoPath string,
+	networkID uint32,
+	useDynamicPorts bool,
+	stateSyncEnabled bool,
+	maxDuration time.Duration,
+) error {
 	flags := tmpnet.DefaultLocalhostFlags()
 	flags.SetDefaults(tmpnet.FlagsMap{
 		config.HealthCheckFreqKey: "30s",
 		// Minimize logging overhead
 		config.LogDisplayLevelKey: logging.Off.String(),
-		config.LogLevelKey:        logging.Info.String(),
 	})
+	if !useDynamicPorts {
+		flags.SetDefaults(tmpnet.FlagsMap{
+			config.HTTPPortKey:    config.DefaultHTTPPort,
+			config.StakingPortKey: config.DefaultStakingPort,
+		})
+	}
+
+	networkName := constants.NetworkName(networkID)
+	syncString := "full-sync"
+	if stateSyncEnabled {
+		syncString = "state-sync"
+	}
 
 	// Create a new single-node network that will bootstrap from the specified network
 	network := &tmpnet.Network{
 		UUID:         uuid.NewString(),
 		NetworkID:    networkID,
-		Owner:        "bootstrap-test",
+		Owner:        fmt.Sprintf("bootstrap-test-%s-%s", networkName, syncString),
 		Nodes:        tmpnet.NewNodesOrPanic(1),
 		DefaultFlags: flags,
 		DefaultRuntimeConfig: tmpnet.NodeRuntimeConfig{
@@ -70,7 +91,7 @@ func checkBootstrap(avalanchegoPath string, networkID uint32, stateSyncEnabled b
 		},
 	}
 
-	if err := network.Create(""); err != nil {
+	if err := network.Create(dataDir); err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
 	}
 	node := network.Nodes[0]

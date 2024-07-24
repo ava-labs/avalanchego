@@ -4,9 +4,6 @@ on:
   # TODO(marun) Add a schedule
   workflow_dispatch:
 
-  # TODO(marun) For testing only - remove before merge
-  pull_request:
-
 jobs:
   check_bootstrap_testnet_full_sync:
     name: Check Bootstrap (testnet,full-sync)

@@ -27,3 +27,9 @@ jobs:
           DOCKER_PASS: ${{ secrets.docker_pass }}
           DOCKER_IMAGE: ${{ secrets.docker_repo }}
         run: scripts/build_image.sh
+      - name: Build and publish boostrap tester image to DockerHub
+        env:
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+          IMAGE_PREFIX: avaplatform
+        run: bash -x scripts/build_bootstrap_tester_image.sh
