@@ -1129,7 +1129,6 @@ func (b *builder) spend(
 			continue
 		}
 
-		// Some of this input was put for staking
 		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
 			Asset: avax.Asset{
 				ID: assetID,
