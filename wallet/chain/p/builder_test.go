@@ -558,13 +558,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
 
 		// data to build the transaction
-		validationRewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardAddr,
-			},
-		}
-		delegationRewardsOwner = &secp256k1fx.OutputOwners{
+		rewardsOwner = &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				rewardAddr,
@@ -587,8 +581,8 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		avaxAssetID,
-		validationRewardsOwner,
-		delegationRewardsOwner,
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -743,13 +737,7 @@ func TestStakingMergesUnlockedUTXOs(t *testing.T) {
 		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
 
 		// data to build the transaction
-		validationRewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardAddr,
-			},
-		}
-		delegationRewardsOwner = &secp256k1fx.OutputOwners{
+		rewardsOwner = &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
 				rewardAddr,
@@ -772,8 +760,8 @@ func TestStakingMergesUnlockedUTXOs(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		avaxAssetID,
-		validationRewardsOwner,
-		delegationRewardsOwner,
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
