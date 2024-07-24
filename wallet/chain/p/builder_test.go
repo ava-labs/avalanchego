@@ -544,138 +544,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-		backend = NewBackend(testContext, chainUTXOs, nil)
-
-		// builder
-		utxoAddr   = utxosKey.Address()
-		rewardKey  = testKeys[0]
-		rewardAddr = rewardKey.Address()
-		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
-
-		// data to build the transaction
-		rewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardAddr,
-			},
-		}
-	)
-
-	sk, err := bls.NewSecretKey()
-	require.NoError(err)
-
-	// build the transaction
-	utx, err := builder.NewAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
-				End:    uint64(time.Now().Add(time.Hour).Unix()),
-				Wght:   2 * units.Avax,
-			},
-			Subnet: constants.PrimaryNetworkID,
-		},
-		signer.NewProofOfPossession(sk),
-		avaxAssetID,
-		rewardsOwner,
-		rewardsOwner,
-		reward.PercentDenominator,
-	)
-	require.NoError(err)
-
-	// check stake amount
-	require.Equal(
-		map[ids.ID]uint64{
-			avaxAssetID: 2 * units.Avax,
-		},
-		addOutputAmounts(utx.StakeOuts),
-	)
-
-	// check fee calculation
-	require.Equal(
-		addAmounts(
-			addOutputAmounts(utx.Outs, utx.StakeOuts),
-			map[ids.ID]uint64{
-				avaxAssetID: testContext.AddPrimaryNetworkValidatorFee,
-			},
-		),
-		addInputAmounts(utx.Ins),
-	)
-}
-
-func TestAddPermissionlessDelegatorTx(t *testing.T) {
-	var (
-		require = require.New(t)
-
-		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
-		})
-		backend = NewBackend(testContext, chainUTXOs, nil)
-
-		// builder
-		utxoAddr   = utxosKey.Address()
-		rewardKey  = testKeys[0]
-		rewardAddr = rewardKey.Address()
-		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
-
-		// data to build the transaction
-		rewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardAddr,
-			},
-		}
-	)
-
-	// build the transaction
-	utx, err := builder.NewAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
-				End:    uint64(time.Now().Add(time.Hour).Unix()),
-				Wght:   2 * units.Avax,
-			},
-			Subnet: constants.PrimaryNetworkID,
-		},
-		avaxAssetID,
-		rewardsOwner,
-	)
-	require.NoError(err)
-
-	// check stake amount
-	require.Equal(
-		map[ids.ID]uint64{
-			avaxAssetID: 2 * units.Avax,
-		},
-		addOutputAmounts(utx.StakeOuts),
-	)
-
-	// check fee calculation
-	require.Equal(
-		addAmounts(
-			addOutputAmounts(utx.Outs, utx.StakeOuts),
-			map[ids.ID]uint64{
-				avaxAssetID: testContext.AddPrimaryNetworkDelegatorFee,
-			},
-		),
-		addInputAmounts(utx.Ins),
-	)
-}
-
-// Outputs should be merged if possible. For example, if there are two unlocked
-// inputs consumed for staking, this should only produce one staked output.
-func TestStakingMergesUnlockedUTXOs(t *testing.T) {
-	var (
-		require = require.New(t)
-
-		// backend
 		utxosOffset uint64 = 2024
 		utxosKey           = testKeys[1]
 		utxosAddr          = utxosKey.Address()
@@ -784,7 +652,73 @@ func TestStakingMergesUnlockedUTXOs(t *testing.T) {
 		),
 		addInputAmounts(utx.Ins),
 	)
-	require.Len(utx.StakeOuts, 1) // The stake outputs should have been merged.
+
+	// Outputs should be merged if possible. For example, if there are two
+	// unlocked inputs consumed for staking, this should only produce one staked
+	// output.
+	require.Len(utx.StakeOuts, 1)
+}
+
+func TestAddPermissionlessDelegatorTx(t *testing.T) {
+	var (
+		require = require.New(t)
+
+		// backend
+		utxosKey   = testKeys[1]
+		utxos      = makeTestUTXOs(utxosKey)
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs, nil)
+
+		// builder
+		utxoAddr   = utxosKey.Address()
+		rewardKey  = testKeys[0]
+		rewardAddr = rewardKey.Address()
+		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
+
+		// data to build the transaction
+		rewardsOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				rewardAddr,
+			},
+		}
+	)
+
+	// build the transaction
+	utx, err := builder.NewAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(time.Now().Add(time.Hour).Unix()),
+				Wght:   2 * units.Avax,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		avaxAssetID,
+		rewardsOwner,
+	)
+	require.NoError(err)
+
+	// check stake amount
+	require.Equal(
+		map[ids.ID]uint64{
+			avaxAssetID: 2 * units.Avax,
+		},
+		addOutputAmounts(utx.StakeOuts),
+	)
+
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs, utx.StakeOuts),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.AddPrimaryNetworkDelegatorFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
