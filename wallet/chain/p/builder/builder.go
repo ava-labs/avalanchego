@@ -1451,27 +1451,6 @@ func (b *builder) spend(
 		}
 	}
 
-	for assetID, amount := range amountsToStake {
-		if amount != 0 && assetID != b.context.AVAXAssetID {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q to stake",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
-	}
-	for assetID, amount := range amountsToBurn {
-		if amount != 0 && assetID != b.context.AVAXAssetID {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
-	}
-
 	// Iterate over the unlocked AVAX UTXOs
 	for _, utxo := range utxos {
 		remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]
@@ -1562,21 +1541,25 @@ func (b *builder) spend(
 		}
 	}
 
-	if remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]; remainingAmountToStake != 0 {
-		return nil, nil, nil, fmt.Errorf(
-			"%w: provided UTXOs need %d more units of asset %q to stake",
-			ErrInsufficientFunds,
-			remainingAmountToStake,
-			b.context.AVAXAssetID,
-		)
+	for assetID, amount := range amountsToStake {
+		if amount != 0 {
+			return nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q to stake",
+				ErrInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
 	}
-	if remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]; remainingAmountToBurn != 0 {
-		return nil, nil, nil, fmt.Errorf(
-			"%w: provided UTXOs need %d more units of asset %q",
-			ErrInsufficientFunds,
-			remainingAmountToBurn,
-			b.context.AVAXAssetID,
-		)
+	for assetID, amount := range amountsToBurn {
+		if amount != 0 {
+			return nil, nil, nil, fmt.Errorf(
+				"%w: provided UTXOs need %d more units of asset %q",
+				ErrInsufficientFunds,
+				amount,
+				assetID,
+			)
+		}
 	}
 
 	// TODO: Multiple by complexity weights
