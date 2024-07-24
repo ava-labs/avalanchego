@@ -675,6 +675,130 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	)
 }
 
+// Outputs should be merged if possible. For example, if there are two unlocked
+// inputs consumed for staking, this should only produce one staked output.
+func TestStakingMergesUnlockedUTXOs(t *testing.T) {
+	var (
+		require = require.New(t)
+
+		// backend
+		utxosOffset uint64 = 2024
+		utxosKey           = testKeys[1]
+		utxosAddr          = utxosKey.Address()
+		utxos              = []*avax.UTXO{
+			{ // UTXO to pay the fee
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty.Prefix(),
+					OutputIndex: uint32(utxosOffset),
+				},
+				Asset: avax.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: testContext.AddPrimaryNetworkValidatorFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{utxosAddr},
+						Threshold: 1,
+					},
+				},
+			},
+			{ // small UTXO
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty.Prefix(utxosOffset + 1),
+					OutputIndex: uint32(utxosOffset + 1),
+				},
+				Asset: avax.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1 * units.NanoAvax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{utxosAddr},
+					},
+				},
+			},
+			{ // large UTXO
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty.Prefix(utxosOffset + 2),
+					OutputIndex: uint32(utxosOffset + 2),
+				},
+				Asset: avax.Asset{ID: avaxAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 9 * units.Avax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Addrs:     []ids.ShortID{utxosAddr},
+						Threshold: 1,
+					},
+				},
+			},
+		}
+		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = NewBackend(testContext, chainUTXOs, nil)
+
+		// builder
+		utxoAddr   = utxosKey.Address()
+		rewardKey  = testKeys[0]
+		rewardAddr = rewardKey.Address()
+		builder    = builder.New(set.Of(utxoAddr, rewardAddr), testContext, backend)
+
+		// data to build the transaction
+		validationRewardsOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				rewardAddr,
+			},
+		}
+		delegationRewardsOwner = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				rewardAddr,
+			},
+		}
+	)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	// build the transaction
+	utx, err := builder.NewAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(time.Now().Add(time.Hour).Unix()),
+				Wght:   2 * units.Avax,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		signer.NewProofOfPossession(sk),
+		avaxAssetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		reward.PercentDenominator,
+	)
+	require.NoError(err)
+
+	// check stake amount
+	require.Equal(
+		map[ids.ID]uint64{
+			avaxAssetID: 2 * units.Avax,
+		},
+		addOutputAmounts(utx.StakeOuts),
+	)
+
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs, utx.StakeOuts),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.AddPrimaryNetworkValidatorFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
+	require.Len(utx.StakeOuts, 1) // The stake outputs should have been merged.
+}
+
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs won't change
 	// run by run. This simplifies checking what utxos are included in the built txs.

@@ -1053,6 +1053,7 @@ func (b *builder) spend(
 	}
 
 	// Iterate over the unlocked UTXOs
+	amountsStaked := make(map[ids.ID]uint64, len(amountsToStake))
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		remainingAmountToStake := amountsToStake[assetID]
@@ -1103,24 +1104,15 @@ func (b *builder) spend(
 		)
 		amountsToBurn[assetID] -= amountToBurn
 
-		amountAvalibleToStake := out.Amt - amountToBurn
+		amountAvailableToStake := out.Amt - amountToBurn
 		// Burn any value that should be burned
 		amountToStake := min(
 			remainingAmountToStake, // Amount we still need to stake
-			amountAvalibleToStake,  // Amount available to stake
+			amountAvailableToStake, // Amount available to stake
 		)
 		amountsToStake[assetID] -= amountToStake
-		if amountToStake > 0 {
-			// Some of this input was put for staking
-			stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
-					OutputOwners: *changeOwner,
-				},
-			})
-		}
-		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
+		amountsStaked[assetID] += amountToStake
+		if remainingAmount := amountAvailableToStake - amountToStake; remainingAmount > 0 {
 			// This input had extra value, so some of it must be returned
 			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
 				Asset: utxo.Asset,
@@ -1130,6 +1122,23 @@ func (b *builder) spend(
 				},
 			})
 		}
+	}
+
+	for assetID, amount := range amountsStaked {
+		if amount == 0 {
+			continue
+		}
+
+		// Some of this input was put for staking
+		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+			Asset: avax.Asset{
+				ID: assetID,
+			},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: *changeOwner,
+			},
+		})
 	}
 
 	for assetID, amount := range amountsToStake {
