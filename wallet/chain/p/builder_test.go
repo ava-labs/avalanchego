@@ -67,7 +67,7 @@ func TestBaseTx(t *testing.T) {
 		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
-		outputsToMove = []*avax.TransferableOutput{{
+		outputToMove = &avax.TransferableOutput{
 			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 7 * units.Avax,
@@ -76,25 +76,25 @@ func TestBaseTx(t *testing.T) {
 					Addrs:     []ids.ShortID{utxoAddr},
 				},
 			},
-		}}
+		}
 	)
 
-	utx, err := builder.NewBaseTx(outputsToMove)
+	utx, err := builder.NewBaseTx([]*avax.TransferableOutput{outputToMove})
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	outs := utx.Outs
-	require.Len(outs, 2)
+	// check that the output is included in the transaction
+	require.Contains(utx.Outs, outputToMove)
+
+	// check fee calculation
 	require.Equal(
 		addAmounts(
-			addOutputAmounts(outs),
+			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
 				avaxAssetID: testContext.BaseTxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
 	)
-	require.Equal(outputsToMove[0], outs[1])
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
