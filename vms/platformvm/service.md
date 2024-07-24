@@ -1221,7 +1221,7 @@ platform.getSubnet({
 }
 ```
 
-- `id` are the ID of the Subnet to get information about. If omitted, fails.
+- `subnetID` is the ID of the Subnet to get information about. If omitted, fails.
 - `threshold` signatures from addresses in `controlKeys` are needed to make changes to 
   a permissioned subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys`
   will be empty.
