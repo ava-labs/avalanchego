@@ -1329,6 +1329,7 @@ func (b *builder) spend(
 		}
 	}
 
+	// Add all the remaining stake amounts assuming unlocked UTXOs.
 	for assetID, amount := range amountsToStake {
 		if amount == 0 {
 			continue
@@ -1355,7 +1356,8 @@ func (b *builder) spend(
 		stakeOutputs = append(stakeOutputs, newOutput)
 	}
 
-	// Iterate over the unlocked UTXOs except AVAX
+	// Iterate over the unlocked UTXOs except AVAX. AVAX is handled last to
+	// account for fees.
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
 		if assetID == b.context.AVAXAssetID {
@@ -1475,6 +1477,7 @@ func (b *builder) spend(
 		remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]
 		remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]
 
+		// TODO: Multiple by complexity weights
 		requiredGas, err := complexity.ToGas(feecomponent.Dimensions{})
 		if err != nil {
 			return nil, nil, nil, err
@@ -1576,6 +1579,7 @@ func (b *builder) spend(
 		)
 	}
 
+	// TODO: Multiple by complexity weights
 	requiredGas, err := complexity.ToGas(feecomponent.Dimensions{})
 	if err != nil {
 		return nil, nil, nil, err
@@ -1614,6 +1618,7 @@ func (b *builder) spend(
 		return nil, nil, nil, err
 	}
 
+	// TODO: Multiple by complexity weights
 	requiredGasWithChange, err := complexity.ToGas(feecomponent.Dimensions{})
 	if err != nil {
 		return nil, nil, nil, err
