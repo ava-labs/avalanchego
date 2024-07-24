@@ -1124,22 +1124,6 @@ func (b *builder) spend(
 		}
 	}
 
-	for assetID, amount := range amountsStaked {
-		if amount == 0 {
-			continue
-		}
-
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
-			Asset: avax.Asset{
-				ID: assetID,
-			},
-			Out: &secp256k1fx.TransferOutput{
-				Amt:          amount,
-				OutputOwners: *changeOwner,
-			},
-		})
-	}
-
 	for assetID, amount := range amountsToStake {
 		if amount != 0 {
 			return nil, nil, nil, fmt.Errorf(
@@ -1159,6 +1143,22 @@ func (b *builder) spend(
 				assetID,
 			)
 		}
+	}
+
+	for assetID, amount := range amountsStaked {
+		if amount == 0 {
+			continue
+		}
+
+		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+			Asset: avax.Asset{
+				ID: assetID,
+			},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: *changeOwner,
+			},
+		})
 	}
 
 	utils.Sort(inputs)                                     // sort inputs
