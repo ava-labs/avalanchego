@@ -45,7 +45,7 @@ func TestTxComplexity(t *testing.T) {
 			expected: fee.Dimensions{
 				fee.Bandwidth: 499,
 				fee.DBRead:    2,
-				fee.DBWrite:   3,
+				fee.DBWrite:   4,
 				fee.Compute:   0, // TODO: implement
 			},
 		},
