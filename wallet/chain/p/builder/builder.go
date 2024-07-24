@@ -1456,7 +1456,7 @@ func (b *builder) spend(
 		remainingAmountToStake := amountsToStake[b.context.AVAXAssetID]
 		remainingAmountToBurn := amountsToBurn[b.context.AVAXAssetID]
 
-		// TODO: Multiple by complexity weights
+		// TODO: Multiply by complexity weights
 		requiredGas, err := complexity.ToGas(feecomponent.Dimensions{})
 		if err != nil {
 			return nil, nil, nil, err
@@ -1562,7 +1562,7 @@ func (b *builder) spend(
 		}
 	}
 
-	// TODO: Multiple by complexity weights
+	// TODO: Multiply by complexity weights
 	requiredGas, err := complexity.ToGas(feecomponent.Dimensions{})
 	if err != nil {
 		return nil, nil, nil, err
@@ -1601,7 +1601,7 @@ func (b *builder) spend(
 		return nil, nil, nil, err
 	}
 
-	// TODO: Multiple by complexity weights
+	// TODO: Multiply by complexity weights
 	requiredGasWithChange, err := complexity.ToGas(feecomponent.Dimensions{})
 	if err != nil {
 		return nil, nil, nil, err
