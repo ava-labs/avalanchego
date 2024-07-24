@@ -47,7 +47,7 @@ type SignedBlock interface {
 	VRFSig() []byte
 
 	// VerifySignature validates the correctness of the VRF signature.
-	VerifySignature(*bls.PublicKey, []byte, ids.ID, uint32) bool
+	VerifySignature(pk *bls.PublicKey, parentVRFSig []byte, chainID ids.ID, networkID uint32) bool
 }
 
 type statelessUnsignedBlock struct {

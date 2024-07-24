@@ -39,7 +39,7 @@ var (
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
 	errInvalidVRFSignature      = errors.New("invalid VRF signature")
-	errVRFSignaturePresents     = errors.New("unexpected VRF signature presents")
+	errUnexpectedVRFSignature   = errors.New("unexpected VRF signature present")
 )
 
 type Block interface {

@@ -104,10 +104,10 @@ func calculateBootstrappingBlockSig(chainID ids.ID, networkID uint32) [hashing.H
 	// |  networkID:           | uint32   |  4 bytes   |
 	// +-----------------------+----------+------------+
 
-	buffer := make([]byte, len(vrfRngRootPrefix)+ids.IDLen+4)
+	buffer := make([]byte, len(vrfRngRootPrefix)+ids.IDLen+wrappers.IntLen)
 	copy(buffer, vrfRngRootPrefix)
 	copy(buffer[len(vrfRngRootPrefix):], chainID[:])
-	binary.LittleEndian.PutUint32(buffer[len(vrfRngRootPrefix)+ids.IDLen:], networkID)
+	binary.BigEndian.PutUint32(buffer[len(vrfRngRootPrefix)+ids.IDLen:], networkID)
 	return hashing.ComputeHash256Array(buffer)
 }
 
@@ -125,7 +125,7 @@ func NextBlockVRFSig(parentBlockVRFSig []byte, blsSignKey *bls.SecretKey, chainI
 		// signature only if it presents. Otherwise, we'll keep it empty.
 		if len(parentBlockVRFSig) == 0 {
 			// no parent block signature.
-			return []byte{}
+			return nil
 		}
 
 		return NextHashBlockSignature(parentBlockVRFSig)
@@ -169,10 +169,10 @@ func Build(
 
 	var err error
 
-	var blkBytes []byte
 	// temporary, set the bytes to the marshaled content of the block.
 	// this doesn't include the signature ( yet )
-	if blkBytes, err = marshalBlock(block); err != nil {
+	blkBytes, err := marshalBlock(block)
+	if err != nil {
 		return nil, err
 	}
 
