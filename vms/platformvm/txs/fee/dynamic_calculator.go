@@ -4,7 +4,6 @@
 package fee
 
 import (
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -12,12 +11,12 @@ import (
 var _ Calculator = (*dynamicCalculator)(nil)
 
 func NewDynamicCalculator(
-	config fee.Config,
-	excess fee.Gas,
+	weights fee.Dimensions,
+	price fee.GasPrice,
 ) Calculator {
 	return &dynamicCalculator{
-		weights: config.Weights,
-		price:   config.MinGasPrice.MulExp(excess, config.ExcessConversionConstant),
+		weights: weights,
+		price:   price,
 	}
 }
 
@@ -35,5 +34,5 @@ func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return math.Mul(uint64(c.price), uint64(gas))
+	return gas.Cost(c.price)
 }
