@@ -64,16 +64,7 @@ message Message {
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // Uptime percentage on subnets
-  repeated SubnetUptime subnet_uptimes = 2;
-}
-
-// SubnetUptime is a descriptor for a peer's perceived uptime on a subnet.
-message SubnetUptime {
-  // Subnet the peer is validating
-  bytes subnet_id = 1;
-  // Uptime percentage on the subnet [0, 100]
-  uint32 uptime = 2;
+  reserved 2; // Until E upgrade is activated.
 }
 
 // Pong is sent in response to a Ping.

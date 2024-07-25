@@ -314,18 +314,18 @@ func (mr *MockOutboundMsgBuilderMockRecorder) PeerList(arg0, arg1 any) *gomock.C
 }
 
 // Ping mocks base method.
-func (m *MockOutboundMsgBuilder) Ping(arg0 uint32, arg1 []*p2p.SubnetUptime) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Ping(arg0 uint32) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ping", arg0, arg1)
+	ret := m.ctrl.Call(m, "Ping", arg0)
 	ret0, _ := ret[0].(OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Ping indicates an expected call of Ping.
-func (mr *MockOutboundMsgBuilderMockRecorder) Ping(arg0, arg1 any) *gomock.Call {
+func (mr *MockOutboundMsgBuilderMockRecorder) Ping(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Ping), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockOutboundMsgBuilder)(nil).Ping), arg0)
 }
 
 // Pong mocks base method.
