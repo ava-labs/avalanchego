@@ -50,15 +50,15 @@ func TestLockedCalculator(t *testing.T) {
 	isBootstrapped.Set(true)
 
 	// Should return the value from the mocked inner calculator
-	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, errTest)
+	mockCalc.EXPECT().CalculateUptime(gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, errTest)
 	_, _, err = lc.CalculateUptime(nodeID)
 	require.ErrorIs(err, errTest)
 
-	mockCalc.EXPECT().CalculateUptimePercent(gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
+	mockCalc.EXPECT().CalculateUptimePercent(gomock.Any()).AnyTimes().Return(float64(0), errTest)
 	_, err = lc.CalculateUptimePercent(nodeID)
 	require.ErrorIs(err, errTest)
 
-	mockCalc.EXPECT().CalculateUptimePercentFrom(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
+	mockCalc.EXPECT().CalculateUptimePercentFrom(gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
 	_, err = lc.CalculateUptimePercentFrom(nodeID, time.Now())
 	require.ErrorIs(err, errTest)
 }

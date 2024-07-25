@@ -40,6 +40,7 @@ type manager struct {
 
 	state       State
 	connections map[ids.NodeID]time.Time // nodeID  -> time
+	tracked     bool
 }
 
 func NewManager(state State, clk *mockable.Clock) Manager {
@@ -70,10 +71,18 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 			return err
 		}
 	}
+	m.tracked = true
 	return nil
 }
 
 func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
+	// TODO: this was not here before, should we add it?
+	if !m.tracked {
+		return nil
+	}
+	defer func() {
+		m.tracked = false
+	}()
 	now := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
 		// If the node is already connected, then we can just
@@ -139,6 +148,12 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 		return upDuration, lastUpdated, nil
 	}
 
+	if !m.tracked {
+		durationOffline := now.Sub(lastUpdated)
+		newUpDuration := upDuration + durationOffline
+		return newUpDuration, now, nil
+	}
+
 	timeConnected, isConnected := m.connections[nodeID]
 	if !isConnected {
 		return upDuration, now, nil
@@ -187,6 +202,9 @@ func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.T
 // updateUptime updates the uptime of the node on the state by the amount
 // of time that the node has been connected.
 func (m *manager) updateUptime(nodeID ids.NodeID) error {
+	if !m.tracked {
+		return nil
+	}
 	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID)
 	if err == database.ErrNotFound {
 		// If a non-validator disconnects, we don't care
