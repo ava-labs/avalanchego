@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: bootstrap-tester-mainnet-full-sync-
+spec:
+  containers:
+    - name: bootstrap-tester
+      image: marunava/bootstrap-tester:0a63c561
+      args:
+        - "--avalanchego-path=/avalanchego/build/avalanchego"
+        - "--network-id=1"
+        - "--state-sync-enabled=false"
+        - "--max-duration=480h"
+        - "--data-dir=/data"
+      ports:
+        - containerPort: 9650
+        - containerPort: 9651
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      resources:
+        limits:
+          cpu: "8"
+          memory: 16Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: bootstrap-tester-mainnet-full-sync
