@@ -1202,6 +1202,60 @@ Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
 :::
 
+### `platform.getSubnet`
+
+Get owners and elastic info about the Subnet.
+
+**Signature:**
+
+```sh
+platform.getSubnet({
+    subnetID: string
+}) ->
+{
+    isPermissioned: bool,
+    controlKeys: []string,
+    threshold: string,
+    locktime: string,
+    subnetTransformationTxID: string
+}
+```
+
+- `subnetID` is the ID of the Subnet to get information about. If omitted, fails.
+- `threshold` signatures from addresses in `controlKeys` are needed to make changes to 
+  a permissioned subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys`
+  will be empty.
+- changes can not be made into the subnet until `locktime` is in the past.
+- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into a elastic one, 
+  for when this change was performed.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getSubnet",
+    "params": {"subnetID":"Vz2ArUpigHt7fyE79uF3gAXvTPLJi2LGgZoMpgNPHowUZJxBb"},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "isPermissioned": true,
+    "controlKeys": ["P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c","P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"],
+    "threshold": "1",
+    "locktime": "0",
+    "subnetTransformationTxID": "11111111111111111111111111111111LpoYY"
+  },
+  "id": 1
+}
+```
+
 ### `platform.getSubnets`
 
 :::caution
