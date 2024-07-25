@@ -27,7 +27,7 @@ type Client interface {
 	Peers(context.Context, ...rpc.Option) ([]Peer, error)
 	IsBootstrapped(context.Context, string, ...rpc.Option) (bool, error)
 	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
-	Uptime(context.Context, ids.ID, ...rpc.Option) (*UptimeResponse, error)
+	Uptime(context.Context, ...rpc.Option) (*UptimeResponse, error)
 	GetVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, error)
 }
 
@@ -101,11 +101,9 @@ func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFee
 	return res, err
 }
 
-func (c *client) Uptime(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (*UptimeResponse, error) {
+func (c *client) Uptime(ctx context.Context, options ...rpc.Option) (*UptimeResponse, error) {
 	res := &UptimeResponse{}
-	err := c.requester.SendRequest(ctx, "info.uptime", &UptimeRequest{
-		SubnetID: subnetID,
-	}, res, options...)
+	err := c.requester.SendRequest(ctx, "info.uptime", struct{}{}, res, options...)
 	return res, err
 }
 
