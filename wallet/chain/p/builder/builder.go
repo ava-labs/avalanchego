@@ -1521,13 +1521,13 @@ func (s *spendHelper) addInput(input *avax.TransferableInput) error {
 	return nil
 }
 
-func (s *spendHelper) addStakedOutput(output *avax.TransferableOutput) error {
-	s.stakeOutputs = append(s.stakeOutputs, output)
+func (s *spendHelper) addChangeOutput(output *avax.TransferableOutput) error {
+	s.changeOutputs = append(s.changeOutputs, output)
 	return s.addOutputComplexity(output)
 }
 
-func (s *spendHelper) addChangeOutput(output *avax.TransferableOutput) error {
-	s.changeOutputs = append(s.changeOutputs, output)
+func (s *spendHelper) addStakedOutput(output *avax.TransferableOutput) error {
+	s.stakeOutputs = append(s.stakeOutputs, output)
 	return s.addOutputComplexity(output)
 }
 
