@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
-const renewPeriod = 9 * 30 * 24 * time.Hour
+const localNetworkUpdateStartTimePeriod = 9 * 30 * 24 * time.Hour // 9 months
 
 var (
 	_ utils.Sortable[Allocation] = Allocation{}
@@ -173,6 +173,10 @@ var (
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
 	LocalConfig Config
+
+	// unmodifiedLocalConfig is the LocalConfig before advancing the StartTime
+	// to a recent value.
+	unmodifiedLocalConfig Config
 )
 
 func init() {
@@ -199,13 +203,21 @@ func init() {
 		panic(err)
 	}
 
-	LocalConfig, err = unparsedLocalConfig.Parse()
+	unmodifiedLocalConfig, err = unparsedLocalConfig.Parse()
 	if err != nil {
 		panic(err)
 	}
 
 	// Renew the staking start time of the local config if required
-	LocalConfig.renewStartTime(time.Now())
+	definedStartTime := time.Unix(int64(unmodifiedLocalConfig.StartTime), 0)
+	recentStartTime := getRecentStartTime(
+		definedStartTime,
+		time.Now(),
+		localNetworkUpdateStartTimePeriod,
+	)
+
+	LocalConfig = unmodifiedLocalConfig
+	LocalConfig.StartTime = uint64(recentStartTime.Unix())
 }
 
 func GetConfig(networkID uint32) *Config {
@@ -254,28 +266,20 @@ func parseGenesisJSONBytesToConfig(bytes []byte) (*Config, error) {
 	return &config, nil
 }
 
-// getCurrentOrNextPeriod calculates the current or next given period date based on the current time.
-func getCurrentOrNextPeriod(currentDate, initialDate time.Time, period time.Duration) time.Time {
-	if currentDate.Before(initialDate) {
-		return initialDate
+// getRecentStartTime advances [definedStartTime] in chunks of [period]. It
+// returns the latest startTime that isn't after [now].
+func getRecentStartTime(
+	definedStartTime time.Time,
+	now time.Time,
+	period time.Duration,
+) time.Time {
+	startTime := definedStartTime
+	for {
+		nextStartTime := startTime.Add(period)
+		if now.Before(nextStartTime) {
+			break
+		}
+		startTime = nextStartTime
 	}
-
-	periodDate := initialDate
-
-	// If the current time is after the period date, calculate the next period date
-	for currentDate.After(periodDate.Add(period)) {
-		periodDate = periodDate.Add(period)
-	}
-
-	return periodDate
-}
-
-// renewStartTime calculates the next period date based on the current time.
-func (c *Config) renewStartTime(currentDate time.Time) {
-	// Define the initial start date
-	initialStartDate := time.Unix(int64(c.StartTime), 0)
-
-	nextPeriodDate := getCurrentOrNextPeriod(currentDate, initialStartDate, renewPeriod)
-
-	c.StartTime = uint64(nextPeriodDate.Unix())
+	return startTime
 }

@@ -53,57 +53,67 @@ func TestAllocationCompare(t *testing.T) {
 	}
 }
 
-func TestRenewPeriod(t *testing.T) {
-	localConfigStartTime := time.Unix(int64(LocalConfig.StartTime), 0)
+func TestGetRecentStartTime(t *testing.T) {
 	type test struct {
 		name     string
-		current  time.Time
-		expected uint64
+		defined  time.Time
+		now      time.Time
+		expected time.Time
 	}
 	tests := []test{
 		{
-			name:     "1 sec before local config",
-			expected: 1721016000, // Mon Jul 15 2024 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(-1 * time.Second),
+			name:     "before 1 period and 1 second",
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(-localNetworkUpdateStartTimePeriod - time.Second),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "1 sec after local config",
-			expected: 1721016000, // Mon Jul 15 2024 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(1 * time.Second),
+			name:     "before 1 second",
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(-time.Second),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "after less than period",
-			expected: 1721016000, // Mon Jul 15 2024 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(renewPeriod).Add(-1 * time.Second),
+			name:     "equal",
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "after exactly 1 period",
-			expected: 1721016000, // Mon Jul 15 2024 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(renewPeriod),
+			name:     "after 1 second",
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(time.Second),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "after 1 period",
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(localNetworkUpdateStartTimePeriod),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(localNetworkUpdateStartTimePeriod),
 		},
 		{
 			name:     "after 1 period and 1 second",
-			expected: 1744344000, // Fri Apr 11 2025 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(renewPeriod).Add(1 * time.Second),
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(localNetworkUpdateStartTimePeriod + time.Second),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(localNetworkUpdateStartTimePeriod),
 		},
 		{
 			name:     "after 2 periods",
-			expected: 1744344000, // Fri Apr 11 2025 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(renewPeriod * 2),
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(2 * localNetworkUpdateStartTimePeriod),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(2 * localNetworkUpdateStartTimePeriod),
 		},
 		{
 			name:     "after 2 periods and 1 second",
-			expected: 1767672000, // Tue Jan 06 2026 04:00:00 GMT+0000
-			current:  localConfigStartTime.Add(renewPeriod * 2).Add(1 * time.Second),
-		}}
+			defined:  time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC),
+			now:      time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(2*localNetworkUpdateStartTimePeriod + time.Second),
+			expected: time.Date(2024, time.July, 15, 4, 0, 0, 0, time.UTC).Add(2 * localNetworkUpdateStartTimePeriod),
+		},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// to avoud modifying the global LocalConfig
-			testLocalConfig := Config{
-				StartTime: LocalConfig.StartTime,
-			}
-			testLocalConfig.renewStartTime(tt.current)
-			require.Equalf(t, tt.expected, testLocalConfig.StartTime, "expected %d, got %d", tt.expected, testLocalConfig.StartTime)
+			actual := getRecentStartTime(tt.defined, tt.now, localNetworkUpdateStartTimePeriod)
+			require.Equal(t, tt.expected, actual)
 		})
 	}
 }
