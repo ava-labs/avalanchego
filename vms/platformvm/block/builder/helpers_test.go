@@ -221,7 +221,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		if res.isBootstrapped.Get() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
-			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			require.NoError(res.uptimes.StopTracking(validatorIDs))
 
 			require.NoError(res.state.Commit())
 		}
