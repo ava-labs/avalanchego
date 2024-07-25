@@ -1,0 +1,23 @@
+name: 'Check Bootstrap (testnet,full-sync)'
+
+on:
+  # TODO(marun) Add a schedule
+  workflow_dispatch:
+
+jobs:
+  check_bootstrap_testnet_full_sync:
+    name: Check Bootstrap (testnet,full-sync)
+    runs-on: avalanche-avalanchego
+    timeout-minutes: 7200 # 5 days, maximum allowed for jobs running on a self-hosted runner
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    - name: Check bootstrap (testnet,full-sync)
+      uses: ./.github/actions/check-bootstrap
+      with:
+        network_id: 5 # testnet
+        state_sync_enabled: false
+        prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+        prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+        loki_id: ${{ secrets.LOKI_ID || '' }}
+        loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

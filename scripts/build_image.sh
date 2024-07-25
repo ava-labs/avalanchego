@@ -71,6 +71,11 @@ if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
     echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
   fi
 else
+  PLATFORMS="${PLATFORMS:-}"
+  if [[ -n "${PLATFORMS}" ]]; then
+    DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS}"
+  fi
+
   # Build a single-arch image since the image name does not include a slash which
   # indicates that a registry is not available.
   #

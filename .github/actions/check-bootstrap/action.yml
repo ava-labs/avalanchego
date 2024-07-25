@@ -1,0 +1,48 @@
+name: 'Check bootstrap for a network and state sync configuration'
+description: 'Checks that bootstrap is possible for the given network and state sync configuration'
+
+inputs:
+  network_id:
+    required: true
+  state_sync_enabled:
+    required: true
+  prometheus_id:
+    required: true
+  prometheus_password:
+    required: true
+  loki_id:
+    required: true
+  loki_password:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Go
+      uses: ./.github/actions/setup-go-for-project
+
+    - name: Build AvalancheGo Binary
+      shell: bash
+      run: ./scripts/build.sh -r
+
+    - name: Check avalanchego version
+      shell: bash
+      run: ./build/avalanchego --version
+
+    - name: Run bootstrap for testnet with state-sync
+      uses: ./.github/actions/run-monitored-tmpnet-cmd
+      with:
+        run: go run ./tests/bootstrap --avalanchego-path=./build/avalanchego --network-id=${{ inputs.network_id }} --state-sync-enabled=${{ inputs.state_sync_enabled }}
+        prometheus_id: ${{ inputs.prometheus_id }}
+        prometheus_password: ${{ inputs.prometheus_password }}
+        loki_id: ${{ inputs.loki_id }}
+        loki_password: ${{ inputs.loki_password }}
+
+    # Skip creation of an artifact in favor of log collection to loki
+
+    - name: Check size of tmpnet path
+      if: always()
+      shell: bash
+      run: |
+        echo "Checking tmpnet disk usage:"
+        du -sh ~/.tmpnet

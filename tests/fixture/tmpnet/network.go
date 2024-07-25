@@ -362,7 +362,7 @@ func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*
 		return err
 	}
 	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
-	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%d&to=now\n", n.UUID, startTime.UnixMilli()); err != nil {
+	if _, err := fmt.Fprintf(w, "\nMetrics: %s\n", DefaultMetricsLink(n.UUID, startTime)); err != nil {
 		return err
 	}
 
@@ -905,4 +905,8 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(networkPath, "latest_"+owner), nil
+}
+
+func DefaultMetricsLink(uuid string, startTime time.Time) string {
+	return fmt.Sprintf("https://grafana-experimental.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%d&to=now", uuid, startTime.UnixMilli())
 }

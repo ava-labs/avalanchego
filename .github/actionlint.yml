@@ -3,3 +3,4 @@ self-hosted-runner:
     - custom-arm64-focal
     - custom-arm64-jammy
     - net-outage-sim
+    - avalanche-avalanchego
