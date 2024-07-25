@@ -91,12 +91,8 @@ var (
 			name:    "Post-Etna",
 			context: testContextPostEtna,
 			feeCalculator: txfee.NewDynamicCalculator(
-				feecomponent.Config{
-					Weights:                  testContextPostEtna.ComplexityWeights,
-					MinGasPrice:              testContextPostEtna.GasPrice,
-					ExcessConversionConstant: 1,
-				},
-				0,
+				testContextPostEtna.ComplexityWeights,
+				testContextPostEtna.GasPrice,
 			),
 		},
 	}

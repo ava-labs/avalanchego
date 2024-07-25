@@ -1588,7 +1588,7 @@ func (s *spendHelper) calculateFee() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return math.Mul(uint64(s.gasPrice), uint64(gas))
+	return gas.Cost(s.gasPrice)
 }
 
 func (s *spendHelper) verifyAssetsConsumed() error {
