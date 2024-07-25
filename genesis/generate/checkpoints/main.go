@@ -20,7 +20,7 @@ const (
 	fujiURI    = "http://localhost:9650"
 	mainnetURI = "http://localhost:9660"
 
-	maxNumCheckpoints = 100
+	numHistoricalCheckpoints = 99
 )
 
 var (
@@ -106,7 +106,7 @@ func getCheckpoints(
 		numAccepted = lastIndex + 1
 		// interval is rounded up to ensure that the number of checkpoints
 		// fetched is at most maxNumCheckpoints.
-		interval    = (numAccepted + maxNumCheckpoints - 1) / maxNumCheckpoints
+		interval    = (numAccepted + numHistoricalCheckpoints - 1) / numHistoricalCheckpoints
 		checkpoints set.Set[ids.ID]
 	)
 	for index := interval - 1; index <= lastIndex; index += interval {
@@ -117,5 +117,9 @@ func getCheckpoints(
 
 		checkpoints.Add(container.ID)
 	}
-	return checkpoints, nil
+
+	// Always include the last accepted block
+	container, err := client.GetContainerByIndex(ctx, lastIndex)
+	checkpoints.Add(container.ID)
+	return checkpoints, err
 }
