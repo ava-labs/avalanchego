@@ -647,7 +647,7 @@ func (b *builder) NewCreateSubnetTx(
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicCreateChainTxComplexities.Add(
+	complexity, err := txfee.IntrinsicCreateSubnetTxComplexities.Add(
 		dynamicComplexity,
 		ownerComplexity,
 	)
@@ -1093,7 +1093,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+	complexity, err := txfee.IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
 		dynamicComplexity,
 		ownerComplexity,
 	)
@@ -1211,9 +1211,8 @@ func (b *builder) spend(
 	})
 
 	s := spendHelper{
-		// TODO: Populate these values
-		weights:  feecomponent.Dimensions{},
-		gasPrice: 0,
+		weights:  b.context.ComplexityWeights,
+		gasPrice: b.context.GasPrice,
 
 		amountsToBurn:  amountsToBurn,
 		amountsToStake: amountsToStake,

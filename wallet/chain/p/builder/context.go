@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const Alias = "P"
@@ -27,6 +28,9 @@ type Context struct {
 	AddPrimaryNetworkDelegatorFee uint64
 	AddSubnetValidatorFee         uint64
 	AddSubnetDelegatorFee         uint64
+
+	ComplexityWeights fee.Dimensions
+	GasPrice          fee.GasPrice
 }
 
 func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
@@ -66,6 +70,10 @@ func NewContextFromClients(
 		AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
 		AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
 		AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+
+		// TODO: Populate these fields once they are exposed by the API
+		ComplexityWeights: fee.Dimensions{},
+		GasPrice:          0,
 	}, nil
 }
 
