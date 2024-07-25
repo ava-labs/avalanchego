@@ -13,7 +13,8 @@ The plugin version is updated to `36` all plugins must update to be compatible.
 
 ### Fixes
 
-- Fixed block building timer recalculation when anyone can propose.
+- Updated local network validator start times
+- Fixed block building timer recalculation when anyone can propose
 
 ### What's Changed
 
@@ -47,6 +48,11 @@ The plugin version is updated to `36` all plugins must update to be compatible.
 - chore: fix some comments by @yingshanghuangqiao in https://github.com/ava-labs/avalanchego/pull/3213
 - Fix typos by @omahs in https://github.com/ava-labs/avalanchego/pull/3208
 - Cleanup fee.staticCalculator by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3210
+- typo by @meaghanfitzgerald in https://github.com/ava-labs/avalanchego/pull/3220
+- add getSubnet to p-chain api reference by @felipemadero in https://github.com/ava-labs/avalanchego/pull/3204
+- [ci] Update fuzz workflows to target master branch by @marun in https://github.com/ava-labs/avalanchego/pull/3221
+- Cleanup wallet tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3230
+- Update local validator start time by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3224
 
 ### New Contributors
 
