@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -136,6 +138,17 @@ func checkBootstrap(
 	}
 
 	log.Print("Bootstrap completed successfully!\n")
+
+	// Check disk usage
+	if len(dataDir) == 0 {
+		dataDir = os.ExpandEnv("$HOME/.tmpnet/networks")
+	}
+	cmd := exec.Command("du", "-sh", dataDir)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check disk usage: %v", err)
+	}
+	log.Printf("Disk usage: %s\n", strings.TrimSpace(string(output)))
 
 	return nil
 }
