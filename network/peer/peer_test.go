@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -22,9 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -106,7 +107,10 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	require.NoError(err)
 	nodeID := ids.NodeIDFromCert(cert)
 
-	ip := ips.NewDynamicIPPort(net.IPv6loopback, 1)
+	ip := utils.NewAtomic(netip.AddrPortFrom(
+		netip.IPv6Loopback(),
+		1,
+	))
 	tls := tlsCert.PrivateKey.(crypto.Signer)
 	bls, err := bls.NewSecretKey()
 	require.NoError(err)

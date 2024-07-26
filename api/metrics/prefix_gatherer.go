@@ -4,8 +4,8 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/protobuf/proto"
@@ -15,7 +15,11 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-var _ MultiGatherer = (*prefixGatherer)(nil)
+var (
+	_ MultiGatherer = (*prefixGatherer)(nil)
+
+	errOverlappingNamespaces = errors.New("prefix could create overlapping namespaces")
+)
 
 // NewPrefixGatherer returns a new MultiGatherer that merges metrics by adding a
 // prefix to their names.
@@ -31,12 +35,14 @@ func (g *prefixGatherer) Register(prefix string, gatherer prometheus.Gatherer) e
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	// TODO: Restrict prefixes to avoid potential conflicts
-	if slices.Contains(g.names, prefix) {
-		return fmt.Errorf("%w: %q",
-			errDuplicateGatherer,
-			prefix,
-		)
+	for _, existingPrefix := range g.names {
+		if eitherIsPrefix(prefix, existingPrefix) {
+			return fmt.Errorf("%w: %q conflicts with %q",
+				errOverlappingNamespaces,
+				prefix,
+				existingPrefix,
+			)
+		}
 	}
 
 	g.names = append(g.names, prefix)
@@ -63,4 +69,20 @@ func (g *prefixedGatherer) Gather() ([]*dto.MetricFamily, error) {
 		))
 	}
 	return metricFamilies, err
+}
+
+// eitherIsPrefix returns true if either [a] is a prefix of [b] or [b] is a
+// prefix of [a].
+//
+// This function accounts for the usage of the namespace boundary, so "hello" is
+// not considered a prefix of "helloworld". However, "hello" is considered a
+// prefix of "hello_world".
+func eitherIsPrefix(a, b string) bool {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	return a == b[:len(a)] && // a is a prefix of b
+		(len(a) == 0 || // a is empty
+			len(a) == len(b) || // a is equal to b
+			b[len(a)] == metric.NamespaceSeparatorByte) // a ends at a namespace boundary of b
 }

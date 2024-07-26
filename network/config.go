@@ -6,6 +6,7 @@ package network
 import (
 	"crypto"
 	"crypto/tls"
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,9 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -110,12 +111,12 @@ type Config struct {
 
 	TLSKeyLogFile string `json:"tlsKeyLogFile"`
 
-	MyNodeID           ids.NodeID        `json:"myNodeID"`
-	MyIPPort           ips.DynamicIPPort `json:"myIP"`
-	NetworkID          uint32            `json:"networkID"`
-	MaxClockDifference time.Duration     `json:"maxClockDifference"`
-	PingFrequency      time.Duration     `json:"pingFrequency"`
-	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
+	MyNodeID           ids.NodeID                    `json:"myNodeID"`
+	MyIPPort           *utils.Atomic[netip.AddrPort] `json:"myIP"`
+	NetworkID          uint32                        `json:"networkID"`
+	MaxClockDifference time.Duration                 `json:"maxClockDifference"`
+	PingFrequency      time.Duration                 `json:"pingFrequency"`
+	AllowPrivateIPs    bool                          `json:"allowPrivateIPs"`
 
 	SupportedACPs set.Set[uint32] `json:"supportedACPs"`
 	ObjectedACPs  set.Set[uint32] `json:"objectedACPs"`

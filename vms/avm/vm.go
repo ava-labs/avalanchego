@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -25,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
-	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/network"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -47,6 +46,7 @@ import (
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	extensions "github.com/ava-labs/avalanchego/vms/avm/fxs"
+	avmmetrics "github.com/ava-labs/avalanchego/vms/avm/metrics"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
@@ -66,7 +66,7 @@ type VM struct {
 
 	config.Config
 
-	metrics metrics.Metrics
+	metrics avmmetrics.Metrics
 
 	avax.AddressManager
 	ids.Aliaser
@@ -173,16 +173,15 @@ func (vm *VM) Initialize(
 		zap.Reflect("config", avmConfig),
 	)
 
-	registerer := prometheus.NewRegistry()
-	if err := ctx.Metrics.Register("", registerer); err != nil {
+	vm.registerer, err = metrics.MakeAndRegister(ctx.Metrics, "")
+	if err != nil {
 		return err
 	}
-	vm.registerer = registerer
 
 	vm.connectedPeers = make(map[ids.NodeID]*version.Application)
 
 	// Initialize metrics as soon as possible
-	vm.metrics, err = metrics.New(registerer)
+	vm.metrics, err = avmmetrics.New(vm.registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
@@ -320,7 +319,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
-	return utils.Err(
+	return errors.Join(
 		vm.state.Close(),
 		vm.baseDB.Close(),
 	)
@@ -641,7 +640,7 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	if assetID, err := ids.FromString(asset); err == nil {
 		return assetID, nil
 	}
-	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
+	return ids.Empty, fmt.Errorf("asset '%s' not found", asset)
 }
 
 // Invariant: onAccept is called when [tx] is being marked as accepted, but

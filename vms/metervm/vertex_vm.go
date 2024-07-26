@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -22,16 +21,21 @@ var (
 	_ snowstorm.Tx                    = (*meterTx)(nil)
 )
 
-func NewVertexVM(vm vertex.LinearizableVMWithEngine) vertex.LinearizableVMWithEngine {
+func NewVertexVM(
+	vm vertex.LinearizableVMWithEngine,
+	reg prometheus.Registerer,
+) vertex.LinearizableVMWithEngine {
 	return &vertexVM{
 		LinearizableVMWithEngine: vm,
+		registry:                 reg,
 	}
 }
 
 type vertexVM struct {
 	vertex.LinearizableVMWithEngine
 	vertexMetrics
-	clock mockable.Clock
+	registry prometheus.Registerer
+	clock    mockable.Clock
 }
 
 func (vm *vertexVM) Initialize(
@@ -45,19 +49,9 @@ func (vm *vertexVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	registerer := prometheus.NewRegistry()
-	if err := vm.vertexMetrics.Initialize(registerer); err != nil {
+	if err := vm.vertexMetrics.Initialize(vm.registry); err != nil {
 		return err
 	}
-
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := chainCtx.Metrics.Register("metervm", registerer); err != nil {
-		return err
-	}
-	if err := chainCtx.Metrics.Register("", multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = multiGatherer
 
 	return vm.LinearizableVMWithEngine.Initialize(
 		ctx,

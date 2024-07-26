@@ -7,9 +7,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -20,33 +20,32 @@ var (
 
 type testDialer struct {
 	// maps [ip.String] to a listener
-	listeners map[string]*testListener
+	listeners map[netip.AddrPort]*testListener
 }
 
 func newTestDialer() *testDialer {
 	return &testDialer{
-		listeners: make(map[string]*testListener),
+		listeners: make(map[netip.AddrPort]*testListener),
 	}
 }
 
-func (d *testDialer) NewListener() (ips.DynamicIPPort, *testListener) {
+func (d *testDialer) NewListener() (netip.AddrPort, *testListener) {
 	// Uses a private IP to easily enable testing AllowPrivateIPs
-	ip := ips.NewDynamicIPPort(
-		net.IPv4(10, 0, 0, 0),
+	addrPort := netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{10, 0, 0, 0}),
 		uint16(len(d.listeners)+1),
 	)
-	staticIP := ip.IPPort()
-	listener := newTestListener(staticIP)
-	d.AddListener(staticIP, listener)
-	return ip, listener
+	listener := newTestListener(addrPort)
+	d.AddListener(addrPort, listener)
+	return addrPort, listener
 }
 
-func (d *testDialer) AddListener(ip ips.IPPort, listener *testListener) {
-	d.listeners[ip.String()] = listener
+func (d *testDialer) AddListener(ip netip.AddrPort, listener *testListener) {
+	d.listeners[ip] = listener
 }
 
-func (d *testDialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) {
-	listener, ok := d.listeners[ip.String()]
+func (d *testDialer) Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error) {
+	listener, ok := d.listeners[ip]
 	if !ok {
 		return nil, errRefused
 	}

@@ -122,3 +122,17 @@ func (p Parameters) MinPercentConnectedHealthy() float64 {
 	alphaRatio := float64(p.AlphaConfidence) / float64(p.K)
 	return alphaRatio*(1-MinPercentConnectedBuffer) + MinPercentConnectedBuffer
 }
+
+type terminationCondition struct {
+	alphaConfidence int
+	beta            int
+}
+
+func newSingleTerminationCondition(alphaConfidence int, beta int) []terminationCondition {
+	return []terminationCondition{
+		{
+			alphaConfidence: alphaConfidence,
+			beta:            beta,
+		},
+	}
+}

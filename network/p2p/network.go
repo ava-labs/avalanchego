@@ -6,6 +6,7 @@ package p2p
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"strconv"
 	"sync"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -81,7 +81,7 @@ func NewNetwork(
 		),
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(metrics.msgTime),
 		registerer.Register(metrics.msgCount),
 	)

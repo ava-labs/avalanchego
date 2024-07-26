@@ -56,6 +56,6 @@ func TestFlat(t *testing.T) {
 	require.Equal(Green, f.Preference())
 	require.True(f.Finalized())
 
-	expected := "SB(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w, PreferenceStrength = 4, SF(Confidence = 2, Finalized = true, SL(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w)))"
+	expected := "SB(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w, PreferenceStrength = 4, SF(Confidence = [2], Finalized = true, SL(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w)))"
 	require.Equal(expected, f.String())
 }

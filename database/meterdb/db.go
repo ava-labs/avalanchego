@@ -5,12 +5,12 @@ package meterdb
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const methodLabel = "method"
@@ -98,7 +98,6 @@ type Database struct {
 
 // New returns a new database with added metrics
 func New(
-	namespace string,
 	reg prometheus.Registerer,
 	db database.Database,
 ) (*Database, error) {
@@ -106,30 +105,27 @@ func New(
 		db: db,
 		calls: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "calls",
-				Help:      "number of calls to the database",
+				Name: "calls",
+				Help: "number of calls to the database",
 			},
 			methodLabels,
 		),
 		duration: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "duration",
-				Help:      "time spent in database calls (ns)",
+				Name: "duration",
+				Help: "time spent in database calls (ns)",
 			},
 			methodLabels,
 		),
 		size: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "size",
-				Help:      "size of data passed in database calls",
+				Name: "size",
+				Help: "size of data passed in database calls",
 			},
 			methodLabels,
 		),
 	}
-	return meterDB, utils.Err(
+	return meterDB, errors.Join(
 		reg.Register(meterDB.calls),
 		reg.Register(meterDB.duration),
 		reg.Register(meterDB.size),

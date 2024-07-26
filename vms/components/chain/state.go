@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -46,9 +45,6 @@ type State struct {
 	// If nil, [BuildBlockWithContext] returns [BuildBlock].
 	buildBlockWithContext func(context.Context, *block.Context) (snowman.Block, error)
 
-	// getStatus returns the status of the block
-	getStatus func(context.Context, snowman.Block) (choices.Status, error)
-
 	// verifiedBlocks is a map of blocks that have been verified and are
 	// therefore currently in consensus.
 	verifiedBlocks map[ids.ID]*BlockWrapper
@@ -75,53 +71,6 @@ type Config struct {
 	BatchedUnmarshalBlock func(context.Context, [][]byte) ([]snowman.Block, error)
 	BuildBlock            func(context.Context) (snowman.Block, error)
 	BuildBlockWithContext func(context.Context, *block.Context) (snowman.Block, error)
-	GetBlockIDAtHeight    func(context.Context, uint64) (ids.ID, error)
-}
-
-// Block is an interface wrapping the normal snowman.Block interface to be used in
-// association with passing in a non-nil function to GetBlockIDAtHeight
-type Block interface {
-	snowman.Block
-
-	SetStatus(choices.Status)
-}
-
-// produceGetStatus creates a getStatus function that infers the status of a block by using a function
-// passed in from the VM that gets the block ID at a specific height. It is assumed that for any height
-// less than or equal to the last accepted block, getBlockIDAtHeight returns the accepted blockID at
-// the requested height.
-func produceGetStatus(s *State, getBlockIDAtHeight func(context.Context, uint64) (ids.ID, error)) func(context.Context, snowman.Block) (choices.Status, error) {
-	return func(ctx context.Context, blk snowman.Block) (choices.Status, error) {
-		internalBlk, ok := blk.(Block)
-		if !ok {
-			return choices.Unknown, fmt.Errorf("expected block to match chain Block interface but found block of type %T", blk)
-		}
-		lastAcceptedHeight := s.lastAcceptedBlock.Height()
-		blkHeight := internalBlk.Height()
-		if blkHeight > lastAcceptedHeight {
-			internalBlk.SetStatus(choices.Processing)
-			return choices.Processing, nil
-		}
-
-		acceptedID, err := getBlockIDAtHeight(ctx, blkHeight)
-		switch err {
-		case nil:
-			if acceptedID == blk.ID() {
-				internalBlk.SetStatus(choices.Accepted)
-				return choices.Accepted, nil
-			}
-			internalBlk.SetStatus(choices.Rejected)
-			return choices.Rejected, nil
-		case database.ErrNotFound:
-			// Not found can happen if chain history is missing. In this case,
-			// the block may have been accepted or rejected, it isn't possible
-			// to know here.
-			internalBlk.SetStatus(choices.Processing)
-			return choices.Processing, nil
-		default:
-			return choices.Unknown, fmt.Errorf("%w: failed to get accepted blkID at height %d", err, blkHeight)
-		}
-	}
 }
 
 func (s *State) initialize(config *Config) {
@@ -131,13 +80,6 @@ func (s *State) initialize(config *Config) {
 	s.buildBlockWithContext = config.BuildBlockWithContext
 	s.unmarshalBlock = config.UnmarshalBlock
 	s.batchedUnmarshalBlock = config.BatchedUnmarshalBlock
-	if config.GetBlockIDAtHeight == nil {
-		s.getStatus = func(_ context.Context, blk snowman.Block) (choices.Status, error) {
-			return blk.Status(), nil
-		}
-	} else {
-		s.getStatus = produceGetStatus(s, config.GetBlockIDAtHeight)
-	}
 	s.lastAcceptedBlock = &BlockWrapper{
 		Block: config.LastAcceptedBlock,
 		state: s,
@@ -282,7 +224,7 @@ func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, erro
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(ctx, blk)
+	return s.addBlockOutsideConsensus(blk), nil
 }
 
 // getCachedBlock checks the caches for [blkID] by priority. Returning
@@ -348,7 +290,7 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(ctx, blk)
+	return s.addBlockOutsideConsensus(blk), nil
 }
 
 // BatchedParseBlock implements part of the block.BatchedChainVM interface. In
@@ -423,11 +365,7 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 		}
 
 		s.missingBlocks.Evict(blkID)
-		wrappedBlk, err := s.addBlockOutsideConsensus(ctx, blk)
-		if err != nil {
-			return nil, err
-		}
-		blks[i] = wrappedBlk
+		blks[i] = s.addBlockOutsideConsensus(blk)
 	}
 	return blks, nil
 }
@@ -445,7 +383,7 @@ func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Conte
 		return nil, err
 	}
 
-	return s.deduplicate(ctx, blk)
+	return s.deduplicate(blk), nil
 }
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it
@@ -456,22 +394,22 @@ func (s *State) BuildBlock(ctx context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	return s.deduplicate(ctx, blk)
+	return s.deduplicate(blk), nil
 }
 
-func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Block, error) {
+func (s *State) deduplicate(blk snowman.Block) snowman.Block {
 	blkID := blk.ID()
 	// Defensive: buildBlock should not return a block that has already been verified.
 	// If it does, make sure to return the existing reference to the block.
 	if existingBlk, ok := s.getCachedBlock(blkID); ok {
-		return existingBlk, nil
+		return existingBlk
 	}
 	// Evict the produced block from missing blocks in case it was previously
 	// marked as missing.
 	s.missingBlocks.Evict(blkID)
 
 	// wrap the returned block and add it to the correct cache
-	return s.addBlockOutsideConsensus(ctx, blk)
+	return s.addBlockOutsideConsensus(blk)
 }
 
 // addBlockOutsideConsensus adds [blk] to the correct cache and returns
@@ -479,27 +417,20 @@ func (s *State) deduplicate(ctx context.Context, blk snowman.Block) (snowman.Blo
 // assumes [blk] is a known, non-wrapped block that is not currently
 // in consensus. [blk] could be either decided or a block that has not yet
 // been verified and added to consensus.
-func (s *State) addBlockOutsideConsensus(ctx context.Context, blk snowman.Block) (snowman.Block, error) {
+func (s *State) addBlockOutsideConsensus(blk snowman.Block) snowman.Block {
 	wrappedBlk := &BlockWrapper{
 		Block: blk,
 		state: s,
 	}
 
 	blkID := blk.ID()
-	status, err := s.getStatus(ctx, blk)
-	if err != nil {
-		return nil, fmt.Errorf("could not get block status for %s due to %w", blkID, err)
-	}
-	switch status {
-	case choices.Accepted, choices.Rejected:
+	if blk.Height() <= s.lastAcceptedBlock.Height() {
 		s.decidedBlocks.Put(blkID, wrappedBlk)
-	case choices.Processing:
+	} else {
 		s.unverifiedBlocks.Put(blkID, wrappedBlk)
-	default:
-		return nil, fmt.Errorf("found unexpected status for blk %s: %s", blkID, status)
 	}
 
-	return wrappedBlk, nil
+	return wrappedBlk
 }
 
 func (s *State) LastAccepted(context.Context) (ids.ID, error) {

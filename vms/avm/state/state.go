@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -408,7 +408,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 }
 
 func (s *state) Close() error {
-	return utils.Err(
+	return errors.Join(
 		s.utxoDB.Close(),
 		s.txDB.Close(),
 		s.blockIDDB.Close(),
@@ -419,7 +419,7 @@ func (s *state) Close() error {
 }
 
 func (s *state) write() error {
-	return utils.Err(
+	return errors.Join(
 		s.writeUTXOs(),
 		s.writeTxs(),
 		s.writeBlockIDs(),
