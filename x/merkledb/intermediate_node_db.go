@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -53,7 +54,7 @@ func newIntermediateNodeDB(
 		evictionBatchSize: evictionBatchSize,
 		tokenSize:         tokenSize,
 		hasher:            hasher,
-		nodeCache:         cache.NewSizedLRU(cacheSize, cacheEntrySize),
+		nodeCache:         lru.NewSizedCache(cacheSize, cacheEntrySize),
 	}
 	result.writeBuffer = newOnEvictCache(
 		writeBufferSize,

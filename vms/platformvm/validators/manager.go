@@ -236,9 +236,7 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return validatorSetsCache
 	}
 
-	validatorSetsCache = &lru.Cache[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
-		Size: validatorSetsCacheSize,
-	}
+	validatorSetsCache = lru.NewCache[uint64, map[ids.NodeID]*validators.GetValidatorOutput](validatorSetsCacheSize)
 	m.caches[subnetID] = validatorSetsCache
 	return validatorSetsCache
 }

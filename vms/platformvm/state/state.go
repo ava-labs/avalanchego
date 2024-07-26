@@ -474,7 +474,7 @@ func newState(
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metricsReg,
-		&lru.Cache[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
+		lru.NewCache[uint64, ids.ID](execCfg.BlockIDCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -483,7 +483,7 @@ func newState(
 	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, block.Block](execCfg.BlockCacheSize, blockSize),
+		lru.NewSizedCache(execCfg.BlockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -511,7 +511,7 @@ func newState(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
+		lru.NewSizedCache(execCfg.TxCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -521,7 +521,7 @@ func newState(
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
-		&lru.Cache[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
+		lru.NewCache[ids.ID, []*avax.UTXO](execCfg.RewardUTXOsCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -539,7 +539,7 @@ func newState(
 	subnetOwnerCache, err := metercacher.New[ids.ID, fxOwnerAndSize](
 		"subnet_owner_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, fxOwnerAndSize](execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
+		lru.NewSizedCache(execCfg.FxOwnerCacheSize, func(_ ids.ID, f fxOwnerAndSize) int {
 			return ids.IDLen + f.size
 		}),
 	)
@@ -550,7 +550,7 @@ func newState(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		lru.NewSizedCache[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
+		lru.NewSizedCache(execCfg.TransformedSubnetTxCacheSize, txSize),
 	)
 	if err != nil {
 		return nil, err
@@ -559,7 +559,7 @@ func newState(
 	supplyCache, err := metercacher.New[ids.ID, *uint64](
 		"supply_cache",
 		metricsReg,
-		&lru.Cache[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
+		lru.NewCache[ids.ID, *uint64](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -568,7 +568,7 @@ func newState(
 	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
 		"chain_cache",
 		metricsReg,
-		&lru.Cache[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
+		lru.NewCache[ids.ID, []*txs.Tx](execCfg.ChainCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -577,7 +577,7 @@ func newState(
 	chainDBCache, err := metercacher.New[ids.ID, linkeddb.LinkedDB](
 		"chain_db_cache",
 		metricsReg,
-		&lru.Cache[ids.ID, linkeddb.LinkedDB]{Size: execCfg.ChainDBCacheSize},
+		lru.NewCache[ids.ID, linkeddb.LinkedDB](execCfg.ChainDBCacheSize),
 	)
 	if err != nil {
 		return nil, err

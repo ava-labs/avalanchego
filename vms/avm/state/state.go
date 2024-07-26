@@ -155,7 +155,7 @@ func New(
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
 		"tx_cache",
 		metrics,
-		&lru.Cache[ids.ID, *txs.Tx]{Size: txCacheSize},
+		lru.NewCache[ids.ID, *txs.Tx](txCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func New(
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metrics,
-		&lru.Cache[uint64, ids.ID]{Size: blockIDCacheSize},
+		lru.NewCache[uint64, ids.ID](blockIDCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func New(
 	blockCache, err := metercacher.New[ids.ID, block.Block](
 		"block_cache",
 		metrics,
-		&lru.Cache[ids.ID, block.Block]{Size: blockCacheSize},
+		lru.NewCache[ids.ID, block.Block](blockCacheSize),
 	)
 	if err != nil {
 		return nil, err

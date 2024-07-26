@@ -7,16 +7,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-const (
-	defaultCacheSize = 256
-)
+const defaultCacheSize = 256
 
 var (
 	ErrWrongVMType                    = errors.New("wrong vm type")
@@ -39,10 +35,9 @@ var (
 
 // Fx describes the secp256k1 feature extension
 type Fx struct {
-	secp256k1.RecoverCache
-
 	VM           VM
 	bootstrapped bool
+	recoverCache *secp256k1.RecoverCache
 }
 
 func (fx *Fx) Initialize(vmIntf interface{}) error {
@@ -53,11 +48,7 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	log := fx.VM.Logger()
 	log.Debug("initializing secp256k1 fx")
 
-	fx.RecoverCache = secp256k1.RecoverCache{
-		Cache: lru.Cache[ids.ID, *secp256k1.PublicKey]{
-			Size: defaultCacheSize,
-		},
-	}
+	fx.recoverCache = secp256k1.NewRecoverCache(2048)
 	c := fx.VM.CodecRegistry()
 	return errors.Join(
 		c.RegisterType(&TransferInput{}),
@@ -200,7 +191,18 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 		// Make sure each signature in the signature list is from an owner of
 		// the output being consumed
 		sig := cred.Sigs[i]
-		pk, err := fx.RecoverPublicKeyFromHash(txHash, sig[:])
+
+		var (
+			pk  *secp256k1.PublicKey
+			err error
+		)
+		// TODO: Refactor the feature extensions so that this code can never be
+		// hit with an uninitialized recover cache.
+		if fx.recoverCache != nil {
+			pk, err = fx.recoverCache.RecoverPublicKeyFromHash(txHash, sig[:])
+		} else {
+			pk, err = secp256k1.RecoverPublicKeyFromHash(txHash, sig[:])
+		}
 		if err != nil {
 			return err
 		}

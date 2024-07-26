@@ -93,11 +93,11 @@ func NewUTXOState(
 	s := &utxoState{
 		codec: codec,
 
-		utxoCache: &lru.Cache[ids.ID, *UTXO]{Size: utxoCacheSize},
+		utxoCache: lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
 		utxoDB:    prefixdb.New(utxoPrefix, db),
 
 		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: &lru.Cache[string, linkeddb.LinkedDB]{Size: indexCacheSize},
+		indexCache: lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
 
 		trackChecksum: trackChecksum,
 	}
@@ -113,7 +113,7 @@ func NewMeteredUTXOState(
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
 		"utxo_cache",
 		metrics,
-		&lru.Cache[ids.ID, *UTXO]{Size: utxoCacheSize},
+		lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -122,9 +122,7 @@ func NewMeteredUTXOState(
 	indexCache, err := metercacher.New[string, linkeddb.LinkedDB](
 		"index_cache",
 		metrics,
-		&lru.Cache[string, linkeddb.LinkedDB]{
-			Size: indexCacheSize,
-		},
+		lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
 	)
 	if err != nil {
 		return nil, err

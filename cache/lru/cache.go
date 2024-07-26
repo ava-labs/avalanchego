@@ -19,64 +19,33 @@ var _ cache.Cacher[struct{}, struct{}] = (*Cache[struct{}, struct{}])(nil)
 type Cache[K comparable, V any] struct {
 	lock     sync.Mutex
 	elements *linked.Hashmap[K, V]
-	// If set to <= 0, will be set internally to 1.
-	Size int
+	size     int
+}
+
+func NewCache[K comparable, V any](size int) *Cache[K, V] {
+	if size <= 0 {
+		size = 1
+	}
+	return &Cache[K, V]{
+		elements: linked.NewHashmap[K, V](),
+		size:     size,
+	}
 }
 
 func (c *Cache[K, V]) Put(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.put(key, value)
-}
-
-func (c *Cache[K, V]) Get(key K) (V, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.get(key)
-}
-
-func (c *Cache[K, _]) Evict(key K) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.evict(key)
-}
-
-func (c *Cache[_, _]) Flush() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.flush()
-}
-
-func (c *Cache[_, _]) Len() int {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.len()
-}
-
-func (c *Cache[_, _]) PortionFilled() float64 {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.portionFilled()
-}
-
-func (c *Cache[K, V]) put(key K, value V) {
-	c.resize()
-
-	if c.elements.Len() == c.Size {
+	if c.elements.Len() == c.size {
 		oldestKey, _, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
 	}
 	c.elements.Put(key, value)
 }
 
-func (c *Cache[K, V]) get(key K) (V, bool) {
-	c.resize()
+func (c *Cache[K, V]) Get(key K) (V, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	val, ok := c.elements.Get(key)
 	if !ok {
@@ -86,42 +55,30 @@ func (c *Cache[K, V]) get(key K) (V, bool) {
 	return val, true
 }
 
-func (c *Cache[K, _]) evict(key K) {
-	c.resize()
+func (c *Cache[K, _]) Evict(key K) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	c.elements.Delete(key)
 }
 
-func (c *Cache[K, V]) flush() {
-	if c.elements != nil {
-		c.elements.Clear()
-	}
+func (c *Cache[_, _]) Flush() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.elements.Clear()
 }
 
-func (c *Cache[_, _]) len() int {
-	if c.elements == nil {
-		return 0
-	}
+func (c *Cache[_, _]) Len() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	return c.elements.Len()
 }
 
-func (c *Cache[_, _]) portionFilled() float64 {
-	return float64(c.len()) / float64(c.Size)
-}
+func (c *Cache[_, _]) PortionFilled() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
-// Initializes [c.elements] if it's nil.
-// Sets [c.size] to 1 if it's <= 0.
-// Removes oldest elements to make number of elements
-// in the cache == [c.size] if necessary.
-func (c *Cache[K, V]) resize() {
-	if c.elements == nil {
-		c.elements = linked.NewHashmap[K, V]()
-	}
-	if c.Size <= 0 {
-		c.Size = 1
-	}
-	for c.elements.Len() > c.Size {
-		oldestKey, _, _ := c.elements.Oldest()
-		c.elements.Delete(oldestKey)
-	}
+	return float64(c.elements.Len()) / float64(c.size)
 }

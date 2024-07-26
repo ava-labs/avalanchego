@@ -2937,8 +2937,8 @@ func TestGetProcessingAncestor(t *testing.T) {
 		nonVerifiedTreeWithUnissuedBlock = ancestor.NewTree()
 
 		emptyNonVerifiedCache             = &cache.Empty[ids.ID, snowman.Block]{}
-		nonVerifiedCacheWithUnissuedBlock = &lru.Cache[ids.ID, snowman.Block]{Size: 1}
-		nonVerifiedCacheWithDecidedBlock  = &lru.Cache[ids.ID, snowman.Block]{Size: 1}
+		nonVerifiedCacheWithUnissuedBlock = lru.NewCache[ids.ID, snowman.Block](1)
+		nonVerifiedCacheWithDecidedBlock  = lru.NewCache[ids.ID, snowman.Block](1)
 	)
 	nonVerifiedTreeWithUnissuedBlock.Add(unissuedBlock.ID(), unissuedBlock.Parent())
 	nonVerifiedCacheWithUnissuedBlock.Put(unissuedBlock.ID(), unissuedBlock)

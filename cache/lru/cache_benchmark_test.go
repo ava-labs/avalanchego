@@ -5,6 +5,7 @@ package lru
 
 import (
 	"crypto/rand"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,50 +13,23 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func BenchmarkLRUCachePutSmall(b *testing.B) {
-	smallLen := 5
-	cache := &Cache[ids.ID, int]{Size: smallLen}
-	for n := 0; n < b.N; n++ {
-		for i := 0; i < smallLen; i++ {
-			var id ids.ID
-			_, err := rand.Read(id[:])
-			require.NoError(b, err)
-			cache.Put(id, n)
-		}
-		b.StopTimer()
-		cache.Flush()
-		b.StartTimer()
-	}
-}
-
-func BenchmarkLRUCachePutMedium(b *testing.B) {
-	mediumLen := 250
-	cache := &Cache[ids.ID, int]{Size: mediumLen}
-	for n := 0; n < b.N; n++ {
-		for i := 0; i < mediumLen; i++ {
-			var id ids.ID
-			_, err := rand.Read(id[:])
-			require.NoError(b, err)
-			cache.Put(id, n)
-		}
-		b.StopTimer()
-		cache.Flush()
-		b.StartTimer()
-	}
-}
-
-func BenchmarkLRUCachePutLarge(b *testing.B) {
-	largeLen := 10000
-	cache := &Cache[ids.ID, int]{Size: largeLen}
-	for n := 0; n < b.N; n++ {
-		for i := 0; i < largeLen; i++ {
-			var id ids.ID
-			_, err := rand.Read(id[:])
-			require.NoError(b, err)
-			cache.Put(id, n)
-		}
-		b.StopTimer()
-		cache.Flush()
-		b.StartTimer()
+// TODO: What is this benchmarking?
+func BenchmarkCachePut(b *testing.B) {
+	sizes := []int{5, 250, 10000}
+	for _, size := range sizes {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			cache := NewCache[ids.ID, int](size)
+			for n := 0; n < b.N; n++ {
+				for i := 0; i < size; i++ {
+					var id ids.ID
+					_, err := rand.Read(id[:])
+					require.NoError(b, err)
+					cache.Put(id, n)
+				}
+				b.StopTimer()
+				cache.Flush()
+				b.StartTimer()
+			}
+		})
 	}
 }

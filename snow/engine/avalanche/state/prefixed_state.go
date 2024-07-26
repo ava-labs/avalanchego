@@ -29,8 +29,8 @@ type prefixedState struct {
 func newPrefixedState(state *state, idCacheSizes int) *prefixedState {
 	return &prefixedState{
 		state:     state,
-		vtx:       &lru.Cache[ids.ID, ids.ID]{Size: idCacheSizes},
-		status:    &lru.Cache[ids.ID, ids.ID]{Size: idCacheSizes},
+		vtx:       lru.NewCache[ids.ID, ids.ID](idCacheSizes),
+		status:    lru.NewCache[ids.ID, ids.ID](idCacheSizes),
 		uniqueVtx: &lru.Deduplicator[ids.ID, *uniqueVertex]{Size: idCacheSizes},
 	}
 }

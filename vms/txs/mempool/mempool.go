@@ -84,7 +84,7 @@ func New[T Tx](
 		unissuedTxs:    linked.NewHashmap[ids.ID, T](),
 		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
 		bytesAvailable: maxMempoolSize,
-		droppedTxIDs:   &lru.Cache[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		droppedTxIDs:   lru.NewCache[ids.ID, error](droppedTxIDsCacheSize),
 		metrics:        metrics,
 	}
 	m.updateMetrics()

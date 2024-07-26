@@ -61,7 +61,7 @@ func NewHeightIndex(db database.Database, commitable versiondb.Commitable) Heigh
 	return &heightIndex{
 		Commitable: commitable,
 
-		heightsCache: &lru.Cache[uint64, ids.ID]{Size: cacheSize},
+		heightsCache: lru.NewCache[uint64, ids.ID](cacheSize),
 		heightDB:     prefixdb.New(heightPrefix, db),
 		metadataDB:   prefixdb.New(metadataPrefix, db),
 	}

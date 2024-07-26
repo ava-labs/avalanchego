@@ -25,13 +25,13 @@ func TestInterface(t *testing.T) {
 		{
 			description: "cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return &lru.Cache[ids.ID, int64]{Size: size}
+				return lru.NewCache[ids.ID, int64](size)
 			},
 		},
 		{
 			description: "sized cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return lru.NewSizedCache[ids.ID, int64](size*cachetest.IntSize, cachetest.IntSizeFunc)
+				return lru.NewSizedCache(size*cachetest.IntSize, cachetest.IntSizeFunc)
 			},
 		},
 	}

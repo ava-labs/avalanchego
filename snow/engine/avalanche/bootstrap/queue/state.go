@@ -67,9 +67,7 @@ func newState(
 	jobsCache, err := metercacher.New[ids.ID, Job](
 		jobsCacheMetricsNamespace,
 		metricsRegisterer,
-		&lru.Cache[ids.ID, Job]{
-			Size: jobsCacheSize,
-		},
+		lru.NewCache[ids.ID, Job](jobsCacheSize),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create metered cache: %w", err)
@@ -87,7 +85,7 @@ func newState(
 		jobsCache:       jobsCache,
 		jobsDB:          jobs,
 		dependenciesDB:  prefixdb.New(dependenciesPrefix, db),
-		dependentsCache: &lru.Cache[ids.ID, linkeddb.LinkedDB]{Size: dependentsCacheSize},
+		dependentsCache: lru.NewCache[ids.ID, linkeddb.LinkedDB](dependentsCacheSize),
 		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsPrefix, db)),
 		metadataDB:      metadataDB,
 		numJobs:         numJobs,

@@ -63,7 +63,7 @@ type node struct {
 
 func New(db database.Database, cacheSize int) LinkedDB {
 	return &linkedDB{
-		nodeCache:    &lru.Cache[string, *node]{Size: cacheSize},
+		nodeCache:    lru.NewCache[string, *node](cacheSize),
 		updatedNodes: make(map[string]*node),
 		db:           db,
 		batch:        db.NewBatch(),

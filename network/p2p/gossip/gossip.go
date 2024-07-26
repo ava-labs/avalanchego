@@ -325,7 +325,7 @@ func NewPushGossiper[T Gossipable](
 		tracking:   make(map[ids.ID]*tracking),
 		toGossip:   buffer.NewUnboundedDeque[T](0),
 		toRegossip: buffer.NewUnboundedDeque[T](0),
-		discarded:  &lru.Cache[ids.ID, struct{}]{Size: discardedSize},
+		discarded:  lru.NewCache[ids.ID, struct{}](discardedSize),
 	}, nil
 }
 

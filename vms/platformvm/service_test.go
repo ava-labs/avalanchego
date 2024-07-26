@@ -79,11 +79,9 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Wall
 	vm, factory, _, mutableSharedMemory := defaultVM(t, latestFork)
 
 	return &Service{
-		vm:          vm,
-		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &lru.Cache[ids.ID, *stakerAttributes]{
-			Size: stakerAttributesCacheSize,
-		},
+		vm:                    vm,
+		addrManager:           avax.NewAddressManager(vm.ctx),
+		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}, mutableSharedMemory, factory
 }
 

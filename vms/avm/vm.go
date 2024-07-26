@@ -193,7 +193,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = &lru.Cache[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
+	vm.assetToFxCache = lru.NewCache[ids.ID, set.Bits64](assetToFxCacheSize)
 
 	vm.pubsub = pubsub.New(ctx.Log)
 

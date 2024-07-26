@@ -14,13 +14,11 @@ import (
 
 func TestSizedCache(t *testing.T) {
 	c := NewSizedCache[ids.ID, int64](cachetest.IntSize, cachetest.IntSizeFunc)
-
 	cachetest.Basic(t, c)
 }
 
 func TestSizedCacheEviction(t *testing.T) {
 	c := NewSizedCache[ids.ID, int64](2*cachetest.IntSize, cachetest.IntSizeFunc)
-
 	cachetest.Eviction(t, c)
 }
 

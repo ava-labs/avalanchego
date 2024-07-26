@@ -65,7 +65,7 @@ func New(
 		outstandingRequests:     bimap.New[common.Request, ids.ID](),
 		outstandingRequestTimes: make(map[common.Request]time.Time),
 
-		processedCache: &lru.Cache[ids.ID, struct{}]{Size: cacheSize},
+		processedCache: lru.NewCache[ids.ID, struct{}](cacheSize),
 		onFinished:     onFinished,
 	}
 	return b, b.metrics.Initialize(reg)
