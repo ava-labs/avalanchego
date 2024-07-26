@@ -17,22 +17,19 @@ source "$SUBNET_EVM_PATH"/scripts/versions.sh
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 if [[ $# -eq 1 ]]; then
-    PLUGIN_DIR=$1
+    BINARY_PATH=$1
 elif [[ $# -eq 0 ]]; then
-    PLUGIN_DIR="${DEFAULT_PLUGIN_DIR}"
+    BINARY_PATH="${SUBNET_EVM_PATH}/build/subnet-evm"
 else
-    echo "Invalid arguments to build subnet-evm. Requires zero (default plugin dir) or one argument to specify the plugin dir."
+    echo "Invalid arguments to build subnet-evm. Requires zero (default binary path) or one argument to specify the binary path."
     exit 1
 fi
 
-PLUGIN_PATH="${PLUGIN_DIR}/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
-
-BINARY_PATH="build/subnet-evm"
-
 # Build Subnet EVM, which is run as a subprocess
 echo "Building Subnet EVM @ GitCommit: $SUBNET_EVM_COMMIT at $BINARY_PATH"
-go build -ldflags "-X github.com/ava-labs/subnet-evm/plugin/evm.GitCommit=$SUBNET_EVM_COMMIT $STATIC_LD_FLAGS" -o "./$BINARY_PATH" "plugin/"*.go
+go build -ldflags "-X github.com/ava-labs/subnet-evm/plugin/evm.GitCommit=$SUBNET_EVM_COMMIT $STATIC_LD_FLAGS" -o "$BINARY_PATH" "plugin/"*.go
 
+PLUGIN_PATH="${DEFAULT_PLUGIN_DIR}/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
 echo "Symlinking ${BINARY_PATH} to ${PLUGIN_PATH}"
-mkdir -p "${PLUGIN_DIR}"
-ln -sf "${PWD}/${BINARY_PATH}" "${PLUGIN_PATH}"
+mkdir -p "${DEFAULT_PLUGIN_DIR}"
+ln -sf "${BINARY_PATH}" "${PLUGIN_PATH}"
