@@ -340,8 +340,8 @@ func (b *builder) NewBaseTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicBaseTxComplexities.Add(
-		memoComplexity,
-		outputComplexity,
+		&memoComplexity,
+		&outputComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -433,8 +433,8 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicAddSubnetValidatorTxComplexities.Add(
-		memoComplexity,
-		authComplexity,
+		&memoComplexity,
+		&authComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -487,8 +487,8 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicRemoveSubnetValidatorTxComplexities.Add(
-		memoComplexity,
-		authComplexity,
+		&memoComplexity,
+		&authComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -595,8 +595,8 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicCreateChainTxComplexities.Add(
-		dynamicComplexity,
-		authComplexity,
+		&dynamicComplexity,
+		&authComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -648,8 +648,8 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicCreateSubnetTxComplexities.Add(
-		memoComplexity,
-		ownerComplexity,
+		&memoComplexity,
+		&ownerComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -706,9 +706,9 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicTransferSubnetOwnershipTxComplexities.Add(
-		memoComplexity,
-		authComplexity,
-		ownerComplexity,
+		&memoComplexity,
+		&authComplexity,
+		&ownerComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -826,9 +826,9 @@ func (b *builder) NewImportTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicImportTxComplexities.Add(
-		memoComplexity,
-		inputComplexity,
-		outputComplexity,
+		&memoComplexity,
+		&inputComplexity,
+		&outputComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -901,8 +901,8 @@ func (b *builder) NewExportTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicExportTxComplexities.Add(
-		memoComplexity,
-		outputComplexity,
+		&memoComplexity,
+		&outputComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -1029,10 +1029,10 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
-		memoComplexity,
-		signerComplexity,
-		validatorOwnerComplexity,
-		delegatorOwnerComplexity,
+		&memoComplexity,
+		&signerComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -1094,8 +1094,8 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		return nil, err
 	}
 	complexity, err := txfee.IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
-		memoComplexity,
-		ownerComplexity,
+		&memoComplexity,
+		&ownerComplexity,
 	)
 	if err != nil {
 		return nil, err
@@ -1512,7 +1512,7 @@ func (s *spendHelper) addInput(input *avax.TransferableInput) error {
 	if err != nil {
 		return err
 	}
-	s.complexity, err = s.complexity.Add(newInputComplexity)
+	s.complexity, err = s.complexity.Add(&newInputComplexity)
 	if err != nil {
 		return err
 	}
@@ -1536,7 +1536,7 @@ func (s *spendHelper) addOutputComplexity(output *avax.TransferableOutput) error
 	if err != nil {
 		return err
 	}
-	s.complexity, err = s.complexity.Add(newOutputComplexity)
+	s.complexity, err = s.complexity.Add(&newOutputComplexity)
 	return err
 }
 

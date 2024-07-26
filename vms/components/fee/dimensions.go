@@ -22,7 +22,7 @@ type (
 // Add returns d + sum(os...).
 //
 // If overflow occurs, an error is returned.
-func (d Dimensions) Add(os ...Dimensions) (Dimensions, error) {
+func (d Dimensions) Add(os ...*Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
 		for i := range o {
@@ -38,7 +38,7 @@ func (d Dimensions) Add(os ...Dimensions) (Dimensions, error) {
 // Sub returns d - sum(os...).
 //
 // If underflow occurs, an error is returned.
-func (d Dimensions) Sub(os ...Dimensions) (Dimensions, error) {
+func (d Dimensions) Sub(os ...*Dimensions) (Dimensions, error) {
 	var err error
 	for _, o := range os {
 		for i := range o {
