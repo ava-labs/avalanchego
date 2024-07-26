@@ -1221,7 +1221,7 @@ func (n *Node) initVMs() error {
 	}
 
 	// Register the VMs that Avalanche supports
-	eUpgradeTime := n.Config.UpgradeConfig.EtnaUpgradeTime
+	eUpgradeTime := n.Config.UpgradeConfig.EtnaTime
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{

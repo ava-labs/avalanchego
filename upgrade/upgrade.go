@@ -4,6 +4,7 @@
 package upgrade
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -105,7 +106,7 @@ var (
 		CortinaTime:                  CortinaTimes[constants.MainnetID],
 		CortinaXChainStopVertexID:    CortinaXChainStopVertexID[constants.MainnetID],
 		DurangoTime:                  DurangoTimes[constants.MainnetID],
-		EtnaUpgradeTime:              EUpgradeTimes[constants.MainnetID],
+		EtnaTime:                     EUpgradeTimes[constants.MainnetID],
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            ApricotPhase1Times[constants.FujiID],
@@ -121,7 +122,7 @@ var (
 		CortinaTime:                  CortinaTimes[constants.FujiID],
 		CortinaXChainStopVertexID:    CortinaXChainStopVertexID[constants.FujiID],
 		DurangoTime:                  DurangoTimes[constants.FujiID],
-		EtnaUpgradeTime:              EUpgradeTimes[constants.FujiID],
+		EtnaTime:                     EUpgradeTimes[constants.FujiID],
 	}
 	Default = Config{
 		ApricotPhase1Time:            DefaultUpgradeTime,
@@ -137,25 +138,62 @@ var (
 		CortinaTime:                  DefaultUpgradeTime,
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  DefaultUpgradeTime,
-		EtnaUpgradeTime:              DefaultUpgradeTime,
+		EtnaTime:                     DefaultUpgradeTime,
 	}
 )
 
 type Config struct {
-	ApricotPhase1Time            time.Time
-	ApricotPhase2Time            time.Time
-	ApricotPhase3Time            time.Time
-	ApricotPhase4Time            time.Time
-	ApricotPhase4MinPChainHeight uint64
-	ApricotPhase5Time            time.Time
-	ApricotPhasePre6Time         time.Time
-	ApricotPhase6Time            time.Time
-	ApricotPhasePost6Time        time.Time
-	BanffTime                    time.Time
-	CortinaTime                  time.Time
-	CortinaXChainStopVertexID    ids.ID
-	DurangoTime                  time.Time
-	EtnaUpgradeTime              time.Time
+	ApricotPhase1Time            time.Time `json:"apricotPhase1Time"`
+	ApricotPhase2Time            time.Time `json:"apricotPhase2Time"`
+	ApricotPhase3Time            time.Time `json:"apricotPhase3Time"`
+	ApricotPhase4Time            time.Time `json:"apricotPhase4Time"`
+	ApricotPhase4MinPChainHeight uint64    `json:"apricotPhase4MinPChainHeight"`
+	ApricotPhase5Time            time.Time `json:"apricotPhase5Time"`
+	ApricotPhasePre6Time         time.Time `json:"apricotPhasePre6Time"`
+	ApricotPhase6Time            time.Time `json:"apricotPhase6Time"`
+	ApricotPhasePost6Time        time.Time `json:"apricotPhasePost6Time"`
+	BanffTime                    time.Time `json:"banffTime"`
+	CortinaTime                  time.Time `json:"cortinaTime"`
+	CortinaXChainStopVertexID    ids.ID    `json:"cortinaXChainStopVertexID"`
+	DurangoTime                  time.Time `json:"durangoTime"`
+	EtnaTime                     time.Time `json:"etnaTime"`
+}
+
+func (c Config) Validate() error {
+	if c.ApricotPhase1Time.After(c.ApricotPhase2Time) {
+		return fmt.Errorf("apricot phase 1 time (%s) is after apricot phase 2 time (%s)", c.ApricotPhase1Time, c.ApricotPhase2Time)
+	}
+	if c.ApricotPhase2Time.After(c.ApricotPhase3Time) {
+		return fmt.Errorf("apricot phase 2 time (%s) is after apricot phase 3 time (%s)", c.ApricotPhase2Time, c.ApricotPhase3Time)
+	}
+	if c.ApricotPhase3Time.After(c.ApricotPhase4Time) {
+		return fmt.Errorf("apricot phase 3 time (%s) is after apricot phase 4 time (%s)", c.ApricotPhase3Time, c.ApricotPhase4Time)
+	}
+	if c.ApricotPhase4Time.After(c.ApricotPhase5Time) {
+		return fmt.Errorf("apricot phase 4 time (%s) is after apricot phase 5 time (%s)", c.ApricotPhase4Time, c.ApricotPhase5Time)
+	}
+	if c.ApricotPhase5Time.After(c.ApricotPhasePre6Time) {
+		return fmt.Errorf("apricot phase 5 time (%s) is after apricot phase pre-6 time (%s)", c.ApricotPhase5Time, c.ApricotPhasePre6Time)
+	}
+	if c.ApricotPhasePre6Time.After(c.ApricotPhase6Time) {
+		return fmt.Errorf("apricot phase pre-6 time (%s) is after apricot phase 6 time (%s)", c.ApricotPhasePre6Time, c.ApricotPhase6Time)
+	}
+	if c.ApricotPhase6Time.After(c.ApricotPhasePost6Time) {
+		return fmt.Errorf("apricot phase 6 time (%s) is after apricot phase post-6 time (%s)", c.ApricotPhase6Time, c.ApricotPhasePost6Time)
+	}
+	if c.ApricotPhasePost6Time.After(c.BanffTime) {
+		return fmt.Errorf("apricot phase post-6 time (%s) is after banff time (%s)", c.ApricotPhasePost6Time, c.BanffTime)
+	}
+	if c.BanffTime.After(c.CortinaTime) {
+		return fmt.Errorf("banff time (%s) is after cortina time (%s)", c.BanffTime, c.CortinaTime)
+	}
+	if c.CortinaTime.After(c.DurangoTime) {
+		return fmt.Errorf("cortina time (%s) is after durango time (%s)", c.CortinaTime, c.DurangoTime)
+	}
+	if c.DurangoTime.After(c.EtnaTime) {
+		return fmt.Errorf("durango time (%s) is after etna time (%s)", c.DurangoTime, c.EtnaTime)
+	}
+	return nil
 }
 
 func GetConfig(networkID uint32) Config {

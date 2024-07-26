@@ -780,8 +780,41 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) fee.StaticConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getUpgradeConfig(_ *viper.Viper, networkID uint32) upgrade.Config {
-	return upgrade.GetConfig(networkID)
+func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) {
+	configured := v.IsSet(UpgradeFileContentKey) || v.IsSet(UpgradeFileKey)
+	if !configured {
+		return upgrade.GetConfig(networkID), nil
+	}
+
+	switch networkID {
+	case constants.MainnetID, constants.FujiID, constants.LocalID:
+		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades on mainnet, fuji, or default local networkID")
+	}
+
+	var (
+		upgradeBytes []byte
+		err          error
+	)
+	switch {
+	case v.IsSet(UpgradeFileContentKey):
+		upgradeContent := v.GetString(UpgradeFileContentKey)
+		upgradeBytes, err = base64.StdEncoding.DecodeString(upgradeContent)
+		if err != nil {
+			return upgrade.Config{}, fmt.Errorf("unable to decode upgrade base64 content: %w", err)
+		}
+	case v.IsSet(UpgradeFileKey):
+		upgradeFileName := GetExpandedArg(v, UpgradeFileKey)
+		upgradeBytes, err = os.ReadFile(upgradeFileName)
+		if err != nil {
+			return upgrade.Config{}, fmt.Errorf("unable to read upgrade file: %w", err)
+		}
+	}
+
+	var upgradeConfig upgrade.Config
+	if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
+		return upgrade.Config{}, fmt.Errorf("unable to unmarshal upgrade bytes: %w", err)
+	}
+	return upgradeConfig, nil
 }
 
 func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
@@ -1300,7 +1333,10 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Upgrade config
-	nodeConfig.UpgradeConfig = getUpgradeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.UpgradeConfig, err = getUpgradeConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Network Config
 	nodeConfig.NetworkConfig, err = getNetworkConfig(
