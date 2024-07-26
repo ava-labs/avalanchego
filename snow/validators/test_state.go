@@ -1,6 +1,9 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// TODO: https://github.com/ava-labs/avalanchego/issues/3174
+//go:build test || !test
+
 package validators
 
 import (

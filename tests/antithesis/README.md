@@ -86,7 +86,7 @@ $ AVAWL_URIS=... CHAIN_IDS="2S9ypz...AzMj9" go run ./tests/antithesis/xsvm
 ### Running a workload with docker-compose
 
 Running the test script for a given test setup with the `DEBUG` flag
-set will avoid cleaning up the the temporary directory where the
+set will avoid cleaning up the temporary directory where the
 docker-compose setup is written to. This will allow manual invocation of
 docker-compose to see the log output of the workload.
 

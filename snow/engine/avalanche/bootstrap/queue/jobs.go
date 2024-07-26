@@ -400,7 +400,7 @@ func (jm *JobsWithMissing) cleanRunnableStack(ctx context.Context) error {
 
 		job, err := jm.state.GetJob(ctx, jobID)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve job on runnnable stack due to: %w", err)
+			return fmt.Errorf("failed to retrieve job on runnable stack due to: %w", err)
 		}
 		deps, err := job.MissingDependencies(ctx)
 		if err != nil {

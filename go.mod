@@ -10,7 +10,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.13.6-rc.1.0.20240702201359-ba2ce5367874
+	github.com/ava-labs/coreth v0.13.7
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20240610153809-9c955cc90a95
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -24,6 +24,7 @@ require (
 	github.com/gorilla/rpc v1.2.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
+	github.com/holiman/uint256 v1.2.4
 	github.com/huin/goupnp v1.3.0
 	github.com/jackpal/gateway v1.0.6
 	github.com/jackpal/go-nat-pmp v1.0.2
@@ -117,7 +118,6 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/billy v0.0.0-20230718173358-1c7e68d277a7 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
