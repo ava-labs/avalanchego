@@ -15,16 +15,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	_ Handler = (*NoOpHandler)(nil)
-	_ Handler = (*TestHandler)(nil)
-	_ Handler = (*ValidatorHandler)(nil)
-)
-
 const (
 	TxGossipHandlerID = iota
 	AtomicTxGossipHandlerID
 	SignatureRequestHandlerID
+)
+
+var (
+	_ Handler = (*NoOpHandler)(nil)
+	_ Handler = (*TestHandler)(nil)
+	_ Handler = (*ValidatorHandler)(nil)
 )
 
 // Handler is the server-side logic for virtual machine application protocols.
