@@ -439,10 +439,17 @@ func Benchmark_Dimensions_Add(b *testing.B) {
 		{10_000, 10_000, 10_000, 10_000},
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = lhs.Add(rhs[0], rhs[1], rhs[2], rhs[3], rhs[4], rhs[5], rhs[6])
-	}
+	b.Run("single", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Add(rhs[0])
+		}
+	})
+
+	b.Run("multiple", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Add(rhs[0], rhs[1], rhs[2], rhs[3], rhs[4], rhs[5], rhs[6])
+		}
+	})
 }
 
 func Benchmark_Dimensions_Sub(b *testing.B) {
@@ -456,8 +463,15 @@ func Benchmark_Dimensions_Sub(b *testing.B) {
 		{1_000, 1_000, 1_000, 1_000},
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = lhs.Sub(rhs[0], rhs[1], rhs[2], rhs[3], rhs[4], rhs[5])
-	}
+	b.Run("single", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Sub(rhs[0])
+		}
+	})
+
+	b.Run("multiple", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Sub(rhs[0], rhs[1], rhs[2], rhs[3], rhs[4], rhs[5])
+		}
+	})
 }
