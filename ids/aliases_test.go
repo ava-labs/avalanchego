@@ -6,8 +6,9 @@ package ids_test
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids/idstest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids/idstest"
 
 	. "github.com/ava-labs/avalanchego/ids"
 )

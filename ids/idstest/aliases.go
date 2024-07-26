@@ -4,8 +4,9 @@
 package idstest
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 var AliasTests = []func(require *require.Assertions, r ids.AliaserReader, w ids.AliaserWriter){

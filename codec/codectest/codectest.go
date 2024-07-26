@@ -7,8 +7,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/codec"
 )
 
 var (
