@@ -17,6 +17,7 @@ require (
 	github.com/compose-spec/compose-go v1.20.2
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/ethereum/go-ethereum v1.13.8
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/btree v1.1.2
 	github.com/google/renameio/v2 v2.0.0
 	github.com/google/uuid v1.6.0
