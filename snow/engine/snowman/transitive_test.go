@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -2936,8 +2937,8 @@ func TestGetProcessingAncestor(t *testing.T) {
 		nonVerifiedTreeWithUnissuedBlock = ancestor.NewTree()
 
 		emptyNonVerifiedCache             = &cache.Empty[ids.ID, snowman.Block]{}
-		nonVerifiedCacheWithUnissuedBlock = &cache.LRU[ids.ID, snowman.Block]{Size: 1}
-		nonVerifiedCacheWithDecidedBlock  = &cache.LRU[ids.ID, snowman.Block]{Size: 1}
+		nonVerifiedCacheWithUnissuedBlock = &lru.Cache[ids.ID, snowman.Block]{Size: 1}
+		nonVerifiedCacheWithDecidedBlock  = &lru.Cache[ids.ID, snowman.Block]{Size: 1}
 	)
 	nonVerifiedTreeWithUnissuedBlock.Add(unissuedBlock.ID(), unissuedBlock.Parent())
 	nonVerifiedCacheWithUnissuedBlock.Put(unissuedBlock.ID(), unissuedBlock)

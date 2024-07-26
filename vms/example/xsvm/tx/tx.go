@@ -4,14 +4,14 @@
 package tx
 
 import (
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var secpCache = secp256k1.RecoverCache{
-	LRU: cache.LRU[ids.ID, *secp256k1.PublicKey]{
+	Cache: lru.Cache[ids.ID, *secp256k1.PublicKey]{
 		Size: 2048,
 	},
 }

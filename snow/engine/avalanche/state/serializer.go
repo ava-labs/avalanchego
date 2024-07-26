@@ -10,7 +10,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -52,7 +52,7 @@ type SerializerConfig struct {
 
 func NewSerializer(config SerializerConfig) vertex.Manager {
 	versionDB := versiondb.New(config.DB)
-	dbCache := &cache.LRU[ids.ID, any]{Size: dbCacheSize}
+	dbCache := &lru.Cache[ids.ID, any]{Size: dbCacheSize}
 	s := Serializer{
 		SerializerConfig: config,
 		versionDB:        versionDB,

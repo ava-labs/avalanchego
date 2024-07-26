@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -235,7 +236,7 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return validatorSetsCache
 	}
 
-	validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
+	validatorSetsCache = &lru.Cache[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
 		Size: validatorSetsCacheSize,
 	}
 	m.caches[subnetID] = validatorSetsCache

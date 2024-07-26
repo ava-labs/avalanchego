@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cache
+package lru
 
 import (
 	"testing"
@@ -24,10 +24,10 @@ func (e *evictable[_]) Evict() {
 	e.evicted++
 }
 
-func TestEvictableLRU(t *testing.T) {
+func TestDeduplicator(t *testing.T) {
 	require := require.New(t)
 
-	cache := EvictableLRU[ids.ID, *evictable[ids.ID]]{}
+	cache := Deduplicator[ids.ID, *evictable[ids.ID]]{}
 
 	expectedValue1 := &evictable[ids.ID]{id: ids.ID{1}}
 	require.Equal(expectedValue1, cache.Deduplicate(expectedValue1))

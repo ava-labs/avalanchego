@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
@@ -66,7 +67,7 @@ func newState(
 	jobsCache, err := metercacher.New[ids.ID, Job](
 		jobsCacheMetricsNamespace,
 		metricsRegisterer,
-		&cache.LRU[ids.ID, Job]{
+		&lru.Cache[ids.ID, Job]{
 			Size: jobsCacheSize,
 		},
 	)
@@ -86,7 +87,7 @@ func newState(
 		jobsCache:       jobsCache,
 		jobsDB:          jobs,
 		dependenciesDB:  prefixdb.New(dependenciesPrefix, db),
-		dependentsCache: &cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: dependentsCacheSize},
+		dependentsCache: &lru.Cache[ids.ID, linkeddb.LinkedDB]{Size: dependentsCacheSize},
 		missingJobIDs:   linkeddb.NewDefault(prefixdb.New(missingJobIDsPrefix, db)),
 		metadataDB:      metadataDB,
 		numJobs:         numJobs,

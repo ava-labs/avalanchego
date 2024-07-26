@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -72,7 +72,7 @@ type mempool[T Tx] struct {
 	unissuedTxs    *linked.Hashmap[ids.ID, T]
 	consumedUTXOs  *setmap.SetMap[ids.ID, ids.ID] // TxID -> Consumed UTXOs
 	bytesAvailable int
-	droppedTxIDs   *cache.LRU[ids.ID, error] // TxID -> Verification error
+	droppedTxIDs   *lru.Cache[ids.ID, error] // TxID -> Verification error
 
 	metrics Metrics
 }
@@ -84,7 +84,7 @@ func New[T Tx](
 		unissuedTxs:    linked.NewHashmap[ids.ID, T](),
 		consumedUTXOs:  setmap.New[ids.ID, ids.ID](),
 		bytesAvailable: maxMempoolSize,
-		droppedTxIDs:   &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
+		droppedTxIDs:   &lru.Cache[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		metrics:        metrics,
 	}
 	m.updateMetrics()

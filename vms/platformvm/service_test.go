@@ -18,7 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -81,7 +81,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Wall
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
-		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
+		stakerAttributesCache: &lru.Cache[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
 	}, mutableSharedMemory, factory

@@ -10,12 +10,13 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	stdecdsa "crypto/ecdsa"
+
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -107,7 +108,7 @@ func RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, error) {
 }
 
 type RecoverCache struct {
-	cache.LRU[ids.ID, *PublicKey]
+	lru.Cache[ids.ID, *PublicKey]
 }
 
 func (r *RecoverCache) RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {

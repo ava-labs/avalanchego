@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -98,7 +98,7 @@ type VM struct {
 	feeAssetID ids.ID
 
 	// Asset ID --> Bit set with fx IDs the asset supports
-	assetToFxCache *cache.LRU[ids.ID, set.Bits64]
+	assetToFxCache *lru.Cache[ids.ID, set.Bits64]
 
 	baseDB database.Database
 	db     *versiondb.Database
@@ -193,7 +193,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
+	vm.assetToFxCache = &lru.Cache[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.New(ctx.Log)
 

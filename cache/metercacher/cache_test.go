@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/cachetest"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -23,19 +25,19 @@ func TestInterface(t *testing.T) {
 		{
 			description: "cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return &cache.LRU[ids.ID, int64]{Size: size}
+				return &lru.Cache[ids.ID, int64]{Size: size}
 			},
 		},
 		{
 			description: "sized cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return cache.NewSizedLRU[ids.ID, int64](size*cache.TestIntSize, cache.TestIntSizeFunc)
+				return lru.NewSizedCache[ids.ID, int64](size*cachetest.IntSize, cachetest.IntSizeFunc)
 			},
 		},
 	}
 
 	for _, scenario := range scenarios {
-		for _, test := range cache.CacherTests {
+		for _, test := range cachetest.Suite {
 			baseCache := scenario.setup(test.Size)
 			c, err := New("", prometheus.NewRegistry(), baseCache)
 			require.NoError(t, err)
