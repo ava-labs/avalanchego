@@ -22,7 +22,7 @@ function print_separator {
 function cleanup {
   print_separator
   echo "cleaning up reusable network"
-  ginkgo -v --tags test ./tests/e2e/e2e.test -- --stop-network
+  ginkgo -v ./tests/e2e/e2e.test -- --stop-network
 }
 trap cleanup EXIT
 

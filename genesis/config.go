@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -20,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
+
+const localNetworkUpdateStartTimePeriod = 9 * 30 * 24 * time.Hour // 9 months
 
 var (
 	_ utils.Sortable[Allocation] = Allocation{}
@@ -170,6 +173,10 @@ var (
 	// LocalConfig is the config that should be used to generate a local
 	// genesis.
 	LocalConfig Config
+
+	// unmodifiedLocalConfig is the LocalConfig before advancing the StartTime
+	// to a recent value.
+	unmodifiedLocalConfig Config
 )
 
 func init() {
@@ -196,10 +203,21 @@ func init() {
 		panic(err)
 	}
 
-	LocalConfig, err = unparsedLocalConfig.Parse()
+	unmodifiedLocalConfig, err = unparsedLocalConfig.Parse()
 	if err != nil {
 		panic(err)
 	}
+
+	// Renew the staking start time of the local config if required
+	definedStartTime := time.Unix(int64(unmodifiedLocalConfig.StartTime), 0)
+	recentStartTime := getRecentStartTime(
+		definedStartTime,
+		time.Now(),
+		localNetworkUpdateStartTimePeriod,
+	)
+
+	LocalConfig = unmodifiedLocalConfig
+	LocalConfig.StartTime = uint64(recentStartTime.Unix())
 }
 
 func GetConfig(networkID uint32) *Config {
@@ -246,4 +264,22 @@ func parseGenesisJSONBytesToConfig(bytes []byte) (*Config, error) {
 		return nil, fmt.Errorf("unable to parse config: %w", err)
 	}
 	return &config, nil
+}
+
+// getRecentStartTime advances [definedStartTime] in chunks of [period]. It
+// returns the latest startTime that isn't after [now].
+func getRecentStartTime(
+	definedStartTime time.Time,
+	now time.Time,
+	period time.Duration,
+) time.Time {
+	startTime := definedStartTime
+	for {
+		nextStartTime := startTime.Add(period)
+		if now.Before(nextStartTime) {
+			break
+		}
+		startTime = nextStartTime
+	}
+	return startTime
 }
