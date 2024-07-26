@@ -4,6 +4,7 @@
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 )
 
 var (
+	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
+
 	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
 	ApricotPhase1Times = map[uint32]time.Time{
@@ -161,37 +164,37 @@ type Config struct {
 
 func (c Config) Validate() error {
 	if c.ApricotPhase1Time.After(c.ApricotPhase2Time) {
-		return fmt.Errorf("apricot phase 1 time (%s) is after apricot phase 2 time (%s)", c.ApricotPhase1Time, c.ApricotPhase2Time)
+		return fmt.Errorf("%w: apricot phase 1 time (%s) is after apricot phase 2 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase1Time, c.ApricotPhase2Time)
 	}
 	if c.ApricotPhase2Time.After(c.ApricotPhase3Time) {
-		return fmt.Errorf("apricot phase 2 time (%s) is after apricot phase 3 time (%s)", c.ApricotPhase2Time, c.ApricotPhase3Time)
+		return fmt.Errorf("%w: apricot phase 2 time (%s) is after apricot phase 3 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase2Time, c.ApricotPhase3Time)
 	}
 	if c.ApricotPhase3Time.After(c.ApricotPhase4Time) {
-		return fmt.Errorf("apricot phase 3 time (%s) is after apricot phase 4 time (%s)", c.ApricotPhase3Time, c.ApricotPhase4Time)
+		return fmt.Errorf("%w: apricot phase 3 time (%s) is after apricot phase 4 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase3Time, c.ApricotPhase4Time)
 	}
 	if c.ApricotPhase4Time.After(c.ApricotPhase5Time) {
-		return fmt.Errorf("apricot phase 4 time (%s) is after apricot phase 5 time (%s)", c.ApricotPhase4Time, c.ApricotPhase5Time)
+		return fmt.Errorf("%w: apricot phase 4 time (%s) is after apricot phase 5 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase4Time, c.ApricotPhase5Time)
 	}
 	if c.ApricotPhase5Time.After(c.ApricotPhasePre6Time) {
-		return fmt.Errorf("apricot phase 5 time (%s) is after apricot phase pre-6 time (%s)", c.ApricotPhase5Time, c.ApricotPhasePre6Time)
+		return fmt.Errorf("%w: apricot phase 5 time (%s) is after apricot phase pre-6 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase5Time, c.ApricotPhasePre6Time)
 	}
 	if c.ApricotPhasePre6Time.After(c.ApricotPhase6Time) {
-		return fmt.Errorf("apricot phase pre-6 time (%s) is after apricot phase 6 time (%s)", c.ApricotPhasePre6Time, c.ApricotPhase6Time)
+		return fmt.Errorf("%w: apricot phase pre-6 time (%s) is after apricot phase 6 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhasePre6Time, c.ApricotPhase6Time)
 	}
 	if c.ApricotPhase6Time.After(c.ApricotPhasePost6Time) {
-		return fmt.Errorf("apricot phase 6 time (%s) is after apricot phase post-6 time (%s)", c.ApricotPhase6Time, c.ApricotPhasePost6Time)
+		return fmt.Errorf("%w: apricot phase 6 time (%s) is after apricot phase post-6 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase6Time, c.ApricotPhasePost6Time)
 	}
 	if c.ApricotPhasePost6Time.After(c.BanffTime) {
-		return fmt.Errorf("apricot phase post-6 time (%s) is after banff time (%s)", c.ApricotPhasePost6Time, c.BanffTime)
+		return fmt.Errorf("%w: apricot phase post-6 time (%s) is after banff time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhasePost6Time, c.BanffTime)
 	}
 	if c.BanffTime.After(c.CortinaTime) {
-		return fmt.Errorf("banff time (%s) is after cortina time (%s)", c.BanffTime, c.CortinaTime)
+		return fmt.Errorf("%w: banff time (%s) is after cortina time (%s)", ErrInvalidUpgradeTimes, c.BanffTime, c.CortinaTime)
 	}
 	if c.CortinaTime.After(c.DurangoTime) {
-		return fmt.Errorf("cortina time (%s) is after durango time (%s)", c.CortinaTime, c.DurangoTime)
+		return fmt.Errorf("%w: cortina time (%s) is after durango time (%s)", ErrInvalidUpgradeTimes, c.CortinaTime, c.DurangoTime)
 	}
 	if c.DurangoTime.After(c.EtnaTime) {
-		return fmt.Errorf("durango time (%s) is after etna time (%s)", c.DurangoTime, c.EtnaTime)
+		return fmt.Errorf("%w: durango time (%s) is after etna time (%s)", ErrInvalidUpgradeTimes, c.DurangoTime, c.EtnaTime)
 	}
 	return nil
 }
