@@ -23,6 +23,9 @@ type Deduplicator[K comparable, V cache.Evictable[K]] struct {
 }
 
 func NewDeduplicator[K comparable, V cache.Evictable[K]](size int) *Deduplicator[K, V] {
+	if size <= 0 {
+		size = 1
+	}
 	return &Deduplicator[K, V]{
 		entryMap:  make(map[K]*linked.ListElement[V]),
 		entryList: linked.NewList[V](),
