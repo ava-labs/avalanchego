@@ -9,11 +9,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ snowman.Block       = (*Block)(nil)
-	_ snowman.OracleBlock = (*Block)(nil)
+	_ snowman.Block             = (*Block)(nil)
+	_ snowman.OracleBlock       = (*Block)(nil)
+	_ smblock.WithVerifyContext = (*Block)(nil)
 )
 
 // Exported for testing in platformvm package.
@@ -22,14 +25,25 @@ type Block struct {
 	manager *manager
 }
 
-func (b *Block) Verify(context.Context) error {
+func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
+	return ExpectsContext(b)
+}
+
+func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error {
 	blkID := b.ID()
 	if _, ok := b.manager.blkIDToState[blkID]; ok {
 		// This block has already been verified.
 		return nil
 	}
 
+	b.manager.verifier.SetProposerVMContext(ctx)
+	defer b.manager.verifier.SetProposerVMContext(nil)
+
 	return b.Visit(b.manager.verifier)
+}
+
+func (b *Block) Verify(ctx context.Context) error {
+	return b.VerifyWithContext(ctx, nil)
 }
 
 func (b *Block) Accept(context.Context) error {

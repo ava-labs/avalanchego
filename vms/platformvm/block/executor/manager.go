@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
@@ -83,9 +85,15 @@ func NewManager(
 	}
 }
 
+type BlockVisitorWithProposerVMCtx interface {
+	block.Visitor
+
+	SetProposerVMContext(*smblock.Context)
+}
+
 type manager struct {
 	*backend
-	verifier block.Visitor
+	verifier blockVisitorWithProposerVMCtx
 	acceptor block.Visitor
 	rejector block.Visitor
 
