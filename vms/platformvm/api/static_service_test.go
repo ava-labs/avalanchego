@@ -18,7 +18,7 @@ import (
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
+	nodeID := ids.GenerateTestNodeID()
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -62,7 +62,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 
 func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
+	nodeID := ids.GenerateTestNodeID()
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -106,7 +106,7 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
+	nodeID := ids.GenerateTestNodeID()
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -151,7 +151,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1})
+	nodeID := ids.GenerateTestNodeID()
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 

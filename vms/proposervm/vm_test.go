@@ -147,9 +147,9 @@ func initTestProposerVM(
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildTestNodeID([]byte{1})
-			nodeID2  = ids.BuildTestNodeID([]byte{2})
-			nodeID3  = ids.BuildTestNodeID([]byte{3})
+			nodeID1  = ids.GenerateTestNodeID()
+			nodeID2  = ids.GenerateTestNodeID()
+			nodeID3  = ids.GenerateTestNodeID()
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -822,7 +822,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		return defaultPChainHeight, nil
 	}
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		nodeID := ids.BuildTestNodeID([]byte{1})
+		nodeID := ids.GenerateTestNodeID()
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			nodeID: {
 				NodeID: nodeID,
@@ -1062,7 +1062,7 @@ func TestInnerVMRollback(t *testing.T) {
 			return defaultPChainHeight, nil
 		},
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			nodeID := ids.BuildTestNodeID([]byte{1})
+			nodeID := ids.GenerateTestNodeID()
 			return map[ids.NodeID]*validators.GetValidatorOutput{
 				nodeID: {
 					NodeID: nodeID,
@@ -1610,9 +1610,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildTestNodeID([]byte{1})
-			nodeID2  = ids.BuildTestNodeID([]byte{2})
-			nodeID3  = ids.BuildTestNodeID([]byte{3})
+			nodeID1  = ids.GenerateTestNodeID()
+			nodeID2  = ids.GenerateTestNodeID()
+			nodeID3  = ids.GenerateTestNodeID()
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
@@ -1781,9 +1781,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildTestNodeID([]byte{1})
-			nodeID2  = ids.BuildTestNodeID([]byte{2})
-			nodeID3  = ids.BuildTestNodeID([]byte{3})
+			nodeID1  = ids.GenerateTestNodeID()
+			nodeID2  = ids.GenerateTestNodeID()
+			nodeID3  = ids.GenerateTestNodeID()
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {
