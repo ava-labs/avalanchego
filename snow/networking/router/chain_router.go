@@ -50,9 +50,6 @@ type peer struct {
 	version *version.Application
 	// The subnets that this peer is currently tracking
 	trackedSubnets set.Set[ids.ID]
-	// The subnets that this peer actually has a connection to.
-	// This is a subset of trackedSubnets.
-	connectedSubnets set.Set[ids.ID]
 }
 
 // ChainRouter routes incoming messages from the validator network
@@ -467,11 +464,6 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 	if _, benched := cr.benched[cr.myNodeID]; benched {
 		return
 	}
-
-	myself := cr.peers[cr.myNodeID]
-	for subnetID := range myself.trackedSubnets {
-		cr.connectedSubnet(myself, cr.myNodeID, subnetID)
-	}
 }
 
 // Connected routes an incoming notification that a validator was just connected
@@ -526,7 +518,6 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 		}
 	}
 
-	cr.connectedSubnet(connectedPeer, nodeID, subnetID)
 }
 
 // Disconnected routes an incoming notification that a validator was connected
@@ -603,8 +594,6 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 				})
 		}
 	}
-
-	peer.connectedSubnets.Clear()
 }
 
 // Unbenched routes an incoming notification that a validator was just unbenched
@@ -646,13 +635,6 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 					EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 				})
 		}
-	}
-
-	// This will unbench the node from all its subnets.
-	// We handle this case separately because the node may have been benched on
-	// a subnet that has no chains.
-	for subnetID := range peer.trackedSubnets {
-		cr.connectedSubnet(peer, nodeID, subnetID)
 	}
 }
 
@@ -757,47 +739,4 @@ func (cr *ChainRouter) clearRequest(
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	return uniqueRequestID, &request
-}
-
-// connectedSubnet pushes an InternalSubnetConnected message with [nodeID] and
-// [subnetID] to the P-chain. This should be called when a node is either first
-// connecting to [subnetID] or when a node that was already connected is
-// unbenched on [subnetID]. This is a noop if [subnetID] is the Primary Network
-// or if the peer is already marked as connected to the subnet.
-// Invariant: should be called after *message.Connected is pushed to the P-chain
-// Invariant: should be called after the P-chain was provided in [AddChain]
-func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID ids.ID) {
-	// if connected to primary network, we can skip this
-	// because Connected has its own internal message
-	if subnetID == constants.PrimaryNetworkID {
-		return
-	}
-
-	// peer already connected to this subnet
-	if peer.connectedSubnets.Contains(subnetID) {
-		return
-	}
-
-	msg := message.InternalConnectedSubnet(nodeID, subnetID)
-	// We only push this message to the P-chain because it is the only chain
-	// that cares about the connectivity of all subnets. Others chains learn
-	// about the connectivity of their own subnet when they receive a
-	// *message.Connected.
-	platformChain, ok := cr.chainHandlers[constants.PlatformChainID]
-	if !ok {
-		cr.log.Error("trying to issue InternalConnectedSubnet message, but platform chain is not registered",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("subnetID", subnetID),
-		)
-		return
-	}
-	platformChain.Push(
-		context.TODO(),
-		handler.Message{
-			InboundMessage: msg,
-			EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
-		},
-	)
-
-	peer.connectedSubnets.Add(subnetID)
 }

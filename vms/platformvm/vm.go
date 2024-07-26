@@ -53,10 +53,9 @@ import (
 )
 
 var (
-	_ snowmanblock.ChainVM       = (*VM)(nil)
-	_ secp256k1fx.VM             = (*VM)(nil)
-	_ validators.State           = (*VM)(nil)
-	_ validators.SubnetConnector = (*VM)(nil)
+	_ snowmanblock.ChainVM = (*VM)(nil)
+	_ secp256k1fx.VM       = (*VM)(nil)
+	_ validators.State     = (*VM)(nil)
 )
 
 type VM struct {
@@ -465,10 +464,6 @@ func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version
 		return err
 	}
 	return vm.Network.Connected(ctx, nodeID, version)
-}
-
-func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {
-	return nil
 }
 
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
