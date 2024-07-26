@@ -308,12 +308,11 @@ type UptimeResponse struct {
 }
 
 type UptimeRequest struct {
-	// if omitted, defaults to primary network
+	// Deprecated: SubnetID in UptimeRequest is deprecated.
+	// Uptime API will be available only for Primary Network Validators.
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// Deprecated: Uptime is deprecated for Subnet Validators.
-// It will be available only for Primary Network Validators.
 func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
 	if args.SubnetID != constants.PrimaryNetworkID {
 		i.log.Warn("Deprecated API called",

@@ -27,8 +27,6 @@ type Client interface {
 	Peers(context.Context, ...rpc.Option) ([]Peer, error)
 	IsBootstrapped(context.Context, string, ...rpc.Option) (bool, error)
 	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
-	// Deprecated: Uptime is deprecated for Subnet Validators.
-	// It will be available only for Primary Network Validators.
 	Uptime(context.Context, ids.ID, ...rpc.Option) (*UptimeResponse, error)
 	GetVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, error)
 }
