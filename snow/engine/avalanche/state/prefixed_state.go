@@ -31,7 +31,7 @@ func newPrefixedState(state *state, idCacheSizes int) *prefixedState {
 		state:     state,
 		vtx:       lru.NewCache[ids.ID, ids.ID](idCacheSizes),
 		status:    lru.NewCache[ids.ID, ids.ID](idCacheSizes),
-		uniqueVtx: &lru.Deduplicator[ids.ID, *uniqueVertex]{Size: idCacheSizes},
+		uniqueVtx: lru.NewDeduplicator[ids.ID, *uniqueVertex](idCacheSizes),
 	}
 }
 
