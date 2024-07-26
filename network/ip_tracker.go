@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto/rand"
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -63,7 +63,7 @@ func newIPTracker(
 		connected:            make(map[ids.NodeID]*ips.ClaimedIPPort),
 		gossipableIndices:    make(map[ids.NodeID]int),
 	}
-	err = utils.Err(
+	err = errors.Join(
 		registerer.Register(tracker.numTrackedIPs),
 		registerer.Register(tracker.numGossipableIPs),
 	)

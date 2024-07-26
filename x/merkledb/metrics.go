@@ -4,11 +4,10 @@
 package merkledb
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -116,7 +115,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
 			Help:      "cumulative number of in-memory lookups performed",
 		}, lookupLabels),
 	}
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(m.hashes),
 		reg.Register(m.io),
 		reg.Register(m.lookup),

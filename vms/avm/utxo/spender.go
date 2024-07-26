@@ -141,7 +141,7 @@ func (s *spender) Spend(
 			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		newAmountSpent, err := math.Add64(amountSpent, input.Amount())
+		newAmountSpent, err := math.Add(amountSpent, input.Amount())
 		if err != nil {
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
@@ -274,7 +274,7 @@ func (s *spender) SpendAll(
 			// this input doesn't have an amount, so I don't care about it here
 			continue
 		}
-		newAmountSpent, err := math.Add64(amountSpent, input.Amount())
+		newAmountSpent, err := math.Add(amountSpent, input.Amount())
 		if err != nil {
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow

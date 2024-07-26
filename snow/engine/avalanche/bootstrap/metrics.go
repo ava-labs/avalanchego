@@ -4,9 +4,9 @@
 package bootstrap
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type metrics struct {
@@ -33,7 +33,7 @@ func (m *metrics) Initialize(registerer prometheus.Registerer) error {
 		Help: "Number of transactions accepted during bootstrapping",
 	})
 
-	return utils.Err(
+	return errors.Join(
 		registerer.Register(m.numFetchedVts),
 		registerer.Register(m.numAcceptedVts),
 		registerer.Register(m.numFetchedTxs),
