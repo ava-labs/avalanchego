@@ -1,19 +1,18 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package codec
+package codectest
 
 import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	Tests = []func(c GeneralCodec, t testing.TB){
+	Tests = []func(c codec.GeneralCodec, t testing.TB){
 		TestStruct,
 		TestRegisterStructTwice,
 		TestUInt32,
@@ -49,7 +48,7 @@ var (
 		TestCanMarshalLargeSlices,
 	}
 
-	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
+	MultipleTagsTests = []func(c codec.GeneralCodec, t testing.TB){
 		TestMultipleTags,
 	}
 )
@@ -127,7 +126,7 @@ type myStruct struct {
 }
 
 // Test marshaling/unmarshaling a complicated struct
-func TestStruct(codec GeneralCodec, t testing.TB) {
+func TestStruct(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	temp := Foo(&MyInnerStruct{})
@@ -215,13 +214,13 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 		MyMap7: myMap7,
 	}
 
-	manager := NewDefaultManager()
+	manager := codec.NewDefaultManager()
 	// Register the types that may be unmarshaled into interfaces
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
-	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
-	require.NoError(codec.RegisterType(""))
-	require.NoError(codec.RegisterType(int32(0)))
-	require.NoError(manager.RegisterCodec(0, codec))
+	require.NoError(cdec.RegisterType(&MyInnerStruct{}))
+	require.NoError(cdec.RegisterType(&MyInnerStruct2{}))
+	require.NoError(cdec.RegisterType(""))
+	require.NoError(cdec.RegisterType(int32(0)))
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	myStructBytes, err := manager.Marshal(0, myStructInstance)
 	require.NoError(err)
@@ -243,21 +242,21 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	require.Equal(myStructInstance, *myStructUnmarshaled)
 }
 
-func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
+func TestRegisterStructTwice(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
-	err := codec.RegisterType(&MyInnerStruct{})
-	require.ErrorIs(err, ErrDuplicateType)
+	require.NoError(cdec.RegisterType(&MyInnerStruct{}))
+	err := cdec.RegisterType(&MyInnerStruct{})
+	require.ErrorIs(err, codec.ErrDuplicateType)
 }
 
-func TestUInt32(codec GeneralCodec, t testing.TB) {
+func TestUInt32(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	number := uint32(500)
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, number)
 	require.NoError(err)
@@ -273,24 +272,24 @@ func TestUInt32(codec GeneralCodec, t testing.TB) {
 	require.Equal(number, numberUnmarshaled)
 }
 
-func TestUIntPtr(codec GeneralCodec, t testing.TB) {
+func TestUIntPtr(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	manager := NewDefaultManager()
+	manager := codec.NewDefaultManager()
 
-	require.NoError(manager.RegisterCodec(0, codec))
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	number := uintptr(500)
 	_, err := manager.Marshal(0, number)
-	require.ErrorIs(err, ErrUnsupportedType)
+	require.ErrorIs(err, codec.ErrUnsupportedType)
 }
 
-func TestSlice(codec GeneralCodec, t testing.TB) {
+func TestSlice(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	mySlice := []bool{true, false, true, true}
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, mySlice)
 	require.NoError(err)
@@ -307,14 +306,14 @@ func TestSlice(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling/unmarshalling largest possible slice
-func TestMaxSizeSlice(codec GeneralCodec, t testing.TB) {
+func TestMaxSizeSlice(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	mySlice := make([]string, math.MaxUint16)
 	mySlice[0] = "first!"
 	mySlice[math.MaxUint16-1] = "last!"
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, mySlice)
 	require.NoError(err)
@@ -331,12 +330,12 @@ func TestMaxSizeSlice(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a bool
-func TestBool(codec GeneralCodec, t testing.TB) {
+func TestBool(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	myBool := true
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myBool)
 	require.NoError(err)
@@ -353,12 +352,12 @@ func TestBool(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling an array
-func TestArray(codec GeneralCodec, t testing.TB) {
+func TestArray(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	myArr := [5]uint64{5, 6, 7, 8, 9}
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myArr)
 	require.NoError(err)
@@ -375,12 +374,12 @@ func TestArray(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a really big array
-func TestBigArray(codec GeneralCodec, t testing.TB) {
+func TestBigArray(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	myArr := [30000]uint64{5, 6, 7, 8, 9}
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myArr)
 	require.NoError(err)
@@ -397,12 +396,12 @@ func TestBigArray(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a pointer to a struct
-func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
+func TestPointerToStruct(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	myPtr := &MyInnerStruct{Str: "Hello!"}
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myPtr)
 	require.NoError(err)
@@ -419,7 +418,7 @@ func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a slice of structs
-func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
+func TestSliceOfStruct(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 	mySlice := []MyInnerStruct3{
 		{
@@ -433,10 +432,10 @@ func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 			F:   &MyInnerStruct{"Six"},
 		},
 	}
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+	require.NoError(cdec.RegisterType(&MyInnerStruct{}))
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, mySlice)
 	require.NoError(err)
@@ -453,13 +452,13 @@ func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling an interface
-func TestInterface(codec GeneralCodec, t testing.TB) {
+func TestInterface(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
+	require.NoError(cdec.RegisterType(&MyInnerStruct2{}))
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	var f Foo = &MyInnerStruct2{true}
 	bytes, err := manager.Marshal(0, &f)
@@ -477,7 +476,7 @@ func TestInterface(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a slice of interfaces
-func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
+func TestSliceOfInterface(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	mySlice := []Foo{
@@ -488,10 +487,10 @@ func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
 			Str: ", World!",
 		},
 	}
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+	require.NoError(cdec.RegisterType(&MyInnerStruct{}))
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, mySlice)
 	require.NoError(err)
@@ -508,7 +507,7 @@ func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling an array of interfaces
-func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
+func TestArrayOfInterface(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	myArray := [2]Foo{
@@ -519,10 +518,10 @@ func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 			Str: ", World!",
 		},
 	}
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+	require.NoError(cdec.RegisterType(&MyInnerStruct{}))
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myArray)
 	require.NoError(err)
@@ -539,16 +538,16 @@ func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a pointer to an interface
-func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
+func TestPointerToInterface(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
 	myPtr := &myinnerStruct
 
-	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+	require.NoError(cdec.RegisterType(&MyInnerStruct{}))
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, &myPtr)
 	require.NoError(err)
@@ -565,12 +564,12 @@ func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a string
-func TestString(codec GeneralCodec, t testing.TB) {
+func TestString(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	myString := "Ayy"
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myString)
 	require.NoError(err)
@@ -587,7 +586,7 @@ func TestString(codec GeneralCodec, t testing.TB) {
 }
 
 // Ensure a nil slice is unmarshaled to slice with length 0
-func TestNilSlice(codec GeneralCodec, t testing.TB) {
+func TestNilSlice(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type structWithSlice struct {
@@ -595,8 +594,8 @@ func TestNilSlice(codec GeneralCodec, t testing.TB) {
 	}
 
 	myStruct := structWithSlice{Slice: nil}
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, myStruct)
 	require.NoError(err)
@@ -614,7 +613,7 @@ func TestNilSlice(codec GeneralCodec, t testing.TB) {
 
 // Ensure that trying to serialize a struct with an unexported member
 // that has `serialize:"true"` returns error
-func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
+func TestSerializeUnexportedField(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type s struct {
@@ -627,17 +626,17 @@ func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
 		unexportedField: "world!",
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	_, err := manager.Marshal(0, myS)
-	require.ErrorIs(err, ErrUnexportedField)
+	require.ErrorIs(err, codec.ErrUnexportedField)
 
 	_, err = manager.Size(0, myS)
-	require.ErrorIs(err, ErrUnexportedField)
+	require.ErrorIs(err, codec.ErrUnexportedField)
 }
 
-func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
+func TestSerializeOfNoSerializeField(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type s struct {
@@ -650,8 +649,8 @@ func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
 		UnserializedField: "Do not serialize me",
 		UnmarkedField:     "No declared serialize",
 	}
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	marshalled, err := manager.Marshal(0, myS)
 	require.NoError(err)
@@ -670,15 +669,15 @@ func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling of nil slice
-func TestNilSliceSerialization(codec GeneralCodec, t testing.TB) {
+func TestNilSliceSerialization(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type simpleSliceStruct struct {
 		Arr []uint32 `serialize:"true"`
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := &simpleSliceStruct{}
 	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version, then nil slice marshaled as 0 length slice
@@ -698,15 +697,15 @@ func TestNilSliceSerialization(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshaling a slice that has 0 elements (but isn't nil)
-func TestEmptySliceSerialization(codec GeneralCodec, t testing.TB) {
+func TestEmptySliceSerialization(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type simpleSliceStruct struct {
 		Arr []uint32 `serialize:"true"`
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
 	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version (uint16) and 0 for size (uint32)
@@ -726,7 +725,7 @@ func TestEmptySliceSerialization(codec GeneralCodec, t testing.TB) {
 }
 
 // Test marshaling empty slice of zero length structs
-func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
+func TestSliceWithEmptySerialization(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -735,8 +734,8 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 		Arr []emptyStruct `serialize:"true"`
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 0),
@@ -757,7 +756,7 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	require.Empty(unmarshaled.Arr)
 }
 
-func TestSliceWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
+func TestSliceWithEmptySerializationError(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -766,33 +765,33 @@ func TestSliceWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
 		Arr []emptyStruct `serialize:"true"`
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1),
 	}
 	_, err := manager.Marshal(0, val)
-	require.ErrorIs(err, ErrMarshalZeroLength)
+	require.ErrorIs(err, codec.ErrMarshalZeroLength)
 
 	_, err = manager.Size(0, val)
-	require.ErrorIs(err, ErrMarshalZeroLength)
+	require.ErrorIs(err, codec.ErrMarshalZeroLength)
 
 	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
 
 	unmarshaled := nestedSliceStruct{}
 	_, err = manager.Unmarshal(b, &unmarshaled)
-	require.ErrorIs(err, ErrUnmarshalZeroLength)
+	require.ErrorIs(err, codec.ErrUnmarshalZeroLength)
 }
 
 // Test marshaling empty map of zero length structs
-func TestMapWithEmptySerialization(codec GeneralCodec, t testing.TB) {
+func TestMapWithEmptySerialization(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := make(map[emptyStruct]emptyStruct)
 	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x00) for numElts
@@ -811,44 +810,44 @@ func TestMapWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	require.Empty(unmarshaled)
 }
 
-func TestMapWithEmptySerializationError(codec GeneralCodec, t testing.TB) {
+func TestMapWithEmptySerializationError(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := map[emptyStruct]emptyStruct{
 		{}: {},
 	}
 	_, err := manager.Marshal(0, val)
-	require.ErrorIs(err, ErrMarshalZeroLength)
+	require.ErrorIs(err, codec.ErrMarshalZeroLength)
 
 	_, err = manager.Size(0, val)
-	require.ErrorIs(err, ErrMarshalZeroLength)
+	require.ErrorIs(err, codec.ErrMarshalZeroLength)
 
 	b := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x01} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x01) for numElts
 
 	var unmarshaled map[emptyStruct]emptyStruct
 	_, err = manager.Unmarshal(b, &unmarshaled)
-	require.ErrorIs(err, ErrUnmarshalZeroLength)
+	require.ErrorIs(err, codec.ErrUnmarshalZeroLength)
 }
 
-func TestSliceTooLarge(codec GeneralCodec, t testing.TB) {
+func TestSliceTooLarge(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	val := []struct{}{}
 	b := []byte{0x00, 0x00, 0xff, 0xff, 0xff, 0xff}
 	_, err := manager.Unmarshal(b, &val)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
+	require.ErrorIs(err, codec.ErrMaxSliceLenExceeded)
 }
 
 // Ensure serializing structs with negative number members works
-func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
+func TestNegativeNumbers(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type s struct {
@@ -858,8 +857,8 @@ func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
 		MyInt64 int64 `serialize:"true"`
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	myS := s{-1, -2, -3, -4}
 	bytes, err := manager.Marshal(0, myS)
@@ -877,7 +876,7 @@ func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
 }
 
 // Ensure deserializing structs with too many bytes errors correctly
-func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
+func TestTooLargeUnmarshal(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type inner struct {
@@ -885,12 +884,12 @@ func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
 	}
 	bytes := []byte{0, 0, 0, 0}
 
-	manager := NewManager(3)
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewManager(3)
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	s := inner{}
 	_, err := manager.Unmarshal(bytes, &s)
-	require.ErrorIs(err, ErrUnmarshalTooBig)
+	require.ErrorIs(err, codec.ErrUnmarshalTooBig)
 }
 
 type outerInterface interface {
@@ -910,13 +909,13 @@ func (*innerInterface) ToInt() int {
 type innerNoInterface struct{}
 
 // Ensure deserializing structs into the wrong interface errors gracefully
-func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
+func TestUnmarshalInvalidInterface(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	manager := NewDefaultManager()
-	require.NoError(codec.RegisterType(&innerInterface{}))
-	require.NoError(codec.RegisterType(&innerNoInterface{}))
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(cdec.RegisterType(&innerInterface{}))
+	require.NoError(cdec.RegisterType(&innerNoInterface{}))
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 0}
@@ -929,26 +928,26 @@ func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
 		bytes := []byte{0, 0, 0, 0, 0, 1}
 		s := outer{}
 		_, err := manager.Unmarshal(bytes, &s)
-		require.ErrorIs(err, ErrDoesNotImplementInterface)
+		require.ErrorIs(err, codec.ErrDoesNotImplementInterface)
 	}
 }
 
 // Test unmarshaling something with extra data
-func TestExtraSpace(codec GeneralCodec, t testing.TB) {
+func TestExtraSpace(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	// codec version 0x0000 then 0x01 for b then 0x02 as extra data.
 	byteSlice := []byte{0x00, 0x00, 0x01, 0x02}
 	var b byte
 	_, err := manager.Unmarshal(byteSlice, &b)
-	require.ErrorIs(err, ErrExtraSpace)
+	require.ErrorIs(err, codec.ErrExtraSpace)
 }
 
 // Ensure deserializing slices whose lengths exceed MaxInt32 error correctly
-func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
+func TestSliceLengthOverflow(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	type inner struct {
@@ -961,12 +960,12 @@ func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 		0xff, 0xff, 0xff, 0xff,
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	s := inner{}
 	_, err := manager.Unmarshal(bytes, &s)
-	require.ErrorIs(err, ErrMaxSliceLenExceeded)
+	require.ErrorIs(err, codec.ErrMaxSliceLenExceeded)
 }
 
 type MultipleVersionsStruct struct {
@@ -978,7 +977,7 @@ type MultipleVersionsStruct struct {
 	NoTags      string `tag1:"false" tag2:"false"`
 }
 
-func TestMultipleTags(codec GeneralCodec, t testing.TB) {
+func TestMultipleTags(cdec codec.GeneralCodec, t testing.TB) {
 	// received codec is expected to have both v1 and v2 registered as tags
 	inputs := MultipleVersionsStruct{
 		BothTags:    "both Tags",
@@ -989,11 +988,11 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 		NoTags:      "Neither Tag",
 	}
 
-	manager := NewDefaultManager()
+	manager := codec.NewDefaultManager()
 	for _, codecVersion := range []uint16{0, 1, 2022} {
 		require := require.New(t)
 
-		require.NoError(manager.RegisterCodec(codecVersion, codec))
+		require.NoError(manager.RegisterCodec(codecVersion, cdec))
 
 		bytes, err := manager.Marshal(codecVersion, inputs)
 		require.NoError(err)
@@ -1011,7 +1010,7 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 	}
 }
 
-func TestMap(codec GeneralCodec, t testing.TB) {
+func TestMap(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	data1 := map[string]MyInnerStruct2{
@@ -1038,8 +1037,8 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 		data3,
 	}
 
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	data1Bytes, err := manager.Marshal(0, data1)
 	require.NoError(err)
@@ -1080,13 +1079,13 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 	require.Len(outerArrayBytes, outerArraySize)
 }
 
-func TestCanMarshalLargeSlices(codec GeneralCodec, t testing.TB) {
+func TestCanMarshalLargeSlices(cdec codec.GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	data := make([]uint16, 1_000_000)
 
-	manager := NewManager(math.MaxInt)
-	require.NoError(manager.RegisterCodec(0, codec))
+	manager := codec.NewManager(math.MaxInt)
+	require.NoError(manager.RegisterCodec(0, cdec))
 
 	bytes, err := manager.Marshal(0, data)
 	require.NoError(err)
@@ -1097,14 +1096,14 @@ func TestCanMarshalLargeSlices(codec GeneralCodec, t testing.TB) {
 	require.Equal(data, unmarshalledData)
 }
 
-func FuzzStructUnmarshal(codec GeneralCodec, f *testing.F) {
-	manager := NewDefaultManager()
+func FuzzStructUnmarshal(cdec codec.GeneralCodec, f *testing.F) {
+	manager := codec.NewDefaultManager()
 	// Register the types that may be unmarshaled into interfaces
-	require.NoError(f, codec.RegisterType(&MyInnerStruct{}))
-	require.NoError(f, codec.RegisterType(&MyInnerStruct2{}))
-	require.NoError(f, codec.RegisterType(""))
-	require.NoError(f, codec.RegisterType(int32(0)))
-	require.NoError(f, manager.RegisterCodec(0, codec))
+	require.NoError(f, cdec.RegisterType(&MyInnerStruct{}))
+	require.NoError(f, cdec.RegisterType(&MyInnerStruct2{}))
+	require.NoError(f, cdec.RegisterType(""))
+	require.NoError(f, cdec.RegisterType(int32(0)))
+	require.NoError(f, manager.RegisterCodec(0, cdec))
 
 	f.Fuzz(func(t *testing.T, bytes []byte) {
 		require := require.New(t)
