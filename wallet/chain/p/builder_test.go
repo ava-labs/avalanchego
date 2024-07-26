@@ -544,8 +544,35 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
+		utxosOffset uint64 = 2024
+		utxosKey           = testKeys[1]
+		utxosAddr          = utxosKey.Address()
+	)
+	makeUTXO := func(amount uint64) *avax.UTXO {
+		utxosOffset++
+		return &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(utxosOffset),
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{utxosAddr},
+					Threshold: 1,
+				},
+			},
+		}
+	}
+
+	var (
+		utxos = []*avax.UTXO{
+			makeUTXO(testContext.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
+			makeUTXO(1 * units.NanoAvax),                        // small UTXO
+			makeUTXO(9 * units.Avax),                            // large UTXO
+		}
 		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
@@ -611,6 +638,11 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		),
 		addInputAmounts(utx.Ins),
 	)
+
+	// Outputs should be merged if possible. For example, if there are two
+	// unlocked inputs consumed for staking, this should only produce one staked
+	// output.
+	require.Len(utx.StakeOuts, 1)
 }
 
 func TestAddPermissionlessDelegatorTx(t *testing.T) {

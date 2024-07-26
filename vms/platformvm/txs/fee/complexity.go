@@ -195,7 +195,7 @@ func OutputComplexity(outs ...*avax.TransferableOutput) (fee.Dimensions, error) 
 			return fee.Dimensions{}, err
 		}
 
-		complexity, err = complexity.Add(outputComplexity)
+		complexity, err = complexity.Add(&outputComplexity)
 		if err != nil {
 			return fee.Dimensions{}, err
 		}
@@ -241,7 +241,7 @@ func InputComplexity(ins ...*avax.TransferableInput) (fee.Dimensions, error) {
 			return fee.Dimensions{}, err
 		}
 
-		complexity, err = complexity.Add(inputComplexity)
+		complexity, err = complexity.Add(&inputComplexity)
 		if err != nil {
 			return fee.Dimensions{}, err
 		}
@@ -397,11 +397,11 @@ func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 		return err
 	}
 	c.output, err = IntrinsicAddPermissionlessValidatorTxComplexities.Add(
-		baseTxComplexity,
-		signerComplexity,
-		outputsComplexity,
-		validatorOwnerComplexity,
-		delegatorOwnerComplexity,
+		&baseTxComplexity,
+		&signerComplexity,
+		&outputsComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
 	)
 	return err
 }
@@ -420,9 +420,9 @@ func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 		return err
 	}
 	c.output, err = IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
-		baseTxComplexity,
-		ownerComplexity,
-		outputsComplexity,
+		&baseTxComplexity,
+		&ownerComplexity,
+		&outputsComplexity,
 	)
 	return err
 }
@@ -437,8 +437,8 @@ func (c *complexityVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) e
 		return err
 	}
 	c.output, err = IntrinsicAddSubnetValidatorTxComplexities.Add(
-		baseTxComplexity,
-		authComplexity,
+		&baseTxComplexity,
+		&authComplexity,
 	)
 	return err
 }
@@ -448,7 +448,7 @@ func (c *complexityVisitor) BaseTx(tx *txs.BaseTx) error {
 	if err != nil {
 		return err
 	}
-	c.output, err = IntrinsicBaseTxComplexities.Add(baseTxComplexity)
+	c.output, err = IntrinsicBaseTxComplexities.Add(&baseTxComplexity)
 	return err
 }
 
@@ -481,9 +481,9 @@ func (c *complexityVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 	c.output, err = IntrinsicCreateChainTxComplexities.Add(
-		dynamicComplexity,
-		baseTxComplexity,
-		authComplexity,
+		&dynamicComplexity,
+		&baseTxComplexity,
+		&authComplexity,
 	)
 	return err
 }
@@ -498,8 +498,8 @@ func (c *complexityVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return err
 	}
 	c.output, err = IntrinsicCreateSubnetTxComplexities.Add(
-		baseTxComplexity,
-		ownerComplexity,
+		&baseTxComplexity,
+		&ownerComplexity,
 	)
 	return err
 }
@@ -514,8 +514,8 @@ func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
 		return err
 	}
 	c.output, err = IntrinsicExportTxComplexities.Add(
-		baseTxComplexity,
-		outputsComplexity,
+		&baseTxComplexity,
+		&outputsComplexity,
 	)
 	return err
 }
@@ -530,8 +530,8 @@ func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 	c.output, err = IntrinsicImportTxComplexities.Add(
-		baseTxComplexity,
-		inputsComplexity,
+		&baseTxComplexity,
+		&inputsComplexity,
 	)
 	return err
 }
@@ -546,8 +546,8 @@ func (c *complexityVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidato
 		return err
 	}
 	c.output, err = IntrinsicRemoveSubnetValidatorTxComplexities.Add(
-		baseTxComplexity,
-		authComplexity,
+		&baseTxComplexity,
+		&authComplexity,
 	)
 	return err
 }
@@ -566,9 +566,9 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		return err
 	}
 	c.output, err = IntrinsicTransferSubnetOwnershipTxComplexities.Add(
-		baseTxComplexity,
-		authComplexity,
-		ownerComplexity,
+		&baseTxComplexity,
+		&authComplexity,
+		&ownerComplexity,
 	)
 	return err
 }
@@ -582,7 +582,7 @@ func baseTxComplexity(tx *txs.BaseTx) (fee.Dimensions, error) {
 	if err != nil {
 		return fee.Dimensions{}, err
 	}
-	complexity, err := outputsComplexity.Add(inputsComplexity)
+	complexity, err := outputsComplexity.Add(&inputsComplexity)
 	if err != nil {
 		return fee.Dimensions{}, err
 	}
