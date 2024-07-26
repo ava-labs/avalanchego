@@ -1,17 +1,20 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ids
+package ids_test
 
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids/idstest"
 	"github.com/stretchr/testify/require"
+
+	. "github.com/ava-labs/avalanchego/ids"
 )
 
 func TestAliaser(t *testing.T) {
 	require := require.New(t)
-	for _, test := range AliasTests {
+	for _, test := range idstest.AliasTests {
 		aliaser := NewAliaser()
 		test(require, aliaser, aliaser)
 	}
