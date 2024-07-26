@@ -1564,7 +1564,6 @@ func (s *spendHelper) consumeLockedAsset(assetID ids.ID, amount uint64) uint64 {
 
 func (s *spendHelper) consumeAsset(assetID ids.ID, amount uint64) uint64 {
 	remainingAmountToBurn := s.amountsToBurn[assetID]
-	remainingAmountToStake := s.amountsToStake[assetID]
 
 	// Burn any value that should be burned
 	amountToBurn := min(
@@ -1573,14 +1572,8 @@ func (s *spendHelper) consumeAsset(assetID ids.ID, amount uint64) uint64 {
 	)
 	s.amountsToBurn[assetID] -= amountToBurn
 
-	amountAvailableToStake := amount - amountToBurn
-	// Burn any value that should be burned
-	amountToStake := min(
-		remainingAmountToStake, // Amount we still need to stake
-		amountAvailableToStake, // Amount available to stake
-	)
-	s.amountsToStake[assetID] -= amountToStake
-	return amountAvailableToStake - amountToStake
+	// Stake any remaining value that should be staked
+	return s.consumeLockedAsset(assetID, amount-amountToBurn)
 }
 
 func (s *spendHelper) calculateFee() (uint64, error) {
