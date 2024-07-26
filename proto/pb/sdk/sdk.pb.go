@@ -169,12 +169,17 @@ func (x *PushGossip) GetGossip() [][]byte {
 	return nil
 }
 
+// SignatureRequest is an AppRequest message type for requesting
+// a BLS signature over a Warp message, as defined in ACP-118:
+// https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
 type SignatureRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Message       []byte `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// Warp message to be signed
+	Message []byte `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// Justification for the message
 	Justification []byte `protobuf:"bytes,2,opt,name=justification,proto3" json:"justification,omitempty"`
 }
 
@@ -224,11 +229,15 @@ func (x *SignatureRequest) GetJustification() []byte {
 	return nil
 }
 
+// SignatureRespnose is an AppResponse message type for providing
+// a requested BLS signature over a Warp message, as defined in ACP-118:
+// https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
 type SignatureResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// BLS signature over the Warp message
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
