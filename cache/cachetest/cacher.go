@@ -1,15 +1,14 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package cache
+package cachetest
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -22,13 +21,13 @@ func TestIntSizeFunc(ids.ID, int64) int {
 // CacherTests is a list of all Cacher tests
 var CacherTests = []struct {
 	Size int
-	Func func(t *testing.T, c Cacher[ids.ID, int64])
+	Func func(t *testing.T, c cache.Cacher[ids.ID, int64])
 }{
 	{Size: 1, Func: TestBasic},
 	{Size: 2, Func: TestEviction},
 }
 
-func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
+func TestBasic(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
 	id1 := ids.ID{1}
@@ -63,7 +62,7 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require.Equal(expectedValue2, value)
 }
 
-func TestEviction(t *testing.T, cache Cacher[ids.ID, int64]) {
+func TestEviction(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
 	id1 := ids.ID{1}
