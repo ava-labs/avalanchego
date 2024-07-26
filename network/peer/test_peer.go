@@ -114,7 +114,7 @@ func StartTestPeer(
 			InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 			Network:              TestNetwork,
 			Router:               router,
-			VersionCompatibility: version.GetCompatibility(networkID, upgrade.DefaultUpgradeTime),
+			VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 			MySubnets:            set.Set[ids.ID]{},
 			Beacons:              validators.NewManager(),
 			Validators:           validators.NewManager(),

@@ -84,7 +84,7 @@ func newConfig(t *testing.T) Config {
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		Network:              TestNetwork,
 		Router:               nil,
-		VersionCompatibility: version.GetCompatibility(constants.LocalID, upgrade.DefaultUpgradeTime),
+		VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 		MySubnets:            nil,
 		Beacons:              validators.NewManager(),
 		Validators:           validators.NewManager(),
@@ -452,7 +452,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 				},
 				version: &version.Application{
 					Name:  version.Client,
@@ -464,7 +464,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 				},
 				version: &version.Application{
 					Name:  version.Client,
@@ -480,7 +480,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators:           validators.NewManager(),
 				},
 				version: version.CurrentApp,
@@ -488,7 +488,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators:           validators.NewManager(),
 				},
 				version: version.CurrentApp,
@@ -500,7 +500,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -519,7 +519,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -542,7 +542,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -562,7 +562,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -586,7 +586,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -606,7 +606,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -630,7 +630,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -652,7 +652,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -678,7 +678,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -700,7 +700,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID, upgrade.DefaultUpgradeTime),
+					VersionCompatibility: version.GetCompatibility(upgrade.DefaultUpgradeTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(

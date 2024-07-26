@@ -780,7 +780,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) fee.StaticConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getUpgradeConfig(v *viper.Viper, networkID uint32) upgrade.Config {
+func getUpgradeConfig(_ *viper.Viper, networkID uint32) upgrade.Config {
 	return upgrade.GetConfig(networkID)
 }
 

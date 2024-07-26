@@ -87,7 +87,7 @@ func init() {
 	}
 }
 
-func GetCompatibility(networkID uint32, minCompatibleTime time.Time) Compatibility {
+func GetCompatibility(minCompatibleTime time.Time) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
