@@ -191,18 +191,7 @@ func (fx *Fx) VerifyCredentials(utx UnsignedTx, in *Input, cred *Credential, out
 		// Make sure each signature in the signature list is from an owner of
 		// the output being consumed
 		sig := cred.Sigs[i]
-
-		var (
-			pk  *secp256k1.PublicKey
-			err error
-		)
-		// TODO: Refactor the feature extensions so that this code can never be
-		// hit with an uninitialized recover cache.
-		if fx.recoverCache != nil {
-			pk, err = fx.recoverCache.RecoverPublicKeyFromHash(txHash, sig[:])
-		} else {
-			pk, err = secp256k1.RecoverPublicKeyFromHash(txHash, sig[:])
-		}
+		pk, err := fx.recoverCache.RecoverPublicKeyFromHash(txHash, sig[:])
 		if err != nil {
 			return err
 		}

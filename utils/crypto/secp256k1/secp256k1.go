@@ -123,6 +123,10 @@ func (r *RecoverCache) RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
 }
 
 func (r *RecoverCache) RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, error) {
+	if r == nil || r.cache == nil {
+		return RecoverPublicKeyFromHash(hash, sig)
+	}
+
 	cacheBytes := make([]byte, len(hash)+len(sig))
 	copy(cacheBytes, hash)
 	copy(cacheBytes[len(hash):], sig)
