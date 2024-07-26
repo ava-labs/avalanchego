@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package database
+package dbtest
 
 import (
 	"bytes"
@@ -18,12 +16,13 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // Tests is a list of all database tests
-var Tests = map[string]func(t *testing.T, db Database){
+var Tests = map[string]func(t *testing.T, db database.Database){
 	"SimpleKeyValue":                   TestSimpleKeyValue,
 	"OverwriteKeyValue":                TestOverwriteKeyValue,
 	"EmptyKey":                         TestEmptyKey,
@@ -65,7 +64,7 @@ var Tests = map[string]func(t *testing.T, db Database){
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
 // calls return the expected values.
-func TestSimpleKeyValue(t *testing.T, db Database) {
+func TestSimpleKeyValue(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -76,7 +75,7 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
 	require.NoError(db.Put(key, value))
@@ -96,12 +95,12 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
 }
 
-func TestOverwriteKeyValue(t *testing.T, db Database) {
+func TestOverwriteKeyValue(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -117,14 +116,14 @@ func TestOverwriteKeyValue(t *testing.T, db Database) {
 	require.Equal(value2, gotValue)
 }
 
-func TestKeyEmptyValue(t *testing.T, db Database) {
+func TestKeyEmptyValue(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
 	val := []byte(nil)
 
 	_, err := db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(db.Put(key, val))
 
@@ -133,7 +132,7 @@ func TestKeyEmptyValue(t *testing.T, db Database) {
 	require.Empty(value)
 }
 
-func TestEmptyKey(t *testing.T, db Database) {
+func TestEmptyKey(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	var (
@@ -145,7 +144,7 @@ func TestEmptyKey(t *testing.T, db Database) {
 
 	// Test that nil key can be retrieved by empty key
 	_, err := db.Get(nilKey)
-	require.Equal(ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(db.Put(nilKey, val1))
 
@@ -163,7 +162,7 @@ func TestEmptyKey(t *testing.T, db Database) {
 
 // TestSimpleKeyValueClosed tests to make sure that Put + Get + Delete + Has
 // calls return the correct error when the database has been closed.
-func TestSimpleKeyValueClosed(t *testing.T, db Database) {
+func TestSimpleKeyValueClosed(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -174,7 +173,7 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
 	require.NoError(db.Put(key, value))
@@ -190,19 +189,19 @@ func TestSimpleKeyValueClosed(t *testing.T, db Database) {
 	require.NoError(db.Close())
 
 	_, err = db.Has(key)
-	require.Equal(ErrClosed, err)
+	require.Equal(database.ErrClosed, err)
 
 	_, err = db.Get(key)
-	require.Equal(ErrClosed, err)
+	require.Equal(database.ErrClosed, err)
 
-	require.Equal(ErrClosed, db.Put(key, value))
-	require.Equal(ErrClosed, db.Delete(key))
-	require.Equal(ErrClosed, db.Close())
+	require.Equal(database.ErrClosed, db.Put(key, value))
+	require.Equal(database.ErrClosed, db.Delete(key))
+	require.Equal(database.ErrClosed, db.Close())
 }
 
 // TestMemorySafetyDatabase ensures it is safe to modify a key after passing it
 // to Database.Put and Database.Get.
-func TestMemorySafetyDatabase(t *testing.T, db Database) {
+func TestMemorySafetyDatabase(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("1key")
@@ -236,7 +235,7 @@ func TestMemorySafetyDatabase(t *testing.T, db Database) {
 
 // TestNewBatchClosed tests to make sure that calling NewBatch on a closed
 // database returns a batch that errors correctly.
-func TestNewBatchClosed(t *testing.T, db Database) {
+func TestNewBatchClosed(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	require.NoError(db.Close())
@@ -249,11 +248,11 @@ func TestNewBatchClosed(t *testing.T, db Database) {
 
 	require.NoError(batch.Put(key, value))
 	require.Positive(batch.Size())
-	require.Equal(ErrClosed, batch.Write())
+	require.Equal(database.ErrClosed, batch.Write())
 }
 
 // TestBatchPut tests to make sure that batched writes work as expected.
-func TestBatchPut(t *testing.T, db Database) {
+func TestBatchPut(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -281,11 +280,11 @@ func TestBatchPut(t *testing.T, db Database) {
 
 	require.NoError(batch.Put(key, value))
 	require.NoError(db.Close())
-	require.Equal(ErrClosed, batch.Write())
+	require.Equal(database.ErrClosed, batch.Write())
 }
 
 // TestBatchDelete tests to make sure that batched deletes work as expected.
-func TestBatchDelete(t *testing.T, db Database) {
+func TestBatchDelete(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -304,14 +303,14 @@ func TestBatchDelete(t *testing.T, db Database) {
 	require.False(has)
 
 	_, err = db.Get(key)
-	require.Equal(ErrNotFound, err)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(db.Delete(key))
 }
 
 // TestMemorySafetyBatch ensures it is safe to modify a key after passing it
 // to Batch.Put.
-func TestMemorySafetyBatch(t *testing.T, db Database) {
+func TestMemorySafetyBatch(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -347,7 +346,7 @@ func TestMemorySafetyBatch(t *testing.T, db Database) {
 
 // TestBatchReset tests to make sure that a batch drops un-written operations
 // when it is reset.
-func TestBatchReset(t *testing.T, db Database) {
+func TestBatchReset(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -376,7 +375,7 @@ func TestBatchReset(t *testing.T, db Database) {
 
 // TestBatchReuse tests to make sure that a batch can be reused once it is
 // reset.
-func TestBatchReuse(t *testing.T, db Database) {
+func TestBatchReuse(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -417,7 +416,7 @@ func TestBatchReuse(t *testing.T, db Database) {
 
 // TestBatchRewrite tests to make sure that write can be called multiple times
 // on a batch and the values will be updated correctly.
-func TestBatchRewrite(t *testing.T, db Database) {
+func TestBatchRewrite(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello1")
@@ -447,7 +446,7 @@ func TestBatchRewrite(t *testing.T, db Database) {
 
 // TestBatchReplay tests to make sure that batches will correctly replay their
 // contents.
-func TestBatchReplay(t *testing.T, db Database) {
+func TestBatchReplay(t *testing.T, db database.Database) {
 	ctrl := gomock.NewController(t)
 	require := require.New(t)
 
@@ -467,7 +466,7 @@ func TestBatchReplay(t *testing.T, db Database) {
 	require.NoError(batch.Put(key1, value2))
 
 	for i := 0; i < 2; i++ {
-		mockBatch := NewMockBatch(ctrl)
+		mockBatch := database.NewMockBatch(ctrl)
 		gomock.InOrder(
 			mockBatch.EXPECT().Put(key1, value1).Times(1),
 			mockBatch.EXPECT().Put(key2, value2).Times(1),
@@ -482,7 +481,7 @@ func TestBatchReplay(t *testing.T, db Database) {
 
 // TestBatchReplayPropagateError tests to make sure that batches will correctly
 // propagate any returned error during Replay.
-func TestBatchReplayPropagateError(t *testing.T, db Database) {
+func TestBatchReplayPropagateError(t *testing.T, db database.Database) {
 	ctrl := gomock.NewController(t)
 	require := require.New(t)
 
@@ -498,13 +497,13 @@ func TestBatchReplayPropagateError(t *testing.T, db Database) {
 	require.NoError(batch.Put(key1, value1))
 	require.NoError(batch.Put(key2, value2))
 
-	mockBatch := NewMockBatch(ctrl)
+	mockBatch := database.NewMockBatch(ctrl)
 	gomock.InOrder(
-		mockBatch.EXPECT().Put(key1, value1).Return(ErrClosed).Times(1),
+		mockBatch.EXPECT().Put(key1, value1).Return(database.ErrClosed).Times(1),
 	)
-	require.Equal(ErrClosed, batch.Replay(mockBatch))
+	require.Equal(database.ErrClosed, batch.Replay(mockBatch))
 
-	mockBatch = NewMockBatch(ctrl)
+	mockBatch = database.NewMockBatch(ctrl)
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
 	)
@@ -513,7 +512,7 @@ func TestBatchReplayPropagateError(t *testing.T, db Database) {
 
 // TestBatchInner tests to make sure that inner can be used to write to the
 // database.
-func TestBatchInner(t *testing.T, db Database) {
+func TestBatchInner(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -560,7 +559,7 @@ func TestBatchInner(t *testing.T, db Database) {
 
 // TestBatchLargeSize tests to make sure that the batch can support a large
 // amount of entries.
-func TestBatchLargeSize(t *testing.T, db Database) {
+func TestBatchLargeSize(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	totalSize := 8 * units.MiB
@@ -587,7 +586,7 @@ func TestBatchLargeSize(t *testing.T, db Database) {
 
 // TestIteratorSnapshot tests to make sure the database iterates over a snapshot
 // of the database at the time of the iterator creation.
-func TestIteratorSnapshot(t *testing.T, db Database) {
+func TestIteratorSnapshot(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -616,7 +615,7 @@ func TestIteratorSnapshot(t *testing.T, db Database) {
 
 // TestIterator tests to make sure the database iterates over the database
 // contents lexicographically.
-func TestIterator(t *testing.T, db Database) {
+func TestIterator(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -649,7 +648,7 @@ func TestIterator(t *testing.T, db Database) {
 
 // TestIteratorStart tests to make sure the iterator can be configured to
 // start mid way through the database.
-func TestIteratorStart(t *testing.T, db Database) {
+func TestIteratorStart(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -678,7 +677,7 @@ func TestIteratorStart(t *testing.T, db Database) {
 
 // TestIteratorPrefix tests to make sure the iterator can be configured to skip
 // keys missing the provided prefix.
-func TestIteratorPrefix(t *testing.T, db Database) {
+func TestIteratorPrefix(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello")
@@ -711,7 +710,7 @@ func TestIteratorPrefix(t *testing.T, db Database) {
 
 // TestIteratorStartPrefix tests to make sure that the iterator can start mid
 // way through the database while skipping a prefix.
-func TestIteratorStartPrefix(t *testing.T, db Database) {
+func TestIteratorStartPrefix(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -748,7 +747,7 @@ func TestIteratorStartPrefix(t *testing.T, db Database) {
 
 // TestIteratorMemorySafety tests to make sure that keys can values are able to
 // be modified from the returned iterator.
-func TestIteratorMemorySafety(t *testing.T, db Database) {
+func TestIteratorMemorySafety(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -799,7 +798,7 @@ func TestIteratorMemorySafety(t *testing.T, db Database) {
 
 // TestIteratorClosed tests to make sure that an iterator that was created with
 // a closed database will report a closed error correctly.
-func TestIteratorClosed(t *testing.T, db Database) {
+func TestIteratorClosed(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -817,7 +816,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.Equal(database.ErrClosed, iterator.Error())
 	}
 
 	{
@@ -829,7 +828,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.Equal(database.ErrClosed, iterator.Error())
 	}
 
 	{
@@ -841,7 +840,7 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.Equal(database.ErrClosed, iterator.Error())
 	}
 
 	{
@@ -853,16 +852,16 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		require.False(iterator.Next())
 		require.Nil(iterator.Key())
 		require.Nil(iterator.Value())
-		require.Equal(ErrClosed, iterator.Error())
+		require.Equal(database.ErrClosed, iterator.Error())
 	}
 }
 
 // TestIteratorError tests to make sure that an iterator on a database will report
-// itself as being exhausted and return [ErrClosed] to indicate that the iteration
+// itself as being exhausted and return [database.ErrClosed] to indicate that the iteration
 // was not successful.
 // Additionally tests that an iterator that has already called Next() can still serve
 // its current value after the underlying DB was closed.
-func TestIteratorError(t *testing.T, db Database) {
+func TestIteratorError(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -890,12 +889,12 @@ func TestIteratorError(t *testing.T, db Database) {
 	require.False(iterator.Next())
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
-	require.Equal(ErrClosed, iterator.Error())
+	require.Equal(database.ErrClosed, iterator.Error())
 }
 
 // TestIteratorErrorAfterRelease tests to make sure that an iterator that was
 // released still reports the error correctly.
-func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
+func TestIteratorErrorAfterRelease(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello1")
@@ -912,11 +911,11 @@ func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
 	require.False(iterator.Next())
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
-	require.Equal(ErrClosed, iterator.Error())
+	require.Equal(database.ErrClosed, iterator.Error())
 }
 
 // TestCompactNoPanic tests to make sure compact never panics.
-func TestCompactNoPanic(t *testing.T, db Database) {
+func TestCompactNoPanic(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -943,23 +942,23 @@ func TestCompactNoPanic(t *testing.T, db Database) {
 
 	require.NoError(db.Close())
 	err := db.Compact(nil, nil)
-	require.ErrorIs(err, ErrClosed)
+	require.ErrorIs(err, database.ErrClosed)
 }
 
-func TestAtomicClear(t *testing.T, db Database) {
-	testClear(t, db, func(db Database) error {
-		return AtomicClear(db, db)
+func TestAtomicClear(t *testing.T, db database.Database) {
+	testClear(t, db, func(db database.Database) error {
+		return database.AtomicClear(db, db)
 	})
 }
 
-func TestClear(t *testing.T, db Database) {
-	testClear(t, db, func(db Database) error {
-		return Clear(db, math.MaxInt)
+func TestClear(t *testing.T, db database.Database) {
+	testClear(t, db, func(db database.Database) error {
+		return database.Clear(db, math.MaxInt)
 	})
 }
 
 // testClear tests to make sure the deletion helper works as expected.
-func testClear(t *testing.T, db Database, clearF func(Database) error) {
+func testClear(t *testing.T, db database.Database, clearF func(database.Database) error) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -975,33 +974,33 @@ func testClear(t *testing.T, db Database, clearF func(Database) error) {
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
-	count, err := Count(db)
+	count, err := database.Count(db)
 	require.NoError(err)
 	require.Equal(3, count)
 
 	require.NoError(clearF(db))
 
-	count, err = Count(db)
+	count, err = database.Count(db)
 	require.NoError(err)
 	require.Zero(count)
 
 	require.NoError(db.Close())
 }
 
-func TestAtomicClearPrefix(t *testing.T, db Database) {
-	testClearPrefix(t, db, func(db Database, prefix []byte) error {
-		return AtomicClearPrefix(db, db, prefix)
+func TestAtomicClearPrefix(t *testing.T, db database.Database) {
+	testClearPrefix(t, db, func(db database.Database, prefix []byte) error {
+		return database.AtomicClearPrefix(db, db, prefix)
 	})
 }
 
-func TestClearPrefix(t *testing.T, db Database) {
-	testClearPrefix(t, db, func(db Database, prefix []byte) error {
-		return ClearPrefix(db, prefix, math.MaxInt)
+func TestClearPrefix(t *testing.T, db database.Database) {
+	testClearPrefix(t, db, func(db database.Database, prefix []byte) error {
+		return database.ClearPrefix(db, prefix, math.MaxInt)
 	})
 }
 
 // testClearPrefix tests to make sure prefix deletion works as expected.
-func testClearPrefix(t *testing.T, db Database, clearF func(Database, []byte) error) {
+func testClearPrefix(t *testing.T, db database.Database, clearF func(database.Database, []byte) error) {
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -1017,13 +1016,13 @@ func testClearPrefix(t *testing.T, db Database, clearF func(Database, []byte) er
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
-	count, err := Count(db)
+	count, err := database.Count(db)
 	require.NoError(err)
 	require.Equal(3, count)
 
 	require.NoError(clearF(db, []byte("hello")))
 
-	count, err = Count(db)
+	count, err = database.Count(db)
 	require.NoError(err)
 	require.Equal(1, count)
 
@@ -1042,7 +1041,7 @@ func testClearPrefix(t *testing.T, db Database, clearF func(Database, []byte) er
 	require.NoError(db.Close())
 }
 
-func TestModifyValueAfterPut(t *testing.T, db Database) {
+func TestModifyValueAfterPut(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte{1}
@@ -1059,7 +1058,7 @@ func TestModifyValueAfterPut(t *testing.T, db Database) {
 	require.Equal(originalValue, retrievedValue)
 }
 
-func TestModifyValueAfterBatchPut(t *testing.T, db Database) {
+func TestModifyValueAfterBatchPut(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte{1}
@@ -1081,7 +1080,7 @@ func TestModifyValueAfterBatchPut(t *testing.T, db Database) {
 	require.Equal(originalValue, retrievedValue)
 }
 
-func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
+func TestModifyValueAfterBatchPutReplay(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte{1}
@@ -1107,7 +1106,7 @@ func TestModifyValueAfterBatchPutReplay(t *testing.T, db Database) {
 	require.Equal(originalValue, retrievedValue)
 }
 
-func TestConcurrentBatches(t *testing.T, db Database) {
+func TestConcurrentBatches(t *testing.T, db database.Database) {
 	numBatches := 10
 	keysPerBatch := 50
 	keySize := 32
@@ -1122,7 +1121,7 @@ func TestConcurrentBatches(t *testing.T, db Database) {
 	))
 }
 
-func TestManySmallConcurrentKVPairBatches(t *testing.T, db Database) {
+func TestManySmallConcurrentKVPairBatches(t *testing.T, db database.Database) {
 	numBatches := 100
 	keysPerBatch := 10
 	keySize := 10
@@ -1138,13 +1137,13 @@ func TestManySmallConcurrentKVPairBatches(t *testing.T, db Database) {
 }
 
 func runConcurrentBatches(
-	db Database,
+	db database.Database,
 	numBatches,
 	keysPerBatch,
 	keySize,
 	valueSize int,
 ) error {
-	batches := make([]Batch, 0, numBatches)
+	batches := make([]database.Batch, 0, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batches = append(batches, db.NewBatch())
 	}
@@ -1166,7 +1165,7 @@ func runConcurrentBatches(
 	return eg.Wait()
 }
 
-func TestPutGetEmpty(t *testing.T, db Database) {
+func TestPutGetEmpty(t *testing.T, db database.Database) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -1184,7 +1183,7 @@ func TestPutGetEmpty(t *testing.T, db Database) {
 	require.Empty(value) // May be nil or empty byte slice.
 }
 
-func FuzzKeyValue(f *testing.F, db Database) {
+func FuzzKeyValue(f *testing.F, db database.Database) {
 	f.Fuzz(func(t *testing.T, key []byte, value []byte) {
 		require := require.New(t)
 
@@ -1205,11 +1204,11 @@ func FuzzKeyValue(f *testing.F, db Database) {
 		require.False(exists)
 
 		_, err = db.Get(key)
-		require.Equal(ErrNotFound, err)
+		require.Equal(database.ErrNotFound, err)
 	})
 }
 
-func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
+func FuzzNewIteratorWithPrefix(f *testing.F, db database.Database) {
 	const (
 		maxKeyLen   = 32
 		maxValueLen = 32
@@ -1268,11 +1267,11 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db Database) {
 		require.Len(expectedList, numIterElts)
 
 		// Clear the database for the next fuzz iteration.
-		require.NoError(AtomicClear(db, db))
+		require.NoError(database.AtomicClear(db, db))
 	})
 }
 
-func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
+func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db database.Database) {
 	const (
 		maxKeyLen   = 32
 		maxValueLen = 32
@@ -1335,6 +1334,6 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db Database) {
 		require.Len(expectedList, numIterElts)
 
 		// Clear the database for the next fuzz iteration.
-		require.NoError(AtomicClear(db, db))
+		require.NoError(database.AtomicClear(db, db))
 	})
 }

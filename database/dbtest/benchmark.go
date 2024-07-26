@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package database
+package dbtest
 
 import (
 	"math/rand"
@@ -11,12 +9,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 var (
 	// Benchmarks is a list of all database benchmarks
-	Benchmarks = map[string]func(b *testing.B, db Database, keys, values [][]byte){
+	Benchmarks = map[string]func(b *testing.B, db database.Database, keys, values [][]byte){
 		"Get":            BenchmarkGet,
 		"Put":            BenchmarkPut,
 		"Delete":         BenchmarkDelete,
@@ -57,7 +56,7 @@ func SetupBenchmark(b *testing.B, count int, keySize, valueSize int) ([][]byte, 
 }
 
 // BenchmarkGet measures the time it takes to get an operation from a database.
-func BenchmarkGet(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkGet(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -78,7 +77,7 @@ func BenchmarkGet(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkPut measures the time it takes to write an operation to a database.
-func BenchmarkPut(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkPut(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -89,7 +88,7 @@ func BenchmarkPut(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkDelete measures the time it takes to delete a (k, v) from a database.
-func BenchmarkDelete(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkDelete(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -110,7 +109,7 @@ func BenchmarkDelete(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkBatchPut measures the time it takes to batch put.
-func BenchmarkBatchPut(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkBatchPut(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -121,7 +120,7 @@ func BenchmarkBatchPut(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkBatchDelete measures the time it takes to batch delete.
-func BenchmarkBatchDelete(b *testing.B, db Database, keys, _ [][]byte) {
+func BenchmarkBatchDelete(b *testing.B, db database.Database, keys, _ [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -132,7 +131,7 @@ func BenchmarkBatchDelete(b *testing.B, db Database, keys, _ [][]byte) {
 }
 
 // BenchmarkBatchWrite measures the time it takes to batch write.
-func BenchmarkBatchWrite(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkBatchWrite(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 
 	require := require.New(b)
@@ -151,7 +150,7 @@ func BenchmarkBatchWrite(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkParallelGet measures the time it takes to read in parallel.
-func BenchmarkParallelGet(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkParallelGet(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -173,7 +172,7 @@ func BenchmarkParallelGet(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkParallelPut measures the time it takes to write to the db in parallel.
-func BenchmarkParallelPut(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkParallelPut(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
@@ -186,7 +185,7 @@ func BenchmarkParallelPut(b *testing.B, db Database, keys, values [][]byte) {
 }
 
 // BenchmarkParallelDelete measures the time it takes to delete a (k, v) from the db.
-func BenchmarkParallelDelete(b *testing.B, db Database, keys, values [][]byte) {
+func BenchmarkParallelDelete(b *testing.B, db database.Database, keys, values [][]byte) {
 	require.NotEmpty(b, keys)
 	count := len(keys)
 
