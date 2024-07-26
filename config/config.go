@@ -787,8 +787,12 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 	}
 
 	switch networkID {
-	case constants.MainnetID, constants.FujiID, constants.LocalID:
-		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades on mainnet, fuji, or default local networkID")
+	case constants.MainnetID:
+		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for mainnet networkID: %d", networkID)
+	case constants.FujiID:
+		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for fuji networkID: %d", networkID)
+	case constants.LocalID:
+		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for local networkID: %d", networkID)
 	}
 
 	var (
@@ -796,17 +800,17 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 		err          error
 	)
 	switch {
-	case v.IsSet(UpgradeFileContentKey):
-		upgradeContent := v.GetString(UpgradeFileContentKey)
-		upgradeBytes, err = base64.StdEncoding.DecodeString(upgradeContent)
-		if err != nil {
-			return upgrade.Config{}, fmt.Errorf("unable to decode upgrade base64 content: %w", err)
-		}
 	case v.IsSet(UpgradeFileKey):
 		upgradeFileName := GetExpandedArg(v, UpgradeFileKey)
 		upgradeBytes, err = os.ReadFile(upgradeFileName)
 		if err != nil {
 			return upgrade.Config{}, fmt.Errorf("unable to read upgrade file: %w", err)
+		}
+	case v.IsSet(UpgradeFileContentKey):
+		upgradeContent := v.GetString(UpgradeFileContentKey)
+		upgradeBytes, err = base64.StdEncoding.DecodeString(upgradeContent)
+		if err != nil {
+			return upgrade.Config{}, fmt.Errorf("unable to decode upgrade base64 content: %w", err)
 		}
 	}
 
