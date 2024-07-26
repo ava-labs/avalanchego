@@ -450,20 +450,6 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 			},
 		)
 	}
-
-	// When we register the P-chain, we mark ourselves as connected on all of
-	// the subnets that we have tracked.
-	if chainID != constants.PlatformChainID {
-		return
-	}
-
-	// If we have currently benched ourselves, we will mark ourselves as
-	// connected when we unbench. So skip connecting now.
-	// This is not "theoretically" possible, but keeping this here prevents us
-	// from keeping an invariant that we never bench ourselves.
-	if _, benched := cr.benched[cr.myNodeID]; benched {
-		return
-	}
 }
 
 // Connected routes an incoming notification that a validator was just connected
@@ -517,7 +503,6 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 			}
 		}
 	}
-
 }
 
 // Disconnected routes an incoming notification that a validator was connected
