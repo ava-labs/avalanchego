@@ -52,7 +52,6 @@ var (
 	_ Network = (*network)(nil)
 
 	errNotValidator        = errors.New("node is not a validator")
-	errNotTracked          = errors.New("subnet is not tracked")
 	errExpectedProxy       = errors.New("expected proxy")
 	errExpectedTCPProtocol = errors.New("expected TCP protocol")
 )
