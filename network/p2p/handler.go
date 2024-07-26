@@ -23,6 +23,7 @@ var (
 
 const (
 	TxGossipHandlerID = iota
+	AtomicTxGossipHandlerID
 	SignatureRequestHandlerID
 )
 
