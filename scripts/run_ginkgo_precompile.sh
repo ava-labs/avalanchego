@@ -24,6 +24,6 @@ TEST_SOURCE_ROOT=$(pwd)
 # By default, it runs all e2e test cases!
 # Use "--ginkgo.skip" to skip tests.
 # Use "--ginkgo.focus" to select tests.
-TEST_SOURCE_ROOT="$TEST_SOURCE_ROOT" ginkgo run -procs=5 tests/precompile \
+TEST_SOURCE_ROOT="$TEST_SOURCE_ROOT" ginkgo -tags=test run -procs=5 tests/precompile \
   --ginkgo.vv \
   --ginkgo.label-filter="${GINKGO_LABEL_FILTER:-""}"

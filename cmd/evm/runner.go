@@ -154,7 +154,7 @@ func runCmd(ctx *cli.Context) error {
 			initialGas = genesisConfig.GasLimit
 		}
 	} else {
-		genesisConfig.Config = params.TestSubnetEVMConfig
+		genesisConfig.Config = params.TestSubnetEVMChainConfig
 	}
 
 	db := rawdb.NewMemoryDatabase()

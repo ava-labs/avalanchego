@@ -69,7 +69,7 @@ func TestSetupGenesis(t *testing.T) {
 }
 
 func testSetupGenesis(t *testing.T, scheme string) {
-	preSubnetConfig := *params.TestPreSubnetEVMConfig
+	preSubnetConfig := *params.TestPreSubnetEVMChainConfig
 	preSubnetConfig.SubnetEVMTimestamp = utils.NewUint64(100)
 	var (
 		customghash = common.HexToHash("0x4a12fe7bf8d40d152d7e9de22337b115186a4662aa3a97217b36146202bbfc66")
