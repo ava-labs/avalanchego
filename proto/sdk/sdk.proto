@@ -18,7 +18,7 @@ message PushGossip {
 }
 
 message SignatureRequest {
-  bytes data = 1;
+  bytes message = 1;
   bytes justification = 2;
 }
 
