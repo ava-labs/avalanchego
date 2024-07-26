@@ -123,6 +123,7 @@ func (r *RecoverCache) RecoverPublicKey(msg, sig []byte) (*PublicKey, error) {
 }
 
 func (r *RecoverCache) RecoverPublicKeyFromHash(hash, sig []byte) (*PublicKey, error) {
+	// TODO: This type should always be initialized by calling NewRecoverCache.
 	if r == nil || r.cache == nil {
 		return RecoverPublicKeyFromHash(hash, sig)
 	}
