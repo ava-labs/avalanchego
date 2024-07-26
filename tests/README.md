@@ -14,9 +14,7 @@ test runs to minimize the setup cost involved:
 $ ./scripts/build_tmpnetctl.sh
 
 # Start a new temporary network configured with subnet-evm's default plugin path
-$ ./build/tmpnetctl start-network \
-  --avalanche-path=./build/avalanchego
-  --plugin-dir=$GOPATH/src/github.com/ava-labs/avalanchego/build/plugins
+$ ./build/tmpnetctl start-network --avalanche-path=./build/avalanchego
 
 # From the root of a clone of subnet-evm, execute the warp test suite against the existing network
 $ ginkgo -vv ./tests/warp -- --use-existing-network --network-dir=$HOME/.tmpnet/networks/latest

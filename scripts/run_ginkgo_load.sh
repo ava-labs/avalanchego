@@ -22,7 +22,7 @@ go install -v github.com/onsi/ginkgo/v2/ginkgo@"${GINKGO_VERSION}"
 EXTRA_ARGS=()
 AVALANCHEGO_BUILD_PATH="${AVALANCHEGO_BUILD_PATH:-}"
 if [[ -n "${AVALANCHEGO_BUILD_PATH}" ]]; then
-  EXTRA_ARGS=("--avalanchego-path=${AVALANCHEGO_BUILD_PATH}/avalanchego" "--plugin-dir=${AVALANCHEGO_BUILD_PATH}/plugins")
+  EXTRA_ARGS=("--avalanchego-path=${AVALANCHEGO_BUILD_PATH}/avalanchego")
   echo "Running with extra args:" "${EXTRA_ARGS[@]}"
 fi
 

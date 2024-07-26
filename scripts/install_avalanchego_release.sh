@@ -116,7 +116,6 @@ else
 fi
 
 AVALANCHEGO_PATH=${AVALANCHEGO_BUILD_PATH}/avalanchego
-AVALANCHEGO_PLUGIN_DIR=${AVALANCHEGO_BUILD_PATH}/plugins
 
 mkdir -p "${AVALANCHEGO_BUILD_PATH}"
 
@@ -125,4 +124,4 @@ cp "${BUILD_DIR}"/avalanchego "${AVALANCHEGO_PATH}"
 
 echo "Installed AvalancheGo release ${AVALANCHE_VERSION}"
 echo "AvalancheGo Path: ${AVALANCHEGO_PATH}"
-echo "Plugin Dir: ${AVALANCHEGO_PLUGIN_DIR}"
+echo "Plugin Dir: ${DEFAULT_PLUGIN_DIR}"
