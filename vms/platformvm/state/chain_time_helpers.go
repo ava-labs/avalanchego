@@ -83,11 +83,10 @@ func PickFeeCalculator(cfg *config.Config, state Chain) (fee.Calculator, error) 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set
 // to either the pre-AP3 or post-AP3 config.
 func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) fee.Calculator {
+	config := cfg.StaticFeeConfig
 	if !cfg.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
-		config := cfg.StaticFeeConfig
 		config.CreateSubnetTxFee = cfg.CreateAssetTxFee
 		config.CreateBlockchainTxFee = cfg.CreateAssetTxFee
-		return fee.NewStaticCalculator(config)
 	}
-	return fee.NewStaticCalculator(cfg.StaticFeeConfig)
+	return fee.NewStaticCalculator(config)
 }
