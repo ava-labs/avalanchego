@@ -34,21 +34,26 @@ type StakingConfig struct {
 	RewardConfig reward.Config `json:"rewardConfig"`
 }
 
-type Params struct {
-	StakingConfig
+type TxFeeConfig struct {
 	fee.StaticConfig
+	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
 }
 
-func GetTxFeeConfig(networkID uint32) fee.StaticConfig {
+type Params struct {
+	TxFeeConfig
+	StakingConfig
+}
+
+func GetTxFeeConfig(networkID uint32) TxFeeConfig {
 	switch networkID {
 	case constants.MainnetID:
-		return MainnetParams.StaticConfig
+		return MainnetParams.TxFeeConfig
 	case constants.FujiID:
-		return FujiParams.StaticConfig
+		return FujiParams.TxFeeConfig
 	case constants.LocalID:
-		return LocalParams.StaticConfig
+		return LocalParams.TxFeeConfig
 	default:
-		return LocalParams.StaticConfig
+		return LocalParams.TxFeeConfig
 	}
 }
 

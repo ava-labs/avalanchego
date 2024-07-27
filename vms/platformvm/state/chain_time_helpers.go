@@ -77,5 +77,19 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // PickFeeCalculator does not modify [state].
 func PickFeeCalculator(cfg *config.Config, state Chain) (fee.Calculator, error) {
 	timestamp := state.GetTimestamp()
-	return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, timestamp), nil
+	return NewStaticFeeCalculator(cfg, timestamp), nil
+}
+
+// PickFeeCalculator creates either a static or a dynamic fee calculator,
+// depending on the active upgrade.
+//
+// PickFeeCalculator does not modify [state].
+func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) fee.Calculator {
+	if !cfg.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
+		config := cfg.StaticFeeConfig
+		config.CreateSubnetTxFee = cfg.CreateAssetTxFee
+		config.CreateBlockchainTxFee = cfg.CreateAssetTxFee
+		return fee.NewStaticCalculator(config)
+	}
+	return fee.NewStaticCalculator(cfg.StaticFeeConfig)
 }
