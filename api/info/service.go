@@ -379,8 +379,8 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 }
 
 type GetTxFeeResponse struct {
-	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
 	TxFee                         json.Uint64 `json:"txFee"`
+	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
 	CreateSubnetTxFee             json.Uint64 `json:"createSubnetTxFee"`
 	TransformSubnetTxFee          json.Uint64 `json:"transformSubnetTxFee"`
 	CreateBlockchainTxFee         json.Uint64 `json:"createBlockchainTxFee"`
@@ -397,8 +397,8 @@ func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) e
 		zap.String("method", "getTxFee"),
 	)
 
-	reply.CreateAssetTxFee = json.Uint64(i.TxFeeConfig.CreateAssetTxFee)
 	reply.TxFee = json.Uint64(i.TxFeeConfig.TxFee)
+	reply.CreateAssetTxFee = json.Uint64(i.TxFeeConfig.CreateAssetTxFee)
 	reply.CreateSubnetTxFee = json.Uint64(i.TxFeeConfig.CreateSubnetTxFee)
 	reply.TransformSubnetTxFee = json.Uint64(i.TxFeeConfig.TransformSubnetTxFee)
 	reply.CreateBlockchainTxFee = json.Uint64(i.TxFeeConfig.CreateBlockchainTxFee)
