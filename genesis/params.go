@@ -40,8 +40,8 @@ type TxFeeConfig struct {
 }
 
 type Params struct {
-	TxFeeConfig
 	StakingConfig
+	TxFeeConfig
 }
 
 func GetTxFeeConfig(networkID uint32) TxFeeConfig {
