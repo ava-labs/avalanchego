@@ -80,10 +80,8 @@ func PickFeeCalculator(cfg *config.Config, state Chain) (fee.Calculator, error) 
 	return NewStaticFeeCalculator(cfg, timestamp), nil
 }
 
-// PickFeeCalculator creates either a static or a dynamic fee calculator,
-// depending on the active upgrade.
-//
-// PickFeeCalculator does not modify [state].
+// NewStaticFeeCalculator creates a static fee calculator, with the config set
+// to either the pre-AP3 or post-AP3 config.
 func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) fee.Calculator {
 	if !cfg.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
 		config := cfg.StaticFeeConfig
