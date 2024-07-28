@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
+const testDynamicPrice = 100
+
 var (
 	testStaticConfig = StaticConfig{
 		TxFee:                         1 * units.Avax,
@@ -25,7 +27,6 @@ var (
 		fee.DBWrite:   300,
 		fee.Compute:   0, // TODO: Populate
 	}
-	testDynamicPrice = fee.GasPrice(100)
 
 	txTests = []struct {
 		name                  string
