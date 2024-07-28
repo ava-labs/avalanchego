@@ -19,6 +19,13 @@ var (
 		AddSubnetValidatorFee:         7 * units.Avax,
 		AddSubnetDelegatorFee:         8 * units.Avax,
 	}
+	testDynamicWeights = fee.Dimensions{
+		fee.Bandwidth: 1,
+		fee.DBRead:    200,
+		fee.DBWrite:   300,
+		fee.Compute:   0, // TODO: Populate
+	}
+	testDynamicPrice = fee.GasPrice(100)
 
 	txTests = []struct {
 		name                  string
@@ -27,6 +34,8 @@ var (
 		expectedStaticFeeErr  error
 		expectedComplexity    fee.Dimensions
 		expectedComplexityErr error
+		expectedDynamicFee    uint64
+		expectedDynamicFeeErr error
 	}{
 		{
 			name:                  "AdvanceTimeTx",
@@ -35,6 +44,8 @@ var (
 			expectedStaticFeeErr:  ErrUnsupportedTx,
 			expectedComplexity:    fee.Dimensions{},
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFee:    0,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                  "RewardValidatorTx",
@@ -43,6 +54,8 @@ var (
 			expectedStaticFeeErr:  ErrUnsupportedTx,
 			expectedComplexity:    fee.Dimensions{},
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFee:    0,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                  "AddValidatorTx",
@@ -51,6 +64,8 @@ var (
 			expectedStaticFeeErr:  nil,
 			expectedComplexity:    fee.Dimensions{},
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFee:    0,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                  "AddDelegatorTx",
@@ -59,6 +74,8 @@ var (
 			expectedStaticFeeErr:  nil,
 			expectedComplexity:    fee.Dimensions{},
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFee:    0,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                 "AddPermissionlessValidatorTx for primary network",
@@ -72,6 +89,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    229_100,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "AddPermissionlessValidatorTx for subnet",
@@ -85,6 +104,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    314_800,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "AddPermissionlessDelegatorTx for primary network",
@@ -98,6 +119,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    209_900,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "AddPermissionlessDelegatorTx for subnet",
@@ -111,6 +134,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    312_000,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "AddSubnetValidatorTx",
@@ -124,6 +149,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    196_000,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "BaseTx",
@@ -137,6 +164,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    149_900,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "CreateChainTx",
@@ -150,6 +179,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    180_900,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "CreateSubnetTx",
@@ -163,6 +194,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    143_900,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "ExportTx",
@@ -176,6 +209,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    153_500,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "ImportTx",
@@ -189,6 +224,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    113_500,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                 "RemoveSubnetValidatorTx",
@@ -202,6 +239,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    193_600,
+			expectedDynamicFeeErr: nil,
 		},
 		{
 			name:                  "TransformSubnetTx",
@@ -210,6 +249,8 @@ var (
 			expectedStaticFeeErr:  nil,
 			expectedComplexity:    fee.Dimensions{},
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFee:    0,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                 "TransferSubnetOwnershipTx",
@@ -223,6 +264,8 @@ var (
 				fee.Compute:   0, // TODO: implement
 			},
 			expectedComplexityErr: nil,
+			expectedDynamicFee:    173_600,
+			expectedDynamicFeeErr: nil,
 		},
 	}
 )
