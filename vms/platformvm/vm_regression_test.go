@@ -37,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -2441,7 +2440,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	require.NoError(err)
 
 	appRequestBytes := p2p.PrefixMessage(
-		p2p.ProtocolPrefix(network.TxGossipHandlerID),
+		p2p.ProtocolPrefix(p2p.TxGossipHandlerID),
 		protocolAppRequestBytest,
 	)
 
