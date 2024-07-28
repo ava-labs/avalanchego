@@ -32,7 +32,8 @@ type Config struct {
 	Validators validators.Manager
 
 	// All static fees config active before E-upgrade
-	StaticFeeConfig fee.StaticConfig
+	CreateAssetTxFee uint64 // Override for CreateSubnet and CreateChain before AP3
+	StaticFeeConfig  fee.StaticConfig
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator

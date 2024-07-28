@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -40,15 +39,16 @@ var (
 	testContextPreEtna = &builder.Context{
 		NetworkID:   constants.UnitTestID,
 		AVAXAssetID: avaxAssetID,
-
-		BaseTxFee:                     units.MicroAvax,
-		CreateSubnetTxFee:             19 * units.MicroAvax,
-		TransformSubnetTxFee:          789 * units.MicroAvax,
-		CreateBlockchainTxFee:         1234 * units.MicroAvax,
-		AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
-		AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
-		AddSubnetValidatorFee:         1010 * units.MilliAvax,
-		AddSubnetDelegatorFee:         9 * units.Avax,
+		StaticFeeConfig: txfee.StaticConfig{
+			TxFee:                         units.MicroAvax,
+			CreateSubnetTxFee:             19 * units.MicroAvax,
+			TransformSubnetTxFee:          789 * units.MicroAvax,
+			CreateBlockchainTxFee:         1234 * units.MicroAvax,
+			AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
+			AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
+			AddSubnetValidatorFee:         1010 * units.MilliAvax,
+			AddSubnetDelegatorFee:         9 * units.Avax,
+		},
 	}
 	testContextPostEtna = &builder.Context{
 		NetworkID:   constants.UnitTestID,
@@ -72,19 +72,7 @@ var (
 			name:    "Pre-Etna",
 			context: testContextPreEtna,
 			feeCalculator: txfee.NewStaticCalculator(
-				txfee.StaticConfig{
-					TxFee:                         testContextPreEtna.BaseTxFee,
-					CreateAssetTxFee:              testContextPreEtna.CreateSubnetTxFee,
-					CreateSubnetTxFee:             testContextPreEtna.CreateSubnetTxFee,
-					TransformSubnetTxFee:          testContextPreEtna.TransformSubnetTxFee,
-					CreateBlockchainTxFee:         testContextPreEtna.CreateBlockchainTxFee,
-					AddPrimaryNetworkValidatorFee: testContextPreEtna.AddPrimaryNetworkValidatorFee,
-					AddPrimaryNetworkDelegatorFee: testContextPreEtna.AddPrimaryNetworkDelegatorFee,
-					AddSubnetValidatorFee:         testContextPreEtna.AddSubnetValidatorFee,
-					AddSubnetDelegatorFee:         testContextPreEtna.AddSubnetDelegatorFee,
-				},
-				upgrade.Config{},
-				time.Now(),
+				testContextPreEtna.StaticFeeConfig,
 			),
 		},
 		{
@@ -618,7 +606,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID:   testContextPreEtna.TransformSubnetTxFee,
+				avaxAssetID:   testContextPreEtna.StaticFeeConfig.TransformSubnetTxFee,
 				subnetAssetID: maxSupply - initialSupply,
 			},
 		),
@@ -653,9 +641,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	var (
 		utxos = []*avax.UTXO{
-			makeUTXO(testContextPreEtna.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
-			makeUTXO(1 * units.NanoAvax),                               // small UTXO
-			makeUTXO(9 * units.Avax),                                   // large UTXO
+			makeUTXO(testContextPreEtna.StaticFeeConfig.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
+			makeUTXO(1 * units.NanoAvax), // small UTXO
+			makeUTXO(9 * units.Avax),     // large UTXO
 		}
 
 		rewardKey  = testKeys[0]
