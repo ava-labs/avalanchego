@@ -171,7 +171,6 @@ var (
 		fee.Compute: 0,
 	}
 
-	errUnsupportedTx     = errors.New("unsupported tx type")
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
@@ -356,23 +355,23 @@ type complexityVisitor struct {
 }
 
 func (*complexityVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	return errUnsupportedTx
+	return ErrUnsupportedTx
 }
 
 func (*complexityVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
-	return errUnsupportedTx
+	return ErrUnsupportedTx
 }
 
 func (*complexityVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	return errUnsupportedTx
+	return ErrUnsupportedTx
 }
 
 func (*complexityVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	return errUnsupportedTx
+	return ErrUnsupportedTx
 }
 
 func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	return errUnsupportedTx
+	return ErrUnsupportedTx
 }
 
 func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
