@@ -766,7 +766,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		return genesis.TxFeeConfig{
 			CreateAssetTxFee: v.GetUint64(CreateAssetTxFeeKey),
-			StaticTxConfig: fee.StaticConfig{
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         v.GetUint64(TxFeeKey),
 				CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
 				TransformSubnetTxFee:          v.GetUint64(TransformSubnetTxFeeKey),

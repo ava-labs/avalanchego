@@ -67,11 +67,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	if err != nil {
-		return err
-	}
-
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
@@ -131,10 +127,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	if err != nil {
-		return err
-	}
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
 	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 

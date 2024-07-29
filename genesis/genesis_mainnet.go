@@ -21,7 +21,7 @@ var (
 	MainnetParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: 10 * units.MilliAvax,
-			StaticTxConfig: fee.StaticConfig{
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             1 * units.Avax,
 				TransformSubnetTxFee:          10 * units.Avax,

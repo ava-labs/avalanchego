@@ -21,7 +21,7 @@ var (
 	FujiParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: 10 * units.MilliAvax,
-			StaticTxConfig: fee.StaticConfig{
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             100 * units.MilliAvax,
 				TransformSubnetTxFee:          1 * units.Avax,
