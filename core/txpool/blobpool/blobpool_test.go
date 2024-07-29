@@ -91,9 +91,9 @@ func init() {
 
 // overrideMinFee sets the minimum base fee to 1 wei for the duration of the test.
 func overrideMinFee(t *testing.T) {
-	orig := dummy.ApricotPhase4MinBaseFee
-	dummy.ApricotPhase4MinBaseFee = big.NewInt(1)
-	t.Cleanup(func() { dummy.ApricotPhase4MinBaseFee = orig })
+	orig := dummy.EUpgradeMinBaseFee
+	dummy.EUpgradeMinBaseFee = big.NewInt(1)
+	t.Cleanup(func() { dummy.EUpgradeMinBaseFee = orig })
 }
 
 // testBlockChain is a mock of the live chain for testing the pool.
