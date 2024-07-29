@@ -403,7 +403,6 @@ func packEtnaBlockTxs(
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
-	capacity feecomponent.Gas,
 ) ([]*txs.Tx, error) {
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
@@ -414,6 +413,18 @@ func packEtnaBlockTxs(
 		return nil, err
 	}
 
+	feeComplexity := stateDiff.GetFeeComplexity()
+	return packEtnaBlockTxsOn(parentID, stateDiff, mempool, backend, manager, feeComplexity.Capacity)
+}
+
+func packEtnaBlockTxsOn(
+	parentID ids.ID,
+	stateDiff state.Diff,
+	mempool mempool.Mempool,
+	backend *txexecutor.Backend,
+	manager blockexecutor.Manager,
+	capacity feecomponent.Gas,
+) ([]*txs.Tx, error) {
 	var (
 		blockTxs        []*txs.Tx
 		inputs          set.Set[ids.ID]
