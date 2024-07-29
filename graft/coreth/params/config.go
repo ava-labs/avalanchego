@@ -540,7 +540,7 @@ type ChainConfig struct {
 	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
 	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
 	// EUpgrade on the Avalanche network. (nil = no fork, 0 = already activated)
-	// It activates Cancun (TODO) and modifies the min base fee (TODO).
+	// It activates Cancun and reduces the min base fee.
 	EUpgradeTime *uint64 `json:"eUpgradeTime,omitempty"`
 
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)

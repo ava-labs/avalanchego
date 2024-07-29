@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testRollup(t *testing.T, longs []uint64, roll int) {
@@ -536,4 +537,30 @@ func TestCalcBlockGasCost(t *testing.T) {
 			)))
 		})
 	}
+}
+
+func TestDynamicFeesEUpgrade(t *testing.T) {
+	require := require.New(t)
+	header := &types.Header{
+		Number: big.NewInt(0),
+	}
+
+	timestamp := uint64(1)
+	extra, nextBaseFee, err := CalcBaseFee(params.TestEUpgradeChainConfig, header, timestamp)
+	require.NoError(err)
+	// Genesis matches the initial base fee
+	require.Equal(params.ApricotPhase3InitialBaseFee, nextBaseFee.Int64())
+
+	timestamp = uint64(10_000)
+	header = &types.Header{
+		Number:  big.NewInt(1),
+		Time:    header.Time,
+		BaseFee: nextBaseFee,
+		Extra:   extra,
+	}
+	_, nextBaseFee, err = CalcBaseFee(params.TestEUpgradeChainConfig, header, timestamp)
+	require.NoError(err)
+	// After some time has passed in the EUpgrade phase, the base fee should drop
+	// lower than the prior base fee minimum.
+	require.Less(nextBaseFee.Int64(), params.ApricotPhase4MinBaseFee)
 }

@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -110,6 +111,12 @@ var (
 	activateCancun = func(cfg *params.ChainConfig) *params.ChainConfig {
 		cpy := *cfg
 		cpy.CancunTime = utils.NewUint64(0)
+		return &cpy
+	}
+
+	activateEUpgrade = func(cfg *params.ChainConfig, eUpgradeTime uint64) *params.ChainConfig {
+		cpy := *cfg
+		cpy.EUpgradeTime = &eUpgradeTime
 		return &cpy
 	}
 
@@ -281,7 +288,24 @@ func GenesisVM(t *testing.T,
 	*atomic.Memory,
 	*commonEng.SenderTest,
 ) {
-	vm := &VM{}
+	return GenesisVMWithClock(t, finishBootstrapping, genesisJSON, configJSON, upgradeJSON, mockable.Clock{})
+}
+
+// GenesisVMWithClock creates a VM instance as GenesisVM does, but also allows
+// setting the vm's time before [Initialize] is called.
+func GenesisVMWithClock(
+	t *testing.T,
+	finishBootstrapping bool,
+	genesisJSON string,
+	configJSON string,
+	upgradeJSON string,
+	clock mockable.Clock,
+) (chan commonEng.Message,
+	*VM, database.Database,
+	*atomic.Memory,
+	*commonEng.SenderTest,
+) {
+	vm := &VM{clock: clock}
 	vm.p2pSender = &commonEng.FakeSender{}
 	ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	appSender := &commonEng.SenderTest{T: t}
@@ -4064,4 +4088,26 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			errCheck(err)
 		})
 	}
+}
+
+func TestMinFeeSetAtEUpgrade(t *testing.T) {
+	require := require.New(t)
+	now := time.Now()
+	eUpgradeTime := uint64(now.Add(1 * time.Second).Unix())
+
+	genesis := genesisJSON(
+		activateEUpgrade(params.TestEUpgradeChainConfig, eUpgradeTime),
+	)
+	clock := mockable.Clock{}
+	clock.Set(now)
+
+	_, vm, _, _, _ := GenesisVMWithClock(t, false, genesis, "", "", clock)
+	initial := vm.txPool.MinFee()
+	require.Equal(params.ApricotPhase4MinBaseFee, initial.Int64())
+
+	require.Eventually(
+		func() bool { return params.EUpgradeMinBaseFee == vm.txPool.MinFee().Int64() },
+		5*time.Second,
+		1*time.Second,
+	)
 }
