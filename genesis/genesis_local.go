@@ -39,7 +39,7 @@ var (
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: units.MilliAvax,
-			StaticTxConfig: fee.StaticConfig{
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             100 * units.MilliAvax,
 				TransformSubnetTxFee:          100 * units.MilliAvax,
