@@ -165,7 +165,7 @@ func verifyAddValidatorTx(
 	}
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, false, err
 	}
@@ -458,7 +458,7 @@ func verifyAddDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +580,7 @@ func verifyAddPermissionlessValidatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -727,7 +727,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
@@ -787,7 +787,7 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	// Verify the flowcheck
-	fee, err := feeCalculator.CalculateFee(sTx)
+	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
