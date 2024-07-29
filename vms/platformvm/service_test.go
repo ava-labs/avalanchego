@@ -375,8 +375,7 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	feeCalculator, err := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
 	createSubnetFee, err := feeCalculator.CalculateFee(&txs.CreateSubnetTx{})
 	require.NoError(err)
 
