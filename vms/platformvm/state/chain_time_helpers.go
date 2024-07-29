@@ -75,7 +75,7 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
-func PickFeeCalculator(cfg *config.Config, state Chain) (fee.Calculator, error) {
+func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
 	timestamp := state.GetTimestamp()
-	return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, timestamp), nil
+	return fee.NewStaticCalculator(cfg.StaticFeeConfig, cfg.UpgradeConfig, timestamp)
 }
