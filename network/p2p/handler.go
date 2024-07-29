@@ -15,6 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+// Standardized identifiers for application protocol handlers
+const (
+	TxGossipHandlerID = iota
+	AtomicTxGossipHandlerID
+	// SignatureRequestHandlerID is specified in ACP-118: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
+	SignatureRequestHandlerID
+)
+
 var (
 	_ Handler = (*NoOpHandler)(nil)
 	_ Handler = (*TestHandler)(nil)
