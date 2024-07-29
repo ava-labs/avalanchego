@@ -278,7 +278,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -396,7 +396,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		childBlk.SignedBlock = childSlb
 
 		err = childBlk.Verify(context.Background())
-		require.ErrorIs(err, errProposerWindowNotStarted)
+		require.ErrorIs(err, errUnexpectedProposer)
 	}
 
 	{

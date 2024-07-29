@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 )
@@ -72,7 +71,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	vm := &VM{
 		Config: Config{
 			ActivationTime:    time.Unix(0, 0),
-			DurangoTime:       time.Unix(0, 0),
+			DurangoTime:       defaultTestingDurangoTime,
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
@@ -109,7 +108,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -200,7 +199,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
+		require.NotEqual(ids.EmptyNodeID, childBlk.Proposer()) // ensure not unsigned block
 	}
 
 	{
@@ -215,7 +214,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
+		require.NotEqual(ids.EmptyNodeID, childBlk.Proposer()) // ensure not unsigned block
 	}
 
 	{
@@ -229,126 +228,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		require.IsType(&postForkBlock{}, childBlkIntf)
 
 		childBlk := childBlkIntf.(*postForkBlock)
-		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
-	}
-}
-
-func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
-	require := require.New(t)
-	ctx := context.Background()
-
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(ctx))
-	}()
-
-	// Build a post fork block. It'll be the parent block in our test cases
-	parentTime := time.Now().Truncate(time.Second)
-	proVM.Set(parentTime)
-
-	coreParentBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return coreParentBlk, nil
-	}
-	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case coreParentBlk.ID():
-			return coreParentBlk, nil
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) { // needed when setting preference
-		switch {
-		case bytes.Equal(b, coreParentBlk.Bytes()):
-			return coreParentBlk, nil
-		case bytes.Equal(b, snowmantest.GenesisBytes):
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	parentBlk, err := proVM.BuildBlock(ctx)
-	require.NoError(err)
-	require.NoError(parentBlk.Verify(ctx))
-	require.NoError(parentBlk.Accept(ctx))
-
-	// Make sure preference is duly set
-	require.NoError(proVM.SetPreference(ctx, parentBlk.ID()))
-	require.Equal(proVM.preferred, parentBlk.ID())
-	_, err = proVM.getPostForkBlock(ctx, parentBlk.ID())
-	require.NoError(err)
-
-	// Mark node as non validator
-	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-		var (
-			aValidator = ids.GenerateTestNodeID()
-
-			// a validator with a weight large enough to fully fill the proposers list
-			weight = uint64(proposer.MaxBuildWindows * 2)
-		)
-		return map[ids.NodeID]*validators.GetValidatorOutput{
-			aValidator: {
-				NodeID: aValidator,
-				Weight: weight,
-			},
-		}, nil
-	}
-
-	coreChildBlk := snowmantest.BuildChild(coreParentBlk)
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return coreChildBlk, nil
-	}
-
-	{
-		// Set local clock before MaxVerifyDelay from parent timestamp.
-		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
-		proVM.Set(localTime)
-
-		_, err := proVM.BuildBlock(ctx)
-		require.ErrorIs(err, errProposerWindowNotStarted)
-	}
-
-	{
-		// Set local clock exactly MaxVerifyDelay from parent timestamp.
-		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
-		proVM.Set(localTime)
-
-		_, err := proVM.BuildBlock(ctx)
-		require.ErrorIs(err, errProposerWindowNotStarted)
-	}
-
-	{
-		// Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
-		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
-		proVM.Set(localTime)
-
-		_, err := proVM.BuildBlock(ctx)
-		require.ErrorIs(err, errProposerWindowNotStarted)
-	}
-
-	{
-		// Set local clock after MaxBuildDelay from parent timestamp
-		// Check that child block is built and it is unsigned
-		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
-		proVM.Set(localTime)
-
-		childBlkIntf, err := proVM.BuildBlock(ctx)
-		require.NoError(err)
-		require.IsType(&postForkBlock{}, childBlkIntf)
-
-		childBlk := childBlkIntf.(*postForkBlock)
-		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
+		require.NotEqual(ids.EmptyNodeID, childBlk.Proposer()) // ensure not unsigned block
 	}
 }
 
@@ -385,7 +265,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 	vm := &VM{
 		Config: Config{
 			ActivationTime:    time.Unix(0, 0),
-			DurangoTime:       time.Unix(0, 0),
+			DurangoTime:       defaultTestingDurangoTime,
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),

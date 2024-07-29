@@ -49,7 +49,8 @@ var (
 	pTestSigner crypto.Signer
 	pTestCert   *staking.Certificate
 
-	defaultPChainHeight uint64 = 2000
+	defaultPChainHeight       uint64 = 2000
+	defaultTestingDurangoTime        = time.Unix(0, 0)
 
 	errUnknownBlock      = errors.New("unknown block")
 	errUnverifiedBlock   = errors.New("unverified block")
@@ -638,7 +639,7 @@ func TestPreFork_Initialize(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -661,7 +662,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -694,7 +695,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -727,7 +728,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -802,7 +803,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -928,7 +929,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	// Because we are now building on a different block, the proposer window
 	// shouldn't have started.
 	_, err = proVM.BuildBlock(context.Background())
-	require.ErrorIs(err, errProposerWindowNotStarted)
+	require.ErrorIs(err, errUnexpectedProposer)
 
 	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxBuildDelay))
 	proVM.Scheduler.SetBuildBlockTime(time.Now())
@@ -1120,7 +1121,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1200,7 +1201,7 @@ func TestInnerVMRollback(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1235,7 +1236,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1324,7 +1325,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1396,7 +1397,7 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1430,7 +1431,7 @@ func TestTooFarAdvanced(t *testing.T) {
 	}
 
 	err = bBlock.Verify(context.Background())
-	require.ErrorIs(err, errProposerWindowNotStarted)
+	require.ErrorIs(err, errUnexpectedProposer)
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
@@ -1469,7 +1470,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1588,7 +1589,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1759,7 +1760,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -1894,7 +1895,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2004,7 +2005,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		innerVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2206,7 +2207,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         mockable.MaxTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
@@ -2298,7 +2299,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
@@ -2343,7 +2344,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: newNumHistoricalBlocks,

@@ -139,6 +139,7 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	vm.ctx = chainCtx
+	vm.lastAcceptedTime = time.Unix(0, 0)
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
@@ -505,7 +506,7 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 		// If the last accepted block wasn't a PostFork block, then we don't
 		// initialize the metadata.
 		vm.lastAcceptedHeight = 0
-		vm.lastAcceptedTime = time.Time{}
+		vm.lastAcceptedTime = time.Unix(0, 0)
 		return nil
 	}
 	if err != nil {

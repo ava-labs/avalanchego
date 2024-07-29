@@ -528,7 +528,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		coreVM,
 		Config{
 			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

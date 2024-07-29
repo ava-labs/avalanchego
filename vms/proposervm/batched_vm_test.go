@@ -965,7 +965,7 @@ func initTestRemoteProposerVM(
 		coreVM,
 		Config{
 			ActivationTime:      activationTime,
-			DurangoTime:         durangoTime,
+			DurangoTime:         defaultTestingDurangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
