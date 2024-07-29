@@ -280,7 +280,6 @@ func addSubnet(env *environment) {
 	if err != nil {
 		panic(err)
 	}
-
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
