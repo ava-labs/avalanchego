@@ -15,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -67,11 +69,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	if err != nil {
-		return err
-	}
-
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
@@ -131,10 +129,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	if err != nil {
-		return err
-	}
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
 	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 
@@ -382,7 +377,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	feeCalculator fee.Calculator,
+	feeCalculator txfee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -431,7 +426,7 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
-	feeCalculator fee.Calculator,
+	feeCalculator txfee.Calculator,
 	onAcceptState state.Diff,
 ) error {
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
@@ -455,19 +450,42 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculator, state state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(
+	txs []*txs.Tx,
+	feeCalculator txfee.Calculator,
+	state state.Diff,
+	parentID ids.ID,
+) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
 	error,
 ) {
+	timestamp := state.GetTimestamp()
+	isEtnaActivated := v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(timestamp)
+
 	var (
-		onAcceptFunc   func()
-		inputs         set.Set[ids.ID]
-		funcs          = make([]func(), 0, len(txs))
-		atomicRequests = make(map[ids.ID]*atomic.Requests)
+		blockComplexity feecomponent.Dimensions
+		onAcceptFunc    func()
+		inputs          set.Set[ids.ID]
+		funcs           = make([]func(), 0, len(txs))
+		atomicRequests  = make(map[ids.ID]*atomic.Requests)
 	)
 	for _, tx := range txs {
+		if isEtnaActivated {
+			txComplexity, err := txfee.TxComplexity(tx.Unsigned)
+			if err != nil {
+				txID := tx.ID()
+				v.MarkDropped(txID, err) // cache tx as dropped
+				return nil, nil, nil, err
+			}
+
+			blockComplexity, err = blockComplexity.Add(&txComplexity)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
+
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,
 			State:         state,
@@ -502,6 +520,21 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
 			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
 		}
+	}
+
+	if isEtnaActivated {
+		blockGas, err := blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		feeComplexity := state.GetFeeComplexity()
+		feeComplexity, err = feeComplexity.ConsumeGas(blockGas)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		state.SetFeeComplexity(feeComplexity)
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {

@@ -24,8 +24,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -243,7 +245,7 @@ func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
 		return nil, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	return packBlockTxs(
+	return packDurangoBlockTxs(
 		preferredID,
 		preferredState,
 		b.Mempool,
@@ -263,7 +265,7 @@ func buildBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (block.Block, error) {
-	blockTxs, err := packBlockTxs(
+	blockTxs, err := packDurangoBlockTxs(
 		parentID,
 		parentState,
 		builder.Mempool,
@@ -313,7 +315,7 @@ func buildBlock(
 	)
 }
 
-func packBlockTxs(
+func packDurangoBlockTxs(
 	parentID ids.ID,
 	parentState state.Chain,
 	mempool mempool.Mempool,
@@ -331,14 +333,10 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff)
-	if err != nil {
-		return nil, err
-	}
-
 	var (
-		blockTxs []*txs.Tx
-		inputs   set.Set[ids.ID]
+		blockTxs      []*txs.Tx
+		inputs        set.Set[ids.ID]
+		feeCalculator = state.PickFeeCalculator(backend.Config, stateDiff)
 	)
 	for {
 		tx, exists := mempool.Peek()
@@ -392,6 +390,100 @@ func packBlockTxs(
 		}
 
 		remainingSize -= txSize
+		blockTxs = append(blockTxs, tx)
+	}
+
+	return blockTxs, nil
+}
+
+func packEtnaBlockTxs(
+	parentID ids.ID,
+	parentState state.Chain,
+	mempool mempool.Mempool,
+	backend *txexecutor.Backend,
+	manager blockexecutor.Manager,
+	timestamp time.Time,
+	capacity feecomponent.Gas,
+) ([]*txs.Tx, error) {
+	stateDiff, err := state.NewDiffOn(parentState)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := txexecutor.AdvanceTimeTo(backend, stateDiff, timestamp); err != nil {
+		return nil, err
+	}
+
+	var (
+		blockTxs        []*txs.Tx
+		inputs          set.Set[ids.ID]
+		blockComplexity feecomponent.Dimensions
+		feeCalculator   = state.PickFeeCalculator(backend.Config, stateDiff)
+	)
+	for {
+		tx, exists := mempool.Peek()
+		if !exists {
+			break
+		}
+
+		txComplexity, err := txfee.TxComplexity(tx.Unsigned)
+		if err != nil {
+			return nil, err
+		}
+		newBlockComplexity, err := blockComplexity.Add(&txComplexity)
+		if err != nil {
+			return nil, err
+		}
+		newBlockGas, err := newBlockComplexity.ToGas(backend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, err
+		}
+		if newBlockGas > capacity {
+			break
+		}
+		mempool.Remove(tx)
+
+		// Invariant: [tx] has already been syntactically verified.
+
+		txDiff, err := state.NewDiffOn(stateDiff)
+		if err != nil {
+			return nil, err
+		}
+
+		executor := &txexecutor.StandardTxExecutor{
+			Backend:       backend,
+			State:         txDiff,
+			FeeCalculator: feeCalculator,
+			Tx:            tx,
+		}
+
+		err = tx.Unsigned.Visit(executor)
+		if err != nil {
+			txID := tx.ID()
+			mempool.MarkDropped(txID, err)
+			continue
+		}
+
+		if inputs.Overlaps(executor.Inputs) {
+			txID := tx.ID()
+			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
+			continue
+		}
+		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
+		if err != nil {
+			txID := tx.ID()
+			mempool.MarkDropped(txID, err)
+			continue
+		}
+		inputs.Union(executor.Inputs)
+
+		txDiff.AddTx(tx, status.Committed)
+		err = txDiff.Apply(stateDiff)
+		if err != nil {
+			return nil, err
+		}
+
+		blockComplexity = newBlockComplexity
 		blockTxs = append(blockTxs, tx)
 	}
 

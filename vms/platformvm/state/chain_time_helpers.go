@@ -75,9 +75,21 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
-func PickFeeCalculator(cfg *config.Config, state Chain) (fee.Calculator, error) {
+func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
 	timestamp := state.GetTimestamp()
-	return NewStaticFeeCalculator(cfg, timestamp), nil
+	if !cfg.UpgradeConfig.IsEActivated(timestamp) {
+		return NewStaticFeeCalculator(cfg, timestamp)
+	}
+
+	feeComplexity := state.GetFeeComplexity()
+	gasPrice := cfg.DynamicFeeConfig.MinGasPrice.MulExp(
+		feeComplexity.Excess,
+		cfg.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	return fee.NewDynamicCalculator(
+		cfg.DynamicFeeConfig.Weights,
+		gasPrice,
+	)
 }
 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set

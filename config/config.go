@@ -765,7 +765,8 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		return genesis.TxFeeConfig{
-			StaticConfig: fee.StaticConfig{
+			CreateAssetTxFee: v.GetUint64(CreateAssetTxFeeKey),
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         v.GetUint64(TxFeeKey),
 				CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
 				TransformSubnetTxFee:          v.GetUint64(TransformSubnetTxFeeKey),
@@ -775,7 +776,8 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				AddSubnetValidatorFee:         v.GetUint64(AddSubnetValidatorFeeKey),
 				AddSubnetDelegatorFee:         v.GetUint64(AddSubnetDelegatorFeeKey),
 			},
-			CreateAssetTxFee: v.GetUint64(CreateAssetTxFeeKey),
+			// TODO: Set these values via flags
+			DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
 		}
 	}
 	return genesis.GetTxFeeConfig(networkID)

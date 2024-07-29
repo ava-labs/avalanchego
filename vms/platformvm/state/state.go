@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -97,6 +98,9 @@ type Chain interface {
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
+
+	GetFeeComplexity() fee.State
+	SetFeeComplexity(f fee.State)
 
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
@@ -353,6 +357,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
+	feeState, persistedFeeState           fee.State
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -1005,6 +1010,16 @@ func (s *state) SetTimestamp(tm time.Time) {
 	s.timestamp = tm
 }
 
+func (s *state) GetFeeComplexity() fee.State {
+	fmt.Println("returning", s.feeState)
+	return s.feeState
+}
+
+func (s *state) SetFeeComplexity(feeState fee.State) {
+	fmt.Println("setting", feeState)
+	s.feeState = feeState
+}
+
 func (s *state) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
@@ -1286,6 +1301,8 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
+
+	// TODO: Load fee state
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -2260,6 +2277,10 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
+	}
+	if s.feeState != s.persistedFeeState {
+		// TODO: Write new fee state
+		s.persistedFeeState = s.feeState
 	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {

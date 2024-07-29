@@ -165,12 +165,22 @@ func AdvanceTimeTo(
 		changed = true
 	}
 
-	if err := changes.Apply(parentState); err != nil {
-		return false, err
+	if backend.Config.UpgradeConfig.IsEActivated(newChainTime) {
+		previousChainTime := changes.GetTimestamp()
+		duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+		feeComplexity := changes.GetFeeComplexity()
+		feeComplexity = feeComplexity.AdvanceTime(
+			backend.Config.DynamicFeeConfig.MaxGasCapacity,
+			backend.Config.DynamicFeeConfig.MaxGasPerSecond,
+			backend.Config.DynamicFeeConfig.TargetGasPerSecond,
+			duration,
+		)
+		changes.SetFeeComplexity(feeComplexity)
 	}
 
-	parentState.SetTimestamp(newChainTime)
-	return changed, nil
+	changes.SetTimestamp(newChainTime)
+	return changed, changes.Apply(parentState)
 }
 
 func GetRewardsCalculator(

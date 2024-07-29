@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -34,6 +35,7 @@ type diff struct {
 	stateVersions Versions
 
 	timestamp time.Time
+	feeState  fee.State
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -71,6 +73,7 @@ func NewDiff(
 		parentID:      parentID,
 		stateVersions: stateVersions,
 		timestamp:     parentState.GetTimestamp(),
+		feeState:      parentState.GetFeeComplexity(),
 		subnetOwners:  make(map[ids.ID]fx.Owner),
 	}, nil
 }
@@ -95,6 +98,16 @@ func (d *diff) GetTimestamp() time.Time {
 
 func (d *diff) SetTimestamp(timestamp time.Time) {
 	d.timestamp = timestamp
+}
+
+func (d *diff) GetFeeComplexity() fee.State {
+	fmt.Println("returning", d.feeState)
+	return d.feeState
+}
+
+func (d *diff) SetFeeComplexity(feeState fee.State) {
+	fmt.Println("setting", feeState)
+	d.feeState = feeState
 }
 
 func (d *diff) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
