@@ -8,6 +8,7 @@ set -euo pipefail
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
 DEFAULT_PLUGIN_DIR="${HOME}/.avalanchego/plugins"
+DEFAULT_VM_ID="srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
