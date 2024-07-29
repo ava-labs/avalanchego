@@ -35,8 +35,8 @@ type StakingConfig struct {
 }
 
 type TxFeeConfig struct {
-	fee.StaticConfig
-	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
+	CreateAssetTxFee uint64           `json:"createAssetTxFee"`
+	StaticTxConfig   fee.StaticConfig `json:"staticTxConfig"`
 }
 
 type Params struct {
