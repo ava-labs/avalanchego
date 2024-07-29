@@ -61,8 +61,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, onAbortState)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(env.config, onAbortState)
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -166,8 +165,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, onAbortState)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(env.config, onAbortState)
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -327,8 +325,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -473,8 +470,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,
@@ -700,8 +696,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	delOnAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, delOnCommitState)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(env.config, delOnCommitState)
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: delOnCommitState,
 		OnAbortState:  delOnAbortState,
@@ -866,8 +861,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	feeCalculator, err := state.PickFeeCalculator(env.config, onCommitState)
-	require.NoError(err)
+	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
 		OnAbortState:  onAbortState,

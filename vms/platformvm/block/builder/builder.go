@@ -331,14 +331,10 @@ func packBlockTxs(
 		return nil, err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(backend.Config, stateDiff)
-	if err != nil {
-		return nil, err
-	}
-
 	var (
-		blockTxs []*txs.Tx
-		inputs   set.Set[ids.ID]
+		blockTxs      []*txs.Tx
+		inputs        set.Set[ids.ID]
+		feeCalculator = state.PickFeeCalculator(backend.Config, stateDiff)
 	)
 	for {
 		tx, exists := mempool.Peek()
