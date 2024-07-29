@@ -7,6 +7,7 @@ import "github.com/ava-labs/avalanchego/utils"
 
 var _ Cacher[struct{}, struct{}] = (*Empty[struct{}, struct{}])(nil)
 
+// Empty is a cache that doesn't store anything.
 type Empty[K any, V any] struct{}
 
 func (*Empty[K, V]) Put(K, V) {}

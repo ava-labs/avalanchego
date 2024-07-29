@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -69,7 +69,7 @@ var (
 type Service struct {
 	vm                    *VM
 	addrManager           avax.AddressManager
-	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
+	stakerAttributesCache *lru.Cache[ids.ID, *stakerAttributes]
 }
 
 // All attributes are optional and may not be filled for each stakerTx.

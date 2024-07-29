@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -324,7 +325,7 @@ func NewPushGossiper[T Gossipable](
 		tracking:   make(map[ids.ID]*tracking),
 		toGossip:   buffer.NewUnboundedDeque[T](0),
 		toRegossip: buffer.NewUnboundedDeque[T](0),
-		discarded:  &cache.LRU[ids.ID, struct{}]{Size: discardedSize},
+		discarded:  lru.NewCache[ids.ID, struct{}](discardedSize),
 	}, nil
 }
 
@@ -346,7 +347,7 @@ type PushGossiper[T Gossipable] struct {
 	addedTimeSum float64 // unix nanoseconds
 	toGossip     buffer.Deque[T]
 	toRegossip   buffer.Deque[T]
-	discarded    *cache.LRU[ids.ID, struct{}] // discarded attempts to avoid overgossiping transactions that are frequently dropped
+	discarded    *lru.Cache[ids.ID, struct{}] // discarded attempts to avoid overgossiping transactions that are frequently dropped
 }
 
 type BranchingFactor struct {

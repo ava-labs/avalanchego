@@ -1,32 +1,31 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cache
+package lru
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache/cachetest"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestSizedLRU(t *testing.T) {
-	cache := NewSizedLRU[ids.ID, int64](TestIntSize, TestIntSizeFunc)
-
-	TestBasic(t, cache)
+func TestSizedCache(t *testing.T) {
+	c := NewSizedCache[ids.ID, int64](cachetest.IntSize, cachetest.IntSizeFunc)
+	cachetest.Basic(t, c)
 }
 
-func TestSizedLRUEviction(t *testing.T) {
-	cache := NewSizedLRU[ids.ID, int64](2*TestIntSize, TestIntSizeFunc)
-
-	TestEviction(t, cache)
+func TestSizedCacheEviction(t *testing.T) {
+	c := NewSizedCache[ids.ID, int64](2*cachetest.IntSize, cachetest.IntSizeFunc)
+	cachetest.Eviction(t, c)
 }
 
-func TestSizedLRUWrongKeyEvictionRegression(t *testing.T) {
+func TestSizedCacheWrongKeyEvictionRegression(t *testing.T) {
 	require := require.New(t)
 
-	cache := NewSizedLRU[string, struct{}](
+	cache := NewSizedCache[string, struct{}](
 		3,
 		func(key string, _ struct{}) int {
 			return len(key)

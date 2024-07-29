@@ -5,6 +5,7 @@ package state
 
 import (
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -28,9 +29,9 @@ type prefixedState struct {
 func newPrefixedState(state *state, idCacheSizes int) *prefixedState {
 	return &prefixedState{
 		state:     state,
-		vtx:       &cache.LRU[ids.ID, ids.ID]{Size: idCacheSizes},
-		status:    &cache.LRU[ids.ID, ids.ID]{Size: idCacheSizes},
-		uniqueVtx: &cache.EvictableLRU[ids.ID, *uniqueVertex]{Size: idCacheSizes},
+		vtx:       lru.NewCache[ids.ID, ids.ID](idCacheSizes),
+		status:    lru.NewCache[ids.ID, ids.ID](idCacheSizes),
+		uniqueVtx: lru.NewDeduplicator[ids.ID, *uniqueVertex](idCacheSizes),
 	}
 }
 
