@@ -12,21 +12,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const Alias = "P"
 
 type Context struct {
-	NetworkID                     uint32
-	AVAXAssetID                   ids.ID
-	BaseTxFee                     uint64
-	CreateSubnetTxFee             uint64
-	TransformSubnetTxFee          uint64
-	CreateBlockchainTxFee         uint64
-	AddPrimaryNetworkValidatorFee uint64
-	AddPrimaryNetworkDelegatorFee uint64
-	AddSubnetValidatorFee         uint64
-	AddSubnetDelegatorFee         uint64
+	NetworkID       uint32
+	AVAXAssetID     ids.ID
+	StaticFeeConfig fee.StaticConfig
 }
 
 func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
@@ -56,16 +50,18 @@ func NewContextFromClients(
 	}
 
 	return &Context{
-		NetworkID:                     networkID,
-		AVAXAssetID:                   asset.AssetID,
-		BaseTxFee:                     uint64(txFees.TxFee),
-		CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
-		TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
-		CreateBlockchainTxFee:         uint64(txFees.CreateBlockchainTxFee),
-		AddPrimaryNetworkValidatorFee: uint64(txFees.AddPrimaryNetworkValidatorFee),
-		AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
-		AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
-		AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+		NetworkID:   networkID,
+		AVAXAssetID: asset.AssetID,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                         uint64(txFees.TxFee),
+			CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
+			TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
+			CreateBlockchainTxFee:         uint64(txFees.CreateBlockchainTxFee),
+			AddPrimaryNetworkValidatorFee: uint64(txFees.AddPrimaryNetworkValidatorFee),
+			AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
+			AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
+			AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+		},
 	}, nil
 }
 
