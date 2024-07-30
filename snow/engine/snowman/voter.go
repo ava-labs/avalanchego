@@ -17,7 +17,7 @@ var _ job.Job[ids.ID] = (*voter)(nil)
 
 // Voter records chits received from [nodeID] once its dependencies are met.
 type voter struct {
-	t               *Transitive
+	e               *Engine
 	nodeID          ids.NodeID
 	requestID       uint32
 	responseOptions []ids.ID
@@ -36,7 +36,7 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	for i, voteOption := range v.responseOptions {
 		// To prevent any potential deadlocks with undisclosed dependencies,
 		// votes must be bubbled to the nearest valid block
-		vote, shouldVote = v.t.getProcessingAncestor(voteOption)
+		vote, shouldVote = v.e.getProcessingAncestor(voteOption)
 		if shouldVote {
 			voteIndex = i
 			break
@@ -45,10 +45,10 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 
 	var results []bag.Bag[ids.ID]
 	if shouldVote {
-		v.t.selectedVoteIndex.Observe(float64(voteIndex))
-		results = v.t.polls.Vote(v.requestID, v.nodeID, vote)
+		v.e.selectedVoteIndex.Observe(float64(voteIndex))
+		results = v.e.polls.Vote(v.requestID, v.nodeID, vote)
 	} else {
-		results = v.t.polls.Drop(v.requestID, v.nodeID)
+		results = v.e.polls.Drop(v.requestID, v.nodeID)
 	}
 
 	if len(results) == 0 {
@@ -57,24 +57,24 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 
 	for _, result := range results {
 		result := result
-		v.t.Ctx.Log.Debug("finishing poll",
+		v.e.Ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),
 		)
-		if err := v.t.Consensus.RecordPoll(ctx, result); err != nil {
+		if err := v.e.Consensus.RecordPoll(ctx, result); err != nil {
 			return err
 		}
 	}
 
-	if err := v.t.VM.SetPreference(ctx, v.t.Consensus.Preference()); err != nil {
+	if err := v.e.VM.SetPreference(ctx, v.e.Consensus.Preference()); err != nil {
 		return err
 	}
 
-	if v.t.Consensus.NumProcessing() == 0 {
-		v.t.Ctx.Log.Debug("Snowman engine can quiesce")
+	if v.e.Consensus.NumProcessing() == 0 {
+		v.e.Ctx.Log.Debug("Snowman engine can quiesce")
 		return nil
 	}
 
-	v.t.Ctx.Log.Debug("Snowman engine can't quiesce")
-	v.t.repoll(ctx)
+	v.e.Ctx.Log.Debug("Snowman engine can't quiesce")
+	v.e.repoll(ctx)
 	return nil
 }

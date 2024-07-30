@@ -4,11 +4,8 @@
 package fee
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
 var (
@@ -16,29 +13,19 @@ var (
 	_ txs.Visitor = (*staticVisitor)(nil)
 )
 
-func NewStaticCalculator(
-	config StaticConfig,
-	upgradeTimes upgrade.Config,
-	chainTime time.Time,
-) Calculator {
+func NewStaticCalculator(config StaticConfig) Calculator {
 	return &staticCalculator{
-		upgrades: upgradeTimes,
-		config:   config,
-		time:     chainTime,
+		config: config,
 	}
 }
 
 type staticCalculator struct {
-	config   StaticConfig
-	upgrades upgrade.Config
-	time     time.Time
+	config StaticConfig
 }
 
 func (c *staticCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 	v := staticVisitor{
-		config:   c.config,
-		upgrades: c.upgrades,
-		time:     c.time,
+		config: c.config,
 	}
 	err := tx.Visit(&v)
 	return v.fee, err
@@ -46,12 +33,18 @@ func (c *staticCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 
 type staticVisitor struct {
 	// inputs
-	config   StaticConfig
-	upgrades upgrade.Config
-	time     time.Time
+	config StaticConfig
 
 	// outputs
 	fee uint64
+}
+
+func (*staticVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return ErrUnsupportedTx
+}
+
+func (*staticVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return ErrUnsupportedTx
 }
 
 func (c *staticVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
@@ -70,30 +63,12 @@ func (c *staticVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
 }
 
 func (c *staticVisitor) CreateChainTx(*txs.CreateChainTx) error {
-	if c.upgrades.IsApricotPhase3Activated(c.time) {
-		c.fee = c.config.CreateBlockchainTxFee
-	} else {
-		c.fee = c.config.CreateAssetTxFee
-	}
+	c.fee = c.config.CreateBlockchainTxFee
 	return nil
 }
 
 func (c *staticVisitor) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	if c.upgrades.IsApricotPhase3Activated(c.time) {
-		c.fee = c.config.CreateSubnetTxFee
-	} else {
-		c.fee = c.config.CreateAssetTxFee
-	}
-	return nil
-}
-
-func (c *staticVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
-	c.fee = 0 // no fees
-	return nil
-}
-
-func (c *staticVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
-	c.fee = 0 // no fees
+	c.fee = c.config.CreateSubnetTxFee
 	return nil
 }
 
