@@ -704,7 +704,16 @@ func TestPersistStakers(t *testing.T) {
 
 func newInitializedState(require *require.Assertions) State {
 	s, _ := newUninitializedState(require)
+	initializeState(require, s)
+	return s
+}
 
+func newUninitializedState(require *require.Assertions) (*state, database.Database) {
+	db := memdb.New()
+	return newStateFromDB(require, db), db
+}
+
+func initializeState(require *require.Assertions, s *state) {
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
 			NodeID: initialNodeID,
@@ -765,13 +774,6 @@ func newInitializedState(require *require.Assertions) State {
 	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
 	require.NoError(s.syncGenesis(genesisBlk, genesisState))
-
-	return s
-}
-
-func newUninitializedState(require *require.Assertions) (*state, database.Database) {
-	db := memdb.New()
-	return newStateFromDB(require, db), db
 }
 
 func newStateFromDB(require *require.Assertions, db database.Database) *state {
@@ -1490,6 +1492,24 @@ func makeBlocks(require *require.Assertions) []block.Block {
 	return blks
 }
 
+func TestStateFeeState(t *testing.T) {
+	require := require.New(t)
+
+	s, db := newUninitializedState(require)
+	initializeState(require, s)
+
+	expectedFeeState := fee.State{
+		Capacity: 1,
+		Excess:   2,
+	}
+	s.SetFeeState(expectedFeeState)
+	require.NoError(s.Commit())
+
+	s = newStateFromDB(require, db)
+	require.NoError(s.load())
+	require.Equal(expectedFeeState, s.GetFeeState())
+}
+
 func TestPutFeeState(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1511,6 +1531,21 @@ func TestPutFeeState(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			},
 		},
+		{
+			name: "populated fee state",
+			feeState: fee.State{
+				Capacity: 0x1234567890ABCDEF,
+				Excess:   0xFEDCBA0987654321,
+			},
+			expectedBytes: []byte{
+				// codec version
+				0x00, 0x00,
+				// capacity
+				0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF,
+				// excess
+				0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21,
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1524,6 +1559,81 @@ func TestPutFeeState(t *testing.T) {
 			actualBytes, err := db.Get(FeeStateKey)
 			require.NoError(err)
 			require.Equal(test.expectedBytes, actualBytes)
+		})
+	}
+}
+
+func TestGetFeeState(t *testing.T) {
+	tests := []struct {
+		name          string
+		value         []byte
+		expectedState fee.State
+		expectedErr   error
+	}{
+		{
+			name:          "not found",
+			value:         nil,
+			expectedState: fee.State{},
+			expectedErr:   nil,
+		},
+		{
+			name: "empty fee state",
+			value: []byte{
+				// codec version
+				0x00, 0x00,
+				// capacity
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				// excess
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			},
+			expectedState: fee.State{
+				Capacity: 0,
+				Excess:   0,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "populated fee state",
+			value: []byte{
+				// codec version
+				0x00, 0x00,
+				// capacity
+				0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF,
+				// excess
+				0xFE, 0xDC, 0xBA, 0x09, 0x87, 0x65, 0x43, 0x21,
+			},
+			expectedState: fee.State{
+				Capacity: 0x1234567890ABCDEF,
+				Excess:   0xFEDCBA0987654321,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "invalid bytes",
+			value: []byte{
+				// codec version
+				0x00, 0x00,
+				// truncated capacity
+				0x12, 0x34, 0x56, 0x78,
+			},
+			expectedState: fee.State{},
+			expectedErr:   wrappers.ErrInsufficientLength,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				require = require.New(t)
+				db      = memdb.New()
+			)
+
+			if test.value != nil {
+				require.NoError(db.Put(FeeStateKey, test.value))
+			}
+
+			actualState, err := getFeeState(db)
+			require.Equal(test.expectedState, actualState)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }
