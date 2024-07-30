@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -61,12 +62,12 @@ type Builder interface {
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
 
-	// PackBlockTxs returns an array of txs that can fit into a valid block of
-	// size [targetBlockSize]. The returned txs are all verified against the
-	// preferred state.
+	// PackAllBlockTxs returns an array of all txs that could be packed into a
+	// valid block of infinite size. The returned txs are all verified against
+	// the preferred state.
 	//
 	// Note: This function does not call the consensus engine.
-	PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error)
+	PackAllBlockTxs() ([]*txs.Tx, error)
 }
 
 // builder implements a simple builder to convert txs into valid blocks
@@ -236,7 +237,7 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 	return b.blkManager.NewBlock(statelessBlk), nil
 }
 
-func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
+func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 	preferredID := b.blkManager.Preferred()
 	preferredState, ok := b.blkManager.GetState(preferredID)
 	if !ok {
@@ -250,7 +251,7 @@ func (b *builder) PackBlockTxs(targetBlockSize int) ([]*txs.Tx, error) {
 		b.txExecutorBackend,
 		b.blkManager,
 		b.txExecutorBackend.Clk.Time(),
-		targetBlockSize,
+		math.MaxInt,
 	)
 }
 
