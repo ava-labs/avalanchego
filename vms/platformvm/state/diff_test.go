@@ -269,9 +269,12 @@ func TestDiffSubnet(t *testing.T) {
 	// Verify parent returns one subnet
 	subnetIDs, err := state.GetSubnetIDs()
 	require.NoError(err)
-	require.Equal([]ids.ID{
-		parentStateCreateSubnetTx.ID(),
-	}, subnetIDs)
+	require.Equal(
+		[]ids.ID{
+			parentStateCreateSubnetTx.ID(),
+		},
+		subnetIDs,
+	)
 
 	diff, err := NewDiffOn(state)
 	require.NoError(err)
@@ -290,10 +293,13 @@ func TestDiffSubnet(t *testing.T) {
 	// Verify parent now returns two subnets
 	subnetIDs, err = state.GetSubnetIDs()
 	require.NoError(err)
-	require.Equal([]ids.ID{
-		parentStateCreateSubnetTx.ID(),
-		createSubnetTx.ID(),
-	}, subnetIDs)
+	require.Equal(
+		[]ids.ID{
+			parentStateCreateSubnetTx.ID(),
+			createSubnetTx.ID(),
+		},
+		subnetIDs,
+	)
 }
 
 func TestDiffChain(t *testing.T) {
@@ -313,9 +319,12 @@ func TestDiffChain(t *testing.T) {
 	// Verify parent returns one chain
 	chains, err := state.GetChains(subnetID)
 	require.NoError(err)
-	require.Equal([]*txs.Tx{
-		parentStateCreateChainTx,
-	}, chains)
+	require.Equal(
+		[]*txs.Tx{
+			parentStateCreateChainTx,
+		},
+		chains,
+	)
 
 	diff, err := NewDiffOn(state)
 	require.NoError(err)
@@ -334,10 +343,13 @@ func TestDiffChain(t *testing.T) {
 	// Verify parent now returns two chains
 	chains, err = state.GetChains(subnetID)
 	require.NoError(err)
-	require.Equal([]*txs.Tx{
-		parentStateCreateChainTx,
-		createChainTx,
-	}, chains)
+	require.Equal(
+		[]*txs.Tx{
+			parentStateCreateChainTx,
+			createChainTx,
+		},
+		chains,
+	)
 }
 
 func TestDiffTx(t *testing.T) {
@@ -428,10 +440,13 @@ func TestDiffRewardUTXO(t *testing.T) {
 	// Verify parent now returns two reward UTXOs
 	rewardUTXOs, err = state.GetRewardUTXOs(txID)
 	require.NoError(err)
-	require.Equal([]*avax.UTXO{
-		parentRewardUTXO,
-		rewardUTXO,
-	}, rewardUTXOs)
+	require.Equal(
+		[]*avax.UTXO{
+			parentRewardUTXO,
+			rewardUTXO,
+		},
+		rewardUTXOs,
+	)
 }
 
 func TestDiffUTXO(t *testing.T) {
