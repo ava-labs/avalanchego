@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var gasPriceMulExpTests = []struct {
@@ -77,6 +79,55 @@ var gasPriceMulExpTests = []struct {
 		excessConversionConstant: math.MaxUint64,
 		expected:                 math.MaxUint64 - 1,
 	},
+}
+
+func Test_Gas_Cost(t *testing.T) {
+	tests := []struct {
+		gas          Gas
+		price        GasPrice
+		expectedCost uint64
+		expectedErr  error
+	}{
+		{
+			gas:          0,
+			price:        100,
+			expectedCost: 0,
+			expectedErr:  nil,
+		},
+		{
+			gas:          100,
+			price:        0,
+			expectedCost: 0,
+			expectedErr:  nil,
+		},
+		{
+			gas:          1,
+			price:        100,
+			expectedCost: 100,
+			expectedErr:  nil,
+		},
+		{
+			gas:          100,
+			price:        100,
+			expectedCost: 10000,
+			expectedErr:  nil,
+		},
+		{
+			gas:          2,
+			price:        math.MaxUint64,
+			expectedCost: 0,
+			expectedErr:  safemath.ErrOverflow,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%d*%d", test.gas, test.price), func(t *testing.T) {
+			require := require.New(t)
+
+			actual, err := test.gas.Cost(test.price)
+			require.Equal(test.expectedCost, actual)
+			require.ErrorIs(err, test.expectedErr)
+		})
+	}
 }
 
 func Test_Gas_AddPerSecond(t *testing.T) {
