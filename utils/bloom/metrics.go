@@ -4,9 +4,9 @@
 package bloom
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Metrics is a collection of commonly useful metrics when using a long-lived
@@ -50,7 +50,7 @@ func NewMetrics(
 			Help:      "Number times the bloom has been reset",
 		}),
 	}
-	err := utils.Err(
+	err := errors.Join(
 		registerer.Register(m.Count),
 		registerer.Register(m.NumHashes),
 		registerer.Register(m.NumEntries),

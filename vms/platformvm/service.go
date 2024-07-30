@@ -192,14 +192,14 @@ utxoFor:
 		switch out := utxo.Out.(type) {
 		case *secp256k1fx.TransferOutput:
 			if out.Locktime <= currentTime {
-				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
+				newBalance, err := safemath.Add(unlockeds[assetID], out.Amount())
 				if err != nil {
 					unlockeds[assetID] = math.MaxUint64
 				} else {
 					unlockeds[assetID] = newBalance
 				}
 			} else {
-				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
 					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
@@ -215,21 +215,21 @@ utxoFor:
 				)
 				continue utxoFor
 			case innerOut.Locktime > currentTime:
-				newBalance, err := safemath.Add64(lockedNotStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add(lockedNotStakeables[assetID], out.Amount())
 				if err != nil {
 					lockedNotStakeables[assetID] = math.MaxUint64
 				} else {
 					lockedNotStakeables[assetID] = newBalance
 				}
 			case out.Locktime <= currentTime:
-				newBalance, err := safemath.Add64(unlockeds[assetID], out.Amount())
+				newBalance, err := safemath.Add(unlockeds[assetID], out.Amount())
 				if err != nil {
 					unlockeds[assetID] = math.MaxUint64
 				} else {
 					unlockeds[assetID] = newBalance
 				}
 			default:
-				newBalance, err := safemath.Add64(lockedStakeables[assetID], out.Amount())
+				newBalance, err := safemath.Add(lockedStakeables[assetID], out.Amount())
 				if err != nil {
 					lockedStakeables[assetID] = math.MaxUint64
 				} else {
@@ -245,7 +245,7 @@ utxoFor:
 
 	balances := maps.Clone(lockedStakeables)
 	for assetID, amount := range lockedNotStakeables {
-		newBalance, err := safemath.Add64(balances[assetID], amount)
+		newBalance, err := safemath.Add(balances[assetID], amount)
 		if err != nil {
 			balances[assetID] = math.MaxUint64
 		} else {
@@ -253,7 +253,7 @@ utxoFor:
 		}
 	}
 	for assetID, amount := range unlockeds {
-		newBalance, err := safemath.Add64(balances[assetID], amount)
+		newBalance, err := safemath.Add(balances[assetID], amount)
 		if err != nil {
 			balances[assetID] = math.MaxUint64
 		} else {
@@ -1898,7 +1898,7 @@ func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked ma
 		}
 
 		assetID := output.AssetID()
-		newAmount, err := safemath.Add64(totalAmountStaked[assetID], secpOut.Amt)
+		newAmount, err := safemath.Add(totalAmountStaked[assetID], secpOut.Amt)
 		if err != nil {
 			newAmount = math.MaxUint64
 		}

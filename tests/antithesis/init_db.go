@@ -16,7 +16,7 @@ import (
 )
 
 // Given a path, compose the expected path of the bootstrap node's docker compose db volume.
-func GetBootstrapVolumePath(targetPath string) (string, error) {
+func getBootstrapVolumePath(targetPath string) (string, error) {
 	absPath, err := filepath.Abs(targetPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert target path to absolute path: %w", err)
@@ -27,7 +27,7 @@ func GetBootstrapVolumePath(targetPath string) (string, error) {
 // Bootstraps a local process-based network, creates its subnets and chains, and copies
 // the resulting db state from one of the nodes to the provided path. The path will be
 // created if it does not already exist.
-func InitBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir string, destPath string) error {
+func initBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir string, destPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
 	if err := tmpnet.BootstrapNewNetwork(

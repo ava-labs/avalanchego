@@ -24,7 +24,7 @@ func GetBalance(db UTXOReader, addrs set.Set[ids.ShortID]) (uint64, error) {
 	balance := uint64(0)
 	for _, utxo := range utxos {
 		if out, ok := utxo.Out.(Amounter); ok {
-			balance, err = safemath.Add64(out.Amount(), balance)
+			balance, err = safemath.Add(out.Amount(), balance)
 			if err != nil {
 				return 0, err
 			}
@@ -84,7 +84,7 @@ func GetPaginatedUTXOs(
 
 		utxoIDs, err := db.UTXOIDs(addr.Bytes(), start, searchSize) // Get UTXOs associated with [addr]
 		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
+			return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
 		for _, utxoID := range utxoIDs {
 			lastUTXOID = utxoID // The last searched UTXO - not the last found
@@ -95,7 +95,7 @@ func GetPaginatedUTXOs(
 
 			utxo, err := db.GetUTXO(utxoID)
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
 			}
 
 			utxos = append(utxos, utxo)

@@ -132,7 +132,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	nextBlkTime, _, err := executor.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
 	if err != nil {
 		return err
 	}
@@ -142,10 +142,12 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend: m.txExecutorBackend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       m.txExecutorBackend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            tx,
 	})
 }
 

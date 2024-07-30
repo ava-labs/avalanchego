@@ -315,7 +315,7 @@ func (b *builder) NewBaseTx(
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
-		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		amountToBurn, err := math.Add(toBurn[assetID], out.Out.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -630,7 +630,7 @@ func (b *builder) NewImportTx(
 		})
 
 		assetID := utxo.AssetID()
-		newImportedAmount, err := math.Add64(importedAmounts[assetID], out.Amt)
+		newImportedAmount, err := math.Add(importedAmounts[assetID], out.Amt)
 		if err != nil {
 			return nil, err
 		}
@@ -702,7 +702,7 @@ func (b *builder) NewExportTx(
 	}
 	for _, out := range outputs {
 		assetID := out.AssetID()
-		amountToBurn, err := math.Add64(toBurn[assetID], out.Out.Amount())
+		amountToBurn, err := math.Add(toBurn[assetID], out.Out.Amount())
 		if err != nil {
 			return nil, err
 		}
@@ -916,7 +916,7 @@ func (b *builder) getBalance(
 		}
 
 		assetID := utxo.AssetID()
-		balance[assetID], err = math.Add64(balance[assetID], out.Amt)
+		balance[assetID], err = math.Add(balance[assetID], out.Amt)
 		if err != nil {
 			return nil, err
 		}
@@ -1052,6 +1052,22 @@ func (b *builder) spend(
 		}
 	}
 
+	for assetID, amount := range amountsToStake {
+		if amount == 0 {
+			continue
+		}
+
+		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+			Asset: avax.Asset{
+				ID: assetID,
+			},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: *changeOwner,
+			},
+		})
+	}
+
 	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
@@ -1103,24 +1119,14 @@ func (b *builder) spend(
 		)
 		amountsToBurn[assetID] -= amountToBurn
 
-		amountAvalibleToStake := out.Amt - amountToBurn
+		amountAvailableToStake := out.Amt - amountToBurn
 		// Burn any value that should be burned
 		amountToStake := min(
 			remainingAmountToStake, // Amount we still need to stake
-			amountAvalibleToStake,  // Amount available to stake
+			amountAvailableToStake, // Amount available to stake
 		)
 		amountsToStake[assetID] -= amountToStake
-		if amountToStake > 0 {
-			// Some of this input was put for staking
-			stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
-					OutputOwners: *changeOwner,
-				},
-			})
-		}
-		if remainingAmount := amountAvalibleToStake - amountToStake; remainingAmount > 0 {
+		if remainingAmount := amountAvailableToStake - amountToStake; remainingAmount > 0 {
 			// This input had extra value, so some of it must be returned
 			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
 				Asset: utxo.Asset,

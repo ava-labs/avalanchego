@@ -77,10 +77,12 @@ func TestNewExportTx(t *testing.T) {
 
 			stateDiff.SetTimestamp(tt.timestamp)
 
+			feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
 			verifier := StandardTxExecutor{
-				Backend: &env.backend,
-				State:   stateDiff,
-				Tx:      tx,
+				Backend:       &env.backend,
+				FeeCalculator: feeCalculator,
+				State:         stateDiff,
+				Tx:            tx,
 			}
 			require.NoError(tx.Unsigned.Visit(&verifier))
 		})

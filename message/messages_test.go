@@ -649,7 +649,7 @@ func TestMessage(t *testing.T) {
 			require.Equal(tv.op, encodedMsg.Op())
 
 			if bytesSaved := encodedMsg.BytesSavedCompression(); tv.bytesSaved {
-				require.Greater(bytesSaved, 0)
+				require.Positive(bytesSaved)
 			}
 
 			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})

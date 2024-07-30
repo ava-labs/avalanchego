@@ -4,9 +4,9 @@
 package metercacher
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -78,7 +78,7 @@ func newMetrics(
 			Help:      "fraction of cache filled",
 		}),
 	}
-	return m, utils.Err(
+	return m, errors.Join(
 		reg.Register(m.getCount),
 		reg.Register(m.getTime),
 		reg.Register(m.putCount),
