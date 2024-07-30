@@ -17,6 +17,8 @@ var (
 		AddSubnetDelegatorFee:         8 * units.Avax,
 	}
 
+	// TODO: Rather than hardcoding transactions, consider implementing and
+	// using a transaction generator.
 	txTests = []struct {
 		name                 string
 		tx                   string
