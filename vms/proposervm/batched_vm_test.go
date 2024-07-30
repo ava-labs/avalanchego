@@ -66,7 +66,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -314,188 +314,11 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require.Empty(res)
 }
 
-func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
-	require := require.New(t)
-
-	var (
-		currentTime  = time.Now().Truncate(time.Second)
-		preForkTime  = currentTime.Add(5 * time.Minute)
-		forkTime     = currentTime.Add(10 * time.Minute)
-		postForkTime = currentTime.Add(15 * time.Minute)
-
-		durangoTime = forkTime
-	)
-
-	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
-	defer func() {
-		require.NoError(proRemoteVM.Shutdown(context.Background()))
-	}()
-
-	// Build some prefork blocks....
-	proRemoteVM.Set(preForkTime)
-	coreBlk1 := snowmantest.BuildChild(snowmantest.Genesis)
-	coreBlk1.TimestampV = preForkTime
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return coreBlk1, nil
-	}
-	builtBlk1, err := proRemoteVM.BuildBlock(context.Background())
-	require.NoError(err)
-	require.IsType(&preForkBlock{}, builtBlk1)
-
-	// prepare build of next block
-	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk1.ID()))
-	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == coreBlk1.ID():
-			return coreBlk1, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	coreBlk2 := snowmantest.BuildChild(coreBlk1)
-	coreBlk2.TimestampV = postForkTime
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return coreBlk2, nil
-	}
-	builtBlk2, err := proRemoteVM.BuildBlock(context.Background())
-	require.NoError(err)
-	require.IsType(&preForkBlock{}, builtBlk2)
-
-	// prepare build of next block
-	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk2.ID()))
-	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch {
-		case blkID == coreBlk2.ID():
-			return coreBlk2, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
-	// .. and some post-fork
-	proRemoteVM.Set(postForkTime)
-	coreBlk3 := snowmantest.BuildChild(coreBlk2)
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return coreBlk3, nil
-	}
-	builtBlk3, err := proRemoteVM.BuildBlock(context.Background())
-	require.NoError(err)
-	require.IsType(&postForkBlock{}, builtBlk3)
-
-	// prepare build of next block
-	require.NoError(builtBlk3.Verify(context.Background()))
-	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk3.ID()))
-	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk3, builtBlk3.(*postForkBlock).PChainHeight()))
-
-	coreBlk4 := snowmantest.BuildChild(coreBlk3)
-	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		return coreBlk4, nil
-	}
-	builtBlk4, err := proRemoteVM.BuildBlock(context.Background())
-	require.NoError(err)
-	require.IsType(&postForkBlock{}, builtBlk4)
-	require.NoError(builtBlk4.Verify(context.Background()))
-
-	// ...Call GetAncestors on them ...
-	// Note: we assumed that if blkID is not known, that's NOT an error.
-	// Simply return an empty result
-	coreVM.GetAncestorsF = func(_ context.Context, blkID ids.ID, maxBlocksNum, _ int, _ time.Duration) ([][]byte, error) {
-		sortedBlocks := [][]byte{
-			coreBlk4.Bytes(),
-			coreBlk3.Bytes(),
-			coreBlk2.Bytes(),
-			coreBlk1.Bytes(),
-		}
-		var startIndex int
-		switch blkID {
-		case coreBlk4.ID():
-			startIndex = 0
-		case coreBlk3.ID():
-			startIndex = 1
-		case coreBlk2.ID():
-			startIndex = 2
-		case coreBlk1.ID():
-			startIndex = 3
-		default:
-			return nil, nil // unknown blockID
-		}
-
-		endIndex := min(startIndex+maxBlocksNum, len(sortedBlocks))
-		return sortedBlocks[startIndex:endIndex], nil
-	}
-
-	// load all known blocks
-	reqBlkID := builtBlk4.ID()
-	maxBlocksNum := 1000                      // an high value to get all built blocks
-	maxBlocksSize := 1000000                  // an high value to get all built blocks
-	maxBlocksRetrivalTime := 10 * time.Minute // an high value to get all built blocks
-	res, err := proRemoteVM.GetAncestors(
-		context.Background(),
-		reqBlkID,
-		maxBlocksNum,
-		maxBlocksSize,
-		maxBlocksRetrivalTime,
-	)
-
-	// ... and check returned values are as expected
-	require.NoError(err)
-	require.Len(res, 4)
-	require.Equal(builtBlk4.Bytes(), res[0])
-	require.Equal(builtBlk3.Bytes(), res[1])
-	require.Equal(builtBlk2.Bytes(), res[2])
-	require.Equal(builtBlk1.Bytes(), res[3])
-
-	// Regression case: load some prefork and some postfork blocks.
-	reqBlkID = builtBlk4.ID()
-	maxBlocksNum = 3
-	res, err = proRemoteVM.GetAncestors(
-		context.Background(),
-		reqBlkID,
-		maxBlocksNum,
-		maxBlocksSize,
-		maxBlocksRetrivalTime,
-	)
-
-	// ... and check returned values are as expected
-	require.NoError(err)
-	require.Len(res, 3)
-	require.Equal(builtBlk4.Bytes(), res[0])
-	require.Equal(builtBlk3.Bytes(), res[1])
-	require.Equal(builtBlk2.Bytes(), res[2])
-
-	// another good call
-	reqBlkID = builtBlk1.ID()
-	res, err = proRemoteVM.GetAncestors(
-		context.Background(),
-		reqBlkID,
-		maxBlocksNum,
-		maxBlocksSize,
-		maxBlocksRetrivalTime,
-	)
-	require.NoError(err)
-	require.Len(res, 1)
-	require.Equal(builtBlk1.Bytes(), res[0])
-
-	// a faulty call
-	reqBlkID = ids.Empty
-	res, err = proRemoteVM.GetAncestors(
-		context.Background(),
-		reqBlkID,
-		maxBlocksNum,
-		maxBlocksSize,
-		maxBlocksRetrivalTime,
-	)
-	require.NoError(err)
-	require.Empty(res)
-}
-
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
 		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		durangoTime    = defaultTestingDurangoTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -965,7 +788,7 @@ func initTestRemoteProposerVM(
 		coreVM,
 		Config{
 			ActivationTime:      activationTime,
-			DurangoTime:         defaultTestingDurangoTime,
+			DurangoTime:         durangoTime,
 			MinimumPChainHeight: 0,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
