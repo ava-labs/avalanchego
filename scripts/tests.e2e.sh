@@ -23,7 +23,7 @@ source ./scripts/constants.sh
 echo "building e2e.test"
 # to install the ginkgo binary (required for test build and run)
 go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-ACK_GINKGO_RC=true ginkgo build --tags test ./tests/e2e
+ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
 # Enable subnet testing by building xsvm
@@ -57,4 +57,4 @@ fi
 
 #################################
 # - Execute in random order to identify unwanted dependency
-ginkgo ${GINKGO_ARGS} -v --tags test --randomize-all ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
+ginkgo ${GINKGO_ARGS} -v --randomize-all ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"

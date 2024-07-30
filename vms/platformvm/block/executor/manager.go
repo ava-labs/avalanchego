@@ -142,11 +142,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
-	if err != nil {
-		return err
-	}
-
+	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
 		Backend:       m.txExecutorBackend,
 		State:         stateDiff,
