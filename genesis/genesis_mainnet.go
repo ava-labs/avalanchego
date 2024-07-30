@@ -10,9 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 	MainnetParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: 10 * units.MilliAvax,
-			StaticFeeConfig: fee.StaticConfig{
+			StaticFeeConfig: txfee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             1 * units.Avax,
 				TransformSubnetTxFee:          10 * units.Avax,
