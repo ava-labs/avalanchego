@@ -36,10 +36,11 @@ func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error
 		return nil
 	}
 
-	b.manager.verifier.SetProposerVMContext(ctx)
-	defer b.manager.verifier.SetProposerVMContext(nil)
-
-	return b.Visit(b.manager.verifier)
+	return b.Visit(&verifier{
+		backend:           b.manager.backend,
+		txExecutorBackend: b.manager.txExecutorBackend,
+		proposerVMCtx:     ctx,
+	})
 }
 
 func (b *Block) Verify(ctx context.Context) error {
