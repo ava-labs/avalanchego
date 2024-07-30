@@ -101,12 +101,10 @@ func (d *diff) SetTimestamp(timestamp time.Time) {
 }
 
 func (d *diff) GetFeeComplexity() fee.State {
-	fmt.Println("returning", d.feeState)
 	return d.feeState
 }
 
 func (d *diff) SetFeeComplexity(feeState fee.State) {
-	fmt.Println("setting", feeState)
 	d.feeState = feeState
 }
 
@@ -414,6 +412,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
+	baseState.SetFeeComplexity(d.feeState)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}

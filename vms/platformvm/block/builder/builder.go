@@ -265,15 +265,30 @@ func buildBlock(
 	forceAdvanceTime bool,
 	parentState state.Chain,
 ) (block.Block, error) {
-	blockTxs, err := packDurangoBlockTxs(
-		parentID,
-		parentState,
-		builder.Mempool,
-		builder.txExecutorBackend,
-		builder.blkManager,
-		timestamp,
-		targetBlockSize,
+	var (
+		blockTxs []*txs.Tx
+		err      error
 	)
+	if builder.txExecutorBackend.Config.UpgradeConfig.IsEActivated(timestamp) {
+		blockTxs, err = packEtnaBlockTxs(
+			parentID,
+			parentState,
+			builder.Mempool,
+			builder.txExecutorBackend,
+			builder.blkManager,
+			timestamp,
+		)
+	} else {
+		blockTxs, err = packDurangoBlockTxs(
+			parentID,
+			parentState,
+			builder.Mempool,
+			builder.txExecutorBackend,
+			builder.blkManager,
+			timestamp,
+			targetBlockSize,
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
@@ -347,46 +362,22 @@ func packDurangoBlockTxs(
 		if txSize > remainingSize {
 			break
 		}
-		mempool.Remove(tx)
 
-		// Invariant: [tx] has already been syntactically verified.
-
-		txDiff, err := state.NewDiffOn(stateDiff)
+		shouldAdd, err := executeTx(
+			parentID,
+			stateDiff,
+			mempool,
+			backend,
+			manager,
+			&inputs,
+			feeCalculator,
+			tx,
+		)
 		if err != nil {
 			return nil, err
 		}
-
-		executor := &txexecutor.StandardTxExecutor{
-			Backend:       backend,
-			State:         txDiff,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-
-		err = tx.Unsigned.Visit(executor)
-		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+		if !shouldAdd {
 			continue
-		}
-
-		if inputs.Overlaps(executor.Inputs) {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
-			continue
-		}
-		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
-		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
-			continue
-		}
-		inputs.Union(executor.Inputs)
-
-		txDiff.AddTx(tx, status.Committed)
-		err = txDiff.Apply(stateDiff)
-		if err != nil {
-			return nil, err
 		}
 
 		remainingSize -= txSize
@@ -452,46 +443,22 @@ func packEtnaBlockTxsOn(
 		if newBlockGas > capacity {
 			break
 		}
-		mempool.Remove(tx)
 
-		// Invariant: [tx] has already been syntactically verified.
-
-		txDiff, err := state.NewDiffOn(stateDiff)
+		shouldAdd, err := executeTx(
+			parentID,
+			stateDiff,
+			mempool,
+			backend,
+			manager,
+			&inputs,
+			feeCalculator,
+			tx,
+		)
 		if err != nil {
 			return nil, err
 		}
-
-		executor := &txexecutor.StandardTxExecutor{
-			Backend:       backend,
-			State:         txDiff,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-
-		err = tx.Unsigned.Visit(executor)
-		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
+		if !shouldAdd {
 			continue
-		}
-
-		if inputs.Overlaps(executor.Inputs) {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
-			continue
-		}
-		err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
-		if err != nil {
-			txID := tx.ID()
-			mempool.MarkDropped(txID, err)
-			continue
-		}
-		inputs.Union(executor.Inputs)
-
-		txDiff.AddTx(tx, status.Committed)
-		err = txDiff.Apply(stateDiff)
-		if err != nil {
-			return nil, err
 		}
 
 		blockComplexity = newBlockComplexity
@@ -499,6 +466,56 @@ func packEtnaBlockTxsOn(
 	}
 
 	return blockTxs, nil
+}
+
+func executeTx(
+	parentID ids.ID,
+	stateDiff state.Diff,
+	mempool mempool.Mempool,
+	backend *txexecutor.Backend,
+	manager blockexecutor.Manager,
+	inputs *set.Set[ids.ID],
+	feeCalculator txfee.Calculator,
+	tx *txs.Tx,
+) (bool, error) {
+	mempool.Remove(tx)
+
+	// Invariant: [tx] has already been syntactically verified.
+
+	txDiff, err := state.NewDiffOn(stateDiff)
+	if err != nil {
+		return false, err
+	}
+
+	executor := &txexecutor.StandardTxExecutor{
+		Backend:       backend,
+		State:         txDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            tx,
+	}
+
+	err = tx.Unsigned.Visit(executor)
+	if err != nil {
+		txID := tx.ID()
+		mempool.MarkDropped(txID, err)
+		return false, nil
+	}
+
+	if inputs.Overlaps(executor.Inputs) {
+		txID := tx.ID()
+		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
+		return false, nil
+	}
+	err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
+	if err != nil {
+		txID := tx.ID()
+		mempool.MarkDropped(txID, err)
+		return false, nil
+	}
+	inputs.Union(executor.Inputs)
+
+	txDiff.AddTx(tx, status.Committed)
+	return true, txDiff.Apply(stateDiff)
 }
 
 // getNextStakerToReward returns the next staker txID to remove from the staking

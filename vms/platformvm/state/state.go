@@ -1011,12 +1011,10 @@ func (s *state) SetTimestamp(tm time.Time) {
 }
 
 func (s *state) GetFeeComplexity() fee.State {
-	fmt.Println("returning", s.feeState)
 	return s.feeState
 }
 
 func (s *state) SetFeeComplexity(feeState fee.State) {
-	fmt.Println("setting", feeState)
 	s.feeState = feeState
 }
 
