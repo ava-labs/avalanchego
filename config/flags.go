@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
 const (
@@ -98,7 +99,18 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.IntSlice(ACPSupportKey, nil, "ACPs to support adoption")
 	fs.IntSlice(ACPObjectKey, nil, "ACPs to object adoption")
 
-	// AVAX fees
+	// AVAX fees:
+	// Dynamic fees:
+	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
+	fs.Uint64(DynamicFeesDBReadWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.DBRead], "Complexity multiplier used to convert DB Reads into Gas")
+	fs.Uint64(DynamicFeesDBWriteWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.DBWrite], "Complexity multiplier used to convert DB Writes into Gas")
+	fs.Uint64(DynamicFeesComputeWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.Compute], "Complexity multiplier used to convert Compute into Gas")
+	fs.Uint64(DynamicFeesMaxGasCapacityKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxGasCapacity), "Maximum amount of Gas the chain is allowed to store for future use")
+	fs.Uint64(DynamicFeesMaxGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxGasPerSecond), "Rate at which Gas is stored for future use")
+	fs.Uint64(DynamicFeesTargetGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.TargetGasPerSecond), "Target rate of Gas usage")
+	fs.Uint64(DynamicFeesMinGasPriceKey, uint64(genesis.LocalParams.DynamicFeeConfig.MinGasPrice), "Minimum Gas price")
+	fs.Uint64(DynamicFeesExcessConversionConstantKey, uint64(genesis.LocalParams.DynamicFeeConfig.ExcessConversionConstant), "Constant to convert excess Gas to the Gas price")
+	// Static fees:
 	fs.Uint64(TxFeeKey, genesis.LocalParams.StaticFeeConfig.TxFee, "Transaction fee, in nAVAX")
 	fs.Uint64(CreateAssetTxFeeKey, genesis.LocalParams.CreateAssetTxFee, "Transaction fee, in nAVAX, for transactions that create new assets")
 	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
