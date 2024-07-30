@@ -19,16 +19,18 @@ var (
 
 	// MainnetParams are the params used for mainnet
 	MainnetParams = Params{
-		StaticConfig: fee.StaticConfig{
-			TxFee:                         units.MilliAvax,
-			CreateAssetTxFee:              10 * units.MilliAvax,
-			CreateSubnetTxFee:             1 * units.Avax,
-			TransformSubnetTxFee:          10 * units.Avax,
-			CreateBlockchainTxFee:         1 * units.Avax,
-			AddPrimaryNetworkValidatorFee: 0,
-			AddPrimaryNetworkDelegatorFee: 0,
-			AddSubnetValidatorFee:         units.MilliAvax,
-			AddSubnetDelegatorFee:         units.MilliAvax,
+		TxFeeConfig: TxFeeConfig{
+			CreateAssetTxFee: 10 * units.MilliAvax,
+			StaticFeeConfig: fee.StaticConfig{
+				TxFee:                         units.MilliAvax,
+				CreateSubnetTxFee:             1 * units.Avax,
+				TransformSubnetTxFee:          10 * units.Avax,
+				CreateBlockchainTxFee:         1 * units.Avax,
+				AddPrimaryNetworkValidatorFee: 0,
+				AddPrimaryNetworkDelegatorFee: 0,
+				AddSubnetValidatorFee:         units.MilliAvax,
+				AddSubnetDelegatorFee:         units.MilliAvax,
+			},
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%

@@ -19,16 +19,18 @@ var (
 
 	// FujiParams are the params used for the fuji testnet
 	FujiParams = Params{
-		StaticConfig: fee.StaticConfig{
-			TxFee:                         units.MilliAvax,
-			CreateAssetTxFee:              10 * units.MilliAvax,
-			CreateSubnetTxFee:             100 * units.MilliAvax,
-			TransformSubnetTxFee:          1 * units.Avax,
-			CreateBlockchainTxFee:         100 * units.MilliAvax,
-			AddPrimaryNetworkValidatorFee: 0,
-			AddPrimaryNetworkDelegatorFee: 0,
-			AddSubnetValidatorFee:         units.MilliAvax,
-			AddSubnetDelegatorFee:         units.MilliAvax,
+		TxFeeConfig: TxFeeConfig{
+			CreateAssetTxFee: 10 * units.MilliAvax,
+			StaticFeeConfig: fee.StaticConfig{
+				TxFee:                         units.MilliAvax,
+				CreateSubnetTxFee:             100 * units.MilliAvax,
+				TransformSubnetTxFee:          1 * units.Avax,
+				CreateBlockchainTxFee:         100 * units.MilliAvax,
+				AddPrimaryNetworkValidatorFee: 0,
+				AddPrimaryNetworkDelegatorFee: 0,
+				AddSubnetValidatorFee:         units.MilliAvax,
+				AddSubnetDelegatorFee:         units.MilliAvax,
+			},
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%
