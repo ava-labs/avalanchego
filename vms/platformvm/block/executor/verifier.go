@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	_ blockVisitorWithProposerVMCtx = (*verifier)(nil)
+	_ block.Visitor = (*verifier)(nil)
 
 	ErrConflictingBlockTxs = errors.New("block contains conflicting transactions")
 
@@ -32,21 +32,11 @@ var (
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
-type blockVisitorWithProposerVMCtx interface {
-	block.Visitor
-
-	SetProposerVMContext(*smblock.Context)
-}
-
 // verifier handles the logic for verifying a block.
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
 	proposerVMCtx     *smblock.Context
-}
-
-func (v *verifier) SetProposerVMContext(proposerVMCtx *smblock.Context) {
-	v.proposerVMCtx = proposerVMCtx
 }
 
 func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
