@@ -28,6 +28,8 @@ var (
 		fee.Compute:   0, // TODO: Populate
 	}
 
+	// TODO: Rather than hardcoding transactions, consider implementing and
+	// using a transaction generator.
 	txTests = []struct {
 		name                  string
 		tx                    string
