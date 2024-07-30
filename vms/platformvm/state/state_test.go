@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -1487,4 +1488,42 @@ func makeBlocks(require *require.Assertions) []block.Block {
 		blks = append(blks, blk)
 	}
 	return blks
+}
+
+func TestPutFeeState(t *testing.T) {
+	tests := []struct {
+		name          string
+		feeState      fee.State
+		expectedBytes []byte
+	}{
+		{
+			name: "empty fee state",
+			feeState: fee.State{
+				Capacity: 0,
+				Excess:   0,
+			},
+			expectedBytes: []byte{
+				// codec version
+				0x00, 0x00,
+				// capacity
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				// excess
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				require = require.New(t)
+				db      = memdb.New()
+			)
+
+			require.NoError(putFeeState(db, test.feeState))
+
+			actualBytes, err := db.Get(FeeStateKey)
+			require.NoError(err)
+			require.Equal(test.expectedBytes, actualBytes)
+		})
+	}
 }
