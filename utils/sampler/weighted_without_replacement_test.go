@@ -13,129 +13,73 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var weightedWithoutReplacementTests = []struct {
-	name string
-	test func(*testing.T, WeightedWithoutReplacement)
-}{
-	{
-		name: "initialize overflow",
-		test: WeightedWithoutReplacementInitializeOverflowTest,
-	},
-	{
-		name: "out of range",
-		test: WeightedWithoutReplacementOutOfRangeTest,
-	},
-	{
-		name: "empty without weight",
-		test: WeightedWithoutReplacementEmptyWithoutWeightTest,
-	},
-	{
-		name: "empty",
-		test: WeightedWithoutReplacementEmptyTest,
-	},
-	{
-		name: "singleton",
-		test: WeightedWithoutReplacementSingletonTest,
-	},
-	{
-		name: "with zero",
-		test: WeightedWithoutReplacementWithZeroTest,
-	},
-	{
-		name: "distribution",
-		test: WeightedWithoutReplacementDistributionTest,
-	},
-}
-
-func TestWeightedWithoutReplacement(t *testing.T) {
-	for _, test := range weightedWithoutReplacementTests {
-		t.Run(test.name, func(t *testing.T) {
-			test.test(t, NewWeightedWithoutReplacement())
-		})
-	}
-}
-
-func WeightedWithoutReplacementInitializeOverflowTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
-	err := s.Initialize([]uint64{1, math.MaxUint64})
+func TestWeightedWithoutReplacementInitializeOverflow(t *testing.T) {
+	sampler := NewWeightedWithoutReplacement()
+	err := sampler.Initialize([]uint64{1, math.MaxUint64})
 	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
-func WeightedWithoutReplacementOutOfRangeTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementOutOfRange(t *testing.T) {
 	require := require.New(t)
+	sampler := NewWeightedWithoutReplacement()
 
-	require.NoError(s.Initialize([]uint64{1}))
+	require.NoError(sampler.Initialize([]uint64{1}))
 
-	_, ok := s.Sample(2)
+	_, ok := sampler.Sample(2)
 	require.False(ok)
 }
 
-func WeightedWithoutReplacementEmptyWithoutWeightTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementEmptyWithoutWeight(t *testing.T) {
 	require := require.New(t)
+	sampler := NewWeightedWithoutReplacement()
 
-	require.NoError(s.Initialize(nil))
+	require.NoError(sampler.Initialize(nil))
 
-	indices, ok := s.Sample(0)
+	indices, ok := sampler.Sample(0)
 	require.True(ok)
 	require.Empty(indices)
 }
 
-func WeightedWithoutReplacementEmptyTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementEmpty(t *testing.T) {
 	require := require.New(t)
+	sampler := NewWeightedWithoutReplacement()
 
-	require.NoError(s.Initialize([]uint64{1}))
+	require.NoError(sampler.Initialize([]uint64{1}))
 
-	indices, ok := s.Sample(0)
+	indices, ok := sampler.Sample(0)
 	require.True(ok)
 	require.Empty(indices)
 }
 
-func WeightedWithoutReplacementSingletonTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementSingleton(t *testing.T) {
 	require := require.New(t)
+	sampler := NewWeightedWithoutReplacement()
 
-	require.NoError(s.Initialize([]uint64{1}))
+	require.NoError(sampler.Initialize([]uint64{1}))
 
-	indices, ok := s.Sample(1)
+	indices, ok := sampler.Sample(1)
 	require.True(ok)
 	require.Equal([]int{0}, indices)
 }
 
-func WeightedWithoutReplacementWithZeroTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementWithZero(t *testing.T) {
 	require := require.New(t)
+	sampler := NewWeightedWithoutReplacement()
 
-	require.NoError(s.Initialize([]uint64{0, 1}))
+	require.NoError(sampler.Initialize([]uint64{0, 1}))
 
-	indices, ok := s.Sample(1)
+	indices, ok := sampler.Sample(1)
 	require.True(ok)
 	require.Equal([]int{1}, indices)
 }
 
-func WeightedWithoutReplacementDistributionTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementDistribution(t *testing.T) {
 	require := require.New(t)
+	sampler := NewWeightedWithoutReplacement()
 
-	require.NoError(s.Initialize([]uint64{1, 1, 2}))
+	require.NoError(sampler.Initialize([]uint64{1, 1, 2}))
 
-	indices, ok := s.Sample(4)
+	indices, ok := sampler.Sample(4)
 	require.True(ok)
 
 	slices.Sort(indices)
