@@ -15,7 +15,7 @@ type WeightedWithoutReplacement interface {
 func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: NewDeterministicUniform(source),
-		w: NewDeterministicWeighted(),
+		w: NewWeighted(),
 	}
 }
 

@@ -19,18 +19,8 @@ var (
 		sampler Weighted
 	}{
 		{
-			name:    "inverse uniform cdf",
-			sampler: &weightedArray{},
-		},
-		{
 			name:    "heap division",
 			sampler: &weightedHeap{},
-		},
-		{
-			name: "lookup",
-			sampler: &weightedUniform{
-				maxWeight: 1024,
-			},
 		},
 		{
 			name:    "best with k=30",
