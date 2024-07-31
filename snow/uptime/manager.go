@@ -40,7 +40,9 @@ type manager struct {
 
 	state       State
 	connections map[ids.NodeID]time.Time // nodeID  -> time
-	tracked     bool
+	// Whether we have started tracking the uptime of the nodes
+	// This is used to avoid setting the uptime before we have started tracking
+	startedTracking bool
 }
 
 func NewManager(state State, clk *mockable.Clock) Manager {
@@ -71,17 +73,17 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 			return err
 		}
 	}
-	m.tracked = true
+	m.startedTracking = true
 	return nil
 }
 
 func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
 	// TODO: this was not here before, should we add it?
-	if !m.tracked {
+	if !m.startedTracking {
 		return nil
 	}
 	defer func() {
-		m.tracked = false
+		m.startedTracking = false
 	}()
 	now := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
@@ -148,7 +150,7 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 		return upDuration, lastUpdated, nil
 	}
 
-	if !m.tracked {
+	if !m.startedTracking {
 		durationOffline := now.Sub(lastUpdated)
 		newUpDuration := upDuration + durationOffline
 		return newUpDuration, now, nil
@@ -202,7 +204,7 @@ func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.T
 // updateUptime updates the uptime of the node on the state by the amount
 // of time that the node has been connected.
 func (m *manager) updateUptime(nodeID ids.NodeID) error {
-	if !m.tracked {
+	if !m.startedTracking {
 		return nil
 	}
 	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID)

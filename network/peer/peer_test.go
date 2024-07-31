@@ -227,7 +227,7 @@ func TestPingUptimes(t *testing.T) {
 		require.NoError(peer0.AwaitClosed(context.Background()))
 		require.NoError(peer1.AwaitClosed(context.Background()))
 	}()
-	pingMsg, err := sharedConfig.MessageCreator.Ping(0)
+	pingMsg, err := sharedConfig.MessageCreator.Ping(1)
 	require.NoError(err)
 	require.True(peer0.Send(context.Background(), pingMsg))
 
@@ -238,7 +238,7 @@ func TestPingUptimes(t *testing.T) {
 	sendAndFlush(t, peer0, peer1)
 
 	uptime := peer1.ObservedUptime()
-	require.Equal(uint32(0), uptime)
+	require.Equal(uint32(1), uptime)
 }
 
 func TestTrackedSubnets(t *testing.T) {

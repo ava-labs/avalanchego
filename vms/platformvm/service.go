@@ -836,10 +836,17 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			// TODO: decide whether we want to keep connected for subnet validators
 			// it should be available at this point
 			if args.SubnetID == constants.PrimaryNetworkID {
-				currentUptime, isConnected, err := s.getAPIUptime(currentStaker)
+				rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(currentStaker.NodeID, currentStaker.StartTime)
 				if err != nil {
 					return err
 				}
+				// Transform this to a percentage (0-100) to make it consistent
+				// with observedUptime in info.peers API
+				currentUptime := avajson.Float32(rawUptime * 100)
+				if err != nil {
+					return err
+				}
+				isConnected := s.vm.uptimeManager.IsConnected(currentStaker.NodeID)
 				connected = &isConnected
 				uptime = &currentUptime
 			}
@@ -1826,23 +1833,6 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = json.Marshal(result)
 	return err
-}
-
-// Returns:
-// 1) the uptime of a validator in the API format
-// 2) whether the validator is currently connected
-// 3) an error if one occurred
-func (s *Service) getAPIUptime(staker *state.Staker) (avajson.Float32, bool, error) {
-	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(staker.NodeID, staker.StartTime)
-	if err != nil {
-		return 0, false, err
-	}
-	connected := s.vm.uptimeManager.IsConnected(staker.NodeID)
-
-	// Transform this to a percentage (0-100) to make it consistent
-	// with observedUptime in info.peers API
-	uptime := avajson.Float32(rawUptime * 100)
-	return uptime, connected, nil
 }
 
 func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Owner, error) {

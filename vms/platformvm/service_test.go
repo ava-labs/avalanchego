@@ -32,6 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -602,6 +604,12 @@ func TestGetCurrentValidators(t *testing.T) {
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
+	connectedIDs := set.NewSet[ids.NodeID](len(genesis.Validators) - 1)
+	for _, vdr := range genesis.Validators[:len(genesis.Validators)-1] {
+		connectedIDs.Add(vdr.NodeID)
+		require.NoError(service.vm.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	}
+
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
@@ -615,6 +623,8 @@ func TestGetCurrentValidators(t *testing.T) {
 
 			require.Equal(vdr.EndTime, gotVdr.EndTime)
 			require.Equal(vdr.StartTime, gotVdr.StartTime)
+			require.Equal(connectedIDs.Contains(vdr.NodeID), *gotVdr.Connected)
+			require.EqualValues(100, *gotVdr.Uptime)
 			found = true
 		}
 		require.True(found, "expected validators to contain %s but didn't", vdr.NodeID)
