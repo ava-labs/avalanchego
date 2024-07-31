@@ -8,7 +8,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 type StakingConfig struct {
@@ -34,21 +36,27 @@ type StakingConfig struct {
 	RewardConfig reward.Config `json:"rewardConfig"`
 }
 
-type Params struct {
-	StakingConfig
-	fee.StaticConfig
+type TxFeeConfig struct {
+	CreateAssetTxFee uint64              `json:"createAssetTxFee"`
+	StaticFeeConfig  txfee.StaticConfig  `json:"staticFeeConfig"`
+	DynamicFeeConfig feecomponent.Config `json:"dynamicFeeConfig"`
 }
 
-func GetTxFeeConfig(networkID uint32) fee.StaticConfig {
+type Params struct {
+	StakingConfig
+	TxFeeConfig
+}
+
+func GetTxFeeConfig(networkID uint32) TxFeeConfig {
 	switch networkID {
 	case constants.MainnetID:
-		return MainnetParams.StaticConfig
+		return MainnetParams.TxFeeConfig
 	case constants.FujiID:
-		return FujiParams.StaticConfig
+		return FujiParams.TxFeeConfig
 	case constants.LocalID:
-		return LocalParams.StaticConfig
+		return LocalParams.TxFeeConfig
 	default:
-		return LocalParams.StaticConfig
+		return LocalParams.TxFeeConfig
 	}
 }
 
