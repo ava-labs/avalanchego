@@ -113,11 +113,14 @@ type Bootstrapper struct {
 
 	// Called when bootstrapping is done on a specific chain
 	onFinished func(ctx context.Context, lastReqID uint32) error
+
+	appraiser Appraiser
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
 	return &Bootstrapper{
+		appraiser:                   config.Appraiser,
 		Config:                      config,
 		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -178,7 +181,7 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to initialize interval tree: %w", err)
 	}
 
-	b.missingBlockIDs, err = getMissingBlockIDs(ctx, b.DB, b.VM, b.tree, b.startingHeight)
+	b.missingBlockIDs, err = getMissingBlockIDs(ctx, b.DB, b.appraiser, b.tree, b.startingHeight)
 	if err != nil {
 		return fmt.Errorf("failed to initialize missing block IDs: %w", err)
 	}
@@ -649,8 +652,8 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		b,
 		log,
 		b.DB,
-		&parseAcceptor{
-			parser:      b.VM,
+		&appraiseAcceptor{
+			appraiser:   b.appraiser,
 			ctx:         b.Ctx,
 			numAccepted: b.numAccepted,
 		},
@@ -773,4 +776,14 @@ func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 
 func (*Bootstrapper) Gossip(context.Context) error {
 	return nil
+}
+
+// Appraiser defines functionality for appraising the raw representation of a snowman block
+type Appraiser interface {
+	// Attempt to create a block from a stream of bytes.
+	//
+	// The block should be represented by the full byte array, without extra
+	// bytes.
+	//
+	AppraiseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error)
 }

@@ -789,7 +789,7 @@ func (m *manager) createAvalancheChain(
 
 	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
 	// using.
-	var vmWrappingProposerVM block.ChainVM = proposervm.New(
+	proposerVM := proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
 			Upgrades:            m.Upgrades,
@@ -800,6 +800,8 @@ func (m *manager) createAvalancheChain(
 			Registerer:          proposervmReg,
 		},
 	)
+
+	var vmWrappingProposerVM block.ChainVM = proposerVM
 
 	if m.MeterVMEnabled {
 		meterchainvmReg, err := metrics.MakeAndRegister(
@@ -948,6 +950,7 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
+		Appraiser:                      proposerVM,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
@@ -1184,7 +1187,7 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
-	vm = proposervm.New(
+	proposerVM := proposervm.New(
 		vm,
 		proposervm.Config{
 			Upgrades:            m.Upgrades,
@@ -1195,6 +1198,8 @@ func (m *manager) createSnowmanChain(
 			Registerer:          proposervmReg,
 		},
 	)
+
+	vm = proposerVM
 
 	if m.MeterVMEnabled {
 		meterchainvmReg, err := metrics.MakeAndRegister(
@@ -1345,6 +1350,7 @@ func (m *manager) createSnowmanChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
+		Appraiser:                      proposerVM,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        beacons,

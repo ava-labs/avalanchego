@@ -28,7 +28,7 @@ type Block interface {
 	Bytes() []byte
 
 	initialize(bytes []byte) error
-	verify(chainID ids.ID) error
+	Verify(chainID ids.ID) error
 }
 
 type SignedBlock interface {
@@ -102,7 +102,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	return nil
 }
 
-func (b *statelessBlock) verify(chainID ids.ID) error {
+func (b *statelessBlock) Verify(chainID ids.ID) error {
 	if len(b.StatelessBlock.Certificate) == 0 {
 		if len(b.Signature) > 0 {
 			return errUnexpectedSignature

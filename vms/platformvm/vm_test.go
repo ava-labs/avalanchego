@@ -1513,6 +1513,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
+		Appraiser:                      &appraiser{VM: vm},
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
@@ -2523,4 +2524,12 @@ func TestPruneMempool(t *testing.T) {
 	require.False(ok)
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
+}
+
+type appraiser struct {
+	*VM
+}
+
+func (a *appraiser) AppraiseBlock(ctx context.Context, blockBytes []byte) (smcon.Block, error) {
+	return a.VM.ParseBlock(ctx, blockBytes)
 }

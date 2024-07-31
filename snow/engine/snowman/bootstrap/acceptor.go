@@ -10,29 +10,28 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ block.Parser  = (*parseAcceptor)(nil)
+	_ Appraiser     = (*appraiseAcceptor)(nil)
 	_ snowman.Block = (*blockAcceptor)(nil)
 )
 
-type parseAcceptor struct {
-	parser      block.Parser
+type appraiseAcceptor struct {
+	appraiser   Appraiser
 	ctx         *snow.ConsensusContext
 	numAccepted prometheus.Counter
 }
 
-func (p *parseAcceptor) ParseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
-	blk, err := p.parser.ParseBlock(ctx, bytes)
+func (a *appraiseAcceptor) AppraiseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
+	blk, err := a.appraiser.AppraiseBlock(ctx, bytes)
 	if err != nil {
 		return nil, err
 	}
 	return &blockAcceptor{
 		Block:       blk,
-		ctx:         p.ctx,
-		numAccepted: p.numAccepted,
+		ctx:         a.ctx,
+		numAccepted: a.numAccepted,
 	}, nil
 }
 

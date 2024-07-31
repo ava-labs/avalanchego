@@ -38,6 +38,6 @@ func (b *option) initialize(bytes []byte) error {
 	return nil
 }
 
-func (*option) verify(ids.ID) error {
+func (*option) Verify(ids.ID) error {
 	return nil
 }
