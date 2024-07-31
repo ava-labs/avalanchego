@@ -216,7 +216,7 @@ func CheckBootstrapIsPossible(network *tmpnet.Network, registerCleanup RegisterC
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
-	// Register a cleanup to ensure the node is stopped after the check
+	// Register a cleanup to ensure the node is stopped at the end of the test
 	registerCleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
