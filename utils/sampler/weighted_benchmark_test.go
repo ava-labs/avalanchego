@@ -63,7 +63,12 @@ func BenchmarkWeightedHeapInitializer(b *testing.B) {
 		for _, size := range sizes {
 			if WeightedPowBenchmarkSampler(b, sampler, pow, size) {
 				b.Run(fmt.Sprintf("%d elements at x^%.1f", size, pow), func(b *testing.B) {
-					WeightedPowBenchmarkInitializer(b, sampler, pow, size)
+					_, weights, _ := CalcWeightedPoW(pow, size)
+
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						_ = sampler.Initialize(weights)
+					}
 				})
 			}
 		}
@@ -71,7 +76,16 @@ func BenchmarkWeightedHeapInitializer(b *testing.B) {
 	for _, size := range sizes {
 		if WeightedSingletonBenchmarkSampler(b, sampler, size) {
 			b.Run(fmt.Sprintf("%d singleton elements", size), func(b *testing.B) {
-				WeightedSingletonBenchmarkInitializer(b, sampler, size)
+				weights := make([]uint64, size)
+				weights[0] = math.MaxUint64 - uint64(size-1)
+				for i := 1; i < len(weights); i++ {
+					weights[i] = 1
+				}
+
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					_ = sampler.Initialize(weights)
+				}
 			})
 		}
 	}
@@ -131,31 +145,4 @@ func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool 
 		_, _ = s.Sample(globalRNG.Uint64Inclusive(math.MaxUint64 - 1))
 	}
 	return true
-}
-
-func WeightedPowBenchmarkInitializer(
-	b *testing.B,
-	s Weighted,
-	exponent float64,
-	size int,
-) {
-	_, weights, _ := CalcWeightedPoW(exponent, size)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = s.Initialize(weights)
-	}
-}
-
-func WeightedSingletonBenchmarkInitializer(b *testing.B, s Weighted, size int) {
-	weights := make([]uint64, size)
-	weights[0] = math.MaxUint64 - uint64(size-1)
-	for i := 1; i < len(weights); i++ {
-		weights[i] = 1
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = s.Initialize(weights)
-	}
 }
