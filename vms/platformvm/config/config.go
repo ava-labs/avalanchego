@@ -14,8 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 // Struct collecting all foundational parameters of PlatformVM
@@ -31,9 +33,12 @@ type Config struct {
 	//            calling VM.Initialize.
 	Validators validators.Manager
 
-	// All static fees config active before E-upgrade
+	// Static fees are active before the E-upgrade
 	CreateAssetTxFee uint64 // Override for CreateSubnet and CreateChain before AP3
-	StaticFeeConfig  fee.StaticConfig
+	StaticFeeConfig  txfee.StaticConfig
+
+	// Dynamic fees are active after the E-upgrade
+	DynamicFeeConfig feecomponent.Config
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator

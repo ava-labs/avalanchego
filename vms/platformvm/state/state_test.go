@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -703,7 +706,16 @@ func TestPersistStakers(t *testing.T) {
 
 func newInitializedState(require *require.Assertions) State {
 	s, _ := newUninitializedState(require)
+	initializeState(require, s)
+	return s
+}
 
+func newUninitializedState(require *require.Assertions) (*state, database.Database) {
+	db := memdb.New()
+	return newStateFromDB(require, db), db
+}
+
+func initializeState(require *require.Assertions, s *state) {
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
 			NodeID: initialNodeID,
@@ -764,13 +776,6 @@ func newInitializedState(require *require.Assertions) State {
 	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
 	require.NoError(s.syncGenesis(genesisBlk, genesisState))
-
-	return s
-}
-
-func newUninitializedState(require *require.Assertions) (*state, database.Database) {
-	db := memdb.New()
-	return newStateFromDB(require, db), db
 }
 
 func newStateFromDB(require *require.Assertions, db database.Database) *state {
@@ -1487,4 +1492,96 @@ func makeBlocks(require *require.Assertions) []block.Block {
 		blks = append(blks, blk)
 	}
 	return blks
+}
+
+// Verify that committing the state writes the fee state to the database and
+// that loading the state fetches the fee state from the database.
+func TestStateFeeStateCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	s, db := newUninitializedState(require)
+	initializeState(require, s)
+
+	expectedFeeState := fee.State{
+		Capacity: 1,
+		Excess:   2,
+	}
+	s.SetFeeState(expectedFeeState)
+	require.NoError(s.Commit())
+
+	s = newStateFromDB(require, db)
+	require.NoError(s.load())
+	require.Equal(expectedFeeState, s.GetFeeState())
+}
+
+// Verify that reading from the database returns the same value that was written
+// to it.
+func TestPutAndGetFeeState(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	defaultFeeState, err := getFeeState(db)
+	require.NoError(err)
+	require.Equal(fee.State{}, defaultFeeState)
+
+	//nolint:gosec // This does not require a secure random number generator
+	expectedFeeState := fee.State{
+		Capacity: fee.Gas(rand.Uint64()),
+		Excess:   fee.Gas(rand.Uint64()),
+	}
+	require.NoError(putFeeState(db, expectedFeeState))
+
+	actualFeeState, err := getFeeState(db)
+	require.NoError(err)
+	require.Equal(expectedFeeState, actualFeeState)
+}
+
+func TestGetFeeStateErrors(t *testing.T) {
+	tests := []struct {
+		value       []byte
+		expectedErr error
+	}{
+		{
+			value: []byte{
+				// truncated codec version
+				0x00,
+			},
+			expectedErr: codec.ErrCantUnpackVersion,
+		},
+		{
+			value: []byte{
+				// codec version
+				0x00, 0x00,
+				// truncated capacity
+				0x12, 0x34, 0x56, 0x78,
+			},
+			expectedErr: wrappers.ErrInsufficientLength,
+		},
+		{
+			value: []byte{
+				// codec version
+				0x00, 0x00,
+				// capacity
+				0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78,
+				// excess
+				0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78,
+				// extra bytes
+				0x00,
+			},
+			expectedErr: codec.ErrExtraSpace,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.expectedErr.Error(), func(t *testing.T) {
+			var (
+				require = require.New(t)
+				db      = memdb.New()
+			)
+			require.NoError(db.Put(FeeStateKey, test.value))
+
+			actualState, err := getFeeState(db)
+			require.Equal(fee.State{}, actualState)
+			require.ErrorIs(err, test.expectedErr)
+		})
+	}
 }
