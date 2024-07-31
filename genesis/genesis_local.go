@@ -37,16 +37,18 @@ var (
 
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
-		StaticConfig: fee.StaticConfig{
-			TxFee:                         units.MilliAvax,
-			CreateAssetTxFee:              units.MilliAvax,
-			CreateSubnetTxFee:             100 * units.MilliAvax,
-			TransformSubnetTxFee:          100 * units.MilliAvax,
-			CreateBlockchainTxFee:         100 * units.MilliAvax,
-			AddPrimaryNetworkValidatorFee: 0,
-			AddPrimaryNetworkDelegatorFee: 0,
-			AddSubnetValidatorFee:         units.MilliAvax,
-			AddSubnetDelegatorFee:         units.MilliAvax,
+		TxFeeConfig: TxFeeConfig{
+			CreateAssetTxFee: units.MilliAvax,
+			StaticFeeConfig: fee.StaticConfig{
+				TxFee:                         units.MilliAvax,
+				CreateSubnetTxFee:             100 * units.MilliAvax,
+				TransformSubnetTxFee:          100 * units.MilliAvax,
+				CreateBlockchainTxFee:         100 * units.MilliAvax,
+				AddPrimaryNetworkValidatorFee: 0,
+				AddPrimaryNetworkDelegatorFee: 0,
+				AddSubnetValidatorFee:         units.MilliAvax,
+				AddSubnetDelegatorFee:         units.MilliAvax,
+			},
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%
