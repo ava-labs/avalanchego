@@ -4,7 +4,6 @@
 package sampler
 
 import (
-	"fmt"
 	"math"
 	"testing"
 
@@ -14,19 +13,6 @@ import (
 )
 
 var (
-	weightedSamplers = []struct {
-		name    string
-		sampler Weighted
-	}{
-		{
-			name:    "heap division",
-			sampler: &weightedHeap{},
-		},
-		{
-			name:    "best with k=30",
-			sampler: NewWeighted(),
-		},
-	}
 	weightedTests = []struct {
 		name string
 		test func(*testing.T, Weighted)
@@ -54,13 +40,12 @@ var (
 	}
 )
 
-func TestAllWeighted(t *testing.T) {
-	for _, s := range weightedSamplers {
-		for _, test := range weightedTests {
-			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
-				test.test(t, s.sampler)
-			})
-		}
+func TestWeightedHeap(t *testing.T) {
+	sampler := &weightedHeap{}
+	for _, test := range weightedTests {
+		t.Run(test.name, func(t *testing.T) {
+			test.test(t, sampler)
+		})
 	}
 }
 
