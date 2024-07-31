@@ -236,9 +236,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:         atomicExecutor.Inputs,
-		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-		atomicRequests: atomicExecutor.AtomicRequests,
+		inputs:          atomicExecutor.Inputs,
+		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
+		atomicRequests:  atomicExecutor.AtomicRequests,
+		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
 	}
 	return nil
 }
@@ -348,9 +349,10 @@ func (v *verifier) abortBlock(b block.Block) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAbortState,
-		timestamp:      onAbortState.GetTimestamp(),
+		statelessBlock:  b,
+		onAcceptState:   onAbortState,
+		timestamp:       onAbortState.GetTimestamp(),
+		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
 	}
 	return nil
 }
@@ -365,9 +367,10 @@ func (v *verifier) commitBlock(b block.Block) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onCommitState,
-		timestamp:      onCommitState.GetTimestamp(),
+		statelessBlock:  b,
+		onAcceptState:   onCommitState,
+		timestamp:       onCommitState.GetTimestamp(),
+		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
 	}
 	return nil
 }
@@ -418,8 +421,9 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:      onAbortState.GetTimestamp(),
-		atomicRequests: atomicRequests,
+		timestamp:       onAbortState.GetTimestamp(),
+		atomicRequests:  atomicRequests,
+		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
 	}
 	return nil
 }
@@ -444,9 +448,10 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:      onAcceptState.GetTimestamp(),
-		inputs:         inputs,
-		atomicRequests: atomicRequests,
+		timestamp:       onAcceptState.GetTimestamp(),
+		inputs:          inputs,
+		atomicRequests:  atomicRequests,
+		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
 	}
 	return nil
 }
