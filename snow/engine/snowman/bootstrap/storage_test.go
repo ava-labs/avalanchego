@@ -6,31 +6,20 @@ package bootstrap
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"encoding/binary"
 	"testing"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/proposervm"
-
-	blockbuilder "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 var _ Appraiser = testAppraiser(nil)
@@ -222,116 +211,6 @@ func TestProcess(t *testing.T) {
 			for _, height := range test.expectedTrackedHeights {
 				require.True(tree.Contains(height))
 			}
-		})
-	}
-}
-
-func TestMeasureExecute(t *testing.T) {
-	const numBlocks = 1000
-
-	halted := &common.Halter{}
-	halted.Halt(context.Background())
-
-	parentID := ids.ID{1}
-	timestamp := time.Unix(123, 0)
-	pChainHeight := uint64(2)
-	chainID := ids.GenerateTestID()
-
-	tlsCert, err := staking.NewTLSCert()
-	require.NoError(t, err)
-
-	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
-	require.NoError(t, err)
-	key := tlsCert.PrivateKey.(crypto.Signer)
-
-	buff := binary.AppendVarint(nil, int64(42))
-
-	signedBlock, err := blockbuilder.Build(
-		parentID,
-		timestamp,
-		pChainHeight,
-		cert,
-		buff,
-		chainID,
-		key,
-	)
-	require.NoError(t, err)
-
-	rawBlock := signedBlock.Bytes()
-
-	blocks := make([][]byte, numBlocks)
-
-	for i := 0; i < numBlocks; i++ {
-		blocks[i] = rawBlock
-	}
-
-	conf := proposervm.Config{
-		ActivationTime:      time.Unix(0, 0),
-		DurangoTime:         time.Unix(0, 0),
-		MinimumPChainHeight: 0,
-		Registerer:          prometheus.NewRegistry(),
-	}
-
-	innerVM := &block.TestVM{
-		ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
-			return &snowmantest.Block{BytesV: rawBlock}, nil
-		},
-	}
-
-	vm := proposervm.New(innerVM, conf)
-
-	db := prefixdb.New([]byte{}, memdb.New())
-
-	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(cert)
-
-	_ = vm.Initialize(context.Background(), &snow.Context{
-		Log:     logging.NoLog{},
-		ChainID: ids.GenerateTestID(),
-	}, db, nil, nil, nil, nil, nil, nil)
-	appraiseVM := &block.TestVM{
-		ParseBlockF: vm.AppraiseBlock,
-	}
-
-	parseVM := &block.TestVM{
-		ParseBlockF: vm.ParseBlock,
-	}
-
-	tests := []struct {
-		name string
-		vm   *block.TestVM
-	}{
-		{
-			name: "appraise",
-			vm:   appraiseVM,
-		},
-		{
-			name: "parse",
-			vm:   parseVM,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			db := memdb.New()
-			tree, err := interval.NewTree(db)
-			require.NoError(t, err)
-
-			for i, blk := range blocks {
-				_, err := interval.Add(db, tree, 0, uint64(i), blk)
-				require.NoError(t, err)
-			}
-
-			t1 := time.Now()
-			require.NoError(t, execute(
-				context.Background(),
-				&common.Halter{},
-				logging.NoLog{}.Info,
-				db,
-				test.vm,
-				tree,
-				numBlocks,
-			))
-			t.Log(time.Since(t1))
 		})
 	}
 }
