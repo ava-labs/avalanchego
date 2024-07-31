@@ -37,6 +37,9 @@ func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error
 			return nil
 		}
 
+		// PlatformVM blocks are valid regardless of the ProposerVM's PChainHeight
+		// currently. When this changes, those validity checks should be done prior to add
+		// [ctx.PChainHeight] to [verifiedHeights].
 		blkState.verifiedHeights.Add(ctx.PChainHeight)
 	}
 
