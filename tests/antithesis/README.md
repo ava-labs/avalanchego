@@ -69,7 +69,7 @@ test setup.
 
 ## Troubleshooting a test setup
 
-### Running a workload directly
+### Running a workload with an existing network
 
 The workload of the 'avalanchego' test setup can be invoked against an
 arbitrary network:
@@ -85,6 +85,20 @@ chain needs to be provided to the workload:
 ```bash
 $ AVAWL_URIS=... CHAIN_IDS="2S9ypz...AzMj9" go run ./tests/antithesis/xsvm
 ```
+
+### Running a workload with a tmpnet network
+
+Just like with e2e tests, running an antithesis workload against a
+tmpnet network requires specifying an avalanchego path (either as an
+argument or an env var):
+
+```bash
+$ go run ./tests/antithesis/avalanchego --avalanchego-path=/path/to/avalanchego
+```
+
+All tmpnet flags are supported (e.g. `--reuse-network`,
+`--stop-network`, `--restart-network`, `--node-count`).  See the
+[tmpnet documentation](../fixture/tmpnet/README.md) for more details.
 
 ### Running a workload with docker compose v2
 

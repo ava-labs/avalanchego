@@ -4,72 +4,127 @@
 package antithesis
 
 import (
-	"errors"
-	"fmt"
+	"flag"
+	"os"
+	"strings"
+	"time"
 
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
 const (
 	URIsKey     = "uris"
 	ChainIDsKey = "chain-ids"
+	DurationKey = "duration"
 
-	FlagsName = "workload"
 	EnvPrefix = "avawl"
-)
-
-var (
-	errNoURIs      = errors.New("at least one URI must be provided")
-	errNoArguments = errors.New("no arguments")
 )
 
 type Config struct {
 	URIs     []string
 	ChainIDs []string
+	Duration time.Duration
 }
 
-func NewConfig(arguments []string) (*Config, error) {
-	v, err := parseFlags(arguments)
-	if err != nil {
-		return nil, err
+// Cleans up resources created by the configuration
+type CleanupFunc func()
+
+type SubnetsForNodesFunc func(nodes ...*tmpnet.Node) []*tmpnet.Subnet
+
+func NewConfig(tc tests.TestContext, defaultNetwork *tmpnet.Network) *Config {
+	return NewConfigWithSubnets(tc, defaultNetwork, nil)
+}
+
+func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, getSubnets SubnetsForNodesFunc) *Config {
+	// tmpnet configuration
+	flagVars := e2e.RegisterFlags()
+
+	var (
+		duration time.Duration
+		uris     CSV
+		// Accept a list of chain IDs, assume they each belong to a separate subnet
+		// TODO(marun) Revisit how chain IDs are provided when 1:n subnet:chain configuration is required.
+		chainIDs CSV
+	)
+	flag.DurationVar(&duration, DurationKey, 0, "[optional] the duration to execute the workload for")
+	flag.Var(&uris, URIsKey, "[optional] URIs of nodes that the workload can communicate with")
+	flag.Var(&chainIDs, ChainIDsKey, "[optional] IDs of chains to target for testing")
+
+	flag.Parse()
+
+	// Env vars take priority over flags
+	envURIs := os.Getenv(strings.ToUpper(EnvPrefix + "_" + URIsKey))
+	if len(envURIs) > 0 {
+		// CSV.Set doesn't actually return an error
+		_ = uris.Set(envURIs)
 	}
+	envChainIDs := os.Getenv(strings.ToUpper(EnvPrefix + "_" + ChainIDsKey))
+	if len(envChainIDs) > 0 {
+		// CSV.Set doesn't actually return an error
+		_ = uris.Set(envChainIDs)
+	}
+
+	// Use the network configuration provided
+	if len(uris) != 0 {
+		require.NoError(tc, awaitHealthyNodes(tc.DefaultContext(), uris), "failed to see healthy nodes")
+		return &Config{
+			URIs:     uris,
+			ChainIDs: chainIDs,
+			Duration: duration,
+		}
+	}
+
+	// Create a new network
+	return configForNewNetwork(tc, defaultNetwork, getSubnets, flagVars, duration)
+}
+
+// configForNewNetwork creates a new network and returns the resulting config and cleanup function.
+func configForNewNetwork(
+	tc tests.TestContext,
+	defaultNetwork *tmpnet.Network,
+	getSubnets SubnetsForNodesFunc,
+	flagVars *e2e.FlagVars,
+	duration time.Duration,
+) *Config {
+	if defaultNetwork.Nodes == nil {
+		defaultNetwork.Nodes = tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+	}
+	if defaultNetwork.Subnets == nil && getSubnets != nil {
+		defaultNetwork.Subnets = getSubnets(defaultNetwork.Nodes...)
+	}
+
+	testEnv := e2e.NewTestEnvironment(tc, flagVars, defaultNetwork)
 
 	c := &Config{
-		URIs:     v.GetStringSlice(URIsKey),
-		ChainIDs: v.GetStringSlice(ChainIDsKey),
+		Duration: duration,
 	}
-	return c, c.Verify()
+	c.URIs = make(CSV, len(testEnv.URIs))
+	for i, nodeURI := range testEnv.URIs {
+		c.URIs[i] = nodeURI.URI
+	}
+	network := testEnv.GetNetwork()
+	c.ChainIDs = make(CSV, len(network.Subnets))
+	for i, subnet := range network.Subnets {
+		c.ChainIDs[i] = subnet.Chains[0].ChainID.String()
+	}
+
+	return c
 }
 
-func (c *Config) Verify() error {
-	if len(c.URIs) == 0 {
-		return errNoURIs
-	}
+// CSV is a custom type that implements the flag.Value interface
+type CSV []string
+
+// String returns the string representation of the CSV type
+func (c *CSV) String() string {
+	return strings.Join(*c, ",")
+}
+
+// Set splits the input string by commas and sets the CSV type
+func (c *CSV) Set(value string) error {
+	*c = strings.Split(value, ",")
 	return nil
-}
-
-func parseFlags(arguments []string) (*viper.Viper, error) {
-	if len(arguments) == 0 {
-		return nil, errNoArguments
-	}
-
-	fs := pflag.NewFlagSet(FlagsName, pflag.ContinueOnError)
-	fs.StringSlice(URIsKey, []string{primary.LocalAPIURI}, "URIs of nodes that the workload can communicate with")
-	fs.StringSlice(ChainIDsKey, []string{}, "IDs of chains to target for testing")
-	if err := fs.Parse(arguments[1:]); err != nil {
-		return nil, fmt.Errorf("failed parsing CLI flags: %w", err)
-	}
-
-	v := viper.New()
-	v.AutomaticEnv()
-	v.SetEnvKeyReplacer(config.DashesToUnderscores)
-	v.SetEnvPrefix(EnvPrefix)
-	if err := v.BindPFlags(fs); err != nil {
-		return nil, fmt.Errorf("failed binding pflags: %w", err)
-	}
-	return v, nil
 }

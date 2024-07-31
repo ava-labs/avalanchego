@@ -8,15 +8,18 @@ import (
 	"crypto/rand"
 	"log"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
+	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -31,23 +34,29 @@ const (
 )
 
 func main() {
-	c, err := antithesis.NewConfig(os.Args)
-	if err != nil {
-		log.Fatalf("invalid config: %s", err)
-	}
+	tc := tests.NewTestContext()
+	defer tc.Cleanup()
+	require := require.New(tc)
 
-	ctx := context.Background()
-	if err := antithesis.AwaitHealthyNodes(ctx, c.URIs); err != nil {
-		log.Fatalf("failed to await healthy nodes: %s", err)
-	}
+	c := antithesis.NewConfigWithSubnets(
+		tc,
+		&tmpnet.Network{
+			Owner: "antithesis-xsvm",
+		},
+		func(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
+			return []*tmpnet.Subnet{
+				subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, nodes...),
+			}
+		},
+	)
+	ctx := tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
 
-	if len(c.ChainIDs) != 1 {
-		log.Fatalf("expected 1 chainID, saw %d", len(c.ChainIDs))
-	}
+	require.Len(c.ChainIDs, 1)
+	log.Printf("CHAIN IDS: %v", c.ChainIDs)
 	chainID, err := ids.FromString(c.ChainIDs[0])
-	if err != nil {
-		log.Fatalf("failed to parse chainID: %s", err)
-	}
+	require.NoError(err, "failed to parse chainID")
+
+	log.Printf("Using uris %v and chainID %s", c.URIs, chainID)
 
 	genesisWorkload := &workload{
 		id:      0,
@@ -63,9 +72,7 @@ func main() {
 	initialAmount := 100 * units.KiloAvax
 	for i := 1; i < NumKeys; i++ {
 		key, err := secp256k1.NewPrivateKey()
-		if err != nil {
-			log.Fatalf("failed to generate key: %s", err)
-		}
+		require.NoError(err, "failed to generate key: %s")
 
 		var (
 			addr          = key.Address()
@@ -82,9 +89,7 @@ func main() {
 				PrivateKey: genesisWorkload.key,
 			},
 		)
-		if err != nil {
-			log.Fatalf("failed to issue initial funding transfer: %s", err)
-		}
+		require.NoError(err, "failed to issue initial funding transfer")
 		log.Printf("issued initial funding transfer %s in %s", transferTxStatus.TxID, time.Since(baseStartTime))
 
 		genesisWorkload.confirmTransferTx(ctx, transferTxStatus)
@@ -123,13 +128,15 @@ func (w *workload) run(ctx context.Context) {
 		<-timer.C
 	}
 
+	tc := tests.NewTestContext()
+	defer tc.Cleanup()
+	require := require.New(tc)
+
 	uri := w.uris[w.id%len(w.uris)]
 
 	client := api.NewClient(uri, w.chainID.String())
 	balance, err := client.Balance(ctx, w.key.Address(), w.chainID)
-	if err != nil {
-		log.Fatalf("failed to fetch balance: %s", err)
-	}
+	require.NoError(err, "failed to fetch balance")
 	log.Printf("worker %d starting with a balance of %d", w.id, balance)
 	assert.Reachable("worker starting", map[string]any{
 		"worker":  w.id,
@@ -158,9 +165,7 @@ func (w *workload) run(ctx context.Context) {
 		}
 
 		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
-		if err != nil {
-			log.Fatalf("failed to read randomness: %s", err)
-		}
+		require.NoError(err, "failed to read randomness")
 
 		timer.Reset(time.Duration(val.Int64()))
 		select {

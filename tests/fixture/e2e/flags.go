@@ -71,19 +71,33 @@ func (v *FlagVars) ActivateEtna() bool {
 	return v.activateEtna
 }
 
+func getEnvWithDefault(envVar, defaultVal string) string {
+	val := os.Getenv(envVar)
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
+}
+
 func RegisterFlags() *FlagVars {
 	vars := FlagVars{}
 	flag.StringVar(
 		&vars.avalancheGoExecPath,
 		"avalanchego-path",
 		os.Getenv(tmpnet.AvalancheGoPathEnvName),
-		fmt.Sprintf("avalanchego executable path (required if not using an existing network). Also possible to configure via the %s env variable.", tmpnet.AvalancheGoPathEnvName),
+		fmt.Sprintf(
+			"[optional] avalanchego executable path if creating a new network. Also possible to configure via the %s env variable.",
+			tmpnet.AvalancheGoPathEnvName,
+		),
 	)
 	flag.StringVar(
 		&vars.pluginDir,
 		"plugin-dir",
-		os.ExpandEnv("$HOME/.avalanchego/plugins"),
-		"[optional] the dir containing VM plugins.",
+		getEnvWithDefault(tmpnet.AvalancheGoPluginDirEnvName, os.ExpandEnv("$HOME/.avalanchego/plugins")),
+		fmt.Sprintf(
+			"[optional] the dir containing VM plugins. Also possible to configure via the %s env variable.",
+			tmpnet.AvalancheGoPluginDirEnvName,
+		),
 	)
 	flag.StringVar(
 		&vars.networkDir,

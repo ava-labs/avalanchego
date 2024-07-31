@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
+	AvalancheGoPathEnvName      = "AVALANCHEGO_PATH"
+	AvalancheGoPluginDirEnvName = "AVALANCHEGO_PLUGIN_DIR"
 
 	defaultNodeInitTimeout = 10 * time.Second
 )

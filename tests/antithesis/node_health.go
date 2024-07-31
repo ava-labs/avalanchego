@@ -13,7 +13,7 @@ import (
 )
 
 // Waits for the nodes at the provided URIs to report healthy.
-func AwaitHealthyNodes(ctx context.Context, uris []string) error {
+func awaitHealthyNodes(ctx context.Context, uris []string) error {
 	for _, uri := range uris {
 		if err := awaitHealthyNode(ctx, uri); err != nil {
 			return err

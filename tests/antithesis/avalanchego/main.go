@@ -8,16 +8,18 @@ import (
 	"crypto/rand"
 	"log"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -39,15 +41,17 @@ import (
 const NumKeys = 5
 
 func main() {
-	c, err := antithesis.NewConfig(os.Args)
-	if err != nil {
-		log.Fatalf("invalid config: %s", err)
-	}
+	tc := tests.NewTestContext()
+	defer tc.Cleanup()
+	require := require.New(tc)
 
-	ctx := context.Background()
-	if err := antithesis.AwaitHealthyNodes(ctx, c.URIs); err != nil {
-		log.Fatalf("failed to await healthy nodes: %s", err)
-	}
+	c := antithesis.NewConfig(
+		tc,
+		&tmpnet.Network{
+			Owner: "antithesis-avalanchego",
+		},
+	)
+	ctx := tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
@@ -56,9 +60,7 @@ func main() {
 		AVAXKeychain: kc,
 		EthKeychain:  kc,
 	})
-	if err != nil {
-		log.Fatalf("failed to initialize wallet: %s", err)
-	}
+	require.NoError(err, "failed to initialize wallet")
 	log.Printf("synced wallet in %s", time.Since(walletSyncStartTime))
 
 	genesisWorkload := &workload{
@@ -79,9 +81,7 @@ func main() {
 	)
 	for i := 1; i < NumKeys; i++ {
 		key, err := secp256k1.NewPrivateKey()
-		if err != nil {
-			log.Fatalf("failed to generate key: %s", err)
-		}
+		require.NoError(err, "failed to generate key")
 
 		var (
 			addr          = key.Address()
@@ -101,11 +101,10 @@ func main() {
 				},
 			},
 		}})
-		if err != nil {
-			log.Fatalf("failed to issue initial funding X-chain baseTx: %s", err)
-		}
+		require.NoError(err, "failed to issue initial funding X-chain baseTx")
 		log.Printf("issued initial funding X-chain baseTx %s in %s", baseTx.ID(), time.Since(baseStartTime))
 
+		// TODO(marun) Enable cleanup of these contexts
 		genesisWorkload.confirmXChainTx(ctx, baseTx)
 
 		uri := c.URIs[i%len(c.URIs)]
@@ -116,9 +115,7 @@ func main() {
 			AVAXKeychain: kc,
 			EthKeychain:  kc,
 		})
-		if err != nil {
-			log.Fatalf("failed to initialize wallet: %s", err)
-		}
+		require.NoError(err, "failed to initialize wallet")
 		log.Printf("synced wallet in %s", time.Since(walletSyncStartTime))
 
 		workloads[i] = &workload{
@@ -153,6 +150,10 @@ func (w *workload) run(ctx context.Context) {
 		<-timer.C
 	}
 
+	tc := tests.NewTestContext()
+	defer tc.Cleanup()
+	require := require.New(tc)
+
 	var (
 		xWallet  = w.wallet.X()
 		xBuilder = xWallet.Builder()
@@ -160,13 +161,9 @@ func (w *workload) run(ctx context.Context) {
 		pBuilder = pWallet.Builder()
 	)
 	xBalances, err := xBuilder.GetFTBalance()
-	if err != nil {
-		log.Fatalf("failed to fetch X-chain balances: %s", err)
-	}
+	require.NoError(err, "failed to fetch X-chain balances")
 	pBalances, err := pBuilder.GetBalance()
-	if err != nil {
-		log.Fatalf("failed to fetch P-chain balances: %s", err)
-	}
+	require.NoError(err, "failed to fetch P-chain balances")
 	var (
 		xContext    = xBuilder.Context()
 		avaxAssetID = xContext.AVAXAssetID
@@ -182,9 +179,7 @@ func (w *workload) run(ctx context.Context) {
 
 	for {
 		val, err := rand.Int(rand.Reader, big.NewInt(5))
-		if err != nil {
-			log.Fatalf("failed to read randomness: %s", err)
-		}
+		require.NoError(err, "failed to read randomness")
 
 		flowID := val.Int64()
 		log.Printf("wallet %d executing flow %d", w.id, flowID)
@@ -202,9 +197,7 @@ func (w *workload) run(ctx context.Context) {
 		}
 
 		val, err = rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
-		if err != nil {
-			log.Fatalf("failed to read randomness: %s", err)
-		}
+		require.NoError(err, "failed to read randomness")
 
 		timer.Reset(time.Duration(val.Int64()))
 		select {

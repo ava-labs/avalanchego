@@ -47,12 +47,12 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 
 	// Subnet testing requires creating an initial db state for the bootstrap node
 	if len(network.Subnets) > 0 {
-		avalancheGoPath := os.Getenv("AVALANCHEGO_PATH")
+		avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
 		if len(avalancheGoPath) == 0 {
 			return errAvalancheGoEvVarNotSet
 		}
 
-		pluginDir := os.Getenv("AVALANCHEGO_PLUGIN_DIR")
+		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
 		if len(pluginDir) == 0 {
 			return errPluginDirEnvVarNotSet
 		}
