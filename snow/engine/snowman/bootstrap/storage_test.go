@@ -16,17 +16,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ Appraiser = testAppraiser(nil)
+var _ block.Parser = testParser(nil)
 
 func TestGetMissingBlockIDs(t *testing.T) {
 	blocks := snowmantest.BuildChain(7)
-	appraiser := makeAppraiser(blocks)
+	parser := makeParser(blocks)
 
 	tests := []struct {
 		name               string
@@ -92,7 +93,7 @@ func TestGetMissingBlockIDs(t *testing.T) {
 			missingBlockIDs, err := getMissingBlockIDs(
 				context.Background(),
 				db,
-				appraiser,
+				parser,
 				tree,
 				test.lastAcceptedHeight,
 			)
@@ -260,7 +261,7 @@ func TestExecute(t *testing.T) {
 			require.NoError(err)
 
 			blocks := snowmantest.BuildChain(numBlocks)
-			parser := makeAppraiser(blocks)
+			parser := makeParser(blocks)
 			for _, blk := range blocks {
 				_, err := interval.Add(db, tree, 0, blk.Height(), blk.Bytes())
 				require.NoError(err)
@@ -293,14 +294,14 @@ func TestExecute(t *testing.T) {
 	}
 }
 
-type testAppraiser func(context.Context, []byte) (snowman.Block, error)
+type testParser func(context.Context, []byte) (snowman.Block, error)
 
-func (f testAppraiser) AppraiseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
+func (f testParser) ParseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
 	return f(ctx, bytes)
 }
 
-func makeAppraiser(blocks []*snowmantest.Block) Appraiser {
-	return testAppraiser(func(_ context.Context, b []byte) (snowman.Block, error) {
+func makeParser(blocks []*snowmantest.Block) block.Parser {
+	return testParser(func(_ context.Context, b []byte) (snowman.Block, error) {
 		for _, block := range blocks {
 			if bytes.Equal(b, block.Bytes()) {
 				return block, nil

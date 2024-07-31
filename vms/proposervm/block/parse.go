@@ -35,14 +35,14 @@ func ParseBlocks(blks [][]byte, chainID ids.ID) []ParseResult {
 	return results
 }
 
-// Parse a block and Verify that the signature attached to the block is valid
+// Parse a block and verify that the signature attached to the block is valid
 // for the certificate provided in the block.
 func Parse(bytes []byte, chainID ids.ID) (Block, error) {
 	block, err := ParseWithoutVerification(bytes)
 	if err != nil {
 		return nil, err
 	}
-	return block, block.Verify(chainID)
+	return block, block.verify(chainID)
 }
 
 // ParseWithoutVerification parses a block without verifying that the signature

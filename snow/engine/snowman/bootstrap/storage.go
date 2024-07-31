@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -37,7 +38,7 @@ const (
 func getMissingBlockIDs(
 	ctx context.Context,
 	db database.KeyValueReader,
-	appraiser Appraiser,
+	parser block.Parser,
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) (set.Set[ids.ID], error) {
@@ -56,7 +57,7 @@ func getMissingBlockIDs(
 			return nil, err
 		}
 
-		blk, err := appraiser.AppraiseBlock(ctx, blkBytes)
+		blk, err := parser.ParseBlock(ctx, blkBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +130,7 @@ func execute(
 	haltable common.Haltable,
 	log logging.Func,
 	db database.Database,
-	appraiser Appraiser,
+	parser block.Parser,
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) error {
@@ -197,7 +198,7 @@ func execute(
 
 	for !haltable.Halted() && iterator.Next() {
 		blkBytes := iterator.Value()
-		blk, err := appraiser.AppraiseBlock(ctx, blkBytes)
+		blk, err := parser.ParseBlock(ctx, blkBytes)
 		if err != nil {
 			return err
 		}

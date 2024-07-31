@@ -38,7 +38,7 @@ type Config struct {
 
 	VM block.ChainVM
 
-	Appraiser Appraiser
+	Parser block.Parser
 
 	Bootstrapped func()
 }

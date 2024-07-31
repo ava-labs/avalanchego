@@ -950,7 +950,7 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		Appraiser:                      proposerVM,
+		Parser:                         &localParser{VM: proposerVM},
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
@@ -1350,7 +1350,7 @@ func (m *manager) createSnowmanChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
-		Appraiser:                      proposerVM,
+		Parser:                         &localParser{VM: proposerVM},
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        beacons,
@@ -1581,4 +1581,13 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 		chainReg,
 	)
 	return chainReg, err
+}
+
+// localParser intercepts invocations to ParseBlock and re-routes them to ParseLocalBlock
+type localParser struct {
+	*proposervm.VM
+}
+
+func (lp *localParser) ParseBlock(ctx context.Context, blockBytes []byte) (smcon.Block, error) {
+	return lp.ParseLocalBlock(ctx, blockBytes)
 }

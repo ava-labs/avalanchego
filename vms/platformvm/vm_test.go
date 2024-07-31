@@ -1513,7 +1513,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
-		Appraiser:                      &appraiser{VM: vm},
+		Parser:                         &parser{VM: vm},
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
@@ -2085,7 +2085,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(abort.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	// Verify that rewarded validator has been removed.
+	// verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
 	// terminating at the same time. The rewarded validator
 	// will the first by txID. To make the test more stable
@@ -2526,10 +2526,10 @@ func TestPruneMempool(t *testing.T) {
 	require.True(ok)
 }
 
-type appraiser struct {
+type parser struct {
 	*VM
 }
 
-func (a *appraiser) AppraiseBlock(ctx context.Context, blockBytes []byte) (smcon.Block, error) {
+func (a *parser) ParseLocalBlock(ctx context.Context, blockBytes []byte) (smcon.Block, error) {
 	return a.VM.ParseBlock(ctx, blockBytes)
 }

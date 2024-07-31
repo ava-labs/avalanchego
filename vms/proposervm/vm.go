@@ -292,7 +292,7 @@ func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	return vm.parsePreForkBlock(ctx, b)
 }
 
-func (vm *VM) AppraiseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+func (vm *VM) ParseLocalBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	if blk, err := vm.parsePostForkBlock(ctx, b, false); err == nil {
 		return blk, nil
 	}
@@ -532,13 +532,19 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 }
 
 func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte, verifySignature bool) (PostForkBlock, error) {
-	statelessBlock, err := statelessblock.ParseWithoutVerification(b)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		statelessBlock statelessblock.Block
+		err            error
+	)
 
 	if verifySignature {
-		if err := statelessBlock.Verify(vm.ctx.ChainID); err != nil {
+		statelessBlock, err = statelessblock.Parse(b, vm.ctx.ChainID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		statelessBlock, err = statelessblock.ParseWithoutVerification(b)
+		if err != nil {
 			return nil, err
 		}
 	}
