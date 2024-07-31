@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -80,6 +81,7 @@ var (
 	SingletonPrefix               = []byte("singleton")
 
 	TimestampKey       = []byte("timestamp")
+	FeeStateKey        = []byte("fee state")
 	CurrentSupplyKey   = []byte("current supply")
 	LastAcceptedKey    = []byte("last accepted")
 	HeightsIndexedKey  = []byte("heights indexed")
@@ -97,6 +99,9 @@ type Chain interface {
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
+
+	GetFeeState() fee.State
+	SetFeeState(f fee.State)
 
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
@@ -266,6 +271,7 @@ type stateBlk struct {
  *   |-- initializedKey -> nil
  *   |-- blocksReindexedKey -> nil
  *   |-- timestampKey -> timestamp
+ *   |-- feeStateKey -> feeState
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
@@ -353,6 +359,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
+	feeState, persistedFeeState           fee.State
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -1005,6 +1012,14 @@ func (s *state) SetTimestamp(tm time.Time) {
 	s.timestamp = tm
 }
 
+func (s *state) GetFeeState() fee.State {
+	return s.feeState
+}
+
+func (s *state) SetFeeState(feeState fee.State) {
+	s.feeState = feeState
+}
+
 func (s *state) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
@@ -1286,6 +1301,13 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
+
+	feeState, err := getFeeState(s.singletonDB)
+	if err != nil {
+		return err
+	}
+	s.persistedFeeState = feeState
+	s.SetFeeState(feeState)
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -2261,6 +2283,12 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
+	if s.feeState != s.persistedFeeState {
+		if err := putFeeState(s.singletonDB, s.feeState); err != nil {
+			return fmt.Errorf("failed to write fee state: %w", err)
+		}
+		s.persistedFeeState = s.feeState
+	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)
@@ -2439,4 +2467,28 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	)
 
 	return s.Commit()
+}
+
+func putFeeState(db database.KeyValueWriter, feeState fee.State) error {
+	feeStateBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, feeState)
+	if err != nil {
+		return err
+	}
+	return db.Put(FeeStateKey, feeStateBytes)
+}
+
+func getFeeState(db database.KeyValueReader) (fee.State, error) {
+	feeStateBytes, err := db.Get(FeeStateKey)
+	if err == database.ErrNotFound {
+		return fee.State{}, nil
+	}
+	if err != nil {
+		return fee.State{}, err
+	}
+
+	var feeState fee.State
+	if _, err := block.GenesisCodec.Unmarshal(feeStateBytes, &feeState); err != nil {
+		return fee.State{}, err
+	}
+	return feeState, nil
 }
