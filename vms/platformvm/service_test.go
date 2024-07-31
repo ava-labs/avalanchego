@@ -624,7 +624,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(vdr.EndTime, gotVdr.EndTime)
 			require.Equal(vdr.StartTime, gotVdr.StartTime)
 			require.Equal(connectedIDs.Contains(vdr.NodeID), *gotVdr.Connected)
-			require.EqualValues(100, *gotVdr.Uptime)
+			require.Equal(avajson.Float32(100), *gotVdr.Uptime)
 			found = true
 		}
 		require.True(found, "expected validators to contain %s but didn't", vdr.NodeID)
