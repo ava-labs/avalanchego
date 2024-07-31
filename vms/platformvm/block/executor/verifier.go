@@ -34,7 +34,7 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
-	pchainHeight      uint64
+	pChainHeight      uint64
 }
 
 func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
