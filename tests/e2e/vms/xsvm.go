@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -51,10 +50,11 @@ func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 }
 
 var _ = ginkgo.Describe("[XSVM]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	ginkgo.It("should support transfers between subnets", func() {
-		network := e2e.Env.GetNetwork()
+		network := e2e.GetEnv(tc).GetNetwork()
 
 		sourceSubnet := network.GetSubnet(subnetAName)
 		require.NotNil(sourceSubnet)
@@ -67,29 +67,29 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
-		tests.Outf(" issuing transactions for source subnet on %s (%s)\n", sourceAPINode.NodeID, sourceAPINode.URI)
+		tc.Outf(" issuing transactions for source subnet on %s (%s)\n", sourceAPINode.NodeID, sourceAPINode.URI)
 
 		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
-		tests.Outf(" issuing transactions for destination subnet on %s (%s)\n", destinationAPINode.NodeID, destinationAPINode.URI)
+		tc.Outf(" issuing transactions for destination subnet on %s (%s)\n", destinationAPINode.NodeID, destinationAPINode.URI)
 
 		destinationKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 
-		ginkgo.By("checking that the funded key has sufficient funds for the export")
+		tc.By("checking that the funded key has sufficient funds for the export")
 		sourceClient := api.NewClient(sourceAPINode.URI, sourceChain.ChainID.String())
 		initialSourcedBalance, err := sourceClient.Balance(
-			e2e.DefaultContext(),
+			tc.DefaultContext(),
 			sourceChain.PreFundedKey.Address(),
 			sourceChain.ChainID,
 		)
 		require.NoError(err)
 		require.GreaterOrEqual(initialSourcedBalance, units.Schmeckle)
 
-		ginkgo.By(fmt.Sprintf("exporting from chain %s on subnet %s", sourceChain.ChainID, sourceSubnet.SubnetID))
+		tc.By(fmt.Sprintf("exporting from chain %s on subnet %s", sourceChain.ChainID, sourceSubnet.SubnetID))
 		exportTxStatus, err := export.Export(
-			e2e.DefaultContext(),
+			tc.DefaultContext(),
 			&export.Config{
 				URI:                sourceAPINode.URI,
 				SourceChainID:      sourceChain.ChainID,
@@ -100,12 +100,12 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tests.Outf(" issued transaction with ID: %s\n", exportTxStatus.TxID)
+		tc.Outf(" issued transaction with ID: %s\n", exportTxStatus.TxID)
 
-		ginkgo.By("checking that the export transaction has been accepted on all nodes")
+		tc.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range sourceValidators[1:] {
 			require.NoError(api.AwaitTxAccepted(
-				e2e.DefaultContext(),
+				tc.DefaultContext(),
 				api.NewClient(node.URI, sourceChain.ChainID.String()),
 				sourceChain.PreFundedKey.Address(),
 				exportTxStatus.Nonce,
@@ -113,12 +113,12 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			))
 		}
 
-		ginkgo.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
+		tc.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
 			destinationChain.ChainID, destinationSubnet.SubnetID))
 		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
 		transferTxStatus, err := transfer.Transfer(
-			e2e.DefaultContext(),
+			tc.DefaultContext(),
 			&transfer.Config{
 				URI:        destinationAPINode.URI,
 				ChainID:    destinationChain.ChainID,
@@ -129,15 +129,15 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tests.Outf(" issued transaction with ID: %s\n", transferTxStatus.TxID)
+		tc.Outf(" issued transaction with ID: %s\n", transferTxStatus.TxID)
 
-		ginkgo.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
+		tc.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
 		sourceURIs := make([]string, len(sourceValidators))
 		for i, node := range sourceValidators {
 			sourceURIs[i] = node.URI
 		}
 		importTxStatus, err := importtx.Import(
-			e2e.DefaultContext(),
+			tc.DefaultContext(),
 			&importtx.Config{
 				URI:                destinationAPINode.URI,
 				SourceURIs:         sourceURIs,
@@ -148,20 +148,20 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tests.Outf(" issued transaction with ID: %s\n", importTxStatus.TxID)
+		tc.Outf(" issued transaction with ID: %s\n", importTxStatus.TxID)
 
-		ginkgo.By("checking that the balance of the source key has decreased")
-		sourceBalance, err := sourceClient.Balance(e2e.DefaultContext(), sourceChain.PreFundedKey.Address(), sourceChain.ChainID)
+		tc.By("checking that the balance of the source key has decreased")
+		sourceBalance, err := sourceClient.Balance(tc.DefaultContext(), sourceChain.PreFundedKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.GreaterOrEqual(initialSourcedBalance-units.Schmeckle, sourceBalance)
 
-		ginkgo.By("checking that the balance of the destination key is non-zero")
+		tc.By("checking that the balance of the destination key is non-zero")
 		destinationClient := api.NewClient(destinationAPINode.URI, destinationChain.ChainID.String())
-		destinationBalance, err := destinationClient.Balance(e2e.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
+		destinationBalance, err := destinationClient.Balance(tc.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
 
-		_ = e2e.CheckBootstrapIsPossible(network)
+		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
 
