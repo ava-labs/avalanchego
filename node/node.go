@@ -1229,6 +1229,7 @@ func (n *Node) initVMs() error {
 				TrackedSubnets:            n.Config.TrackedSubnets,
 				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
 				StaticFeeConfig:           n.Config.StaticFeeConfig,
+				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
 				MinValidatorStake:         n.Config.MinValidatorStake,
 				MaxValidatorStake:         n.Config.MaxValidatorStake,
