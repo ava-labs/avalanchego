@@ -56,7 +56,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -66,10 +66,6 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -99,8 +95,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// Visit the block
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(context.Background()))
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
@@ -142,7 +138,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -153,10 +149,6 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	onAccept := state.NewMockDiff(ctrl)
@@ -196,8 +188,8 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(context.Background()))
 
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(onAccept, gotBlkState.onAcceptState)
 	require.Equal(inputs, gotBlkState.inputs)
@@ -231,7 +223,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -242,10 +234,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -298,8 +286,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(set.Set[ids.ID]{}, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
@@ -338,7 +326,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -348,10 +336,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	apricotBlk, err := block.NewApricotCommitBlock(
@@ -372,8 +356,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
@@ -411,7 +395,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -421,10 +405,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	apricotBlk, err := block.NewApricotAbortBlock(
@@ -445,8 +425,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
