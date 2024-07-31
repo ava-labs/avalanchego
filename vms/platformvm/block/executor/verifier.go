@@ -16,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-
-	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
@@ -36,7 +34,7 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
-	proposerVMCtx     *smblock.Context
+	pchainHeight      uint64
 }
 
 func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
@@ -239,7 +237,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		inputs:          atomicExecutor.Inputs,
 		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests:  atomicExecutor.AtomicRequests,
-		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -352,7 +350,7 @@ func (v *verifier) abortBlock(b block.Block) error {
 		statelessBlock:  b,
 		onAcceptState:   onAbortState,
 		timestamp:       onAbortState.GetTimestamp(),
-		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -370,7 +368,7 @@ func (v *verifier) commitBlock(b block.Block) error {
 		statelessBlock:  b,
 		onAcceptState:   onCommitState,
 		timestamp:       onCommitState.GetTimestamp(),
-		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -423,7 +421,7 @@ func (v *verifier) proposalBlock(
 		// always be the same as the Banff Proposal Block.
 		timestamp:       onAbortState.GetTimestamp(),
 		atomicRequests:  atomicRequests,
-		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -451,7 +449,7 @@ func (v *verifier) standardBlock(
 		timestamp:       onAcceptState.GetTimestamp(),
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
-		verifiedHeights: set.Of(v.proposerVMCtx.PChainHeight),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }

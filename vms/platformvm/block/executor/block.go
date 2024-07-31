@@ -30,13 +30,13 @@ func (*Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 }
 
 func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error {
+	pChainHeight := uint64(0)
+	if ctx != nil {
+		pChainHeight = ctx.PChainHeight
+	}
+
 	blkID := b.ID()
 	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
-		pChainHeight := uint64(0)
-		if ctx != nil {
-			pChainHeight = ctx.PChainHeight
-		}
-
 		if blkState.verifiedHeights.Contains(pChainHeight) {
 			// This block has already been verified against this height.
 			return nil
@@ -51,7 +51,7 @@ func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error
 	return b.Visit(&verifier{
 		backend:           b.manager.backend,
 		txExecutorBackend: b.manager.txExecutorBackend,
-		proposerVMCtx:     ctx,
+		pChainHeight:      pChainHeight,
 	})
 }
 
