@@ -25,15 +25,19 @@ type Block struct {
 	manager *manager
 }
 
-func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
-	return ExpectsContext(b)
+func (*Block) ShouldVerifyWithContext(context.Context) (bool, error) {
+	return true, nil
 }
 
 func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error {
 	blkID := b.ID()
-	if _, ok := b.manager.blkIDToState[blkID]; ok {
-		// This block has already been verified.
-		return nil
+	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
+		if blkState.verifiedHeights.Contains(ctx.PChainHeight) {
+			// This block has already been verified against this height.
+			return nil
+		}
+
+		blkState.verifiedHeights.Add(ctx.PChainHeight)
 	}
 
 	return b.Visit(&verifier{
