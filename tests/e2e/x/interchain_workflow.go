@@ -151,6 +151,6 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			require.Positive(balances[avaxAssetID])
 		})
 
-		_ = e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork(), ginkgo.DeferCleanup)
+		_ = e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })

@@ -163,6 +163,6 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			require.Positive(balances[avaxAssetID])
 		})
 
-		_ = e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork(), ginkgo.DeferCleanup)
+		_ = e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })

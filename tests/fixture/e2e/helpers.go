@@ -54,11 +54,6 @@ const (
 	PrivateNetworksDirName = "private_networks"
 )
 
-// RegisterCleanupFunc is a function that registers a function intended to be called at
-// the end of a given test. A function that accepts this type can avoid a direct
-// dependency on ginkgo's DeferCleanup function.
-type RegisterCleanupFunc func(args ...interface{})
-
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
 	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
@@ -193,7 +188,7 @@ func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 
 // Verify that a new node can bootstrap into the network. If the check wasn't skipped,
 // the node will be returned to the caller.
-func CheckBootstrapIsPossible(network *tmpnet.Network, registerCleanup RegisterCleanupFunc) *tmpnet.Node {
+func CheckBootstrapIsPossible(network *tmpnet.Network) *tmpnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
@@ -217,7 +212,7 @@ func CheckBootstrapIsPossible(network *tmpnet.Network, registerCleanup RegisterC
 	// so no further cleanup effort is required if an error is seen here.
 
 	// Register a cleanup to ensure the node is stopped at the end of the test
-	registerCleanup(func() {
+	ginkgo.DeferCleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(node.Stop(ctx))

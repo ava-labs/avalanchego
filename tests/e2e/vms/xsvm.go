@@ -161,7 +161,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
 
-		_ = e2e.CheckBootstrapIsPossible(network, ginkgo.DeferCleanup)
+		_ = e2e.CheckBootstrapIsPossible(network)
 	})
 })
 

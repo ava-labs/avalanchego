@@ -162,6 +162,6 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			_ = e2e.SendEthTransaction(ethClient, signedTx)
 		})
 
-		_ = e2e.CheckBootstrapIsPossible(privateNetwork, ginkgo.DeferCleanup)
+		_ = e2e.CheckBootstrapIsPossible(privateNetwork)
 	})
 })
