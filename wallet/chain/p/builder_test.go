@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -34,16 +35,18 @@ var (
 	subnetAssetID = ids.Empty.Prefix(2024)
 
 	testContext = &builder.Context{
-		NetworkID:                     constants.UnitTestID,
-		AVAXAssetID:                   avaxAssetID,
-		BaseTxFee:                     units.MicroAvax,
-		CreateSubnetTxFee:             19 * units.MicroAvax,
-		TransformSubnetTxFee:          789 * units.MicroAvax,
-		CreateBlockchainTxFee:         1234 * units.MicroAvax,
-		AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
-		AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
-		AddSubnetValidatorFee:         1010 * units.MilliAvax,
-		AddSubnetDelegatorFee:         9 * units.Avax,
+		NetworkID:   constants.UnitTestID,
+		AVAXAssetID: avaxAssetID,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                         units.MicroAvax,
+			CreateSubnetTxFee:             19 * units.MicroAvax,
+			TransformSubnetTxFee:          789 * units.MicroAvax,
+			CreateBlockchainTxFee:         1234 * units.MicroAvax,
+			AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
+			AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
+			AddSubnetValidatorFee:         1010 * units.MilliAvax,
+			AddSubnetDelegatorFee:         9 * units.Avax,
+		},
 	}
 )
 
@@ -90,7 +93,7 @@ func TestBaseTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.BaseTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -148,7 +151,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.AddSubnetValidatorFee,
+				avaxAssetID: testContext.StaticFeeConfig.AddSubnetValidatorFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -200,7 +203,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.BaseTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -260,7 +263,7 @@ func TestCreateChainTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.CreateBlockchainTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.CreateBlockchainTxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -309,7 +312,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.CreateSubnetTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.CreateSubnetTxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -361,7 +364,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.BaseTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -412,7 +415,7 @@ func TestImportTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.BaseTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
 			},
 		),
 		addInputAmounts(utx.Ins, utx.ImportedInputs),
@@ -463,7 +466,7 @@ func TestExportTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs, utx.ExportedOutputs),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.BaseTxFee,
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -531,7 +534,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs),
 			map[ids.ID]uint64{
-				avaxAssetID:   testContext.TransformSubnetTxFee,
+				avaxAssetID:   testContext.StaticFeeConfig.TransformSubnetTxFee,
 				subnetAssetID: maxSupply - initialSupply,
 			},
 		),
@@ -569,9 +572,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	var (
 		utxos = []*avax.UTXO{
-			makeUTXO(testContext.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
-			makeUTXO(1 * units.NanoAvax),                        // small UTXO
-			makeUTXO(9 * units.Avax),                            // large UTXO
+			makeUTXO(testContext.StaticFeeConfig.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
+			makeUTXO(1 * units.NanoAvax),                                        // small UTXO
+			makeUTXO(9 * units.Avax),                                            // large UTXO
 		}
 		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
@@ -633,7 +636,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs, utx.StakeOuts),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.AddPrimaryNetworkValidatorFee,
+				avaxAssetID: testContext.StaticFeeConfig.AddPrimaryNetworkValidatorFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
@@ -700,7 +703,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		addAmounts(
 			addOutputAmounts(utx.Outs, utx.StakeOuts),
 			map[ids.ID]uint64{
-				avaxAssetID: testContext.AddPrimaryNetworkDelegatorFee,
+				avaxAssetID: testContext.StaticFeeConfig.AddPrimaryNetworkDelegatorFee,
 			},
 		),
 		addInputAmounts(utx.Ins),
