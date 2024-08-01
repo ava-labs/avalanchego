@@ -36,7 +36,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		ethClient := e2e.NewEthClient(nodeURI)
 
 		ginkgo.By("allocating a pre-funded key to send from and a recipient key to deliver to")
-		senderKey := e2e.Env.AllocatePreFundedKey()
+		senderKey := e2e.Env.PreFundedKey
 		senderEthAddress := evm.GetEthAddress(senderKey)
 		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)

@@ -16,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -74,7 +77,13 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 			// Ensure the same set of 10 keys is used for all tests
 			// by retrieving them outside of runFunc.
-			testKeys := e2e.Env.AllocatePreFundedKeys(10)
+			testKeys := []*secp256k1.PrivateKey{
+				// The funded key will be the source of funds for the new keys
+				e2e.Env.PreFundedKey,
+			}
+			newKeys, err := tmpnet.NewPrivateKeys(9)
+			require.NoError(err)
+			testKeys = append(testKeys, newKeys...)
 
 			runFunc := func(round int) {
 				tests.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
@@ -158,6 +167,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				receiverOrigBal := testBalances[toIdx]
 
 				amountToTransfer := senderOrigBal / 10
+
+				// Special-case the transfer amount from the funded key to ensure
+				// that new keys have enough funds to perform their own transfers.
+				if shortAddrs[fromIdx] == e2e.Env.PreFundedKey.Address() {
+					amountToTransfer = 10 * units.Avax
+				}
 
 				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer

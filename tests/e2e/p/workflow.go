@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -37,7 +38,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 	ginkgo.It("P-chain main operations",
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
-			keychain := e2e.Env.NewKeychain(2)
+			// Use a pre-funded key for the P-Chain
+			keychain := e2e.Env.NewKeychain()
+			// Use a new key for the X-Chain
+			xChainKey, err := secp256k1.NewPrivateKey()
+			require.NoError(err)
+			keychain.Add(xChainKey)
 			baseWallet := e2e.NewWallet(keychain, nodeURI)
 
 			pWallet := baseWallet.P()
