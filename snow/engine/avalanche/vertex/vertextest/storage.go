@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package vertex
+package vertextest
 
 import (
 	"context"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 var (
@@ -21,7 +20,7 @@ var (
 	errEdge               = errors.New("unexpectedly called Edge")
 	errStopVertexAccepted = errors.New("unexpectedly called StopVertexAccepted")
 
-	_ Storage = (*TestStorage)(nil)
+	_ vertex.Storage = (*TestStorage)(nil)
 )
 
 type TestStorage struct {

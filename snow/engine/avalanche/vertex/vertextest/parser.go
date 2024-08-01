@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package vertex
+package vertextest
 
 import (
 	"context"
@@ -13,12 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 var (
 	errParse = errors.New("unexpectedly called Parse")
 
-	_ Parser = (*TestParser)(nil)
+	_ vertex.Parser = (*TestParser)(nil)
 )
 
 type TestParser struct {

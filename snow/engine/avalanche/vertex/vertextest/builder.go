@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package vertex
+package vertextest
 
 import (
 	"context"
@@ -14,12 +12,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 var (
 	errBuild = errors.New("unexpectedly called Build")
 
-	_ Builder = (*TestBuilder)(nil)
+	_ vertex.Builder = (*TestBuilder)(nil)
 )
 
 type TestBuilder struct {

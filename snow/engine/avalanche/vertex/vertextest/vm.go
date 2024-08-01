@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package vertex
+package vertextest
 
 import (
 	"context"
@@ -13,13 +11,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 )
 
 var (
 	errLinearize = errors.New("unexpectedly called Linearize")
 
-	_ LinearizableVM = (*TestVM)(nil)
+	_ vertex.LinearizableVM = (*TestVM)(nil)
 )
 
 type TestVM struct {

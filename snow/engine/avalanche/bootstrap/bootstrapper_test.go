@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/vertextest"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -56,7 +56,7 @@ func (t *testTx) Accept(ctx context.Context) error {
 	return nil
 }
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.SenderTest, *vertex.TestManager, *vertex.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.SenderTest, *vertextest.TestManager, *vertextest.TestVM) {
 	require := require.New(t)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -65,8 +65,8 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.SenderTest, *verte
 	vdrs := validators.NewManager()
 	db := memdb.New()
 	sender := &enginetest.SenderTest{T: t}
-	manager := vertex.NewTestManager(t)
-	vm := &vertex.TestVM{}
+	manager := vertextest.NewTestManager(t)
+	vm := &vertextest.TestVM{}
 	vm.T = t
 
 	sender.Default(true)

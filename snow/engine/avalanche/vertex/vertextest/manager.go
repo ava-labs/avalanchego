@@ -1,13 +1,15 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
+package vertextest
 
-package vertex
+import (
+	"testing"
 
-import "testing"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+)
 
-var _ Manager = (*TestManager)(nil)
+var _ vertex.Manager = (*TestManager)(nil)
 
 type TestManager struct {
 	TestBuilder
