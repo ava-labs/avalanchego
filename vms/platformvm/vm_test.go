@@ -2085,7 +2085,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(abort.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	// verify that rewarded validator has been removed.
+	// Verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
 	// terminating at the same time. The rewarded validator
 	// will the first by txID. To make the test more stable

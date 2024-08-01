@@ -787,8 +787,6 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
-	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
-	// using.
 	proposerVM := proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
@@ -801,6 +799,8 @@ func (m *manager) createAvalancheChain(
 		},
 	)
 
+	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
+	// using.
 	var vmWrappingProposerVM block.ChainVM = proposerVM
 
 	if m.MeterVMEnabled {

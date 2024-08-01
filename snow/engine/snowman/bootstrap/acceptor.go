@@ -24,15 +24,15 @@ type parseAcceptor struct {
 	numAccepted prometheus.Counter
 }
 
-func (a *parseAcceptor) ParseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
-	blk, err := a.parser.ParseBlock(ctx, bytes)
+func (p *parseAcceptor) ParseBlock(ctx context.Context, bytes []byte) (snowman.Block, error) {
+	blk, err := p.parser.ParseBlock(ctx, bytes)
 	if err != nil {
 		return nil, err
 	}
 	return &blockAcceptor{
 		Block:       blk,
-		ctx:         a.ctx,
-		numAccepted: a.numAccepted,
+		ctx:         p.ctx,
+		numAccepted: p.numAccepted,
 	}, nil
 }
 
