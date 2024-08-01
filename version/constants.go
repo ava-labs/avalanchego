@@ -9,7 +9,7 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -68,82 +68,76 @@ var (
 	// by avalanchego, but is useful for downstream libraries.
 	RPCChainVMProtocolCompatibility map[uint][]*Semantic
 
-	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhase1Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhase1Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhase1Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhase2Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhase2Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhase2Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhase3Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhase3Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhase3Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhase4Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.September, 22, 21, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.September, 16, 21, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase4MinPChainHeight = map[uint32]uint64{
-		constants.MainnetID: 793005,
-		constants.FujiID:    47437,
+		constants.MainnetID: upgrade.Mainnet.ApricotPhase4Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhase4Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhase5Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.December, 2, 18, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhase5Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhase5Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhasePre6Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhasePre6Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhasePre6Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhase6Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhase6Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhase6Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	ApricotPhasePost6Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.ApricotPhasePost6Time,
+		constants.FujiID:    upgrade.Fuji.ApricotPhasePost6Time,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	BanffTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.BanffTime,
+		constants.FujiID:    upgrade.Fuji.BanffTime,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	CortinaTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
-	}
-	CortinaXChainStopVertexID = map[uint32]ids.ID{
-		// The mainnet stop vertex is well known. It can be verified on any
-		// fully synced node by looking at the parentID of the genesis block.
-		//
-		// Ref: https://subnets.avax.network/x-chain/block/0
-		constants.MainnetID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
-		// The fuji stop vertex is well known. It can be verified on any fully
-		// synced node by looking at the parentID of the genesis block.
-		//
-		// Ref: https://subnets-test.avax.network/x-chain/block/0
-		constants.FujiID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
+		constants.MainnetID: upgrade.Mainnet.CortinaTime,
+		constants.FujiID:    upgrade.Fuji.CortinaTime,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	DurangoTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.DurangoTime,
+		constants.FujiID:    upgrade.Fuji.DurangoTime,
 	}
 
+	// Deprecated: This will be removed once coreth no longer uses it.
 	EUpgradeTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.MainnetID: upgrade.Mainnet.EtnaTime,
+		constants.FujiID:    upgrade.Fuji.EtnaTime,
 	}
 )
 
@@ -168,95 +162,11 @@ func init() {
 	}
 }
 
-func GetApricotPhase1Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase1Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhase2Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase2Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhase3Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase3Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhase4Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase4Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhase5Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase5Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhasePre6Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhasePre6Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhase6Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetApricotPhasePost6Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhasePost6Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetBanffTime(networkID uint32) time.Time {
-	if upgradeTime, exists := BanffTimes[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetCortinaTime(networkID uint32) time.Time {
-	if upgradeTime, exists := CortinaTimes[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetDurangoTime(networkID uint32) time.Time {
-	if upgradeTime, exists := DurangoTimes[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetEUpgradeTime(networkID uint32) time.Time {
-	if upgradeTime, exists := EUpgradeTimes[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
-func GetCompatibility(networkID uint32) Compatibility {
+func GetCompatibility(minCompatibleTime time.Time) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetDurangoTime(networkID),
+		minCompatibleTime,
 		PrevMinimumCompatibleVersion,
 	)
 }
