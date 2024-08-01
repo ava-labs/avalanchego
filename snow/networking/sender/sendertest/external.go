@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package sender
+package sendertest
 
 import (
 	"errors"
@@ -12,12 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	_ ExternalSender = (*ExternalSenderTest)(nil)
+	_ sender.ExternalSender = (*ExternalSenderTest)(nil)
 
 	errSend = errors.New("unexpectedly called Send")
 )

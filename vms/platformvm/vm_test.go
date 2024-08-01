@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -1459,7 +1460,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sender.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.ExternalSenderTest{TB: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
