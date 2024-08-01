@@ -217,7 +217,7 @@ func NewTestNetwork(
 				resourceTracker.DiskTracker(),
 			),
 		},
-		upgrade.DefaultUpgradeTime,
+		upgrade.InitiallyActiveTime,
 		msgCreator,
 		metrics,
 		log,

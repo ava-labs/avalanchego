@@ -82,7 +82,6 @@ import (
 
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	pupgrade "github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	coreth "github.com/ava-labs/coreth/plugin/evm"
 )
 
@@ -1185,11 +1184,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
-			ApricotPhase4Time:                       n.Config.UpgradeConfig.ApricotPhase4Time,
-			ApricotPhase4MinPChainHeight:            n.Config.UpgradeConfig.ApricotPhase4MinPChainHeight,
-			CortinaTime:                             n.Config.UpgradeConfig.CortinaTime,
-			CortinaXChainStopVertexID:               n.Config.UpgradeConfig.CortinaXChainStopVertexID,
-			DurangoTime:                             n.Config.UpgradeConfig.DurangoTime,
+			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,
 			StateSyncBeacons:                        n.Config.StateSyncIDs,
 			TracingEnabled:                          n.Config.TraceConfig.Enabled,
@@ -1221,7 +1216,6 @@ func (n *Node) initVMs() error {
 	}
 
 	// Register the VMs that Avalanche supports
-	eUpgradeTime := n.Config.UpgradeConfig.EtnaTime
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
@@ -1242,23 +1236,15 @@ func (n *Node) initVMs() error {
 				MinStakeDuration:          n.Config.MinStakeDuration,
 				MaxStakeDuration:          n.Config.MaxStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
-				UpgradeConfig: pupgrade.Config{
-					ApricotPhase3Time: n.Config.UpgradeConfig.ApricotPhase3Time,
-					ApricotPhase5Time: n.Config.UpgradeConfig.ApricotPhase5Time,
-					BanffTime:         n.Config.UpgradeConfig.BanffTime,
-					CortinaTime:       n.Config.UpgradeConfig.CortinaTime,
-					DurangoTime:       n.Config.UpgradeConfig.DurangoTime,
-					EUpgradeTime:      eUpgradeTime,
-				},
-				UseCurrentHeight: n.Config.UseCurrentHeight,
+				UpgradeConfig:             n.Config.UpgradeConfig,
+				UseCurrentHeight:          n.Config.UseCurrentHeight,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
-				TxFee:              n.Config.StaticFeeConfig.TxFee,
-				CreateAssetTxFee:   n.Config.CreateAssetTxFee,
-				CortinaUpgradeTime: n.Config.UpgradeConfig.CortinaTime,
-				EUpgradeTime:       eUpgradeTime,
+				Upgrades:         n.Config.UpgradeConfig,
+				TxFee:            n.Config.StaticFeeConfig.TxFee,
+				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),

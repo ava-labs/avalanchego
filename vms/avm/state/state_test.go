@@ -287,7 +287,7 @@ func TestInitializeChainState(t *testing.T) {
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()
-	genesisTimestamp := upgrade.DefaultUpgradeTime
+	genesisTimestamp := upgrade.InitiallyActiveTime
 	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
 
 	lastAcceptedID := s.GetLastAccepted()
