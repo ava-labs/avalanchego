@@ -90,7 +90,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	peerTracker.Connected(peer, version.CurrentApp)
 
 	return Config{
-		Parser:                         vm,
+		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        vdrs,

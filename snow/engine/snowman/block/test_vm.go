@@ -75,10 +75,6 @@ func (vm *TestVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, erro
 	return nil, errParseBlock
 }
 
-func (vm *TestVM) ParseLocalBlock(ctx context.Context, b []byte) (snowman.Block, error) {
-	return vm.ParseBlock(ctx, b)
-}
-
 func (vm *TestVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	if vm.GetBlockF != nil {
 		return vm.GetBlockF(ctx, id)

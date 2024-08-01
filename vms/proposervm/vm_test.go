@@ -2536,7 +2536,7 @@ func TestLocalParse(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		f              func(ctx context.Context, b []byte) (snowman.Block, error)
+		f              block.ParseFunc
 		block          []byte
 		resultingBlock interface{}
 	}{

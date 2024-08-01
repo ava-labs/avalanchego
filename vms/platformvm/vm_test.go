@@ -1513,7 +1513,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
-		Parser:                         &parser{VM: vm},
+		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
@@ -2524,12 +2524,4 @@ func TestPruneMempool(t *testing.T) {
 	require.False(ok)
 	_, ok = vm.Builder.Get(baseTxID)
 	require.True(ok)
-}
-
-type parser struct {
-	*VM
-}
-
-func (a *parser) ParseLocalBlock(ctx context.Context, blockBytes []byte) (smcon.Block, error) {
-	return a.VM.ParseBlock(ctx, blockBytes)
 }
