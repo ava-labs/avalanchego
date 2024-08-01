@@ -66,7 +66,7 @@ const (
 	banff
 	cortina
 	durango
-	eUpgrade
+	etna
 
 	latestFork = durango
 )
@@ -334,7 +334,7 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	}
 
 	switch f {
-	case eUpgrade:
+	case etna:
 		c.UpgradeConfig.EtnaTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
 	case durango:
