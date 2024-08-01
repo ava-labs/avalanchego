@@ -163,7 +163,7 @@ func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) erro
 
 func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	parentTimestamp := b.Timestamp()
-	if b.vm.Upgrades.IsApricotPhase4Activated(parentTimestamp) {
+	if !b.vm.Upgrades.IsApricotPhase4Activated(parentTimestamp) {
 		// The chain hasn't forked yet
 		innerBlock, err := b.vm.ChainVM.BuildBlock(ctx)
 		if err != nil {
