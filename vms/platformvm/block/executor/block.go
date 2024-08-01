@@ -29,7 +29,10 @@ func (b *Block) Verify(context.Context) error {
 		return nil
 	}
 
-	return b.Visit(b.manager.verifier)
+	return b.Visit(&verifier{
+		backend:           b.manager.backend,
+		txExecutorBackend: b.manager.txExecutorBackend,
+	})
 }
 
 func (b *Block) Accept(context.Context) error {

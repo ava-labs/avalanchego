@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -58,8 +59,6 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}
 	env.blkManager.(*manager).lastAccepted = parentID
 	chainTime := env.clk.Time().Truncate(time.Second)
-	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 
 	// create a proposal transaction to be included into proposal block
 	utx := &txs.AddValidatorTx{
@@ -88,6 +87,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 
 	// setup state to validate proposal block transaction
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
+	onParentAccept.EXPECT().GetFeeState().Return(fee.State{}).AnyTimes()
 
 	currentStakersIt := state.NewMockStakerIterator(ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
@@ -156,10 +156,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	chainTime := parentTime
-	env.mockedState.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
+	onParentAccept.EXPECT().GetFeeState().Return(fee.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{

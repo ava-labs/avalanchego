@@ -67,11 +67,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	if err != nil {
-		return err
-	}
-
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
@@ -131,10 +127,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	if err != nil {
-		return err
-	}
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
 	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 
@@ -168,10 +161,8 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	var (
-		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
-		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
-		timestamp       = onCommitState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
+		timestamp     = onCommitState.GetTimestamp() // Equal to parent timestamp
+		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
 	)
 	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
 }
@@ -188,10 +179,8 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	var (
-		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
-		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
-		timestamp       = onAcceptState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
+		timestamp     = onAcceptState.GetTimestamp() // Equal to parent timestamp
+		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
 	)
 	return v.standardBlock(b, feeCalculator, onAcceptState)
 }
@@ -215,7 +204,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
-	feeCalculator := fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, currentTimestamp)
+	feeCalculator := state.NewStaticFeeCalculator(v.txExecutorBackend.Config, currentTimestamp)
 	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
 		FeeCalculator: feeCalculator,

@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
-const txGossipHandlerID = 0
-
 var (
 	_ common.AppHandler    = (*Network)(nil)
 	_ validators.Connector = (*Network)(nil)
@@ -68,7 +66,7 @@ func New(
 		config.MaxValidatorSetStaleness,
 	)
 	txGossipClient := p2pNetwork.NewClient(
-		txGossipHandlerID,
+		p2p.TxGossipHandlerID,
 		p2p.WithValidatorSampling(validators),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
@@ -157,7 +155,7 @@ func New(
 		appRequestHandler: validatorHandler,
 	}
 
-	if err := p2pNetwork.AddHandler(txGossipHandlerID, txGossipHandler); err != nil {
+	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
 		return nil, err
 	}
 
