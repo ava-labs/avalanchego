@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/statetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -524,7 +525,7 @@ func TestPushGossiper(t *testing.T) {
 				&p2p.Peers{},
 				logging.NoLog{},
 				constants.PrimaryNetworkID,
-				&validators.TestState{
+				&statetest.TestState{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 1, nil
 					},

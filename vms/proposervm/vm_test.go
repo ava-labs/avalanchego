@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/statetest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -77,7 +78,7 @@ func initTestProposerVM(
 	minPChainHeight uint64,
 ) (
 	*fullVM,
-	*validators.TestState,
+	*statetest.TestState,
 	*VM,
 	database.Database,
 ) {
@@ -135,7 +136,7 @@ func initTestProposerVM(
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &statetest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -812,7 +813,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &statetest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1056,7 +1057,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 func TestInnerVMRollback(t *testing.T) {
 	require := require.New(t)
 
-	valState := &validators.TestState{
+	valState := &statetest.TestState{
 		T: t,
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return defaultPChainHeight, nil
@@ -1598,7 +1599,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &statetest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1769,7 +1770,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &statetest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -2186,7 +2187,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
-	ctx.ValidatorState = &validators.TestState{
+	ctx.ValidatorState = &statetest.TestState{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
 			return snowmantest.GenesisHeight, nil

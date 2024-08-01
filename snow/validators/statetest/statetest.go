@@ -1,10 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// TODO: https://github.com/ava-labs/avalanchego/issues/3174
-//go:build test || !test
-
-package validators
+package statetest
 
 import (
 	"context"
@@ -14,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 var (
@@ -23,7 +21,7 @@ var (
 	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
 )
 
-var _ State = (*TestState)(nil)
+var _ validators.State = (*TestState)(nil)
 
 type TestState struct {
 	T testing.TB
@@ -36,7 +34,7 @@ type TestState struct {
 	GetMinimumHeightF func(ctx context.Context) (uint64, error)
 	GetCurrentHeightF func(ctx context.Context) (uint64, error)
 	GetSubnetIDF      func(ctx context.Context, chainID ids.ID) (ids.ID, error)
-	GetValidatorSetF  func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*GetValidatorOutput, error)
+	GetValidatorSetF  func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
 func (vm *TestState) GetMinimumHeight(ctx context.Context) (uint64, error) {
@@ -73,7 +71,7 @@ func (vm *TestState) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*GetValidatorOutput, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	if vm.GetValidatorSetF != nil {
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
