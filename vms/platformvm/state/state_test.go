@@ -1404,17 +1404,17 @@ func TestStateSubnetOwner(t *testing.T) {
 func TestStateSubnetManager(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(s State, subnetID ids.ID, chainID ids.ID, addr []byte)
+		setup func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte)
 	}{
 		{
 			name: "in-memory",
-			setup: func(s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
+			setup: func(_ *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
 				s.SetSubnetManager(subnetID, chainID, addr)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
+			setup: func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
 				subnetManagerCache := s.(*state).subnetManagerCache
 
 				require.Zero(t, subnetManagerCache.Len())
@@ -1441,7 +1441,7 @@ func TestStateSubnetManager(t *testing.T) {
 			expectedChainID := ids.GenerateTestID()
 			expectedAddr := []byte{'a', 'd', 'd', 'r'}
 
-			test.setup(initializedState, subnetID, expectedChainID, expectedAddr)
+			test.setup(t, initializedState, subnetID, expectedChainID, expectedAddr)
 
 			chainID, addr, err = initializedState.GetSubnetManager(subnetID)
 			require.NoError(err)
