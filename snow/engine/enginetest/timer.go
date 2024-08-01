@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var _ common.Timer = (*TimerTest)(nil)

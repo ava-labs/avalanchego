@@ -8,8 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (

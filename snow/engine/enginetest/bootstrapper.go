@@ -7,8 +7,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var (
