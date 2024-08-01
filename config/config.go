@@ -798,8 +798,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 }
 
 func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) {
-	configured := v.IsSet(UpgradeFileContentKey) || v.IsSet(UpgradeFileKey)
-	if !configured {
+	if !v.IsSet(UpgradeFileKey) && !v.IsSet(UpgradeFileContentKey) {
 		return upgrade.GetConfig(networkID), nil
 	}
 
