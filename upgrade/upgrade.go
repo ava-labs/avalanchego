@@ -13,136 +13,139 @@ import (
 )
 
 var (
-	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
+	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	UnscheduledActivationTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
 
-	DefaultUpgradeTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-
-	ApricotPhase1Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
-	}
-
-	ApricotPhase2Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
-	}
-
-	ApricotPhase3Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
-	}
-
-	ApricotPhase4Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.September, 22, 21, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.September, 16, 21, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase4MinPChainHeight = map[uint32]uint64{
-		constants.MainnetID: 793005,
-		constants.FujiID:    47437,
-	}
-
-	ApricotPhase5Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.December, 2, 18, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
-	}
-
-	ApricotPhasePre6Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
-	}
-
-	ApricotPhase6Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
-	}
-
-	ApricotPhasePost6Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC),
-	}
-
-	BanffTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
-	}
-
-	CortinaTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
-	}
-	CortinaXChainStopVertexID = map[uint32]ids.ID{
+	Mainnet = Config{
+		ApricotPhase1Time:            time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
+		ApricotPhase2Time:            time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
+		ApricotPhase3Time:            time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
+		ApricotPhase4Time:            time.Date(2021, time.September, 22, 21, 0, 0, 0, time.UTC),
+		ApricotPhase4MinPChainHeight: 793005,
+		ApricotPhase5Time:            time.Date(2021, time.December, 2, 18, 0, 0, 0, time.UTC),
+		ApricotPhasePre6Time:         time.Date(2022, time.September, 5, 1, 30, 0, 0, time.UTC),
+		ApricotPhase6Time:            time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		ApricotPhasePost6Time:        time.Date(2022, time.September, 7, 3, 0, 0, 0, time.UTC),
+		BanffTime:                    time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
+		CortinaTime:                  time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		// The mainnet stop vertex is well known. It can be verified on any
 		// fully synced node by looking at the parentID of the genesis block.
 		//
 		// Ref: https://subnets.avax.network/x-chain/block/0
-		constants.MainnetID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
+		CortinaXChainStopVertexID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
+		DurangoTime:               time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
+		EtnaTime:                  UnscheduledActivationTime,
+	}
+	Fuji = Config{
+		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
+		ApricotPhase2Time:            time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
+		ApricotPhase3Time:            time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
+		ApricotPhase4Time:            time.Date(2021, time.September, 16, 21, 0, 0, 0, time.UTC),
+		ApricotPhase4MinPChainHeight: 47437,
+		ApricotPhase5Time:            time.Date(2021, time.November, 24, 15, 0, 0, 0, time.UTC),
+		ApricotPhasePre6Time:         time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		ApricotPhase6Time:            time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		ApricotPhasePost6Time:        time.Date(2022, time.September, 7, 6, 0, 0, 0, time.UTC),
+		BanffTime:                    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
+		CortinaTime:                  time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 		// The fuji stop vertex is well known. It can be verified on any fully
 		// synced node by looking at the parentID of the genesis block.
 		//
 		// Ref: https://subnets-test.avax.network/x-chain/block/0
-		constants.FujiID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
-	}
-
-	DurangoTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
-	}
-
-	EUpgradeTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-	}
-)
-
-var (
-	Mainnet = Config{
-		ApricotPhase1Time:            ApricotPhase1Times[constants.MainnetID],
-		ApricotPhase2Time:            ApricotPhase2Times[constants.MainnetID],
-		ApricotPhase3Time:            ApricotPhase3Times[constants.MainnetID],
-		ApricotPhase4Time:            ApricotPhase4Times[constants.MainnetID],
-		ApricotPhase4MinPChainHeight: ApricotPhase4MinPChainHeight[constants.MainnetID],
-		ApricotPhase5Time:            ApricotPhase5Times[constants.MainnetID],
-		ApricotPhasePre6Time:         ApricotPhasePre6Times[constants.MainnetID],
-		ApricotPhase6Time:            ApricotPhase6Times[constants.MainnetID],
-		ApricotPhasePost6Time:        ApricotPhasePost6Times[constants.MainnetID],
-		BanffTime:                    BanffTimes[constants.MainnetID],
-		CortinaTime:                  CortinaTimes[constants.MainnetID],
-		CortinaXChainStopVertexID:    CortinaXChainStopVertexID[constants.MainnetID],
-		DurangoTime:                  DurangoTimes[constants.MainnetID],
-		EtnaTime:                     EUpgradeTimes[constants.MainnetID],
-	}
-	Fuji = Config{
-		ApricotPhase1Time:            ApricotPhase1Times[constants.FujiID],
-		ApricotPhase2Time:            ApricotPhase2Times[constants.FujiID],
-		ApricotPhase3Time:            ApricotPhase3Times[constants.FujiID],
-		ApricotPhase4Time:            ApricotPhase4Times[constants.FujiID],
-		ApricotPhase4MinPChainHeight: ApricotPhase4MinPChainHeight[constants.FujiID],
-		ApricotPhase5Time:            ApricotPhase5Times[constants.FujiID],
-		ApricotPhasePre6Time:         ApricotPhasePre6Times[constants.FujiID],
-		ApricotPhase6Time:            ApricotPhase6Times[constants.FujiID],
-		ApricotPhasePost6Time:        ApricotPhasePost6Times[constants.FujiID],
-		BanffTime:                    BanffTimes[constants.FujiID],
-		CortinaTime:                  CortinaTimes[constants.FujiID],
-		CortinaXChainStopVertexID:    CortinaXChainStopVertexID[constants.FujiID],
-		DurangoTime:                  DurangoTimes[constants.FujiID],
-		EtnaTime:                     EUpgradeTimes[constants.FujiID],
+		CortinaXChainStopVertexID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
+		DurangoTime:               time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
+		EtnaTime:                  UnscheduledActivationTime,
 	}
 	Default = Config{
-		ApricotPhase1Time:            DefaultUpgradeTime,
-		ApricotPhase2Time:            DefaultUpgradeTime,
-		ApricotPhase3Time:            DefaultUpgradeTime,
-		ApricotPhase4Time:            DefaultUpgradeTime,
+		ApricotPhase1Time:            InitiallyActiveTime,
+		ApricotPhase2Time:            InitiallyActiveTime,
+		ApricotPhase3Time:            InitiallyActiveTime,
+		ApricotPhase4Time:            InitiallyActiveTime,
 		ApricotPhase4MinPChainHeight: 0,
-		ApricotPhase5Time:            DefaultUpgradeTime,
-		ApricotPhasePre6Time:         DefaultUpgradeTime,
-		ApricotPhase6Time:            DefaultUpgradeTime,
-		ApricotPhasePost6Time:        DefaultUpgradeTime,
-		BanffTime:                    DefaultUpgradeTime,
-		CortinaTime:                  DefaultUpgradeTime,
+		ApricotPhase5Time:            InitiallyActiveTime,
+		ApricotPhasePre6Time:         InitiallyActiveTime,
+		ApricotPhase6Time:            InitiallyActiveTime,
+		ApricotPhasePost6Time:        InitiallyActiveTime,
+		BanffTime:                    InitiallyActiveTime,
+		CortinaTime:                  InitiallyActiveTime,
 		CortinaXChainStopVertexID:    ids.Empty,
-		DurangoTime:                  DefaultUpgradeTime,
-		EtnaTime:                     DefaultUpgradeTime,
+		DurangoTime:                  InitiallyActiveTime,
+		EtnaTime:                     InitiallyActiveTime,
 	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhase1Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhase1Time,
+		constants.FujiID:    Fuji.ApricotPhase1Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhase2Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhase2Time,
+		constants.FujiID:    Fuji.ApricotPhase2Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhase3Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhase3Time,
+		constants.FujiID:    Fuji.ApricotPhase3Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhase4Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhase4Time,
+		constants.FujiID:    Fuji.ApricotPhase4Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhase5Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhase5Time,
+		constants.FujiID:    Fuji.ApricotPhase5Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhasePre6Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhasePre6Time,
+		constants.FujiID:    Fuji.ApricotPhasePre6Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhase6Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhase6Time,
+		constants.FujiID:    Fuji.ApricotPhase6Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	ApricotPhasePost6Times = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.ApricotPhasePost6Time,
+		constants.FujiID:    Fuji.ApricotPhasePost6Time,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	BanffTimes = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.BanffTime,
+		constants.FujiID:    Fuji.BanffTime,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	CortinaTimes = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.CortinaTime,
+		constants.FujiID:    Fuji.CortinaTime,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	DurangoTimes = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.DurangoTime,
+		constants.FujiID:    Fuji.DurangoTime,
+	}
+
+	// Deprecated: This will be removed once coreth no longer uses it.
+	EUpgradeTimes = map[uint32]time.Time{
+		constants.MainnetID: Mainnet.EtnaTime,
+		constants.FujiID:    Fuji.EtnaTime,
+	}
+
+	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
 )
 
 type Config struct {
@@ -162,41 +165,81 @@ type Config struct {
 	EtnaTime                     time.Time `json:"etnaTime"`
 }
 
-func (c Config) Validate() error {
-	if c.ApricotPhase1Time.After(c.ApricotPhase2Time) {
-		return fmt.Errorf("%w: apricot phase 1 time (%s) is after apricot phase 2 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase1Time, c.ApricotPhase2Time)
+func (c *Config) Validate() error {
+	upgrades := []time.Time{
+		c.ApricotPhase1Time,
+		c.ApricotPhase2Time,
+		c.ApricotPhase3Time,
+		c.ApricotPhase4Time,
+		c.ApricotPhase5Time,
+		c.ApricotPhasePre6Time,
+		c.ApricotPhase6Time,
+		c.ApricotPhasePost6Time,
+		c.BanffTime,
+		c.CortinaTime,
+		c.DurangoTime,
+		c.EtnaTime,
 	}
-	if c.ApricotPhase2Time.After(c.ApricotPhase3Time) {
-		return fmt.Errorf("%w: apricot phase 2 time (%s) is after apricot phase 3 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase2Time, c.ApricotPhase3Time)
-	}
-	if c.ApricotPhase3Time.After(c.ApricotPhase4Time) {
-		return fmt.Errorf("%w: apricot phase 3 time (%s) is after apricot phase 4 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase3Time, c.ApricotPhase4Time)
-	}
-	if c.ApricotPhase4Time.After(c.ApricotPhase5Time) {
-		return fmt.Errorf("%w: apricot phase 4 time (%s) is after apricot phase 5 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase4Time, c.ApricotPhase5Time)
-	}
-	if c.ApricotPhase5Time.After(c.ApricotPhasePre6Time) {
-		return fmt.Errorf("%w: apricot phase 5 time (%s) is after apricot phase pre-6 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase5Time, c.ApricotPhasePre6Time)
-	}
-	if c.ApricotPhasePre6Time.After(c.ApricotPhase6Time) {
-		return fmt.Errorf("%w: apricot phase pre-6 time (%s) is after apricot phase 6 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhasePre6Time, c.ApricotPhase6Time)
-	}
-	if c.ApricotPhase6Time.After(c.ApricotPhasePost6Time) {
-		return fmt.Errorf("%w: apricot phase 6 time (%s) is after apricot phase post-6 time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhase6Time, c.ApricotPhasePost6Time)
-	}
-	if c.ApricotPhasePost6Time.After(c.BanffTime) {
-		return fmt.Errorf("%w: apricot phase post-6 time (%s) is after banff time (%s)", ErrInvalidUpgradeTimes, c.ApricotPhasePost6Time, c.BanffTime)
-	}
-	if c.BanffTime.After(c.CortinaTime) {
-		return fmt.Errorf("%w: banff time (%s) is after cortina time (%s)", ErrInvalidUpgradeTimes, c.BanffTime, c.CortinaTime)
-	}
-	if c.CortinaTime.After(c.DurangoTime) {
-		return fmt.Errorf("%w: cortina time (%s) is after durango time (%s)", ErrInvalidUpgradeTimes, c.CortinaTime, c.DurangoTime)
-	}
-	if c.DurangoTime.After(c.EtnaTime) {
-		return fmt.Errorf("%w: durango time (%s) is after etna time (%s)", ErrInvalidUpgradeTimes, c.DurangoTime, c.EtnaTime)
+	for i := 0; i < len(upgrades)-1; i++ {
+		if upgrades[i].After(upgrades[i+1]) {
+			return fmt.Errorf("%w: upgrade %d (%s) is after upgrade %d (%s)",
+				ErrInvalidUpgradeTimes,
+				i,
+				upgrades[i],
+				i+1,
+				upgrades[i+1],
+			)
+		}
 	}
 	return nil
+}
+
+func (c *Config) IsApricotPhase1Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhase1Time)
+}
+
+func (c *Config) IsApricotPhase2Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhase2Time)
+}
+
+func (c *Config) IsApricotPhase3Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhase3Time)
+}
+
+func (c *Config) IsApricotPhase4Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhase4Time)
+}
+
+func (c *Config) IsApricotPhase5Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhase5Time)
+}
+
+func (c *Config) IsApricotPhasePre6Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhasePre6Time)
+}
+
+func (c *Config) IsApricotPhase6Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhase6Time)
+}
+
+func (c *Config) IsApricotPhasePost6Activated(t time.Time) bool {
+	return !t.Before(c.ApricotPhasePost6Time)
+}
+
+func (c *Config) IsBanffActivated(t time.Time) bool {
+	return !t.Before(c.BanffTime)
+}
+
+func (c *Config) IsCortinaActivated(t time.Time) bool {
+	return !t.Before(c.CortinaTime)
+}
+
+func (c *Config) IsDurangoActivated(t time.Time) bool {
+	return !t.Before(c.DurangoTime)
+}
+
+func (c *Config) IsEtnaActivated(t time.Time) bool {
+	return !t.Before(c.EtnaTime)
 }
 
 func GetConfig(networkID uint32) Config {

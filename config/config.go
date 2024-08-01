@@ -804,12 +804,10 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 	}
 
 	switch networkID {
-	case constants.MainnetID:
-		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for mainnet networkID: %d", networkID)
-	case constants.FujiID:
-		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for fuji networkID: %d", networkID)
-	case constants.LocalID:
-		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for local networkID: %d", networkID)
+	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for networkID: %s",
+			constants.NetworkName(networkID),
+		)
 	}
 
 	var (

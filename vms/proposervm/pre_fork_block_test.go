@@ -667,7 +667,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 
 	// Should call BuildBlock since proposervm is not activated
 	innerBlk.EXPECT().Timestamp().Return(time.Time{})
-	vm.ActivationTime = mockable.MaxTime
+	vm.Upgrades.ApricotPhase4Time = mockable.MaxTime
 
 	gotChild, err = blk.buildChild(context.Background())
 	require.NoError(err)
