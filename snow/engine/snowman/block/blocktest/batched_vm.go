@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package block
+package blocktest
 
 import (
 	"context"
@@ -15,13 +13,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
 	errGetAncestor       = errors.New("unexpectedly called GetAncestor")
 	errBatchedParseBlock = errors.New("unexpectedly called BatchedParseBlock")
 
-	_ BatchedChainVM = (*TestBatchedVM)(nil)
+	_ block.BatchedChainVM = (*TestBatchedVM)(nil)
 )
 
 // TestBatchedVM is a BatchedVM that is useful for testing.

@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 )
 
 var (
@@ -23,7 +23,7 @@ var (
 )
 
 type TestVM struct {
-	block.TestVM
+	blocktest.TestVM
 
 	CantLinearize, CantParse bool
 

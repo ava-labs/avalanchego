@@ -1,20 +1,19 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package block
+package blocktest
 
 import (
 	"context"
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	_ StateSyncableVM = (*TestStateSyncableVM)(nil)
+	_ block.StateSyncableVM = (*TestStateSyncableVM)(nil)
 
 	errStateSyncEnabled           = errors.New("unexpectedly called StateSyncEnabled")
 	errStateSyncGetOngoingSummary = errors.New("unexpectedly called StateSyncGetOngoingSummary")
@@ -33,10 +32,10 @@ type TestStateSyncableVM struct {
 	CantGetStateSummary bool
 
 	StateSyncEnabledF           func(context.Context) (bool, error)
-	GetOngoingSyncStateSummaryF func(context.Context) (StateSummary, error)
-	GetLastStateSummaryF        func(context.Context) (StateSummary, error)
-	ParseStateSummaryF          func(ctx context.Context, summaryBytes []byte) (StateSummary, error)
-	GetStateSummaryF            func(ctx context.Context, summaryHeight uint64) (StateSummary, error)
+	GetOngoingSyncStateSummaryF func(context.Context) (block.StateSummary, error)
+	GetLastStateSummaryF        func(context.Context) (block.StateSummary, error)
+	ParseStateSummaryF          func(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
+	GetStateSummaryF            func(ctx context.Context, summaryHeight uint64) (block.StateSummary, error)
 }
 
 func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
@@ -49,7 +48,7 @@ func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, erro
 	return false, errStateSyncEnabled
 }
 
-func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (StateSummary, error) {
+func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
 	if vm.GetOngoingSyncStateSummaryF != nil {
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
@@ -59,7 +58,7 @@ func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (
 	return nil, errStateSyncGetOngoingSummary
 }
 
-func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (StateSummary, error) {
+func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (block.StateSummary, error) {
 	if vm.GetLastStateSummaryF != nil {
 		return vm.GetLastStateSummaryF(ctx)
 	}
@@ -69,7 +68,7 @@ func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (StateSu
 	return nil, errGetLastStateSummary
 }
 
-func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (StateSummary, error) {
+func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	if vm.ParseStateSummaryF != nil {
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
@@ -79,7 +78,7 @@ func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryByt
 	return nil, errParseStateSummary
 }
 
-func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error) {
+func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
 	if vm.GetStateSummaryF != nil {
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}

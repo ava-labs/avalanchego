@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/statetest"
@@ -42,8 +43,8 @@ var (
 )
 
 type fullVM struct {
-	*block.TestVM
-	*block.TestStateSyncableVM
+	*blocktest.TestVM
+	*blocktest.TestStateSyncableVM
 }
 
 var (
@@ -86,12 +87,12 @@ func initTestProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := &fullVM{
-		TestVM: &block.TestVM{
+		TestVM: &blocktest.TestVM{
 			TestVM: common.TestVM{
 				T: t,
 			},
 		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
+		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,
 		},
 	}
@@ -776,7 +777,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 func TestExpiredBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM := &block.TestVM{}
+	coreVM := &blocktest.TestVM{}
 	coreVM.T = t
 
 	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
@@ -1073,7 +1074,7 @@ func TestInnerVMRollback(t *testing.T) {
 		},
 	}
 
-	coreVM := &block.TestVM{
+	coreVM := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 			InitializeF: func(
@@ -1547,7 +1548,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
+	coreVM := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 		},
@@ -1718,7 +1719,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
+	coreVM := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 		},
@@ -2151,7 +2152,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	currentHeight := uint64(0)
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
+	coreVM := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {

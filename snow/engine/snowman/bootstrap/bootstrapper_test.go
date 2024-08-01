@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -35,7 +35,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *blocktest.TestVM) {
 	require := require.New(t)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -44,7 +44,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	vdrs := validators.NewManager()
 
 	sender := &common.SenderTest{}
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 
 	sender.T = t
 	vm.T = t
@@ -109,7 +109,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	require := require.New(t)
 
 	sender := &common.SenderTest{T: t}
-	vm := &block.TestVM{
+	vm := &blocktest.TestVM{
 		TestVM: common.TestVM{T: t},
 	}
 
@@ -611,7 +611,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	peers := validators.NewManager()
 
 	sender := &common.SenderTest{}
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 
 	sender.T = t
 	vm.T = t
@@ -772,7 +772,7 @@ func TestBootstrapperRollbackOnSetState(t *testing.T) {
 	require.Equal(blks[0].HeightV, bs.startingHeight)
 }
 
-func initializeVMWithBlockchain(vm *block.TestVM, blocks []*snowmantest.Block) {
+func initializeVMWithBlockchain(vm *blocktest.TestVM, blocks []*snowmantest.Block) {
 	vm.CantSetState = false
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		blocks,

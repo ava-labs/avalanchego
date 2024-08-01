@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -53,8 +54,8 @@ func init() {
 }
 
 type fullVM struct {
-	*block.TestVM
-	*block.TestStateSyncableVM
+	*blocktest.TestVM
+	*blocktest.TestStateSyncableVM
 }
 
 func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
@@ -82,10 +83,10 @@ func buildTestsObjects(
 	require := require.New(t)
 
 	fullVM := &fullVM{
-		TestVM: &block.TestVM{
+		TestVM: &blocktest.TestVM{
 			TestVM: common.TestVM{T: t},
 		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
+		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,
 		},
 	}

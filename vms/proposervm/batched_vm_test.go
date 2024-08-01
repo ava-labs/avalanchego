@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/statetest"
@@ -598,7 +599,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 
 	vm := VM{
 		ctx: &snow.Context{ChainID: chainID},
-		ChainVM: &block.TestVM{
+		ChainVM: &blocktest.TestVM{
 			ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
 				return &snowmantest.Block{BytesV: rawBlock}, nil
 			},
@@ -907,8 +908,8 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 }
 
 type TestRemoteProposerVM struct {
-	*block.TestBatchedVM
-	*block.TestVM
+	*blocktest.TestBatchedVM
+	*blocktest.TestVM
 }
 
 func initTestRemoteProposerVM(
@@ -923,8 +924,8 @@ func initTestRemoteProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := TestRemoteProposerVM{
-		TestVM:        &block.TestVM{},
-		TestBatchedVM: &block.TestBatchedVM{},
+		TestVM:        &blocktest.TestVM{},
+		TestBatchedVM: &blocktest.TestBatchedVM{},
 	}
 	coreVM.TestVM.T = t
 	coreVM.TestBatchedVM.T = t

@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -64,7 +64,7 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 	}
 }
 
-func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *blocktest.TestVM, *Transitive) {
 	require := require.New(t)
 
 	vdr := ids.GenerateTestNodeID()
@@ -76,7 +76,7 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	config.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	config.VM = vm
 
@@ -330,7 +330,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -654,7 +654,7 @@ func TestVoteCanceling(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -723,7 +723,7 @@ func TestEngineNoQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
@@ -763,7 +763,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
@@ -1404,7 +1404,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1492,7 +1492,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1578,7 +1578,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2163,7 +2163,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2257,7 +2257,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	sender.Default(true)
 
-	vm := &block.TestVM{}
+	vm := &blocktest.TestVM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2401,7 +2401,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	acceptedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
 	rejectedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
 
-	vm := &block.TestVM{
+	vm := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 			InitializeF: func(
@@ -2619,7 +2619,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 	config.Sender = sender
 
 	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
-	vm := &block.TestVM{
+	vm := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 			InitializeF: func(
@@ -2769,7 +2769,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	)
 	rejectedChain[1].VerifyV = errInvalid
 
-	vm := &block.TestVM{
+	vm := &blocktest.TestVM{
 		TestVM: common.TestVM{
 			T: t,
 			InitializeF: func(

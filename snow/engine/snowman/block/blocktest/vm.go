@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package block
+package blocktest
 
 import (
 	"context"
@@ -14,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
@@ -23,7 +22,7 @@ var (
 	errLastAccepted       = errors.New("unexpectedly called LastAccepted")
 	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
-	_ ChainVM = (*TestVM)(nil)
+	_ block.ChainVM = (*TestVM)(nil)
 )
 
 // TestVM is a ChainVM that is useful for testing.

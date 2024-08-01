@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package block
+package blocktest
 
 import (
 	"context"
@@ -13,10 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
-	_ StateSummary = (*TestStateSummary)(nil)
+	_ block.StateSummary = (*TestStateSummary)(nil)
 
 	errAccept = errors.New("unexpectedly called Accept")
 )
@@ -28,7 +27,7 @@ type TestStateSummary struct {
 
 	T          *testing.T
 	CantAccept bool
-	AcceptF    func(context.Context) (StateSyncMode, error)
+	AcceptF    func(context.Context) (block.StateSyncMode, error)
 }
 
 func (s *TestStateSummary) ID() ids.ID {
@@ -43,12 +42,12 @@ func (s *TestStateSummary) Bytes() []byte {
 	return s.BytesV
 }
 
-func (s *TestStateSummary) Accept(ctx context.Context) (StateSyncMode, error) {
+func (s *TestStateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) {
 	if s.AcceptF != nil {
 		return s.AcceptF(ctx)
 	}
 	if s.CantAccept && s.T != nil {
 		require.FailNow(s.T, errAccept.Error())
 	}
-	return StateSyncSkipped, errAccept
+	return block.StateSyncSkipped, errAccept
 }
