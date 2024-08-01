@@ -2512,9 +2512,6 @@ func TestLocalParse(t *testing.T) {
 	improperlySignedBlock[len(improperlySignedBlock)-1] = ^improperlySignedBlock[len(improperlySignedBlock)-1]
 
 	conf := Config{
-		ActivationTime:      time.Unix(0, 0),
-		DurangoTime:         time.Unix(0, 0),
-		MinimumPChainHeight: 0,
 		MinBlkDelay:         DefaultMinBlockDelay,
 		NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 		StakingLeafSigner:   pTestSigner,
