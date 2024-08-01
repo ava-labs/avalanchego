@@ -64,7 +64,7 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 	}
 }
 
-func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Transitive) {
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *block.TestVM, *Engine) {
 	require := require.New(t)
 
 	vdr := ids.GenerateTestNodeID()
@@ -3023,7 +3023,7 @@ func TestGetProcessingAncestor(t *testing.T) {
 			metrics, err := newMetrics(prometheus.NewRegistry())
 			require.NoError(err)
 
-			engine := &Transitive{
+			engine := &Engine{
 				Config: Config{
 					Ctx:       ctx,
 					Consensus: consensus,
@@ -3092,7 +3092,7 @@ func TestShouldIssueBlock(t *testing.T) {
 	))
 	require.NoError(t, c.Add(blocks[1]))
 
-	engine := &Transitive{
+	engine := &Engine{
 		Config: Config{
 			Consensus: c,
 		},
