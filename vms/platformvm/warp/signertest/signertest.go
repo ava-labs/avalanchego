@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package warp
+package signertest
 
 import (
 	"testing"
@@ -13,20 +11,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // SignerTests is a list of all signer tests
-var SignerTests = map[string]func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
+var SignerTests = map[string]func(t *testing.T, s warp.Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
 	"WrongChainID":   TestWrongChainID,
 	"WrongNetworkID": TestWrongNetworkID,
 	"Verifies":       TestVerifies,
 }
 
 // Test that using a random SourceChainID results in an error
-func TestWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
+func TestWrongChainID(t *testing.T, s warp.Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
 	require := require.New(t)
 
-	msg, err := NewUnsignedMessage(
+	msg, err := warp.NewUnsignedMessage(
 		constants.UnitTestID,
 		ids.GenerateTestID(),
 		[]byte("payload"),
@@ -39,10 +38,10 @@ func TestWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.
 }
 
 // Test that using a different networkID results in an error
-func TestWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkID uint32, blockchainID ids.ID) {
+func TestWrongNetworkID(t *testing.T, s warp.Signer, _ *bls.SecretKey, networkID uint32, blockchainID ids.ID) {
 	require := require.New(t)
 
-	msg, err := NewUnsignedMessage(
+	msg, err := warp.NewUnsignedMessage(
 		networkID+1,
 		blockchainID,
 		[]byte("payload"),
@@ -55,10 +54,10 @@ func TestWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkID uint
 }
 
 // Test that a signature generated with the signer verifies correctly
-func TestVerifies(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
+func TestVerifies(t *testing.T, s warp.Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
 	require := require.New(t)
 
-	msg, err := NewUnsignedMessage(
+	msg, err := warp.NewUnsignedMessage(
 		networkID,
 		chainID,
 		[]byte("payload"),
