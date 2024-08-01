@@ -80,7 +80,7 @@ const (
 	banff
 	cortina
 	durango
-	eUpgrade
+	etna
 
 	latestFork = durango
 
@@ -220,7 +220,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch f {
-	case eUpgrade:
+	case etna:
 		etnaTime = latestForkTime
 		fallthrough
 	case durango:

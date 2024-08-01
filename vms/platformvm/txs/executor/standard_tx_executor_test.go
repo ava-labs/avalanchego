@@ -2262,7 +2262,7 @@ func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	}
 
 	switch f {
-	case eUpgrade:
+	case etna:
 		c.UpgradeConfig.EtnaTime = tm
 		fallthrough
 	case durango:
