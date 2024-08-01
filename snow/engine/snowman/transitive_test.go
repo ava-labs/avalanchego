@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -64,7 +65,7 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 	}
 }
 
-func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common.SenderTest, *blocktest.TestVM, *Transitive) {
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *enginetest.SenderTest, *blocktest.TestVM, *Transitive) {
 	require := require.New(t)
 
 	vdr := ids.GenerateTestNodeID()
@@ -72,7 +73,7 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *common
 	require.NoError(config.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
 	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, config.ConnectedValidators)
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	config.Sender = sender
 	sender.Default(true)
 
@@ -326,7 +327,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
@@ -650,7 +651,7 @@ func TestVoteCanceling(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
@@ -719,7 +720,7 @@ func TestEngineNoQuery(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
@@ -759,7 +760,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
@@ -1400,7 +1401,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
@@ -1487,7 +1488,7 @@ func TestEngineDoubleChit(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
@@ -1574,7 +1575,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
@@ -2158,7 +2159,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
@@ -2252,7 +2253,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	vals := validators.NewManager()
 	engCfg.Validators = vals
 
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
@@ -2391,7 +2392,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID1, nil, ids.Empty, 1))
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID2, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{
+	sender := &enginetest.SenderTest{
 		T:          t,
 		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
 	}
@@ -2402,7 +2403,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	rejectedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
 
 	vm := &blocktest.TestVM{
-		TestVM: common.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -2611,7 +2612,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{
+	sender := &enginetest.SenderTest{
 		T:          t,
 		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
 	}
@@ -2620,7 +2621,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 
 	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
 	vm := &blocktest.TestVM{
-		TestVM: common.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -2756,7 +2757,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID, nil, ids.Empty, 1))
 
-	sender := &common.SenderTest{
+	sender := &enginetest.SenderTest{
 		T:          t,
 		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
 	}
@@ -2770,7 +2771,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	rejectedChain[1].VerifyV = errInvalid
 
 	vm := &blocktest.TestVM{
-		TestVM: common.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(
 				context.Context,

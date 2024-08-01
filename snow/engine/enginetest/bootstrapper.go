@@ -1,19 +1,18 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package common
+package enginetest
 
 import (
 	"context"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	_ BootstrapableEngine = (*BootstrapperTest)(nil)
+	_ common.BootstrapableEngine = (*BootstrapperTest)(nil)
 
 	errClear = errors.New("unexpectedly called Clear")
 )

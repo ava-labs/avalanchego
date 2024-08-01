@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
@@ -286,7 +287,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
-	appSender := &common.SenderTest{}
+	appSender := &enginetest.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
@@ -1477,7 +1478,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &enginetest.BootstrapTrackerTest{
 		T: t,
 		IsBootstrappedF: func() bool {
 			return isBootstrapped
@@ -2028,7 +2029,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	msgChan := make(chan common.Message, 1)
-	appSender := &common.SenderTest{T: t}
+	appSender := &enginetest.SenderTest{T: t}
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -30,7 +31,7 @@ type StateSyncEnabledMock struct {
 	*block.MockStateSyncableVM
 }
 
-func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.SenderTest) {
+func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginetest.SenderTest) {
 	ctrl := gomock.NewController(t)
 
 	vm := StateSyncEnabledMock{
@@ -38,7 +39,7 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.
 		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
-	sender := &common.SenderTest{
+	sender := &enginetest.SenderTest{
 		T: t,
 	}
 	sender.Default(true)

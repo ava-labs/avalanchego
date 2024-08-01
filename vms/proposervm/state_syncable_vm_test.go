@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -32,7 +33,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	innerVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: common.TestVM{
+			TestVM: enginetest.TestVM{
 				T: t,
 			},
 		},

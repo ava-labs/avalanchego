@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -78,19 +78,19 @@ func buildTestsObjects(
 ) (
 	*stateSyncer,
 	*fullVM,
-	*common.SenderTest,
+	*enginetest.SenderTest,
 ) {
 	require := require.New(t)
 
 	fullVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: common.TestVM{T: t},
+			TestVM: enginetest.TestVM{T: t},
 		},
 		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,
 		},
 	}
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 	dummyGetter, err := getter.New(
 		fullVM,
 		sender,

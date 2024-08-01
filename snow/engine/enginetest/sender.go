@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package common
+package enginetest
 
 import (
 	"context"
@@ -12,12 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	_ Sender    = (*SenderTest)(nil)
-	_ AppSender = (*FakeSender)(nil)
+	_ common.Sender    = (*SenderTest)(nil)
+	_ common.AppSender = (*FakeSender)(nil)
 
 	errSendAppRequest  = errors.New("unexpectedly called SendAppRequest")
 	errSendAppResponse = errors.New("unexpectedly called SendAppResponse")
@@ -57,7 +56,7 @@ type SenderTest struct {
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
-	SendAppGossipF               func(context.Context, SendConfig, []byte) error
+	SendAppGossipF               func(context.Context, common.SendConfig, []byte) error
 	SendCrossChainAppRequestF    func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppResponseF   func(context.Context, ids.ID, uint32, []byte)
 	SendCrossChainAppErrorF      func(context.Context, ids.ID, uint32, int32, string)
@@ -332,7 +331,7 @@ func (s *SenderTest) SendAppError(ctx context.Context, nodeID ids.NodeID, reques
 // initialized, then testing will fail.
 func (s *SenderTest) SendAppGossip(
 	ctx context.Context,
-	config SendConfig,
+	config common.SendConfig,
 	appGossipBytes []byte,
 ) error {
 	switch {
@@ -350,7 +349,7 @@ type FakeSender struct {
 	SentAppGossip,
 	SentCrossChainAppRequest, SentCrossChainAppResponse chan []byte
 
-	SentAppError, SentCrossChainAppError chan *AppError
+	SentAppError, SentCrossChainAppError chan *common.AppError
 }
 
 func (f FakeSender) SendAppRequest(_ context.Context, _ set.Set[ids.NodeID], _ uint32, bytes []byte) error {
@@ -376,14 +375,14 @@ func (f FakeSender) SendAppError(_ context.Context, _ ids.NodeID, _ uint32, erro
 		return nil
 	}
 
-	f.SentAppError <- &AppError{
+	f.SentAppError <- &common.AppError{
 		Code:    errorCode,
 		Message: errorMessage,
 	}
 	return nil
 }
 
-func (f FakeSender) SendAppGossip(_ context.Context, _ SendConfig, bytes []byte) error {
+func (f FakeSender) SendAppGossip(_ context.Context, _ common.SendConfig, bytes []byte) error {
 	if f.SentAppGossip == nil {
 		return nil
 	}
@@ -415,7 +414,7 @@ func (f FakeSender) SendCrossChainAppError(_ context.Context, _ ids.ID, _ uint32
 		return nil
 	}
 
-	f.SentCrossChainAppError <- &AppError{
+	f.SentCrossChainAppError <- &common.AppError{
 		Code:    errorCode,
 		Message: errorMessage,
 	}

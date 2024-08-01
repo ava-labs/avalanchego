@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
@@ -39,11 +40,11 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	// Build state syncer
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	sender := &common.SenderTest{T: t}
+	sender := &enginetest.SenderTest{T: t}
 
 	// Non state syncableVM case
 	nonStateSyncableVM := &blocktest.TestVM{
-		TestVM: common.TestVM{T: t},
+		TestVM: enginetest.TestVM{T: t},
 	}
 	dummyGetter, err := getter.New(
 		nonStateSyncableVM,
@@ -68,7 +69,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	// State syncableVM case
 	fullVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: common.TestVM{T: t},
+			TestVM: enginetest.TestVM{T: t},
 		},
 		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,

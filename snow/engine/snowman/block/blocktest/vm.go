@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -27,7 +27,7 @@ var (
 
 // TestVM is a ChainVM that is useful for testing.
 type TestVM struct {
-	common.TestVM
+	enginetest.TestVM
 
 	CantBuildBlock,
 	CantParseBlock,

@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/statetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -58,7 +59,7 @@ func TestMessageRouting(t *testing.T) {
 		},
 	}
 
-	sender := &common.FakeSender{
+	sender := &enginetest.FakeSender{
 		SentAppGossip:            make(chan []byte, 1),
 		SentAppRequest:           make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
@@ -93,7 +94,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := common.FakeSender{
+	sender := enginetest.FakeSender{
 		SentAppRequest:           make(chan []byte, 1),
 		SentAppGossip:            make(chan []byte, 1),
 		SentCrossChainAppRequest: make(chan []byte, 1),
@@ -152,7 +153,7 @@ func TestAppRequestResponse(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := common.FakeSender{
+	sender := enginetest.FakeSender{
 		SentAppRequest: make(chan []byte, 1),
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -187,7 +188,7 @@ func TestAppRequestCancelledContext(t *testing.T) {
 	ctx := context.Background()
 
 	sentMessages := make(chan []byte, 1)
-	sender := &common.SenderTest{
+	sender := &enginetest.SenderTest{
 		SendAppRequestF: func(ctx context.Context, _ set.Set[ids.NodeID], _ uint32, msgBytes []byte) error {
 			require.NoError(ctx.Err())
 			sentMessages <- msgBytes
@@ -228,7 +229,7 @@ func TestAppRequestFailed(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := common.FakeSender{
+	sender := enginetest.FakeSender{
 		SentAppRequest: make(chan []byte, 1),
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -258,7 +259,7 @@ func TestCrossChainAppRequestResponse(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := common.FakeSender{
+	sender := enginetest.FakeSender{
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -290,7 +291,7 @@ func TestCrossChainAppRequestCancelledContext(t *testing.T) {
 	ctx := context.Background()
 
 	sentMessages := make(chan []byte, 1)
-	sender := &common.SenderTest{
+	sender := &enginetest.SenderTest{
 		SendCrossChainAppRequestF: func(ctx context.Context, _ ids.ID, _ uint32, msgBytes []byte) {
 			require.NoError(ctx.Err())
 			sentMessages <- msgBytes
@@ -327,7 +328,7 @@ func TestCrossChainAppRequestFailed(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := common.FakeSender{
+	sender := enginetest.FakeSender{
 		SentCrossChainAppRequest: make(chan []byte, 1),
 	}
 	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
@@ -425,7 +426,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 			wantRequestID := uint32(111)
 
 			done := make(chan struct{})
-			sender := &common.SenderTest{}
+			sender := &enginetest.SenderTest{}
 			sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
 				defer close(done)
 
@@ -464,7 +465,7 @@ func TestAppError(t *testing.T) {
 	wantRequestID := uint32(111)
 
 	done := make(chan struct{})
-	sender := &common.SenderTest{}
+	sender := &enginetest.SenderTest{}
 	sender.SendAppErrorF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
 		defer close(done)
 
@@ -545,7 +546,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	sender := &common.FakeSender{
+	sender := &enginetest.FakeSender{
 		SentAppRequest: make(chan []byte, 1),
 	}
 
@@ -631,7 +632,7 @@ func TestPeersSample(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(logging.NoLog{}, &enginetest.FakeSender{}, prometheus.NewRegistry(), "")
 			require.NoError(err)
 
 			for connected := range tt.connected {
@@ -674,7 +675,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			require := require.New(t)
 
 			sent := set.Set[ids.NodeID]{}
-			sender := &common.SenderTest{
+			sender := &enginetest.SenderTest{
 				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
 					sent = nodeIDs
 					return nil
@@ -769,7 +770,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			require := require.New(t)
 
 			done := make(chan struct{})
-			sender := &common.SenderTest{
+			sender := &enginetest.SenderTest{
 				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
 					require.Subset(tt.expected, nodeIDs.List())
 					close(done)
@@ -799,7 +800,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 func TestMultipleClients(t *testing.T) {
 	require := require.New(t)
 
-	n, err := NewNetwork(logging.NoLog{}, &common.SenderTest{}, prometheus.NewRegistry(), "")
+	n, err := NewNetwork(logging.NoLog{}, &enginetest.SenderTest{}, prometheus.NewRegistry(), "")
 	require.NoError(err)
 	_ = n.NewClient(0)
 	_ = n.NewClient(0)

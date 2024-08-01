@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -139,8 +140,8 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.BootstrapperTest{
+		EngineTest: enginetest.EngineTest{
 			T: t,
 		},
 	}
@@ -416,8 +417,8 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.BootstrapperTest{
+		EngineTest: enginetest.EngineTest{
 			T: t,
 		},
 	}
@@ -573,8 +574,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.BootstrapperTest{
+		EngineTest: enginetest.EngineTest{
 			T: t,
 		},
 	}

@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -21,7 +21,7 @@ func DefaultConfig(t testing.TB) Config {
 	return Config{
 		Ctx:                 snowtest.ConsensusContext(ctx),
 		VM:                  &blocktest.TestVM{},
-		Sender:              &common.SenderTest{},
+		Sender:              &enginetest.SenderTest{},
 		Validators:          validators.NewManager(),
 		ConnectedValidators: tracker.NewPeers(),
 		Params: snowball.Parameters{

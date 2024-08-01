@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package common
+package enginetest
 
 import (
 	"context"
@@ -15,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -47,7 +46,7 @@ var (
 	errChits                         = errors.New("unexpectedly called Chits")
 	errStart                         = errors.New("unexpectedly called Start")
 
-	_ Engine = (*EngineTest)(nil)
+	_ common.Engine = (*EngineTest)(nil)
 )
 
 // EngineTest is a test engine
@@ -115,7 +114,7 @@ type EngineTest struct {
 	ContextF                     func() *snow.ConsensusContext
 	HaltF                        func(context.Context)
 	TimeoutF, GossipF, ShutdownF func(context.Context) error
-	NotifyF                      func(context.Context, Message) error
+	NotifyF                      func(context.Context, common.Message) error
 	GetF, GetAncestorsF          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
 	PullQueryF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error
 	PutF                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
@@ -127,20 +126,20 @@ type EngineTest struct {
 	GetStateSummaryFrontierF, GetStateSummaryFrontierFailedF, GetAcceptedStateSummaryFailedF,
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
 	StateSummaryFrontierF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) error
 	GetAcceptedStateSummaryF    func(ctx context.Context, nodeID ids.NodeID, requestID uint32, keys set.Set[uint64]) error
 	AcceptedStateSummaryF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs set.Set[ids.ID]) error
 	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
 	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
 	HealthF                     func(context.Context) (interface{}, error)
-	GetVMF                      func() VM
+	GetVMF                      func() common.VM
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error
 }
 
 func (e *EngineTest) Default(cant bool) {
@@ -265,7 +264,7 @@ func (e *EngineTest) Shutdown(ctx context.Context) error {
 	return errShutdown
 }
 
-func (e *EngineTest) Notify(ctx context.Context, msg Message) error {
+func (e *EngineTest) Notify(ctx context.Context, msg common.Message) error {
 	if e.NotifyF != nil {
 		return e.NotifyF(ctx, msg)
 	}
@@ -564,7 +563,7 @@ func (e *EngineTest) CrossChainAppRequest(ctx context.Context, chainID ids.ID, r
 	return errCrossChainAppRequest
 }
 
-func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
+func (e *EngineTest) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
 	if e.CrossChainAppRequestFailedF != nil {
 		return e.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
 	}
@@ -616,7 +615,7 @@ func (e *EngineTest) AppResponse(ctx context.Context, nodeID ids.NodeID, request
 	return errAppResponse
 }
 
-func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error {
+func (e *EngineTest) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 	if e.AppRequestFailedF != nil {
 		return e.AppRequestFailedF(ctx, nodeID, requestID, appErr)
 	}

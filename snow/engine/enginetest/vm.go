@@ -1,9 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
-package common
+package enginetest
 
 import (
 	"context"
@@ -17,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -37,7 +36,7 @@ var (
 	errCrossChainAppResponse      = errors.New("unexpectedly called CrossChainAppResponse")
 	errCrossChainAppRequestFailed = errors.New("unexpectedly called CrossChainAppRequestFailed")
 
-	_ VM = (*TestVM)(nil)
+	_ common.VM = (*TestVM)(nil)
 )
 
 // TestVM is a test vm
@@ -50,7 +49,7 @@ type TestVM struct {
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
 	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
 
-	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error
+	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
 	SetStateF                   func(ctx context.Context, state snow.State) error
 	ShutdownF                   func(context.Context) error
 	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
@@ -60,11 +59,11 @@ type TestVM struct {
 	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
 	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
 	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error
+	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
 	VersionF                    func(context.Context) (string, error)
 	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
 	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error
+	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -92,9 +91,9 @@ func (vm *TestVM) Initialize(
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
-	msgChan chan<- Message,
-	fxs []*Fx,
-	appSender AppSender,
+	msgChan chan<- common.Message,
+	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	if vm.InitializeF != nil {
 		return vm.InitializeF(
@@ -174,7 +173,7 @@ func (vm *TestVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID u
 	return errAppRequest
 }
 
-func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *AppError) error {
+func (vm *TestVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 	if vm.AppRequestFailedF != nil {
 		return vm.AppRequestFailedF(ctx, nodeID, requestID, appErr)
 	}
@@ -226,7 +225,7 @@ func (vm *TestVM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requ
 	return errCrossChainAppRequest
 }
 
-func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
+func (vm *TestVM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
 	if vm.CrossChainAppRequestFailedF != nil {
 		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
 	}
