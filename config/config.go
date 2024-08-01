@@ -803,7 +803,8 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 		return upgrade.GetConfig(networkID), nil
 	}
 
-	if constants.ProductionNetworkIDs.Contains(networkID) {
+	switch networkID {
+	case constants.MainnetID, constants.TestnetID, constants.LocalID:
 		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for networkID: %s",
 			constants.NetworkName(networkID),
 		)
