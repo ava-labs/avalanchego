@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common/utxotest"
 )
 
 var (
@@ -57,7 +57,7 @@ func TestBaseTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -104,7 +104,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -162,7 +162,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -214,7 +214,7 @@ func TestCreateChainTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -274,7 +274,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -323,7 +323,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -377,7 +377,7 @@ func TestImportTx(t *testing.T) {
 		utxos         = makeTestUTXOs(utxosKey)
 		sourceChainID = ids.GenerateTestID()
 		importedUTXOs = utxos[:1]
-		chainUTXOs    = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs    = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 			sourceChainID:             importedUTXOs,
 		})
@@ -426,7 +426,7 @@ func TestExportTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -477,7 +477,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -546,7 +546,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -620,7 +620,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
