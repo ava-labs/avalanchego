@@ -3,13 +3,45 @@
 
 package ids
 
-import "sync/atomic"
+import (
+	"sync"
+	"time"
 
-var offset = uint64(0)
+	"gonum.org/v1/gonum/mathext/prng"
+)
+
+type uniqueRandUint64 struct {
+	generated map[uint64]bool
+	rng       *prng.MT19937
+	lock      sync.Mutex
+}
+
+func (u *uniqueRandUint64) Uint64() uint64 {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
+	for {
+		n := u.rng.Uint64()
+		if !u.generated[n] {
+			u.generated[n] = true
+			return n
+		}
+	}
+}
+
+var generator = uniqueRandUint64{
+	generated: make(map[uint64]bool),
+}
+
+func init() {
+	source := prng.NewMT19937()
+	source.Seed(uint64(time.Now().UnixNano()))
+	generator.rng = source
+}
 
 // GenerateTestID returns a new ID that should only be used for testing
 func GenerateTestID() ID {
-	return Empty.Prefix(atomic.AddUint64(&offset, 1))
+	return Empty.Prefix(generator.Uint64())
 }
 
 // GenerateTestShortID returns a new ID that should only be used for testing

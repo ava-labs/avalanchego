@@ -21,9 +21,9 @@ func TestParseInvalid(t *testing.T) {
 func TestParseValid(t *testing.T) {
 	require := require.New(t)
 
-	chainID := ids.ID{1}
+	chainID := ids.GenerateTestID()
 	height := uint64(2)
-	parentIDs := []ids.ID{{4}, {5}}
+	parentIDs := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 	txs := [][]byte{{6}, {7}}
 	vtx, err := Build(
 		chainID,

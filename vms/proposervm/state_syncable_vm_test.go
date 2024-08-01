@@ -124,7 +124,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	}()
 
 	innerSummary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: uint64(2022),
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
@@ -207,7 +207,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	}()
 
 	innerSummary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: uint64(2022),
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
@@ -291,7 +291,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
@@ -376,7 +376,7 @@ func TestParseStateSummary(t *testing.T) {
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
@@ -453,7 +453,7 @@ func TestStateSummaryAccept(t *testing.T) {
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}
@@ -520,7 +520,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	reqHeight := uint64(1969)
 
 	innerSummary := &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
 	}

@@ -573,7 +573,7 @@ func createTxs() []*txs.Tx {
 			}},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
-					TxID:        ids.ID{'t', 'x', 'I', 'D'},
+					TxID:        ids.GenerateTestID(),
 					OutputIndex: 1,
 				},
 				Asset: avax.Asset{ID: ids.GenerateTestID()},
@@ -614,7 +614,7 @@ func createParentTxs(cm codec.Manager) ([]*txs.Tx, error) {
 			}},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
-					TxID:        ids.ID{'t', 'x', 'p', 'a', 'r', 'e', 'n', 't'},
+					TxID:        ids.GenerateTestID(),
 					OutputIndex: 1,
 				},
 				Asset: avax.Asset{ID: ids.ID{1, 2, 3}},

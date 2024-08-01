@@ -289,7 +289,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		var (
 			thisNode = proVM.ctx.NodeID
-			nodeID1  = ids.BuildTestNodeID([]byte{1})
+			nodeID1  = ids.GenerateTestNodeID()
 		)
 		return map[ids.NodeID]*validators.GetValidatorOutput{
 			thisNode: {

@@ -45,10 +45,10 @@ func TestNewTargeter(t *testing.T) {
 func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	vdr := ids.BuildTestNodeID([]byte{1})
+	vdr := ids.GenerateTestNodeID()
 	vdrWeight := uint64(1)
 	totalVdrWeight := uint64(10)
-	nonVdr := ids.BuildTestNodeID([]byte{2})
+	nonVdr := ids.GenerateTestNodeID()
 	vdrs := validators.NewManager()
 	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, vdr, nil, ids.Empty, 1))
 	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))

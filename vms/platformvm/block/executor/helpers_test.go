@@ -81,7 +81,7 @@ var (
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
 	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
+	avaxAssetID               = ids.GenerateTestID()
 	defaultTxFee              = uint64(100)
 
 	genesisBlkID ids.ID

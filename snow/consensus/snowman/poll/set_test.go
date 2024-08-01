@@ -15,16 +15,16 @@ import (
 )
 
 var (
-	blkID1 = ids.ID{1}
-	blkID2 = ids.ID{2}
-	blkID3 = ids.ID{3}
-	blkID4 = ids.ID{4}
+	blkID1 = ids.GenerateTestID()
+	blkID2 = ids.GenerateTestID()
+	blkID3 = ids.GenerateTestID()
+	blkID4 = ids.GenerateTestID()
 
-	vdr1 = ids.BuildTestNodeID([]byte{0x01})
-	vdr2 = ids.BuildTestNodeID([]byte{0x02})
-	vdr3 = ids.BuildTestNodeID([]byte{0x03})
-	vdr4 = ids.BuildTestNodeID([]byte{0x04})
-	vdr5 = ids.BuildTestNodeID([]byte{0x05}) // k = 5
+	vdr1 = ids.GenerateTestNodeID()
+	vdr2 = ids.GenerateTestNodeID()
+	vdr3 = ids.GenerateTestNodeID()
+	vdr4 = ids.GenerateTestNodeID()
+	vdr5 = ids.GenerateTestNodeID()
 )
 
 func TestNewSetErrorOnPollsMetrics(t *testing.T) {

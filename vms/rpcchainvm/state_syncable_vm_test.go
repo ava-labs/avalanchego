@@ -35,28 +35,30 @@ var (
 
 	// a summary to be returned in some UTs
 	mockedSummary = &block.TestStateSummary{
-		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
+		IDV:     ids.GenerateTestID(),
 		HeightV: SummaryHeight,
 		BytesV:  []byte("summary"),
 	}
 
+	parentBlkID = ids.GenerateTestID()
+
 	// last accepted blocks data before and after summary is accepted
 	preSummaryBlk = &snowmantest.Block{
 		Decidable: snowtest.Decidable{
-			IDV:    ids.ID{'f', 'i', 'r', 's', 't', 'B', 'l', 'K'},
+			IDV:    ids.GenerateTestID(),
 			Status: snowtest.Accepted,
 		},
 		HeightV: preSummaryHeight,
-		ParentV: ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'B', 'l', 'k'},
+		ParentV: parentBlkID,
 	}
 
 	summaryBlk = &snowmantest.Block{
 		Decidable: snowtest.Decidable{
-			IDV:    ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'B', 'l', 'K'},
+			IDV:    ids.GenerateTestID(),
 			Status: snowtest.Accepted,
 		},
 		HeightV: SummaryHeight,
-		ParentV: ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'B', 'l', 'k'},
+		ParentV: parentBlkID,
 	}
 
 	// a fictitious error unrelated to state sync

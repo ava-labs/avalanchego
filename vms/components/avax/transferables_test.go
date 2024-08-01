@@ -47,10 +47,10 @@ func TestTransferableOutputSorting(t *testing.T) {
 	manager := codec.NewDefaultManager()
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
-	assetID1 := ids.ID{1}
+	assetID := ids.GenerateTestID()
 	outs := []*TransferableOutput{
 		{
-			Asset: Asset{ID: assetID1},
+			Asset: Asset{ID: assetID},
 			Out:   &TestTransferable{Val: 1},
 		},
 		{
@@ -58,7 +58,7 @@ func TestTransferableOutputSorting(t *testing.T) {
 			Out:   &TestTransferable{Val: 1},
 		},
 		{
-			Asset: Asset{ID: assetID1},
+			Asset: Asset{ID: assetID},
 			Out:   &TestTransferable{Val: 0},
 		},
 		{
@@ -77,8 +77,8 @@ func TestTransferableOutputSorting(t *testing.T) {
 	require.Zero(outs[0].Out.(*TestTransferable).Val)
 	require.Zero(outs[1].Out.(*TestTransferable).Val)
 	require.Equal(uint64(1), outs[2].Out.(*TestTransferable).Val)
-	require.Equal(assetID1, outs[3].AssetID())
-	require.Equal(assetID1, outs[4].AssetID())
+	require.Equal(assetID, outs[3].AssetID())
+	require.Equal(assetID, outs[4].AssetID())
 }
 
 func TestTransferableOutputSerialization(t *testing.T) {

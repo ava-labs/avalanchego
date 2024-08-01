@@ -4,6 +4,7 @@
 package poll
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,7 +52,8 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 	expected := `waiting on Bag[ids.NodeID]: (Size = 1)
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received Bag[ids.ID]: (Size = 1)
-    SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
+    BLK_ID_1_STRING: 1`
+	expected = strings.Replace(expected, "BLK_ID_1_STRING", blkID1.String(), 1)
 	require.Equal(expected, poll.String())
 }
 

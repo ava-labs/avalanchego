@@ -25,7 +25,7 @@ func TestValidatorDataCompare(t *testing.T) {
 		},
 		{
 			a: validatorData{
-				id: ids.BuildTestNodeID([]byte{1}),
+				id: ids.GenerateTestNodeID(),
 			},
 			b:        validatorData{},
 			expected: 1,

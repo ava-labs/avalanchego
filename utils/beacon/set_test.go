@@ -15,9 +15,9 @@ import (
 func TestSet(t *testing.T) {
 	require := require.New(t)
 
-	id0 := ids.BuildTestNodeID([]byte{0})
-	id1 := ids.BuildTestNodeID([]byte{1})
-	id2 := ids.BuildTestNodeID([]byte{2})
+	id0 := ids.GenerateTestNodeID()
+	id1 := ids.GenerateTestNodeID()
+	id2 := ids.GenerateTestNodeID()
 
 	ip0 := netip.AddrPortFrom(
 		netip.IPv4Unspecified(),

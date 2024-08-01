@@ -305,9 +305,9 @@ func TestSetMap(t *testing.T) {
 func TestSetWeight(t *testing.T) {
 	require := require.New(t)
 
-	vdr0 := ids.BuildTestNodeID([]byte{1})
+	vdr0 := ids.GenerateTestNodeID()
 	weight0 := uint64(93)
-	vdr1 := ids.BuildTestNodeID([]byte{2})
+	vdr1 := ids.GenerateTestNodeID()
 	weight1 := uint64(123)
 
 	s := newSet(ids.Empty, nil)
@@ -384,7 +384,7 @@ func TestSetString(t *testing.T) {
 func TestSetAddCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.BuildTestNodeID([]byte{1})
+	nodeID0 := ids.GenerateTestNodeID()
 	sk0, err := bls.NewSecretKey()
 	require.NoError(err)
 	pk0 := bls.PublicFromSecretKey(sk0)
@@ -412,7 +412,7 @@ func TestSetAddCallback(t *testing.T) {
 func TestSetAddWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.BuildTestNodeID([]byte{1})
+	nodeID0 := ids.GenerateTestNodeID()
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(1)
 	weight1 := uint64(93)
@@ -446,7 +446,7 @@ func TestSetAddWeightCallback(t *testing.T) {
 func TestSetRemoveWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.BuildTestNodeID([]byte{1})
+	nodeID0 := ids.GenerateTestNodeID()
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(93)
 	weight1 := uint64(92)
@@ -480,7 +480,7 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 func TestSetValidatorRemovedCallback(t *testing.T) {
 	require := require.New(t)
 
-	nodeID0 := ids.BuildTestNodeID([]byte{1})
+	nodeID0 := ids.GenerateTestNodeID()
 	txID0 := ids.GenerateTestID()
 	weight0 := uint64(93)
 

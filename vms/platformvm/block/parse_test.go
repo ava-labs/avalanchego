@@ -23,7 +23,7 @@ func TestStandardBlocks(t *testing.T) {
 	// check Apricot standard block can be built and parsed
 	require := require.New(t)
 	blkTimestamp := time.Now()
-	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
+	parentID := ids.GenerateTestID()
 	height := uint64(2022)
 	decisionTxs, err := testDecisionTxs()
 	require.NoError(err)
@@ -75,7 +75,7 @@ func TestProposalBlocks(t *testing.T) {
 	// check Apricot proposal block can be built and parsed
 	require := require.New(t)
 	blkTimestamp := time.Now()
-	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
+	parentID := ids.GenerateTestID()
 	height := uint64(2022)
 	proposalTx, err := testProposalTx()
 	require.NoError(err)
@@ -170,7 +170,7 @@ func TestCommitBlock(t *testing.T) {
 	// check Apricot commit block can be built and parsed
 	require := require.New(t)
 	blkTimestamp := time.Now()
-	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
+	parentID := ids.GenerateTestID()
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
@@ -213,7 +213,7 @@ func TestAbortBlock(t *testing.T) {
 	// check Apricot abort block can be built and parsed
 	require := require.New(t)
 	blkTimestamp := time.Now()
-	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
+	parentID := ids.GenerateTestID()
 	height := uint64(2022)
 
 	for _, cdc := range []codec.Manager{Codec, GenesisCodec} {
@@ -255,7 +255,7 @@ func TestAbortBlock(t *testing.T) {
 func TestAtomicBlock(t *testing.T) {
 	// check atomic block can be built and parsed
 	require := require.New(t)
-	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't', 'I', 'D'}
+	parentID := ids.GenerateTestID()
 	height := uint64(2022)
 	atomicTx, err := testAtomicTx()
 	require.NoError(err)
@@ -286,12 +286,13 @@ func TestAtomicBlock(t *testing.T) {
 }
 
 func testAtomicTx() (*txs.Tx, error) {
+	assetID := ids.GenerateTestID()
 	utx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    10,
-			BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
+			BlockchainID: ids.GenerateTestID(),
 			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+				Asset: avax.Asset{ID: assetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: uint64(1234),
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -302,10 +303,10 @@ func testAtomicTx() (*txs.Tx, error) {
 			}},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
-					TxID:        ids.ID{'t', 'x', 'I', 'D'},
+					TxID:        ids.GenerateTestID(),
 					OutputIndex: 2,
 				},
-				Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+				Asset: avax.Asset{ID: assetID},
 				In: &secp256k1fx.TransferInput{
 					Amt:   uint64(5678),
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -313,13 +314,13 @@ func testAtomicTx() (*txs.Tx, error) {
 			}},
 			Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
-		SourceChain: ids.ID{'c', 'h', 'a', 'i', 'n'},
+		SourceChain: ids.GenerateTestID(),
 		ImportedInputs: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.Empty.Prefix(1),
 				OutputIndex: 1,
 			},
-			Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+			Asset: avax.Asset{ID: assetID},
 			In: &secp256k1fx.TransferInput{
 				Amt:   50000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -331,6 +332,7 @@ func testAtomicTx() (*txs.Tx, error) {
 }
 
 func testDecisionTxs() ([]*txs.Tx, error) {
+	assetID := ids.GenerateTestID()
 	countTxs := 2
 	decisionTxs := make([]*txs.Tx, 0, countTxs)
 	for i := 0; i < countTxs; i++ {
@@ -338,9 +340,9 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 		utx := &txs.CreateChainTx{
 			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    10,
-				BlockchainID: ids.ID{'c', 'h', 'a', 'i', 'n', 'I', 'D'},
+				BlockchainID: ids.GenerateTestID(),
 				Outs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+					Asset: avax.Asset{ID: assetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: uint64(1234),
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -351,10 +353,10 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 				}},
 				Ins: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
-						TxID:        ids.ID{'t', 'x', 'I', 'D'},
+						TxID:        ids.GenerateTestID(),
 						OutputIndex: 2,
 					},
-					Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 'r', 't'}},
+					Asset: avax.Asset{ID: assetID},
 					In: &secp256k1fx.TransferInput{
 						Amt:   uint64(5678),
 						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -362,7 +364,7 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 				}},
 				Memo: []byte{1, 2, 3, 4, 5, 6, 7, 8},
 			}},
-			SubnetID:    ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'},
+			SubnetID:    ids.GenerateTestID(),
 			ChainName:   "a chain",
 			VMID:        ids.GenerateTestID(),
 			FxIDs:       []ids.ID{ids.GenerateTestID()},
@@ -382,7 +384,7 @@ func testDecisionTxs() ([]*txs.Tx, error) {
 
 func testProposalTx() (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{
-		TxID: ids.ID{'r', 'e', 'w', 'a', 'r', 'd', 'I', 'D'},
+		TxID: ids.GenerateTestID(),
 	}
 
 	signers := [][]*secp256k1.PrivateKey{{preFundedKeys[0]}}

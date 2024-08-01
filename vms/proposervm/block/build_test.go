@@ -17,11 +17,11 @@ import (
 func TestBuild(t *testing.T) {
 	require := require.New(t)
 
-	parentID := ids.ID{1}
+	parentID := ids.GenerateTestID()
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
-	chainID := ids.ID{4}
+	chainID := ids.GenerateTestID()
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
@@ -50,7 +50,7 @@ func TestBuild(t *testing.T) {
 }
 
 func TestBuildUnsigned(t *testing.T) {
-	parentID := ids.ID{1}
+	parentID := ids.GenerateTestID()
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
@@ -70,9 +70,9 @@ func TestBuildUnsigned(t *testing.T) {
 func TestBuildHeader(t *testing.T) {
 	require := require.New(t)
 
-	chainID := ids.ID{1}
-	parentID := ids.ID{2}
-	bodyID := ids.ID{3}
+	chainID := ids.GenerateTestID()
+	parentID := ids.GenerateTestID()
+	bodyID := ids.GenerateTestID()
 
 	builtHeader, err := BuildHeader(
 		chainID,
@@ -89,7 +89,7 @@ func TestBuildHeader(t *testing.T) {
 func TestBuildOption(t *testing.T) {
 	require := require.New(t)
 
-	parentID := ids.ID{1}
+	parentID := ids.GenerateTestID()
 	innerBlockBytes := []byte{3}
 
 	builtOption, err := BuildOption(parentID, innerBlockBytes)

@@ -356,9 +356,9 @@ func TestGetMap(t *testing.T) {
 func TestWeight(t *testing.T) {
 	require := require.New(t)
 
-	vdr0 := ids.BuildTestNodeID([]byte{1})
+	vdr0 := ids.GenerateTestNodeID()
 	weight0 := uint64(93)
-	vdr1 := ids.BuildTestNodeID([]byte{2})
+	vdr1 := ids.GenerateTestNodeID()
 	weight1 := uint64(123)
 
 	m := NewManager()

@@ -899,7 +899,7 @@ func TestCreateChain(t *testing.T) {
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
+		ids.GenerateTestID(),
 		nil,
 		"name",
 	)
@@ -1418,7 +1418,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkID := advanceTimeBlk.ID()
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
-	peerID := ids.BuildTestNodeID([]byte{1, 2, 3, 4, 5, 4, 3, 2, 1})
+	peerID := ids.GenerateTestNodeID()
 	beacons := validators.NewManager()
 	require.NoError(beacons.AddStaker(ctx.SubnetID, peerID, nil, ids.Empty, 1))
 
