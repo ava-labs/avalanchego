@@ -25,7 +25,7 @@ func newNnarySnowflake(alphaPreference int, terminationConditions []terminationC
 // Invariant:
 // len(terminationConditions) == len(confidence)
 // terminationConditions[i].alphaConfidence < terminationConditions[i+1].alphaConfidence
-// terminationConditions[i].beta <= terminationConditions[i+1].beta
+// terminationConditions[i].beta >= terminationConditions[i+1].beta
 // confidence[i] >= confidence[i+1] (except after finalizing due to early termination)
 type nnarySnowflake struct {
 	// wrap the n-nary slush logic
