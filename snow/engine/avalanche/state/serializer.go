@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -43,11 +42,10 @@ type Serializer struct {
 }
 
 type SerializerConfig struct {
-	ChainID  ids.ID
-	VM       vertex.DAGVM
-	DB       database.Database
-	Log      logging.Logger
-	Upgrades upgrade.Config
+	ChainID ids.ID
+	VM      vertex.DAGVM
+	DB      database.Database
+	Log     logging.Logger
 }
 
 func NewSerializer(config SerializerConfig) vertex.Manager {

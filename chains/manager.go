@@ -725,11 +725,10 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := state.NewSerializer(
 		state.SerializerConfig{
-			ChainID:  ctx.ChainID,
-			VM:       dagVM,
-			DB:       vertexDB,
-			Log:      ctx.Log,
-			Upgrades: m.Upgrades,
+			ChainID: ctx.ChainID,
+			VM:      dagVM,
+			DB:      vertexDB,
+			Log:     ctx.Log,
 		},
 	)
 
