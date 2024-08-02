@@ -16,7 +16,6 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-
 	for _, test := range idstest.AliasTests {
 		t.Run("", func(t *testing.T) {
 			require := require.New(t)
