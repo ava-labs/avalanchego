@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -939,7 +940,9 @@ func defaultTestBackend(bootstrapped bool, sharedMemory atomic.SharedMemory) *ex
 			Log:          logging.NoLog{},
 		},
 		Config: &config.Config{
-			EUpgradeTime:     mockable.MaxTime,
+			Upgrades: upgrade.Config{
+				EtnaTime: mockable.MaxTime,
+			},
 			TxFee:            0,
 			CreateAssetTxFee: 0,
 		},

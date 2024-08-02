@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -60,7 +61,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -82,7 +82,7 @@ const (
 	banff
 	cortina
 	durango
-	eUpgrade
+	etna
 
 	latestFork = durango
 
@@ -215,15 +215,15 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 		banffTime         = mockable.MaxTime
 		cortinaTime       = mockable.MaxTime
 		durangoTime       = mockable.MaxTime
-		eUpgradeTime      = mockable.MaxTime
+		etnaTime          = mockable.MaxTime
 	)
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
 	switch f {
-	case eUpgrade:
-		eUpgradeTime = latestForkTime
+	case etna:
+		etnaTime = latestForkTime
 		fallthrough
 	case durango:
 		durangoTime = latestForkTime
@@ -266,7 +266,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 			BanffTime:         banffTime,
 			CortinaTime:       cortinaTime,
 			DurangoTime:       durangoTime,
-			EUpgradeTime:      eUpgradeTime,
+			EtnaTime:          etnaTime,
 		},
 	}}
 
@@ -1205,10 +1205,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 
@@ -1295,10 +1295,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 
@@ -1346,10 +1346,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 
@@ -1515,6 +1515,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
+		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
@@ -1696,10 +1697,10 @@ func TestUnverifiedParent(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 
@@ -1859,10 +1860,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 
@@ -1910,10 +1911,10 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 
@@ -2012,10 +2013,10 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  latestForkTime,
-			DurangoTime:  latestForkTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: latestForkTime,
+			DurangoTime: latestForkTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 

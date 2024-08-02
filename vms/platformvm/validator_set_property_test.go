@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -45,7 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -668,7 +668,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 			ApricotPhase5Time: forkTime,
 			BanffTime:         forkTime,
 			CortinaTime:       forkTime,
-			EUpgradeTime:      mockable.MaxTime,
+			EtnaTime:          mockable.MaxTime,
 		},
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))

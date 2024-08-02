@@ -585,6 +585,55 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
+func TestDiffSubnetManager(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state := newInitializedState(require)
+
+	states := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
+	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
+
+	var (
+		newManager = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
+		subnetID   = ids.GenerateTestID()
+	)
+
+	chainID, addr, err := state.GetSubnetManager(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
+
+	d, err := NewDiff(lastAcceptedID, states)
+	require.NoError(err)
+
+	chainID, addr, err = d.GetSubnetManager(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
+
+	// Setting a subnet manager should be reflected on diff not state
+	d.SetSubnetManager(subnetID, newManager.ChainID, newManager.Addr)
+	chainID, addr, err = d.GetSubnetManager(subnetID)
+	require.NoError(err)
+	require.Equal(newManager.ChainID, chainID)
+	require.Equal(newManager.Addr, addr)
+
+	chainID, addr, err = state.GetSubnetManager(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(ids.Empty, chainID)
+	require.Nil(addr)
+
+	// State should reflect new subnet manager after diff is applied
+	require.NoError(d.Apply(state))
+
+	chainID, addr, err = state.GetSubnetManager(subnetID)
+	require.NoError(err)
+	require.Equal(newManager.ChainID, chainID)
+	require.Equal(newManager.Addr, addr)
+}
+
 func TestDiffStacking(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
