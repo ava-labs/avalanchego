@@ -16,6 +16,8 @@ const (
 	VersionJSONKey                         = "version-json"
 	GenesisFileKey                         = "genesis-file"
 	GenesisFileContentKey                  = "genesis-file-content"
+	UpgradeFileKey                         = "upgrade-file"
+	UpgradeFileContentKey                  = "upgrade-file-content"
 	NetworkNameKey                         = "network-id"
 	ACPSupportKey                          = "acp-support"
 	ACPObjectKey                           = "acp-object"

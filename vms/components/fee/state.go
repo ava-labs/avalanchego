@@ -13,8 +13,8 @@ import (
 var ErrInsufficientCapacity = errors.New("insufficient capacity")
 
 type State struct {
-	Capacity Gas
-	Excess   Gas
+	Capacity Gas `serialize:"true" json:"capacity"`
+	Excess   Gas `serialize:"true" json:"excess"`
 }
 
 // AdvanceTime adds maxGasPerSecond to capacity and subtracts targetGasPerSecond

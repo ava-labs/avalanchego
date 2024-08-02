@@ -20,7 +20,7 @@ func newBinarySnowflake(alphaPreference int, terminationConditions []termination
 // Invariant:
 // len(terminationConditions) == len(confidence)
 // terminationConditions[i].alphaConfidence < terminationConditions[i+1].alphaConfidence
-// terminationConditions[i].beta <= terminationConditions[i+1].beta
+// terminationConditions[i].beta >= terminationConditions[i+1].beta
 // confidence[i] >= confidence[i+1] (except after finalizing due to early termination)
 type binarySnowflake struct {
 	// wrap the binary slush logic
