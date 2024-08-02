@@ -109,7 +109,7 @@ func (s *set) Add(requestID uint32, vdrs bag.Bag[ids.NodeID]) bool {
 }
 
 // Vote registers the connections response to a query for [id]. If there was no
-// query, or the response has already be registered, nothing is performed.
+// query, or the response has already been registered, nothing is performed.
 func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []bag.Bag[ids.ID] {
 	holder, exists := s.polls.Get(requestID)
 	if !exists {

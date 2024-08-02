@@ -6,8 +6,8 @@ package snowball
 import "github.com/ava-labs/avalanchego/ids"
 
 var (
-	SnowballFactory  Factory = snowballFactory{}
-	SnowflakeFactory Factory = snowflakeFactory{}
+	FactoryInstance Factory = snowballFactory{}
+	_               Factory = snowflakeFactory{}
 )
 
 type snowballFactory struct{}
