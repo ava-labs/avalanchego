@@ -261,7 +261,7 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	// make sure that once we get to normal operation, we already have the durango upgrade active.
 	if newState == snow.NormalOp {
 		// the P-chain is expected to be syncronized
-		if !vm.IsDurangoActivated(vm.lastAcceptedTime) {
+		if !vm.Config.Upgrades.IsDurangoActivated(vm.lastAcceptedTime) {
 			return errDurangoUpgradeNotActivated
 		}
 	}
@@ -297,7 +297,14 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
-	if blk, err := vm.parsePostForkBlock(ctx, b); err == nil {
+	if blk, err := vm.parsePostForkBlock(ctx, b, true); err == nil {
+		return blk, nil
+	}
+	return vm.parsePreForkBlock(ctx, b)
+}
+
+func (vm *VM) ParseLocalBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+	if blk, err := vm.parsePostForkBlock(ctx, b, false); err == nil {
 		return blk, nil
 	}
 	return vm.parsePreForkBlock(ctx, b)
@@ -332,7 +339,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
 	)
-	if vm.IsDurangoActivated(parentTimestamp) {
+	if vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
 		if nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
@@ -535,8 +542,17 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 	return nil
 }
 
-func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, error) {
-	statelessBlock, err := statelessblock.Parse(b, vm.ctx.ChainID)
+func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte, verifySignature bool) (PostForkBlock, error) {
+	var (
+		statelessBlock statelessblock.Block
+		err            error
+	)
+
+	if verifySignature {
+		statelessBlock, err = statelessblock.Parse(b, vm.ctx.ChainID)
+	} else {
+		statelessBlock, err = statelessblock.ParseWithoutVerification(b)
+	}
 	if err != nil {
 		return nil, err
 	}

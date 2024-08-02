@@ -23,9 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -420,7 +423,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 
 	vm := VM{
 		ctx: &snow.Context{ChainID: chainID},
-		ChainVM: &block.TestVM{
+		ChainVM: &blocktest.TestVM{
 			ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
 				return &snowmantest.Block{BytesV: rawBlock}, nil
 			},
@@ -729,8 +732,8 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 }
 
 type TestRemoteProposerVM struct {
-	*block.TestBatchedVM
-	*block.TestVM
+	*blocktest.TestBatchedVM
+	*blocktest.TestVM
 }
 
 func initTestRemoteProposerVM(
@@ -745,8 +748,8 @@ func initTestRemoteProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := TestRemoteProposerVM{
-		TestVM:        &block.TestVM{},
-		TestBatchedVM: &block.TestBatchedVM{},
+		TestVM:        &blocktest.TestVM{},
+		TestBatchedVM: &blocktest.TestBatchedVM{},
 	}
 	coreVM.TestVM.T = t
 	coreVM.TestBatchedVM.T = t
@@ -787,9 +790,11 @@ func initTestRemoteProposerVM(
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      activationTime,
-			DurangoTime:         durangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            activationTime,
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  durangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -798,7 +803,7 @@ func initTestRemoteProposerVM(
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {

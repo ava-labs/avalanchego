@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
@@ -70,8 +71,11 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require.NoError(err)
 	vm := &VM{
 		Config: Config{
-			ActivationTime:    time.Unix(0, 0),
-			DurangoTime:       defaultTestingDurangoTime,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
@@ -264,8 +268,11 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 	require.NoError(err)
 	vm := &VM{
 		Config: Config{
-			ActivationTime:    time.Unix(0, 0),
-			DurangoTime:       defaultTestingDurangoTime,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			StakingCertLeaf:   &staking.Certificate{},
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),

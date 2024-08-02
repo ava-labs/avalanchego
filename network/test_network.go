@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -216,6 +217,7 @@ func NewTestNetwork(
 				resourceTracker.DiskTracker(),
 			),
 		},
+		upgrade.InitiallyActiveTime,
 		msgCreator,
 		metrics,
 		log,

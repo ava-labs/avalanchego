@@ -24,11 +24,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -41,8 +46,8 @@ var (
 )
 
 type fullVM struct {
-	*block.TestVM
-	*block.TestStateSyncableVM
+	*blocktest.TestVM
+	*blocktest.TestStateSyncableVM
 }
 
 var (
@@ -78,7 +83,7 @@ func initTestProposerVM(
 	minPChainHeight uint64,
 ) (
 	*fullVM,
-	*validators.TestState,
+	*validatorstest.TestState,
 	*VM,
 	database.Database,
 ) {
@@ -86,12 +91,12 @@ func initTestProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{
+		TestVM: &blocktest.TestVM{
+			TestVM: enginetest.TestVM{
 				T: t,
 			},
 		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
+		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,
 		},
 	}
@@ -125,9 +130,11 @@ func initTestProposerVM(
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      proBlkStartTime,
-			DurangoTime:         durangoTime,
-			MinimumPChainHeight: minPChainHeight,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            proBlkStartTime,
+				ApricotPhase4MinPChainHeight: minPChainHeight,
+				DurangoTime:                  durangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -136,7 +143,7 @@ func initTestProposerVM(
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -776,7 +783,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 func TestExpiredBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM := &block.TestVM{}
+	coreVM := &blocktest.TestVM{}
 	coreVM.T = t
 
 	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
@@ -802,9 +809,11 @@ func TestExpiredBuildBlock(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -813,7 +822,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1057,7 +1066,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 func TestInnerVMRollback(t *testing.T) {
 	require := require.New(t)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return defaultPChainHeight, nil
@@ -1073,8 +1082,8 @@ func TestInnerVMRollback(t *testing.T) {
 		},
 	}
 
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -1120,9 +1129,11 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1200,9 +1211,11 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1547,8 +1560,8 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
@@ -1588,9 +1601,11 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1599,7 +1614,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1718,8 +1733,8 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
@@ -1759,9 +1774,11 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1770,7 +1787,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1894,9 +1911,11 @@ func TestVMInnerBlkCache(t *testing.T) {
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2004,9 +2023,11 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2151,8 +2172,8 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	currentHeight := uint64(0)
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
 				return nil
@@ -2187,7 +2208,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
-	ctx.ValidatorState = &validators.TestState{
+	ctx.ValidatorState = &validatorstest.TestState{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
 			return snowmantest.GenesisHeight, nil
@@ -2206,9 +2227,11 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2298,9 +2321,11 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2343,9 +2368,11 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         defaultTestingDurangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  defaultTestingDurangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: newNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2453,4 +2480,91 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(parentTimestamp.Add(proVM.MinBlkDelay), slotTime)
+}
+
+func TestLocalParse(t *testing.T) {
+	innerVM := &blocktest.TestVM{
+		ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
+			return &snowmantest.Block{BytesV: rawBlock}, nil
+		},
+	}
+
+	chainID := ids.GenerateTestID()
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(t, err)
+	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	signedBlock, err := statelessblock.Build(
+		ids.ID{1},
+		time.Unix(123, 0),
+		uint64(42),
+		cert,
+		[]byte{1, 2, 3},
+		chainID,
+		key,
+	)
+	require.NoError(t, err)
+
+	properlySignedBlock := signedBlock.Bytes()
+
+	improperlySignedBlock := make([]byte, len(properlySignedBlock))
+	copy(improperlySignedBlock, properlySignedBlock)
+	improperlySignedBlock[len(improperlySignedBlock)-1] = ^improperlySignedBlock[len(improperlySignedBlock)-1]
+
+	conf := Config{
+		MinBlkDelay:         DefaultMinBlockDelay,
+		NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+		StakingLeafSigner:   pTestSigner,
+		StakingCertLeaf:     pTestCert,
+		Registerer:          prometheus.NewRegistry(),
+	}
+
+	vm := New(innerVM, conf)
+	defer func() {
+		require.NoError(t, vm.Shutdown(context.Background()))
+	}()
+
+	db := prefixdb.New([]byte{}, memdb.New())
+
+	_ = vm.Initialize(context.Background(), &snow.Context{
+		Log:     logging.NoLog{},
+		ChainID: chainID,
+	}, db, nil, nil, nil, nil, nil, nil)
+
+	tests := []struct {
+		name           string
+		f              block.ParseFunc
+		block          []byte
+		resultingBlock interface{}
+	}{
+		{
+			name:           "local parse as post-fork",
+			f:              vm.ParseLocalBlock,
+			block:          improperlySignedBlock,
+			resultingBlock: &postForkBlock{},
+		},
+		{
+			name:           "parse as pre-fork",
+			f:              vm.ParseBlock,
+			block:          improperlySignedBlock,
+			resultingBlock: &preForkBlock{},
+		},
+		{
+			name:           "parse as post-fork",
+			f:              vm.ParseBlock,
+			block:          properlySignedBlock,
+			resultingBlock: &postForkBlock{},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			block, err := test.f(context.Background(), test.block)
+			require.NoError(t, err)
+			require.IsType(t, test.resultingBlock, block)
+		})
+	}
 }
