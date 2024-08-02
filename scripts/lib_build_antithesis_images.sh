@@ -64,14 +64,22 @@ function build_antithesis_images {
   local docker_cmd="docker buildx build\
  --build-arg GO_VERSION=${go_version}\
  --build-arg BUILDER_IMAGE_TAG=${image_tag}\
- --build-arg BUILDER_WORKDIR=${builder_workdir}\
- --build-arg AVALANCHEGO_NODE_IMAGE=antithesis-avalanchego-node:${node_image_tag}"
+ --build-arg BUILDER_WORKDIR=${builder_workdir}"
+
+  # By default the node image is intended to be local-only.
+  AVALANCHEGO_NODE_IMAGE="antithesis-avalanchego-node:${node_image_tag}"
 
   if [[ -n "${image_prefix}" && -z "${node_only}" ]]; then
     # Push images with an image prefix since the prefix defines a registry location, and only if building
     # all images. When building just the node image the image is only intended to be used locally.
     docker_cmd="${docker_cmd} --push"
+
+    # When the node image is pushed as part of the build, references to the image must be qualified.
+    AVALANCHEGO_NODE_IMAGE="${image_prefix}/${AVALANCHEGO_NODE_IMAGE}"
   fi
+
+  # Ensure the correct node image name is configured
+  docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=${AVALANCHEGO_NODE_IMAGE}"
 
   # Build node image first to allow the workload image to use it.
   ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${target_path}"
