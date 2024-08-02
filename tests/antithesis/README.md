@@ -83,12 +83,12 @@ chain needs to be provided to the workload:
 $ AVAWL_URIS=... CHAIN_IDS="2S9ypz...AzMj9" go run ./tests/antithesis/xsvm
 ```
 
-### Running a workload with docker-compose
+### Running a workload with docker compose v2
 
 Running the test script for a given test setup with the `DEBUG` flag
 set will avoid cleaning up the temporary directory where the
-docker-compose setup is written to. This will allow manual invocation of
-docker-compose to see the log output of the workload.
+docker compose setup is written to. This will allow manual invocation of
+docker compose to see the log output of the workload.
 
 ```bash
 $ DEBUG=1 ./scripts/tests.build_antithesis_images.sh
@@ -99,7 +99,7 @@ directory will appear in the output of the script:
 
 ```
 ...
-using temporary directory /tmp/tmp.E6eHdDr4ln as the docker-compose path"
+using temporary directory /tmp/tmp.E6eHdDr4ln as the docker compose path"
 ...
 ```
 
@@ -110,10 +110,10 @@ output appears on stdout for inspection:
 $ cd [temporary directory]
 
 # Start the compose project
-$ docker-compose up
+$ docker compose up
 
 # Cleanup the compose project
-$ docker-compose down --volumes
+$ docker compose down --volumes
 ```
 
 ## Manually triggering an Antithesis test run
