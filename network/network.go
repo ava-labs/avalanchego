@@ -681,7 +681,7 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 //   - [subnetID] the subnetID whose membership should be considered to
 //     determine if the node is a validator.
 //   - [allower] interface that determines if a node is allowed to connect to
-//     the subnet based on it's validator status.
+//     the subnet based on its validator status.
 func (n *network) getPeers(
 	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
