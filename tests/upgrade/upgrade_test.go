@@ -59,6 +59,6 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			e2e.WaitForHealthy(node)
 		}
 
-		e2e.CheckBootstrapIsPossible(network)
+		_ = e2e.CheckBootstrapIsPossible(network)
 	})
 })
