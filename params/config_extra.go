@@ -129,3 +129,10 @@ func getUpgradeTime(networkID uint32, upgradeTimes map[uint32]time.Time) *uint64
 	// genesis.
 	return utils.NewUint64(0)
 }
+
+// SetEVMUpgrades sets the mapped upgrades (Avalanche > EVM upgrades) for the chain config.
+func (c *ChainConfig) SetEVMUpgrades() {
+	if c.EUpgradeTime != nil {
+		c.CancunTime = utils.NewUint64(*c.EUpgradeTime)
+	}
+}
