@@ -1436,7 +1436,8 @@ func setupReceiptBackend(t *testing.T, genBlocks int) (*testBackend, []common.Ha
 	// Set the terminal total difficulty in the config
 	// genesis.Config.TerminalTotalDifficulty = big.NewInt(0)
 	// genesis.Config.TerminalTotalDifficultyPassed = true
-	backend := newTestBackend(t, genBlocks, genesis, dummy.NewCoinbaseFaker(), func(i int, b *core.BlockGen) {
+	// FullFaker used to skip header verification that enforces no blobs.
+	backend := newTestBackend(t, genBlocks, genesis, dummy.NewFullFaker(), func(i int, b *core.BlockGen) {
 		var (
 			tx  *types.Transaction
 			err error
