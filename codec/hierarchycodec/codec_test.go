@@ -12,14 +12,14 @@ import (
 func TestVectors(t *testing.T) {
 	for _, test := range codectest.Tests {
 		c := NewDefault()
-		test(c, t)
+		test(t, c)
 	}
 }
 
 func TestMultipleTags(t *testing.T) {
 	for _, test := range codectest.MultipleTagsTests {
 		c := New([]string{"tag1", "tag2"})
-		test(c, t)
+		test(t, c)
 	}
 }
 

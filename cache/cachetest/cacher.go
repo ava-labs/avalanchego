@@ -28,8 +28,6 @@ var Tests = []struct {
 }
 
 func TestBasic(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
-	t.Helper()
-
 	require := require.New(t)
 
 	id1 := ids.ID{1}
@@ -65,8 +63,6 @@ func TestBasic(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
 }
 
 func TestEviction(t *testing.T, cache cache.Cacher[ids.ID, int64]) {
-	t.Helper()
-
 	require := require.New(t)
 
 	id1 := ids.ID{1}
