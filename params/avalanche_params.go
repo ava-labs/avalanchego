@@ -13,20 +13,20 @@ import (
 const (
 	// MinGasPrice is the number of nAVAX required per gas unit for a
 	// transaction to be valid, measured in wei
-	LaunchMinGasPrice        int64 = 470_000_000_000
-	ApricotPhase1MinGasPrice int64 = 225_000_000_000
+	LaunchMinGasPrice        int64 = 470 * GWei
+	ApricotPhase1MinGasPrice int64 = 225 * GWei
 
 	AvalancheAtomicTxFee = units.MilliAvax
 
 	ApricotPhase1GasLimit uint64 = 8_000_000
 	CortinaGasLimit       uint64 = 15_000_000
 
-	ApricotPhase3MinBaseFee               int64  = 75_000_000_000
-	ApricotPhase3MaxBaseFee               int64  = 225_000_000_000
-	ApricotPhase3InitialBaseFee           int64  = 225_000_000_000
+	ApricotPhase3MinBaseFee               int64  = 75 * GWei
+	ApricotPhase3MaxBaseFee               int64  = 225 * GWei
+	ApricotPhase3InitialBaseFee           int64  = 225 * GWei
 	ApricotPhase3TargetGas                uint64 = 10_000_000
-	ApricotPhase4MinBaseFee               int64  = 25_000_000_000
-	ApricotPhase4MaxBaseFee               int64  = 1_000_000_000_000
+	ApricotPhase4MinBaseFee               int64  = 25 * GWei
+	ApricotPhase4MaxBaseFee               int64  = 1_000 * GWei
 	ApricotPhase4BaseFeeChangeDenominator uint64 = 12
 	ApricotPhase5TargetGas                uint64 = 15_000_000
 	ApricotPhase5BaseFeeChangeDenominator uint64 = 36

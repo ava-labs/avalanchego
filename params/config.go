@@ -539,8 +539,10 @@ type ChainConfig struct {
 	// and Avalanche Warp Messaging. (nil = no fork, 0 = already activated)
 	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
 	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
-	// EUpgrade on the Avalanche network. (nil = no fork, 0 = already activated)
-	// It activates Cancun and reduces the min base fee.
+	// EUpgrade activates Cancun from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
+	// and reduces the min base fee. (nil = no fork, 0 = already activated)
+	// Note: EIP-4844 BlobTxs are not enabled in the mempool and blocks are not
+	// allowed to contain them. For details see https://github.com/avalanche-foundation/ACPs/pull/131
 	EUpgradeTime *uint64 `json:"eUpgradeTime,omitempty"`
 
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
