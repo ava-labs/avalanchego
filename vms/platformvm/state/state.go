@@ -661,6 +661,24 @@ func newState(
 	}, nil
 }
 
+func (s *state) GetCurrentValidators(subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, error) {
+	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
+	for _, staker := range s.currentStakers.validators[subnetID] {
+		validator := staker.validator
+		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
+			NodeID:    validator.NodeID,
+			PublicKey: validator.PublicKey,
+			Weight:    validator.Weight,
+			StartTime: uint64(validator.StartTime.Unix()),
+			// TODO: not implemented yet
+			SetWeightNonce: 0,
+			// TODO: not implemented yet
+			IsActive: true,
+		}
+	}
+	return result, nil
+}
+
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
