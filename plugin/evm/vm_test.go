@@ -21,7 +21,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/metrics"
@@ -41,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -55,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	constantsEng "github.com/ava-labs/avalanchego/utils/constants"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -217,9 +219,9 @@ func NewContext() *snow.Context {
 	ctx.ValidatorState = &validators.TestState{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: constants.PrimaryNetworkID,
-				testXChainID:              constants.PrimaryNetworkID,
-				testCChainID:              constants.PrimaryNetworkID,
+				constantsEng.PlatformChainID: constantsEng.PrimaryNetworkID,
+				testXChainID:                 constantsEng.PrimaryNetworkID,
+				testCChainID:                 constantsEng.PrimaryNetworkID,
 			}[chainID]
 			if !ok {
 				return ids.Empty, errors.New("unknown chain")
@@ -4088,6 +4090,50 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			errCheck(err)
 		})
 	}
+}
+
+func TestNoBlobsAllowed(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	gspec := new(core.Genesis)
+	err := json.Unmarshal([]byte(genesisJSONCancun), gspec)
+	require.NoError(err)
+
+	// Make one block with a single blob tx
+	signer := types.NewCancunSigner(gspec.Config.ChainID)
+	blockGen := func(_ int, b *core.BlockGen) {
+		b.SetCoinbase(constants.BlackholeAddr)
+		fee := big.NewInt(500)
+		fee.Add(fee, b.BaseFee())
+		tx, err := types.SignTx(types.NewTx(&types.BlobTx{
+			Nonce:      0,
+			GasTipCap:  uint256.NewInt(1),
+			GasFeeCap:  uint256.MustFromBig(fee),
+			Gas:        params.TxGas,
+			To:         testEthAddrs[0],
+			BlobFeeCap: uint256.NewInt(1),
+			BlobHashes: []common.Hash{{1}},
+			Value:      new(uint256.Int),
+		}), signer, testKeys[0].ToECDSA())
+		require.NoError(err)
+		b.AddTx(tx)
+	}
+	// FullFaker used to skip header verification so we can generate a block with blobs
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, dummy.NewFullFaker(), 1, 10, blockGen)
+	require.NoError(err)
+
+	// Create a VM with the genesis (will use header verification)
+	_, vm, _, _, _ := GenesisVM(t, true, genesisJSONCancun, "", "")
+	defer func() { require.NoError(vm.Shutdown(ctx)) }()
+
+	// Verification should fail
+	vmBlock, err := vm.newBlock(blocks[0])
+	require.NoError(err)
+	_, err = vm.ParseBlock(ctx, vmBlock.Bytes())
+	require.ErrorContains(err, "blobs not enabled on avalanche networks")
+	err = vmBlock.Verify(ctx)
+	require.ErrorContains(err, "blobs not enabled on avalanche networks")
 }
 
 func TestMinFeeSetAtEUpgrade(t *testing.T) {
