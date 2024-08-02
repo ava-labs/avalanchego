@@ -721,7 +721,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			name:  "validator connected",
 			peers: []ids.NodeID{nodeID0, nodeID1},
 			option: func(_ *testing.T, n *Network) ClientOption {
-				state := &validatorstest.TestState{
+				state := &validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},
@@ -744,7 +744,7 @@ func TestNodeSamplerClientOption(t *testing.T) {
 			name:  "validator disconnected",
 			peers: []ids.NodeID{nodeID0},
 			option: func(_ *testing.T, n *Network) ClientOption {
-				state := &validatorstest.TestState{
+				state := &validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},

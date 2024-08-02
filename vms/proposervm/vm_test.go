@@ -82,7 +82,7 @@ func initTestProposerVM(
 	minPChainHeight uint64,
 ) (
 	*fullVM,
-	*validatorstest.TestState,
+	*validatorstest.State,
 	*VM,
 	database.Database,
 ) {
@@ -142,7 +142,7 @@ func initTestProposerVM(
 		},
 	)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -821,7 +821,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		},
 	)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1065,7 +1065,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 func TestInnerVMRollback(t *testing.T) {
 	require := require.New(t)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return defaultPChainHeight, nil
@@ -1613,7 +1613,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1786,7 +1786,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -2207,7 +2207,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
-	ctx.ValidatorState = &validatorstest.TestState{
+	ctx.ValidatorState = &validatorstest.State{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
 			return snowmantest.GenesisHeight, nil

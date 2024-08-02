@@ -525,7 +525,7 @@ func TestPushGossiper(t *testing.T) {
 				&p2p.Peers{},
 				logging.NoLog{},
 				constants.PrimaryNetworkID,
-				&validatorstest.TestState{
+				&validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 1, nil
 					},

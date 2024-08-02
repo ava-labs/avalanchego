@@ -980,7 +980,7 @@ func initTestRemoteProposerVM(
 		},
 	)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
