@@ -69,7 +69,7 @@ func TestEthTxGossip(t *testing.T) {
 
 	network, err := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(ethTxGossipProtocol)
+	client := network.NewClient(p2p.TxGossipHandlerID)
 
 	// we only accept gossip requests from validators
 	requestingNodeID := ids.GenerateTestNodeID()
@@ -201,7 +201,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 
 	// we should get a message that has the protocol prefix and the gossip
 	// message
-	require.Equal(byte(ethTxGossipProtocol), sent[0])
+	require.Equal(byte(p2p.TxGossipHandlerID), sent[0])
 	require.NoError(proto.Unmarshal(sent[1:], got))
 
 	marshaller := GossipEthTxMarshaller{}
@@ -259,7 +259,7 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	inboundGossipBytes, err := proto.Marshal(inboundGossip)
 	require.NoError(err)
 
-	inboundGossipMsg := append(binary.AppendUvarint(nil, ethTxGossipProtocol), inboundGossipBytes...)
+	inboundGossipMsg := append(binary.AppendUvarint(nil, p2p.TxGossipHandlerID), inboundGossipBytes...)
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
 
 	require.True(vm.txPool.Has(signedTx.Hash()))
