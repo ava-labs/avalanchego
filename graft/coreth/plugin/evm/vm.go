@@ -490,7 +490,7 @@ func (vm *VM) Initialize(
 
 	vm.chainID = g.Config.ChainID
 
-	g.Config.SetEVMUpgrades()
+	g.Config.SetEthUpgrades()
 
 	vm.ethConfig = ethconfig.NewDefaultConfig()
 	vm.ethConfig.Genesis = g

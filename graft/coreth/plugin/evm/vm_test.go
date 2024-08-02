@@ -4113,7 +4113,7 @@ func TestNoBlobsAllowed(t *testing.T) {
 			Gas:        params.TxGas,
 			To:         testEthAddrs[0],
 			BlobFeeCap: uint256.NewInt(1),
-			BlobHashes: []common.Hash{{1}},
+			BlobHashes: []common.Hash{{1}}, // This blob is expected to cause verification to fail
 			Value:      new(uint256.Int),
 		}), signer, testKeys[0].ToECDSA())
 		require.NoError(err)
