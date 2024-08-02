@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -185,34 +186,41 @@ func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
 	return common.WithBaseFee(baseFee)
 }
 
-// Verify that a new node can bootstrap into the network. This function is safe to call
-// from `Teardown` by virtue of not depending on ginkgo.DeferCleanup.
-func CheckBootstrapIsPossible(network *tmpnet.Network) {
+// Verify that a new node can bootstrap into the network. If the check wasn't skipped,
+// the node will be returned to the caller.
+func CheckBootstrapIsPossible(network *tmpnet.Network) *tmpnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
 		tests.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
-		return
+		return nil
 	}
 	ginkgo.By("checking if bootstrap is possible with the current network state")
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
+	// Ensure all subnets are bootstrapped
+	subnetIDs := make([]string, len(network.Subnets))
+	for i, subnet := range network.Subnets {
+		subnetIDs[i] = subnet.SubnetID.String()
+	}
+	flags := tmpnet.FlagsMap{
+		config.TrackSubnetsKey: strings.Join(subnetIDs, ","),
+	}
 
-	node := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{})
-	require.NoError(network.StartNode(ctx, ginkgo.GinkgoWriter, node))
+	node := tmpnet.NewEphemeralNode(flags)
+	require.NoError(network.StartNode(DefaultContext(), ginkgo.GinkgoWriter, node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
-	// Ensure the node is always stopped at the end of the check
-	defer func() {
-		ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
+	// Register a cleanup to ensure the node is stopped at the end of the test
+	ginkgo.DeferCleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(node.Stop(ctx))
-	}()
+	})
 
 	// Check that the node becomes healthy within timeout
-	require.NoError(tmpnet.WaitForHealthy(ctx, node))
+	require.NoError(tmpnet.WaitForHealthy(DefaultContext(), node))
+	return node
 }
 
 // Start a temporary network with the provided avalanchego binary.

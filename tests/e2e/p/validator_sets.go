@@ -111,6 +111,6 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			}
 		})
 
-		e2e.CheckBootstrapIsPossible(network)
+		_ = e2e.CheckBootstrapIsPossible(network)
 	})
 })

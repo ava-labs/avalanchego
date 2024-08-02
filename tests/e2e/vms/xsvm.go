@@ -160,6 +160,8 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		destinationBalance, err := destinationClient.Balance(e2e.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
+
+		_ = e2e.CheckBootstrapIsPossible(network)
 	})
 })
 
