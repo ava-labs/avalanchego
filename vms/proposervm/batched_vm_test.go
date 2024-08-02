@@ -853,7 +853,13 @@ func initTestRemoteProposerVM(
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
+	// the proposerVM would not support using NormalOp pre-durango, however, for the purpose of this test, we want to bypass that.
+	// we'll adjust the lastAcceptedTime here to bypass that before setting the state.
+	var lastAcceptedTime time.Time
+	lastAcceptedTime, proVM.lastAcceptedTime = proVM.lastAcceptedTime, durangoTime
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
+	// and restore the lastAcceptedTime.
+	proVM.lastAcceptedTime = lastAcceptedTime
 	return coreVM, proVM
 }
