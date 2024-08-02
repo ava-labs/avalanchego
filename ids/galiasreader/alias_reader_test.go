@@ -16,28 +16,31 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	require := require.New(t)
 
 	for _, test := range idstest.AliasTests {
-		listener, err := grpcutils.NewListener()
-		require.NoError(err)
-		serverCloser := grpcutils.ServerCloser{}
-		w := ids.NewAliaser()
+		t.Run("", func(t *testing.T) {
+			require := require.New(t)
 
-		server := grpcutils.NewServer()
-		aliasreaderpb.RegisterAliasReaderServer(server, NewServer(w))
-		serverCloser.Add(server)
+			listener, err := grpcutils.NewListener()
+			require.NoError(err)
+			serverCloser := grpcutils.ServerCloser{}
+			w := ids.NewAliaser()
 
-		go grpcutils.Serve(listener, server)
+			server := grpcutils.NewServer()
+			aliasreaderpb.RegisterAliasReaderServer(server, NewServer(w))
+			serverCloser.Add(server)
 
-		conn, err := grpcutils.Dial(listener.Addr().String())
-		require.NoError(err)
+			go grpcutils.Serve(listener, server)
 
-		r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
-		test(require, r, w)
+			conn, err := grpcutils.Dial(listener.Addr().String())
+			require.NoError(err)
 
-		serverCloser.Stop()
-		_ = conn.Close()
-		_ = listener.Close()
+			r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
+			test(t, r, w)
+
+			serverCloser.Stop()
+			_ = conn.Close()
+			_ = listener.Close()
+		})
 	}
 }
