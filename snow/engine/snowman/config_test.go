@@ -20,7 +20,7 @@ func DefaultConfig(t testing.TB) Config {
 
 	return Config{
 		Ctx:                 snowtest.ConsensusContext(ctx),
-		VM:                  &blocktest.TestVM{},
+		VM:                  &blocktest.VM{},
 		Sender:              &enginetest.Sender{},
 		Validators:          validators.NewManager(),
 		ConnectedValidators: tracker.NewPeers(),

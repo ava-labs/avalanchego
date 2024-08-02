@@ -22,7 +22,7 @@ var (
 )
 
 type VM struct {
-	blocktest.TestVM
+	blocktest.VM
 
 	CantLinearize, CantParse bool
 
@@ -31,7 +31,7 @@ type VM struct {
 }
 
 func (vm *VM) Default(cant bool) {
-	vm.TestVM.Default(cant)
+	vm.VM.Default(cant)
 
 	vm.CantParse = cant
 }

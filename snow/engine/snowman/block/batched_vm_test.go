@@ -25,7 +25,7 @@ var errTest = errors.New("non-nil error")
 func TestGetAncestorsDatabaseNotFound(t *testing.T) {
 	require := require.New(t)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	someID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(someID, id)
@@ -41,7 +41,7 @@ func TestGetAncestorsDatabaseNotFound(t *testing.T) {
 func TestGetAncestorsPropagatesErrors(t *testing.T) {
 	require := require.New(t)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	someID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(someID, id)

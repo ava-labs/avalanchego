@@ -33,12 +33,12 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	require := require.New(t)
 
 	innerVM := &fullVM{
-		TestVM: &blocktest.TestVM{
+		VM: &blocktest.VM{
 			VM: enginetest.VM{
 				T: t,
 			},
 		},
-		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
+		StateSyncableVM: &blocktest.StateSyncableVM{
 			T: t,
 		},
 	}
@@ -125,7 +125,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	innerSummary := &blocktest.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: uint64(2022),
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -208,7 +208,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	innerSummary := &blocktest.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: uint64(2022),
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -292,7 +292,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &blocktest.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -377,7 +377,7 @@ func TestParseStateSummary(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &blocktest.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -454,7 +454,7 @@ func TestStateSummaryAccept(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &blocktest.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -521,7 +521,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &blocktest.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},

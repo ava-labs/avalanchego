@@ -46,8 +46,8 @@ var (
 )
 
 type fullVM struct {
-	*blocktest.TestVM
-	*blocktest.TestStateSyncableVM
+	*blocktest.VM
+	*blocktest.StateSyncableVM
 }
 
 var (
@@ -90,12 +90,12 @@ func initTestProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := &fullVM{
-		TestVM: &blocktest.TestVM{
+		VM: &blocktest.VM{
 			VM: enginetest.VM{
 				T: t,
 			},
 		},
-		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
+		StateSyncableVM: &blocktest.StateSyncableVM{
 			T: t,
 		},
 	}
@@ -782,7 +782,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 func TestExpiredBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM := &blocktest.TestVM{}
+	coreVM := &blocktest.VM{}
 	coreVM.T = t
 
 	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
@@ -1081,7 +1081,7 @@ func TestInnerVMRollback(t *testing.T) {
 		},
 	}
 
-	coreVM := &blocktest.TestVM{
+	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(
@@ -1559,7 +1559,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &blocktest.TestVM{
+	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
 		},
@@ -1732,7 +1732,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &blocktest.TestVM{
+	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
 		},
@@ -2171,7 +2171,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	currentHeight := uint64(0)
 
 	initialState := []byte("genesis state")
-	coreVM := &blocktest.TestVM{
+	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
@@ -2482,7 +2482,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 }
 
 func TestLocalParse(t *testing.T) {
-	innerVM := &blocktest.TestVM{
+	innerVM := &blocktest.VM{
 		ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
 			return &snowmantest.Block{BytesV: rawBlock}, nil
 		},

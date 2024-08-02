@@ -20,11 +20,11 @@ var (
 	errGetAncestor       = errors.New("unexpectedly called GetAncestor")
 	errBatchedParseBlock = errors.New("unexpectedly called BatchedParseBlock")
 
-	_ block.BatchedChainVM = (*TestBatchedVM)(nil)
+	_ block.BatchedChainVM = (*BatchedVM)(nil)
 )
 
-// TestBatchedVM is a BatchedVM that is useful for testing.
-type TestBatchedVM struct {
+// BatchedVM is a BatchedVM that is useful for testing.
+type BatchedVM struct {
 	T *testing.T
 
 	CantGetAncestors    bool
@@ -44,12 +44,12 @@ type TestBatchedVM struct {
 	) ([]snowman.Block, error)
 }
 
-func (vm *TestBatchedVM) Default(cant bool) {
+func (vm *BatchedVM) Default(cant bool) {
 	vm.CantGetAncestors = cant
 	vm.CantBatchParseBlock = cant
 }
 
-func (vm *TestBatchedVM) GetAncestors(
+func (vm *BatchedVM) GetAncestors(
 	ctx context.Context,
 	blkID ids.ID,
 	maxBlocksNum int,
@@ -71,7 +71,7 @@ func (vm *TestBatchedVM) GetAncestors(
 	return nil, errGetAncestor
 }
 
-func (vm *TestBatchedVM) BatchedParseBlock(
+func (vm *BatchedVM) BatchedParseBlock(
 	ctx context.Context,
 	blks [][]byte,
 ) ([]snowman.Block, error) {

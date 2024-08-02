@@ -35,7 +35,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *blocktest.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *blocktest.VM) {
 	require := require.New(t)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -44,7 +44,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *blocktest
 	vdrs := validators.NewManager()
 
 	sender := &enginetest.Sender{}
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 
 	sender.T = t
 	vm.T = t
@@ -110,7 +110,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	require := require.New(t)
 
 	sender := &enginetest.Sender{T: t}
-	vm := &blocktest.TestVM{
+	vm := &blocktest.VM{
 		VM: enginetest.VM{T: t},
 	}
 
@@ -612,7 +612,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	peers := validators.NewManager()
 
 	sender := &enginetest.Sender{}
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 
 	sender.T = t
 	vm.T = t
@@ -773,7 +773,7 @@ func TestBootstrapperRollbackOnSetState(t *testing.T) {
 	require.Equal(blks[0].HeightV, bs.startingHeight)
 }
 
-func initializeVMWithBlockchain(vm *blocktest.TestVM, blocks []*snowmantest.Block) {
+func initializeVMWithBlockchain(vm *blocktest.VM, blocks []*snowmantest.Block) {
 	vm.CantSetState = false
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		blocks,

@@ -43,7 +43,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	sender := &enginetest.Sender{T: t}
 
 	// Non state syncableVM case
-	nonStateSyncableVM := &blocktest.TestVM{
+	nonStateSyncableVM := &blocktest.VM{
 		VM: enginetest.VM{T: t},
 	}
 	dummyGetter, err := getter.New(
@@ -68,10 +68,10 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 
 	// State syncableVM case
 	fullVM := &fullVM{
-		TestVM: &blocktest.TestVM{
+		VM: &blocktest.VM{
 			VM: enginetest.VM{T: t},
 		},
-		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
+		StateSyncableVM: &blocktest.StateSyncableVM{
 			T: t,
 		},
 	}
@@ -166,7 +166,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	syncer, fullVM, _ := buildTestsObjects(t, ctx, startup, beacons, (totalWeight+1)/2)
 
 	// mock VM to simulate a valid summary is returned
-	localSummary := &blocktest.TestStateSummary{
+	localSummary := &blocktest.StateSummary{
 		HeightV: 2000,
 		IDV:     summaryID,
 		BytesV:  summaryBytes,
@@ -294,7 +294,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-		return &blocktest.TestStateSummary{
+		return &blocktest.StateSummary{
 			HeightV: key,
 			IDV:     summaryID,
 			BytesV:  summaryBytes,
@@ -480,7 +480,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// mock VM to simulate a valid but late summary is returned
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-		return &blocktest.TestStateSummary{
+		return &blocktest.StateSummary{
 			HeightV: key,
 			IDV:     summaryID,
 			BytesV:  summaryBytes,
@@ -529,7 +529,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
-			return &blocktest.TestStateSummary{
+			return &blocktest.StateSummary{
 				HeightV: key,
 				IDV:     summaryID,
 				BytesV:  summaryBytes,
@@ -617,7 +617,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		require.Equal(summaryBytes, b)
-		return &blocktest.TestStateSummary{
+		return &blocktest.StateSummary{
 			HeightV: key,
 			IDV:     summaryID,
 			BytesV:  summaryBytes,
@@ -687,7 +687,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-		return &blocktest.TestStateSummary{
+		return &blocktest.StateSummary{
 			HeightV: key,
 			IDV:     summaryID,
 			BytesV:  summaryBytes,
@@ -804,7 +804,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-		return &blocktest.TestStateSummary{
+		return &blocktest.StateSummary{
 			HeightV: key,
 			IDV:     summaryID,
 			BytesV:  summaryBytes,
@@ -906,13 +906,13 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	summary := &blocktest.TestStateSummary{
+	summary := &blocktest.StateSummary{
 		HeightV: key,
 		IDV:     summaryID,
 		BytesV:  summaryBytes,
 		T:       t,
 	}
-	minoritySummary := &blocktest.TestStateSummary{
+	minoritySummary := &blocktest.StateSummary{
 		HeightV: minorityKey,
 		IDV:     minoritySummaryID,
 		BytesV:  minoritySummaryBytes,
@@ -1051,7 +1051,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	}
 
 	// mock VM to simulate a valid summary is returned
-	minoritySummary := &blocktest.TestStateSummary{
+	minoritySummary := &blocktest.StateSummary{
 		HeightV: minorityKey,
 		IDV:     minoritySummaryID,
 		BytesV:  minoritySummaryBytes,
@@ -1157,13 +1157,13 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	}
 
 	// mock VM to simulate a valid minoritySummary1 is returned
-	minoritySummary1 := &blocktest.TestStateSummary{
+	minoritySummary1 := &blocktest.StateSummary{
 		HeightV: key,
 		IDV:     summaryID,
 		BytesV:  summaryBytes,
 		T:       t,
 	}
-	minoritySummary2 := &blocktest.TestStateSummary{
+	minoritySummary2 := &blocktest.StateSummary{
 		HeightV: minorityKey,
 		IDV:     minoritySummaryID,
 		BytesV:  minoritySummaryBytes,
