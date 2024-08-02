@@ -1461,7 +1461,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network

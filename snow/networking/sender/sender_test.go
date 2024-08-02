@@ -92,7 +92,7 @@ func TestTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -369,7 +369,7 @@ func TestReliableMessages(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -526,7 +526,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(

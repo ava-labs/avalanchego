@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	_ sender.ExternalSender = (*ExternalSenderTest)(nil)
+	_ sender.ExternalSender = (*External)(nil)
 
 	errSend = errors.New("unexpectedly called Send")
 )
 
-// ExternalSenderTest is a test sender
-type ExternalSenderTest struct {
+// External is a test sender
+type External struct {
 	TB testing.TB
 
 	CantSend bool
@@ -31,11 +31,11 @@ type ExternalSenderTest struct {
 }
 
 // Default set the default callable value to [cant]
-func (s *ExternalSenderTest) Default(cant bool) {
+func (s *External) Default(cant bool) {
 	s.CantSend = cant
 }
 
-func (s *ExternalSenderTest) Send(
+func (s *External) Send(
 	msg message.OutboundMessage,
 	config common.SendConfig,
 	subnetID ids.ID,
