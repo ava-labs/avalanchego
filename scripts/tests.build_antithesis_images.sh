@@ -9,6 +9,8 @@ set -euo pipefail
 #   3. Running the workload and its target network without error for a minute
 #   4. Stopping the workload and its target network
 #
+# `docker compose` is used (docker compose v2 plugin) due to it being installed by default on
+# public github runners. `docker-compose` (the v1 plugin) is not installed by default.
 
 # e.g.,
 # TEST_SETUP=avalanchego ./scripts/tests.build_antithesis_images.sh                 # Test build of images for avalanchego test setup
@@ -31,10 +33,10 @@ docker create --name "${CONTAINER_NAME}" "${IMAGE_NAME}:${TAG}" /bin/true
 
 # Create a temporary directory to write the compose configuration to
 TMPDIR="$(mktemp -d)"
-echo "using temporary directory ${TMPDIR} as the docker-compose path"
+echo "using temporary directory ${TMPDIR} as the docker compose path"
 
 COMPOSE_FILE="${TMPDIR}/docker-compose.yml"
-COMPOSE_CMD="docker-compose -f ${COMPOSE_FILE}"
+COMPOSE_CMD="docker compose -f ${COMPOSE_FILE}"
 
 # Ensure cleanup
 function cleanup {
