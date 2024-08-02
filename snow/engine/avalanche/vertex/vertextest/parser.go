@@ -17,20 +17,20 @@ import (
 var (
 	errParse = errors.New("unexpectedly called Parse")
 
-	_ vertex.Parser = (*TestParser)(nil)
+	_ vertex.Parser = (*Parser)(nil)
 )
 
-type TestParser struct {
+type Parser struct {
 	T            *testing.T
 	CantParseVtx bool
 	ParseVtxF    func(context.Context, []byte) (avalanche.Vertex, error)
 }
 
-func (p *TestParser) Default(cant bool) {
+func (p *Parser) Default(cant bool) {
 	p.CantParseVtx = cant
 }
 
-func (p *TestParser) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, error) {
+func (p *Parser) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, error) {
 	if p.ParseVtxF != nil {
 		return p.ParseVtxF(ctx, b)
 	}

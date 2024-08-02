@@ -9,24 +9,24 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
-var _ vertex.Manager = (*TestManager)(nil)
+var _ vertex.Manager = (*Manager)(nil)
 
-type TestManager struct {
-	TestBuilder
-	TestParser
-	TestStorage
+type Manager struct {
+	Builder
+	Parser
+	Storage
 }
 
-func NewTestManager(t *testing.T) *TestManager {
-	return &TestManager{
-		TestBuilder: TestBuilder{T: t},
-		TestParser:  TestParser{T: t},
-		TestStorage: TestStorage{T: t},
+func NewManager(t *testing.T) *Manager {
+	return &Manager{
+		Builder: Builder{T: t},
+		Parser:  Parser{T: t},
+		Storage: Storage{T: t},
 	}
 }
 
-func (m *TestManager) Default(cant bool) {
-	m.TestBuilder.Default(cant)
-	m.TestParser.Default(cant)
-	m.TestStorage.Default(cant)
+func (m *Manager) Default(cant bool) {
+	m.Builder.Default(cant)
+	m.Parser.Default(cant)
+	m.Storage.Default(cant)
 }

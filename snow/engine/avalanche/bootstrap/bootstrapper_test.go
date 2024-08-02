@@ -56,7 +56,7 @@ func (t *testTx) Accept(ctx context.Context) error {
 	return nil
 }
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.SenderTest, *vertextest.TestManager, *vertextest.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.SenderTest, *vertextest.Manager, *vertextest.VM) {
 	require := require.New(t)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -65,8 +65,8 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.SenderTest, *verte
 	vdrs := validators.NewManager()
 	db := memdb.New()
 	sender := &enginetest.SenderTest{T: t}
-	manager := vertextest.NewTestManager(t)
-	vm := &vertextest.TestVM{}
+	manager := vertextest.NewManager(t)
+	vm := &vertextest.VM{}
 	vm.T = t
 
 	sender.Default(true)

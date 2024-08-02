@@ -20,10 +20,10 @@ var (
 	errEdge               = errors.New("unexpectedly called Edge")
 	errStopVertexAccepted = errors.New("unexpectedly called StopVertexAccepted")
 
-	_ vertex.Storage = (*TestStorage)(nil)
+	_ vertex.Storage = (*Storage)(nil)
 )
 
-type TestStorage struct {
+type Storage struct {
 	T                                            *testing.T
 	CantGetVtx, CantEdge, CantStopVertexAccepted bool
 	GetVtxF                                      func(context.Context, ids.ID) (avalanche.Vertex, error)
@@ -31,12 +31,12 @@ type TestStorage struct {
 	StopVertexAcceptedF                          func(context.Context) (bool, error)
 }
 
-func (s *TestStorage) Default(cant bool) {
+func (s *Storage) Default(cant bool) {
 	s.CantGetVtx = cant
 	s.CantEdge = cant
 }
 
-func (s *TestStorage) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
+func (s *Storage) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 	if s.GetVtxF != nil {
 		return s.GetVtxF(ctx, vtxID)
 	}
@@ -46,7 +46,7 @@ func (s *TestStorage) GetVtx(ctx context.Context, vtxID ids.ID) (avalanche.Verte
 	return nil, errGet
 }
 
-func (s *TestStorage) Edge(ctx context.Context) []ids.ID {
+func (s *Storage) Edge(ctx context.Context) []ids.ID {
 	if s.EdgeF != nil {
 		return s.EdgeF(ctx)
 	}
@@ -56,7 +56,7 @@ func (s *TestStorage) Edge(ctx context.Context) []ids.ID {
 	return nil
 }
 
-func (s *TestStorage) StopVertexAccepted(ctx context.Context) (bool, error) {
+func (s *Storage) StopVertexAccepted(ctx context.Context) (bool, error) {
 	if s.StopVertexAcceptedF != nil {
 		return s.StopVertexAcceptedF(ctx)
 	}
