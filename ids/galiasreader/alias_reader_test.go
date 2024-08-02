@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ids/idstest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
@@ -17,7 +18,7 @@ import (
 func TestInterface(t *testing.T) {
 	require := require.New(t)
 
-	for _, test := range ids.AliasTests {
+	for _, test := range idstest.AliasTests {
 		listener, err := grpcutils.NewListener()
 		require.NoError(err)
 		serverCloser := grpcutils.ServerCloser{}

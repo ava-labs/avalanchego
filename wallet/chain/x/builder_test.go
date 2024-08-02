@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common/utxotest"
 )
 
 var (
@@ -51,7 +51,7 @@ func TestBaseTx(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
@@ -100,7 +100,7 @@ func TestCreateAssetTx(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
@@ -189,7 +189,7 @@ func TestMintNFTOperation(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
@@ -234,7 +234,7 @@ func TestMintFTOperation(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
@@ -281,7 +281,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
@@ -324,7 +324,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
@@ -362,7 +362,7 @@ func TestImportTx(t *testing.T) {
 		utxos          = makeTestUTXOs(utxosKey)
 		sourceChainID  = ids.GenerateTestID()
 		importedUTXOs  = utxos[:1]
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID:      utxos,
@@ -412,7 +412,7 @@ func TestExportTx(t *testing.T) {
 		// backend
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
-		genericBackend = common.NewDeterministicChainUTXOs(
+		genericBackend = utxotest.NewDeterministicChainUTXOs(
 			require,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,

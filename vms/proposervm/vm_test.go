@@ -24,9 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
@@ -43,8 +46,8 @@ var (
 )
 
 type fullVM struct {
-	*block.TestVM
-	*block.TestStateSyncableVM
+	*blocktest.TestVM
+	*blocktest.TestStateSyncableVM
 }
 
 var (
@@ -79,7 +82,7 @@ func initTestProposerVM(
 	minPChainHeight uint64,
 ) (
 	*fullVM,
-	*validators.TestState,
+	*validatorstest.TestState,
 	*VM,
 	database.Database,
 ) {
@@ -87,12 +90,12 @@ func initTestProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{
+		TestVM: &blocktest.TestVM{
+			TestVM: enginetest.TestVM{
 				T: t,
 			},
 		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
+		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,
 		},
 	}
@@ -139,7 +142,7 @@ func initTestProposerVM(
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -779,7 +782,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 func TestExpiredBuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM := &block.TestVM{}
+	coreVM := &blocktest.TestVM{}
 	coreVM.T = t
 
 	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
@@ -818,7 +821,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1062,7 +1065,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 func TestInnerVMRollback(t *testing.T) {
 	require := require.New(t)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 		GetCurrentHeightF: func(context.Context) (uint64, error) {
 			return defaultPChainHeight, nil
@@ -1078,8 +1081,8 @@ func TestInnerVMRollback(t *testing.T) {
 		},
 	}
 
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -1556,8 +1559,8 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
@@ -1610,7 +1613,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -1729,8 +1732,8 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{snowmantest.GenesisID}
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
@@ -1783,7 +1786,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		},
 	)
 
-	valState := &validators.TestState{
+	valState := &validatorstest.TestState{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {
@@ -2168,8 +2171,8 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	currentHeight := uint64(0)
 
 	initialState := []byte("genesis state")
-	coreVM := &block.TestVM{
-		TestVM: common.TestVM{
+	coreVM := &blocktest.TestVM{
+		TestVM: enginetest.TestVM{
 			T: t,
 			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
 				return nil
@@ -2204,7 +2207,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
-	ctx.ValidatorState = &validators.TestState{
+	ctx.ValidatorState = &validatorstest.TestState{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {
 			return snowmantest.GenesisHeight, nil
@@ -2479,7 +2482,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 }
 
 func TestLocalParse(t *testing.T) {
-	innerVM := &block.TestVM{
+	innerVM := &blocktest.TestVM{
 		ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
 			return &snowmantest.Block{BytesV: rawBlock}, nil
 		},

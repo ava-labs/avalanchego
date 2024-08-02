@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
@@ -100,7 +101,7 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
 	for _, bf := range validBranchFactors {
-		for name, test := range database.Tests {
+		for name, test := range dbtest.Tests {
 			t.Run(fmt.Sprintf("%s_%d", name, bf), func(t *testing.T) {
 				db, err := getBasicDBWithBranchFactor(bf)
 				require.NoError(t, err)
@@ -111,10 +112,10 @@ func Test_MerkleDB_DB_Interface(t *testing.T) {
 }
 
 func Benchmark_MerkleDB_DBInterface(b *testing.B) {
-	for _, size := range database.BenchmarkSizes {
-		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
+	for _, size := range dbtest.BenchmarkSizes {
+		keys, values := dbtest.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bf := range validBranchFactors {
-			for name, bench := range database.Benchmarks {
+			for name, bench := range dbtest.Benchmarks {
 				b.Run(fmt.Sprintf("merkledb_%d_%d_pairs_%d_keys_%d_values_%s", bf, size[0], size[1], size[2], name), func(b *testing.B) {
 					db, err := getBasicDBWithBranchFactor(bf)
 					require.NoError(b, err)
