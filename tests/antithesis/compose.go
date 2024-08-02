@@ -30,7 +30,7 @@ var (
 	errPluginDirEnvVarNotSet  = errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
 )
 
-// Creates docker-compose configuration for an antithesis test
+// Creates docker compose configuration for an antithesis test
 // setup. Configuration is via env vars to simplify usage by main entrypoints. If
 // the provided network includes a subnet, the initial DB state for the subnet
 // will be created and written to the target path.
@@ -77,7 +77,7 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 	return nil
 }
 
-// Initialize the given path with the docker-compose configuration (compose file and
+// Initialize the given path with the docker compose configuration (compose file and
 // volumes) needed for an Antithesis test setup.
 func initComposeConfig(
 	network *tmpnet.Network,
