@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -32,13 +31,16 @@ import (
 // - Checks the expected value of the funding address
 
 var _ = e2e.DescribePChain("[Workflow]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	ginkgo.It("P-chain main operations",
 		func() {
-			nodeURI := e2e.Env.GetRandomNodeURI()
-			keychain := e2e.Env.NewKeychain(2)
-			baseWallet := e2e.NewWallet(keychain, nodeURI)
+			env := e2e.GetEnv(tc)
+
+			nodeURI := env.GetRandomNodeURI()
+			keychain := env.NewKeychain(2)
+			baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 
 			pWallet := baseWallet.P()
 			pBuilder := pWallet.Builder()
@@ -49,25 +51,25 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			xContext := xBuilder.Context()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
 
-			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
-			minValStake, minDelStake, err := pChainClient.GetMinStake(e2e.DefaultContext(), constants.PlatformChainID)
+			tc.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
+			minValStake, minDelStake, err := pChainClient.GetMinStake(tc.DefaultContext(), constants.PlatformChainID)
 			require.NoError(err)
-			tests.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
-			tests.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
+			tc.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
+			tc.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
 
-			tests.Outf("{{blue}} fetching tx fee {{/}}\n")
+			tc.Outf("{{blue}} fetching tx fee {{/}}\n")
 			infoClient := info.NewClient(nodeURI.URI)
-			fees, err := infoClient.GetTxFee(e2e.DefaultContext())
+			fees, err := infoClient.GetTxFee(tc.DefaultContext())
 			require.NoError(err)
 			txFees := uint64(fees.TxFee)
-			tests.Outf("{{green}} txFee: %d {{/}}\n", txFees)
+			tc.Outf("{{green}} txFee: %d {{/}}\n", txFees)
 
 			// amount to transfer from P to X chain
 			toTransfer := 1 * units.Avax
 
 			pShortAddr := keychain.Keys[0].Address()
 			xTargetAddr := keychain.Keys[1].Address()
-			ginkgo.By("check selected keys have sufficient funds", func() {
+			tc.By("check selected keys have sufficient funds", func() {
 				pBalances, err := pWallet.Builder().GetBalance()
 				pBalance := pBalances[avaxAssetID]
 				minBalance := minValStake + txFees + minDelStake + txFees + toTransfer + txFees
@@ -98,7 +100,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 			pop := signer.NewProofOfPossession(sk)
 
-			ginkgo.By("issue add validator tx", func() {
+			tc.By("issue add validator tx", func() {
 				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					vdr,
 					pop,
@@ -106,17 +108,17 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					rewardOwner,
 					rewardOwner,
 					shares,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 			})
 
-			ginkgo.By("issue add delegator tx", func() {
+			tc.By("issue add delegator tx", func() {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					vdr,
 					avaxAssetID,
 					rewardOwner,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 			})
@@ -125,12 +127,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pBalances, err := pWallet.Builder().GetBalance()
 			require.NoError(err)
 			pStartBalance := pBalances[avaxAssetID]
-			tests.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", pStartBalance)
+			tc.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", pStartBalance)
 
 			xBalances, err := xWallet.Builder().GetFTBalance()
 			require.NoError(err)
 			xStartBalance := xBalances[avaxAssetID]
-			tests.Outf("{{blue}} X-chain balance before P->X export: %d {{/}}\n", xStartBalance)
+			tc.Outf("{{blue}} X-chain balance before P->X export: %d {{/}}\n", xStartBalance)
 
 			outputOwner := secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -143,7 +145,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				OutputOwners: outputOwner,
 			}
 
-			ginkgo.By("export avax from P to X chain", func() {
+			tc.By("export avax from P to X chain", func() {
 				_, err := pWallet.IssueExportTx(
 					xContext.BlockchainID,
 					[]*avax.TransferableOutput{
@@ -154,7 +156,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 							Out: output,
 						},
 					},
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 			})
@@ -163,21 +165,21 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pBalances, err = pWallet.Builder().GetBalance()
 			require.NoError(err)
 			pPreImportBalance := pBalances[avaxAssetID]
-			tests.Outf("{{blue}} P-chain balance after P->X export: %d {{/}}\n", pPreImportBalance)
+			tc.Outf("{{blue}} P-chain balance after P->X export: %d {{/}}\n", pPreImportBalance)
 
 			xBalances, err = xWallet.Builder().GetFTBalance()
 			require.NoError(err)
 			xPreImportBalance := xBalances[avaxAssetID]
-			tests.Outf("{{blue}} X-chain balance after P->X export: %d {{/}}\n", xPreImportBalance)
+			tc.Outf("{{blue}} X-chain balance after P->X export: %d {{/}}\n", xPreImportBalance)
 
 			require.Equal(xPreImportBalance, xStartBalance) // import not performed yet
 			require.Equal(pPreImportBalance, pStartBalance-toTransfer-txFees)
 
-			ginkgo.By("import avax from P into X chain", func() {
+			tc.By("import avax from P into X chain", func() {
 				_, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					&outputOwner,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 			})
@@ -186,12 +188,12 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pBalances, err = pWallet.Builder().GetBalance()
 			require.NoError(err)
 			pFinalBalance := pBalances[avaxAssetID]
-			tests.Outf("{{blue}} P-chain balance after P->X import: %d {{/}}\n", pFinalBalance)
+			tc.Outf("{{blue}} P-chain balance after P->X import: %d {{/}}\n", pFinalBalance)
 
 			xBalances, err = xWallet.Builder().GetFTBalance()
 			require.NoError(err)
 			xFinalBalance := xBalances[avaxAssetID]
-			tests.Outf("{{blue}} X-chain balance after P->X import: %d {{/}}\n", xFinalBalance)
+			tc.Outf("{{blue}} X-chain balance after P->X import: %d {{/}}\n", xFinalBalance)
 
 			require.Equal(xFinalBalance, xPreImportBalance+toTransfer-txFees) // import not performed yet
 			require.Equal(pFinalBalance, pPreImportBalance)

@@ -30,7 +30,8 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	const (
 		transferAmount = 10 * units.Avax
@@ -38,20 +39,22 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 	)
 
 	ginkgo.It("should ensure that funds can be transferred from the P-Chain to the X-Chain and the C-Chain", func() {
-		network := e2e.Env.GetNetwork()
+		env := e2e.GetEnv(tc)
 
-		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
+		network := env.GetNetwork()
+
+		tc.By("checking that the network has a compatible minimum stake duration", func() {
 			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
 			require.Equal(tmpnet.DefaultMinStakeDuration, minStakeDuration)
 		})
 
-		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
+		tc.By("creating wallet with a funded key to send from and recipient key to deliver to")
 		recipientKey, err := secp256k1.NewPrivateKey()
 		require.NoError(err)
-		keychain := e2e.Env.NewKeychain(1)
+		keychain := env.NewKeychain(1)
 		keychain.Add(recipientKey)
-		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.NewWallet(keychain, nodeURI)
+		nodeURI := env.GetRandomNodeURI()
+		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -63,7 +66,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		cBuilder := cWallet.Builder()
 		cContext := cBuilder.Context()
 
-		ginkgo.By("defining common configuration")
+		tc.By("defining common configuration")
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
 		avaxAssetID := xContext.AVAXAssetID
 		// Use the same owner for sending to X-Chain and importing funds to P-Chain
@@ -91,18 +94,18 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			},
 		}
 
-		ginkgo.By("adding new node and waiting for it to report healthy")
-		node := e2e.AddEphemeralNode(network, tmpnet.FlagsMap{})
-		e2e.WaitForHealthy(node)
+		tc.By("adding new node and waiting for it to report healthy")
+		node := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
+		e2e.WaitForHealthy(tc, node)
 
-		ginkgo.By("retrieving new node's id and pop")
+		tc.By("retrieving new node's id and pop")
 		infoClient := info.NewClient(node.URI)
-		nodeID, nodePOP, err := infoClient.GetNodeID(e2e.DefaultContext())
+		nodeID, nodePOP, err := infoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
 		// Adding a validator should not break interchain transfer.
 		endTime := time.Now().Add(30 * time.Second)
-		ginkgo.By("adding the new node as a validator", func() {
+		tc.By("adding the new node as a validator", func() {
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
@@ -131,13 +134,13 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
 				delegationShare,
-				e2e.WithDefaultContext(),
+				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
 
 		// Adding a delegator should not break interchain transfer.
-		ginkgo.By("adding a delegator to the new node", func() {
+		tc.By("adding a delegator to the new node", func() {
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 
@@ -155,30 +158,30 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Threshold: 1,
 					Addrs:     []ids.ShortID{rewardKey.Address()},
 				},
-				e2e.WithDefaultContext(),
+				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
 
-		ginkgo.By("exporting AVAX from the P-Chain to the X-Chain", func() {
+		tc.By("exporting AVAX from the P-Chain to the X-Chain", func() {
 			_, err := pWallet.IssueExportTx(
 				xContext.BlockchainID,
 				exportOutputs,
-				e2e.WithDefaultContext(),
+				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
 
-		ginkgo.By("importing AVAX from the P-Chain to the X-Chain", func() {
+		tc.By("importing AVAX from the P-Chain to the X-Chain", func() {
 			_, err := xWallet.IssueImportTx(
 				constants.PlatformChainID,
 				&recipientOwner,
-				e2e.WithDefaultContext(),
+				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
 
-		ginkgo.By("checking that the recipient address has received imported funds on the X-Chain", func() {
+		tc.By("checking that the recipient address has received imported funds on the X-Chain", func() {
 			balances, err := xWallet.Builder().GetFTBalance(common.WithCustomAddresses(set.Of(
 				recipientKey.Address(),
 			)))
@@ -186,36 +189,36 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			require.Positive(balances[avaxAssetID])
 		})
 
-		ginkgo.By("exporting AVAX from the P-Chain to the C-Chain", func() {
+		tc.By("exporting AVAX from the P-Chain to the C-Chain", func() {
 			_, err := pWallet.IssueExportTx(
 				cContext.BlockchainID,
 				exportOutputs,
-				e2e.WithDefaultContext(),
+				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
 
-		ginkgo.By("initializing a new eth client")
-		ethClient := e2e.NewEthClient(nodeURI)
+		tc.By("initializing a new eth client")
+		ethClient := e2e.NewEthClient(tc, nodeURI)
 
-		ginkgo.By("importing AVAX from the P-Chain to the C-Chain", func() {
+		tc.By("importing AVAX from the P-Chain to the C-Chain", func() {
 			_, err := cWallet.IssueImportTx(
 				constants.PlatformChainID,
 				recipientEthAddress,
-				e2e.WithDefaultContext(),
-				e2e.WithSuggestedGasPrice(ethClient),
+				tc.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(tc, ethClient),
 			)
 			require.NoError(err)
 		})
 
-		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
-		balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
+		tc.By("checking that the recipient address has received imported funds on the C-Chain")
+		balance, err := ethClient.BalanceAt(tc.DefaultContext(), recipientEthAddress, nil)
 		require.NoError(err)
 		require.Positive(balance.Cmp(big.NewInt(0)))
 
-		ginkgo.By("stopping validator node to free up resources for a bootstrap check")
-		require.NoError(node.Stop(e2e.DefaultContext()))
+		tc.By("stopping validator node to free up resources for a bootstrap check")
+		require.NoError(node.Stop(tc.DefaultContext()))
 
-		_ = e2e.CheckBootstrapIsPossible(network)
+		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
