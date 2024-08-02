@@ -37,6 +37,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 	return e2e.NewTestEnvironment(
+		e2e.NewTestContext(),
 		flagVars,
 		&tmpnet.Network{
 			Owner:   "avalanchego-e2e",
@@ -48,5 +49,5 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(envBytes)
+	e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
 })

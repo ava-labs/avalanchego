@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -25,22 +24,25 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Validator Sets]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	ginkgo.It("should be identical for every height for all nodes in the network", func() {
-		network := e2e.Env.GetNetwork()
+		env := e2e.GetEnv(tc)
 
-		ginkgo.By("creating wallet with a funded key to source delegated funds from")
-		keychain := e2e.Env.NewKeychain(1)
-		nodeURI := e2e.Env.GetRandomNodeURI()
-		baseWallet := e2e.NewWallet(keychain, nodeURI)
+		network := env.GetNetwork()
+
+		tc.By("creating wallet with a funded key to source delegated funds from")
+		keychain := env.NewKeychain(1)
+		nodeURI := env.GetRandomNodeURI()
+		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 		pWallet := baseWallet.P()
 
 		pBuilder := pWallet.Builder()
 		pContext := pBuilder.Context()
 
 		const delegatorCount = 15
-		ginkgo.By(fmt.Sprintf("adding %d delegators", delegatorCount), func() {
+		tc.By(fmt.Sprintf("adding %d delegators", delegatorCount), func() {
 			rewardKey, err := secp256k1.NewPrivateKey()
 			require.NoError(err)
 			avaxAssetID := pContext.AVAXAssetID
@@ -65,24 +67,24 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{rewardKey.Address()},
 					},
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 			}
 		})
 
-		ginkgo.By("getting the current P-Chain height from the wallet")
-		currentPChainHeight, err := platformvm.NewClient(nodeURI.URI).GetHeight(e2e.DefaultContext())
+		tc.By("getting the current P-Chain height from the wallet")
+		currentPChainHeight, err := platformvm.NewClient(nodeURI.URI).GetHeight(tc.DefaultContext())
 		require.NoError(err)
 
-		ginkgo.By("checking that validator sets are equal across all heights for all nodes", func() {
-			pvmClients := make([]platformvm.Client, len(e2e.Env.URIs))
-			for i, nodeURI := range e2e.Env.URIs {
+		tc.By("checking that validator sets are equal across all heights for all nodes", func() {
+			pvmClients := make([]platformvm.Client, len(env.URIs))
+			for i, nodeURI := range env.URIs {
 				pvmClients[i] = platformvm.NewClient(nodeURI.URI)
 				// Ensure that the height of the target node is at least the expected height
-				e2e.Eventually(
+				tc.Eventually(
 					func() bool {
-						pChainHeight, err := pvmClients[i].GetHeight(e2e.DefaultContext())
+						pChainHeight, err := pvmClients[i].GetHeight(tc.DefaultContext())
 						require.NoError(err)
 						return pChainHeight >= currentPChainHeight
 					},
@@ -93,11 +95,11 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			}
 
 			for height := uint64(0); height <= currentPChainHeight; height++ {
-				tests.Outf(" checked validator sets for height %d\n", height)
+				tc.Outf(" checked validator sets for height %d\n", height)
 				var observedValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
 				for _, pvmClient := range pvmClients {
 					validatorSet, err := pvmClient.GetValidatorsAt(
-						e2e.DefaultContext(),
+						tc.DefaultContext(),
 						constants.PrimaryNetworkID,
 						height,
 					)
@@ -111,6 +113,6 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			}
 		})
 
-		_ = e2e.CheckBootstrapIsPossible(network)
+		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
