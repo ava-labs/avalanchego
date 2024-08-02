@@ -2482,7 +2482,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 }
 
 func TestLocalParse(t *testing.T) {
-	innerVM := &block.TestVM{
+	innerVM := &blocktest.TestVM{
 		ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
 			return &snowmantest.Block{BytesV: rawBlock}, nil
 		},
