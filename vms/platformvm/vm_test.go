@@ -1513,6 +1513,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
+		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
