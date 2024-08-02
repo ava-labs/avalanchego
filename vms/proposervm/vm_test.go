@@ -91,7 +91,7 @@ func initTestProposerVM(
 	initialState := []byte("genesis state")
 	coreVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: enginetest.TestVM{
+			VM: enginetest.VM{
 				T: t,
 			},
 		},
@@ -1082,7 +1082,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	coreVM := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -1560,7 +1560,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 
 	initialState := []byte("genesis state")
 	coreVM := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+		VM: enginetest.VM{
 			T: t,
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
@@ -1733,7 +1733,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 
 	initialState := []byte("genesis state")
 	coreVM := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+		VM: enginetest.VM{
 			T: t,
 		},
 		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
@@ -2172,7 +2172,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 
 	initialState := []byte("genesis state")
 	coreVM := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
 				return nil

@@ -105,7 +105,7 @@ func TestGossiperGossip(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
 
-			responseSender := &enginetest.FakeSender{
+			responseSender := &enginetest.SenderStub{
 				SentAppResponse: make(chan []byte, 1),
 			}
 			responseNetwork, err := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
@@ -134,7 +134,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 			require.NoError(responseNetwork.AddHandler(0x0, handler))
 
-			requestSender := &enginetest.FakeSender{
+			requestSender := &enginetest.SenderStub{
 				SentAppRequest: make(chan []byte, 1),
 			}
 
@@ -510,7 +510,7 @@ func TestPushGossiper(t *testing.T) {
 			require := require.New(t)
 			ctx := context.Background()
 
-			sender := &enginetest.FakeSender{
+			sender := &enginetest.SenderStub{
 				SentAppGossip: make(chan []byte, 2),
 			}
 			network, err := p2p.NewNetwork(

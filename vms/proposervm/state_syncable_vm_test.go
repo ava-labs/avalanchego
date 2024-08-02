@@ -34,7 +34,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	innerVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: enginetest.TestVM{
+			VM: enginetest.VM{
 				T: t,
 			},
 		},

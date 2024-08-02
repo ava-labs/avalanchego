@@ -27,7 +27,7 @@ var (
 
 // TestVM is a ChainVM that is useful for testing.
 type TestVM struct {
-	enginetest.TestVM
+	enginetest.VM
 
 	CantBuildBlock,
 	CantParseBlock,
@@ -45,7 +45,7 @@ type TestVM struct {
 }
 
 func (vm *TestVM) Default(cant bool) {
-	vm.TestVM.Default(cant)
+	vm.VM.Default(cant)
 
 	vm.CantBuildBlock = cant
 	vm.CantParseBlock = cant

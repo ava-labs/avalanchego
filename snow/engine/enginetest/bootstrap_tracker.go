@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// BootstrapTrackerTest is a test subnet
-type BootstrapTrackerTest struct {
+// BootstrapTracker is a test subnet
+type BootstrapTracker struct {
 	T *testing.T
 
 	CantIsBootstrapped, CantBootstrapped, CantOnBootstrapCompleted bool
@@ -24,7 +24,7 @@ type BootstrapTrackerTest struct {
 }
 
 // Default set the default callable value to [cant]
-func (s *BootstrapTrackerTest) Default(cant bool) {
+func (s *BootstrapTracker) Default(cant bool) {
 	s.CantIsBootstrapped = cant
 	s.CantBootstrapped = cant
 	s.CantOnBootstrapCompleted = cant
@@ -33,7 +33,7 @@ func (s *BootstrapTrackerTest) Default(cant bool) {
 // IsBootstrapped calls IsBootstrappedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail. Defaults to returning false.
-func (s *BootstrapTrackerTest) IsBootstrapped() bool {
+func (s *BootstrapTracker) IsBootstrapped() bool {
 	if s.IsBootstrappedF != nil {
 		return s.IsBootstrappedF()
 	}
@@ -46,7 +46,7 @@ func (s *BootstrapTrackerTest) IsBootstrapped() bool {
 // Bootstrapped calls BootstrappedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *BootstrapTrackerTest) Bootstrapped(chainID ids.ID) {
+func (s *BootstrapTracker) Bootstrapped(chainID ids.ID) {
 	if s.BootstrappedF != nil {
 		s.BootstrappedF(chainID)
 	} else if s.CantBootstrapped && s.T != nil {
@@ -54,7 +54,7 @@ func (s *BootstrapTrackerTest) Bootstrapped(chainID ids.ID) {
 	}
 }
 
-func (s *BootstrapTrackerTest) OnBootstrapCompleted() chan struct{} {
+func (s *BootstrapTracker) OnBootstrapCompleted() chan struct{} {
 	if s.OnBootstrapCompletedF != nil {
 		return s.OnBootstrapCompletedF()
 	} else if s.CantOnBootstrapCompleted && s.T != nil {

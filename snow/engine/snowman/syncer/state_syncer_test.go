@@ -40,11 +40,11 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	// Build state syncer
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 
 	// Non state syncableVM case
 	nonStateSyncableVM := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{T: t},
+		VM: enginetest.VM{T: t},
 	}
 	dummyGetter, err := getter.New(
 		nonStateSyncableVM,
@@ -69,7 +69,7 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 	// State syncableVM case
 	fullVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: enginetest.TestVM{T: t},
+			VM: enginetest.VM{T: t},
 		},
 		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,

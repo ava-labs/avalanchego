@@ -78,19 +78,19 @@ func buildTestsObjects(
 ) (
 	*stateSyncer,
 	*fullVM,
-	*enginetest.SenderTest,
+	*enginetest.Sender,
 ) {
 	require := require.New(t)
 
 	fullVM := &fullVM{
 		TestVM: &blocktest.TestVM{
-			TestVM: enginetest.TestVM{T: t},
+			VM: enginetest.VM{T: t},
 		},
 		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
 			T: t,
 		},
 	}
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	dummyGetter, err := getter.New(
 		fullVM,
 		sender,

@@ -193,7 +193,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 			},
 			c.additionalFxs...,
 		),
-		&enginetest.SenderTest{},
+		&enginetest.Sender{},
 	))
 
 	stopVertexID := ids.GenerateTestID()
