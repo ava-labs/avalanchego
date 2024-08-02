@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/statetest"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -330,7 +330,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 			validator := getValidatorOutputs[i]
 			getValidatorsOutput[validator.NodeID] = validator
 		}
-		validatorState := &statetest.TestState{
+		validatorState := &validatorstest.TestState{
 			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 				return getValidatorsOutput, nil
 			},
