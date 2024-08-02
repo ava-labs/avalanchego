@@ -211,6 +211,68 @@ func TestParametersVerify(t *testing.T) {
 			},
 			expectedError: ErrParametersInvalid,
 		},
+		{
+			name: "termination criteria same vote threshold",
+			params: Parameters{
+				TerminationCriteria: []TerminationCriteria{
+					{VoteThreshold: 10, ConsecutiveSuccesses: 5},
+					{VoteThreshold: 10, ConsecutiveSuccesses: 4},
+				},
+			},
+			expectedError: ErrParametersInvalid,
+		},
+		{
+			name: "termination criteria descending vote threshold",
+			params: Parameters{
+				TerminationCriteria: []TerminationCriteria{
+					{VoteThreshold: 10, ConsecutiveSuccesses: 5},
+					{VoteThreshold: 9, ConsecutiveSuccesses: 4},
+				},
+			},
+			expectedError: ErrParametersInvalid,
+		},
+		{
+			name: "termination criteria ascending consecutive successes",
+			params: Parameters{
+				TerminationCriteria: []TerminationCriteria{
+					{VoteThreshold: 10, ConsecutiveSuccesses: 5},
+					{VoteThreshold: 11, ConsecutiveSuccesses: 6},
+				},
+			},
+			expectedError: ErrParametersInvalid,
+		},
+		{
+			name: "termination criteria single criteria",
+			params: Parameters{
+				K:                     1,
+				AlphaPreference:       1,
+				Beta:                  1,
+				ConcurrentRepolls:     1,
+				OptimalProcessing:     1,
+				MaxOutstandingItems:   1,
+				MaxItemProcessingTime: 1,
+				TerminationCriteria: []TerminationCriteria{
+					{VoteThreshold: 10, ConsecutiveSuccesses: 5},
+				},
+			},
+		},
+		{
+			name: "termination criteria multiple criteria",
+			params: Parameters{
+				K:                     1,
+				AlphaPreference:       1,
+				Beta:                  1,
+				ConcurrentRepolls:     1,
+				OptimalProcessing:     1,
+				MaxOutstandingItems:   1,
+				MaxItemProcessingTime: 1,
+				TerminationCriteria: []TerminationCriteria{
+					{VoteThreshold: 10, ConsecutiveSuccesses: 5},
+					{VoteThreshold: 11, ConsecutiveSuccesses: 5},
+					{VoteThreshold: 12, ConsecutiveSuccesses: 4},
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

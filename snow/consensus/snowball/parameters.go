@@ -63,6 +63,9 @@ type Parameters struct {
 	// Beta is the number of consecutive successful queries required for
 	// finalization.
 	Beta int `json:"beta" yaml:"beta"`
+	// TerminationCriteria is the criteria that if any of them is satisfied, the protocol is finalized.
+	// The VoteThresholds should be arranged in ascending order.
+	TerminationCriteria []TerminationCriteria `json:"terminationCriteria" yaml:"terminationCriteria"`
 	// ConcurrentRepolls is the number of outstanding polls the engine will
 	// target to have while there is something processing.
 	ConcurrentRepolls int `json:"concurrentRepolls" yaml:"concurrentRepolls"`
@@ -78,23 +81,37 @@ type Parameters struct {
 	MaxItemProcessingTime time.Duration `json:"maxItemProcessingTime" yaml:"maxItemProcessingTime"`
 }
 
+// TerminationCriteria is a condition that is satisfied, the protocol is finalized.
+type TerminationCriteria struct {
+	// ConsecutiveSuccesses is the number of consecutive successful queries with a given vote threshold,
+	// also known as β.
+	ConsecutiveSuccesses int `json:"consecutiveSuccesses" yaml:"consecutiveSuccesses"`
+	// VoteThreshold is the threshold to increase the confidence, also known as α.
+	VoteThreshold int `json:"voteThreshold" yaml:"voteThreshold"`
+}
+
 // Verify returns nil if the parameters describe a valid initialization.
 //
 // An initialization is valid if the following conditions are met:
 //
-// - K/2 < AlphaPreference <= AlphaConfidence <= K
-// - 0 < ConcurrentRepolls <= Beta
-// - 0 < OptimalProcessing
-// - 0 < MaxOutstandingItems
-// - 0 < MaxItemProcessingTime
-//
-// Note: K/2 < K implies that 0 <= K/2, so we don't need an explicit check that
-// AlphaPreference is positive.
+//   - 0 <= K/2 < AlphaPreference <= AlphaConfidence <= K
+//   - 0 < ConcurrentRepolls <= Beta
+//   - 0 < OptimalProcessing
+//   - 0 < MaxOutstandingItems
+//   - 0 < MaxItemProcessingTime
+//   - ∀i⋹{0,1,...,|TerminationCriteria|-2}:
+//     TerminationCriteria[i].VoteThreshold < TerminationCriteria[i+1].VoteThreshold
+//     TerminationCriteria[i].ConsecutiveSuccesses >= TerminationCriteria[i+1].ConsecutiveSuccesses
+//   - If |TerminationCriteria| > 0 then AlphaConfidence == 0
 func (p Parameters) Verify() error {
+	if err := p.verifyTerminationCriteria(); err != nil {
+		return err
+	}
+
 	switch {
 	case p.AlphaPreference <= p.K/2:
 		return fmt.Errorf("%w: k = %d, alphaPreference = %d: fails the condition that: k/2 < alphaPreference", ErrParametersInvalid, p.K, p.AlphaPreference)
-	case p.AlphaConfidence < p.AlphaPreference:
+	case p.AlphaConfidence < p.AlphaPreference && len(p.TerminationCriteria) == 0:
 		return fmt.Errorf("%w: alphaPreference = %d, alphaConfidence = %d: fails the condition that: alphaPreference <= alphaConfidence", ErrParametersInvalid, p.AlphaPreference, p.AlphaConfidence)
 	case p.K < p.AlphaConfidence:
 		return fmt.Errorf("%w: k = %d, alphaConfidence = %d: fails the condition that: alphaConfidence <= k", ErrParametersInvalid, p.K, p.AlphaConfidence)
@@ -115,6 +132,28 @@ func (p Parameters) Verify() error {
 	}
 }
 
+func (p Parameters) verifyTerminationCriteria() error {
+	if len(p.TerminationCriteria) > 0 && p.AlphaConfidence != 0 {
+		return fmt.Errorf("%w: termination criteria cannot be configured together with alpha confidence (%d), "+
+			"they are mutually exclusive", ErrParametersInvalid, p.AlphaConfidence)
+	}
+	for i := range p.TerminationCriteria {
+		if i+1 == len(p.TerminationCriteria) {
+			continue
+		}
+		if p.TerminationCriteria[i].VoteThreshold >= p.TerminationCriteria[i+1].VoteThreshold {
+			return fmt.Errorf("%w: TerminationCriteria[%d].VoteThreshold (%d) should be less than "+
+				"TerminationCriteria[%d].VoteThreshold (%d)", ErrParametersInvalid, i, p.TerminationCriteria[i].VoteThreshold, i+1, p.TerminationCriteria[i+1].VoteThreshold)
+		}
+		if p.TerminationCriteria[i].ConsecutiveSuccesses < p.TerminationCriteria[i+1].ConsecutiveSuccesses {
+			return fmt.Errorf("%w: TerminationCriteria[%d].ConsecutiveSuccesses (%d) should be bigger or equal than "+
+				"TerminationCriteria[%d].ConsecutiveSuccesses (%d)",
+				ErrParametersInvalid, i, p.TerminationCriteria[i].ConsecutiveSuccesses, i+1, p.TerminationCriteria[i+1].ConsecutiveSuccesses)
+		}
+	}
+	return nil
+}
+
 func (p Parameters) MinPercentConnectedHealthy() float64 {
 	// AlphaConfidence is used here to ensure that the node can still feasibly
 	// accept operations. If AlphaPreference were used, committing could be
@@ -123,16 +162,27 @@ func (p Parameters) MinPercentConnectedHealthy() float64 {
 	return alphaRatio*(1-MinPercentConnectedBuffer) + MinPercentConnectedBuffer
 }
 
+func (p Parameters) terminationConditions() []terminationCondition {
+	if len(p.TerminationCriteria) == 0 {
+		return []terminationCondition{{alphaConfidence: p.AlphaConfidence, beta: p.Beta}}
+	}
+
+	return newTerminationCondition(p.TerminationCriteria)
+}
+
 type terminationCondition struct {
 	alphaConfidence int
 	beta            int
 }
 
-func newSingleTerminationCondition(alphaConfidence int, beta int) []terminationCondition {
-	return []terminationCondition{
-		{
-			alphaConfidence: alphaConfidence,
-			beta:            beta,
-		},
+func newTerminationCondition(tc []TerminationCriteria) []terminationCondition {
+	result := make([]terminationCondition, len(tc))
+	for i := 0; i < len(tc); i++ {
+		result[i] = terminationCondition{
+			alphaConfidence: tc[i].VoteThreshold,
+			beta:            tc[i].ConsecutiveSuccesses,
+		}
 	}
+
+	return result
 }

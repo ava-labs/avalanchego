@@ -90,8 +90,19 @@ var (
 	errFileDoesNotExist                       = errors.New("file does not exist")
 )
 
-func getConsensusConfig(v *viper.Viper) snowball.Parameters {
+func getConsensusConfig(v *viper.Viper) (snowball.Parameters, error) {
+	var terminationCriteria []snowball.TerminationCriteria
+
+	tcText := v.GetString(SnowTerminationCriteriaJSONKey)
+	if v.IsSet(SnowTerminationCriteriaJSONKey) && tcText != "" {
+		if err := json.Unmarshal([]byte(tcText), &terminationCriteria); err != nil {
+			return snowball.Parameters{}, fmt.Errorf("%w: failed parsing %s: %s is not a valid JSON array of the form "+
+				"{\"consecutiveSuccesses\":x,\"voteThreshold\":y}", snowball.ErrParametersInvalid, SnowTerminationCriteriaJSONKey, tcText)
+		}
+	}
+
 	p := snowball.Parameters{
+		TerminationCriteria:   terminationCriteria,
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
@@ -105,7 +116,7 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
 		p.AlphaConfidence = p.AlphaPreference
 	}
-	return p
+	return p, nil
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
@@ -1063,7 +1074,10 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			config := getDefaultSubnetConfig(v)
+			config, err := getDefaultSubnetConfig(v)
+			if err != nil {
+				return nil, err
+			}
 			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
@@ -1116,7 +1130,10 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, err
 		}
 
-		config := getDefaultSubnetConfig(v)
+		config, err := getDefaultSubnetConfig(v)
+		if err != nil {
+			return nil, err
+		}
 		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
@@ -1136,13 +1153,17 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	return subnetConfigs, nil
 }
 
-func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
+func getDefaultSubnetConfig(v *viper.Viper) (subnets.Config, error) {
+	cc, err := getConsensusConfig(v)
+	if err != nil {
+		return subnets.Config{}, err
+	}
 	return subnets.Config{
-		ConsensusParameters:         getConsensusConfig(v),
+		ConsensusParameters:         cc,
 		ValidatorOnly:               false,
 		ProposerMinBlockDelay:       proposervm.DefaultMinBlockDelay,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
-	}
+	}, nil
 }
 
 func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
@@ -1373,7 +1394,10 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
 
-	primaryNetworkConfig := getDefaultSubnetConfig(v)
+	primaryNetworkConfig, err := getDefaultSubnetConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
 	if err := primaryNetworkConfig.Valid(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}

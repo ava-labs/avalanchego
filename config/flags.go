@@ -304,6 +304,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(BootstrapAncestorsMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Ancestors message")
 
 	// Consensus
+	fs.String(SnowTerminationCriteriaJSONKey, "", "Termination criteria for poll")
 	fs.Int(SnowSampleSizeKey, snowball.DefaultParameters.K, "Number of nodes to query for each network poll")
 	fs.Int(SnowQuorumSizeKey, snowball.DefaultParameters.AlphaConfidence, "Threshold of nodes required to update this node's preference and increase its confidence in a network poll")
 	fs.Int(SnowPreferenceQuorumSizeKey, snowball.DefaultParameters.AlphaPreference, fmt.Sprintf("Threshold of nodes required to update this node's preference in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))

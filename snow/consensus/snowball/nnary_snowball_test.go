@@ -14,7 +14,7 @@ func TestNnarySnowball(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 	sb.Add(Blue)
@@ -57,7 +57,7 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 1
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 
@@ -74,7 +74,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 	sb.Add(Blue)
@@ -114,7 +114,7 @@ func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sb := newNnarySnowball(alphaPreference, terminationConditions, Red)
 	sb.Add(Blue)
