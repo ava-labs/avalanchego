@@ -446,7 +446,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		)
 	}
 
-	// Notify those that registered to be notified when a new chain is created
+	// Notify those who registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Name, chain.Context, chain.VM)
 
 	// Allows messages to be routed to the new chain. If the handler hasn't been
