@@ -28,7 +28,8 @@ var (
 	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
 	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEUpgradeNotActive          = errors.New("attempting to use a E-upgrade feature prior to activation")
+	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
 )
 
 type StandardTxExecutor struct {
@@ -434,14 +435,16 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 }
 
 func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	currentTimestamp := e.State.GetTimestamp()
+	if e.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
+		return errTransformSubnetTxPostEtna
+	}
+
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
-	var (
-		currentTimestamp = e.State.GetTimestamp()
-		isDurangoActive  = e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
+	isDurangoActive := e.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
 	}
@@ -497,8 +500,8 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		currentTimestamp = e.State.GetTimestamp()
 		upgrades         = e.Backend.Config.UpgradeConfig
 	)
-	if !upgrades.IsEActivated(currentTimestamp) {
-		return errEUpgradeNotActive
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
 	}
 
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {

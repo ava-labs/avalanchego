@@ -38,5 +38,8 @@ type Config struct {
 
 	VM block.ChainVM
 
+	// NonVerifyingParse parses blocks without verifying them.
+	NonVerifyingParse block.ParseFunc
+
 	Bootstrapped func()
 }

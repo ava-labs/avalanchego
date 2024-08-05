@@ -16,7 +16,7 @@ func Test_Dimensions_Add(t *testing.T) {
 	tests := []struct {
 		name        string
 		lhs         Dimensions
-		rhs         []Dimensions
+		rhs         []*Dimensions
 		expected    Dimensions
 		expectedErr error
 	}{
@@ -28,7 +28,7 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   4,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 10,
 					DBRead:    20,
@@ -52,7 +52,7 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   4,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 10,
 					DBRead:    20,
@@ -82,7 +82,7 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   4,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 10,
 					DBRead:    20,
@@ -106,7 +106,7 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   4,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 10,
 					DBRead:    20,
@@ -130,7 +130,7 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   math.MaxUint64,
 				Compute:   4,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 10,
 					DBRead:    20,
@@ -154,7 +154,7 @@ func Test_Dimensions_Add(t *testing.T) {
 				DBWrite:   3,
 				Compute:   math.MaxUint64,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 10,
 					DBRead:    20,
@@ -186,7 +186,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 	tests := []struct {
 		name        string
 		lhs         Dimensions
-		rhs         []Dimensions
+		rhs         []*Dimensions
 		expected    Dimensions
 		expectedErr error
 	}{
@@ -198,7 +198,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 1,
 					DBRead:    2,
@@ -222,7 +222,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 1,
 					DBRead:    2,
@@ -252,7 +252,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: math.MaxUint64,
 					DBRead:    2,
@@ -276,7 +276,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 1,
 					DBRead:    math.MaxUint64,
@@ -300,7 +300,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 1,
 					DBRead:    2,
@@ -324,7 +324,7 @@ func Test_Dimensions_Sub(t *testing.T) {
 				DBWrite:   33,
 				Compute:   44,
 			},
-			rhs: []Dimensions{
+			rhs: []*Dimensions{
 				{
 					Bandwidth: 1,
 					DBRead:    2,
@@ -425,4 +425,53 @@ func Test_Dimensions_ToGas(t *testing.T) {
 			require.Equal(test.expected, actual)
 		})
 	}
+}
+
+func Benchmark_Dimensions_Add(b *testing.B) {
+	lhs := Dimensions{600, 10, 10, 1000}
+	rhs := []*Dimensions{
+		{1, 1, 1, 1},
+		{10, 10, 10, 10},
+		{100, 100, 100, 100},
+		{200, 200, 200, 200},
+		{500, 500, 500, 500},
+		{1_000, 1_000, 1_000, 1_000},
+		{10_000, 10_000, 10_000, 10_000},
+	}
+
+	b.Run("single", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Add(rhs[0])
+		}
+	})
+
+	b.Run("multiple", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Add(rhs[0], rhs[1], rhs[2], rhs[3], rhs[4], rhs[5], rhs[6])
+		}
+	})
+}
+
+func Benchmark_Dimensions_Sub(b *testing.B) {
+	lhs := Dimensions{10_000, 10_000, 10_000, 100_000}
+	rhs := []*Dimensions{
+		{1, 1, 1, 1},
+		{10, 10, 10, 10},
+		{100, 100, 100, 100},
+		{200, 200, 200, 200},
+		{500, 500, 500, 500},
+		{1_000, 1_000, 1_000, 1_000},
+	}
+
+	b.Run("single", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Sub(rhs[0])
+		}
+	})
+
+	b.Run("multiple", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = lhs.Sub(rhs[0], rhs[1], rhs[2], rhs[3], rhs[4], rhs[5])
+		}
+	})
 }

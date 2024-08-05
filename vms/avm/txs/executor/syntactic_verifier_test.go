@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -28,9 +29,11 @@ import (
 var (
 	keys      = secp256k1.TestKeys()
 	feeConfig = config.Config{
+		Upgrades: upgrade.Config{
+			EtnaTime: mockable.MaxTime,
+		},
 		TxFee:            2,
 		CreateAssetTxFee: 3,
-		EUpgradeTime:     mockable.MaxTime,
 	}
 )
 

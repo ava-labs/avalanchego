@@ -513,10 +513,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			feeCalculator, err := state.PickFeeCalculator(backend.Config, chain)
-			require.NoError(t, err)
-
-			err = verifyAddPermissionlessValidatorTx(backend, feeCalculator, chain, sTx, tx)
+			feeCalculator := state.PickFeeCalculator(backend.Config, chain)
+			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, chain, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

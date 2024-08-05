@@ -20,9 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common/utxotest"
 )
 
 var (
@@ -34,16 +35,18 @@ var (
 	subnetAssetID = ids.Empty.Prefix(2024)
 
 	testContext = &builder.Context{
-		NetworkID:                     constants.UnitTestID,
-		AVAXAssetID:                   avaxAssetID,
-		BaseTxFee:                     units.MicroAvax,
-		CreateSubnetTxFee:             19 * units.MicroAvax,
-		TransformSubnetTxFee:          789 * units.MicroAvax,
-		CreateBlockchainTxFee:         1234 * units.MicroAvax,
-		AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
-		AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
-		AddSubnetValidatorFee:         1010 * units.MilliAvax,
-		AddSubnetDelegatorFee:         9 * units.Avax,
+		NetworkID:   constants.UnitTestID,
+		AVAXAssetID: avaxAssetID,
+		StaticFeeConfig: fee.StaticConfig{
+			TxFee:                         units.MicroAvax,
+			CreateSubnetTxFee:             19 * units.MicroAvax,
+			TransformSubnetTxFee:          789 * units.MicroAvax,
+			CreateBlockchainTxFee:         1234 * units.MicroAvax,
+			AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
+			AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
+			AddSubnetValidatorFee:         1010 * units.MilliAvax,
+			AddSubnetDelegatorFee:         9 * units.Avax,
+		},
 	}
 )
 
@@ -57,7 +60,7 @@ func TestBaseTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -67,7 +70,7 @@ func TestBaseTx(t *testing.T) {
 		builder  = builder.New(set.Of(utxoAddr), testContext, backend)
 
 		// data to build the transaction
-		outputsToMove = []*avax.TransferableOutput{{
+		outputToMove = &avax.TransferableOutput{
 			Asset: avax.Asset{ID: avaxAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 7 * units.Avax,
@@ -76,22 +79,25 @@ func TestBaseTx(t *testing.T) {
 					Addrs:     []ids.ShortID{utxoAddr},
 				},
 			},
-		}}
+		}
 	)
 
-	utx, err := builder.NewBaseTx(outputsToMove)
+	utx, err := builder.NewBaseTx([]*avax.TransferableOutput{outputToMove})
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 2)
+	// check that the output is included in the transaction
+	require.Contains(utx.Outs, outputToMove)
 
-	expectedConsumed := testContext.BaseTxFee + outputsToMove[0].Out.Amount()
-	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
-	require.Equal(outputsToMove[0], outs[1])
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
@@ -101,7 +107,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -140,15 +146,16 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 1)
-
-	expectedConsumed := testContext.AddSubnetValidatorFee
-	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.AddSubnetValidatorFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestRemoveSubnetValidatorTx(t *testing.T) {
@@ -158,7 +165,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -191,15 +198,16 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
-
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestCreateChainTx(t *testing.T) {
@@ -209,7 +217,7 @@ func TestCreateChainTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -250,15 +258,16 @@ func TestCreateChainTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
-
-	expectedConsumed := testContext.CreateBlockchainTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.CreateBlockchainTxFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestCreateSubnetTx(t *testing.T) {
@@ -268,7 +277,7 @@ func TestCreateSubnetTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -298,15 +307,16 @@ func TestCreateSubnetTx(t *testing.T) {
 	utx, err := builder.NewCreateSubnetTx(subnetOwner)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
-
-	expectedConsumed := testContext.CreateSubnetTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.CreateSubnetTxFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestTransferSubnetOwnershipTx(t *testing.T) {
@@ -316,7 +326,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -349,15 +359,16 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 1)
-	require.Len(outs, 1)
-
-	expectedConsumed := testContext.BaseTxFee
-	consumed := ins[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestImportTx(t *testing.T) {
@@ -369,7 +380,7 @@ func TestImportTx(t *testing.T) {
 		utxos         = makeTestUTXOs(utxosKey)
 		sourceChainID = ids.GenerateTestID()
 		importedUTXOs = utxos[:1]
-		chainUTXOs    = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs    = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 			sourceChainID:             importedUTXOs,
 		})
@@ -397,17 +408,18 @@ func TestImportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	importedIns := utx.ImportedInputs
-	require.Empty(ins) // we spend the imported input (at least partially)
-	require.Len(importedIns, 1)
-	require.Len(outs, 1)
+	require.Empty(utx.Ins) // we spend the imported input (at least partially)
 
-	expectedConsumed := testContext.BaseTxFee
-	consumed := importedIns[0].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
+			},
+		),
+		addInputAmounts(utx.Ins, utx.ImportedInputs),
+	)
 }
 
 func TestExportTx(t *testing.T) {
@@ -417,7 +429,7 @@ func TestExportTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -447,16 +459,18 @@ func TestExportTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 1)
-
-	expectedConsumed := testContext.BaseTxFee + exportedOutputs[0].Out.Amount()
-	consumed := ins[0].In.Amount() + ins[1].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
 	require.Equal(utx.ExportedOutputs, exportedOutputs)
+
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs, utx.ExportedOutputs),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.TxFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestTransformSubnetTx(t *testing.T) {
@@ -466,7 +480,7 @@ func TestTransformSubnetTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 
@@ -515,18 +529,17 @@ func TestTransformSubnetTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	outs := utx.Outs
-	require.Len(ins, 2)
-	require.Len(outs, 2)
-
-	expectedConsumedSubnetAsset := maxSupply - initialSupply
-	consumedSubnetAsset := ins[0].In.Amount() - outs[1].Out.Amount()
-	require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-	expectedConsumed := testContext.TransformSubnetTxFee
-	consumed := ins[1].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs),
+			map[ids.ID]uint64{
+				avaxAssetID:   testContext.StaticFeeConfig.TransformSubnetTxFee,
+				subnetAssetID: maxSupply - initialSupply,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func TestAddPermissionlessValidatorTx(t *testing.T) {
@@ -534,9 +547,36 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		require = require.New(t)
 
 		// backend
-		utxosKey   = testKeys[1]
-		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		utxosOffset uint64 = 2024
+		utxosKey           = testKeys[1]
+		utxosAddr          = utxosKey.Address()
+	)
+	makeUTXO := func(amount uint64) *avax.UTXO {
+		utxosOffset++
+		return &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.Empty.Prefix(utxosOffset),
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: avax.Asset{ID: avaxAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Addrs:     []ids.ShortID{utxosAddr},
+					Threshold: 1,
+				},
+			},
+		}
+	}
+
+	var (
+		utxos = []*avax.UTXO{
+			makeUTXO(testContext.StaticFeeConfig.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
+			makeUTXO(1 * units.NanoAvax),                                        // small UTXO
+			makeUTXO(9 * units.Avax),                                            // large UTXO
+		}
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -583,20 +623,29 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	staked := utx.StakeOuts
-	outs := utx.Outs
-	require.Len(ins, 4)
-	require.Len(staked, 2)
-	require.Len(outs, 2)
+	// check stake amount
+	require.Equal(
+		map[ids.ID]uint64{
+			avaxAssetID: 2 * units.Avax,
+		},
+		addOutputAmounts(utx.StakeOuts),
+	)
 
-	expectedConsumedSubnetAsset := utx.Validator.Weight()
-	consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
-	require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-	expectedConsumed := testContext.AddPrimaryNetworkValidatorFee
-	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs, utx.StakeOuts),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.AddPrimaryNetworkValidatorFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
+
+	// Outputs should be merged if possible. For example, if there are two
+	// unlocked inputs consumed for staking, this should only produce one staked
+	// output.
+	require.Len(utx.StakeOuts, 1)
 }
 
 func TestAddPermissionlessDelegatorTx(t *testing.T) {
@@ -606,7 +655,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 		// backend
 		utxosKey   = testKeys[1]
 		utxos      = makeTestUTXOs(utxosKey)
-		chainUTXOs = common.NewDeterministicChainUTXOs(require, map[ids.ID][]*avax.UTXO{
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
 		backend = NewBackend(testContext, chainUTXOs, nil)
@@ -641,20 +690,24 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// check UTXOs selection and fee financing
-	ins := utx.Ins
-	staked := utx.StakeOuts
-	outs := utx.Outs
-	require.Len(ins, 4)
-	require.Len(staked, 2)
-	require.Len(outs, 2)
+	// check stake amount
+	require.Equal(
+		map[ids.ID]uint64{
+			avaxAssetID: 2 * units.Avax,
+		},
+		addOutputAmounts(utx.StakeOuts),
+	)
 
-	expectedConsumedSubnetAsset := utx.Validator.Weight()
-	consumedSubnetAsset := staked[0].Out.Amount() + staked[1].Out.Amount()
-	require.Equal(expectedConsumedSubnetAsset, consumedSubnetAsset)
-	expectedConsumed := testContext.AddPrimaryNetworkDelegatorFee
-	consumed := ins[1].In.Amount() + ins[3].In.Amount() - outs[0].Out.Amount()
-	require.Equal(expectedConsumed, consumed)
+	// check fee calculation
+	require.Equal(
+		addAmounts(
+			addOutputAmounts(utx.Outs, utx.StakeOuts),
+			map[ids.ID]uint64{
+				avaxAssetID: testContext.StaticFeeConfig.AddPrimaryNetworkDelegatorFee,
+			},
+		),
+		addInputAmounts(utx.Ins),
+	)
 }
 
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
@@ -744,4 +797,34 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 			},
 		},
 	}
+}
+
+func addAmounts(allAmounts ...map[ids.ID]uint64) map[ids.ID]uint64 {
+	amounts := make(map[ids.ID]uint64)
+	for _, amountsToAdd := range allAmounts {
+		for assetID, amount := range amountsToAdd {
+			amounts[assetID] += amount
+		}
+	}
+	return amounts
+}
+
+func addInputAmounts(inputSlices ...[]*avax.TransferableInput) map[ids.ID]uint64 {
+	consumed := make(map[ids.ID]uint64)
+	for _, inputs := range inputSlices {
+		for _, in := range inputs {
+			consumed[in.AssetID()] += in.In.Amount()
+		}
+	}
+	return consumed
+}
+
+func addOutputAmounts(outputSlices ...[]*avax.TransferableOutput) map[ids.ID]uint64 {
+	produced := make(map[ids.ID]uint64)
+	for _, outputs := range outputSlices {
+		for _, out := range outputs {
+			produced[out.AssetID()] += out.Out.Amount()
+		}
+	}
+	return produced
 }

@@ -18,12 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 type APIIndexerConfig struct {
@@ -123,13 +123,15 @@ type DatabaseConfig struct {
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	HTTPConfig       `json:"httpConfig"`
-	IPConfig         `json:"ipConfig"`
-	StakingConfig    `json:"stakingConfig"`
-	fee.StaticConfig `json:"txFeeConfig"`
-	StateSyncConfig  `json:"stateSyncConfig"`
-	BootstrapConfig  `json:"bootstrapConfig"`
-	DatabaseConfig   `json:"databaseConfig"`
+	HTTPConfig          `json:"httpConfig"`
+	IPConfig            `json:"ipConfig"`
+	StakingConfig       `json:"stakingConfig"`
+	genesis.TxFeeConfig `json:"txFeeConfig"`
+	StateSyncConfig     `json:"stateSyncConfig"`
+	BootstrapConfig     `json:"bootstrapConfig"`
+	DatabaseConfig      `json:"databaseConfig"`
+
+	UpgradeConfig upgrade.Config `json:"upgradeConfig"`
 
 	// Genesis information
 	GenesisBytes []byte `json:"-"`

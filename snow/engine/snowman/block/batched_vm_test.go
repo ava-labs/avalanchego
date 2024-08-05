@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package block
+package block_test
 
 import (
 	"context"
@@ -14,7 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	. "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var errTest = errors.New("non-nil error")
@@ -22,7 +25,7 @@ var errTest = errors.New("non-nil error")
 func TestGetAncestorsDatabaseNotFound(t *testing.T) {
 	require := require.New(t)
 
-	vm := &TestVM{}
+	vm := &blocktest.VM{}
 	someID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(someID, id)
@@ -38,7 +41,7 @@ func TestGetAncestorsDatabaseNotFound(t *testing.T) {
 func TestGetAncestorsPropagatesErrors(t *testing.T) {
 	require := require.New(t)
 
-	vm := &TestVM{}
+	vm := &blocktest.VM{}
 	someID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		require.Equal(someID, id)

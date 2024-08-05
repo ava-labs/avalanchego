@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -34,6 +35,7 @@ type diff struct {
 	stateVersions Versions
 
 	timestamp time.Time
+	feeState  fee.State
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -73,6 +75,7 @@ func NewDiff(
 		parentID:       parentID,
 		stateVersions:  stateVersions,
 		timestamp:      parentState.GetTimestamp(),
+		feeState:       parentState.GetFeeState(),
 		subnetOwners:   make(map[ids.ID]fx.Owner),
 		subnetManagers: make(map[ids.ID]chainIDAndAddr),
 	}, nil
@@ -98,6 +101,14 @@ func (d *diff) GetTimestamp() time.Time {
 
 func (d *diff) SetTimestamp(timestamp time.Time) {
 	d.timestamp = timestamp
+}
+
+func (d *diff) GetFeeState() fee.State {
+	return d.feeState
+}
+
+func (d *diff) SetFeeState(feeState fee.State) {
+	d.feeState = feeState
 }
 
 func (d *diff) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
@@ -424,6 +435,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
+	baseState.SetFeeState(d.feeState)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}

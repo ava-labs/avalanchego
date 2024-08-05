@@ -41,10 +41,6 @@ func GetID(db KeyValueReader, key []byte) (ids.ID, error) {
 	return ids.ToID(b)
 }
 
-func ParseID(b []byte) (ids.ID, error) {
-	return ids.ToID(b)
-}
-
 func PutUInt64(db KeyValueWriter, key []byte, val uint64) error {
 	b := PackUInt64(val)
 	return db.Put(key, b)
@@ -161,13 +157,6 @@ func Size(db Iteratee) (int, error) {
 		size += len(iterator.Key()) + len(iterator.Value()) + kvPairOverhead
 	}
 	return size, iterator.Error()
-}
-
-func IsEmpty(db Iteratee) (bool, error) {
-	iterator := db.NewIterator()
-	defer iterator.Release()
-
-	return !iterator.Next(), iterator.Error()
 }
 
 func AtomicClear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
