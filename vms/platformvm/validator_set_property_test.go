@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -684,7 +685,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	appSender := &common.SenderTest{}
+	appSender := &enginetest.Sender{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil

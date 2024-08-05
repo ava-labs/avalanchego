@@ -24,11 +24,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -285,7 +287,7 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
-	appSender := &common.SenderTest{}
+	appSender := &enginetest.Sender{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
@@ -1459,7 +1461,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sender.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(true)
 
 	// Passes messages from the consensus engine to the network
@@ -1476,7 +1478,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &enginetest.BootstrapTracker{
 		T: t,
 		IsBootstrappedF: func() bool {
 			return isBootstrapped
@@ -2028,7 +2030,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	msgChan := make(chan common.Message, 1)
-	appSender := &common.SenderTest{T: t}
+	appSender := &enginetest.Sender{T: t}
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,

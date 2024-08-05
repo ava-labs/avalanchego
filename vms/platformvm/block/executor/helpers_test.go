@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -120,7 +120,7 @@ type test struct {
 type environment struct {
 	blkManager Manager
 	mempool    mempool.Mempool
-	sender     *common.SenderTest
+	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -192,7 +192,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &common.SenderTest{T: t}
+	res.sender = &enginetest.Sender{T: t}
 
 	metrics := metrics.Noop
 

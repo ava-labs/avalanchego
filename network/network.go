@@ -678,10 +678,10 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 //
 //   - [nodeIDs] the IDs of the peers that should be returned if they are
 //     connected.
-//   - [subnetID] the subnetID whose membership should be considered if
-//     [validatorOnly] is set to true.
-//   - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
-//     validators in [subnetID].
+//   - [subnetID] the subnetID whose membership should be considered to
+//     determine if the node is a validator.
+//   - [allower] interface that determines if a node is allowed to connect to
+//     the subnet based on its validator status.
 func (n *network) getPeers(
 	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
@@ -695,10 +695,6 @@ func (n *network) getPeers(
 	for nodeID := range nodeIDs {
 		peer, ok := n.connectedPeers.GetByID(nodeID)
 		if !ok {
-			continue
-		}
-
-		if trackedSubnets := peer.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 

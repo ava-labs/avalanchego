@@ -35,12 +35,12 @@ jobs:
       run: bash -x ./scripts/build_antithesis_images.sh
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
-        TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+        IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
         TEST_SETUP: avalanchego
 
     - name: Build and push images for xsvm test setup
       run: bash -x ./scripts/build_antithesis_images.sh
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
-        TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+        IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
         TEST_SETUP: xsvm

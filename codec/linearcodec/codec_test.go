@@ -7,23 +7,22 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/codectest"
 )
 
 func TestVectors(t *testing.T) {
-	for _, test := range codec.Tests {
-		c := NewDefault()
-		test(c, t)
-	}
+	codectest.RunAll(t, func() codec.GeneralCodec {
+		return NewDefault()
+	})
 }
 
 func TestMultipleTags(t *testing.T) {
-	for _, test := range codec.MultipleTagsTests {
-		c := New([]string{"tag1", "tag2"})
-		test(c, t)
-	}
+	codectest.RunAllMultipleTags(t, func() codec.GeneralCodec {
+		return New([]string{"tag1", "tag2"})
+	})
 }
 
 func FuzzStructUnmarshalLinearCodec(f *testing.F) {
 	c := NewDefault()
-	codec.FuzzStructUnmarshal(c, f)
+	codectest.FuzzStructUnmarshal(c, f)
 }
