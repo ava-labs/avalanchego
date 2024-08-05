@@ -15,13 +15,13 @@ import (
 )
 
 func TestSizedLRU(t *testing.T) {
-	cache := NewSizedLRU[ids.ID, int64](cachetest.TestIntSize, cachetest.TestIntSizeFunc)
+	cache := NewSizedLRU[ids.ID, int64](cachetest.IntSize, cachetest.IntSizeFunc)
 
 	cachetest.TestBasic(t, cache)
 }
 
 func TestSizedLRUEviction(t *testing.T) {
-	cache := NewSizedLRU[ids.ID, int64](2*cachetest.TestIntSize, cachetest.TestIntSizeFunc)
+	cache := NewSizedLRU[ids.ID, int64](2*cachetest.IntSize, cachetest.IntSizeFunc)
 
 	cachetest.TestEviction(t, cache)
 }

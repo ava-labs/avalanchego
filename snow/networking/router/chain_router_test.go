@@ -118,8 +118,8 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -137,7 +137,7 @@ func TestShutdown(t *testing.T) {
 	}
 	bootstrapper.HaltF = func(context.Context) {}
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(true)
 	engine.CantGossip = false
 	engine.ContextF = func() *snow.ConsensusContext {
@@ -244,7 +244,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	engine := enginetest.EngineTest{
+	engine := enginetest.Engine{
 		T: t,
 		StartF: func(context.Context, uint32) error {
 			return nil
@@ -263,9 +263,9 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	engine.Default(true)
 	engine.CantGossip = false
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: engine,
-		CantClear:  true,
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine:    engine,
+		CantClear: true,
 	}
 
 	h.SetEngineManager(&handler.EngineManager{
@@ -378,8 +378,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapFinished := make(chan struct{}, 1)
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -399,7 +399,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		return nil
 	}
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -547,8 +547,8 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1130,8 +1130,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1149,7 +1149,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
@@ -1411,8 +1411,8 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1429,7 +1429,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		Type:  engineType,
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
@@ -1680,7 +1680,7 @@ func TestCrossChainAppRequest(t *testing.T) {
 	}
 }
 
-func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.EngineTest) {
+func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	// Create a timeout manager
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -1751,8 +1751,8 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.EngineTest) {
 	)
 	require.NoError(t, err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1761,7 +1761,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.EngineTest) {
 		return ctx
 	}
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx

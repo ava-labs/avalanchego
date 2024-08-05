@@ -54,8 +54,8 @@ func init() {
 }
 
 type fullVM struct {
-	*blocktest.TestVM
-	*blocktest.TestStateSyncableVM
+	*blocktest.VM
+	*blocktest.StateSyncableVM
 }
 
 func buildTestPeers(t *testing.T, subnetID ids.ID) validators.Manager {
@@ -78,19 +78,19 @@ func buildTestsObjects(
 ) (
 	*stateSyncer,
 	*fullVM,
-	*enginetest.SenderTest,
+	*enginetest.Sender,
 ) {
 	require := require.New(t)
 
 	fullVM := &fullVM{
-		TestVM: &blocktest.TestVM{
-			TestVM: enginetest.TestVM{T: t},
+		VM: &blocktest.VM{
+			VM: enginetest.VM{T: t},
 		},
-		TestStateSyncableVM: &blocktest.TestStateSyncableVM{
+		StateSyncableVM: &blocktest.StateSyncableVM{
 			T: t,
 		},
 	}
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	dummyGetter, err := getter.New(
 		fullVM,
 		sender,

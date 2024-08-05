@@ -35,7 +35,7 @@ var (
 	SummaryHeight    = uint64(2022)
 
 	// a summary to be returned in some UTs
-	mockedSummary = &blocktest.TestStateSummary{
+	mockedSummary = &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: SummaryHeight,
 		BytesV:  []byte("summary"),

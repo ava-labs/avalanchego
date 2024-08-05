@@ -108,7 +108,7 @@ type environment struct {
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
 	network    *network.Network
-	sender     *enginetest.SenderTest
+	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -169,7 +169,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &enginetest.SenderTest{T: t}
+	res.sender = &enginetest.Sender{T: t}
 	res.sender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
 		return nil
 	}

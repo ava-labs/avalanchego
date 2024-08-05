@@ -18,20 +18,20 @@ import (
 var (
 	errBuild = errors.New("unexpectedly called Build")
 
-	_ vertex.Builder = (*TestBuilder)(nil)
+	_ vertex.Builder = (*Builder)(nil)
 )
 
-type TestBuilder struct {
+type Builder struct {
 	T             *testing.T
 	CantBuildVtx  bool
 	BuildStopVtxF func(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error)
 }
 
-func (b *TestBuilder) Default(cant bool) {
+func (b *Builder) Default(cant bool) {
 	b.CantBuildVtx = cant
 }
 
-func (b *TestBuilder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error) {
+func (b *Builder) BuildStopVtx(ctx context.Context, parentIDs []ids.ID) (avalanche.Vertex, error) {
 	if b.BuildStopVtxF != nil {
 		return b.BuildStopVtxF(ctx, parentIDs)
 	}

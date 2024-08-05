@@ -6,6 +6,7 @@ package utxotest
 import (
 	"context"
 	"slices"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -15,12 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-func NewDeterministicChainUTXOs(require *require.Assertions, utxoSets map[ids.ID][]*avax.UTXO) *DeterministicChainUTXOs {
+func NewDeterministicChainUTXOs(t *testing.T, utxoSets map[ids.ID][]*avax.UTXO) *DeterministicChainUTXOs {
 	globalUTXOs := common.NewUTXOs()
 	for subnetID, utxos := range utxoSets {
 		for _, utxo := range utxos {
 			require.NoError(
-				globalUTXOs.AddUTXO(context.Background(), subnetID, constants.PlatformChainID, utxo),
+				t, globalUTXOs.AddUTXO(context.Background(), subnetID, constants.PlatformChainID, utxo),
 			)
 		}
 	}

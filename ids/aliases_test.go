@@ -14,11 +14,10 @@ import (
 )
 
 func TestAliaser(t *testing.T) {
-	require := require.New(t)
-	for _, test := range idstest.AliasTests {
-		aliaser := NewAliaser()
-		test(require, aliaser, aliaser)
-	}
+	idstest.RunAllAlias(t, func() (AliaserReader, AliaserWriter) {
+		a := NewAliaser()
+		return a, a
+	})
 }
 
 func TestPrimaryAliasOrDefaultTest(t *testing.T) {

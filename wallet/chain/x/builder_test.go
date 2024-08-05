@@ -52,7 +52,7 @@ func TestBaseTx(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},
@@ -101,7 +101,7 @@ func TestCreateAssetTx(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},
@@ -190,7 +190,7 @@ func TestMintNFTOperation(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},
@@ -235,7 +235,7 @@ func TestMintFTOperation(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},
@@ -282,7 +282,7 @@ func TestMintPropertyOperation(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},
@@ -325,7 +325,7 @@ func TestBurnPropertyOperation(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},
@@ -363,7 +363,7 @@ func TestImportTx(t *testing.T) {
 		sourceChainID  = ids.GenerateTestID()
 		importedUTXOs  = utxos[:1]
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID:      utxos,
 				sourceChainID: importedUTXOs,
@@ -413,7 +413,7 @@ func TestExportTx(t *testing.T) {
 		utxosKey       = testKeys[1]
 		utxos          = makeTestUTXOs(utxosKey)
 		genericBackend = utxotest.NewDeterministicChainUTXOs(
-			require,
+			t,
 			map[ids.ID][]*avax.UTXO{
 				xChainID: utxos,
 			},

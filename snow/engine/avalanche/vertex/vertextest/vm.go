@@ -18,11 +18,11 @@ import (
 var (
 	errLinearize = errors.New("unexpectedly called Linearize")
 
-	_ vertex.LinearizableVM = (*TestVM)(nil)
+	_ vertex.LinearizableVM = (*VM)(nil)
 )
 
-type TestVM struct {
-	blocktest.TestVM
+type VM struct {
+	blocktest.VM
 
 	CantLinearize, CantParse bool
 
@@ -30,13 +30,13 @@ type TestVM struct {
 	ParseTxF   func(context.Context, []byte) (snowstorm.Tx, error)
 }
 
-func (vm *TestVM) Default(cant bool) {
-	vm.TestVM.Default(cant)
+func (vm *VM) Default(cant bool) {
+	vm.VM.Default(cant)
 
 	vm.CantParse = cant
 }
 
-func (vm *TestVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
+func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	if vm.LinearizeF != nil {
 		return vm.LinearizeF(ctx, stopVertexID)
 	}
@@ -46,7 +46,7 @@ func (vm *TestVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	return errLinearize
 }
 
-func (vm *TestVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
+func (vm *VM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 	if vm.ParseTxF != nil {
 		return vm.ParseTxF(ctx, b)
 	}
