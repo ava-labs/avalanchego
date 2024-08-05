@@ -4,7 +4,6 @@
 package sampler
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"testing"
@@ -14,88 +13,15 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	weightedWithoutReplacementSamplers = []struct {
-		name    string
-		sampler WeightedWithoutReplacement
-	}{
-		{
-			name: "generic with replacer and best",
-			sampler: &weightedWithoutReplacementGeneric{
-				u: &uniformReplacer{
-					rng: globalRNG,
-				},
-				w: &weightedBest{
-					samplers: []Weighted{
-						&weightedArray{},
-						&weightedHeap{},
-						&weightedUniform{
-							maxWeight: 1024,
-						},
-					},
-					benchmarkIterations: 30,
-				},
-			},
-		},
-	}
-	weightedWithoutReplacementTests = []struct {
-		name string
-		test func(*testing.T, WeightedWithoutReplacement)
-	}{
-		{
-			name: "initialize overflow",
-			test: WeightedWithoutReplacementInitializeOverflowTest,
-		},
-		{
-			name: "out of range",
-			test: WeightedWithoutReplacementOutOfRangeTest,
-		},
-		{
-			name: "empty without weight",
-			test: WeightedWithoutReplacementEmptyWithoutWeightTest,
-		},
-		{
-			name: "empty",
-			test: WeightedWithoutReplacementEmptyTest,
-		},
-		{
-			name: "singleton",
-			test: WeightedWithoutReplacementSingletonTest,
-		},
-		{
-			name: "with zero",
-			test: WeightedWithoutReplacementWithZeroTest,
-		},
-		{
-			name: "distribution",
-			test: WeightedWithoutReplacementDistributionTest,
-		},
-	}
-)
-
-func TestAllWeightedWithoutReplacement(t *testing.T) {
-	for _, s := range weightedWithoutReplacementSamplers {
-		for _, test := range weightedWithoutReplacementTests {
-			t.Run(fmt.Sprintf("sampler %s test %s", s.name, test.name), func(t *testing.T) {
-				test.test(t, s.sampler)
-			})
-		}
-	}
-}
-
-func WeightedWithoutReplacementInitializeOverflowTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementInitializeOverflow(t *testing.T) {
+	s := NewWeightedWithoutReplacement()
 	err := s.Initialize([]uint64{1, math.MaxUint64})
 	require.ErrorIs(t, err, safemath.ErrOverflow)
 }
 
-func WeightedWithoutReplacementOutOfRangeTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementOutOfRange(t *testing.T) {
 	require := require.New(t)
+	s := NewWeightedWithoutReplacement()
 
 	require.NoError(s.Initialize([]uint64{1}))
 
@@ -103,11 +29,9 @@ func WeightedWithoutReplacementOutOfRangeTest(
 	require.False(ok)
 }
 
-func WeightedWithoutReplacementEmptyWithoutWeightTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementEmptyWithoutWeight(t *testing.T) {
 	require := require.New(t)
+	s := NewWeightedWithoutReplacement()
 
 	require.NoError(s.Initialize(nil))
 
@@ -116,11 +40,9 @@ func WeightedWithoutReplacementEmptyWithoutWeightTest(
 	require.Empty(indices)
 }
 
-func WeightedWithoutReplacementEmptyTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementEmpty(t *testing.T) {
 	require := require.New(t)
+	s := NewWeightedWithoutReplacement()
 
 	require.NoError(s.Initialize([]uint64{1}))
 
@@ -129,11 +51,9 @@ func WeightedWithoutReplacementEmptyTest(
 	require.Empty(indices)
 }
 
-func WeightedWithoutReplacementSingletonTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementSingleton(t *testing.T) {
 	require := require.New(t)
+	s := NewWeightedWithoutReplacement()
 
 	require.NoError(s.Initialize([]uint64{1}))
 
@@ -142,11 +62,9 @@ func WeightedWithoutReplacementSingletonTest(
 	require.Equal([]int{0}, indices)
 }
 
-func WeightedWithoutReplacementWithZeroTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementWithZero(t *testing.T) {
 	require := require.New(t)
+	s := NewWeightedWithoutReplacement()
 
 	require.NoError(s.Initialize([]uint64{0, 1}))
 
@@ -155,11 +73,9 @@ func WeightedWithoutReplacementWithZeroTest(
 	require.Equal([]int{1}, indices)
 }
 
-func WeightedWithoutReplacementDistributionTest(
-	t *testing.T,
-	s WeightedWithoutReplacement,
-) {
+func TestWeightedWithoutReplacementDistribution(t *testing.T) {
 	require := require.New(t)
+	s := NewWeightedWithoutReplacement()
 
 	require.NoError(s.Initialize([]uint64{1, 1, 2}))
 

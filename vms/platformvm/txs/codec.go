@@ -4,11 +4,11 @@
 package txs
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -42,7 +42,7 @@ func init() {
 
 		c.SkipRegistrations(4)
 
-		errs.Add(RegisterDUnsignedTxsTypes(c))
+		errs.Add(RegisterDurangoUnsignedTxsTypes(c))
 	}
 
 	Codec = codec.NewDefaultManager()
@@ -103,8 +103,8 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 	return errs.Err
 }
 
-func RegisterDUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
-	return utils.Err(
+func RegisterDurangoUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
 		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
 		targetCodec.RegisterType(&BaseTx{}),
 	)

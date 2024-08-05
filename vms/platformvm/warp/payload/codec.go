@@ -4,9 +4,10 @@
 package payload
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -22,7 +23,7 @@ func init() {
 	Codec = codec.NewManager(MaxMessageSize)
 	lc := linearcodec.NewDefault()
 
-	err := utils.Err(
+	err := errors.Join(
 		lc.RegisterType(&Hash{}),
 		lc.RegisterType(&AddressedCall{}),
 		Codec.RegisterCodec(CodecVersion, lc),

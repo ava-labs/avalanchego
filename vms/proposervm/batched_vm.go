@@ -7,9 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -83,10 +81,6 @@ func (vm *VM) GetAncestors(
 }
 
 func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
-	if vm.batchedVM == nil {
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
 	type partialData struct {
 		index int
 		block statelessblock.Block
@@ -99,9 +93,11 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		statelessBlockDescs = make([]partialData, 0, len(blks))
 		innerBlockBytes     = make([][]byte, 0, len(blks))
 	)
+
+	parsingResults := statelessblock.ParseBlocks(blks, vm.ctx.ChainID)
+
 	for ; blocksIndex < len(blks); blocksIndex++ {
-		blkBytes := blks[blocksIndex]
-		statelessBlock, err := statelessblock.Parse(blkBytes, vm.ctx.ChainID)
+		statelessBlock, err := parsingResults[blocksIndex].Block, parsingResults[blocksIndex].Err
 		if err != nil {
 			break
 		}
@@ -122,21 +118,13 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 	innerBlockBytes = append(innerBlockBytes, blks[blocksIndex:]...)
 
 	// parse all inner blocks at once
-	innerBlks, err := vm.batchedVM.BatchedParseBlock(ctx, innerBlockBytes)
+	innerBlks, err := block.BatchedParseBlock(ctx, vm.ChainVM, innerBlockBytes)
 	if err != nil {
 		return nil, err
 	}
 	for ; innerBlocksIndex < len(statelessBlockDescs); innerBlocksIndex++ {
 		statelessBlockDesc := statelessBlockDescs[innerBlocksIndex]
 		statelessBlk := statelessBlockDesc.block
-		blkID := statelessBlk.ID()
-
-		_, status, err := vm.State.GetBlock(blkID)
-		if err == database.ErrNotFound {
-			status = choices.Processing
-		} else if err != nil {
-			return nil, err
-		}
 
 		if statelessSignedBlock, ok := statelessBlk.(statelessblock.SignedBlock); ok {
 			blocks[statelessBlockDesc.index] = &postForkBlock{
@@ -144,7 +132,6 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 				postForkCommonComponents: postForkCommonComponents{
 					vm:       vm,
 					innerBlk: innerBlks[innerBlocksIndex],
-					status:   status,
 				},
 			}
 		} else {
@@ -153,7 +140,6 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 				postForkCommonComponents: postForkCommonComponents{
 					vm:       vm,
 					innerBlk: innerBlks[innerBlocksIndex],
-					status:   status,
 				},
 			}
 		}
@@ -171,6 +157,5 @@ func (vm *VM) getStatelessBlk(blkID ids.ID) (statelessblock.Block, error) {
 	if currentBlk, exists := vm.verifiedBlocks[blkID]; exists {
 		return currentBlk.getStatelessBlk(), nil
 	}
-	statelessBlock, _, err := vm.State.GetBlock(blkID)
-	return statelessBlock, err
+	return vm.State.GetBlock(blkID)
 }

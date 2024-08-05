@@ -9,12 +9,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
 func TestInterface(t *testing.T) {
-	for name, test := range database.Tests {
+	for name, test := range dbtest.Tests {
 		t.Run(name, func(t *testing.T) {
 			db := memdb.New()
 			test(t, New([]byte("hello"), db))
@@ -37,21 +37,21 @@ func TestPrefixLimit(t *testing.T) {
 }
 
 func FuzzKeyValue(f *testing.F) {
-	database.FuzzKeyValue(f, New([]byte(""), memdb.New()))
+	dbtest.FuzzKeyValue(f, New([]byte(""), memdb.New()))
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	database.FuzzNewIteratorWithPrefix(f, New([]byte(""), memdb.New()))
+	dbtest.FuzzNewIteratorWithPrefix(f, New([]byte(""), memdb.New()))
 }
 
 func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
-	database.FuzzNewIteratorWithStartAndPrefix(f, New([]byte(""), memdb.New()))
+	dbtest.FuzzNewIteratorWithStartAndPrefix(f, New([]byte(""), memdb.New()))
 }
 
 func BenchmarkInterface(b *testing.B) {
-	for _, size := range database.BenchmarkSizes {
-		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
-		for name, bench := range database.Benchmarks {
+	for _, size := range dbtest.BenchmarkSizes {
+		keys, values := dbtest.SetupBenchmark(b, size[0], size[1], size[2])
+		for name, bench := range dbtest.Benchmarks {
 			b.Run(fmt.Sprintf("prefixdb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
 				db := New([]byte("hello"), memdb.New())
 				bench(b, db, keys, values)

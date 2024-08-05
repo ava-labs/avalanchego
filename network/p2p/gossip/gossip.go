@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -43,7 +42,6 @@ var (
 	_ Gossiper = (*PullGossiper[*testTx])(nil)
 	_ Gossiper = (*NoOpGossiper)(nil)
 
-	_ Set[*testTx] = (*EmptySet[*testTx])(nil)
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
 	ioTypeLabels   = []string{ioLabel, typeLabel}
@@ -78,8 +76,6 @@ var (
 	ErrInvalidDiscardedSize     = errors.New("discarded size cannot be negative")
 	ErrInvalidTargetGossipSize  = errors.New("target gossip size cannot be negative")
 	ErrInvalidRegossipFrequency = errors.New("re-gossip frequency cannot be negative")
-
-	errEmptySetCantAdd = errors.New("empty set can not add")
 )
 
 // Gossiper gossips Gossipables to other nodes
@@ -150,7 +146,7 @@ func NewMetrics(
 			typeLabels,
 		),
 	}
-	err := utils.Err(
+	err := errors.Join(
 		metrics.Register(m.count),
 		metrics.Register(m.bytes),
 		metrics.Register(m.tracking),
@@ -602,26 +598,6 @@ type TestGossiper struct {
 
 func (t *TestGossiper) Gossip(ctx context.Context) error {
 	return t.GossipF(ctx)
-}
-
-type EmptySet[T Gossipable] struct{}
-
-func (EmptySet[_]) Gossip(context.Context) error {
-	return nil
-}
-
-func (EmptySet[T]) Add(T) error {
-	return errEmptySetCantAdd
-}
-
-func (EmptySet[T]) Has(ids.ID) bool {
-	return false
-}
-
-func (EmptySet[T]) Iterate(func(gossipable T) bool) {}
-
-func (EmptySet[_]) GetFilter() ([]byte, []byte) {
-	return bloom.EmptyFilter.Marshal(), ids.Empty[:]
 }
 
 type FullSet[T Gossipable] struct{}

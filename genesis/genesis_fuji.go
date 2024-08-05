@@ -10,7 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -19,16 +21,32 @@ var (
 
 	// FujiParams are the params used for the fuji testnet
 	FujiParams = Params{
-		StaticConfig: fee.StaticConfig{
-			TxFee:                         units.MilliAvax,
-			CreateAssetTxFee:              10 * units.MilliAvax,
-			CreateSubnetTxFee:             100 * units.MilliAvax,
-			TransformSubnetTxFee:          1 * units.Avax,
-			CreateBlockchainTxFee:         100 * units.MilliAvax,
-			AddPrimaryNetworkValidatorFee: 0,
-			AddPrimaryNetworkDelegatorFee: 0,
-			AddSubnetValidatorFee:         units.MilliAvax,
-			AddSubnetDelegatorFee:         units.MilliAvax,
+		TxFeeConfig: TxFeeConfig{
+			CreateAssetTxFee: 10 * units.MilliAvax,
+			StaticFeeConfig: txfee.StaticConfig{
+				TxFee:                         units.MilliAvax,
+				CreateSubnetTxFee:             100 * units.MilliAvax,
+				TransformSubnetTxFee:          1 * units.Avax,
+				CreateBlockchainTxFee:         100 * units.MilliAvax,
+				AddPrimaryNetworkValidatorFee: 0,
+				AddPrimaryNetworkDelegatorFee: 0,
+				AddSubnetValidatorFee:         units.MilliAvax,
+				AddSubnetDelegatorFee:         units.MilliAvax,
+			},
+			// TODO: Set these values to something more reasonable
+			DynamicFeeConfig: feecomponent.Config{
+				Weights: feecomponent.Dimensions{
+					feecomponent.Bandwidth: 1,
+					feecomponent.DBRead:    1,
+					feecomponent.DBWrite:   1,
+					feecomponent.Compute:   1,
+				},
+				MaxGasCapacity:           1_000_000,
+				MaxGasPerSecond:          1_000,
+				TargetGasPerSecond:       500,
+				MinGasPrice:              1,
+				ExcessConversionConstant: 1,
+			},
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%

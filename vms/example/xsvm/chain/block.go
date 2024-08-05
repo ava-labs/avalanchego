@@ -12,11 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
@@ -30,7 +28,6 @@ var (
 	errMissingParent         = errors.New("missing parent block")
 	errMissingChild          = errors.New("missing child block")
 	errParentNotVerified     = errors.New("parent block has not been verified")
-	errMissingState          = errors.New("missing state")
 	errFutureTimestamp       = errors.New("future timestamp")
 	errTimestampBeforeParent = errors.New("timestamp before parent")
 	errWrongHeight           = errors.New("wrong height")
@@ -52,9 +49,8 @@ type block struct {
 
 	chain *chain
 
-	id     ids.ID
-	status choices.Status
-	bytes  []byte
+	id    ids.ID
+	bytes []byte
 
 	state               *versiondb.Database
 	verifiedChildrenIDs set.Set[ids.ID]
@@ -62,13 +58,6 @@ type block struct {
 
 func (b *block) ID() ids.ID {
 	return b.id
-}
-
-func (b *block) Status() choices.Status {
-	if !b.status.Decided() {
-		b.status = b.calculateStatus()
-	}
-	return b.status
 }
 
 func (b *block) Parent() ids.ID {
@@ -108,15 +97,16 @@ func (b *block) Accept(context.Context) error {
 		}
 	}
 
-	b.status = choices.Accepted
-	b.chain.lastAccepted = b.id
+	b.chain.lastAcceptedID = b.id
+	b.chain.lastAcceptedHeight = b.Height()
 	delete(b.chain.verifiedBlocks, b.ParentID)
+	b.state = nil
 	return nil
 }
 
 func (b *block) Reject(context.Context) error {
-	b.status = choices.Rejected
 	delete(b.chain.verifiedBlocks, b.id)
+	b.state = nil
 
 	// TODO: push transactions back into the mempool
 	return nil
@@ -178,42 +168,15 @@ func (b *block) VerifyWithContext(ctx context.Context, blockContext *smblock.Con
 }
 
 func (b *block) State() (database.Database, error) {
-	if b.id == b.chain.lastAccepted {
+	if b.id == b.chain.lastAcceptedID {
 		return b.chain.acceptedState, nil
 	}
 
-	// States of accepted blocks other than the lastAccepted are undefined.
-	if b.Status() == choices.Accepted {
-		return nil, errMissingState
-	}
-
-	// We should not be calling State on an unverified block.
+	// If this block isn't processing, then the child should never have had
+	// verify called on it.
 	if b.state == nil {
 		return nil, errParentNotVerified
 	}
 
 	return b.state, nil
-}
-
-func (b *block) calculateStatus() choices.Status {
-	if b.chain.lastAccepted == b.id {
-		return choices.Accepted
-	}
-	if _, ok := b.chain.verifiedBlocks[b.id]; ok {
-		return choices.Processing
-	}
-
-	_, err := state.GetBlock(b.chain.acceptedState, b.id)
-	switch {
-	case err == nil:
-		return choices.Accepted
-
-	case errors.Is(err, database.ErrNotFound):
-		// This block hasn't been verified yet.
-		return choices.Processing
-
-	default:
-		// TODO: correctly report this error to the consensus engine.
-		return choices.Processing
-	}
 }

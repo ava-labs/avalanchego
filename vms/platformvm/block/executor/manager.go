@@ -64,10 +64,6 @@ func NewManager(
 
 	return &manager{
 		backend: backend,
-		verifier: &verifier{
-			backend:           backend,
-			txExecutorBackend: txExecutorBackend,
-		},
 		acceptor: &acceptor{
 			backend:      backend,
 			metrics:      metrics,
@@ -85,7 +81,6 @@ func NewManager(
 
 type manager struct {
 	*backend
-	verifier block.Visitor
 	acceptor block.Visitor
 	rejector block.Visitor
 
@@ -142,10 +137,12 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
+	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
 	return tx.Unsigned.Visit(&executor.StandardTxExecutor{
-		Backend: m.txExecutorBackend,
-		State:   stateDiff,
-		Tx:      tx,
+		Backend:       m.txExecutorBackend,
+		State:         stateDiff,
+		FeeCalculator: feeCalculator,
+		Tx:            tx,
 	})
 }
 

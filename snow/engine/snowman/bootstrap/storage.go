@@ -38,7 +38,7 @@ const (
 func getMissingBlockIDs(
 	ctx context.Context,
 	db database.KeyValueReader,
-	parser block.Parser,
+	nonVerifyingParser block.Parser,
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) (set.Set[ids.ID], error) {
@@ -57,7 +57,7 @@ func getMissingBlockIDs(
 			return nil, err
 		}
 
-		blk, err := parser.ParseBlock(ctx, blkBytes)
+		blk, err := nonVerifyingParser.ParseBlock(ctx, blkBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func execute(
 	haltable common.Haltable,
 	log logging.Func,
 	db database.Database,
-	parser block.Parser,
+	nonVerifyingParser block.Parser,
 	tree *interval.Tree,
 	lastAcceptedHeight uint64,
 ) error {
@@ -198,7 +198,7 @@ func execute(
 
 	for !haltable.Halted() && iterator.Next() {
 		blkBytes := iterator.Value()
-		blk, err := parser.ParseBlock(ctx, blkBytes)
+		blk, err := nonVerifyingParser.ParseBlock(ctx, blkBytes)
 		if err != nil {
 			return err
 		}

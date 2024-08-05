@@ -502,7 +502,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// block.
 		if parentBlock.sb.Finalized() && ts.lastAcceptedID == vote.parentID {
 			if err := ts.acceptPreferredChild(ctx, parentBlock); err != nil {
-				return ids.ID{}, err
+				return ids.Empty, err
 			}
 
 			// by accepting the child of parentBlock, the last accepted block is
@@ -522,7 +522,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		// children will need to have their confidence reset. If there isn't a
 		// child having RecordPoll called, then the nextID will default to the
 		// nil ID.
-		nextID := ids.ID{}
+		nextID := ids.Empty
 		if len(voteStack) > 0 {
 			nextID = voteStack[newStackSize-1].parentID
 		}

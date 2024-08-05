@@ -4,6 +4,7 @@
 package benchlist
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -130,7 +130,7 @@ func NewBenchlist(
 		maxPortion:             maxPortion,
 	}
 
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(benchlist.numBenched),
 		reg.Register(benchlist.weightBenched),
 	)
@@ -294,7 +294,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 		return
 	}
 
-	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
+	newBenchedStake, err := safemath.Add(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen
 		b.ctx.Log.Error("overflow calculating new benched stake",
