@@ -5,7 +5,7 @@ ARG GO_VERSION
 FROM golang:$GO_VERSION-bullseye
 
 WORKDIR /build
-# Copy and download avalanche dependencies using go mod
+# Copy and download dependencies using go mod
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
