@@ -892,9 +892,9 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 }
 
-func TestEUpgradeStandardTxExecutorAddSubnetValidator(t *testing.T) {
+func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, eUpgrade)
+	env := newEnvironment(t, etna)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -2016,7 +2016,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
-						Config:       defaultTestConfig(t, eUpgrade, env.latestForkTime),
+						Config:       defaultTestConfig(t, etna, env.latestForkTime),
 						Bootstrapped: &utils.Atomic[bool]{},
 						Ctx:          &snow.Context{},
 					},
