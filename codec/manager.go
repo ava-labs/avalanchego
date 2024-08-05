@@ -15,7 +15,7 @@ import (
 const (
 	VersionSize = wrappers.ShortLen
 
-	// default max size, in bytes, of something being marshalled by Marshal()
+	// default max size, in bytes, of something being marshaled by Marshal()
 	defaultMaxSize = 256 * units.KiB
 
 	// initial capacity of byte slice that values are marshaled into.
