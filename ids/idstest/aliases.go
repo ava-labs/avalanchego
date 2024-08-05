@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package codectest provides a test suite for testing functionality related to
+// IDs.
 package idstest
 
 import (
@@ -11,14 +13,35 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var AliasTests = []func(testing.TB, ids.AliaserReader, ids.AliaserWriter){
-	TestAliaserLookupError,
-	TestAliaserLookup,
-	TestAliaserAliasesEmpty,
-	TestAliaserAliases,
-	TestAliaserPrimaryAlias,
-	TestAliaserAliasClash,
-	TestAliaserRemoveAlias,
+// An AliasTest couples a test in the Aliaser suite with a human-readable name.
+type AliasTest struct {
+	Name string
+	Test func(testing.TB, ids.AliaserReader, ids.AliaserWriter)
+}
+
+// Run runs the test on the Aliaser{Reader+Writer} pair.
+func (tt *AliasTest) Run(t *testing.T, r ids.AliaserReader, w ids.AliaserWriter) {
+	t.Run(tt.Name, func(t *testing.T) {
+		tt.Test(t, r, w)
+	})
+}
+
+// RunAll runs all [AliasTests], constructing a new GeneralCodec for each.
+func RunAllAlias(t *testing.T, ctor func() (ids.AliaserReader, ids.AliaserWriter)) {
+	for _, tt := range AliasTests {
+		r, w := ctor()
+		tt.Run(t, r, w)
+	}
+}
+
+var AliasTests = []AliasTest{
+	{"Lookup Error}", TestAliaserLookupError},
+	{"Lookup}", TestAliaserLookup},
+	{"Aliases Empty}", TestAliaserAliasesEmpty},
+	{"Aliases}", TestAliaserAliases},
+	{"Primary Alias}", TestAliaserPrimaryAlias},
+	{"Alias Clash}", TestAliaserAliasClash},
+	{"Remove Alias}", TestAliaserRemoveAlias},
 }
 
 func TestAliaserLookupError(tb testing.TB, r ids.AliaserReader, _ ids.AliaserWriter) {

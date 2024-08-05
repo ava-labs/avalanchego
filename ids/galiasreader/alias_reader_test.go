@@ -17,7 +17,7 @@ import (
 
 func TestInterface(t *testing.T) {
 	for _, test := range idstest.AliasTests {
-		t.Run("", func(t *testing.T) {
+		t.Run(test.Name, func(t *testing.T) {
 			require := require.New(t)
 
 			listener, err := grpcutils.NewListener()
@@ -35,7 +35,7 @@ func TestInterface(t *testing.T) {
 			require.NoError(err)
 
 			r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
-			test(t, r, w)
+			test.Test(t, r, w)
 
 			serverCloser.Stop()
 			_ = conn.Close()
