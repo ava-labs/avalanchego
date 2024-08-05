@@ -46,7 +46,7 @@ func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		// already passed syntactic verification
 		return nil
 	case tx.Subnet == constants.PrimaryNetworkID:
-		return ErrTransferPermissionlessSubnet
+		return ErrConvertPermissionlessSubnet
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

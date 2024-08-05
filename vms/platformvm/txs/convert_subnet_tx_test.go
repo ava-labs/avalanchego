@@ -607,7 +607,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 					Subnet: constants.PrimaryNetworkID,
 				}
 			},
-			expectedErr: ErrTransferPermissionlessSubnet,
+			expectedErr: ErrConvertPermissionlessSubnet,
 		},
 		{
 			name: "invalid subnetAuth",
