@@ -46,6 +46,8 @@ const (
 	innerBlkCacheSize     = 64 * units.MiB
 )
 
+var errDurangoUpgradeNotActivated = errors.New("durango upgrade was not activated")
+
 var (
 	_ block.ChainVM         = (*VM)(nil)
 	_ block.BatchedChainVM  = (*VM)(nil)
@@ -137,6 +139,7 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	vm.ctx = chainCtx
+	vm.lastAcceptedTime = time.Unix(0, 0)
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
@@ -253,6 +256,14 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 	if err := vm.ChainVM.SetState(ctx, newState); err != nil {
 		return err
+	}
+
+	// make sure that once we get to normal operation, we already have the durango upgrade active.
+	if newState == snow.NormalOp {
+		// the P-chain is expected to be syncronized
+		if !vm.Config.Upgrades.IsDurangoActivated(vm.lastAcceptedTime) {
+			return errDurangoUpgradeNotActivated
+		}
 	}
 
 	oldState := vm.consensusState
@@ -502,7 +513,7 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 		// If the last accepted block wasn't a PostFork block, then we don't
 		// initialize the metadata.
 		vm.lastAcceptedHeight = 0
-		vm.lastAcceptedTime = time.Time{}
+		vm.lastAcceptedTime = time.Unix(0, 0)
 		return nil
 	}
 	if err != nil {

@@ -18,7 +18,7 @@ type postForkBlock struct {
 	postForkCommonComponents
 
 	// slot of the proposer that produced this block.
-	// It is populated in verifyPostDurangoBlockDelay.
+	// It is populated in verifyBlockDelay.
 	// It is used to report metrics during Accept.
 	slot *uint64
 }

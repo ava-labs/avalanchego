@@ -531,7 +531,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 			Upgrades: upgrade.Config{
 				ApricotPhase4Time:            time.Unix(0, 0),
 				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
+				DurangoTime:                  defaultTestingDurangoTime,
 			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
