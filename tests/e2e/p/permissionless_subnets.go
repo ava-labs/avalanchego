@@ -32,6 +32,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 	ginkgo.It("subnets operations",
 		func() {
 			env := e2e.GetEnv(tc)
+
 			nodeURI := env.GetRandomNodeURI()
 
 			infoClient := info.NewClient(nodeURI.URI)
