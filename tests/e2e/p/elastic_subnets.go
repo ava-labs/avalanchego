@@ -43,9 +43,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 
 			now := time.Now()
 			if upgrades.IsEtnaActivated(now) {
-				tc.Outf("{{green}}Etna is activated{{/}}: %s (now) >= %s (EtnaTime)\n", now, upgrades.EtnaTime)
-				// Elastic Subnets are disabled in Etna.
-				return
+				ginkgo.Skip("Etna is activated. Elastic Subnets are disabled post-Etna, skipping test.")
 			}
 
 			keychain := env.NewKeychain(1)

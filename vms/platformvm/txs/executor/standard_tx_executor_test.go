@@ -1599,45 +1599,25 @@ func TestDurangoMemoField(t *testing.T) {
 
 // Verifies that [TransformSubnetTx] is disabled post-Etna
 func TestEtnaDisabledTransactions(t *testing.T) {
-	type test struct {
-		name        string
-		buildTx     func(*environment) *txs.Tx
-		expectedErr error
+	require := require.New(t)
+
+	env := newEnvironment(t, etna)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	tx := &txs.Tx{
+		Unsigned: &txs.TransformSubnetTx{},
 	}
 
-	tests := []test{
-		{
-			name: "TransformSubnetTx",
-			buildTx: func(_ *environment) *txs.Tx {
-				return &txs.Tx{
-					Unsigned: &txs.TransformSubnetTx{},
-				}
-			},
-			expectedErr: errTransformSubnetTxPostEUpgrade,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			env := newEnvironment(t, etna)
-			env.ctx.Lock.Lock()
-			defer env.ctx.Lock.Unlock()
-
-			onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-			require.NoError(err)
-
-			tx := tt.buildTx(env)
-
-			err = tx.Unsigned.Visit(&StandardTxExecutor{
-				Backend: &env.backend,
-				State:   onAcceptState,
-				Tx:      tx,
-			})
-			require.ErrorIs(err, tt.expectedErr)
-		})
-	}
+	err = tx.Unsigned.Visit(&StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      tx,
+	})
+	require.ErrorIs(err, errTransformSubnetTxPostEtna)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

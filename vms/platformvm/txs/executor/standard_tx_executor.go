@@ -25,10 +25,10 @@ import (
 var (
 	_ txs.Visitor = (*StandardTxExecutor)(nil)
 
-	errEmptyNodeID                   = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge      = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango    = errors.New("staker transactions must have a StartTime pre-Durango")
-	errTransformSubnetTxPostEUpgrade = errors.New("TransformSubnetTx is not permitted post-EUpgrade")
+	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
+	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
 )
 
 type StandardTxExecutor struct {
@@ -436,7 +436,7 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	currentTimestamp := e.State.GetTimestamp()
 	if e.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
-		return errTransformSubnetTxPostEUpgrade
+		return errTransformSubnetTxPostEtna
 	}
 
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
