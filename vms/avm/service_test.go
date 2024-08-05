@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -2720,7 +2721,9 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					EUpgradeTime: mockable.MaxTime,
+					Upgrades: upgrade.Config{
+						EtnaTime: mockable.MaxTime,
+					},
 				},
 			})
 			service := &Service{vm: env.vm}
