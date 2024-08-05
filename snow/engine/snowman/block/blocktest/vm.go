@@ -22,12 +22,12 @@ var (
 	errLastAccepted       = errors.New("unexpectedly called LastAccepted")
 	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
-	_ block.ChainVM = (*TestVM)(nil)
+	_ block.ChainVM = (*VM)(nil)
 )
 
-// TestVM is a ChainVM that is useful for testing.
-type TestVM struct {
-	enginetest.TestVM
+// VM is a ChainVM that is useful for testing.
+type VM struct {
+	enginetest.VM
 
 	CantBuildBlock,
 	CantParseBlock,
@@ -44,8 +44,8 @@ type TestVM struct {
 	GetBlockIDAtHeightF func(ctx context.Context, height uint64) (ids.ID, error)
 }
 
-func (vm *TestVM) Default(cant bool) {
-	vm.TestVM.Default(cant)
+func (vm *VM) Default(cant bool) {
+	vm.VM.Default(cant)
 
 	vm.CantBuildBlock = cant
 	vm.CantParseBlock = cant
@@ -54,7 +54,7 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantLastAccepted = cant
 }
 
-func (vm *TestVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
+func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	if vm.BuildBlockF != nil {
 		return vm.BuildBlockF(ctx)
 	}
@@ -64,7 +64,7 @@ func (vm *TestVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	return nil, errBuildBlock
 }
 
-func (vm *TestVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	if vm.ParseBlockF != nil {
 		return vm.ParseBlockF(ctx, b)
 	}
@@ -74,7 +74,7 @@ func (vm *TestVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, erro
 	return nil, errParseBlock
 }
 
-func (vm *TestVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
+func (vm *VM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	if vm.GetBlockF != nil {
 		return vm.GetBlockF(ctx, id)
 	}
@@ -84,7 +84,7 @@ func (vm *TestVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error
 	return nil, errGetBlock
 }
 
-func (vm *TestVM) SetPreference(ctx context.Context, id ids.ID) error {
+func (vm *VM) SetPreference(ctx context.Context, id ids.ID) error {
 	if vm.SetPreferenceF != nil {
 		return vm.SetPreferenceF(ctx, id)
 	}
@@ -94,7 +94,7 @@ func (vm *TestVM) SetPreference(ctx context.Context, id ids.ID) error {
 	return nil
 }
 
-func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
+func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	if vm.LastAcceptedF != nil {
 		return vm.LastAcceptedF(ctx)
 	}
@@ -104,7 +104,7 @@ func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	return ids.Empty, errLastAccepted
 }
 
-func (vm *TestVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	if vm.GetBlockIDAtHeightF != nil {
 		return vm.GetBlockIDAtHeightF(ctx, height)
 	}

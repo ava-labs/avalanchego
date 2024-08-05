@@ -24,7 +24,7 @@ import (
 var errUnknownTx = errors.New("unknown tx")
 
 func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowstorm.Tx, error)) *Serializer {
-	vm := vertextest.TestVM{}
+	vm := vertextest.VM{}
 	vm.T = t
 	vm.Default(true)
 	vm.ParseTxF = parse

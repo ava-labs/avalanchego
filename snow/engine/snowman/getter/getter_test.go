@@ -27,19 +27,19 @@ import (
 var errUnknownBlock = errors.New("unknown block")
 
 type StateSyncEnabledMock struct {
-	*blocktest.TestVM
+	*blocktest.VM
 	*block.MockStateSyncableVM
 }
 
-func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginetest.SenderTest) {
+func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginetest.Sender) {
 	ctrl := gomock.NewController(t)
 
 	vm := StateSyncEnabledMock{
-		TestVM:              &blocktest.TestVM{},
+		VM:                  &blocktest.VM{},
 		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
-	sender := &enginetest.SenderTest{
+	sender := &enginetest.Sender{
 		T: t,
 	}
 	sender.Default(true)

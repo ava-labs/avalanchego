@@ -600,7 +600,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 
 	vm := VM{
 		ctx: &snow.Context{ChainID: chainID},
-		ChainVM: &blocktest.TestVM{
+		ChainVM: &blocktest.VM{
 			ParseBlockF: func(_ context.Context, rawBlock []byte) (snowman.Block, error) {
 				return &snowmantest.Block{BytesV: rawBlock}, nil
 			},
@@ -909,8 +909,8 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 }
 
 type TestRemoteProposerVM struct {
-	*blocktest.TestBatchedVM
-	*blocktest.TestVM
+	*blocktest.BatchedVM
+	*blocktest.VM
 }
 
 func initTestRemoteProposerVM(
@@ -925,11 +925,11 @@ func initTestRemoteProposerVM(
 
 	initialState := []byte("genesis state")
 	coreVM := TestRemoteProposerVM{
-		TestVM:        &blocktest.TestVM{},
-		TestBatchedVM: &blocktest.TestBatchedVM{},
+		VM:        &blocktest.VM{},
+		BatchedVM: &blocktest.BatchedVM{},
 	}
-	coreVM.TestVM.T = t
-	coreVM.TestBatchedVM.T = t
+	coreVM.VM.T = t
+	coreVM.BatchedVM.T = t
 
 	coreVM.InitializeF = func(
 		context.Context,
@@ -980,7 +980,7 @@ func initTestRemoteProposerVM(
 		},
 	)
 
-	valState := &validatorstest.TestState{
+	valState := &validatorstest.State{
 		T: t,
 	}
 	valState.GetMinimumHeightF = func(context.Context) (uint64, error) {

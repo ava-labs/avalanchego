@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	_ block.StateSummary = (*TestStateSummary)(nil)
+	_ block.StateSummary = (*StateSummary)(nil)
 
 	errAccept = errors.New("unexpectedly called Accept")
 )
 
-type TestStateSummary struct {
+type StateSummary struct {
 	IDV     ids.ID
 	HeightV uint64
 	BytesV  []byte
@@ -30,19 +30,19 @@ type TestStateSummary struct {
 	AcceptF    func(context.Context) (block.StateSyncMode, error)
 }
 
-func (s *TestStateSummary) ID() ids.ID {
+func (s *StateSummary) ID() ids.ID {
 	return s.IDV
 }
 
-func (s *TestStateSummary) Height() uint64 {
+func (s *StateSummary) Height() uint64 {
 	return s.HeightV
 }
 
-func (s *TestStateSummary) Bytes() []byte {
+func (s *StateSummary) Bytes() []byte {
 	return s.BytesV
 }
 
-func (s *TestStateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) {
+func (s *StateSummary) Accept(ctx context.Context) (block.StateSyncMode, error) {
 	if s.AcceptF != nil {
 		return s.AcceptF(ctx)
 	}

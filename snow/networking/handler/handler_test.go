@@ -83,8 +83,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -195,8 +195,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 		closed <- struct{}{}
 	})
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -208,7 +208,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		return errFatal
 	}
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -295,8 +295,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 	handler.clock.Set(time.Now())
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -383,14 +383,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
 	bootstrapper.Default(false)
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -469,14 +469,14 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
 	bootstrapper.Default(false)
 
-	engine := &enginetest.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -651,14 +651,14 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			bootstrapper := &enginetest.BootstrapperTest{
-				EngineTest: enginetest.EngineTest{
+			bootstrapper := &enginetest.Bootstrapper{
+				Engine: enginetest.Engine{
 					T: t,
 				},
 			}
 			bootstrapper.Default(false)
 
-			engine := &enginetest.EngineTest{T: t}
+			engine := &enginetest.Engine{T: t}
 			engine.Default(false)
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx

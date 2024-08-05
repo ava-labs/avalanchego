@@ -13,26 +13,26 @@ import (
 )
 
 var (
-	_ common.BootstrapableEngine = (*BootstrapperTest)(nil)
+	_ common.BootstrapableEngine = (*Bootstrapper)(nil)
 
 	errClear = errors.New("unexpectedly called Clear")
 )
 
-type BootstrapperTest struct {
-	EngineTest
+type Bootstrapper struct {
+	Engine
 
 	CantClear bool
 
 	ClearF func(ctx context.Context) error
 }
 
-func (b *BootstrapperTest) Default(cant bool) {
-	b.EngineTest.Default(cant)
+func (b *Bootstrapper) Default(cant bool) {
+	b.Engine.Default(cant)
 
 	b.CantClear = cant
 }
 
-func (b *BootstrapperTest) Clear(ctx context.Context) error {
+func (b *Bootstrapper) Clear(ctx context.Context) error {
 	if b.ClearF != nil {
 		return b.ClearF(ctx)
 	}

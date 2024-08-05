@@ -21,9 +21,15 @@ var (
 	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
 )
 
-var _ validators.State = (*TestState)(nil)
+var _ validators.State = (*State)(nil)
 
-type TestState struct {
+// TestState is an alias for State because ava-labs/coreth uses the original
+// identifier and this change would otherwise break the build.
+//
+// Deprecated: use [State].
+type TestState = State
+
+type State struct {
 	T testing.TB
 
 	CantGetMinimumHeight,
@@ -37,7 +43,7 @@ type TestState struct {
 	GetValidatorSetF  func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
-func (vm *TestState) GetMinimumHeight(ctx context.Context) (uint64, error) {
+func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if vm.GetMinimumHeightF != nil {
 		return vm.GetMinimumHeightF(ctx)
 	}
@@ -47,7 +53,7 @@ func (vm *TestState) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return 0, errMinimumHeight
 }
 
-func (vm *TestState) GetCurrentHeight(ctx context.Context) (uint64, error) {
+func (vm *State) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	if vm.GetCurrentHeightF != nil {
 		return vm.GetCurrentHeightF(ctx)
 	}
@@ -57,7 +63,7 @@ func (vm *TestState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	return 0, errCurrentHeight
 }
 
-func (vm *TestState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
 	if vm.GetSubnetIDF != nil {
 		return vm.GetSubnetIDF(ctx, chainID)
 	}
@@ -67,7 +73,7 @@ func (vm *TestState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, e
 	return ids.Empty, errSubnetID
 }
 
-func (vm *TestState) GetValidatorSet(
+func (vm *State) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,

@@ -63,7 +63,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require.NoError(aliaser.Alias(CChainID, "C"))
 	require.NoError(aliaser.Alias(CChainID, CChainID.String()))
 
-	validatorState := &validatorstest.TestState{
+	validatorState := &validatorstest.State{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,

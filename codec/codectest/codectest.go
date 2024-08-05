@@ -1,6 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package codectest provides a test suite for testing codec implementations.
 package codectest
 
 import (
@@ -12,45 +13,72 @@ import (
 	codecpkg "github.com/ava-labs/avalanchego/codec"
 )
 
+// A NamedTest couples a test in the suite with a human-readable name.
+type NamedTest struct {
+	Name string
+	Test func(testing.TB, codecpkg.GeneralCodec)
+}
+
+// Run runs the test on the GeneralCodec.
+func (tt *NamedTest) Run(t *testing.T, c codecpkg.GeneralCodec) {
+	t.Run(tt.Name, func(t *testing.T) {
+		tt.Test(t, c)
+	})
+}
+
+// RunAll runs all [Tests], constructing a new GeneralCodec for each.
+func RunAll(t *testing.T, ctor func() codecpkg.GeneralCodec) {
+	for _, tt := range Tests {
+		tt.Run(t, ctor())
+	}
+}
+
+// RunAll runs all [MultipleTagsTests], constructing a new GeneralCodec for each.
+func RunAllMultipleTags(t *testing.T, ctor func() codecpkg.GeneralCodec) {
+	for _, tt := range MultipleTagsTests {
+		tt.Run(t, ctor())
+	}
+}
+
 var (
-	Tests = []func(c codecpkg.GeneralCodec, t testing.TB){
-		TestStruct,
-		TestRegisterStructTwice,
-		TestUInt32,
-		TestUIntPtr,
-		TestSlice,
-		TestMaxSizeSlice,
-		TestBool,
-		TestArray,
-		TestBigArray,
-		TestPointerToStruct,
-		TestSliceOfStruct,
-		TestInterface,
-		TestSliceOfInterface,
-		TestArrayOfInterface,
-		TestPointerToInterface,
-		TestString,
-		TestNilSlice,
-		TestSerializeUnexportedField,
-		TestSerializeOfNoSerializeField,
-		TestNilSliceSerialization,
-		TestEmptySliceSerialization,
-		TestSliceWithEmptySerialization,
-		TestSliceWithEmptySerializationError,
-		TestMapWithEmptySerialization,
-		TestMapWithEmptySerializationError,
-		TestSliceTooLarge,
-		TestNegativeNumbers,
-		TestTooLargeUnmarshal,
-		TestUnmarshalInvalidInterface,
-		TestExtraSpace,
-		TestSliceLengthOverflow,
-		TestMap,
-		TestCanMarshalLargeSlices,
+	Tests = []NamedTest{
+		{"Struct", TestStruct},
+		{"Register Struct Twice", TestRegisterStructTwice},
+		{"UInt32", TestUInt32},
+		{"UIntPtr", TestUIntPtr},
+		{"Slice", TestSlice},
+		{"Max-Size Slice", TestMaxSizeSlice},
+		{"Bool", TestBool},
+		{"Array", TestArray},
+		{"Big Array", TestBigArray},
+		{"Pointer To Struct", TestPointerToStruct},
+		{"Slice Of Struct", TestSliceOfStruct},
+		{"Interface", TestInterface},
+		{"Slice Of Interface", TestSliceOfInterface},
+		{"Array Of Interface", TestArrayOfInterface},
+		{"Pointer To Interface", TestPointerToInterface},
+		{"String", TestString},
+		{"Nil Slice", TestNilSlice},
+		{"Serialize Unexported Field", TestSerializeUnexportedField},
+		{"Serialize Of NoSerialize Field", TestSerializeOfNoSerializeField},
+		{"Nil Slice Serialization", TestNilSliceSerialization},
+		{"Empty Slice Serialization", TestEmptySliceSerialization},
+		{"Slice With Empty Serialization", TestSliceWithEmptySerialization},
+		{"Slice With Empty Serialization Error", TestSliceWithEmptySerializationError},
+		{"Map With Empty Serialization", TestMapWithEmptySerialization},
+		{"Map With Empty Serialization Error", TestMapWithEmptySerializationError},
+		{"Slice Too Large", TestSliceTooLarge},
+		{"Negative Numbers", TestNegativeNumbers},
+		{"Too Large Unmarshal", TestTooLargeUnmarshal},
+		{"Unmarshal Invalid Interface", TestUnmarshalInvalidInterface},
+		{"Extra Space", TestExtraSpace},
+		{"Slice Length Overflow", TestSliceLengthOverflow},
+		{"Map", TestMap},
+		{"Can Marshal Large Slices", TestCanMarshalLargeSlices},
 	}
 
-	MultipleTagsTests = []func(c codecpkg.GeneralCodec, t testing.TB){
-		TestMultipleTags,
+	MultipleTagsTests = []NamedTest{
+		{"Multiple Tags", TestMultipleTags},
 	}
 )
 
@@ -127,7 +155,7 @@ type myStruct struct {
 }
 
 // Test marshaling/unmarshaling a complicated struct
-func TestStruct(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestStruct(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	temp := Foo(&MyInnerStruct{})
@@ -243,7 +271,7 @@ func TestStruct(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.Equal(myStructInstance, *myStructUnmarshaled)
 }
 
-func TestRegisterStructTwice(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestRegisterStructTwice(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	require.NoError(codec.RegisterType(&MyInnerStruct{}))
@@ -251,7 +279,7 @@ func TestRegisterStructTwice(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.ErrorIs(err, codecpkg.ErrDuplicateType)
 }
 
-func TestUInt32(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestUInt32(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	number := uint32(500)
@@ -273,7 +301,7 @@ func TestUInt32(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.Equal(number, numberUnmarshaled)
 }
 
-func TestUIntPtr(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestUIntPtr(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	manager := codecpkg.NewDefaultManager()
@@ -285,7 +313,7 @@ func TestUIntPtr(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.ErrorIs(err, codecpkg.ErrUnsupportedType)
 }
 
-func TestSlice(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSlice(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	mySlice := []bool{true, false, true, true}
@@ -307,7 +335,7 @@ func TestSlice(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling/unmarshalling largest possible slice
-func TestMaxSizeSlice(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestMaxSizeSlice(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	mySlice := make([]string, math.MaxUint16)
@@ -331,7 +359,7 @@ func TestMaxSizeSlice(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a bool
-func TestBool(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestBool(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	myBool := true
@@ -353,7 +381,7 @@ func TestBool(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling an array
-func TestArray(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestArray(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	myArr := [5]uint64{5, 6, 7, 8, 9}
@@ -375,7 +403,7 @@ func TestArray(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a really big array
-func TestBigArray(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestBigArray(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	myArr := [30000]uint64{5, 6, 7, 8, 9}
@@ -397,7 +425,7 @@ func TestBigArray(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a pointer to a struct
-func TestPointerToStruct(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestPointerToStruct(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	myPtr := &MyInnerStruct{Str: "Hello!"}
@@ -419,7 +447,7 @@ func TestPointerToStruct(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a slice of structs
-func TestSliceOfStruct(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSliceOfStruct(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 	mySlice := []MyInnerStruct3{
 		{
@@ -453,7 +481,7 @@ func TestSliceOfStruct(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling an interface
-func TestInterface(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestInterface(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
@@ -477,7 +505,7 @@ func TestInterface(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a slice of interfaces
-func TestSliceOfInterface(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSliceOfInterface(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	mySlice := []Foo{
@@ -508,7 +536,7 @@ func TestSliceOfInterface(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling an array of interfaces
-func TestArrayOfInterface(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestArrayOfInterface(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	myArray := [2]Foo{
@@ -539,7 +567,7 @@ func TestArrayOfInterface(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a pointer to an interface
-func TestPointerToInterface(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestPointerToInterface(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
@@ -565,7 +593,7 @@ func TestPointerToInterface(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshalling a string
-func TestString(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestString(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	myString := "Ayy"
@@ -587,7 +615,7 @@ func TestString(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Ensure a nil slice is unmarshaled to slice with length 0
-func TestNilSlice(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestNilSlice(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type structWithSlice struct {
@@ -614,7 +642,7 @@ func TestNilSlice(codec codecpkg.GeneralCodec, t testing.TB) {
 
 // Ensure that trying to serialize a struct with an unexported member
 // that has `serialize:"true"` returns error
-func TestSerializeUnexportedField(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSerializeUnexportedField(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type s struct {
@@ -637,7 +665,7 @@ func TestSerializeUnexportedField(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.ErrorIs(err, codecpkg.ErrUnexportedField)
 }
 
-func TestSerializeOfNoSerializeField(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSerializeOfNoSerializeField(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type s struct {
@@ -670,7 +698,7 @@ func TestSerializeOfNoSerializeField(codec codecpkg.GeneralCodec, t testing.TB) 
 }
 
 // Test marshalling of nil slice
-func TestNilSliceSerialization(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestNilSliceSerialization(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type simpleSliceStruct struct {
@@ -698,7 +726,7 @@ func TestNilSliceSerialization(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshaling a slice that has 0 elements (but isn't nil)
-func TestEmptySliceSerialization(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestEmptySliceSerialization(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type simpleSliceStruct struct {
@@ -726,7 +754,7 @@ func TestEmptySliceSerialization(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test marshaling empty slice of zero length structs
-func TestSliceWithEmptySerialization(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSliceWithEmptySerialization(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -757,7 +785,7 @@ func TestSliceWithEmptySerialization(codec codecpkg.GeneralCodec, t testing.TB) 
 	require.Empty(unmarshaled.Arr)
 }
 
-func TestSliceWithEmptySerializationError(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSliceWithEmptySerializationError(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -786,7 +814,7 @@ func TestSliceWithEmptySerializationError(codec codecpkg.GeneralCodec, t testing
 }
 
 // Test marshaling empty map of zero length structs
-func TestMapWithEmptySerialization(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestMapWithEmptySerialization(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -811,7 +839,7 @@ func TestMapWithEmptySerialization(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.Empty(unmarshaled)
 }
 
-func TestMapWithEmptySerializationError(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestMapWithEmptySerializationError(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type emptyStruct struct{}
@@ -835,7 +863,7 @@ func TestMapWithEmptySerializationError(codec codecpkg.GeneralCodec, t testing.T
 	require.ErrorIs(err, codecpkg.ErrUnmarshalZeroLength)
 }
 
-func TestSliceTooLarge(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSliceTooLarge(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	manager := codecpkg.NewDefaultManager()
@@ -848,7 +876,7 @@ func TestSliceTooLarge(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Ensure serializing structs with negative number members works
-func TestNegativeNumbers(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestNegativeNumbers(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type s struct {
@@ -877,7 +905,7 @@ func TestNegativeNumbers(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Ensure deserializing structs with too many bytes errors correctly
-func TestTooLargeUnmarshal(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestTooLargeUnmarshal(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type inner struct {
@@ -910,7 +938,7 @@ func (*innerInterface) ToInt() int {
 type innerNoInterface struct{}
 
 // Ensure deserializing structs into the wrong interface errors gracefully
-func TestUnmarshalInvalidInterface(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestUnmarshalInvalidInterface(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	manager := codecpkg.NewDefaultManager()
@@ -934,7 +962,7 @@ func TestUnmarshalInvalidInterface(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Test unmarshaling something with extra data
-func TestExtraSpace(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestExtraSpace(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	manager := codecpkg.NewDefaultManager()
@@ -948,7 +976,7 @@ func TestExtraSpace(codec codecpkg.GeneralCodec, t testing.TB) {
 }
 
 // Ensure deserializing slices whose lengths exceed MaxInt32 error correctly
-func TestSliceLengthOverflow(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestSliceLengthOverflow(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	type inner struct {
@@ -978,7 +1006,7 @@ type MultipleVersionsStruct struct {
 	NoTags      string `tag1:"false" tag2:"false"`
 }
 
-func TestMultipleTags(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestMultipleTags(t testing.TB, codec codecpkg.GeneralCodec) {
 	// received codec is expected to have both v1 and v2 registered as tags
 	inputs := MultipleVersionsStruct{
 		BothTags:    "both Tags",
@@ -1011,7 +1039,7 @@ func TestMultipleTags(codec codecpkg.GeneralCodec, t testing.TB) {
 	}
 }
 
-func TestMap(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestMap(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	data1 := map[string]MyInnerStruct2{
@@ -1080,7 +1108,7 @@ func TestMap(codec codecpkg.GeneralCodec, t testing.TB) {
 	require.Len(outerArrayBytes, outerArraySize)
 }
 
-func TestCanMarshalLargeSlices(codec codecpkg.GeneralCodec, t testing.TB) {
+func TestCanMarshalLargeSlices(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
 	data := make([]uint16, 1_000_000)

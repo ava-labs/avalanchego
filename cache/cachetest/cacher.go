@@ -12,14 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const TestIntSize = ids.IDLen + 8
+const IntSize = ids.IDLen + 8
 
-func TestIntSizeFunc(ids.ID, int64) int {
-	return TestIntSize
+func IntSizeFunc(ids.ID, int64) int {
+	return IntSize
 }
 
-// CacherTests is a list of all Cacher tests
-var CacherTests = []struct {
+// Tests is a list of all Cacher tests
+var Tests = []struct {
 	Size int
 	Func func(t *testing.T, c cache.Cacher[ids.ID, int64])
 }{

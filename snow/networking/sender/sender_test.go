@@ -92,7 +92,7 @@ func TestTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -140,8 +140,8 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -369,7 +369,7 @@ func TestReliableMessages(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -417,8 +417,8 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -526,7 +526,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &sendertest.ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -574,8 +574,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &enginetest.BootstrapperTest{
-		EngineTest: enginetest.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
