@@ -379,7 +379,7 @@ func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	// TODO: Should we include additional complexity for subnets
+	// TODO: Should we include additional complexity for subnets?
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err
@@ -411,7 +411,7 @@ func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 }
 
 func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	// TODO: Should we include additional complexity for subnets
+	// TODO: Should we include additional complexity for subnets?
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err
