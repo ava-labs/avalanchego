@@ -18,6 +18,13 @@ type (
 	GasPrice uint64
 )
 
+// Cost converts the gas to nAVAX based on the price.
+//
+// If overflow would occur, an error is returned.
+func (g Gas) Cost(price GasPrice) (uint64, error) {
+	return safemath.Mul(uint64(g), uint64(price))
+}
+
 // AddPerSecond returns g + gasPerSecond * seconds.
 //
 // If overflow would occur, MaxUint64 is returned.
