@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 )
 
+const testDynamicPrice = 100
+
 var (
 	testStaticConfig = StaticConfig{
 		TxFee:                         1 * units.Avax,
@@ -19,6 +21,12 @@ var (
 		AddSubnetValidatorFee:         7 * units.Avax,
 		AddSubnetDelegatorFee:         8 * units.Avax,
 	}
+	testDynamicWeights = fee.Dimensions{
+		fee.Bandwidth: 1,
+		fee.DBRead:    200,
+		fee.DBWrite:   300,
+		fee.Compute:   0, // TODO: Populate
+	}
 
 	// TODO: Rather than hardcoding transactions, consider implementing and
 	// using a transaction generator.
@@ -29,30 +37,36 @@ var (
 		expectedStaticFeeErr  error
 		expectedComplexity    fee.Dimensions
 		expectedComplexityErr error
+		expectedDynamicFee    uint64
+		expectedDynamicFeeErr error
 	}{
 		{
 			name:                  "AdvanceTimeTx",
 			tx:                    "0000000000130000000066a56fe700000000",
 			expectedStaticFeeErr:  ErrUnsupportedTx,
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                  "RewardValidatorTx",
 			tx:                    "0000000000143d0ad12b8ee8928edf248ca91ca55600fb383f07c32bff1d6dec472b25cf59a700000000",
 			expectedStaticFeeErr:  ErrUnsupportedTx,
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                  "AddValidatorTx",
 			tx:                    "00000000000c0000000100000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000f4b21e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000015000000006134088000000005000001d1a94a200000000001000000000000000400000000b3da694c70b8bee4478051313621c3f2282088b4000000005f6976d500000000614aaa19000001d1a94a20000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000016000000006134088000000007000001d1a94a20000000000000000000000000010000000120868ed5ac611711b33d2e4f97085347415db1c40000000b0000000000000000000000010000000120868ed5ac611711b33d2e4f97085347415db1c400009c40000000010000000900000001620513952dd17c8726d52e9e621618cb38f09fd194abb4cd7b4ee35ecd10880a562ad968dc81a89beab4e87d88d5d582aa73d0d265c87892d1ffff1f6e00f0ef00",
 			expectedStaticFee:     testStaticConfig.AddPrimaryNetworkValidatorFee,
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:                  "AddDelegatorTx",
 			tx:                    "00000000000e000000050000000000000000000000000000000000000000000000000000000000000000000000013d9bdac0ed1d761330cf680efdeb1a42159eb387d6d2950c96f7d28f61bbe2aa00000007000000003b9aca0000000000000000000000000100000001f887b4c7030e95d2495603ae5d8b14cc0a66781a000000011767be999a49ca24fe705de032fa613b682493110fd6468ae7fb56bde1b9d729000000003d9bdac0ed1d761330cf680efdeb1a42159eb387d6d2950c96f7d28f61bbe2aa00000005000000012a05f20000000001000000000000000400000000c51c552c49174e2e18b392049d3e4cd48b11490f000000005f692452000000005f73b05200000000ee6b2800000000013d9bdac0ed1d761330cf680efdeb1a42159eb387d6d2950c96f7d28f61bbe2aa0000000700000000ee6b280000000000000000000000000100000001e0cfe8cae22827d032805ded484e393ce51cbedb0000000b00000000000000000000000100000001e0cfe8cae22827d032805ded484e393ce51cbedb00000001000000090000000135cd78758035ed528d230317e5d880083a86a2b68c4a95655571828fe226548f235031c8dabd1fe06366a57613c4370ac26c4c59d1a1c46287a59906ec41b88f00",
 			expectedStaticFee:     testStaticConfig.AddPrimaryNetworkDelegatorFee,
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:              "AddPermissionlessValidatorTx for primary network",
@@ -64,6 +78,7 @@ var (
 				fee.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 229_100,
 		},
 		{
 			name:              "AddPermissionlessValidatorTx for subnet",
@@ -75,6 +90,7 @@ var (
 				fee.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[fee.DBWrite] + 2*intrinsicInputDBWrite + 3*intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 314_800,
 		},
 		{
 			name:              "AddPermissionlessDelegatorTx for primary network",
@@ -86,6 +102,7 @@ var (
 				fee.DBWrite:   IntrinsicAddPermissionlessDelegatorTxComplexities[fee.DBWrite] + 1*intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 209_900,
 		},
 		{
 			name:              "AddPermissionlessDelegatorTx for subnet",
@@ -97,6 +114,7 @@ var (
 				fee.DBWrite:   IntrinsicAddPermissionlessDelegatorTxComplexities[fee.DBWrite] + 2*intrinsicInputDBWrite + 3*intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 312_000,
 		},
 		{
 			name:              "AddSubnetValidatorTx",
@@ -108,6 +126,7 @@ var (
 				fee.DBWrite:   IntrinsicAddSubnetValidatorTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 196_000,
 		},
 		{
 			name:              "BaseTx",
@@ -119,6 +138,7 @@ var (
 				fee.DBWrite:   IntrinsicBaseTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 149_900,
 		},
 		{
 			name:              "CreateChainTx",
@@ -130,6 +150,7 @@ var (
 				fee.DBWrite:   IntrinsicCreateChainTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 180_900,
 		},
 		{
 			name:              "CreateSubnetTx",
@@ -141,6 +162,7 @@ var (
 				fee.DBWrite:   IntrinsicCreateSubnetTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 143_900,
 		},
 		{
 			name:              "ExportTx",
@@ -152,6 +174,7 @@ var (
 				fee.DBWrite:   IntrinsicExportTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 153_500,
 		},
 		{
 			name:              "ImportTx",
@@ -163,6 +186,7 @@ var (
 				fee.DBWrite:   IntrinsicImportTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 113_500,
 		},
 		{
 			name:              "RemoveSubnetValidatorTx",
@@ -174,12 +198,14 @@ var (
 				fee.DBWrite:   IntrinsicRemoveSubnetValidatorTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 193_600,
 		},
 		{
 			name:                  "TransformSubnetTx",
 			tx:                    "000000000018000030390000000000000000000000000000000000000000000000000000000000000000000000022f6399f3e626fe1e75f9daa5e726cb64b7bfec0b6e6d8930eaa9dfa336edca7a00000007000000000000609b000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29cdbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f263c5fbc0000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c0000000294a113f31a30ee643288277574434f9066e0cdc1d53d6eb2610805c388814134000000002f6399f3e626fe1e75f9daa5e726cb64b7bfec0b6e6d8930eaa9dfa336edca7a00000005000000000000c137000000010000000094a113f31a30ee643288277574434f9066e0cdc1d53d6eb2610805c38881413400000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f269bbdcc000000001000000000000000097ea88082100491617204ed70c19fc1a2fce4474bee962904359d0b59e84c1242f6399f3e626fe1e75f9daa5e726cb64b7bfec0b6e6d8930eaa9dfa336edca7a000000000000609b000000000000c1370000000000000001000000000000000a0000000000000001000000000000006400127500001fa40000000001000000000000000a64000000010000000a00000001000000000000000300000009000000015c640ddd6afc7d8059ef54663654d74f0c56cc1ed0b974d401171cdae0b29be67f3223e299d3e5e7c492ef4c7110ddf44d672bd698c42947bfb15ab750f0ca820000000009000000015c640ddd6afc7d8059ef54663654d74f0c56cc1ed0b974d401171cdae0b29be67f3223e299d3e5e7c492ef4c7110ddf44d672bd698c42947bfb15ab750f0ca820000000009000000015c640ddd6afc7d8059ef54663654d74f0c56cc1ed0b974d401171cdae0b29be67f3223e299d3e5e7c492ef4c7110ddf44d672bd698c42947bfb15ab750f0ca8200",
 			expectedStaticFee:     testStaticConfig.TransformSubnetTxFee,
 			expectedComplexityErr: ErrUnsupportedTx,
+			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
 		{
 			name:              "TransferSubnetOwnershipTx",
@@ -191,6 +217,7 @@ var (
 				fee.DBWrite:   IntrinsicTransferSubnetOwnershipTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
+			expectedDynamicFee: 173_600,
 		},
 	}
 )
