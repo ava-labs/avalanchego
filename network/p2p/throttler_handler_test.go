@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -57,7 +58,7 @@ func TestThrottlerHandlerAppRequest(t *testing.T) {
 	tests := []struct {
 		name        string
 		Throttler   Throttler
-		expectedErr error
+		expectedErr *common.AppError
 	}{
 		{
 			name:      "not throttled",

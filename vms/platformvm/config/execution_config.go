@@ -21,6 +21,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	ChainDBCacheSize:             2048,
 	BlockIDCacheSize:             8192,
 	FxOwnerCacheSize:             4 * units.MiB,
+	SubnetManagerCacheSize:       4 * units.MiB,
 	ChecksumsEnabled:             false,
 	MempoolPruneFrequency:        30 * time.Minute,
 }

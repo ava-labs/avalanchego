@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -82,8 +83,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -114,7 +115,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
-	chainID := ids.ID{}
+	chainID := ids.Empty
 	msg := Message{
 		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
@@ -194,8 +195,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 		closed <- struct{}{}
 	})
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -207,7 +208,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		return errFatal
 	}
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -237,7 +238,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	reqID := uint32(1)
 	deadline := time.Nanosecond
 	msg := Message{
-		InboundMessage: message.InboundGetAcceptedFrontier(ids.ID{}, reqID, deadline, nodeID),
+		InboundMessage: message.InboundGetAcceptedFrontier(ids.Empty, reqID, deadline, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 	handler.Push(context.Background(), msg)
@@ -294,8 +295,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 
 	handler.clock.Set(time.Now())
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -382,14 +383,14 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
 	bootstrapper.Default(false)
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -468,14 +469,14 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
 	bootstrapper.Default(false)
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -650,14 +651,14 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			bootstrapper := &common.BootstrapperTest{
-				EngineTest: common.EngineTest{
+			bootstrapper := &enginetest.Bootstrapper{
+				Engine: enginetest.Engine{
 					T: t,
 				},
 			}
 			bootstrapper.Default(false)
 
-			engine := &common.EngineTest{T: t}
+			engine := &enginetest.Engine{T: t}
 			engine.Default(false)
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx

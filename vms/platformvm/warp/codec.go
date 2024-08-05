@@ -4,11 +4,11 @@
 package warp
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const CodecVersion = 0
@@ -19,7 +19,7 @@ func init() {
 	Codec = codec.NewManager(math.MaxInt)
 	lc := linearcodec.NewDefault()
 
-	err := utils.Err(
+	err := errors.Join(
 		lc.RegisterType(&BitSetSignature{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)

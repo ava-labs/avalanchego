@@ -123,7 +123,7 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 
 	var totalWeight uint64
 	for _, validator := range validators {
-		totalWeight, err = math.Add64(totalWeight, validator.weight)
+		totalWeight, err = math.Add(totalWeight, validator.weight)
 		if err != nil {
 			return nil, err
 		}

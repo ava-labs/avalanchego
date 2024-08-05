@@ -4,11 +4,10 @@
 package sync
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -74,7 +73,7 @@ func NewMetrics(namespace string, reg prometheus.Registerer) (SyncMetrics, error
 			Help:      "cumulative amount of proof requests that were successful",
 		}),
 	}
-	err := utils.Err(
+	err := errors.Join(
 		reg.Register(m.requestsFailed),
 		reg.Register(m.requestsMade),
 		reg.Register(m.requestsSucceeded),

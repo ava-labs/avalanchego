@@ -19,11 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -234,7 +232,7 @@ func (vm *VM) Initialize(
 		Buckets: []float64{0.5, 1.5, 2.5},
 	})
 
-	return utils.Err(
+	return errors.Join(
 		vm.Config.Registerer.Register(vm.proposerBuildSlotGauge),
 		vm.Config.Registerer.Register(vm.acceptedBlocksSlotHistogram),
 	)
@@ -288,7 +286,14 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
-	if blk, err := vm.parsePostForkBlock(ctx, b); err == nil {
+	if blk, err := vm.parsePostForkBlock(ctx, b, true); err == nil {
+		return blk, nil
+	}
+	return vm.parsePreForkBlock(ctx, b)
+}
+
+func (vm *VM) ParseLocalBlock(ctx context.Context, b []byte) (snowman.Block, error) {
+	if blk, err := vm.parsePostForkBlock(ctx, b, false); err == nil {
 		return blk, nil
 	}
 	return vm.parsePreForkBlock(ctx, b)
@@ -323,7 +328,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
 	)
-	if vm.IsDurangoActivated(parentTimestamp) {
+	if vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
 		if nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,
@@ -407,9 +412,9 @@ func (vm *VM) getPostDurangoSlotTime(
 	switch {
 	case err == nil:
 		delay = max(delay, vm.MinBlkDelay)
-		return parentTimestamp.Add(delay), err
+		return parentTimestamp.Add(delay), nil
 	case errors.Is(err, proposer.ErrAnyoneCanPropose):
-		return parentTimestamp.Add(vm.MinBlkDelay), err
+		return parentTimestamp.Add(vm.MinBlkDelay), nil
 	default:
 		return time.Time{}, err
 	}
@@ -526,22 +531,22 @@ func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 	return nil
 }
 
-func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, error) {
-	statelessBlock, err := statelessblock.Parse(b, vm.ctx.ChainID)
+func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte, verifySignature bool) (PostForkBlock, error) {
+	var (
+		statelessBlock statelessblock.Block
+		err            error
+	)
+
+	if verifySignature {
+		statelessBlock, err = statelessblock.Parse(b, vm.ctx.ChainID)
+	} else {
+		statelessBlock, err = statelessblock.ParseWithoutVerification(b)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	// if the block already exists, then make sure the status is set correctly
 	blkID := statelessBlock.ID()
-	blk, err := vm.getPostForkBlock(ctx, blkID)
-	if err == nil {
-		return blk, nil
-	}
-	if err != database.ErrNotFound {
-		return nil, err
-	}
-
 	innerBlkBytes := statelessBlock.Block()
 	innerBlk, err := vm.parseInnerBlock(ctx, blkID, innerBlkBytes)
 	if err != nil {
@@ -549,25 +554,22 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte) (PostForkBlock, 
 	}
 
 	if statelessSignedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
-		blk = &postForkBlock{
+		return &postForkBlock{
 			SignedBlock: statelessSignedBlock,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   choices.Processing,
 			},
-		}
-	} else {
-		blk = &postForkOption{
-			Block: statelessBlock,
-			postForkCommonComponents: postForkCommonComponents{
-				vm:       vm,
-				innerBlk: innerBlk,
-				status:   choices.Processing,
-			},
-		}
+		}, nil
 	}
-	return blk, nil
+
+	return &postForkOption{
+		Block: statelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+		},
+	}, nil
 }
 
 func (vm *VM) parsePreForkBlock(ctx context.Context, b []byte) (*preForkBlock, error) {
@@ -591,7 +593,7 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		return block, nil
 	}
 
-	statelessBlock, status, err := vm.State.GetBlock(blkID)
+	statelessBlock, err := vm.State.GetBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +610,6 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       vm,
 				innerBlk: innerBlk,
-				status:   status,
 			},
 		}, nil
 	}
@@ -617,7 +618,6 @@ func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       vm,
 			innerBlk: innerBlk,
-			status:   status,
 		},
 	}, nil
 }
@@ -641,7 +641,7 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
+	if err := vm.State.PutBlock(blk.getStatelessBlk()); err != nil {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {

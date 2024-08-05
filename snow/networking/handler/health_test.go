@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -97,14 +97,14 @@ func TestHealthCheckSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			bootstrapper := &common.BootstrapperTest{
-				EngineTest: common.EngineTest{
+			bootstrapper := &enginetest.Bootstrapper{
+				Engine: enginetest.Engine{
 					T: t,
 				},
 			}
 			bootstrapper.Default(false)
 
-			engine := &common.EngineTest{T: t}
+			engine := &enginetest.Engine{T: t}
 			engine.Default(false)
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx

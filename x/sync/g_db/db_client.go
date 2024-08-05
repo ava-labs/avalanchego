@@ -32,7 +32,7 @@ type DBClient struct {
 func (c *DBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	resp, err := c.client.GetMerkleRoot(ctx, &emptypb.Empty{})
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	return ids.ToID(resp.RootHash)
 }

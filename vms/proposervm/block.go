@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -65,7 +64,6 @@ type Block interface {
 type PostForkBlock interface {
 	Block
 
-	setStatus(choices.Status)
 	getStatelessBlk() block.Block
 	setInnerBlk(snowman.Block)
 }
@@ -74,7 +72,6 @@ type PostForkBlock interface {
 type postForkCommonComponents struct {
 	vm       *VM
 	innerBlk snowman.Block
-	status   choices.Status
 }
 
 // Return the inner block's height
@@ -144,7 +141,7 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		var shouldHaveProposer bool
-		if p.vm.IsDurangoActivated(parentTimestamp) {
+		if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 			shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		} else {
 			shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
@@ -200,7 +197,7 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	var shouldBuildSignedBlock bool
-	if p.vm.IsDurangoActivated(parentTimestamp) {
+	if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPostDurango(
 			ctx,
 			parentID,
@@ -268,7 +265,6 @@ func (p *postForkCommonComponents) buildChild(
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       p.vm,
 			innerBlk: innerBlock,
-			status:   choices.Processing,
 		},
 	}
 

@@ -68,8 +68,8 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	// IssueAddSubnetValidatorTx creates, signs, and issues a transaction that
-	// removes a validator of a subnet.
+	// IssueRemoveSubnetValidatorTx creates, signs, and issues a transaction
+	// that removes a validator of a subnet.
 	//
 	// - [nodeID] is the validator being removed from [subnetID].
 	IssueRemoveSubnetValidatorTx(

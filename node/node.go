@@ -77,7 +77,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
@@ -102,6 +101,7 @@ const (
 	requestsNamespace        = constants.PlatformName + metric.NamespaceSeparator + "requests"
 	resourceTrackerNamespace = constants.PlatformName + metric.NamespaceSeparator + "resource_tracker"
 	responsesNamespace       = constants.PlatformName + metric.NamespaceSeparator + "responses"
+	rpcchainvmNamespace      = constants.PlatformName + metric.NamespaceSeparator + "rpcchainvm"
 	systemResourcesNamespace = constants.PlatformName + metric.NamespaceSeparator + "system_resources"
 )
 
@@ -400,6 +400,9 @@ type Node struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	diskTargeter tracker.Targeter
+
+	// Closed when a sufficient amount of bootstrap nodes are connected to
+	onSufficientlyConnected chan struct{}
 }
 
 /*
@@ -596,36 +599,19 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 	}
 
+	n.onSufficientlyConnected = make(chan struct{})
 	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
-		onSufficientlyConnected := make(chan struct{})
 		consensusRouter = &beaconManager{
 			Router:                  consensusRouter,
 			beacons:                 n.bootstrappers,
 			requiredConns:           int64(requiredConns),
-			onSufficientlyConnected: onSufficientlyConnected,
+			onSufficientlyConnected: n.onSufficientlyConnected,
 		}
-
-		// Log a warning if we aren't able to connect to a sufficient portion of
-		// nodes.
-		go func() {
-			timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
-			defer timer.Stop()
-
-			select {
-			case <-timer.C:
-				if n.shuttingDown.Get() {
-					return
-				}
-				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("bootstrappers", n.bootstrappers),
-					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
-				)
-			case <-onSufficientlyConnected:
-			}
-		}()
+	} else {
+		close(n.onSufficientlyConnected)
 	}
 
 	// add node configs to network config
@@ -646,6 +632,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
+		n.Config.UpgradeConfig.DurangoTime,
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -714,6 +701,25 @@ func (n *Node) Dispatch() error {
 		// If node is already shutting down, this does nothing.
 		n.Shutdown(1)
 	})
+
+	// Log a warning if we aren't able to connect to a sufficient portion of
+	// nodes.
+	go func() {
+		timer := time.NewTimer(n.Config.BootstrapBeaconConnectionTimeout)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+			if n.shuttingDown.Get() {
+				return
+			}
+			n.Log.Warn("failed to connect to bootstrap nodes",
+				zap.Stringer("bootstrappers", n.bootstrappers),
+				zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
+			)
+		case <-n.onSufficientlyConnected:
+		}
+	}()
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
@@ -1178,8 +1184,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
-			ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
-			ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
+			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,
 			StateSyncBeacons:                        n.Config.StateSyncIDs,
 			TracingEnabled:                          n.Config.TraceConfig.Enabled,
@@ -1211,8 +1216,7 @@ func (n *Node) initVMs() error {
 	}
 
 	// Register the VMs that Avalanche supports
-	eUpgradeTime := version.GetEUpgradeTime(n.Config.NetworkID)
-	err := utils.Err(
+	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                    n.chainManager,
@@ -1221,7 +1225,9 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				StaticFeeConfig:           n.Config.StaticConfig,
+				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
+				StaticFeeConfig:           n.Config.StaticFeeConfig,
+				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
 				MinValidatorStake:         n.Config.MinValidatorStake,
 				MaxValidatorStake:         n.Config.MaxValidatorStake,
@@ -1230,22 +1236,15 @@ func (n *Node) initVMs() error {
 				MinStakeDuration:          n.Config.MinStakeDuration,
 				MaxStakeDuration:          n.Config.MaxStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
-				UpgradeConfig: upgrade.Config{
-					ApricotPhase3Time: version.GetApricotPhase3Time(n.Config.NetworkID),
-					ApricotPhase5Time: version.GetApricotPhase5Time(n.Config.NetworkID),
-					BanffTime:         version.GetBanffTime(n.Config.NetworkID),
-					CortinaTime:       version.GetCortinaTime(n.Config.NetworkID),
-					DurangoTime:       version.GetDurangoTime(n.Config.NetworkID),
-					EUpgradeTime:      eUpgradeTime,
-				},
-				UseCurrentHeight: n.Config.UseCurrentHeight,
+				UpgradeConfig:             n.Config.UpgradeConfig,
+				UseCurrentHeight:          n.Config.UseCurrentHeight,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
-				TxFee:            n.Config.TxFee,
+				Upgrades:         n.Config.UpgradeConfig,
+				TxFee:            n.Config.StaticFeeConfig.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
-				EUpgradeTime:     eUpgradeTime,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
@@ -1257,6 +1256,11 @@ func (n *Node) initVMs() error {
 	// initialize vm runtime manager
 	n.runtimeManager = runtime.NewManager()
 
+	rpcchainvmMetricsGatherer := metrics.NewLabelGatherer(chains.ChainLabel)
+	if err := n.MetricsGatherer.Register(rpcchainvmNamespace, rpcchainvmMetricsGatherer); err != nil {
+		return err
+	}
+
 	// initialize the vm registry
 	n.VMRegistry = registry.NewVMRegistry(registry.VMRegistryConfig{
 		VMGetter: registry.NewVMGetter(registry.VMGetterConfig{
@@ -1265,6 +1269,7 @@ func (n *Node) initVMs() error {
 			PluginDirectory: n.Config.PluginDir,
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
+			MetricsGatherer: rpcchainvmMetricsGatherer,
 		}),
 		VMManager: n.VMManager,
 	})
@@ -1409,20 +1414,13 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:                       version.CurrentApp,
-			NodeID:                        n.ID,
-			NodePOP:                       signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:                     n.Config.NetworkID,
-			TxFee:                         n.Config.TxFee,
-			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
-			TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
-			CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
-			AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
-			AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
-			AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
-			AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-			VMManager:                     n.VMManager,
+			Version:     version.CurrentApp,
+			NodeID:      n.ID,
+			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NetworkID:   n.Config.NetworkID,
+			TxFeeConfig: n.Config.TxFeeConfig,
+			VMManager:   n.VMManager,
+			Upgrades:    n.Config.UpgradeConfig,
 		},
 		n.Log,
 		n.vdrs,

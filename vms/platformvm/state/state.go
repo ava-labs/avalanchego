@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -34,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -82,6 +82,7 @@ var (
 	SingletonPrefix               = []byte("singleton")
 
 	TimestampKey       = []byte("timestamp")
+	FeeStateKey        = []byte("fee state")
 	CurrentSupplyKey   = []byte("current supply")
 	LastAcceptedKey    = []byte("last accepted")
 	HeightsIndexedKey  = []byte("heights indexed")
@@ -99,6 +100,9 @@ type Chain interface {
 
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
+
+	GetFeeState() fee.State
+	SetFeeState(f fee.State)
 
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
@@ -271,6 +275,7 @@ type stateBlk struct {
  *   |-- initializedKey -> nil
  *   |-- blocksReindexedKey -> nil
  *   |-- timestampKey -> timestamp
+ *   |-- feeStateKey -> feeState
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
@@ -344,7 +349,7 @@ type state struct {
 	subnetOwnerDB    database.Database
 
 	subnetManagers     map[ids.ID]chainIDAndAddr            // map of subnetID -> manager of the subnet
-	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager; if the entry is nil, it is not in the database
+	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager
 	subnetManagerDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
@@ -362,6 +367,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
+	feeState, persistedFeeState           fee.State
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -388,7 +394,7 @@ type ValidatorWeightDiff struct {
 func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
 	if v.Decrease == negative {
 		var err error
-		v.Amount, err = safemath.Add64(v.Amount, amount)
+		v.Amount, err = safemath.Add(v.Amount, amount)
 		return err
 	}
 
@@ -565,7 +571,7 @@ func newState(
 		"subnet_manager_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.SubnetManagerCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
-			return ids.IDLen + len(f.Addr)
+			return 2*ids.IDLen + len(f.Addr)
 		}),
 	)
 	if err != nil {
@@ -1064,6 +1070,14 @@ func (s *state) SetTimestamp(tm time.Time) {
 	s.timestamp = tm
 }
 
+func (s *state) GetFeeState() fee.State {
+	return s.feeState
+}
+
+func (s *state) SetFeeState(feeState fee.State) {
+	s.feeState = feeState
+}
+
 func (s *state) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
@@ -1185,7 +1199,7 @@ func applyWeightDiff(
 	if weightDiff.Decrease {
 		// The validator's weight was decreased at this block, so in the
 		// prior block it was higher.
-		vdr.Weight, err = safemath.Add64(vdr.Weight, weightDiff.Amount)
+		vdr.Weight, err = safemath.Add(vdr.Weight, weightDiff.Amount)
 	} else {
 		// The validator's weight was increased at this block, so in the
 		// prior block it was lower.
@@ -1291,7 +1305,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			stakeAmount,
 			currentSupply,
 		)
-		newCurrentSupply, err := safemath.Add64(currentSupply, potentialReward)
+		newCurrentSupply, err := safemath.Add(currentSupply, potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1330,7 +1344,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 
 // Load pulls data previously stored on disk that is expected to be in memory.
 func (s *state) load() error {
-	return utils.Err(
+	return errors.Join(
 		s.loadMetadata(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
@@ -1345,6 +1359,13 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
+
+	feeState, err := getFeeState(s.singletonDB)
+	if err != nil {
+		return err
+	}
+	s.persistedFeeState = feeState
+	s.SetFeeState(feeState)
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -1551,7 +1572,7 @@ func (s *state) loadCurrentValidators() error {
 		}
 	}
 
-	return utils.Err(
+	return errors.Join(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
@@ -1635,7 +1656,7 @@ func (s *state) loadPendingValidators() error {
 		}
 	}
 
-	return utils.Err(
+	return errors.Join(
 		validatorIt.Error(),
 		subnetValidatorIt.Error(),
 		delegatorIt.Error(),
@@ -1685,7 +1706,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		codecVersion = CodecVersion0
 	}
 
-	return utils.Err(
+	return errors.Join(
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
@@ -1704,7 +1725,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 }
 
 func (s *state) Close() error {
-	return utils.Err(
+	return errors.Join(
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -2341,6 +2362,12 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedTimestamp = s.timestamp
 	}
+	if s.feeState != s.persistedFeeState {
+		if err := putFeeState(s.singletonDB, s.feeState); err != nil {
+			return fmt.Errorf("failed to write fee state: %w", err)
+		}
+		s.persistedFeeState = s.feeState
+	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)
@@ -2462,7 +2489,7 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			err := utils.Err(
+			err := errors.Join(
 				s.Commit(),
 				blockIterator.Error(),
 			)
@@ -2519,4 +2546,28 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	)
 
 	return s.Commit()
+}
+
+func putFeeState(db database.KeyValueWriter, feeState fee.State) error {
+	feeStateBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, feeState)
+	if err != nil {
+		return err
+	}
+	return db.Put(FeeStateKey, feeStateBytes)
+}
+
+func getFeeState(db database.KeyValueReader) (fee.State, error) {
+	feeStateBytes, err := db.Get(FeeStateKey)
+	if err == database.ErrNotFound {
+		return fee.State{}, nil
+	}
+	if err != nil {
+		return fee.State{}, err
+	}
+
+	var feeState fee.State
+	if _, err := block.GenesisCodec.Unmarshal(feeStateBytes, &feeState); err != nil {
+		return fee.State{}, err
+	}
+	return feeState, nil
 }

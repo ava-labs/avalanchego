@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -25,19 +27,19 @@ import (
 var errUnknownBlock = errors.New("unknown block")
 
 type StateSyncEnabledMock struct {
-	*block.TestVM
+	*blocktest.VM
 	*block.MockStateSyncableVM
 }
 
-func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.SenderTest) {
+func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginetest.Sender) {
 	ctrl := gomock.NewController(t)
 
 	vm := StateSyncEnabledMock{
-		TestVM:              &block.TestVM{},
+		VM:                  &blocktest.VM{},
 		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
 	}
 
-	sender := &common.SenderTest{
+	sender := &enginetest.Sender{
 		T: t,
 	}
 	sender.Default(true)
@@ -80,20 +82,25 @@ func TestFilterAccepted(t *testing.T) {
 	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	require.NoError(acceptedBlk.Accept(context.Background()))
 
-	unknownBlkID := ids.GenerateTestID()
-
-	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		case acceptedBlk.ID():
-			return acceptedBlk, nil
-		case unknownBlkID:
-			return nil, errUnknownBlock
-		default:
-			require.FailNow(errUnknownBlock.Error())
-			return nil, errUnknownBlock
+	var (
+		allBlocks = []*snowmantest.Block{
+			snowmantest.Genesis,
+			acceptedBlk,
 		}
+		unknownBlkID = ids.GenerateTestID()
+	)
+
+	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(allBlocks)
+	vm.GetBlockIDAtHeightF = snowmantest.MakeGetBlockIDAtHeightF(allBlocks)
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		for _, blk := range allBlocks {
+			if blk.ID() == blkID {
+				return blk, nil
+			}
+		}
+
+		require.Equal(unknownBlkID, blkID)
+		return nil, errUnknownBlock
 	}
 
 	var accepted []ids.ID

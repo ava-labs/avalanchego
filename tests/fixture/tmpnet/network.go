@@ -84,7 +84,9 @@ type Network struct {
 	// Path where network configuration and data is stored
 	Dir string
 
-	// Id of the network. If zero, must be set in Genesis.
+	// Id of the network. If zero, must be set in Genesis. Consider
+	// using the GetNetworkID method if needing to retrieve the ID of
+	// a running network.
 	NetworkID uint32
 
 	// Configuration common across nodes
@@ -315,7 +317,7 @@ func (n *Network) Create(rootDir string) error {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
 		if err := n.EnsureNodeConfig(node); err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -562,10 +564,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
-	networkID := n.NetworkID
-	if networkID == 0 && n.Genesis != nil && n.Genesis.NetworkID > 0 {
-		networkID = n.Genesis.NetworkID
-	}
+	networkID := n.GetNetworkID()
 	if networkID > 0 {
 		// Convert the network id to a string to ensure consistency in JSON round-tripping.
 		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
@@ -580,7 +579,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Set fields including the network path
 	if len(n.Dir) > 0 {
 		defaultFlags := FlagsMap{
-			config.ChainConfigDirKey: n.getChainConfigDir(),
+			config.ChainConfigDirKey: n.GetChainConfigDir(),
 		}
 
 		if n.Genesis != nil {
@@ -588,7 +587,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 		}
 
 		// Only set the subnet dir if it exists or the node won't start.
-		subnetDir := n.getSubnetDir()
+		subnetDir := n.GetSubnetDir()
 		if _, err := os.Stat(subnetDir); err == nil {
 			defaultFlags[config.SubnetConfigDirKey] = subnetDir
 		} else if !errors.Is(err, os.ErrNotExist) {
@@ -681,7 +680,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 		}
 
 		// Persist the subnet configuration
-		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
 
@@ -757,7 +756,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
-		if err := waitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
+		if err := WaitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
 			return err
 		}
 
@@ -767,7 +766,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 		}
 
 		// Persist the chain configuration
-		if err := subnet.Write(n.getSubnetDir(), n.getChainConfigDir()); err != nil {
+		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
 		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {
@@ -843,6 +842,18 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// GetNetworkID returns the effective ID of the network. If the network
+// defines a genesis, the network ID in the genesis will be returned. If a
+// genesis is not present (i.e. a network with a genesis included in the
+// avalanchego binary - mainnet, testnet and local), the value of the
+// NetworkID field will be returned
+func (n *Network) GetNetworkID() uint32 {
+	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		return n.Genesis.NetworkID
+	}
+	return n.NetworkID
 }
 
 // Waits until the provided nodes are healthy.

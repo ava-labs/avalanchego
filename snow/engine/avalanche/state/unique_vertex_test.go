@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/vertextest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -23,7 +24,7 @@ import (
 var errUnknownTx = errors.New("unknown tx")
 
 func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowstorm.Tx, error)) *Serializer {
-	vm := vertex.TestVM{}
+	vm := vertextest.VM{}
 	vm.T = t
 	vm.Default(true)
 	vm.ParseTxF = parse
@@ -47,7 +48,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 
 	uVtx := &uniqueVertex{
 		serializer: s,
-		id:         ids.ID{},
+		id:         ids.Empty,
 	}
 
 	status := uVtx.Status()
@@ -78,10 +79,9 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	id := ids.ID{2}
 	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.ID{} // Same as chainID of serializer
 	height := uint64(1)
 	vtx, err := vertex.Build( // regular, non-stop vertex
-		chainID,
+		s.ChainID,
 		height,
 		parentIDs,
 		[][]byte{{0}},
@@ -153,10 +153,9 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 	parentID := uvtxParent.ID()
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.ID{}
 	height := uint64(1)
 	innerVertex, err := vertex.Build( // regular, non-stop vertex
-		chainID,
+		s.ChainID,
 		height,
 		parentIDs,
 		[][]byte{txBytes},
@@ -259,16 +258,6 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require := require.New(t)
 
-	chainID := ids.Empty
-	statelessVertex, err := vertex.Build( // regular, non-stop vertex
-		chainID,
-		0,
-		nil,
-		[][]byte{{1}},
-	)
-	require.NoError(err)
-	vtxBytes := statelessVertex.Bytes()
-
 	s := newTestSerializer(t, func(_ context.Context, b []byte) (snowstorm.Tx, error) {
 		switch {
 		case bytes.Equal(b, []byte{2}):
@@ -277,6 +266,15 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 			return nil, errUnknownTx
 		}
 	})
+
+	statelessVertex, err := vertex.Build( // regular, non-stop vertex
+		s.ChainID,
+		0,
+		nil,
+		[][]byte{{1}},
+	)
+	require.NoError(err)
+	vtxBytes := statelessVertex.Bytes()
 
 	_, err = s.ParseVtx(context.Background(), vtxBytes)
 	require.ErrorIs(err, errUnknownTx)
@@ -289,7 +287,7 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require.ErrorIs(err, errUnknownVertex)
 
 	childStatelessVertex, err := vertex.Build( // regular, non-stop vertex
-		chainID,
+		s.ChainID,
 		1,
 		[]ids.ID{id},
 		[][]byte{{2}},
@@ -323,14 +321,14 @@ func newTestUniqueVertex(
 	)
 	if !stopVertex {
 		vtx, err = vertex.Build(
-			ids.ID{},
+			s.ChainID,
 			uint64(1),
 			parentIDs,
 			txs,
 		)
 	} else {
 		vtx, err = vertex.BuildStopVertex(
-			ids.ID{},
+			s.ChainID,
 			uint64(1),
 			parentIDs,
 		)
