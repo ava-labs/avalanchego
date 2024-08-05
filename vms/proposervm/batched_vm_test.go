@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -965,9 +966,11 @@ func initTestRemoteProposerVM(
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      activationTime,
-			DurangoTime:         durangoTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            activationTime,
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  durangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,

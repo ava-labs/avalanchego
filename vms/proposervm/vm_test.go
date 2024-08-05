@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -124,9 +125,11 @@ func initTestProposerVM(
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      proBlkStartTime,
-			DurangoTime:         durangoTime,
-			MinimumPChainHeight: minPChainHeight,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            proBlkStartTime,
+				ApricotPhase4MinPChainHeight: minPChainHeight,
+				DurangoTime:                  durangoTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -817,9 +820,11 @@ func TestExpiredBuildBlock(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  mockable.MaxTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1139,9 +1144,11 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  mockable.MaxTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1220,9 +1227,11 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  mockable.MaxTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1612,9 +1621,11 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  time.Unix(0, 0),
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1784,9 +1795,11 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  time.Unix(0, 0),
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1919,9 +1932,11 @@ func TestVMInnerBlkCache(t *testing.T) {
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  time.Unix(0, 0),
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2034,9 +2049,11 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  time.Unix(0, 0),
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2243,9 +2260,11 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         mockable.MaxTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  mockable.MaxTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2335,9 +2354,11 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  mockable.MaxTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2380,9 +2401,11 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			ActivationTime:      time.Time{},
-			DurangoTime:         mockable.MaxTime,
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Time{},
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  mockable.MaxTime,
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: newNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,

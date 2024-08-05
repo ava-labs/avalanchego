@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -48,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -69,7 +69,7 @@ const (
 	banff
 	cortina
 	durango
-	eUpgrade
+	etna
 )
 
 var (
@@ -359,13 +359,13 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 			BanffTime:         mockable.MaxTime,
 			CortinaTime:       mockable.MaxTime,
 			DurangoTime:       mockable.MaxTime,
-			EUpgradeTime:      mockable.MaxTime,
+			EtnaTime:          mockable.MaxTime,
 		},
 	}
 
 	switch f {
-	case eUpgrade:
-		c.UpgradeConfig.EUpgradeTime = time.Time{} // neglecting fork ordering this for package tests
+	case etna:
+		c.UpgradeConfig.EtnaTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
 	case durango:
 		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests

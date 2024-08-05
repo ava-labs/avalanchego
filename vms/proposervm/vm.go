@@ -321,7 +321,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		parentTimestamp  = blk.Timestamp()
 		nextStartTime    time.Time
 	)
-	if vm.IsDurangoActivated(parentTimestamp) {
+	if vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		currentTime := vm.Clock.Time().Truncate(time.Second)
 		if nextStartTime, err = vm.getPostDurangoSlotTime(
 			ctx,

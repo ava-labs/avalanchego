@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -50,7 +51,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
@@ -233,8 +233,7 @@ type ManagerConfig struct {
 	// containers in an ancestors message it receives.
 	BootstrapAncestorsMaxContainersReceived int
 
-	ApricotPhase4Time            time.Time
-	ApricotPhase4MinPChainHeight uint64
+	Upgrades upgrade.Config
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -726,11 +725,10 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := state.NewSerializer(
 		state.SerializerConfig{
-			ChainID:     ctx.ChainID,
-			VM:          dagVM,
-			DB:          vertexDB,
-			Log:         ctx.Log,
-			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
+			ChainID: ctx.ChainID,
+			VM:      dagVM,
+			DB:      vertexDB,
+			Log:     ctx.Log,
 		},
 	)
 
@@ -767,8 +765,8 @@ func (m *manager) createAvalancheChain(
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	}
 	m.Log.Info("creating proposervm wrapper",
-		zap.Time("activationTime", m.ApricotPhase4Time),
-		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
+		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
@@ -794,9 +792,7 @@ func (m *manager) createAvalancheChain(
 	var vmWrappingProposerVM block.ChainVM = proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
-			ActivationTime:      m.ApricotPhase4Time,
-			DurangoTime:         version.GetDurangoTime(m.NetworkID),
-			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
+			Upgrades:            m.Upgrades,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
@@ -1012,7 +1008,7 @@ func (m *manager) createAvalancheChain(
 		VM:                             linearizableVM,
 	}
 	if ctx.ChainID == m.XChainID {
-		avalancheBootstrapperConfig.StopVertexID = version.CortinaXChainStopVertexID[ctx.NetworkID]
+		avalancheBootstrapperConfig.StopVertexID = m.Upgrades.CortinaXChainStopVertexID
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
@@ -1172,8 +1168,8 @@ func (m *manager) createSnowmanChain(
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	}
 	m.Log.Info("creating proposervm wrapper",
-		zap.Time("activationTime", m.ApricotPhase4Time),
-		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
+		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
@@ -1193,9 +1189,7 @@ func (m *manager) createSnowmanChain(
 	vm = proposervm.New(
 		vm,
 		proposervm.Config{
-			ActivationTime:      m.ApricotPhase4Time,
-			DurangoTime:         version.GetDurangoTime(m.NetworkID),
-			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
+			Upgrades:            m.Upgrades,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,

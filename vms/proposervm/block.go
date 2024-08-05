@@ -143,7 +143,7 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		var shouldHaveProposer bool
-		if p.vm.IsDurangoActivated(parentTimestamp) {
+		if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 			shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		} else {
 			shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
@@ -201,7 +201,7 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	var shouldBuildSignedBlock bool
-	if p.vm.IsDurangoActivated(parentTimestamp) {
+	if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPostDurango(
 			ctx,
 			parentID,
@@ -224,7 +224,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	var childBlockVrfSig []byte
 	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
-	if p.vm.IsEActivated(newTimestamp) {
+	if p.vm.Config.Upgrades.IsEtnaActivated(newTimestamp) {
 		if shouldBuildSignedBlock {
 			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, p.vm.Config.StakingBLSKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
 		} else {
