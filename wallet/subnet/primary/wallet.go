@@ -123,11 +123,11 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	}
 	subnetIDs := []ids.ID{}
 	for _, tx := range pChainTxs {
-		if _, ok := tx.Unsigned.(*txs.CreateSubnetTx); ok {
+		switch unsignedTx := tx.Unsigned.(type) {
+		case *txs.CreateSubnetTx:
 			subnetIDs = append(subnetIDs, tx.ID())
-		}
-		if transferSubnetOwnershipTx, ok := tx.Unsigned.(*txs.TransferSubnetOwnershipTx); ok {
-			subnetIDs = append(subnetIDs, transferSubnetOwnershipTx.Subnet)
+		case *txs.TransferSubnetOwnershipTx:
+			subnetIDs = append(subnetIDs, unsignedTx.Subnet)
 		}
 	}
 	subnetOwners := map[ids.ID]fx.Owner{}
