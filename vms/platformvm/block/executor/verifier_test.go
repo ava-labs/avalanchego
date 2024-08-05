@@ -15,9 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -26,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
@@ -41,6 +42,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
+	parentOnAcceptState.EXPECT().GetFeeState().Return(fee.State{}).Times(2)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -56,7 +58,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -66,10 +68,6 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -99,8 +97,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// Visit the block
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(context.Background()))
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
@@ -142,7 +140,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -153,10 +151,6 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	onAccept := state.NewMockDiff(ctrl)
@@ -196,8 +190,8 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(context.Background()))
 
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(onAccept, gotBlkState.onAcceptState)
 	require.Equal(inputs, gotBlkState.inputs)
@@ -231,7 +225,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -242,10 +236,6 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	blkTx := txs.NewMockUnsignedTx(ctrl)
@@ -291,6 +281,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentState.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -298,8 +289,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(apricotBlk, gotBlkState.statelessBlock)
 	require.Equal(set.Set[ids.ID]{}, gotBlkState.inputs)
 	require.Equal(timestamp, gotBlkState.timestamp)
@@ -338,7 +329,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -348,10 +339,6 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	apricotBlk, err := block.NewApricotCommitBlock(
@@ -372,8 +359,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
@@ -411,7 +398,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			Log: logging.NoLog{},
 		},
 	}
-	verifier := &verifier{
+	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
 				UpgradeConfig: upgrade.Config{
@@ -421,10 +408,6 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
-	}
-	manager := &manager{
-		backend:  backend,
-		verifier: verifier,
 	}
 
 	apricotBlk, err := block.NewApricotAbortBlock(
@@ -445,8 +428,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 
 	// Assert expected state.
-	require.Contains(verifier.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := verifier.backend.blkIDToState[apricotBlk.ID()]
+	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
+	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
 	require.Equal(parentOnAbortState, gotBlkState.onAcceptState)
 	require.Equal(timestamp, gotBlkState.timestamp)
 
@@ -567,6 +550,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
+			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -665,6 +649,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
+			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -782,6 +767,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	parentState.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

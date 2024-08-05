@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
@@ -117,8 +118,8 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -136,7 +137,7 @@ func TestShutdown(t *testing.T) {
 	}
 	bootstrapper.HaltF = func(context.Context) {}
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(true)
 	engine.CantGossip = false
 	engine.ContextF = func() *snow.ConsensusContext {
@@ -243,7 +244,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	engine := common.EngineTest{
+	engine := enginetest.Engine{
 		T: t,
 		StartF: func(context.Context, uint32) error {
 			return nil
@@ -262,9 +263,9 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	engine.Default(true)
 	engine.CantGossip = false
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: engine,
-		CantClear:  true,
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine:    engine,
+		CantClear: true,
 	}
 
 	h.SetEngineManager(&handler.EngineManager{
@@ -377,8 +378,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapFinished := make(chan struct{}, 1)
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -398,7 +399,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		return nil
 	}
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
@@ -546,8 +547,8 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1129,8 +1130,8 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1148,7 +1149,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
@@ -1410,8 +1411,8 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1428,7 +1429,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		Type:  engineType,
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
@@ -1679,7 +1680,7 @@ func TestCrossChainAppRequest(t *testing.T) {
 	}
 }
 
-func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
+func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	// Create a timeout manager
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -1750,8 +1751,8 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 	)
 	require.NoError(t, err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -1760,7 +1761,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *common.EngineTest) {
 		return ctx
 	}
 
-	engine := &common.EngineTest{T: t}
+	engine := &enginetest.Engine{T: t}
 	engine.Default(false)
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -57,7 +58,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		nonValidatorID = ids.GenerateTestNodeID()
 	)
 
-	vdrState := &validators.TestState{
+	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -444,13 +445,13 @@ func TestProposerDistribution(t *testing.T) {
 	require.Less(maxSTDDeviation, 3.)
 }
 
-func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validators.TestState) {
+func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validatorstest.State) {
 	validatorIDs := make([]ids.NodeID, count)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
 	}
 
-	vdrState := &validators.TestState{
+	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)

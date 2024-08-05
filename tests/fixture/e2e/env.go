@@ -19,20 +19,18 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // Env is used to access shared test fixture. Intended to be
-// initialized from SynchronizedBeforeSuite.
-var Env *TestEnvironment
+// initialized from SynchronizedBeforeSuite. Not exported to limit
+// access to the shared env to GetEnv which adds a test context.
+var env *TestEnvironment
 
-func InitSharedTestEnvironment(envBytes []byte) {
-	require := require.New(ginkgo.GinkgoT())
-	require.Nil(Env, "env already initialized")
-	Env = &TestEnvironment{}
-	require.NoError(json.Unmarshal(envBytes, Env))
-	Env.require = require
+func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
+	require := require.New(t)
+	require.Nil(env, "env already initialized")
+	env = &TestEnvironment{}
+	require.NoError(json.Unmarshal(envBytes, env))
 }
 
 type TestEnvironment struct {
@@ -47,18 +45,29 @@ type TestEnvironment struct {
 	// scraped before shutdown.
 	PrivateNetworkShutdownDelay time.Duration
 
-	require *require.Assertions
+	testContext tests.TestContext
+}
+
+// Retrieve the test environment configured with the provided test context.
+func GetEnv(tc tests.TestContext) *TestEnvironment {
+	return &TestEnvironment{
+		NetworkDir:                  env.NetworkDir,
+		URIs:                        env.URIs,
+		TestDataServerURI:           env.TestDataServerURI,
+		PrivateNetworkShutdownDelay: env.PrivateNetworkShutdownDelay,
+		testContext:                 tc,
+	}
 }
 
 func (te *TestEnvironment) Marshal() []byte {
 	bytes, err := json.Marshal(te)
-	require.NoError(ginkgo.GinkgoT(), err)
+	require.NoError(te.testContext, err)
 	return bytes
 }
 
 // Initialize a new test environment with a shared network (either pre-existing or newly created).
-func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
-	require := require.New(ginkgo.GinkgoT())
+func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
+	require := require.New(tc)
 
 	var network *tmpnet.Network
 	// Need to load the network if it is being stopped or reused
@@ -83,22 +92,22 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 			var err error
 			network, err = tmpnet.ReadNetwork(networkDir)
 			require.NoError(err)
-			tests.Outf("{{yellow}}Loaded a network configured at %s{{/}}\n", network.Dir)
+			tc.Outf("{{yellow}}Loaded a network configured at %s{{/}}\n", network.Dir)
 		}
 
 		if flagVars.StopNetwork() {
 			if len(networkSymlink) > 0 {
 				// Remove the symlink to avoid attempts to reuse the stopped network
-				tests.Outf("Removing symlink %s\n", networkSymlink)
+				tc.Outf("Removing symlink %s\n", networkSymlink)
 				if err := os.Remove(networkSymlink); !errors.Is(err, os.ErrNotExist) {
 					require.NoError(err)
 				}
 			}
 			if network != nil {
-				tests.Outf("Stopping network\n")
-				require.NoError(network.Stop(DefaultContext()))
+				tc.Outf("Stopping network\n")
+				require.NoError(network.Stop(tc.DefaultContext()))
 			} else {
-				tests.Outf("No network to stop\n")
+				tc.Outf("No network to stop\n")
 			}
 			os.Exit(0)
 		}
@@ -108,6 +117,7 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 	if network == nil {
 		network = desiredNetwork
 		StartNetwork(
+			tc,
 			network,
 			flagVars.AvalancheGoExecPath(),
 			flagVars.PluginDir(),
@@ -116,14 +126,14 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 		)
 
 		// Wait for chains to have bootstrapped on all nodes
-		Eventually(func() bool {
+		tc.Eventually(func() bool {
 			for _, subnet := range network.Subnets {
 				for _, validatorID := range subnet.ValidatorIDs {
 					uri, err := network.GetURIForNodeID(validatorID)
 					require.NoError(err)
 					infoClient := info.NewClient(uri)
 					for _, chain := range subnet.Chains {
-						isBootstrapped, err := infoClient.IsBootstrapped(DefaultContext(), chain.ChainID.String())
+						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
 						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
 						if err != nil || !isBootstrapped {
 							return false
@@ -137,12 +147,12 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
-	tests.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
+	tc.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
 
 	testDataServerURI, err := fixture.ServeTestData(fixture.TestData{
 		PreFundedKeys: network.PreFundedKeys,
 	})
-	tests.Outf("{{green}}test data server URI: {{/}} %+v\n", testDataServerURI)
+	tc.Outf("{{green}}test data server URI: {{/}} %+v\n", testDataServerURI)
 	require.NoError(err)
 
 	return &TestEnvironment{
@@ -150,7 +160,7 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 		URIs:                        uris,
 		TestDataServerURI:           testDataServerURI,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
-		require:                     require,
+		testContext:                 tc,
 	}
 }
 
@@ -159,22 +169,22 @@ func NewTestEnvironment(flagVars *FlagVars, desiredNetwork *tmpnet.Network) *Tes
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	te.testContext.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	return nodeURI
 }
 
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
 	network, err := tmpnet.ReadNetwork(te.NetworkDir)
-	te.require.NoError(err)
+	require.NoError(te.testContext, err)
 	return network
 }
 
 // Retrieve the specified number of funded keys allocated for the caller's exclusive use.
 func (te *TestEnvironment) AllocatePreFundedKeys(count int) []*secp256k1.PrivateKey {
 	keys, err := fixture.AllocatePreFundedKeys(te.TestDataServerURI, count)
-	te.require.NoError(err)
-	tests.Outf("{{blue}} allocated pre-funded key(s): %+v{{/}}\n", keys)
+	require.NoError(te.testContext, err)
+	te.testContext.Outf("{{blue}} allocated pre-funded key(s): %+v{{/}}\n", keys)
 	return keys
 }
 
@@ -191,14 +201,16 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 
 // Create a new private network that is not shared with other tests.
 func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
+	require := require.New(te.testContext)
 	// Use the same configuration as the shared network
 	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
-	te.require.NoError(err)
+	require.NoError(err)
 
 	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)
-	te.require.NoError(err)
+	require.NoError(err)
 
 	StartNetwork(
+		te.testContext,
 		network,
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,

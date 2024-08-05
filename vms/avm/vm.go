@@ -395,7 +395,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  */
 
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
-	time := version.GetCortinaTime(vm.ctx.NetworkID)
+	time := vm.Config.Upgrades.CortinaTime
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
