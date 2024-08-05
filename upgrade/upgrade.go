@@ -14,7 +14,7 @@ import (
 
 var (
 	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-	UnscheduledActivationTime = time.Date(9999, time.December, 1, 0, 0, 0, 0, time.UTC)
+	UnscheduledActivationTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
 
 	Mainnet = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
