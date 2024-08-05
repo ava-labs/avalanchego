@@ -2236,8 +2236,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2425,8 +2424,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				cfg := defaultTestConfig(t, durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2442,7 +2440,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			err: errEUpgradeNotActive,
+			err: errEtnaUpgradeNotActive,
 		},
 		{
 			name: "tx fails syntactic verification",
@@ -2453,9 +2451,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := defaultTestConfig(t, eUpgrade, env.latestForkTime)
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				cfg := defaultTestConfig(t, etna, env.latestForkTime)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2482,11 +2479,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := defaultTestConfig(t, eUpgrade, env.latestForkTime)
+				cfg := defaultTestConfig(t, etna, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2519,11 +2515,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
-				cfg := defaultTestConfig(t, eUpgrade, env.latestForkTime)
+				cfg := defaultTestConfig(t, etna, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2553,11 +2548,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(&txs.Tx{Unsigned: &txs.TransformSubnetTx{}}, nil).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
-				cfg := defaultTestConfig(t, eUpgrade, env.latestForkTime)
+				cfg := defaultTestConfig(t, etna, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2588,11 +2582,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
-				cfg := defaultTestConfig(t, eUpgrade, env.latestForkTime)
+				cfg := defaultTestConfig(t, etna, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -2629,11 +2622,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := defaultTestConfig(t, eUpgrade, env.latestForkTime)
+				cfg := defaultTestConfig(t, etna, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
-				feeCalculator, err := state.PickFeeCalculator(cfg, env.state)
-				require.NoError(t, err)
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
