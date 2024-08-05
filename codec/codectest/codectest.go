@@ -1,6 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// Package codectest provides a test suite for testing codec implementations.
 package codectest
 
 import (
@@ -12,45 +13,72 @@ import (
 	codecpkg "github.com/ava-labs/avalanchego/codec"
 )
 
+// A NamedTest couples a test in the suite with a human-readable name.
+type NamedTest struct {
+	Name string
+	Test func(testing.TB, codecpkg.GeneralCodec)
+}
+
+// Run runs the test on the GeneralCodec.
+func (tt *NamedTest) Run(t *testing.T, c codecpkg.GeneralCodec) {
+	t.Run(tt.Name, func(t *testing.T) {
+		tt.Test(t, c)
+	})
+}
+
+// RunAll runs all [Tests], constructing a new GeneralCodec for each.
+func RunAll(t *testing.T, ctor func() codecpkg.GeneralCodec) {
+	for _, tt := range Tests {
+		tt.Run(t, ctor())
+	}
+}
+
+// RunAll runs all [MultipleTagsTests], constructing a new GeneralCodec for each.
+func RunAllMultipleTags(t *testing.T, ctor func() codecpkg.GeneralCodec) {
+	for _, tt := range MultipleTagsTests {
+		tt.Run(t, ctor())
+	}
+}
+
 var (
-	Tests = []func(testing.TB, codecpkg.GeneralCodec){
-		TestStruct,
-		TestRegisterStructTwice,
-		TestUInt32,
-		TestUIntPtr,
-		TestSlice,
-		TestMaxSizeSlice,
-		TestBool,
-		TestArray,
-		TestBigArray,
-		TestPointerToStruct,
-		TestSliceOfStruct,
-		TestInterface,
-		TestSliceOfInterface,
-		TestArrayOfInterface,
-		TestPointerToInterface,
-		TestString,
-		TestNilSlice,
-		TestSerializeUnexportedField,
-		TestSerializeOfNoSerializeField,
-		TestNilSliceSerialization,
-		TestEmptySliceSerialization,
-		TestSliceWithEmptySerialization,
-		TestSliceWithEmptySerializationError,
-		TestMapWithEmptySerialization,
-		TestMapWithEmptySerializationError,
-		TestSliceTooLarge,
-		TestNegativeNumbers,
-		TestTooLargeUnmarshal,
-		TestUnmarshalInvalidInterface,
-		TestExtraSpace,
-		TestSliceLengthOverflow,
-		TestMap,
-		TestCanMarshalLargeSlices,
+	Tests = []NamedTest{
+		{"Struct", TestStruct},
+		{"Register Struct Twice", TestRegisterStructTwice},
+		{"UInt32", TestUInt32},
+		{"UIntPtr", TestUIntPtr},
+		{"Slice", TestSlice},
+		{"Max-Size Slice", TestMaxSizeSlice},
+		{"Bool", TestBool},
+		{"Array", TestArray},
+		{"Big Array", TestBigArray},
+		{"Pointer To Struct", TestPointerToStruct},
+		{"Slice Of Struct", TestSliceOfStruct},
+		{"Interface", TestInterface},
+		{"Slice Of Interface", TestSliceOfInterface},
+		{"Array Of Interface", TestArrayOfInterface},
+		{"Pointer To Interface", TestPointerToInterface},
+		{"String", TestString},
+		{"Nil Slice", TestNilSlice},
+		{"Serialize Unexported Field", TestSerializeUnexportedField},
+		{"Serialize Of NoSerialize Field", TestSerializeOfNoSerializeField},
+		{"Nil Slice Serialization", TestNilSliceSerialization},
+		{"Empty Slice Serialization", TestEmptySliceSerialization},
+		{"Slice With Empty Serialization", TestSliceWithEmptySerialization},
+		{"Slice With Empty Serialization Error", TestSliceWithEmptySerializationError},
+		{"Map With Empty Serialization", TestMapWithEmptySerialization},
+		{"Map With Empty Serialization Error", TestMapWithEmptySerializationError},
+		{"Slice Too Large", TestSliceTooLarge},
+		{"Negative Numbers", TestNegativeNumbers},
+		{"Too Large Unmarshal", TestTooLargeUnmarshal},
+		{"Unmarshal Invalid Interface", TestUnmarshalInvalidInterface},
+		{"Extra Space", TestExtraSpace},
+		{"Slice Length Overflow", TestSliceLengthOverflow},
+		{"Map", TestMap},
+		{"Can Marshal Large Slices", TestCanMarshalLargeSlices},
 	}
 
-	MultipleTagsTests = []func(testing.TB, codecpkg.GeneralCodec){
-		TestMultipleTags,
+	MultipleTagsTests = []NamedTest{
+		{"Multiple Tags", TestMultipleTags},
 	}
 )
 

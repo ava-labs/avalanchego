@@ -6,25 +6,20 @@ package linearcodec
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/codectest"
 )
 
 func TestVectors(t *testing.T) {
-	for _, test := range codectest.Tests {
-		t.Run("", func(t *testing.T) {
-			c := NewDefault()
-			test(t, c)
-		})
-	}
+	codectest.RunAll(t, func() codec.GeneralCodec {
+		return NewDefault()
+	})
 }
 
 func TestMultipleTags(t *testing.T) {
-	for _, test := range codectest.MultipleTagsTests {
-		t.Run("", func(t *testing.T) {
-			c := New([]string{"tag1", "tag2"})
-			test(t, c)
-		})
-	}
+	codectest.RunAllMultipleTags(t, func() codec.GeneralCodec {
+		return New([]string{"tag1", "tag2"})
+	})
 }
 
 func FuzzStructUnmarshalLinearCodec(f *testing.F) {
