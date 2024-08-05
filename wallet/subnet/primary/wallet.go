@@ -106,11 +106,23 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		return nil, err
 	}
 
-	subnetIDs := []ids.ID{}
-	if config.PChainTxsToFetch != nil {
-		subnetIDs = config.PChainTxsToFetch.List()
+	pChainTxs := config.PChainTxs
+	if pChainTxs == nil {
+		pChainTxs = make(map[ids.ID]*txs.Tx)
 	}
-	for _, tx := range config.PChainTxs {
+	for txID := range config.PChainTxsToFetch {
+		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
+		if err != nil {
+			return nil, err
+		}
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		if err != nil {
+			return nil, err
+		}
+		pChainTxs[txID] = tx
+	}
+	subnetIDs := []ids.ID{}
+	for _, tx := range pChainTxs {
 		if _, ok := tx.Unsigned.(*txs.CreateSubnetTx); ok {
 			subnetIDs = append(subnetIDs, tx.ID())
 		}
