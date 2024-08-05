@@ -9,34 +9,36 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/ids/idstest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 )
 
 func TestInterface(t *testing.T) {
-	require := require.New(t)
+	for _, test := range idstest.AliasTests {
+		t.Run(test.Name, func(t *testing.T) {
+			require := require.New(t)
 
-	for _, test := range ids.AliasTests {
-		listener, err := grpcutils.NewListener()
-		require.NoError(err)
-		serverCloser := grpcutils.ServerCloser{}
-		w := ids.NewAliaser()
+			listener, err := grpcutils.NewListener()
+			require.NoError(err)
+			defer listener.Close()
+			serverCloser := grpcutils.ServerCloser{}
+			defer serverCloser.Stop()
+			w := ids.NewAliaser()
 
-		server := grpcutils.NewServer()
-		aliasreaderpb.RegisterAliasReaderServer(server, NewServer(w))
-		serverCloser.Add(server)
+			server := grpcutils.NewServer()
+			aliasreaderpb.RegisterAliasReaderServer(server, NewServer(w))
+			serverCloser.Add(server)
 
-		go grpcutils.Serve(listener, server)
+			go grpcutils.Serve(listener, server)
 
-		conn, err := grpcutils.Dial(listener.Addr().String())
-		require.NoError(err)
+			conn, err := grpcutils.Dial(listener.Addr().String())
+			require.NoError(err)
+			defer conn.Close()
 
-		r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
-		test(require, r, w)
-
-		serverCloser.Stop()
-		_ = conn.Close()
-		_ = listener.Close()
+			r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
+			test.Test(t, r, w)
+		})
 	}
 }

@@ -64,6 +64,11 @@ const (
 
 	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
 		bls.SignatureLen // signature
+
+	intrinsicInputDBRead = 1
+
+	intrinsicInputDBWrite  = 1
+	intrinsicOutputDBWrite = 1
 )
 
 var (
@@ -178,14 +183,13 @@ var (
 	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
-// TODO: Implement compute complexity
 func TxComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
 	c := complexityVisitor{}
 	err := tx.Visit(&c)
 	return c.output, err
 }
 
-// OutputComplexity returns the complexity outputs adds to a transaction.
+// OutputComplexity returns the complexity outputs add to a transaction.
 func OutputComplexity(outs ...*avax.TransferableOutput) (fee.Dimensions, error) {
 	var complexity fee.Dimensions
 	for _, out := range outs {
@@ -206,7 +210,7 @@ func outputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
 	complexity := fee.Dimensions{
 		fee.Bandwidth: intrinsicOutputBandwidth + intrinsicSECP256k1FxOutputBandwidth,
 		fee.DBRead:    0,
-		fee.DBWrite:   1,
+		fee.DBWrite:   intrinsicOutputDBWrite,
 		fee.Compute:   0,
 	}
 
@@ -230,7 +234,7 @@ func outputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
 	return complexity, err
 }
 
-// InputComplexity returns the complexity inputs adds to a transaction.
+// InputComplexity returns the complexity inputs add to a transaction.
 // It includes the complexity that the corresponding credentials will add.
 func InputComplexity(ins ...*avax.TransferableInput) (fee.Dimensions, error) {
 	var complexity fee.Dimensions
@@ -251,9 +255,9 @@ func InputComplexity(ins ...*avax.TransferableInput) (fee.Dimensions, error) {
 func inputComplexity(in *avax.TransferableInput) (fee.Dimensions, error) {
 	complexity := fee.Dimensions{
 		fee.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
-		fee.DBRead:    1,
-		fee.DBWrite:   1,
-		fee.Compute:   0,
+		fee.DBRead:    intrinsicInputDBRead,
+		fee.DBWrite:   intrinsicInputDBWrite,
+		fee.Compute:   0, // TODO: Add compute complexity
 	}
 
 	inIntf := in.In
@@ -328,7 +332,7 @@ func AuthComplexity(authIntf verify.Verifiable) (fee.Dimensions, error) {
 		fee.Bandwidth: bandwidth,
 		fee.DBRead:    0,
 		fee.DBWrite:   0,
-		fee.Compute:   0,
+		fee.Compute:   0, // TODO: Add compute complexity
 	}, nil
 }
 
@@ -343,7 +347,7 @@ func SignerComplexity(s signer.Signer) (fee.Dimensions, error) {
 			fee.Bandwidth: intrinsicPoPBandwidth,
 			fee.DBRead:    0,
 			fee.DBWrite:   0,
-			fee.Compute:   0,
+			fee.Compute:   0, // TODO: Add compute complexity
 		}, nil
 	default:
 		return fee.Dimensions{}, errUnsupportedSigner
@@ -375,6 +379,7 @@ func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 }
 
 func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	// TODO: Should we include additional complexity for subnets?
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err
@@ -406,6 +411,7 @@ func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 }
 
 func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	// TODO: Should we include additional complexity for subnets?
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err
@@ -508,6 +514,7 @@ func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
+	// TODO: Should exported outputs be more complex?
 	outputsComplexity, err := OutputComplexity(tx.ExportedOutputs...)
 	if err != nil {
 		return err
@@ -524,6 +531,7 @@ func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
 	if err != nil {
 		return err
 	}
+	// TODO: Should imported inputs be more complex?
 	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
 	if err != nil {
 		return err

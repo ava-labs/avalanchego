@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -129,6 +130,8 @@ type Config struct {
 	StateSyncConfig     `json:"stateSyncConfig"`
 	BootstrapConfig     `json:"bootstrapConfig"`
 	DatabaseConfig      `json:"databaseConfig"`
+
+	UpgradeConfig upgrade.Config `json:"upgradeConfig"`
 
 	// Genesis information
 	GenesisBytes []byte `json:"-"`

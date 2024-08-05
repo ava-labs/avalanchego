@@ -172,6 +172,7 @@ type network struct {
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
+	minCompatibleTime time.Time,
 	msgCreator message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
@@ -261,7 +262,7 @@ func NewNetwork(
 		InboundMsgThrottler:  inboundMsgThrottler,
 		Network:              nil, // This is set below.
 		Router:               router,
-		VersionCompatibility: version.GetCompatibility(config.NetworkID),
+		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
 		MySubnets:            config.TrackedSubnets,
 		Beacons:              config.Beacons,
 		Validators:           config.Validators,
@@ -677,10 +678,10 @@ func (n *network) track(ip *ips.ClaimedIPPort) error {
 //
 //   - [nodeIDs] the IDs of the peers that should be returned if they are
 //     connected.
-//   - [subnetID] the subnetID whose membership should be considered if
-//     [validatorOnly] is set to true.
-//   - [validatorOnly] is the flag to drop any nodes from [nodeIDs] that are not
-//     validators in [subnetID].
+//   - [subnetID] the subnetID whose membership should be considered to
+//     determine if the node is a validator.
+//   - [allower] interface that determines if a node is allowed to connect to
+//     the subnet based on its validator status.
 func (n *network) getPeers(
 	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
@@ -694,10 +695,6 @@ func (n *network) getPeers(
 	for nodeID := range nodeIDs {
 		peer, ok := n.connectedPeers.GetByID(nodeID)
 		if !ok {
-			continue
-		}
-
-		if trackedSubnets := peer.TrackedSubnets(); !trackedSubnets.Contains(subnetID) {
 			continue
 		}
 

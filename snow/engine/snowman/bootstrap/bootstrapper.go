@@ -113,11 +113,14 @@ type Bootstrapper struct {
 
 	// Called when bootstrapping is done on a specific chain
 	onFinished func(ctx context.Context, lastReqID uint32) error
+
+	nonVerifyingParser block.Parser
 }
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
 	return &Bootstrapper{
+		nonVerifyingParser:          config.NonVerifyingParse,
 		Config:                      config,
 		metrics:                     metrics,
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -178,7 +181,7 @@ func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 		return fmt.Errorf("failed to initialize interval tree: %w", err)
 	}
 
-	b.missingBlockIDs, err = getMissingBlockIDs(ctx, b.DB, b.VM, b.tree, b.startingHeight)
+	b.missingBlockIDs, err = getMissingBlockIDs(ctx, b.DB, b.nonVerifyingParser, b.tree, b.startingHeight)
 	if err != nil {
 		return fmt.Errorf("failed to initialize missing block IDs: %w", err)
 	}
@@ -650,7 +653,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		log,
 		b.DB,
 		&parseAcceptor{
-			parser:      b.VM,
+			parser:      b.nonVerifyingParser,
 			ctx:         b.Ctx,
 			numAccepted: b.numAccepted,
 		},
