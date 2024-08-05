@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
@@ -39,6 +41,8 @@ func init() {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
+	tc := e2e.NewTestContext()
+
 	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
@@ -50,13 +54,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	}
 
 	upgradeJSON, err := json.Marshal(upgrades)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(tc, err)
 
 	upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
 	return e2e.NewTestEnvironment(
-		e2e.NewTestContext(),
+		tc,
 		flagVars,
 		&tmpnet.Network{
 			Owner: "avalanchego-e2e",

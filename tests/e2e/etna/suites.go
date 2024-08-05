@@ -1,8 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Implements tests for the banff network upgrade.
-package banff
+// Implements tests for the etna network upgrade.
+package etna
 
 import (
 	"time"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/upgrade"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -25,12 +24,9 @@ var _ = ginkgo.Describe("[Etna]", func() {
 			env := e2e.GetEnv(tc)
 			infoClient := info.NewClient(env.GetRandomNodeURI().URI)
 
-			var upgrades *upgrade.Config
-			tc.By("get upgrade config", func() {
-				var err error
-				upgrades, err = infoClient.Upgrades(tc.DefaultContext())
-				require.NoError(err)
-			})
+			tc.By("get upgrade config")
+			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
 
 			now := time.Now()
 			if !upgrades.IsEtnaActivated(now) {
