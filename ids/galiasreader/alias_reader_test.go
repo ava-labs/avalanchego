@@ -22,7 +22,9 @@ func TestInterface(t *testing.T) {
 
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)
+			defer listener.Close()
 			serverCloser := grpcutils.ServerCloser{}
+			defer serverCloser.Stop()
 			w := ids.NewAliaser()
 
 			server := grpcutils.NewServer()
@@ -33,13 +35,10 @@ func TestInterface(t *testing.T) {
 
 			conn, err := grpcutils.Dial(listener.Addr().String())
 			require.NoError(err)
+			defer conn.Close()
 
 			r := NewClient(aliasreaderpb.NewAliasReaderClient(conn))
 			test.Test(t, r, w)
-
-			serverCloser.Stop()
-			_ = conn.Close()
-			_ = listener.Close()
 		})
 	}
 }
