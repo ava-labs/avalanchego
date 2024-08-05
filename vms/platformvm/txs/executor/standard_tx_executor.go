@@ -435,7 +435,7 @@ func (e *StandardTxExecutor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidat
 
 func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	currentTimestamp := e.State.GetTimestamp()
-	if e.Config.UpgradeConfig.IsEActivated(currentTimestamp) {
+	if e.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
 		return errTransformSubnetTxPostEUpgrade
 	}
 

@@ -1597,8 +1597,8 @@ func TestDurangoMemoField(t *testing.T) {
 	}
 }
 
-// Verifies that [TransformSubnetTx] is disabled post-E
-func TestEUpgradeDisabledTransactions(t *testing.T) {
+// Verifies that [TransformSubnetTx] is disabled post-Etna
+func TestEtnaDisabledTransactions(t *testing.T) {
 	type test struct {
 		name        string
 		buildTx     func(*environment) *txs.Tx
@@ -1621,7 +1621,7 @@ func TestEUpgradeDisabledTransactions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, eUpgrade)
+			env := newEnvironment(t, etna)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
