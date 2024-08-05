@@ -84,7 +84,9 @@ type Network struct {
 	// Path where network configuration and data is stored
 	Dir string
 
-	// Id of the network. If zero, must be set in Genesis.
+	// Id of the network. If zero, must be set in Genesis. Consider
+	// using the GetNetworkID method if needing to retrieve the ID of
+	// a running network.
 	NetworkID uint32
 
 	// Configuration common across nodes
@@ -562,10 +564,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
-	networkID := n.NetworkID
-	if networkID == 0 && n.Genesis != nil && n.Genesis.NetworkID > 0 {
-		networkID = n.Genesis.NetworkID
-	}
+	networkID := n.GetNetworkID()
 	if networkID > 0 {
 		// Convert the network id to a string to ensure consistency in JSON round-tripping.
 		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
@@ -843,6 +842,18 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	}
 
 	return bootstrapIPs, bootstrapIDs, nil
+}
+
+// GetNetworkID returns the effective ID of the network. If the network
+// defines a genesis, the network ID in the genesis will be returned. If a
+// genesis is not present (i.e. a network with a genesis included in the
+// avalanchego binary - mainnet, testnet and local), the value of the
+// NetworkID field will be returned
+func (n *Network) GetNetworkID() uint32 {
+	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		return n.Genesis.NetworkID
+	}
+	return n.NetworkID
 }
 
 // Waits until the provided nodes are healthy.
