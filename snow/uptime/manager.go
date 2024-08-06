@@ -90,9 +90,7 @@ func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
 		// If the node is already connected, then we can just
 		// update the uptime in the state and remove the connection
 		if _, isConnected := m.connections[nodeID]; isConnected {
-			err := m.updateUptime(nodeID)
-			delete(m.connections, nodeID)
-			if err != nil {
+			if err := m.disconnect(nodeID); err != nil {
 				return err
 			}
 			continue
@@ -129,6 +127,10 @@ func (m *manager) IsConnected(nodeID ids.NodeID) bool {
 }
 
 func (m *manager) Disconnect(nodeID ids.NodeID) error {
+	return m.disconnect(nodeID)
+}
+
+func (m *manager) disconnect(nodeID ids.NodeID) error {
 	if err := m.updateUptime(nodeID); err != nil {
 		return err
 	}
