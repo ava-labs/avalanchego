@@ -943,8 +943,8 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 	return filepath.Join(networkPath, "latest_"+owner), nil
 }
 
-// Checks that VM binaries for the given subnets exist and optionally checks that VM binaries have the
-// same rpcchainvm version as the indicated avalanchego binary.
+// checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
+// binaries have the same rpcchainvm version as the indicated avalanchego binary.
 func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
 	if len(subnets) == 0 {
 		return nil
