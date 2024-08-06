@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -262,7 +263,7 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	minimumValidPChainHeight := uint64(10)
 	getValidatorSetTestErr := errors.New("can't get validator set test error")
 
-	vm.ctx.ValidatorState = &validators.TestState{
+	vm.ctx.ValidatorState = &validatorstest.State{
 		// TODO: test both Primary Network / C-Chain and non-Primary Network
 		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
 			return ids.Empty, nil
@@ -425,7 +426,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	minimumValidPChainHeight := uint64(10)
 	getValidatorSetTestErr := errors.New("can't get validator set test error")
 
-	vm.ctx.ValidatorState = &validators.TestState{
+	vm.ctx.ValidatorState = &validatorstest.State{
 		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
 			return ids.Empty, nil
 		},

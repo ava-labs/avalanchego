@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -28,6 +28,6 @@ func TestSnowContext() *snow.Context {
 		BCLookup:       ids.NewAliaser(),
 		Metrics:        metrics.NewMultiGatherer(),
 		ChainDataDir:   "",
-		ValidatorState: &validators.TestState{},
+		ValidatorState: &validatorstest.State{},
 	}
 }
