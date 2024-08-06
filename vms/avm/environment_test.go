@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -232,11 +233,13 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 func staticConfig(tb testing.TB, f fork) config.Config {
 	c := config.Config{
+		StaticConfig: fee.StaticConfig{
+			TxFee:            testTxFee,
+			CreateAssetTxFee: testTxFee,
+		},
 		Upgrades: upgrade.Config{
 			EtnaTime: mockable.MaxTime,
 		},
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
 	}
 
 	switch f {
