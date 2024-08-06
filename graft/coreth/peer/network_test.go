@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -510,7 +511,7 @@ func TestHandleInvalidMessages(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(1)
-	sender := &common.SenderTest{
+	sender := &enginetest.Sender{
 		SendAppErrorF: func(context.Context, ids.NodeID, uint32, int32, string) error {
 			return nil
 		},
