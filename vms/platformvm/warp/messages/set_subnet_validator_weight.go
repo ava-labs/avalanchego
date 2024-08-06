@@ -11,19 +11,19 @@ import (
 
 // SetSubnetValidatorWeight is signed when the subnet wants to update the weight of a validator.
 type SetSubnetValidatorWeight struct {
-	MessageID ids.ID `serialize:"true"`
-	Nonce     uint64 `serialize:"true"`
-	Weight    uint64 `serialize:"true"`
+	ValidationID ids.ID `serialize:"true"`
+	Nonce        uint64 `serialize:"true"`
+	Weight       uint64 `serialize:"true"`
 
 	bytes []byte
 }
 
 // NewSetSubnetValidatorWeight creates a new *SetSubnetValidatorWeight and initializes it.
-func NewSetSubnetValidatorWeight(messageID ids.ID, nonce uint64, weight uint64) (*SetSubnetValidatorWeight, error) {
+func NewSetSubnetValidatorWeight(validationID ids.ID, nonce uint64, weight uint64) (*SetSubnetValidatorWeight, error) {
 	bhp := &SetSubnetValidatorWeight{
-		MessageID: messageID,
-		Nonce:     nonce,
-		Weight:    weight,
+		ValidationID: validationID,
+		Nonce:        nonce,
+		Weight:       weight,
 	}
 	return bhp, initialize(bhp)
 }

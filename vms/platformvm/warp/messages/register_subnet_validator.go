@@ -7,16 +7,17 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 // RegisterSubnetValidator is signed when the subnet wants to add a validator with
 // the given weight to the subnet.
 type RegisterSubnetValidator struct {
-	SubnetID    ids.ID     `serialize:"true"`
-	NodeID      ids.NodeID `serialize:"true"`
-	Weight      uint64     `serialize:"true"`
-	Expiry      uint64     `serialize:"true"`
-	Ed25519Auth []byte     `serialize:"true"`
+	SubnetID  ids.ID                 `serialize:"true"`
+	NodeID    ids.NodeID             `serialize:"true"`
+	Weight    uint64                 `serialize:"true"`
+	BlsPubKey [bls.PublicKeyLen]byte `serialize:"true"`
+	Expiry    uint64                 `serialize:"true"`
 
 	bytes []byte
 }
@@ -26,15 +27,15 @@ func NewRegisterSubnetValidator(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
 	weight uint64,
+	blsPubKey [bls.PublicKeyLen]byte,
 	expiry uint64,
-	ed25519Auth []byte,
 ) (*RegisterSubnetValidator, error) {
 	bhp := &RegisterSubnetValidator{
-		SubnetID:    subnetID,
-		NodeID:      nodeID,
-		Weight:      weight,
-		Expiry:      expiry,
-		Ed25519Auth: ed25519Auth,
+		SubnetID:  subnetID,
+		NodeID:    nodeID,
+		Weight:    weight,
+		BlsPubKey: blsPubKey,
+		Expiry:    expiry,
 	}
 	return bhp, initialize(bhp)
 }
