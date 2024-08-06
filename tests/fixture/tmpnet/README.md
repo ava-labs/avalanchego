@@ -93,9 +93,14 @@ network := &tmpnet.Network{                   // Configure non-default values fo
             Name: "xsvm-a",                   // User-defined name used to reference subnet in code and on disk
             Chains: []*tmpnet.Chain{
                 {
-                    VMName: "xsvm",           // Name of the VM the chain will run, will be used to derive the name of the VM binary
-                    Genesis: <genesis bytes>, // Genesis bytes used to initialize the custom chain
-                    PreFundedKey: <key>,      // (Optional) A private key that is funded in the genesis bytes
+                    VMName: "xsvm",              // Name of the VM the chain will run, will be used to derive the name of the VM binary
+                    Genesis: <genesis bytes>,    // Genesis bytes used to initialize the custom chain
+                    PreFundedKey: <key>,         // (Optional) A private key that is funded in the genesis bytes
+                    VersionArgs: "version-json", // (Optional) Arguments that prompt the VM binary to output version details in json format.
+                                                 // If one or more arguments are provided, the resulting json output should include a field
+                                                 // named `rpcchainvm` of type uint64 containing the rpc version supported by the VM binary.
+                                                 // The version will be checked against the version reported by the configured avalanchego
+                                                 // binary before network and node start.
                 },
             },
             ValidatorIDs: <node ids>,         // The IDs of nodes that validate the subnet
