@@ -136,11 +136,11 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		if err != nil {
 			return nil, err
 		}
-		owner := secp256k1fx.OutputOwners{}
-		owner.Locktime = subnetInfo.Locktime
-		owner.Threshold = subnetInfo.Threshold
-		owner.Addrs = subnetInfo.ControlKeys
-		subnetOwners[subnetID] = &owner
+		subnetOwners[subnetID] = &secp256k1fx.OutputOwners{
+			Locktime:  subnetInfo.Locktime,
+			Threshold: subnetInfo.Threshold,
+			Addrs:     subnetInfo.ControlKeys,
+		}
 	}
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
 	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
