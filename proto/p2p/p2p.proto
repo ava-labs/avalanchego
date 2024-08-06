@@ -64,7 +64,7 @@ message Message {
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  reserved 2; // Until E upgrade is activated.
+  reserved 2; // Until Etna upgrade is activated.
 }
 
 // Pong is sent in response to a Ping.
