@@ -604,6 +604,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
+	// Connect to nodes other than the last node in genesis.Validators, which is the node being tested.
 	connectedIDs := set.NewSet[ids.NodeID](len(genesis.Validators) - 1)
 	for _, vdr := range genesis.Validators[:len(genesis.Validators)-1] {
 		connectedIDs.Add(vdr.NodeID)
