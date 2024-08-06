@@ -39,7 +39,7 @@ type manager struct {
 	clock *mockable.Clock
 
 	state       State
-	connections map[ids.NodeID]time.Time // nodeID  -> time
+	connections map[ids.NodeID]time.Time // nodeID  -> connected at
 	// Whether we have started tracking the uptime of the nodes
 	// This is used to avoid setting the uptime before we have started tracking
 	startedTracking bool
