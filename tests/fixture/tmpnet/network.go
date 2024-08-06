@@ -943,6 +943,8 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 	return filepath.Join(networkPath, "latest_"+owner), nil
 }
 
+const invalidRPCVersion = 0
+
 // checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
 // binaries have the same rpcchainvm version as the indicated avalanchego binary.
 func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
@@ -950,8 +952,15 @@ func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, plu
 		return nil
 	}
 
+	expectedRPCVersion, err := getRPCVersion(avalanchegoPath, "--version-json")
+	if err != nil {
+		// Only warn if the rpc version is not available to ensure backwards compatibility.
+		if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for avalanchego: %v\n", err); err != nil {
+			return err
+		}
+	}
+
 	errs := []error{}
-	var expectedRPCVersion uint64
 	for _, subnet := range subnets {
 		for _, chain := range subnet.Chains {
 			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
@@ -961,21 +970,12 @@ func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, plu
 				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %w", subnet.Name, err))
 			}
 
-			if len(chain.VersionArgs) == 0 {
-				// Not possible to check the rpcchainvm version of the VM binary
+			if len(chain.VersionArgs) == 0 || expectedRPCVersion == invalidRPCVersion {
+				// Not possible to check the rpcchainvm version
 				continue
 			}
 
-			// Only retrieve the avalanchego rpcversion when a comparison will be made
-			if expectedRPCVersion == 0 {
-				var err error
-				expectedRPCVersion, err = getRPCVersion(avalanchegoPath, "--version-json")
-				if err != nil {
-					return fmt.Errorf("failed to determine rpcchainvm version for avalanchego: %w", err)
-				}
-			}
-
-			// Check that the rpcchainvm version matches avalanchego
+			// Check that the VM's rpcchainvm version matches avalanchego's version
 			rpcVersion, err := getRPCVersion(pluginPath, chain.VersionArgs...)
 			if err != nil {
 				if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for VM Binary for subnet %q: %v\n", subnet.Name, err); err != nil {
