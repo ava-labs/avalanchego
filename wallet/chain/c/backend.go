@@ -116,7 +116,7 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, tx *evm.Tx) error {
 			}
 			account.Balance.Sub(account.Balance, balance)
 
-			newNonce, err := math.Add64(input.Nonce, 1)
+			newNonce, err := math.Add(input.Nonce, 1)
 			if err != nil {
 				return err
 			}

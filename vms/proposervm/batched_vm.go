@@ -81,10 +81,6 @@ func (vm *VM) GetAncestors(
 }
 
 func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.Block, error) {
-	if vm.batchedVM == nil {
-		return nil, block.ErrRemoteVMNotImplemented
-	}
-
 	type partialData struct {
 		index int
 		block statelessblock.Block
@@ -97,9 +93,11 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		statelessBlockDescs = make([]partialData, 0, len(blks))
 		innerBlockBytes     = make([][]byte, 0, len(blks))
 	)
+
+	parsingResults := statelessblock.ParseBlocks(blks, vm.ctx.ChainID)
+
 	for ; blocksIndex < len(blks); blocksIndex++ {
-		blkBytes := blks[blocksIndex]
-		statelessBlock, err := statelessblock.Parse(blkBytes, vm.ctx.ChainID)
+		statelessBlock, err := parsingResults[blocksIndex].Block, parsingResults[blocksIndex].Err
 		if err != nil {
 			break
 		}
@@ -120,7 +118,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 	innerBlockBytes = append(innerBlockBytes, blks[blocksIndex:]...)
 
 	// parse all inner blocks at once
-	innerBlks, err := vm.batchedVM.BatchedParseBlock(ctx, innerBlockBytes)
+	innerBlks, err := block.BatchedParseBlock(ctx, vm.ChainVM, innerBlockBytes)
 	if err != nil {
 		return nil, err
 	}

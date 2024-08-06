@@ -141,7 +141,7 @@ func (p *postForkCommonComponents) Verify(
 		}
 
 		var shouldHaveProposer bool
-		if p.vm.IsDurangoActivated(parentTimestamp) {
+		if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 			shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
 		} else {
 			shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
@@ -197,7 +197,7 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	var shouldBuildSignedBlock bool
-	if p.vm.IsDurangoActivated(parentTimestamp) {
+	if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
 		shouldBuildSignedBlock, err = p.shouldBuildSignedBlockPostDurango(
 			ctx,
 			parentID,
