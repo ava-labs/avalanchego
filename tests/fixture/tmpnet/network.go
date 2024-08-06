@@ -940,9 +940,8 @@ func checkVMBinariesExist(subnets []*Subnet, pluginDir string) error {
 	for _, subnet := range subnets {
 		for _, chain := range subnet.Chains {
 			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
-			_, err := os.Stat(pluginPath)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("VM binary for subnet %q not found at %q", subnet.Name, pluginPath))
+			if _, err := os.Stat(pluginPath); err != nil {
+				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %v ", subnet.Name, err))
 			}
 		}
 	}
