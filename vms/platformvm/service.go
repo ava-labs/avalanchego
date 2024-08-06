@@ -832,9 +832,6 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			delegationFee := avajson.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
 			var uptime *avajson.Float32
 			var connected *bool
-			// Only calculate uptime for primary network validators
-			// TODO: decide whether we want to keep connected for subnet validators
-			// it should be available at this point
 			if args.SubnetID == constants.PrimaryNetworkID {
 				rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(currentStaker.NodeID, currentStaker.StartTime)
 				if err != nil {
