@@ -468,7 +468,7 @@ func (v *verifier) processStandardTxs(
 	error,
 ) {
 	timestamp := state.GetTimestamp()
-	isEtnaActivated := v.txExecutorBackend.Config.UpgradeConfig.IsEActivated(timestamp)
+	isEtnaActivated := v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp)
 
 	var (
 		blockComplexity feecomponent.Dimensions

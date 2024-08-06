@@ -165,7 +165,7 @@ func AdvanceTimeTo(
 		changed = true
 	}
 
-	if backend.Config.UpgradeConfig.IsEActivated(newChainTime) {
+	if backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
 		previousChainTime := changes.GetTimestamp()
 		duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
 
