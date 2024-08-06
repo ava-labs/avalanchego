@@ -468,11 +468,12 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 		return err
 	}
 
-	if err := checkVMBinaries(w, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
+	if err := n.EnsureNodeConfig(node); err != nil {
 		return err
 	}
 
-	if err := n.EnsureNodeConfig(node); err != nil {
+	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
+	if err := checkVMBinaries(w, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
