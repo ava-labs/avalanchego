@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/signertest"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/warp"
@@ -65,7 +66,7 @@ func setupSigner(t testing.TB) *testSigner {
 }
 
 func TestInterface(t *testing.T) {
-	for name, test := range warp.SignerTests {
+	for name, test := range signertest.SignerTests {
 		t.Run(name, func(t *testing.T) {
 			s := setupSigner(t)
 			test(t, s.client, s.sk, s.networkID, s.chainID)

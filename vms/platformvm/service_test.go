@@ -375,9 +375,8 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _, _ := defaultService(t)
 
-	feeCalculator, err := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
-	require.NoError(err)
-	createSubnetFee, err := feeCalculator.CalculateFee(&txs.Tx{Unsigned: &txs.CreateSubnetTx{}})
+	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
+	createSubnetFee, err := feeCalculator.CalculateFee(&txs.CreateSubnetTx{})
 	require.NoError(err)
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -769,7 +768,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, factory := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
 			builder, signer := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 			utx, err := builder.NewCreateChainTx(

@@ -8,7 +8,6 @@ package state
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
@@ -43,11 +42,10 @@ type Serializer struct {
 }
 
 type SerializerConfig struct {
-	ChainID     ids.ID
-	VM          vertex.DAGVM
-	DB          database.Database
-	Log         logging.Logger
-	CortinaTime time.Time
+	ChainID ids.ID
+	VM      vertex.DAGVM
+	DB      database.Database
+	Log     logging.Logger
 }
 
 func NewSerializer(config SerializerConfig) vertex.Manager {
@@ -86,7 +84,7 @@ func (s *Serializer) BuildStopVtx(
 			return nil, err
 		}
 		parentHeight := parent.v.vtx.Height()
-		childHeight, err := math.Add64(parentHeight, 1)
+		childHeight, err := math.Add(parentHeight, 1)
 		if err != nil {
 			return nil, err
 		}

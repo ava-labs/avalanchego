@@ -21,8 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-const TxGossipHandlerID = 0
-
 var errMempoolDisabledWithPartialSync = errors.New("mempool is disabled partial syncing")
 
 type Network struct {
@@ -66,7 +64,7 @@ func New(
 		config.MaxValidatorSetStaleness,
 	)
 	txGossipClient := p2pNetwork.NewClient(
-		TxGossipHandlerID,
+		p2p.TxGossipHandlerID,
 		p2p.WithValidatorSampling(validators),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
@@ -154,7 +152,7 @@ func New(
 		appRequestHandler: validatorHandler,
 	}
 
-	if err := p2pNetwork.AddHandler(TxGossipHandlerID, txGossipHandler); err != nil {
+	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
 		return nil, err
 	}
 

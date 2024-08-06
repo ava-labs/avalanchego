@@ -2,4 +2,3 @@ self-hosted-runner:
   labels:
     - custom-arm64-focal
     - custom-arm64-jammy
-    - net-outage-sim

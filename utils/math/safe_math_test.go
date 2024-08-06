@@ -12,28 +12,39 @@ import (
 
 const maxUint64 uint64 = math.MaxUint64
 
-func TestAdd64(t *testing.T) {
+func TestMaxUint(t *testing.T) {
 	require := require.New(t)
 
-	sum, err := Add64(0, maxUint64)
+	require.Equal(uint(math.MaxUint), MaxUint[uint]())
+	require.Equal(uint8(math.MaxUint8), MaxUint[uint8]())
+	require.Equal(uint16(math.MaxUint16), MaxUint[uint16]())
+	require.Equal(uint32(math.MaxUint32), MaxUint[uint32]())
+	require.Equal(uint64(math.MaxUint64), MaxUint[uint64]())
+	require.Equal(uintptr(math.MaxUint), MaxUint[uintptr]())
+}
+
+func TestAdd(t *testing.T) {
+	require := require.New(t)
+
+	sum, err := Add(0, maxUint64)
 	require.NoError(err)
 	require.Equal(maxUint64, sum)
 
-	sum, err = Add64(maxUint64, 0)
+	sum, err = Add(maxUint64, 0)
 	require.NoError(err)
 	require.Equal(maxUint64, sum)
 
-	sum, err = Add64(uint64(1<<62), uint64(1<<62))
+	sum, err = Add(uint64(1<<62), uint64(1<<62))
 	require.NoError(err)
 	require.Equal(uint64(1<<63), sum)
 
-	_, err = Add64(1, maxUint64)
+	_, err = Add(1, maxUint64)
 	require.ErrorIs(err, ErrOverflow)
 
-	_, err = Add64(maxUint64, 1)
+	_, err = Add(maxUint64, 1)
 	require.ErrorIs(err, ErrOverflow)
 
-	_, err = Add64(maxUint64, maxUint64)
+	_, err = Add(maxUint64, maxUint64)
 	require.ErrorIs(err, ErrOverflow)
 }
 
@@ -63,34 +74,34 @@ func TestSub(t *testing.T) {
 	require.ErrorIs(err, ErrUnderflow)
 }
 
-func TestMul64(t *testing.T) {
+func TestMul(t *testing.T) {
 	require := require.New(t)
 
-	got, err := Mul64(0, maxUint64)
+	got, err := Mul(0, maxUint64)
 	require.NoError(err)
 	require.Zero(got)
 
-	got, err = Mul64(maxUint64, 0)
+	got, err = Mul(maxUint64, 0)
 	require.NoError(err)
 	require.Zero(got)
 
-	got, err = Mul64(uint64(1), uint64(3))
+	got, err = Mul(uint64(1), uint64(3))
 	require.NoError(err)
 	require.Equal(uint64(3), got)
 
-	got, err = Mul64(uint64(3), uint64(1))
+	got, err = Mul(uint64(3), uint64(1))
 	require.NoError(err)
 	require.Equal(uint64(3), got)
 
-	got, err = Mul64(uint64(2), uint64(3))
+	got, err = Mul(uint64(2), uint64(3))
 	require.NoError(err)
 	require.Equal(uint64(6), got)
 
-	got, err = Mul64(maxUint64, 0)
+	got, err = Mul(maxUint64, 0)
 	require.NoError(err)
 	require.Zero(got)
 
-	_, err = Mul64(maxUint64-1, 2)
+	_, err = Mul(maxUint64-1, 2)
 	require.ErrorIs(err, ErrOverflow)
 }
 

@@ -4,19 +4,13 @@
 package config
 
 import (
-	"time"
-
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 )
 
 // Struct collecting all the foundational parameters of the AVM
 type Config struct {
+	Upgrades upgrade.Config
+
 	fee.StaticConfig
-
-	// Time of the E network upgrade
-	EUpgradeTime time.Time
-}
-
-func (c *Config) IsEActivated(timestamp time.Time) bool {
-	return !timestamp.Before(c.EUpgradeTime)
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -30,7 +31,9 @@ var (
 			TxFee:            2,
 			CreateAssetTxFee: 3,
 		},
-		EUpgradeTime: mockable.MaxTime,
+		Upgrades: upgrade.Config{
+			EtnaTime: mockable.MaxTime,
+		},
 	}
 )
 

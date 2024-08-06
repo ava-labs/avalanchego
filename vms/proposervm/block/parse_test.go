@@ -14,7 +14,68 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+func TestParseBlocks(t *testing.T) {
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(t, err)
+	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	signedBlock, err := Build(
+		parentID,
+		timestamp,
+		pChainHeight,
+		cert,
+		innerBlockBytes,
+		chainID,
+		key,
+	)
+	require.NoError(t, err)
+
+	signedBlockBytes := signedBlock.Bytes()
+	malformedBlockBytes := make([]byte, len(signedBlockBytes)-1)
+	copy(malformedBlockBytes, signedBlockBytes)
+
+	for _, testCase := range []struct {
+		name   string
+		input  [][]byte
+		output []ParseResult
+	}{
+		{
+			name:   "ValidThenInvalid",
+			input:  [][]byte{signedBlockBytes, malformedBlockBytes},
+			output: []ParseResult{{Block: &statelessBlock{bytes: signedBlockBytes}}, {Err: wrappers.ErrInsufficientLength}},
+		},
+		{
+			name:   "InvalidThenValid",
+			input:  [][]byte{malformedBlockBytes, signedBlockBytes},
+			output: []ParseResult{{Err: wrappers.ErrInsufficientLength}, {Block: &statelessBlock{bytes: signedBlockBytes}}},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			results := ParseBlocks(testCase.input, chainID)
+			for i := range testCase.output {
+				if testCase.output[i].Block == nil {
+					require.Nil(t, results[i].Block)
+					require.ErrorIs(t, results[i].Err, testCase.output[i].Err)
+				} else {
+					require.Equal(t, testCase.output[i].Block.Bytes(), results[i].Block.Bytes())
+					require.NoError(t, results[i].Err)
+				}
+			}
+		})
+	}
+}
 
 func TestParse(t *testing.T) {
 	parentID := ids.ID{1}

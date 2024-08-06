@@ -34,6 +34,7 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
+	pChainHeight      uint64
 }
 
 func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
@@ -67,11 +68,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		return err
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	if err != nil {
-		return err
-	}
-
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
@@ -131,10 +128,7 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 		return errBanffStandardBlockWithoutChanges
 	}
 
-	feeCalculator, err := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	if err != nil {
-		return err
-	}
+	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
 	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
 }
 
@@ -168,10 +162,8 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	}
 
 	var (
-		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
-		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
-		timestamp       = onCommitState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
+		timestamp     = onCommitState.GetTimestamp() // Equal to parent timestamp
+		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
 	)
 	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
 }
@@ -188,10 +180,8 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 	}
 
 	var (
-		staticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
-		upgradeConfig   = v.txExecutorBackend.Config.UpgradeConfig
-		timestamp       = onAcceptState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator   = fee.NewStaticCalculator(staticFeeConfig, upgradeConfig, timestamp)
+		timestamp     = onAcceptState.GetTimestamp() // Equal to parent timestamp
+		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
 	)
 	return v.standardBlock(b, feeCalculator, onAcceptState)
 }
@@ -215,7 +205,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
-	feeCalculator := fee.NewStaticCalculator(v.txExecutorBackend.Config.StaticFeeConfig, v.txExecutorBackend.Config.UpgradeConfig, currentTimestamp)
+	feeCalculator := state.NewStaticFeeCalculator(v.txExecutorBackend.Config, currentTimestamp)
 	atomicExecutor := executor.AtomicTxExecutor{
 		Backend:       v.txExecutorBackend,
 		FeeCalculator: feeCalculator,
@@ -244,9 +234,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:         atomicExecutor.Inputs,
-		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-		atomicRequests: atomicExecutor.AtomicRequests,
+		inputs:          atomicExecutor.Inputs,
+		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
+		atomicRequests:  atomicExecutor.AtomicRequests,
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -356,9 +347,10 @@ func (v *verifier) abortBlock(b block.Block) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAbortState,
-		timestamp:      onAbortState.GetTimestamp(),
+		statelessBlock:  b,
+		onAcceptState:   onAbortState,
+		timestamp:       onAbortState.GetTimestamp(),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -373,9 +365,10 @@ func (v *verifier) commitBlock(b block.Block) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onCommitState,
-		timestamp:      onCommitState.GetTimestamp(),
+		statelessBlock:  b,
+		onAcceptState:   onCommitState,
+		timestamp:       onCommitState.GetTimestamp(),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -426,8 +419,9 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:      onAbortState.GetTimestamp(),
-		atomicRequests: atomicRequests,
+		timestamp:       onAbortState.GetTimestamp(),
+		atomicRequests:  atomicRequests,
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -452,9 +446,10 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:      onAcceptState.GetTimestamp(),
-		inputs:         inputs,
-		atomicRequests: atomicRequests,
+		timestamp:       onAcceptState.GetTimestamp(),
+		inputs:          inputs,
+		atomicRequests:  atomicRequests,
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
