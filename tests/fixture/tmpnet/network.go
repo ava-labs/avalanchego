@@ -945,8 +945,5 @@ func checkVMBinariesExist(subnets []*Subnet, pluginDir string) error {
 			}
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...)
 }
