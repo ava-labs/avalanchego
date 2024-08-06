@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/vertextest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -23,7 +24,7 @@ import (
 var errUnknownTx = errors.New("unknown tx")
 
 func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowstorm.Tx, error)) *Serializer {
-	vm := vertex.TestVM{}
+	vm := vertextest.VM{}
 	vm.T = t
 	vm.Default(true)
 	vm.ParseTxF = parse

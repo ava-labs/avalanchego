@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -50,7 +51,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/fx"
 	"github.com/ava-labs/avalanchego/vms/metervm"
@@ -233,8 +233,7 @@ type ManagerConfig struct {
 	// containers in an ancestors message it receives.
 	BootstrapAncestorsMaxContainersReceived int
 
-	ApricotPhase4Time            time.Time
-	ApricotPhase4MinPChainHeight uint64
+	Upgrades upgrade.Config
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -447,7 +446,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 		)
 	}
 
-	// Notify those that registered to be notified when a new chain is created
+	// Notify those who registered to be notified when a new chain is created
 	m.notifyRegistrants(chain.Name, chain.Context, chain.VM)
 
 	// Allows messages to be routed to the new chain. If the handler hasn't been
@@ -726,11 +725,10 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := state.NewSerializer(
 		state.SerializerConfig{
-			ChainID:     ctx.ChainID,
-			VM:          dagVM,
-			DB:          vertexDB,
-			Log:         ctx.Log,
-			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
+			ChainID: ctx.ChainID,
+			VM:      dagVM,
+			DB:      vertexDB,
+			Log:     ctx.Log,
 		},
 	)
 
@@ -767,8 +765,8 @@ func (m *manager) createAvalancheChain(
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	}
 	m.Log.Info("creating proposervm wrapper",
-		zap.Time("activationTime", m.ApricotPhase4Time),
-		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
+		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
@@ -789,14 +787,10 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
-	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
-	// using.
-	var vmWrappingProposerVM block.ChainVM = proposervm.New(
+	proposerVM := proposervm.New(
 		vmWrappedInsideProposerVM,
 		proposervm.Config{
-			ActivationTime:      m.ApricotPhase4Time,
-			DurangoTime:         version.GetDurangoTime(m.NetworkID),
-			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
+			Upgrades:            m.Upgrades,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
@@ -804,6 +798,10 @@ func (m *manager) createAvalancheChain(
 			Registerer:          proposervmReg,
 		},
 	)
+
+	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
+	// using.
+	var vmWrappingProposerVM block.ChainVM = proposerVM
 
 	if m.MeterVMEnabled {
 		meterchainvmReg, err := metrics.MakeAndRegister(
@@ -951,6 +949,7 @@ func (m *manager) createAvalancheChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
+		NonVerifyingParse:              block.ParseFunc(proposerVM.ParseLocalBlock),
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
@@ -1009,7 +1008,7 @@ func (m *manager) createAvalancheChain(
 		VM:                             linearizableVM,
 	}
 	if ctx.ChainID == m.XChainID {
-		avalancheBootstrapperConfig.StopVertexID = version.CortinaXChainStopVertexID[ctx.NetworkID]
+		avalancheBootstrapperConfig.StopVertexID = m.Upgrades.CortinaXChainStopVertexID
 	}
 
 	avalancheBootstrapper, err := avbootstrap.New(
@@ -1160,8 +1159,8 @@ func (m *manager) createSnowmanChain(
 		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	}
 	m.Log.Info("creating proposervm wrapper",
-		zap.Time("activationTime", m.ApricotPhase4Time),
-		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
+		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
 		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
@@ -1178,12 +1177,10 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
-	vm = proposervm.New(
+	proposerVM := proposervm.New(
 		vm,
 		proposervm.Config{
-			ActivationTime:      m.ApricotPhase4Time,
-			DurangoTime:         version.GetDurangoTime(m.NetworkID),
-			MinimumPChainHeight: m.ApricotPhase4MinPChainHeight,
+			Upgrades:            m.Upgrades,
 			MinBlkDelay:         minBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   m.StakingTLSSigner,
@@ -1191,6 +1188,8 @@ func (m *manager) createSnowmanChain(
 			Registerer:          proposervmReg,
 		},
 	)
+
+	vm = proposerVM
 
 	if m.MeterVMEnabled {
 		meterchainvmReg, err := metrics.MakeAndRegister(
@@ -1340,6 +1339,7 @@ func (m *manager) createSnowmanChain(
 
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
+		NonVerifyingParse:              block.ParseFunc(proposerVM.ParseLocalBlock),
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        beacons,

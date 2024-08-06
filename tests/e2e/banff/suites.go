@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -20,12 +19,14 @@ import (
 )
 
 var _ = ginkgo.Describe("[Banff]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	ginkgo.It("can send custom assets X->P and P->X",
 		func() {
-			keychain := e2e.Env.NewKeychain(1)
-			wallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
+			env := e2e.GetEnv(tc)
+			keychain := env.NewKeychain(1)
+			wallet := e2e.NewWallet(tc, keychain, env.GetRandomNodeURI())
 
 			// Get the P-chain and the X-chain wallets
 			pWallet := wallet.P()
@@ -43,7 +44,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			}
 
 			var assetID ids.ID
-			ginkgo.By("create new X-chain asset", func() {
+			tc.By("create new X-chain asset", func() {
 				assetTx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
@@ -56,15 +57,15 @@ var _ = ginkgo.Describe("[Banff]", func() {
 							},
 						},
 					},
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 				assetID = assetTx.ID()
 
-				tests.Outf("{{green}}created new X-chain asset{{/}}: %s\n", assetID)
+				tc.Outf("{{green}}created new X-chain asset{{/}}: %s\n", assetID)
 			})
 
-			ginkgo.By("export new X-chain asset to P-chain", func() {
+			tc.By("export new X-chain asset to P-chain", func() {
 				tx, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
@@ -78,25 +79,25 @@ var _ = ginkgo.Describe("[Banff]", func() {
 							},
 						},
 					},
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 
-				tests.Outf("{{green}}issued X-chain export{{/}}: %s\n", tx.ID())
+				tc.Outf("{{green}}issued X-chain export{{/}}: %s\n", tx.ID())
 			})
 
-			ginkgo.By("import new asset from X-chain on the P-chain", func() {
+			tc.By("import new asset from X-chain on the P-chain", func() {
 				tx, err := pWallet.IssueImportTx(
 					xChainID,
 					owner,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 
-				tests.Outf("{{green}}issued P-chain import{{/}}: %s\n", tx.ID())
+				tc.Outf("{{green}}issued P-chain import{{/}}: %s\n", tx.ID())
 			})
 
-			ginkgo.By("export asset from P-chain to the X-chain", func() {
+			tc.By("export asset from P-chain to the X-chain", func() {
 				tx, err := pWallet.IssueExportTx(
 					xChainID,
 					[]*avax.TransferableOutput{
@@ -110,22 +111,22 @@ var _ = ginkgo.Describe("[Banff]", func() {
 							},
 						},
 					},
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 
-				tests.Outf("{{green}}issued P-chain export{{/}}: %s\n", tx.ID())
+				tc.Outf("{{green}}issued P-chain export{{/}}: %s\n", tx.ID())
 			})
 
-			ginkgo.By("import asset from P-chain on the X-chain", func() {
+			tc.By("import asset from P-chain on the X-chain", func() {
 				tx, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					owner,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 
-				tests.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())
+				tc.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())
 			})
 		})
 })

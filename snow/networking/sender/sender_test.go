@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sender
+package sender_test
 
 import (
 	"context"
@@ -19,9 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -37,6 +39,8 @@ import (
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+
+	. "github.com/ava-labs/avalanchego/snow/networking/sender"
 )
 
 const testThreadPoolSize = 2
@@ -88,7 +92,7 @@ func TestTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -135,8 +139,8 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -364,7 +368,7 @@ func TestReliableMessages(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -411,8 +415,8 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}
@@ -520,7 +524,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		prometheus.NewRegistry(),
 	))
 
-	externalSender := &ExternalSenderTest{TB: t}
+	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(false)
 
 	sender, err := New(
@@ -567,8 +571,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(err)
 
-	bootstrapper := &common.BootstrapperTest{
-		EngineTest: common.EngineTest{
+	bootstrapper := &enginetest.Bootstrapper{
+		Engine: enginetest.Engine{
 			T: t,
 		},
 	}

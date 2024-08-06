@@ -20,6 +20,7 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
+	fee "github.com/ava-labs/avalanchego/vms/components/fee"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -257,6 +258,20 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), arg0, arg1)
 }
 
+// GetFeeState mocks base method.
+func (m *MockChain) GetFeeState() fee.State {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeState")
+	ret0, _ := ret[0].(fee.State)
+	return ret0
+}
+
+// GetFeeState indicates an expected call of GetFeeState.
+func (mr *MockChainMockRecorder) GetFeeState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeState", reflect.TypeOf((*MockChain)(nil).GetFeeState))
+}
+
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockChain) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -300,6 +315,22 @@ func (m *MockChain) GetPendingValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, 
 func (mr *MockChainMockRecorder) GetPendingValidator(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), arg0, arg1)
+}
+
+// GetSubnetManager mocks base method.
+func (m *MockChain) GetSubnetManager(arg0 ids.ID) (ids.ID, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetManager", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetSubnetManager indicates an expected call of GetSubnetManager.
+func (mr *MockChainMockRecorder) GetSubnetManager(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockChain)(nil).GetSubnetManager), arg0)
 }
 
 // GetSubnetOwner mocks base method.
@@ -449,6 +480,30 @@ func (m *MockChain) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64
 func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockChain)(nil).SetDelegateeReward), arg0, arg1, arg2)
+}
+
+// SetFeeState mocks base method.
+func (m *MockChain) SetFeeState(arg0 fee.State) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeState", arg0)
+}
+
+// SetFeeState indicates an expected call of SetFeeState.
+func (mr *MockChainMockRecorder) SetFeeState(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeState", reflect.TypeOf((*MockChain)(nil).SetFeeState), arg0)
+}
+
+// SetSubnetManager mocks base method.
+func (m *MockChain) SetSubnetManager(arg0, arg1 ids.ID, arg2 []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetManager", arg0, arg1, arg2)
+}
+
+// SetSubnetManager indicates an expected call of SetSubnetManager.
+func (mr *MockChainMockRecorder) SetSubnetManager(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetManager", reflect.TypeOf((*MockChain)(nil).SetSubnetManager), arg0, arg1, arg2)
 }
 
 // SetSubnetOwner mocks base method.
@@ -719,6 +774,20 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).GetDelegateeReward), arg0, arg1)
 }
 
+// GetFeeState mocks base method.
+func (m *MockDiff) GetFeeState() fee.State {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeState")
+	ret0, _ := ret[0].(fee.State)
+	return ret0
+}
+
+// GetFeeState indicates an expected call of GetFeeState.
+func (mr *MockDiffMockRecorder) GetFeeState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeState", reflect.TypeOf((*MockDiff)(nil).GetFeeState))
+}
+
 // GetPendingDelegatorIterator mocks base method.
 func (m *MockDiff) GetPendingDelegatorIterator(arg0 ids.ID, arg1 ids.NodeID) (StakerIterator, error) {
 	m.ctrl.T.Helper()
@@ -762,6 +831,22 @@ func (m *MockDiff) GetPendingValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, e
 func (mr *MockDiffMockRecorder) GetPendingValidator(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockDiff)(nil).GetPendingValidator), arg0, arg1)
+}
+
+// GetSubnetManager mocks base method.
+func (m *MockDiff) GetSubnetManager(arg0 ids.ID) (ids.ID, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetManager", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetSubnetManager indicates an expected call of GetSubnetManager.
+func (mr *MockDiffMockRecorder) GetSubnetManager(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockDiff)(nil).GetSubnetManager), arg0)
 }
 
 // GetSubnetOwner mocks base method.
@@ -911,6 +996,30 @@ func (m *MockDiff) SetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID, arg2 uint64)
 func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockDiff)(nil).SetDelegateeReward), arg0, arg1, arg2)
+}
+
+// SetFeeState mocks base method.
+func (m *MockDiff) SetFeeState(arg0 fee.State) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeState", arg0)
+}
+
+// SetFeeState indicates an expected call of SetFeeState.
+func (mr *MockDiffMockRecorder) SetFeeState(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeState", reflect.TypeOf((*MockDiff)(nil).SetFeeState), arg0)
+}
+
+// SetSubnetManager mocks base method.
+func (m *MockDiff) SetSubnetManager(arg0, arg1 ids.ID, arg2 []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetManager", arg0, arg1, arg2)
+}
+
+// SetSubnetManager indicates an expected call of SetSubnetManager.
+func (mr *MockDiffMockRecorder) SetSubnetManager(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetManager", reflect.TypeOf((*MockDiff)(nil).SetSubnetManager), arg0, arg1, arg2)
 }
 
 // SetSubnetOwner mocks base method.
@@ -1306,6 +1415,20 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), arg0, arg1)
 }
 
+// GetFeeState mocks base method.
+func (m *MockState) GetFeeState() fee.State {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFeeState")
+	ret0, _ := ret[0].(fee.State)
+	return ret0
+}
+
+// GetFeeState indicates an expected call of GetFeeState.
+func (mr *MockStateMockRecorder) GetFeeState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeState", reflect.TypeOf((*MockState)(nil).GetFeeState))
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()
@@ -1423,6 +1546,22 @@ func (m *MockState) GetSubnetIDs() ([]ids.ID, error) {
 func (mr *MockStateMockRecorder) GetSubnetIDs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDs", reflect.TypeOf((*MockState)(nil).GetSubnetIDs))
+}
+
+// GetSubnetManager mocks base method.
+func (m *MockState) GetSubnetManager(arg0 ids.ID) (ids.ID, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetManager", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetSubnetManager indicates an expected call of GetSubnetManager.
+func (mr *MockStateMockRecorder) GetSubnetManager(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockState)(nil).GetSubnetManager), arg0)
 }
 
 // GetSubnetOwner mocks base method.
@@ -1604,6 +1743,18 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDelegateeReward", reflect.TypeOf((*MockState)(nil).SetDelegateeReward), arg0, arg1, arg2)
 }
 
+// SetFeeState mocks base method.
+func (m *MockState) SetFeeState(arg0 fee.State) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetFeeState", arg0)
+}
+
+// SetFeeState indicates an expected call of SetFeeState.
+func (mr *MockStateMockRecorder) SetFeeState(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeState", reflect.TypeOf((*MockState)(nil).SetFeeState), arg0)
+}
+
 // SetHeight mocks base method.
 func (m *MockState) SetHeight(arg0 uint64) {
 	m.ctrl.T.Helper()
@@ -1626,6 +1777,18 @@ func (m *MockState) SetLastAccepted(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) SetLastAccepted(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), arg0)
+}
+
+// SetSubnetManager mocks base method.
+func (m *MockState) SetSubnetManager(arg0, arg1 ids.ID, arg2 []byte) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetManager", arg0, arg1, arg2)
+}
+
+// SetSubnetManager indicates an expected call of SetSubnetManager.
+func (mr *MockStateMockRecorder) SetSubnetManager(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetManager", reflect.TypeOf((*MockState)(nil).SetSubnetManager), arg0, arg1, arg2)
 }
 
 // SetSubnetOwner mocks base method.

@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -43,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -457,10 +457,10 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig: upgrade.Config{
-			BanffTime:    latestForkTime,
-			CortinaTime:  mockable.MaxTime,
-			DurangoTime:  mockable.MaxTime,
-			EUpgradeTime: mockable.MaxTime,
+			BanffTime:   latestForkTime,
+			CortinaTime: mockable.MaxTime,
+			DurangoTime: mockable.MaxTime,
+			EtnaTime:    mockable.MaxTime,
 		},
 	}}
 

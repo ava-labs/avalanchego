@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -53,6 +54,7 @@ type Parameters struct {
 	NetworkID   uint32
 	TxFeeConfig genesis.TxFeeConfig
 	VMManager   vms.Manager
+	Upgrades    upgrade.Config
 }
 
 func NewService(
@@ -280,6 +282,17 @@ func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *
 		return fmt.Errorf("there is no chain with alias/ID '%s'", args.Chain)
 	}
 	reply.IsBootstrapped = i.chainManager.IsBootstrapped(chainID)
+	return nil
+}
+
+// Upgrades returns the upgrade schedule this node is running.
+func (i *Info) Upgrades(_ *http.Request, _ *struct{}, reply *upgrade.Config) error {
+	i.log.Debug("API called",
+		zap.String("service", "info"),
+		zap.String("method", "upgrades"),
+	)
+
+	*reply = i.Parameters.Upgrades
 	return nil
 }
 

@@ -64,10 +64,6 @@ func NewManager(
 
 	return &manager{
 		backend: backend,
-		verifier: &verifier{
-			backend:           backend,
-			txExecutorBackend: txExecutorBackend,
-		},
 		acceptor: &acceptor{
 			backend:      backend,
 			metrics:      metrics,
@@ -85,7 +81,6 @@ func NewManager(
 
 type manager struct {
 	*backend
-	verifier block.Visitor
 	acceptor block.Visitor
 	rejector block.Visitor
 

@@ -19,7 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -44,7 +46,7 @@ type fork uint8
 
 const (
 	durango fork = iota
-	eUpgrade
+	etna
 
 	latest = durango
 
@@ -191,7 +193,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 			},
 			c.additionalFxs...,
 		),
-		&common.SenderTest{},
+		&enginetest.Sender{},
 	))
 
 	stopVertexID := ids.GenerateTestID()
@@ -230,14 +232,16 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 func staticConfig(tb testing.TB, f fork) config.Config {
 	c := config.Config{
+		Upgrades: upgrade.Config{
+			EtnaTime: mockable.MaxTime,
+		},
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
-		EUpgradeTime:     mockable.MaxTime,
 	}
 
 	switch f {
-	case eUpgrade:
-		c.EUpgradeTime = time.Time{}
+	case etna:
+		c.Upgrades.EtnaTime = time.Time{}
 	case durango:
 	default:
 		require.FailNow(tb, "unhandled fork", f)
