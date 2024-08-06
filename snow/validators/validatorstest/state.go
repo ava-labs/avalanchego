@@ -23,12 +23,6 @@ var (
 
 var _ validators.State = (*State)(nil)
 
-// TestState is an alias for State because ava-labs/coreth uses the original
-// identifier and this change would otherwise break the build.
-//
-// Deprecated: use [State].
-type TestState = State
-
 type State struct {
 	T testing.TB
 
