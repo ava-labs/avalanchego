@@ -79,6 +79,19 @@ var gasPriceMulExpTests = []struct {
 	},
 }
 
+func Test_Gas_Cost(t *testing.T) {
+	require := require.New(t)
+
+	const (
+		gas      Gas      = 40
+		price    GasPrice = 100
+		expected uint64   = 4000
+	)
+	actual, err := gas.Cost(price)
+	require.NoError(err)
+	require.Equal(expected, actual)
+}
+
 func Test_Gas_AddPerSecond(t *testing.T) {
 	tests := []struct {
 		initial      Gas
