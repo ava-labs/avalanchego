@@ -6,10 +6,12 @@ package tmpnet
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -141,7 +143,7 @@ func BootstrapNewNetwork(
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
 	}
-	if err := checkVMBinariesExist(network.Subnets, pluginDir); err != nil {
+	if err := checkVMBinaries(w, network.Subnets, avalancheGoExecPath, pluginDir); err != nil {
 		return err
 	}
 	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
@@ -465,7 +467,8 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 	if err != nil {
 		return err
 	}
-	if err := checkVMBinariesExist(n.Subnets, pluginDir); err != nil {
+
+	if err := checkVMBinaries(w, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
@@ -939,15 +942,69 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 	return filepath.Join(networkPath, "latest_"+owner), nil
 }
 
-func checkVMBinariesExist(subnets []*Subnet, pluginDir string) error {
+// Checks that VM binaries for the given subnets exist and optionally checks that VM binaries have the
+// same rpcchainvm version as the indicated avalanchego binary.
+func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
+	if len(subnets) == 0 {
+		return nil
+	}
+
 	errs := []error{}
+	var expectedRPCVersion uint64
 	for _, subnet := range subnets {
 		for _, chain := range subnet.Chains {
 			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
+
+			// Check that the path exists
 			if _, err := os.Stat(pluginPath); err != nil {
 				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %w", subnet.Name, err))
 			}
+
+			if len(chain.VersionArgs) == 0 {
+				// Not possible to check the rpcchainvm version of the VM binary
+				continue
+			}
+
+			// Only retrieve the avalanchego rpcversion when a comparison will be made
+			if expectedRPCVersion == 0 {
+				var err error
+				expectedRPCVersion, err = getRPCVersion(avalanchegoPath, "--version-json")
+				if err != nil {
+					return fmt.Errorf("failed to determine rpcchainvm version for avalanchego: %w", err)
+				}
+			}
+
+			// Check that the rpcchainvm version matches avalanchego
+			rpcVersion, err := getRPCVersion(pluginPath, chain.VersionArgs...)
+			if err != nil {
+				if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for VM Binary for subnet %q: %v\n", subnet.Name, err); err != nil {
+					return err
+				}
+			} else if expectedRPCVersion != rpcVersion {
+				errs = append(errs, fmt.Errorf("unexpected rpcchainvm version for VM binary of subnet %q: %q reports %d, but %q reports %d", subnet.Name, avalanchegoPath, expectedRPCVersion, pluginPath, rpcVersion))
+			}
 		}
 	}
+
 	return errors.Join(errs...)
+}
+
+type RPCChainVMVersion struct {
+	RPCChainVM uint64 `json:"rpcchainvm"`
+}
+
+// getRPCVersion attempts to invoke the given command with the specified version arguments and
+// retrieve the rpcchainvm version from its output.
+func getRPCVersion(command string, versionArgs ...string) (uint64, error) {
+	cmd := exec.Command(command, versionArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("command %q failed with output: %s", command, output)
+	}
+	version := &RPCChainVMVersion{}
+	if err := json.Unmarshal(output, version); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
+	}
+
+	return version.RPCChainVM, nil
 }
