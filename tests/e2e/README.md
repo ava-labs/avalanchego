@@ -77,6 +77,17 @@ If a network is not already running the first time the suite runs with
 `--reuse-network`, one will be started automatically and configured
 for reuse by subsequent test runs also supplying `--reuse-network`.
 
+### Restarting temporary networks
+
+When iterating on a change to avalanchego and/or a VM, it may be
+useful to restart a running network to ensure the network is using the
+latest binary state. Supplying `--restart-network` in addition to
+`--reuse-network` will ensure that all nodes are restarted before
+tests are run. `--restart-network` is ignored if a network is not
+running or if `--stop-network` is supplied.
+
+### Stopping temporary networks
+
 To stop a network configured for reuse, invoke the test suite with the
 `--stop-network` argument. This will stop the network and exit
 immediately without executing any tests:
