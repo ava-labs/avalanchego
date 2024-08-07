@@ -38,8 +38,8 @@ var (
 			MaxValidatorStake: 2 * units.KiloAvax,
 			MinDelegatorStake: 0 * units.Avax,
 			MinDelegationFee:  0, // 0%
-			MinStakeDuration:  24 * time.Hour,
-			MaxStakeDuration:  365 * 24 * time.Hour,
+			MinStakeDuration:  5 * time.Minute,
+			MaxStakeDuration:  5 * 365 * 24 * time.Hour,
 			RewardConfig: reward.Config{
 				MaxConsumptionRate: 0,
 				MinConsumptionRate: 0,

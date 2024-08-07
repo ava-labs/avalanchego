@@ -1,7 +1,7 @@
 {
   "networkID": 1002,
   "allocations": null,
-  "startTime": 1667217600,
+  "startTime": 1715348670,
   "initialStakeDuration": 0,
   "initialStakeDurationOffset": 3600,
   "initialStakedFunds": null,
@@ -265,7 +265,7 @@
           {
             "amount": 100000000000000,
             "nodeID": "NodeID-YUy7DaNMhNe9mqdLX9PDsusaQFeRZKSy",
-            "validatorDuration": 31104000,
+            "validatorDuration": 157680000,
             "depositDuration": 110376000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 3 Years 8%",
@@ -451,7 +451,7 @@
           {
             "amount": 100000000000000,
             "nodeID": "NodeID-ErN1zp6C2abP2F8HL9TxLL8RwT6kTmnAN",
-            "validatorDuration": 62208000,
+            "validatorDuration": 157680000,
             "depositDuration": 141912000,
             "timestampOffset": 5270400,
             "depositOfferMemo": "PreSale 4 Years 9%",
@@ -1152,7 +1152,7 @@
         },
         "platformAllocations": [
           {
-            "amount": 730754200000000000,
+            "amount": 730744200000000000,
             "memo": "ID: 49, Bucket: 99 TESTACCOUNT, Type: unlocked"
           }
         ]
@@ -1199,6 +1199,21 @@
           {
             "amount": 1010000000000000,
             "memo": "ID: 52, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
+          }
+        ]
+      },
+	  {
+        "ethAddr": "0x0000000000000000000000000000000000000000",
+        "avaxAddr": "X-kopernikus1v8weslt4jr4n0m0jseupz9frk9rt83u6x9rsyj",
+        "xAmount": 0,
+        "addressStates": {
+          "consortiumMember": false,
+          "kycVerified": true
+        },
+        "platformAllocations": [
+          {
+            "amount": 10000000000000,
+            "memo": "ID: 53 custom, Bucket: 99 TESTACCOUNT, Type: unlocked incentive"
           }
         ]
       }
