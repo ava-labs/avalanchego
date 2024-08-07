@@ -118,7 +118,7 @@ func newApricotPhase3InstructionSet() JumpTable {
 	return validate(instructionSet)
 }
 
-// newApricotPhase1InstructionSet returns the frontier,
+// newApricotPhase2InstructionSet returns the frontier,
 // homestead, byzantium, constantinople petersburg,
 // istanbul, and apricotPhase1 instructions.
 func newApricotPhase2InstructionSet() JumpTable {
