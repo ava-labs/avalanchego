@@ -50,6 +50,10 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
 
 		{
+			// Get the default genesis so we can modify it
+			genesis, err := network.DefaultGenesis()
+			require.NoError(err)
+			network.Genesis = genesis
 			// Etna enables Cancun which modifies the outcome of the C-Chain genesis
 			// This is because of new header fields that modify the genesis block hash.
 			// This code can be removed once the Etna upgrade is activated.
