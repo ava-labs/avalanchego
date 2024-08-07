@@ -1465,14 +1465,12 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	}
 
 	execute := func(t *testing.T, tt test) (CaminoProposalTxExecutor, *txs.Tx) {
-		utx := &txs.CaminoRewardValidatorTx{
+		tx := &txs.Tx{Unsigned: &txs.CaminoRewardValidatorTx{
 			RewardValidatorTx: txs.RewardValidatorTx{TxID: stakerToRemove.TxID},
 			Ins:               tt.ins,
 			Outs:              tt.outs,
-		}
-
-		tx, err := txs.NewSigned(utx, txs.Codec, nil)
-		require.NoError(t, err)
+		}}
+		require.NoError(t, tx.Initialize(txs.Codec))
 
 		tt.preExecute(t, tx)
 

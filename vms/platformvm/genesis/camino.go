@@ -59,17 +59,17 @@ type Block struct {
 
 func (b *Block) Init() error {
 	for _, tx := range b.Validators {
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
 	}
 	for _, tx := range b.Deposits {
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
 	}
 	for _, tx := range b.UnlockedUTXOsTxs {
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
 	}

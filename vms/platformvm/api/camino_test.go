@@ -154,7 +154,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 					Creds: []verify.Verifiable{},
 				}
-				require.NoError(t, validatorTx.Sign(txs.GenesisCodec, nil))
+				require.NoError(t, validatorTx.Initialize(txs.GenesisCodec))
 
 				validatorDepositTx := &txs.Tx{
 					Unsigned: &txs.DepositTx{
@@ -207,7 +207,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 					Creds: []verify.Verifiable{},
 				}
-				require.NoError(t, validatorDepositTx.Sign(txs.GenesisCodec, nil))
+				require.NoError(t, validatorDepositTx.Initialize(txs.GenesisCodec))
 
 				depositTx := &txs.Tx{
 					Unsigned: &txs.DepositTx{
@@ -244,7 +244,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 					Creds: []verify.Verifiable{},
 				}
-				require.NoError(t, depositTx.Sign(txs.GenesisCodec, nil))
+				require.NoError(t, depositTx.Initialize(txs.GenesisCodec))
 
 				return &genesis.Genesis{
 					Timestamp:     5,

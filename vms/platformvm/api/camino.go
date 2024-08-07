@@ -233,7 +233,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 			GenesisData: genesisBytes,
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
 
@@ -246,7 +246,7 @@ func buildCaminoGenesis(args *BuildGenesisArgs, reply *BuildGenesisReply) error 
 	for _, genesisBlock := range genesisBlocks {
 		if len(genesisBlock.UnlockedUTXOsTxs) != 0 {
 			tx := genesisBlock.UnlockedUTXOsTxs[0]
-			if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+			if err := tx.Initialize(txs.GenesisCodec); err != nil {
 				return err
 			}
 
@@ -351,7 +351,7 @@ func makeValidator(
 		},
 		NodeOwnerAuth: &secp256k1fx.Input{},
 	}}
-	if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+	if err := tx.Initialize(txs.GenesisCodec); err != nil {
 		return nil, err
 	}
 
@@ -428,7 +428,7 @@ func makeUTXOAndDeposit(
 			DepositDuration: uint32(deposit.Duration),
 			RewardsOwner:    &owner,
 		}}
-		if err := depositTx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := depositTx.Initialize(txs.GenesisCodec); err != nil {
 			return nil, nil, err
 		}
 

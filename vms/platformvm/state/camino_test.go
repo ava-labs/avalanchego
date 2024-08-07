@@ -286,7 +286,7 @@ func TestSyncGenesis(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.NoError(tt.args.g.Camino.Init())
-			err := tt.cs.SyncGenesis(tt.args.s, tt.args.g)
+			err := tt.cs.syncGenesis(tt.args.s, tt.args.g)
 			require.ErrorIs(tt.err, err)
 
 			require.Len(tt.cs.modifiedDeposits, len(tt.want.modifiedDeposits))
