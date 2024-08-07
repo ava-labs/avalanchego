@@ -127,5 +127,5 @@ func (c *CSV) Set(value string) error {
 }
 
 func envVarName(key string) string {
-	return strings.ToUpper(strings.ToUpper(EnvPrefix + "_" + key))
+	return strings.ToUpper(EnvPrefix + "_" + key)
 }

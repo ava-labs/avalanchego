@@ -207,6 +207,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Check that the avalanchego workload is sane
+        shell: bash
+        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=60s
       - name: Check image build for avalanchego test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
@@ -218,26 +224,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - name: Check image build for xsvm test setup
-        shell: bash
-        run: bash -x scripts/tests.build_antithesis_images.sh
-        env:
-          TEST_SETUP: xsvm
-  test_antithesis_workloads:
-    name: Check sanity of antithesis workloads
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh -r
-      - name: Check that the avalanchego workload is sane
-        shell: bash
-        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=60s
       - name: Build xsvm binary
         shell: bash
         run: ./scripts/build_xsvm.sh
       - name: Check that the xsvm workload is sane
         shell: bash
         run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=60s
+      - name: Check image build for xsvm test setup
+        shell: bash
+        run: bash -x scripts/tests.build_antithesis_images.sh
+        env:
+          TEST_SETUP: xsvm
