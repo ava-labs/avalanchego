@@ -32,8 +32,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/coreth/precompile/modules"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/utils"
@@ -460,6 +460,7 @@ var (
 )
 
 func getChainConfig(networkID uint32, chainID *big.Int) *ChainConfig {
+	agoUpgrade := upgrade.GetConfig(networkID)
 	return &ChainConfig{
 		ChainID:                         chainID,
 		HomesteadBlock:                  big.NewInt(0),
@@ -473,18 +474,18 @@ func getChainConfig(networkID uint32, chainID *big.Int) *ChainConfig {
 		PetersburgBlock:                 big.NewInt(0),
 		IstanbulBlock:                   big.NewInt(0),
 		MuirGlacierBlock:                big.NewInt(0),
-		ApricotPhase1BlockTimestamp:     getUpgradeTime(networkID, version.ApricotPhase1Times),
-		ApricotPhase2BlockTimestamp:     getUpgradeTime(networkID, version.ApricotPhase2Times),
-		ApricotPhase3BlockTimestamp:     getUpgradeTime(networkID, version.ApricotPhase3Times),
-		ApricotPhase4BlockTimestamp:     getUpgradeTime(networkID, version.ApricotPhase4Times),
-		ApricotPhase5BlockTimestamp:     getUpgradeTime(networkID, version.ApricotPhase5Times),
-		ApricotPhasePre6BlockTimestamp:  getUpgradeTime(networkID, version.ApricotPhasePre6Times),
-		ApricotPhase6BlockTimestamp:     getUpgradeTime(networkID, version.ApricotPhase6Times),
-		ApricotPhasePost6BlockTimestamp: getUpgradeTime(networkID, version.ApricotPhasePost6Times),
-		BanffBlockTimestamp:             getUpgradeTime(networkID, version.BanffTimes),
-		CortinaBlockTimestamp:           getUpgradeTime(networkID, version.CortinaTimes),
-		DurangoBlockTimestamp:           getUpgradeTime(networkID, version.DurangoTimes),
-		EUpgradeTime:                    getUpgradeTime(networkID, version.EUpgradeTimes),
+		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase1Time),
+		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase2Time),
+		ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase3Time),
+		ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase4Time),
+		ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase5Time),
+		ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(agoUpgrade.ApricotPhasePre6Time),
+		ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase6Time),
+		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(agoUpgrade.ApricotPhasePost6Time),
+		BanffBlockTimestamp:             utils.TimeToNewUint64(agoUpgrade.BanffTime),
+		CortinaBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.CortinaTime),
+		DurangoBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.DurangoTime),
+		EUpgradeTime:                    utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 	}
 }
 

@@ -6,7 +6,6 @@ package params
 import (
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/utils"
@@ -119,15 +118,6 @@ func (c *ChainConfig) ToWithUpgradesJSON() *ChainConfigWithUpgradesJSON {
 		ChainConfig:   *c,
 		UpgradeConfig: c.UpgradeConfig,
 	}
-}
-
-func getUpgradeTime(networkID uint32, upgradeTimes map[uint32]time.Time) *uint64 {
-	if upgradeTime, ok := upgradeTimes[networkID]; ok {
-		return utils.TimeToNewUint64(upgradeTime)
-	}
-	// If the upgrade time isn't specified, default being enabled in the
-	// genesis.
-	return utils.NewUint64(0)
 }
 
 // SetEthUpgrades enables Etheruem network upgrades using the same time as
