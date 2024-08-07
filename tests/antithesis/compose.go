@@ -230,7 +230,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	}
 
 	workloadEnv := types.Mapping{
-		"AVAWL_URIS": strings.Join(uris, " "),
+		envVarName(URIsKey): strings.Join(uris, " "),
 	}
 	chainIDs := []string{}
 	for _, subnet := range network.Subnets {
@@ -239,7 +239,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 	}
 	if len(chainIDs) > 0 {
-		workloadEnv["AVAWL_CHAIN_IDS"] = strings.Join(chainIDs, " ")
+		workloadEnv[envVarName(ChainIDsKey)] = strings.Join(chainIDs, " ")
 	}
 
 	workloadName := "workload"

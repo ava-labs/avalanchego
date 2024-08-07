@@ -30,9 +30,6 @@ type Config struct {
 	Duration time.Duration
 }
 
-// Cleans up resources created by the configuration
-type CleanupFunc func()
-
 type SubnetsForNodesFunc func(nodes ...*tmpnet.Node) []*tmpnet.Subnet
 
 func NewConfig(tc tests.TestContext, defaultNetwork *tmpnet.Network) *Config {
@@ -57,12 +54,12 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	flag.Parse()
 
 	// Env vars take priority over flags
-	envURIs := os.Getenv(strings.ToUpper(EnvPrefix + "_" + URIsKey))
+	envURIs := os.Getenv(envVarName(URIsKey))
 	if len(envURIs) > 0 {
 		// CSV.Set doesn't actually return an error
 		_ = uris.Set(envURIs)
 	}
-	envChainIDs := os.Getenv(strings.ToUpper(EnvPrefix + "_" + ChainIDsKey))
+	envChainIDs := os.Getenv(envVarName(ChainIDsKey))
 	if len(envChainIDs) > 0 {
 		// CSV.Set doesn't actually return an error
 		_ = uris.Set(envChainIDs)
@@ -82,7 +79,7 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	return configForNewNetwork(tc, defaultNetwork, getSubnets, flagVars, duration)
 }
 
-// configForNewNetwork creates a new network and returns the resulting config and cleanup function.
+// configForNewNetwork creates a new network and returns the resulting config.
 func configForNewNetwork(
 	tc tests.TestContext,
 	defaultNetwork *tmpnet.Network,
@@ -127,4 +124,8 @@ func (c *CSV) String() string {
 func (c *CSV) Set(value string) error {
 	*c = strings.Split(value, ",")
 	return nil
+}
+
+func envVarName(key string) string {
+	return strings.ToUpper(strings.ToUpper(EnvPrefix + "_" + key))
 }
