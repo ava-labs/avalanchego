@@ -405,7 +405,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	// Staker5:                                     |--------------------|
 
 	// Staker0 it's here just to allow to issue a proposal block with the chosen endTime.
-	staker0RewardAddress := ids.GenerateTestShortID()
+	staker0RewardAddress := ids.ShortID{2}
 	staker0 := staker{
 		nodeID:        ids.NodeID(staker0RewardAddress),
 		rewardAddress: staker0RewardAddress,
@@ -421,7 +421,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
 	}
 
-	staker2RewardAddress := ids.GenerateTestShortID()
+	staker2RewardAddress := ids.ShortID{1}
 	staker2 := staker{
 		nodeID:        ids.NodeID(staker2RewardAddress),
 		rewardAddress: staker2RewardAddress,
