@@ -70,6 +70,11 @@ func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	// TODO: handle subnet conversion
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
 	return b.baseTx(tx)
 }
