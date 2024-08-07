@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -39,6 +40,7 @@ type Network struct {
 }
 
 func New(
+	ctx *snow.Context,
 	log logging.Logger,
 	nodeID ids.NodeID,
 	subnetID ids.ID,
@@ -153,6 +155,12 @@ func New(
 	}
 
 	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
+		return nil, err
+	}
+	signatureRequestHandler := signatureRequestHandler{
+		signer: ctx.WarpSigner,
+	}
+	if err := p2pNetwork.AddHandler(p2p.SignatureRequestHandlerID, signatureRequestHandler); err != nil {
 		return nil, err
 	}
 
