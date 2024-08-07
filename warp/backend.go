@@ -43,6 +43,8 @@ type Backend interface {
 	GetBlockSignature(blockID ids.ID) ([bls.SignatureLen]byte, error)
 
 	// GetMessage retrieves the [unsignedMessage] from the warp backend database if available
+	// TODO: After E-Upgrade, the backend no longer needs to store the mapping from messageHash
+	// to unsignedMessage (and this method can be removed).
 	GetMessage(messageHash ids.ID) (*avalancheWarp.UnsignedMessage, error)
 
 	// Clear clears the entire db
