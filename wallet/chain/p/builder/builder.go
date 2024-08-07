@@ -331,9 +331,6 @@ func (b *builder) NewBaseTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	outputComplexity, err := txfee.OutputComplexity(outputs...)
 	if err != nil {
@@ -425,9 +422,6 @@ func (b *builder) NewAddSubnetValidatorTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	authComplexity, err := txfee.AuthComplexity(subnetAuth)
 	if err != nil {
@@ -479,9 +473,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	authComplexity, err := txfee.AuthComplexity(subnetAuth)
 	if err != nil {
@@ -587,9 +578,6 @@ func (b *builder) NewCreateChainTx(
 	}
 	dynamicComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: bandwidth,
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	authComplexity, err := txfee.AuthComplexity(subnetAuth)
 	if err != nil {
@@ -640,9 +628,6 @@ func (b *builder) NewCreateSubnetTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	ownerComplexity, err := txfee.OwnerComplexity(owner)
 	if err != nil {
@@ -694,9 +679,6 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	authComplexity, err := txfee.AuthComplexity(subnetAuth)
 	if err != nil {
@@ -814,9 +796,6 @@ func (b *builder) NewImportTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	inputComplexity, err := txfee.InputComplexity(importedInputs...)
 	if err != nil {
@@ -893,9 +872,6 @@ func (b *builder) NewExportTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	outputComplexity, err := txfee.OutputComplexity(outputs...)
 	if err != nil {
@@ -1013,9 +989,6 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	signerComplexity, err := txfee.SignerComplexity(signer)
 	if err != nil {
@@ -1086,9 +1059,6 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	memo := ops.Memo()
 	memoComplexity := feecomponent.Dimensions{
 		feecomponent.Bandwidth: uint64(len(memo)),
-		feecomponent.DBRead:    0,
-		feecomponent.DBWrite:   0,
-		feecomponent.Compute:   0,
 	}
 	ownerComplexity, err := txfee.OwnerComplexity(rewardsOwner)
 	if err != nil {
