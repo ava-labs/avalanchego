@@ -423,6 +423,29 @@ func TestLock(t *testing.T) {
 				}
 			},
 		},
+		"OK: deposit for new owner": {
+			args: args{
+				totalAmountToSpend: 1,
+				totalAmountToBurn:  1,
+				appliedLockState:   locked.StateDeposited,
+				recipient:          &recipientOwners,
+				change:             &changeOwners,
+			},
+			utxos: []*avax.UTXO{
+				generate.UTXO(ids.ID{8, 8}, ctx.AVAXAssetID, 5, outputOwners, ids.Empty, ids.Empty, true),
+			},
+			generateWant: func(utxos []*avax.UTXO) want {
+				return want{
+					ins: []*avax.TransferableInput{
+						generate.InFromUTXO(t, utxos[0], []uint32{0}, false),
+					},
+					outs: []*avax.TransferableOutput{
+						generate.Out(ctx.AVAXAssetID, 1, recipientOwners, locked.ThisTxID, ids.Empty),
+						generate.Out(ctx.AVAXAssetID, 3, changeOwners, ids.Empty, ids.Empty),
+					},
+				}
+			},
+		},
 	}
 
 	for name, tt := range tests {
