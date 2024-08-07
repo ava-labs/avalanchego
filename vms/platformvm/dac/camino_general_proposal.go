@@ -19,7 +19,7 @@ import (
 const (
 	generalProposalMaxOptionsCount = 3
 	generalProposalMaxOptionSize   = 256
-	generalProposalMinDuration     = uint64(time.Hour * 24 / time.Second)      // 1 day
+	GeneralProposalMinDuration     = uint64(time.Hour * 24 / time.Second)      // 1 day
 	generalProposalMaxDuration     = uint64(time.Hour * 24 * 30 / time.Second) // 1 month
 )
 
@@ -75,8 +75,8 @@ func (p *GeneralProposal) Verify() error {
 		return fmt.Errorf("%w (expected: no more than %d, actual: %d)", errWrongOptionsCount, generalProposalMaxOptionsCount, len(p.Options))
 	case p.Start >= p.End:
 		return errEndNotAfterStart
-	case p.End-p.Start < generalProposalMinDuration:
-		return fmt.Errorf("%w (expected: minimum duration %d, actual: %d)", errWrongDuration, generalProposalMinDuration, p.End-p.Start)
+	case p.End-p.Start < GeneralProposalMinDuration:
+		return fmt.Errorf("%w (expected: minimum duration %d, actual: %d)", errWrongDuration, GeneralProposalMinDuration, p.End-p.Start)
 	case p.End-p.Start > generalProposalMaxDuration:
 		return fmt.Errorf("%w (expected: maximum duration %d, actual: %d)", errWrongDuration, generalProposalMaxDuration, p.End-p.Start)
 	}

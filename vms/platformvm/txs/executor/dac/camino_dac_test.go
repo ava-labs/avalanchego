@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -26,6 +27,8 @@ import (
 
 func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 	ctx := snow.DefaultContextTest()
+	// TODO @evlekht replace with test.PhaseLast when cairo phase will be added as last
+	defaultConfig := test.Config(t, test.PhaseCairo)
 
 	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
@@ -52,18 +55,41 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		state           func(*gomock.Controller, *txs.AddProposalTx, *config.Config) *state.MockDiff
+		config          *config.Config
 		utx             func() *txs.AddProposalTx
 		signers         [][]*secp256k1.PrivateKey
 		isAdminProposal bool
 		expectedErr     error
 	}{
-		"Proposer isn't caminoProposer": {
-			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+		"Not CairoPhase": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				return s
+			},
+			config: test.Config(t, test.PhaseBerlin),
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNotCairoPhase,
+		},
+		"Proposer isn't caminoProposer": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -78,17 +104,19 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 			expectedErr: errNotPermittedToCreateProposal,
 		},
 		"Already active BaseFeeProposal": {
-			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				proposalsIterator := state.NewMockProposalsIterator(c)
 				proposalsIterator.EXPECT().Next().Return(true)
 				proposalsIterator.EXPECT().Value().Return(&dac.BaseFeeProposalState{}, nil)
 				proposalsIterator.EXPECT().Release()
 
+				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -103,17 +131,19 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 			expectedErr: errAlreadyActiveProposal,
 		},
 		"OK": {
-			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				proposalsIterator := state.NewMockProposalsIterator(c)
 				proposalsIterator.EXPECT().Next().Return(false)
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
+				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -135,7 +165,12 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(
+				tt.config,
+				tt.state(gomock.NewController(t), utx, tt.config),
+				utx,
+				tt.isAdminProposal,
+			))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -172,6 +207,7 @@ func TestProposalExecutorBaseFeeProposal(t *testing.T) {
 
 func TestProposalVerifierAddMemberProposal(t *testing.T) {
 	ctx := snow.DefaultContextTest()
+	defaultConfig := test.Config(t, test.PhaseLast)
 
 	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
@@ -200,6 +236,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 
 	tests := map[string]struct {
 		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		config          *config.Config
 		utx             func() *txs.AddProposalTx
 		signers         [][]*secp256k1.PrivateKey
 		isAdminProposal bool
@@ -211,6 +248,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateConsortium, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -255,6 +293,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -280,6 +319,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -301,7 +341,12 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(
+				tt.config,
+				tt.state(gomock.NewController(t), utx),
+				utx,
+				tt.isAdminProposal,
+			))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -342,6 +387,7 @@ func TestProposalExecutorAddMemberProposal(t *testing.T) {
 
 func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 	ctx := snow.DefaultContextTest()
+	defaultConfig := test.Config(t, test.PhaseLast)
 
 	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
@@ -373,6 +419,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 
 	tests := map[string]struct {
 		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		config          *config.Config
 		utx             func() *txs.AddProposalTx
 		signers         [][]*secp256k1.PrivateKey
 		isAdminProposal bool
@@ -384,6 +431,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetAddressStates(memberAddress).Return(as.AddressStateEmpty, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -404,6 +452,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -425,6 +474,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetShortIDLink(utx.ProposerAddress, state.ShortLinkKeyRegisterNode).Return(ids.ShortEmpty, database.ErrNotFound)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -447,6 +497,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, memberNodeID).Return(nil, database.ErrNotFound)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -475,6 +526,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -500,6 +552,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -528,6 +581,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -549,7 +603,12 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(
+				tt.config,
+				tt.state(gomock.NewController(t), utx),
+				utx,
+				tt.isAdminProposal,
+			))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -809,6 +868,7 @@ func TestGetBondTxIDs(t *testing.T) {
 
 func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 	ctx := snow.DefaultContextTest()
+	defaultConfig := test.Config(t, test.PhaseLast)
 
 	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
 	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
@@ -835,18 +895,41 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 	}}
 
 	tests := map[string]struct {
-		state           func(*gomock.Controller, *txs.AddProposalTx) *state.MockDiff
+		state           func(*gomock.Controller, *txs.AddProposalTx, *config.Config) *state.MockDiff
+		config          *config.Config
 		utx             func() *txs.AddProposalTx
 		signers         [][]*secp256k1.PrivateKey
 		isAdminProposal bool
 		expectedErr     error
 	}{
-		"Proposer isn't caminoProposer": {
-			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+		"Not CairoPhase": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				return s
+			},
+			config: test.Config(t, test.PhaseBerlin),
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+			expectedErr: errNotCairoPhase,
+		},
+		"Proposer isn't caminoProposer": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -861,17 +944,19 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 			expectedErr: errNotPermittedToCreateProposal,
 		},
 		"Already active FeeDistributionProposal": {
-			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				proposalsIterator := state.NewMockProposalsIterator(c)
 				proposalsIterator.EXPECT().Next().Return(true)
 				proposalsIterator.EXPECT().Value().Return(&dac.FeeDistributionProposalState{}, nil)
 				proposalsIterator.EXPECT().Release()
 
+				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -886,17 +971,19 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 			expectedErr: errAlreadyActiveProposal,
 		},
 		"OK": {
-			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				proposalsIterator := state.NewMockProposalsIterator(c)
 				proposalsIterator.EXPECT().Next().Return(false)
 				proposalsIterator.EXPECT().Release()
 				proposalsIterator.EXPECT().Error().Return(nil)
 
+				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
 				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
+			config: defaultConfig,
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,
@@ -918,7 +1005,12 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(
+				tt.config,
+				tt.state(gomock.NewController(t), utx, tt.config),
+				utx,
+				tt.isAdminProposal,
+			))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

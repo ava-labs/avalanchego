@@ -71,12 +71,12 @@ func TestGeneralProposalVerify(t *testing.T) {
 		"To small duration": {
 			proposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration - 1,
+				End:     100 + GeneralProposalMinDuration - 1,
 				Options: [][]byte{{1}, {2}, {3}},
 			},
 			expectedProposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration - 1,
+				End:     100 + GeneralProposalMinDuration - 1,
 				Options: [][]byte{{1}, {2}, {3}},
 			},
 			expectedErr: errWrongDuration,
@@ -97,12 +97,12 @@ func TestGeneralProposalVerify(t *testing.T) {
 		"Option is bigger than allowed": {
 			proposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{make([]byte, generalProposalMaxOptionSize+1)},
 			},
 			expectedProposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{make([]byte, generalProposalMaxOptionSize+1)},
 			},
 			expectedErr: errGeneralProposalOptionIsToBig,
@@ -110,12 +110,12 @@ func TestGeneralProposalVerify(t *testing.T) {
 		"Not unique option": {
 			proposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{{1}, {2}, {1}},
 			},
 			expectedProposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{{1}, {2}, {1}},
 			},
 			expectedErr: errNotUniqueOption,
@@ -123,24 +123,24 @@ func TestGeneralProposalVerify(t *testing.T) {
 		"OK: 1 option": {
 			proposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{make([]byte, generalProposalMaxOptionSize)},
 			},
 			expectedProposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{make([]byte, generalProposalMaxOptionSize)},
 			},
 		},
 		"OK: 3 options": {
 			proposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{{1}, {2}, {3}},
 			},
 			expectedProposal: &GeneralProposal{
 				Start:   100,
-				End:     100 + generalProposalMinDuration,
+				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{{1}, {2}, {3}},
 			},
 		},

@@ -1766,7 +1766,7 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 		return fmt.Errorf("%w: %s", errProposerCredentialMismatch, err)
 	}
 
-	if err := txProposal.VerifyWith(dac.NewProposalVerifier(e.State, tx, isAdminProposal)); err != nil {
+	if err := txProposal.VerifyWith(dac.NewProposalVerifier(e.Config, e.State, tx, isAdminProposal)); err != nil {
 		return fmt.Errorf("%w: %s", errInvalidProposal, err)
 	}
 
@@ -1799,7 +1799,6 @@ func (e *CaminoStandardTxExecutor) AddProposalTx(tx *txs.AddProposalTx) error {
 	var proposalState dacProposals.ProposalState
 
 	if isAdminProposal {
-		// currently we only have addMember and excludeMember proposals, and their option 0 is "success" option
 		proposalState, err = txProposal.CreateFinishedProposalState(adminProposal.OptionIndex)
 		if err != nil {
 			// should never happen

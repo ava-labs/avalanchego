@@ -5907,9 +5907,10 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
 
 	applicantAddress := ids.ShortID{1, 1, 1}
+	proposerNodeShortID := ids.ShortID{2, 2, 2}
 
-	proposalWrapper := &txs.ProposalWrapper{Proposal: &dac.BaseFeeProposal{
-		Start: 100, End: 101, Options: []uint64{1},
+	proposalWrapper := &txs.ProposalWrapper{Proposal: &dac.GeneralProposal{
+		Start: 100, End: 100 + dac.GeneralProposalMinDuration, Options: [][]byte{{}},
 	}}
 	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposalWrapper)
 	require.NoError(t, err)
@@ -6149,7 +6150,7 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.ProposerAddress}, nil)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateConsortium
 				return s
 			},
 			utx: func(cfg *config.Config) *txs.AddProposalTx {
@@ -6190,13 +6191,11 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.ProposerAddress}, nil)
 
 				// * proposal verifier
-				proposalsIterator := state.NewMockProposalsIterator(c)
-				proposalsIterator.EXPECT().Next().Return(false)
-				proposalsIterator.EXPECT().Release()
-				proposalsIterator.EXPECT().Error().Return(nil)
-
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
-				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateConsortium, nil)
+				s.EXPECT().GetShortIDLink(utx.ProposerAddress, state.ShortLinkKeyRegisterNode).
+					Return(proposerNodeShortID, nil)
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, ids.NodeID(proposerNodeShortID)).
+					Return(&state.Staker{}, nil)
 				// *
 
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)

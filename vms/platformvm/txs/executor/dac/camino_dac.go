@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -27,9 +28,11 @@ var (
 	errNotPermittedToCreateProposal = errors.New("don't have permission to create proposal of this type")
 	errAlreadyActiveProposal        = errors.New("there is already active proposal of this type")
 	errNoActiveValidator            = errors.New("no active validator")
+	errNotCairoPhase                = errors.New("not allowed before CairoPhase")
 )
 
 type proposalVerifier struct {
+	config          *config.Config
 	state           state.Chain
 	addProposalTx   *txs.AddProposalTx
 	isAdminProposal bool
@@ -52,8 +55,9 @@ type proposalBondTxIDsGetter struct {
 	state state.Chain
 }
 
-func NewProposalVerifier(state state.Chain, tx *txs.AddProposalTx, isAdminProposal bool) dac.Verifier {
+func NewProposalVerifier(config *config.Config, state state.Chain, tx *txs.AddProposalTx, isAdminProposal bool) dac.Verifier {
 	return &proposalVerifier{
+		config:          config,
 		state:           state,
 		addProposalTx:   tx,
 		isAdminProposal: isAdminProposal,
@@ -89,6 +93,10 @@ func getBondTxIDs(bondTxIDsGetter dac.BondTxIDsGetter, state state.Chain, tx *tx
 // BaseFeeProposal
 
 func (e *proposalVerifier) BaseFeeProposal(*dac.BaseFeeProposal) error {
+	if !e.config.IsCairoPhaseActivated(e.state.GetTimestamp()) {
+		return errNotCairoPhase
+	}
+
 	// verify address state (role)
 	proposerAddressState, err := e.state.GetAddressStates(e.addProposalTx.ProposerAddress)
 	if err != nil {
@@ -354,6 +362,10 @@ func (*proposalBondTxIDsGetter) GeneralProposal(*dac.GeneralProposalState) ([]id
 // FeeDistributionProposal
 
 func (e *proposalVerifier) FeeDistributionProposal(*dac.FeeDistributionProposal) error {
+	if !e.config.IsCairoPhaseActivated(e.state.GetTimestamp()) {
+		return errNotCairoPhase
+	}
+
 	// verify address state (role)
 	proposerAddressState, err := e.state.GetAddressStates(e.addProposalTx.ProposerAddress)
 	if err != nil {
