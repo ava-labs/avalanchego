@@ -16,6 +16,7 @@ import (
 )
 
 // SignatureRequestHandler serves warp signature requests. It is a peer.RequestHandler for message.MessageSignatureRequest.
+// TODO: After E-Upgrade, this handler can be removed and SignatureRequestHandlerP2P is sufficient.
 type SignatureRequestHandler struct {
 	backend warp.Backend
 	codec   codec.Manager

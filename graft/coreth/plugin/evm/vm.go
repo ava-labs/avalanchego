@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/warp"
+	"github.com/ava-labs/coreth/warp/handlers"
 	warpValidators "github.com/ava-labs/coreth/warp/validators"
 
 	// Force-load tracer engine to trigger registration
@@ -645,7 +646,6 @@ func (vm *VM) Initialize(
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
-	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
 	// interface. The fx will register all of its types, which can be safely
 	// ignored by the VM's codec.
@@ -655,7 +655,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.initializeStateSyncServer()
+	vm.initializeHandlers()
 	return vm.initializeStateSyncClient(lastAcceptedHeight)
 }
 
@@ -793,13 +793,17 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 	return nil
 }
 
-// initializeStateSyncServer should be called after [vm.chain] is initialized.
-func (vm *VM) initializeStateSyncServer() {
+// initializeHandlers should be called after [vm.chain] is initialized.
+func (vm *VM) initializeHandlers() {
 	vm.StateSyncServer = NewStateSyncServer(&stateSyncServerConfig{
 		Chain:            vm.blockChain,
 		AtomicTrie:       vm.atomicTrie,
 		SyncableInterval: vm.config.StateSyncCommitInterval,
 	})
+
+	// Add p2p warp message warpHandler
+	warpHandler := handlers.NewSignatureRequestHandlerP2P(vm.warpBackend, vm.networkCodec)
+	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
 
 	vm.setAppRequestHandlers()
 	vm.setCrossChainAppRequestHandler()
