@@ -4,6 +4,7 @@
 package upgrade
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"testing"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/coreth/core"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -45,6 +48,21 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 
 	ginkgo.It("can upgrade versions", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
+
+		{
+			// Etna enables Cancun which modifies the outcome of the C-Chain genesis
+			// This is because of new header fields that modify the genesis block hash.
+			// This code can be removed once the Etna upgrade is activated.
+			cChainGenesis := new(core.Genesis)
+			cChainGenesisStr := network.Genesis.CChainGenesis
+			require.NoError(json.Unmarshal([]byte(cChainGenesisStr), cChainGenesis))
+			unscheduledActivationTime := uint64(upgrade.UnscheduledActivationTime.Unix())
+			cChainGenesis.Config.EUpgradeTime = &unscheduledActivationTime
+			cChainGenesisBytes, err := json.Marshal(cChainGenesis)
+			require.NoError(err)
+			network.Genesis.CChainGenesis = string(cChainGenesisBytes)
+		}
+
 		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
 
 		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
