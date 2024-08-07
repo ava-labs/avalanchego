@@ -39,7 +39,7 @@ func (*AddMemberProposal) GetOptions() any {
 }
 
 func (*AddMemberProposal) AdminProposer() as.AddressState {
-	return as.AddressStateRoleConsortiumAdminProposer
+	return as.AddressStateRoleConsortiumSecretary
 }
 
 func (p *AddMemberProposal) Verify() error {

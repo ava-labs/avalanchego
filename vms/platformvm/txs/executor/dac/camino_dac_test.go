@@ -82,11 +82,11 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 			},
 			expectedErr: errNotCairoPhase,
 		},
-		"Proposer isn't caminoProposer": {
+		"Proposer isn't FoundationAdmin": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateFoundationAdmin
 				return s
 			},
 			config: defaultConfig,
@@ -112,7 +112,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 
 				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -139,7 +139,7 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Error().Return(nil)
 
 				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -354,7 +354,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 
 func TestProposalExecutorAddMemberProposal(t *testing.T) {
 	applicantAddress := ids.ShortID{1}
-	applicantAddressState := as.AddressStateCaminoProposer // just not empty
+	applicantAddressState := as.AddressStateFoundationAdmin // just not empty
 
 	tests := map[string]struct {
 		state       func(*gomock.Controller) *state.MockDiff
@@ -616,7 +616,7 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 
 func TestProposalExecutorExcludeMemberProposal(t *testing.T) {
 	memberAddress := ids.ShortID{1}
-	memberAddressState := as.AddressStateCaminoProposer | as.AddressStateConsortium // just not only c-member
+	memberAddressState := as.AddressStateFoundationAdmin | as.AddressStateConsortium // just not only c-member
 	memberNodeShortID := ids.ShortID{2}
 	memberNodeID := ids.NodeID(memberNodeShortID)
 	memberValidator := &state.Staker{TxID: ids.ID{3}}
@@ -922,11 +922,11 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 			},
 			expectedErr: errNotCairoPhase,
 		},
-		"Proposer isn't caminoProposer": {
+		"Proposer isn't FoundationAdmin": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateCaminoProposer
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateEmpty, nil) // not AddressStateFoundationAdmin
 				return s
 			},
 			config: defaultConfig,
@@ -952,7 +952,7 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Release()
 
 				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},
@@ -979,7 +979,7 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 				proposalsIterator.EXPECT().Error().Return(nil)
 
 				s.EXPECT().GetTimestamp().Return(cfg.CairoPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateCaminoProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateFoundationAdmin, nil)
 				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
 				return s
 			},

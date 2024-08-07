@@ -46,7 +46,7 @@ func (p *ExcludeMemberProposal) GetData() any {
 }
 
 func (*ExcludeMemberProposal) AdminProposer() as.AddressState {
-	return as.AddressStateRoleConsortiumAdminProposer
+	return as.AddressStateRoleConsortiumSecretary
 }
 
 func (p *ExcludeMemberProposal) Verify() error {

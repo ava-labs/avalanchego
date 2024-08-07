@@ -60,11 +60,12 @@ type Proposal interface {
 
 	StartTime() time.Time
 	EndTime() time.Time
-	// AddressStateEmpty means that this proposal can't be used as admin proposal
-	AdminProposer() as.AddressState
 	CreateProposalState(allowedVoters []ids.ShortID) ProposalState
 	CreateFinishedProposalState(optionIndex uint32) (ProposalState, error)
 	VerifyWith(Verifier) error
+
+	// AddressStateEmpty means that this proposal can't be used as admin proposal
+	AdminProposer() as.AddressState
 
 	// Returns proposal options. (used in magellan)
 	//

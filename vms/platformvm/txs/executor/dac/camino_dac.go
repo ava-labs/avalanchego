@@ -103,7 +103,7 @@ func (e *proposalVerifier) BaseFeeProposal(*dac.BaseFeeProposal) error {
 		return err
 	}
 
-	if proposerAddressState.IsNot(as.AddressStateCaminoProposer) {
+	if proposerAddressState.IsNot(as.AddressStateFoundationAdmin) {
 		return errNotPermittedToCreateProposal
 	}
 
@@ -372,7 +372,7 @@ func (e *proposalVerifier) FeeDistributionProposal(*dac.FeeDistributionProposal)
 		return err
 	}
 
-	if proposerAddressState.IsNot(as.AddressStateCaminoProposer) {
+	if proposerAddressState.IsNot(as.AddressStateFoundationAdmin) {
 		return errNotPermittedToCreateProposal
 	}
 

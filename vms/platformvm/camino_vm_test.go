@@ -44,7 +44,10 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	nodeKey, nodeID := test.Keys[0], ids.NodeID(test.Keys[0].Address())
 	rootAdminKey := test.FundedKeys[0]
-	adminProposerKey := test.FundedKeys[0]
+	consortiumSecretaryKey := test.FundedKeys[0]
+	kycAdminKey := test.FundedKeys[0]
+	validatorAdminKey := test.FundedKeys[0]
+	fundsKey := test.FundedKeys[0]
 	consortiumMemberKey := test.Keys[1]
 
 	caminoGenesisConf := api.Camino{
@@ -61,11 +64,22 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	// Set consortium member
-	// add admin proposer role to root admin
+	// set ConsortiumSecretary role
 	tx, err := vm.txBuilder.NewAddressStateTx(
-		adminProposerKey.Address(),
+		consortiumSecretaryKey.Address(),
 		false,
-		as.AddressStateBitRoleConsortiumAdminProposer,
+		as.AddressStateBitRoleConsortiumSecretary,
+		rootAdminKey.Address(),
+		[]*secp256k1.PrivateKey{rootAdminKey},
+		nil,
+	)
+	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
+	// set kyc admin role
+	tx, err = vm.txBuilder.NewAddressStateTx(
+		kycAdminKey.Address(),
+		false,
+		as.AddressStateBitRoleKYCAdmin,
 		rootAdminKey.Address(),
 		[]*secp256k1.PrivateKey{rootAdminKey},
 		nil,
@@ -77,15 +91,15 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitKYCVerified,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		kycAdminKey.Address(),
+		[]*secp256k1.PrivateKey{kycAdminKey},
 		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, addrStateTx)
 	// make admin proposal to add consortium member
-	proposalTx := buildAddMemberProposalTx(t, vm, test.FundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
-		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
+	proposalTx := buildAddMemberProposalTx(t, vm, consortiumSecretaryKey, vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
+		consortiumSecretaryKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
 	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
@@ -94,7 +108,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		ids.EmptyNodeID,
 		nodeID,
 		consortiumMemberKey.Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{fundsKey, nodeKey, consortiumMemberKey},
 		nil,
 	)
 	require.NoError(err)
@@ -111,7 +125,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{test.FundedKeys[0], consortiumMemberKey},
+		[]*secp256k1.PrivateKey{fundsKey, consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -121,12 +135,24 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	vm.clock.Set(startTime)
 
 	// Defer the validator
+	// set validator admin role
+	tx, err = vm.txBuilder.NewAddressStateTx(
+		validatorAdminKey.Address(),
+		false,
+		as.AddressStateBitRoleValidatorAdmin,
+		rootAdminKey.Address(),
+		[]*secp256k1.PrivateKey{rootAdminKey},
+		nil,
+	)
+	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
+	// defer validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitNodeDeferred,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		validatorAdminKey.Address(),
+		[]*secp256k1.PrivateKey{validatorAdminKey},
 		nil,
 	)
 	require.NoError(err)
@@ -200,8 +226,11 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	require := require.New(t)
 
 	nodeKey, nodeID := test.Keys[0], ids.NodeID(test.Keys[0].Address())
+	fundsKey := test.FundedKeys[0]
 	rootAdminKey := test.FundedKeys[0]
-	adminProposerKey := test.FundedKeys[0]
+	kycAdminKey := test.FundedKeys[0]
+	validatorAdminKey := test.FundedKeys[0]
+	consortiumSecretaryKey := test.FundedKeys[0]
 	consortiumMemberKey := test.Keys[1]
 
 	caminoGenesisConf := api.Camino{
@@ -221,31 +250,42 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	// Set consortium member
-	// add admin proposer role to root admin
+	// set consortium secretary role
 	tx, err := vm.txBuilder.NewAddressStateTx(
-		adminProposerKey.Address(),
+		consortiumSecretaryKey.Address(),
 		false,
-		as.AddressStateBitRoleConsortiumAdminProposer,
+		as.AddressStateBitRoleConsortiumSecretary,
 		rootAdminKey.Address(),
 		[]*secp256k1.PrivateKey{rootAdminKey},
 		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
-	// set kyc flag for test consortium member (not member yet)
+	// set kyc admin role
 	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
+		kycAdminKey.Address(),
+		false,
+		as.AddressStateBitRoleKYCAdmin,
+		rootAdminKey.Address(),
+		[]*secp256k1.PrivateKey{rootAdminKey},
+		nil,
+	)
+	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, addrStateTx)
+	// set kyc flag for test consortium member (not member yet)
+	addrStateTx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitKYCVerified,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		kycAdminKey.Address(),
+		[]*secp256k1.PrivateKey{kycAdminKey},
 		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, addrStateTx)
 	// make admin proposal to add consortium member
-	proposalTx := buildAddMemberProposalTx(t, vm, test.FundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
-		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
+	proposalTx := buildAddMemberProposalTx(t, vm, consortiumSecretaryKey, vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
+		consortiumSecretaryKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
 	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
@@ -254,7 +294,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		ids.EmptyNodeID,
 		nodeID,
 		consortiumMemberKey.Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{fundsKey, nodeKey, consortiumMemberKey},
 		nil,
 	)
 	require.NoError(err)
@@ -271,7 +311,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{test.FundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{fundsKey, nodeKey, consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -280,13 +320,24 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	// Fast-forward clock to time for validator to be moved from pending to current
 	vm.clock.Set(startTime)
 
+	// Set validator admin role
+	tx, err = vm.txBuilder.NewAddressStateTx(
+		validatorAdminKey.Address(),
+		false,
+		as.AddressStateBitRoleValidatorAdmin,
+		rootAdminKey.Address(),
+		[]*secp256k1.PrivateKey{rootAdminKey},
+		nil,
+	)
+	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, tx)
 	// Defer the validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitNodeDeferred,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		validatorAdminKey.Address(),
+		[]*secp256k1.PrivateKey{validatorAdminKey},
 		nil,
 	)
 	require.NoError(err)
@@ -303,8 +354,8 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		true,
 		as.AddressStateBitNodeDeferred,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		validatorAdminKey.Address(),
+		[]*secp256k1.PrivateKey{validatorAdminKey},
 		nil,
 	)
 	require.NoError(err)
@@ -446,10 +497,6 @@ func TestDepositsAutoUnlock(t *testing.T) {
 
 func TestProposals(t *testing.T) {
 	proposerKey, proposerAddr := test.Keys[0], test.Keys[0].Address()
-	proposerAddrStr, err := address.FormatBech32(constants.UnitTestHRP, proposerAddr.Bytes())
-	require.NoError(t, err)
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.UnitTestHRP, test.FundedKeys[0].Address().Bytes())
-	require.NoError(t, err)
 
 	defaultConfig := test.Config(t, test.PhaseLast)
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
@@ -524,11 +571,11 @@ func TestProposals(t *testing.T) {
 			}, test.PhaseCairo, []api.UTXO{ // TODO @evlekht replace with PhaseLast when cairo is added
 				{
 					Amount:  json.Uint64(balance),
-					Address: proposerAddrStr,
+					Address: test.KeysBech32[0],
 				},
 				{
 					Amount:  json.Uint64(defaultTxFee),
-					Address: caminoPreFundedKey0AddrStr,
+					Address: test.FundedKeysBech32[0],
 				},
 			})
 			vm.ctx.Lock.Lock()
@@ -545,7 +592,7 @@ func TestProposals(t *testing.T) {
 			addrStateTx, err := vm.txBuilder.NewAddressStateTx(
 				proposerAddr,
 				false,
-				as.AddressStateBitCaminoProposer,
+				as.AddressStateBitFoundationAdmin,
 				test.FundedKeys[0].Address(),
 				[]*secp256k1.PrivateKey{test.FundedKeys[0]},
 				nil,
@@ -647,13 +694,10 @@ func TestProposals(t *testing.T) {
 func TestAdminProposals(t *testing.T) {
 	require := require.New(t)
 
-	proposerKey, proposerAddr := test.Keys[0], test.Keys[0].Address()
-	proposerAddrStr, err := address.FormatBech32(constants.UnitTestHRP, proposerAddr.Bytes())
-	require.NoError(err)
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.UnitTestHRP, test.FundedKeys[0].Address().Bytes())
-	require.NoError(err)
-
-	applicantAddr := proposerAddr
+	rootAdminKey := test.FundedKeys[0]
+	kycAdminKey := test.FundedKeys[0]
+	consortiumSecretaryKey := test.Keys[0]
+	applicantAddr := consortiumSecretaryKey.Address()
 
 	defaultConfig := test.Config(t, test.PhaseLast)
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
@@ -663,20 +707,20 @@ func TestAdminProposals(t *testing.T) {
 	vm := newCaminoVM(t, api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
-		InitialAdmin:        test.FundedKeys[0].Address(),
+		InitialAdmin:        rootAdminKey.Address(),
 	}, test.PhaseLast, []api.UTXO{
 		{
 			Amount:  json.Uint64(balance),
-			Address: proposerAddrStr,
+			Address: test.KeysBech32[0],
 		},
 		{
 			Amount:  json.Uint64(defaultTxFee * 2),
-			Address: caminoPreFundedKey0AddrStr,
+			Address: test.FundedKeysBech32[0],
 		},
 	})
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	checkBalance(t, vm.state, proposerAddr,
+	checkBalance(t, vm.state, consortiumSecretaryKey.Address(),
 		balance,          // total
 		0, 0, 0, balance, // unlocked
 	)
@@ -686,11 +730,11 @@ func TestAdminProposals(t *testing.T) {
 
 	// Give proposer address role to make admin proposals
 	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
-		proposerAddr,
+		consortiumSecretaryKey.Address(),
 		false,
-		as.AddressStateBitRoleConsortiumAdminProposer,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		as.AddressStateBitRoleConsortiumSecretary,
+		rootAdminKey.Address(),
+		[]*secp256k1.PrivateKey{rootAdminKey},
 		nil,
 	)
 	require.NoError(err)
@@ -701,13 +745,26 @@ func TestAdminProposals(t *testing.T) {
 	require.NoError(err)
 	require.True(applicantAddrState.IsNot(as.AddressStateConsortium))
 
+	// Set kyc admin role
+	addrStateTx, err = vm.txBuilder.NewAddressStateTx(
+		kycAdminKey.Address(),
+		false,
+		as.AddressStateBitRoleKYCAdmin,
+		rootAdminKey.Address(),
+		[]*secp256k1.PrivateKey{rootAdminKey},
+		nil,
+	)
+	require.NoError(err)
+	blk = buildAndAcceptBlock(t, vm, addrStateTx)
+	require.Len(blk.Txs(), 1)
+	checkTx(t, vm, blk.ID(), addrStateTx.ID())
 	// Make applicant (see admin proposal below) kyc-verified
 	addrStateTx, err = vm.txBuilder.NewAddressStateTx(
 		applicantAddr,
 		false,
 		as.AddressStateBitKYCVerified,
-		test.FundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		kycAdminKey.Address(),
+		[]*secp256k1.PrivateKey{kycAdminKey},
 		nil,
 	)
 	require.NoError(err)
@@ -720,8 +777,8 @@ func TestAdminProposals(t *testing.T) {
 
 	// Add admin proposal
 	chainTime := vm.state.GetTimestamp()
-	proposalTx := buildAddMemberProposalTx(t, vm, proposerKey, proposalBondAmount, fee,
-		proposerKey, applicantAddr, chainTime.Add(100*time.Second), true)
+	proposalTx := buildAddMemberProposalTx(t, vm, consortiumSecretaryKey, proposalBondAmount, fee,
+		consortiumSecretaryKey, applicantAddr, chainTime.Add(100*time.Second), true)
 	proposalState, nextProposalIDsToExpire, nexExpirationTime, proposalIDsToFinish := makeProposalWithTx(t, vm, proposalTx)
 	addMemberProposalState, ok := proposalState.(*dac.AddMemberProposalState)
 	require.True(ok)
@@ -730,7 +787,7 @@ func TestAdminProposals(t *testing.T) {
 	require.Equal(proposalState.EndTime(), nexExpirationTime)
 	require.Equal([]ids.ID{proposalTx.ID()}, proposalIDsToFinish) // admin proposal must be immediately finished
 	burnedAmt += fee
-	checkBalance(t, vm.state, proposerAddr,
+	checkBalance(t, vm.state, consortiumSecretaryKey.Address(),
 		balance-burnedAmt,                          // total
 		proposalBondAmount,                         // bonded
 		0, 0, balance-proposalBondAmount-burnedAmt, // unlocked
@@ -747,7 +804,7 @@ func TestAdminProposals(t *testing.T) {
 	proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
 	require.NoError(err)
 	require.Empty(proposalIDsToFinish)
-	checkBalance(t, vm.state, proposerAddr,
+	checkBalance(t, vm.state, consortiumSecretaryKey.Address(),
 		balance-burnedAmt,          // total
 		0, 0, 0, balance-burnedAmt, // unlocked
 	)
@@ -764,9 +821,9 @@ func TestExcludeMemberProposals(t *testing.T) {
 	memberToExcludeNodeKey, memberToExcludeNodeShortID := test.Keys[1], test.Keys[1].Address()
 	memberToExcludeNodeID := ids.NodeID(memberToExcludeNodeShortID)
 
-	// admin & funds & proposer
 	rootAdminKey := test.FundedKeys[0]
-	consortiumAdminKey := test.FundedKeys[0]
+	kycAdminKey := test.FundedKeys[0]
+	consortiumSecretaryKey := test.FundedKeys[0]
 	proposerMemberKey := test.FundedKeys[0]
 	fundsKey := test.FundedKeys[0]
 	fundsAddr := test.FundedKeys[0].Address()
@@ -870,11 +927,11 @@ func TestExcludeMemberProposals(t *testing.T) {
 				0, 0, balance-bondedAmt, // unlocked
 			)
 
-			// give root admin consortiumAdmin role
+			// set ConsortiumSecretary role
 			addrStateTx, err := vm.txBuilder.NewAddressStateTx(
-				consortiumAdminKey.Address(),
+				consortiumSecretaryKey.Address(),
 				false,
-				as.AddressStateBitRoleConsortiumAdminProposer,
+				as.AddressStateBitRoleConsortiumSecretary,
 				rootAdminKey.Address(),
 				[]*secp256k1.PrivateKey{rootAdminKey, fundsKey},
 				nil,
@@ -899,9 +956,9 @@ func TestExcludeMemberProposals(t *testing.T) {
 			_, err = vm.state.GetShortIDLink(memberToExcludeAddr, state.ShortLinkKeyRegisterNode)
 			require.ErrorIs(err, database.ErrNotFound)
 			addrStateTx, err = vm.txBuilder.NewAddressStateTx(
-				memberToExcludeAddr,
+				kycAdminKey.Address(),
 				false,
-				as.AddressStateBitKYCVerified,
+				as.AddressStateBitRoleKYCAdmin,
 				rootAdminKey.Address(),
 				[]*secp256k1.PrivateKey{rootAdminKey},
 				nil,
@@ -918,9 +975,29 @@ func TestExcludeMemberProposals(t *testing.T) {
 				bondedAmt,                         // bonded
 				0, 0, balance-bondedAmt-burnedAmt, // unlocked
 			)
+			addrStateTx, err = vm.txBuilder.NewAddressStateTx(
+				memberToExcludeAddr,
+				false,
+				as.AddressStateBitKYCVerified,
+				kycAdminKey.Address(),
+				[]*secp256k1.PrivateKey{kycAdminKey},
+				nil,
+			)
+			require.NoError(err)
+			_ = buildAndAcceptBlock(t, vm, addrStateTx)
+			expectedHeight++
+			height, err = vm.GetCurrentHeight(context.Background())
+			require.NoError(err)
+			require.Equal(expectedHeight, height)
+			burnedAmt += fee
+			checkBalance(t, vm.state, fundsAddr,
+				balance-burnedAmt,                 // total
+				bondedAmt,                         // bonded
+				0, 0, balance-bondedAmt-burnedAmt, // unlocked
+			)
 
 			addMemberProposalTx := buildAddMemberProposalTx(t, vm, fundsKey, proposalBondAmount, defaultTxFee,
-				consortiumAdminKey, memberToExcludeAddr, vm.clock.Time(), true)
+				consortiumSecretaryKey, memberToExcludeAddr, vm.clock.Time(), true)
 			_, _, _, _ = makeProposalWithTx(t, vm, addMemberProposalTx) // add admin proposal
 			expectedHeight++
 			height, err = vm.GetCurrentHeight(context.Background())
@@ -1090,8 +1167,9 @@ func TestExcludeMemberProposals(t *testing.T) {
 
 			if tt.moreExclude {
 				excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, fundsKey, proposalBondAmount, fee,
-					consortiumAdminKey, memberToExcludeAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
-				require.Error(vm.Builder.AddUnverifiedTx(excludeMemberProposalTx))
+					consortiumSecretaryKey, memberToExcludeAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
+				err = vm.Builder.AddUnverifiedTx(excludeMemberProposalTx)
+				require.ErrorIs(err, txexecutor.ErrInvalidProposal)
 				height, err = vm.GetCurrentHeight(context.Background())
 				require.NoError(err)
 				require.Equal(expectedHeight, height)

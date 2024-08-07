@@ -1486,7 +1486,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	})
 }
 
-func TestCaminoStandardTxAddressStateTx(t *testing.T) {
+func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 	ctx := test.Context(t)
 	caminoGenesisConf := api.Camino{VerifyNodeSignature: true, LockModeBondDeposit: true}
 
@@ -1993,7 +1993,7 @@ func TestCaminoStandardTxAddressStateTx(t *testing.T) {
 					[]ids.ShortID{feeOwnerAddr, executorAddr}, nil)
 
 				s.EXPECT().GetAddressStates(utx.Address).Return(as.AddressStateEmpty, nil)
-				s.EXPECT().SetAddressStates(utx.Address, as.AddressStateKYCVerified)
+				s.EXPECT().SetAddressStates(utx.Address, as.AddressStateRoleKYCAdmin)
 
 				expect.ConsumeUTXOs(t, s, utx.Ins)
 				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
@@ -2009,7 +2009,7 @@ func TestCaminoStandardTxAddressStateTx(t *testing.T) {
 					},
 				}},
 				Address:      otherAddr,
-				StateBit:     as.AddressStateBitKYCVerified,
+				StateBit:     as.AddressStateBitRoleKYCAdmin,
 				ExecutorAuth: &secp256k1fx.Input{},
 			},
 			phase: phase,
@@ -2028,29 +2028,29 @@ func TestCaminoStandardTxAddressStateTx(t *testing.T) {
 			executorAddrState:      as.AddressStateRoleAdmin,
 		},
 		"OK: target state is not empty": {
-			txStateBit:             as.AddressStateBitKYCVerified,
+			txStateBit:             as.AddressStateBitRoleKYCAdmin,
 			currentTargetAddrState: as.AddressStateConsortium,
 			executorAddrState:      as.AddressStateRoleAdmin,
 		},
 		"OK: not modified": {
-			txStateBit:             as.AddressStateBitKYCVerified,
-			currentTargetAddrState: as.AddressStateKYCVerified,
+			txStateBit:             as.AddressStateBitRoleKYCAdmin,
+			currentTargetAddrState: as.AddressStateRoleKYCAdmin,
 			executorAddrState:      as.AddressStateRoleAdmin,
 		},
 		"OK: modifying executors own address state": {
 			selfModify:             true,
-			txStateBit:             as.AddressStateBitKYCVerified,
+			txStateBit:             as.AddressStateBitRoleKYCAdmin,
 			currentTargetAddrState: as.AddressStateRoleAdmin,
 			executorAddrState:      as.AddressStateRoleAdmin,
 		},
 		"OK: removal": {
-			txStateBit:             as.AddressStateBitKYCVerified,
+			txStateBit:             as.AddressStateBitRoleKYCAdmin,
 			remove:                 true,
-			currentTargetAddrState: as.AddressStateKYCVerified,
+			currentTargetAddrState: as.AddressStateRoleKYCAdmin,
 			executorAddrState:      as.AddressStateRoleAdmin,
 		},
 		"OK: removal, not modified": {
-			txStateBit:             as.AddressStateBitKYCVerified,
+			txStateBit:             as.AddressStateBitRoleKYCAdmin,
 			remove:                 true,
 			currentTargetAddrState: as.AddressStateConsortium,
 			executorAddrState:      as.AddressStateRoleAdmin,
@@ -2058,46 +2058,54 @@ func TestCaminoStandardTxAddressStateTx(t *testing.T) {
 	}
 
 	validBits := getBitsFromAddressState(as.AddressStateValidBits)
-
-	// set role-bit permissions
-	permissionsMatrix := map[as.AddressStateBit]map[as.AddressStateBit]bool{}
-	for _, role := range validBits {
-		permissionsMatrix[role] = map[as.AddressStateBit]bool{}
-		for _, bit := range validBits {
-			permissionsMatrix[role][bit] = false
-		}
-	}
-	for _, bit := range validBits {
-		permissionsMatrix[as.AddressStateBitRoleAdmin][bit] = true
-	}
-	permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCVerified] = true
-	permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCExpired] = true
-	permissionsMatrix[as.AddressStateBitRoleOffersAdmin][as.AddressStateBitOffersCreator] = true
-
-	// set phase-bit restrictions
-	bitsPhaseMatrix := map[as.AddressStateBit]map[test.Phase]error{}
-	for _, bit := range validBits {
-		bitsPhaseMatrix[bit] = map[test.Phase]error{}
-		for phase := test.PhaseFirst; phase <= test.PhaseLast; phase++ {
-			bitsPhaseMatrix[bit][phase] = nil
-		}
-	}
-	// sunriseBits := getBitsFromAddressState(as.AddressStateSunrisePhaseBits)
+	roleBits := getBitsFromAddressState(addressStateRoleBits)
 	athensBits := getBitsFromAddressState(as.AddressStateAthensPhaseBits)
 	berlinBits := getBitsFromAddressState(as.AddressStateBerlinPhaseBits)
-	for _, bit := range athensBits {
-		for phase := test.PhaseFirst; phase < test.PhaseAthens; phase++ {
-			bitsPhaseMatrix[bit][phase] = errNotAthensPhase
-		}
-	}
-	for _, bit := range berlinBits {
-		for phase := test.PhaseFirst; phase < test.PhaseBerlin; phase++ {
-			bitsPhaseMatrix[bit][phase] = errNotBerlinPhase
-		}
-	}
-	bitsPhaseMatrix[as.AddressStateBitConsortium][test.PhaseBerlin] = errBerlinPhase
 
-	// set phase-txUpgrade restrictions := getBitsFromAddressState(as.AddressStateSunrisePhaseBits)
+	// set phase-role-bit permissions
+	permissionsMatrix := map[test.Phase]map[as.AddressStateBit]map[as.AddressStateBit]error{}
+	for phase := test.PhaseFirst; phase <= test.PhaseLast; phase++ {
+		permissionsMatrix[phase] = make(map[as.AddressStateBit]map[as.AddressStateBit]error)
+	}
+	for _, permissionsMatrix := range permissionsMatrix {
+		for _, role := range validBits {
+			permissionsMatrix[role] = map[as.AddressStateBit]error{}
+			for _, bit := range validBits {
+				permissionsMatrix[role][bit] = errAddrStateNotPermitted
+			}
+		}
+	}
+	for phase := test.PhaseFirst; phase < test.PhaseBerlin; phase++ {
+		for _, bit := range validBits {
+			permissionsMatrix[phase][as.AddressStateBitRoleAdmin][bit] = nil
+		}
+	}
+	for phase := test.PhaseBerlin; phase <= test.PhaseLast; phase++ {
+		for _, bit := range roleBits {
+			permissionsMatrix[phase][as.AddressStateBitRoleAdmin][bit] = nil
+		}
+	}
+	for _, permissionsMatrix := range permissionsMatrix {
+		permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCVerified] = nil
+		permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCExpired] = nil
+		permissionsMatrix[as.AddressStateBitRoleOffersAdmin][as.AddressStateBitOffersCreator] = nil
+		permissionsMatrix[as.AddressStateBitRoleValidatorAdmin][as.AddressStateBitNodeDeferred] = nil
+	}
+	for _, role := range validBits {
+		for phase := test.PhaseFirst; phase < test.PhaseAthens; phase++ {
+			for _, bit := range athensBits {
+				permissionsMatrix[phase][role][bit] = errNotAthensPhase
+			}
+		}
+		for phase := test.PhaseFirst; phase < test.PhaseBerlin; phase++ {
+			for _, bit := range berlinBits {
+				permissionsMatrix[phase][role][bit] = errNotBerlinPhase
+			}
+		}
+		permissionsMatrix[test.PhaseBerlin][role][as.AddressStateBitConsortium] = errBerlinPhase
+	}
+
+	// set phase-txUpgrade restrictions
 	txUpgradeMatrix := map[test.Phase][]codec.UpgradeVersionID{}
 	for phase := test.PhaseFirst; phase < test.PhaseBerlin; phase++ {
 		txUpgradeMatrix[phase] = append(txUpgradeMatrix[phase], codec.UpgradeVersion0)
@@ -2106,15 +2114,13 @@ func TestCaminoStandardTxAddressStateTx(t *testing.T) {
 		txUpgradeMatrix[phase] = append(txUpgradeMatrix[phase], codec.UpgradeVersion1)
 	}
 
-	for role, permissions := range permissionsMatrix {
-		for bit, allowed := range permissions {
-			if allowed {
-				for phase := test.PhaseFirst; phase <= test.PhaseLast; phase++ {
-					if bitsPhaseMatrix[bit][phase] != nil {
-						continue
-					}
-					txUpgrades := txUpgradeMatrix[phase]
-					for _, txUpgrade := range txUpgrades {
+	for phase, permissionsMatrix := range permissionsMatrix {
+		for role, permissions := range permissionsMatrix {
+			for bit, expectedErr := range permissions {
+				txUpgrades := txUpgradeMatrix[phase]
+				for _, txUpgrade := range txUpgrades {
+					switch expectedErr {
+					case nil:
 						if bit == as.AddressStateBitConsortium {
 							// resume node, defer is tested below
 							testCaseOK[txUpgrade](t, testData{
@@ -2127,35 +2133,16 @@ func TestCaminoStandardTxAddressStateTx(t *testing.T) {
 							txStateBit:        bit,
 							executorAddrState: role.ToAddressState(),
 						}, fmt.Sprintf("OK: (%0d) modifies (%0d)", role, bit), phase)
-					}
-				}
-			} else {
-				for phase := test.PhaseFirst; phase <= test.PhaseLast; phase++ {
-					if bitsPhaseMatrix[bit][phase] != nil {
-						continue
-					}
-					txUpgrades := txUpgradeMatrix[phase]
-					for _, txUpgrade := range txUpgrades {
+					case errAddrStateNotPermitted:
 						testCaseFailNoPermission[txUpgrade](t, testData{
 							txStateBit:        bit,
 							executorAddrState: role.ToAddressState(),
 						}, fmt.Sprintf("Fail: (%0d) modifies (%0d)", role, bit), phase)
+					default:
+						testCaseFailBitForbidden[txUpgrade](t, testData{txStateBit: bit},
+							fmt.Sprintf("Fail: (%0d) modifies (%0d), forbidden by phase", bit, role), expectedErr, phase)
 					}
 				}
-			}
-		}
-	}
-
-	for _, bit := range validBits {
-		for phase := test.PhaseFirst; phase <= test.PhaseLast; phase++ {
-			expectedErr := bitsPhaseMatrix[bit][phase]
-			if expectedErr == nil {
-				continue
-			}
-			txUpgrades := txUpgradeMatrix[phase]
-			for _, txUpgrade := range txUpgrades {
-				testCaseFailBitForbidden[txUpgrade](t, testData{txStateBit: bit},
-					fmt.Sprintf("Forbid bit %d", bit), expectedErr, phase)
 			}
 		}
 	}
@@ -6164,7 +6151,7 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
 			},
-			expectedErr: errInvalidProposal,
+			expectedErr: ErrInvalidProposal,
 		},
 		"OK": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddProposalTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
@@ -6236,7 +6223,7 @@ func TestCaminoStandardTxExecutorAddProposalTx(t *testing.T) {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
-				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateRoleConsortiumAdminProposer, nil)
+				s.EXPECT().GetAddressStates(utx.ProposerAddress).Return(as.AddressStateRoleConsortiumSecretary, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.ProposerAddress}, nil)
 
 				// * proposal verifier
