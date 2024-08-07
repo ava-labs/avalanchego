@@ -79,10 +79,21 @@ jobs:
           check-latest: true
       - name: Run static analysis tests
         shell: bash
-        run: scripts/lint.sh
+        run: TESTS='golangci_lint' scripts/lint.sh
       - name: Run shellcheck
         shell: bash
         run: scripts/shellcheck.sh
+  License-Headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' #camino-license needs go version > 1.21 because of "slices" package
+          check-latest: true
+      - name: Run static analysis tests
+        shell: bash
+        run: TESTS='license_header' scripts/lint.sh
   buf-lint:
     name: Protobuf Lint
     runs-on: ubuntu-latest

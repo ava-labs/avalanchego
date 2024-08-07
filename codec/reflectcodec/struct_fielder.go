@@ -1,4 +1,4 @@
-// Copyright (C) 2023-2024, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2024, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
