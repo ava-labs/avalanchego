@@ -4,190 +4,167 @@
 package txs
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/require"
 )
 
 func TestAddressStateTxSyntacticVerify(t *testing.T) {
-	require := require.New(t)
 	ctx := defaultContext()
-	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
+	addr1 := ids.ShortID{1}
+	lockTxID := ids.ID{2}
+	owner1 := secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{addr1}}
 
-	var (
-		stx            *Tx
-		addressStateTx *AddressStateTx
-		err            error
-	)
-
-	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
-
-	// Case : unsigned tx is nil
-	require.ErrorIs(addressStateTx.SyntacticVerify(ctx), ErrNilTx)
-
-	inputs := []*avax.TransferableInput{{
-		UTXOID: avax.UTXOID{
-			TxID:        ids.ID{'t', 'x', 'I', 'D'},
-			OutputIndex: 2,
-		},
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-		In: &secp256k1fx.TransferInput{
-			Amt:   uint64(5678),
-			Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
+	baseTx := BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    ctx.NetworkID,
+		BlockchainID: ctx.ChainID,
 	}}
-	outputs := []*avax.TransferableOutput{{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: uint64(1234),
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+
+	type testCase struct {
+		tx          *AddressStateTx
+		expectedErr error
+	}
+
+	tests := map[string]testCase{
+		"Nil tx": {
+			expectedErr: ErrNilTx,
+		},
+		"Empty target address": {
+			tx: &AddressStateTx{
+				BaseTx: baseTx,
+			},
+			expectedErr: errEmptyAddress,
+		},
+		"Address state bit is greater than max possible bit": {
+			tx: &AddressStateTx{
+				BaseTx:   baseTx,
+				Address:  addr1,
+				StateBit: as.AddressStateBitMax + 1,
+			},
+			expectedErr: errInvalidAddrStateBit,
+		},
+		"UpgradeVersion1, bad executor auth": {
+			tx: &AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          addr1,
+				ExecutorAuth:     (*secp256k1fx.Input)(nil),
+			},
+			expectedErr: errBadExecutorAuth,
+		},
+		"UpgradeVersion1, empty executor address": {
+			tx: &AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          addr1,
+				ExecutorAuth:     &secp256k1fx.Input{},
+			},
+			expectedErr: ErrEmptyExecutorAddress,
+		},
+		"Stakeable base tx input": {
+			tx: &AddressStateTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generateTestStakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{0}),
+					},
+				}},
+				Address: addr1,
+			},
+			expectedErr: locked.ErrWrongInType,
+		},
+		"Stakeable base tx output": {
+			tx: &AddressStateTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Outs: []*avax.TransferableOutput{
+						generateTestStakeableOut(ctx.AVAXAssetID, 1, 1, owner1),
+					},
+				}},
+				Address: addr1,
+			},
+			expectedErr: locked.ErrWrongOutType,
+		},
+		"Locked base tx input": {
+			tx: &AddressStateTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generateTestIn(ctx.AVAXAssetID, 1, lockTxID, ids.Empty, []uint32{0}),
+					},
+				}},
+				Address: addr1,
+			},
+			expectedErr: locked.ErrWrongInType,
+		},
+		"Locked base tx output": {
+			tx: &AddressStateTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Outs: []*avax.TransferableOutput{
+						generateTestOut(ctx.AVAXAssetID, 1, owner1, lockTxID, ids.Empty),
+					},
+				}},
+				Address: addr1,
+			},
+			expectedErr: locked.ErrWrongOutType,
+		},
+		"OK: UpgradeVersion0": {
+			tx: &AddressStateTx{
+				BaseTx:  baseTx,
+				Address: addr1,
 			},
 		},
-	}}
-	lockedOut := &avax.TransferableOutput{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-		Out: &locked.Out{
-			IDs: locked.IDsEmpty,
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: uint64(1234),
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-				},
+		"OK: UpgradeVersion1": {
+			tx: &AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          addr1,
+				Executor:         addr1,
+				ExecutorAuth:     &secp256k1fx.Input{},
 			},
 		},
 	}
 
-	stakedOut := &avax.TransferableOutput{
-		Asset: avax.Asset{ID: ids.ID{'a', 's', 's', 'e', 't'}},
-		Out: &stakeable.LockOut{
-			TransferableOut: &secp256k1fx.TransferOutput{
-				Amt: uint64(1234),
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-				},
-			},
-		},
+	// bit range test cases
+	for bit := as.AddressStateBit(0); bit <= as.AddressStateBitMax; bit++ {
+		tx := &AddressStateTx{
+			BaseTx:   baseTx,
+			Address:  addr1,
+			StateBit: bit,
+		}
+		if bit.ToAddressState()&as.AddressStateValidBits == 0 {
+			testCaseName := fmt.Sprintf("BitValidity/%02d is invalid", bit)
+			require.NotContains(t, tests, testCaseName)
+			tests[testCaseName] = testCase{
+				tx:          tx,
+				expectedErr: errInvalidAddrStateBit,
+			}
+		} else {
+			testCaseName := fmt.Sprintf("BitValidity/OK: %02d", bit)
+			require.NotContains(t, tests, testCaseName)
+			tests[testCaseName] = testCase{
+				tx: tx,
+			}
+		}
 	}
 
-	addressStateTx = &AddressStateTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
-		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   as.AddressStateBitRoleAdmin,
-		Remove:  false,
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tt.tx.SyntacticVerify(ctx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
 	}
-
-	lockedOutputs := append([]*avax.TransferableOutput{}, outputs...)
-	lockedOutputs = append(lockedOutputs, lockedOut)
-
-	addressStateTxLocked := &AddressStateTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			Ins:          inputs,
-			Outs:         lockedOutputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
-		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   as.AddressStateBitRoleAdmin,
-		Remove:  false,
-	}
-
-	lockedOutputs[1] = stakedOut
-	addressStateTxStaked := &AddressStateTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			Ins:          inputs,
-			Outs:         lockedOutputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
-		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   as.AddressStateBitRoleAdmin,
-		Remove:  false,
-	}
-
-	executorAuth := secp256k1fx.Input{}
-
-	addressStateTxUpgraded := &AddressStateTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    ctx.NetworkID,
-			BlockchainID: ctx.ChainID,
-			Ins:          inputs,
-			Outs:         outputs,
-			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
-		}},
-		UpgradeVersionID: codec.BuildUpgradeVersionID(1),
-		Address:          preFundedKeys[0].PublicKey().Address(),
-		State:            as.AddressStateBitRoleAdmin,
-		Remove:           false,
-		Executor:         ids.ShortEmpty,
-		ExecutorAuth:     &executorAuth,
-	}
-
-	// Case: valid tx
-	stx, err = NewSigned(addressStateTx, Codec, signers)
-	require.NoError(err)
-	require.NoError(stx.SyntacticVerify(ctx))
-
-	// Case: Empty address
-	addressStateTx.SyntacticallyVerified = false
-	addressStateTx.Address = ids.ShortID{}
-	stx, err = NewSigned(addressStateTx, Codec, signers)
-	require.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	require.Error(err, ErrEmptyAddress)
-	addressStateTx.Address = preFundedKeys[0].PublicKey().Address()
-
-	// Invalid mode
-	addressStateTx.SyntacticallyVerified = false
-	addressStateTx.State = 99
-	stx, err = NewSigned(addressStateTx, Codec, signers)
-	require.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	require.Error(err, ErrInvalidState)
-	addressStateTx.State = as.AddressStateBitRoleAdmin
-
-	// Locked out
-	stx, err = NewSigned(addressStateTxLocked, Codec, signers)
-	require.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
-
-	// Staked out
-	stx, err = NewSigned(addressStateTxStaked, Codec, signers)
-	require.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	require.Error(err)
-
-	// Upgraded / empty executor
-	stx, err = NewSigned(addressStateTxUpgraded, Codec, signers)
-	require.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	require.Error(err, ErrEmptyAddress)
-
-	// Upgraded / Ok
-	addressStateTxUpgraded.Executor = ids.ShortID{'X'}
-	stx, err = NewSigned(addressStateTxUpgraded, Codec, signers)
-	require.NoError(err)
-	err = stx.SyntacticVerify(ctx)
-	require.NoError(err)
 }

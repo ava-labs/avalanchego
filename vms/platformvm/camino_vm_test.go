@@ -86,6 +86,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		adminProposerKey.Address(),
 		false,
 		as.AddressStateBitRoleConsortiumAdminProposer,
+		rootAdminKey.Address(),
 		[]*secp256k1.PrivateKey{rootAdminKey},
 		outputOwners,
 	)
@@ -95,6 +96,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitKYCVerified,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		nil,
 	)
@@ -153,6 +155,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitNodeDeferred,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -167,7 +170,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state and consortium member is true
 	ownerState, _ := vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, as.AddressStateNodeDeferred|as.AddressStateConsortiumMember|as.AddressStateKYCVerified)
+	require.Equal(ownerState, as.AddressStateNodeDeferred|as.AddressStateConsortium|as.AddressStateKYCVerified)
 
 	// Fast-forward clock to time for validator to be rewarded
 	vm.clock.Set(endTime)
@@ -218,7 +221,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state is false
 	ownerState, _ = vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, as.AddressStateConsortiumMember|as.AddressStateKYCVerified)
+	require.Equal(ownerState, as.AddressStateConsortium|as.AddressStateKYCVerified)
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())
@@ -272,6 +275,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		adminProposerKey.Address(),
 		false,
 		as.AddressStateBitRoleConsortiumAdminProposer,
+		rootAdminKey.Address(),
 		[]*secp256k1.PrivateKey{rootAdminKey},
 		outputOwners,
 	)
@@ -281,6 +285,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitKYCVerified,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		nil,
 	)
@@ -340,6 +345,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitNodeDeferred,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -357,6 +363,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		true,
 		as.AddressStateBitNodeDeferred,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -600,6 +607,7 @@ func TestProposals(t *testing.T) {
 				proposerAddr,
 				false,
 				as.AddressStateBitCaminoProposer,
+				caminoPreFundedKeys[0].Address(),
 				[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 				nil,
 			)
@@ -741,6 +749,7 @@ func TestAdminProposals(t *testing.T) {
 		proposerAddr,
 		false,
 		as.AddressStateBitRoleConsortiumAdminProposer,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		nil,
 	)
@@ -750,13 +759,14 @@ func TestAdminProposals(t *testing.T) {
 	checkTx(t, vm, blk.ID(), addrStateTx.ID())
 	applicantAddrState, err := vm.state.GetAddressStates(applicantAddr)
 	require.NoError(err)
-	require.True(applicantAddrState.IsNot(as.AddressStateConsortiumMember))
+	require.True(applicantAddrState.IsNot(as.AddressStateConsortium))
 
 	// Make applicant (see admin proposal below) kyc-verified
 	addrStateTx, err = vm.txBuilder.NewAddressStateTx(
 		applicantAddr,
 		false,
 		as.AddressStateBitKYCVerified,
+		caminoPreFundedKeys[0].Address(),
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		nil,
 	)
@@ -805,7 +815,7 @@ func TestAdminProposals(t *testing.T) {
 	// check that applicant became c-member
 	applicantAddrState, err = vm.state.GetAddressStates(applicantAddr)
 	require.NoError(err)
-	require.True(applicantAddrState.Is(as.AddressStateConsortiumMember))
+	require.True(applicantAddrState.Is(as.AddressStateConsortium))
 }
 
 func TestExcludeMemberProposals(t *testing.T) {
@@ -933,6 +943,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 				consortiumAdminKey.Address(),
 				false,
 				as.AddressStateBitRoleConsortiumAdminProposer,
+				rootAdminKey.Address(),
 				[]*secp256k1.PrivateKey{rootAdminKey, fundsKey},
 				nil,
 			)
@@ -959,6 +970,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 				memberToExcludeAddr,
 				false,
 				as.AddressStateBitKYCVerified,
+				rootAdminKey.Address(),
 				[]*secp256k1.PrivateKey{rootAdminKey},
 				nil,
 			)
@@ -997,7 +1009,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 			require.Equal(expectedHeight, height)
 			memberAddrState, err = vm.state.GetAddressStates(memberToExcludeAddr)
 			require.NoError(err)
-			require.Equal(as.AddressStateConsortiumMember|as.AddressStateKYCVerified, memberAddrState)
+			require.Equal(as.AddressStateConsortium|as.AddressStateKYCVerified, memberAddrState)
 			bondedAmt -= proposalBondAmount
 			checkBalance(t, vm.state, fundsAddr,
 				balance-burnedAmt,                 // total
@@ -1226,7 +1238,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 					0, 0, balance-burnedAmt-bondedAmt, // unlocked
 				)
 			} else {
-				require.Equal(as.AddressStateConsortiumMember|as.AddressStateKYCVerified, memberAddrState)
+				require.Equal(as.AddressStateConsortium|as.AddressStateKYCVerified, memberAddrState)
 				if tt.pendingValidator {
 					require.NoError(pendingValidatorErr)
 				} else {

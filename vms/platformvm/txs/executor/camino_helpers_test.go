@@ -15,7 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -23,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -110,7 +108,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 
-	baseState := defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
+	baseState := defaultCaminoState(config, ctx, baseDB, rewards, caminoGenesisConf)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -118,7 +116,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 
 	txBuilder := builder.NewCamino(
 		ctx,
-		&config,
+		config,
 		&clk,
 		fx,
 		baseState,
@@ -127,7 +125,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 	)
 
 	backend := Backend{
-		Config:       &config,
+		Config:       config,
 		Ctx:          ctx,
 		Clk:          &clk,
 		Bootstrapped: &isBootstrapped,
@@ -139,7 +137,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 
 	env := &caminoEnvironment{
 		isBootstrapped: &isBootstrapped,
-		config:         &config,
+		config:         config,
 		clk:            &clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
@@ -240,41 +238,15 @@ func defaultCaminoState(
 	return state
 }
 
-func defaultCaminoConfig(postBanff bool) config.Config {
-	banffTime := mockable.MaxTime
-	if postBanff {
-		banffTime = defaultValidateEndTime.Add(-2 * time.Second)
+func defaultCaminoConfig(postBanff bool) *config.Config {
+	config := defaultConfig(postBanff, true)
+	config.MinValidatorStake = defaultCaminoValidatorWeight
+	config.MaxValidatorStake = defaultCaminoValidatorWeight
+	config.BerlinPhaseTime = defaultValidateStartTime.Add(-2 * time.Second)
+	config.CaminoConfig = caminoconfig.Config{
+		DACProposalBondAmount: 100 * units.Avax,
 	}
-
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
-	return config.Config{
-		Chains:                 chains.TestManager,
-		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		Validators:             vdrs,
-		TxFee:                  defaultTxFee,
-		CreateSubnetTxFee:      100 * defaultTxFee,
-		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      defaultCaminoValidatorWeight,
-		MaxValidatorStake:      defaultCaminoValidatorWeight,
-		MinDelegatorStake:      1 * units.MilliAvax,
-		MinStakeDuration:       defaultMinStakingDuration,
-		MaxStakeDuration:       defaultMaxStakingDuration,
-		RewardConfig: reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-		ApricotPhase3Time: defaultValidateEndTime,
-		ApricotPhase5Time: defaultValidateEndTime,
-		BanffTime:         banffTime,
-		CaminoConfig: caminoconfig.Config{
-			DACProposalBondAmount: 100 * units.Avax,
-		},
-	}
+	return &config
 }
 
 func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []byte {
@@ -644,7 +616,7 @@ func newCaminoEnvironmentWithMocks(
 
 	rewards := reward.NewCalculator(vmConfig.RewardConfig)
 
-	defaultState := defaultCaminoState(&vmConfig, ctx, baseDB, rewards, caminoGenesisConf)
+	defaultState := defaultCaminoState(vmConfig, ctx, baseDB, rewards, caminoGenesisConf)
 
 	if sharedMemory != nil {
 		msm = &mutableSharedMemory{
@@ -659,7 +631,7 @@ func newCaminoEnvironmentWithMocks(
 
 	return &caminoEnvironment{
 		isBootstrapped: &isBootstrapped,
-		config:         &vmConfig,
+		config:         vmConfig,
 		clk:            &clk,
 		baseDB:         baseDB,
 		ctx:            ctx,
@@ -672,7 +644,7 @@ func newCaminoEnvironmentWithMocks(
 		utxosHandler:   utxoHandler,
 		txBuilder: builder.NewCamino(
 			ctx,
-			&vmConfig,
+			vmConfig,
 			&clk,
 			fx,
 			defaultState,
@@ -680,7 +652,7 @@ func newCaminoEnvironmentWithMocks(
 			utxoHandler,
 		),
 		backend: Backend{
-			Config:       &vmConfig,
+			Config:       vmConfig,
 			Ctx:          ctx,
 			Clk:          &clk,
 			Bootstrapped: &isBootstrapped,
@@ -819,4 +791,40 @@ func expectProduceNewlyLockedUTXOs(t *testing.T, s *state.MockDiff, outs []*avax
 			Out:   out,
 		})
 	}
+}
+
+type phase int
+
+const (
+	sunrisePhase phase = 0
+	athensPhase  phase = 1
+	berlinPhase  phase = 2
+	firstPhase   phase = sunrisePhase
+	lastPhase    phase = berlinPhase
+)
+
+func phaseTime(t *testing.T, phase phase, cfg *config.Config) time.Time {
+	switch phase {
+	case sunrisePhase: // SunrisePhase
+		return cfg.AthensPhaseTime.Add(-time.Second)
+	case athensPhase:
+		return cfg.AthensPhaseTime
+	case berlinPhase:
+		return cfg.BerlinPhaseTime
+	}
+	require.FailNow(t, "unknown phase")
+	return time.Time{}
+}
+
+func phaseName(t *testing.T, phase phase) string {
+	switch phase {
+	case sunrisePhase:
+		return "SunrisePhase"
+	case athensPhase:
+		return "AthensPhase"
+	case berlinPhase:
+		return "BerlinPhase"
+	}
+	require.FailNow(t, "unknown phase")
+	return ""
 }

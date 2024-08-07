@@ -980,9 +980,9 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 					Ins:          tt.ins,
 					Outs:         tt.outs,
 				}},
-				Address: caminoPreFundedKeys[0].PublicKey().Address(),
-				State:   0,
-				Remove:  false,
+				Address:  caminoPreFundedKeys[0].PublicKey().Address(),
+				StateBit: 0,
+				Remove:   false,
 			}
 
 			executor := generateExecutor(addressStateTxLockedTx, env)
@@ -1582,372 +1582,704 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TODO @evlekht rewrite test, removal test cases not setting initial state for target, and by this not actually testing removal
-func TestAddAddressStateTxExecutor(t *testing.T) {
-	var (
-		bob   = preFundedKeys[0].PublicKey().Address()
-		alice = preFundedKeys[1].PublicKey().Address()
-	)
+func TestAddressStateTxExecutor(t *testing.T) {
+	ctx, _ := defaultCtx(nil)
+	// ctx := snowtest.Context(t, snowtest.PChainID)
+	caminoGenesisConf := api.Camino{VerifyNodeSignature: true, LockModeBondDeposit: true}
 
-	caminoGenesisConf := api.Camino{
-		VerifyNodeSignature: true,
-		LockModeBondDeposit: true,
-	}
+	otherAddr := ids.ShortID{1}
+	msigAliasAddr := ids.ShortID{2}
+	deferredNodeShortID := ids.ShortID{1, 1}
+	deferredNodeID := ids.NodeID(deferredNodeShortID)
+	deferredStaker := &state.Staker{TxID: ids.ID{1, 1, 1}}
+	msigAliasOwner := secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{msigAliasAddr}}
 
-	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
-	env.ctx.Lock.Lock()
-	defer func() {
-		err := shutdownCaminoEnvironment(env)
-		require.NoError(t, err)
-	}()
+	feeOwnerKey, feeOwnerAddr, feeOwner := generateKeyAndOwner(t)
+	executorKey, executorAddr, executorOwner := generateKeyAndOwner(t)
 
-	utxos, err := avax.GetAllUTXOs(env.state, set.Set[ids.ShortID]{
-		caminoPreFundedKeys[0].Address(): struct{}{},
-	})
-	require.NoError(t, err)
-
-	var unlockedUTXO *avax.UTXO
-	for _, utxo := range utxos {
-		if _, ok := utxo.Out.(*locked.Out); !ok {
-			unlockedUTXO = utxo
-			break
-		}
-	}
-	require.NotNil(t, unlockedUTXO)
-
-	out, ok := utxos[0].Out.(avax.TransferableOut)
-	require.True(t, ok)
-	unlockedUTXOAmount := out.Amount()
-
-	signers := [][]*secp256k1.PrivateKey{
-		{preFundedKeys[0]},
-	}
-
-	outputOwners := secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-	}
-	sigIndices := []uint32{0}
-
-	tests := map[string]struct {
-		UpgradeVersion uint16
-		stateAddress   ids.ShortID
-		targetAddress  ids.ShortID
-		txFlag         as.AddressStateBit
-		existingState  as.AddressState
-		expectedErrs   []error
-		expectedState  as.AddressState
-		remove         bool
-		executor       ids.ShortID
-		executorAuth   *secp256k1fx.Input
-	}{
-		// Bob has Admin role, and he is trying to give himself Admin role (again)
-		"State: Admin, Flag: Admin role, Add, Same Address": {
-			stateAddress:  bob,
-			targetAddress: bob,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: as.AddressStateRoleAdmin,
-			remove:        false,
-		},
-		// Bob has KYC role, and he is trying to give himself KYC role (again)
-		"State: KYC, Flag: KYC role, Add, Same Address": {
-			stateAddress:  bob,
-			targetAddress: bob,
-			txFlag:        as.AddressStateBitRoleKYC,
-			existingState: as.AddressStateRoleKYC,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-			remove:        false,
-		},
-		// Bob has KYC role, and he is trying to give himself Admin role
-		"State: KYC, Flag: Admin role, Add, Same Address": {
-			stateAddress:  bob,
-			targetAddress: bob,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleKYC,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-			remove:        false,
-		},
-		// Bob has Admin role, and he is trying to give Alice Admin role
-		"State: Admin, Flag: Admin role, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: as.AddressStateRoleAdmin,
-			remove:        false,
-		},
-		// Bob has Admin role, and he is trying to remove from Alice the Admin role
-		"State: Admin, Flag: Admin role, Remove, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: 0,
-			remove:        true,
-		},
-		// Bob has Admin role, and he is trying to give Alice KYC Role
-		"State: Admin, Flag: KYC role, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleKYC,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: as.AddressStateRoleKYC,
-			remove:        false,
-		},
-		// Bob has Admin role, and he is trying to remove from Alice the KYC role
-		"State: Admin, Flag: KYC role, Remove, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleKYC,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: 0,
-			remove:        true,
-		},
-		// Bob has Admin role, and he is trying to remove it from himself
-		"State: Admin, Flag: Admin role, Remove, Same Address": {
-			stateAddress:  bob,
-			targetAddress: bob,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: 0,
-			expectedErrs:  []error{errAdminCannotBeDeleted, errAdminCannotBeDeleted, errAdminCannotBeDeleted},
-			remove:        true,
-		},
-		// Bob has Admin role, and he is trying to give Alice the KYC Verified state
-		"State: Admin, Flag: KYC Verified, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitKYCVerified,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: as.AddressStateKYCVerified,
-			remove:        false,
-		},
-		// Bob has Admin role, and he is trying to give Alice the KYC Expired state
-		"State: Admin, Flag: KYC Expired, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitKYCExpired,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: as.AddressStateKYCExpired,
-			remove:        false,
-		},
-		// Bob has Admin role, and he is trying to give Alice the Consortium state
-		"State: Admin, Flag: Consortium, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitConsortium,
-			existingState: as.AddressStateRoleAdmin,
-			expectedState: as.AddressStateConsortiumMember,
-			remove:        false,
-			expectedErrs:  []error{nil, nil, errAddrStateNotPermitted},
-		},
-		// Bob has KYC role, and he is trying to give Alice KYC Expired state
-		"State: KYC, Flag: KYC Expired, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitKYCExpired,
-			existingState: as.AddressStateRoleKYC,
-			expectedState: as.AddressStateKYCExpired,
-			remove:        false,
-		},
-		// Bob has KYC role, and he is trying to give Alice KYC Expired state
-		"State: KYC, Flag: KYC Verified, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitKYCVerified,
-			existingState: as.AddressStateRoleKYC,
-			expectedState: as.AddressStateKYCVerified,
-			remove:        false,
-		},
-		// Some Address has Admin role, and he is trying to give Alice Admin role
-		"Wrong address": {
-			stateAddress:  ids.GenerateTestShortID(),
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-			remove:        false,
-		},
-		// An Empty Address has Admin role, and he is trying to give Alice Admin role
-		"Empty State Address": {
-			stateAddress:  ids.ShortEmpty,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-			remove:        false,
-		},
-		// Bob has Admin role, and he is trying to give Admin role to an Empty Address
-		"Empty Target Address": {
-			stateAddress:  bob,
-			targetAddress: ids.ShortEmpty,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateRoleAdmin,
-			expectedErrs:  []error{txs.ErrEmptyAddress, txs.ErrEmptyAddress, txs.ErrEmptyAddress},
-			remove:        false,
-		},
-		// Bob has empty addr state, and he is trying to give Alice Admin role
-		"State: none, Flag: Admin role, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateEmpty,
-			remove:        false,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-		},
-		// Bob has empty addr state, and he is trying to remove Admin role from Alice
-		"State: none, Flag: Admin role, Remove, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleAdmin,
-			existingState: as.AddressStateEmpty,
-			remove:        true,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-		},
-		// Bob has empty addr state, and he is trying to give Alice KYC role
-		"State: none, Flag: KYC role, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleKYC,
-			existingState: as.AddressStateEmpty,
-			remove:        false,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-		},
-		// Bob has empty addr state, and he is trying to remove KYC role from Alice
-		"State: none, Flag: KYC role, Remove, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitRoleKYC,
-			existingState: as.AddressStateEmpty,
-			remove:        true,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-		},
-		// Bob has empty addr state, and he is trying to give Alice KYC Verified state
-		"State: none, Flag: KYC Verified, Add, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitKYCVerified,
-			existingState: as.AddressStateEmpty,
-			remove:        false,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-		},
-		// Bob has empty addr state, and he is trying to remove KYC Verified state from Alice
-		"State: none, Flag: KYC Verified, Remove, Different Address": {
-			stateAddress:  bob,
-			targetAddress: alice,
-			txFlag:        as.AddressStateBitKYCVerified,
-			existingState: as.AddressStateEmpty,
-			remove:        true,
-			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted, errAddrStateNotPermitted},
-		},
-		// Bob has KYC role, and he is trying to give Alice KYC Expired state
-		"Upgrade: 1, State: KYC, Flag: KYC Expired, Add, Different Address": {
-			UpgradeVersion: 1,
-			stateAddress:   bob,
-			targetAddress:  alice,
-			txFlag:         as.AddressStateBitKYCExpired,
-			existingState:  as.AddressStateRoleKYC,
-			expectedState:  as.AddressStateKYCExpired,
-			expectedErrs:   []error{errNotAthensPhase, nil},
-			remove:         false,
-			executor:       bob,
-			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
-		// Bob has KYC role, alice tries to executor her KYC Expired state
-		"Upgrade: 1, State: KYC, Flag: KYC Expired, wrong executor": {
-			UpgradeVersion: 1,
-			stateAddress:   bob,
-			targetAddress:  alice,
-			txFlag:         as.AddressStateBitKYCExpired,
-			existingState:  as.AddressStateRoleKYC,
-			expectedState:  as.AddressStateKYCExpired,
-			expectedErrs:   []error{errNotAthensPhase, errSignatureMissing, errSignatureMissing},
-			remove:         false,
-			executor:       alice,
-			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
-		},
-	}
+	feeUTXO := generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
+	halfFeeUTXO1 := generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, defaultTxFee/2, feeOwner, ids.Empty, ids.Empty)
+	halfFeeUTXO2 := generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, defaultTxFee-defaultTxFee/2, executorOwner, ids.Empty, ids.Empty)
+	msigFeeUTXO := generateTestUTXO(ids.ID{4}, ctx.AVAXAssetID, defaultTxFee, msigAliasOwner, ids.Empty, ids.Empty)
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    env.ctx.NetworkID,
-		BlockchainID: env.ctx.ChainID,
-		Ins: []*avax.TransferableInput{
-			generateTestInFromUTXO(unlockedUTXO, sigIndices),
-		},
-		Outs: []*avax.TransferableOutput{
-			generateTestOut(avaxAssetID, unlockedUTXOAmount-defaultTxFee, outputOwners, ids.Empty, ids.Empty),
-		},
+		NetworkID:    ctx.NetworkID,
+		BlockchainID: ctx.ChainID,
+		Ins:          []*avax.TransferableInput{generateTestInFromUTXO(feeUTXO, []uint32{0})},
 	}}
 
-	chainTime := env.state.GetTimestamp()
+	type testData struct {
+		selfModify             bool
+		txStateBit             as.AddressStateBit
+		remove                 bool
+		currentTargetAddrState as.AddressState
+		executorAddrState      as.AddressState
+	}
 
-	fnSetPhaseTimes := []func() string{
-		func() string {
-			env.config.AthensPhaseTime = chainTime.Add(1 * time.Second) // not yet active
-			env.config.BerlinPhaseTime = chainTime.Add(2 * time.Second) // not yet active
-			return "Sunrise"
+	type testCase struct {
+		state       func(*testing.T, *gomock.Controller, *txs.AddressStateTx, ids.ID, *config.Config) *state.MockDiff
+		utx         *txs.AddressStateTx
+		signers     [][]*secp256k1.PrivateKey
+		expectedErr error
+	}
+
+	testCases := map[string]testCase{}
+
+	type testCaseFunc func(t *testing.T, tt testData, testCaseName string, phase phase)
+	type testCaseSimpleFunc func(t *testing.T, phase phase)
+	type testCaseFuncWithErr func(t *testing.T, tt testData, testCaseName string, expectedErr error, phase phase)
+
+	var failCaseSimpleNoOp testCaseSimpleFunc = func(t *testing.T, phase phase) {}
+
+	testCaseFailMultisigAlias := map[codec.UpgradeVersionID]testCaseSimpleFunc{}
+	testCaseFailMultisigAlias[codec.UpgradeVersion0] = func(t *testing.T, phase phase) {
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 0/Fail with multisig alias", phase, phaseName(t, phase))
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				require.Zero(t, utx.UpgradeVersionID.Version())
+
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+
+				// not getting addr state for msigAlias addr
+				s.EXPECT().GetAddressStates(feeOwnerAddr).Return(as.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(executorAddr).Return(as.AddressStateEmpty, nil)
+				// fails to verify permission to change target
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins:          []*avax.TransferableInput{generateTestInFromUTXO(msigFeeUTXO, []uint32{0})},
+				}},
+				Address:      otherAddr,
+				StateBit:     as.AddressStateBitKYCVerified,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey, executorKey},
+			},
+			expectedErr: errAddrStateNotPermitted,
+		}
+	}
+	testCaseFailMultisigAlias[codec.UpgradeVersion1] = failCaseSimpleNoOp
+
+	testCaseFailUpgradeVersionForbidden := map[codec.UpgradeVersionID]testCaseSimpleFunc{}
+	testCaseFailUpgradeVersionForbidden[codec.UpgradeVersion0] = func(t *testing.T, phase phase) {
+		require.GreaterOrEqual(t, phase, berlinPhase)
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 0/Upgrade version is forbidden", phase, phaseName(t, phase))
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				require.Zero(t, utx.UpgradeVersionID.Version())
+				require.GreaterOrEqual(t, phase, berlinPhase)
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx:       baseTx,
+				Address:      otherAddr,
+				StateBit:     as.AddressStateBitKYCVerified,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey},
+			},
+			expectedErr: errBerlinPhase,
+		}
+	}
+	testCaseFailUpgradeVersionForbidden[codec.UpgradeVersion1] = func(t *testing.T, phase phase) {
+		require.Equal(t, sunrisePhase, phase)
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 1/Upgrade version is forbidden", phase, phaseName(t, phase))
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				require.Greater(t, utx.UpgradeVersionID.Version(), uint16(0))
+				require.Equal(t, phase, sunrisePhase)
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          otherAddr,
+				StateBit:         as.AddressStateBitKYCVerified,
+				Executor:         executorAddr,
+				ExecutorAuth:     &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {executorKey},
+			},
+			expectedErr: errNotAthensPhase,
+		}
+	}
+
+	testCaseFailWrongExecutorCredential := map[codec.UpgradeVersionID]testCaseSimpleFunc{}
+	testCaseFailWrongExecutorCredential[codec.UpgradeVersion0] = failCaseSimpleNoOp
+	testCaseFailWrongExecutorCredential[codec.UpgradeVersion1] = func(t *testing.T, phase phase) {
+		if phase < athensPhase {
+			return
+		}
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 1/Wrong executor credential", phase, phaseName(t, phase))
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.Executor}, nil)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          otherAddr,
+				StateBit:         as.AddressStateBitKYCVerified,
+				Executor:         executorAddr,
+				ExecutorAuth:     &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {feeOwnerKey},
+			},
+			expectedErr: errSignatureMissing,
+		}
+	}
+
+	testCaseFailNoPermission := map[codec.UpgradeVersionID]testCaseFunc{}
+	testCaseFailNoPermission[codec.UpgradeVersion0] = func(
+		t *testing.T,
+		tt testData,
+		testCaseName string,
+		phase phase,
+	) {
+		testCaseName = fmt.Sprintf("%d_%s/Upgrade 0/%s", phase, phaseName(t, phase), testCaseName)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				s.EXPECT().GetAddressStates(feeOwnerAddr).Return(tt.executorAddrState, nil)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx:       baseTx,
+				Address:      otherAddr,
+				StateBit:     tt.txStateBit,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey},
+			},
+			expectedErr: errAddrStateNotPermitted,
+		}
+	}
+	testCaseFailNoPermission[codec.UpgradeVersion1] = func(
+		t *testing.T,
+		tt testData,
+		testCaseName string,
+		phase phase,
+	) {
+		testCaseName = fmt.Sprintf("%d_%s/Upgrade 1/%s", phase, phaseName(t, phase), testCaseName)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.Executor}, nil)
+				s.EXPECT().GetAddressStates(executorAddr).Return(tt.executorAddrState, nil)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          otherAddr,
+				StateBit:         tt.txStateBit,
+				Executor:         executorAddr,
+				ExecutorAuth:     &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {executorKey},
+			},
+			expectedErr: errAddrStateNotPermitted,
+		}
+	}
+
+	testCaseFailBitForbidden := map[codec.UpgradeVersionID]testCaseFuncWithErr{}
+	testCaseFailBitForbidden[codec.UpgradeVersion0] = func(
+		t *testing.T,
+		tt testData,
+		testCaseName string,
+		expectedErr error,
+		phase phase,
+	) {
+		testCaseName = fmt.Sprintf("%d_%s/Upgrade 0/%s", phase, phaseName(t, phase), testCaseName)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx:       baseTx,
+				Address:      otherAddr,
+				StateBit:     tt.txStateBit,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey},
+			},
+			expectedErr: expectedErr,
+		}
+	}
+	testCaseFailBitForbidden[codec.UpgradeVersion1] = func(
+		t *testing.T,
+		tt testData,
+		testCaseName string,
+		expectedErr error,
+		phase phase,
+	) {
+		testCaseName = fmt.Sprintf("%d_%s/Upgrade 1/%s", phase, phaseName(t, phase), testCaseName)
+		require.NotContains(t, testCases, testCaseName, fmt.Sprintf("duplicate test-case name: %s", testCaseName))
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          otherAddr,
+				StateBit:         tt.txStateBit,
+				Executor:         executorAddr,
+				ExecutorAuth:     &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {executorKey},
+			},
+			expectedErr: expectedErr,
+		}
+	}
+
+	testCaseFailAdminSelfRemove := map[codec.UpgradeVersionID]testCaseSimpleFunc{}
+	testCaseFailAdminSelfRemove[codec.UpgradeVersion0] = func(t *testing.T, phase phase) {
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 0/AddressStateRoleAdmin (%d) self-remove", phase, phaseName(t, phase), as.AddressStateBitRoleAdmin)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx:       baseTx,
+				Address:      feeOwnerAddr,
+				StateBit:     as.AddressStateBitRoleAdmin,
+				Remove:       true,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey},
+			},
+			expectedErr: errAdminCannotBeDeleted,
+		}
+	}
+	testCaseFailAdminSelfRemove[codec.UpgradeVersion1] = func(t *testing.T, phase phase) {
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 1/AddressStateRoleAdmin (%d) self-remove", phase, phaseName(t, phase), as.AddressStateBitRoleAdmin)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.Executor}, nil)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          executorAddr,
+				StateBit:         as.AddressStateBitRoleAdmin,
+				Remove:           true,
+				Executor:         executorAddr,
+				ExecutorAuth:     &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {executorKey},
+			},
+			expectedErr: errAdminCannotBeDeleted,
+		}
+	}
+
+	testCaseOK := map[codec.UpgradeVersionID]testCaseFunc{}
+	testCaseOK[codec.UpgradeVersion0] = func(
+		t *testing.T,
+		tt testData,
+		testCaseName string,
+		phase phase,
+	) {
+		testCaseName = fmt.Sprintf("%d_%s/Upgrade 0/%s", phase, phaseName(t, phase), testCaseName)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		targetAddr := otherAddr
+		if tt.selfModify {
+			targetAddr = feeOwnerAddr
+		}
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				require.Zero(t, utx.UpgradeVersionID.Version())
+				if feeOwnerAddr == utx.Address {
+					require.Equal(t, tt.currentTargetAddrState, as.AddressStateRoleAdmin)
+				}
+
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+
+				s.EXPECT().GetAddressStates(feeOwnerAddr).Return(tt.executorAddrState, nil)
+
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+
+				if utx.StateBit == as.AddressStateBitNodeDeferred {
+					s.EXPECT().GetShortIDLink(utx.Address, state.ShortLinkKeyRegisterNode).Return(deferredNodeShortID, nil)
+					if utx.Remove {
+						s.EXPECT().GetDeferredValidator(constants.PrimaryNetworkID, deferredNodeID).Return(deferredStaker, nil)
+						s.EXPECT().DeleteDeferredValidator(deferredStaker)
+						s.EXPECT().PutCurrentValidator(deferredStaker)
+					} else {
+						s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, deferredNodeID).Return(deferredStaker, nil)
+						s.EXPECT().DeleteCurrentValidator(deferredStaker)
+						s.EXPECT().PutDeferredValidator(deferredStaker)
+					}
+				}
+
+				s.EXPECT().GetAddressStates(utx.Address).Return(tt.currentTargetAddrState, nil)
+				txAddrState := utx.StateBit.ToAddressState()
+				newTargetAddrState := tt.currentTargetAddrState
+				if utx.Remove && (tt.currentTargetAddrState&txAddrState) != 0 {
+					newTargetAddrState ^= txAddrState
+				} else if !utx.Remove {
+					newTargetAddrState |= txAddrState
+				}
+				if tt.currentTargetAddrState != newTargetAddrState {
+					s.EXPECT().SetAddressStates(utx.Address, newTargetAddrState)
+				}
+
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx:       baseTx,
+				Address:      targetAddr,
+				StateBit:     tt.txStateBit,
+				Remove:       tt.remove,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey},
+			},
+		}
+	}
+	testCaseOK[codec.UpgradeVersion1] = func(
+		t *testing.T,
+		tt testData,
+		testCaseName string,
+		phase phase,
+	) {
+		testCaseName = fmt.Sprintf("%d_%s/Upgrade 1/%s", phase, phaseName(t, phase), testCaseName)
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		targetAddr := otherAddr
+		if tt.selfModify {
+			targetAddr = executorAddr
+		}
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				require.Greater(t, utx.UpgradeVersionID.Version(), uint16(0))
+				require.Greater(t, phase, 0)
+				if utx.Executor == utx.Address {
+					require.Equal(t, as.AddressStateRoleAdmin, tt.currentTargetAddrState)
+				}
+
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+
+				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.Executor}, nil)
+				s.EXPECT().GetAddressStates(utx.Executor).Return(tt.executorAddrState, nil)
+
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+
+				if utx.StateBit == as.AddressStateBitNodeDeferred {
+					s.EXPECT().GetShortIDLink(utx.Address, state.ShortLinkKeyRegisterNode).Return(deferredNodeShortID, nil)
+					if utx.Remove {
+						s.EXPECT().GetDeferredValidator(constants.PrimaryNetworkID, deferredNodeID).Return(deferredStaker, nil)
+						s.EXPECT().DeleteDeferredValidator(deferredStaker)
+						s.EXPECT().PutCurrentValidator(deferredStaker)
+					} else {
+						s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, deferredNodeID).Return(deferredStaker, nil)
+						s.EXPECT().DeleteCurrentValidator(deferredStaker)
+						s.EXPECT().PutDeferredValidator(deferredStaker)
+					}
+				}
+
+				s.EXPECT().GetAddressStates(utx.Address).Return(tt.currentTargetAddrState, nil)
+				txAddrState := utx.StateBit.ToAddressState()
+				newTargetAddrState := tt.currentTargetAddrState
+				if utx.Remove && (tt.currentTargetAddrState&txAddrState) != 0 {
+					newTargetAddrState ^= txAddrState
+				} else if !utx.Remove {
+					newTargetAddrState |= txAddrState
+				}
+				if tt.currentTargetAddrState != newTargetAddrState {
+					s.EXPECT().SetAddressStates(utx.Address, newTargetAddrState)
+				}
+
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx:           baseTx,
+				Address:          targetAddr,
+				StateBit:         tt.txStateBit,
+				Remove:           tt.remove,
+				Executor:         executorAddr,
+				ExecutorAuth:     &secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {executorKey},
+			},
+		}
+	}
+
+	testCaseOKMultiInput := map[codec.UpgradeVersionID]testCaseSimpleFunc{}
+	testCaseOKMultiInput[codec.UpgradeVersion0] = func(t *testing.T, phase phase) {
+		testCaseName := fmt.Sprintf("%d_%s/Upgrade 0/OK: Second input owner has admin role", phase, phaseName(t, phase))
+		require.NotContains(t, testCases, testCaseName, testCaseName)
+		testCases[testCaseName] = testCase{
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddressStateTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				require.Zero(t, utx.UpgradeVersionID.Version())
+
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(phaseTime(t, phase, cfg))
+
+				// not getting addr state for msigAlias addr
+				s.EXPECT().GetAddressStates(feeOwnerAddr).Return(as.AddressStateEmpty, nil)
+				s.EXPECT().GetAddressStates(executorAddr).Return(as.AddressStateRoleAdmin, nil)
+
+				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
+				expectVerifyLock(t, s, utx.Ins,
+					[]*avax.UTXO{halfFeeUTXO1, halfFeeUTXO2},
+					[]ids.ShortID{feeOwnerAddr, executorAddr}, nil)
+
+				s.EXPECT().GetAddressStates(utx.Address).Return(as.AddressStateEmpty, nil)
+				s.EXPECT().SetAddressStates(utx.Address, as.AddressStateKYCVerified)
+
+				expectConsumeUTXOs(t, s, utx.Ins)
+				expectProduceUTXOs(t, s, utx.Outs, txID, 0)
+				return s
+			},
+			utx: &txs.AddressStateTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generateTestInFromUTXO(halfFeeUTXO1, []uint32{0}),
+						generateTestInFromUTXO(halfFeeUTXO2, []uint32{0}),
+					},
+				}},
+				Address:      otherAddr,
+				StateBit:     as.AddressStateBitKYCVerified,
+				ExecutorAuth: &secp256k1fx.Input{},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {executorKey},
+			},
+		}
+	}
+	testCaseOKMultiInput[codec.UpgradeVersion1] = failCaseSimpleNoOp
+
+	simpleOKCases := map[string]testData{
+		"OK: remove other admin": {
+			txStateBit:             as.AddressStateBitRoleAdmin,
+			remove:                 true,
+			currentTargetAddrState: as.AddressStateRoleAdmin,
+			executorAddrState:      as.AddressStateRoleAdmin,
 		},
-		func() string {
-			env.config.AthensPhaseTime = chainTime                      // active
-			env.config.BerlinPhaseTime = chainTime.Add(1 * time.Second) // not yet active
-			return "Athens"
+		"OK: target state is not empty": {
+			txStateBit:             as.AddressStateBitKYCVerified,
+			currentTargetAddrState: as.AddressStateConsortium,
+			executorAddrState:      as.AddressStateRoleAdmin,
 		},
-		func() string {
-			env.config.AthensPhaseTime = chainTime.Add(-1 * time.Second) // active
-			env.config.BerlinPhaseTime = chainTime                       // active
-			return "Berlin"
+		"OK: not modified": {
+			txStateBit:             as.AddressStateBitKYCVerified,
+			currentTargetAddrState: as.AddressStateKYCVerified,
+			executorAddrState:      as.AddressStateRoleAdmin,
+		},
+		"OK: modifying executors own address state": {
+			selfModify:             true,
+			txStateBit:             as.AddressStateBitKYCVerified,
+			currentTargetAddrState: as.AddressStateRoleAdmin,
+			executorAddrState:      as.AddressStateRoleAdmin,
+		},
+		"OK: removal": {
+			txStateBit:             as.AddressStateBitKYCVerified,
+			remove:                 true,
+			currentTargetAddrState: as.AddressStateKYCVerified,
+			executorAddrState:      as.AddressStateRoleAdmin,
+		},
+		"OK: removal, not modified": {
+			txStateBit:             as.AddressStateBitKYCVerified,
+			remove:                 true,
+			currentTargetAddrState: as.AddressStateConsortium,
+			executorAddrState:      as.AddressStateRoleAdmin,
 		},
 	}
 
-	for phase := 0; phase < 3; phase++ {
-		phaseName := fnSetPhaseTimes[phase]()
-		for name, tt := range tests {
-			t.Run(fmt.Sprintf("%s; %s", phaseName, name), func(t *testing.T) {
-				addressStateTx := &txs.AddressStateTx{
-					UpgradeVersionID: codec.BuildUpgradeVersionID(tt.UpgradeVersion),
-					BaseTx:           baseTx,
-					Address:          tt.targetAddress,
-					State:            tt.txFlag,
-					Remove:           tt.remove,
-					Executor:         tt.executor,
-					ExecutorAuth:     tt.executorAuth,
-				}
+	validBits := getBitsFromAddressState(as.AddressStateValidBits)
 
-				tx, err := txs.NewSigned(addressStateTx, txs.Codec, signers)
-				require.NoError(t, err)
-
-				if tt.UpgradeVersion > 0 {
-					tx.Creds = append(tx.Creds, tx.Creds[0])
-				}
-
-				onAcceptState, err := state.NewCaminoDiff(lastAcceptedID, env)
-				require.NoError(t, err)
-
-				executor := CaminoStandardTxExecutor{
-					StandardTxExecutor{
-						Backend: &env.backend,
-						State:   onAcceptState,
-						Tx:      tx,
-					},
-				}
-
-				executor.State.SetAddressStates(tt.stateAddress, tt.existingState)
-
-				err = addressStateTx.Visit(&executor)
-				if len(tt.expectedErrs) > phase {
-					require.ErrorIs(t, err, tt.expectedErrs[phase])
-				} else {
-					require.NoError(t, err)
-				}
-
-				if err == nil {
-					targetStates, _ := executor.State.GetAddressStates(tt.targetAddress)
-					require.Equal(t, targetStates, tt.expectedState)
-				}
-			})
+	// set role-bit permissions
+	permissionsMatrix := map[as.AddressStateBit]map[as.AddressStateBit]bool{}
+	for _, role := range validBits {
+		permissionsMatrix[role] = map[as.AddressStateBit]bool{}
+		for _, bit := range validBits {
+			permissionsMatrix[role][bit] = false
 		}
+	}
+	for _, bit := range validBits {
+		permissionsMatrix[as.AddressStateBitRoleAdmin][bit] = true
+	}
+	permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCVerified] = true
+	permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCExpired] = true
+	permissionsMatrix[as.AddressStateBitRoleOffersAdmin][as.AddressStateBitOffersCreator] = true
+
+	// set phase-bit restrictions
+	bitsPhaseMatrix := map[as.AddressStateBit]map[phase]error{}
+	for _, bit := range validBits {
+		bitsPhaseMatrix[bit] = map[phase]error{}
+		for phase := firstPhase; phase <= lastPhase; phase++ {
+			bitsPhaseMatrix[bit][phase] = nil
+		}
+	}
+	// sunriseBits := getBitsFromAddressState(as.AddressStateSunrisePhaseBits)
+	athensBits := getBitsFromAddressState(as.AddressStateAthensPhaseBits)
+	berlinBits := getBitsFromAddressState(as.AddressStateBerlinPhaseBits)
+	for _, bit := range athensBits {
+		for phase := firstPhase; phase < athensPhase; phase++ {
+			bitsPhaseMatrix[bit][phase] = errNotAthensPhase
+		}
+	}
+	for _, bit := range berlinBits {
+		for phase := firstPhase; phase < berlinPhase; phase++ {
+			bitsPhaseMatrix[bit][phase] = errNotBerlinPhase
+		}
+	}
+	bitsPhaseMatrix[as.AddressStateBitConsortium][berlinPhase] = errBerlinPhase
+
+	// set phase-txUpgrade restrictions := getBitsFromAddressState(as.AddressStateSunrisePhaseBits)
+	txUpgradeMatrix := map[phase][]codec.UpgradeVersionID{}
+	for phase := firstPhase; phase < berlinPhase; phase++ {
+		txUpgradeMatrix[phase] = append(txUpgradeMatrix[phase], codec.UpgradeVersion0)
+	}
+	for phase := athensPhase; phase <= lastPhase; phase++ {
+		txUpgradeMatrix[phase] = append(txUpgradeMatrix[phase], codec.UpgradeVersion1)
+	}
+
+	for role, permissions := range permissionsMatrix {
+		for bit, allowed := range permissions {
+			if allowed {
+				for phase := firstPhase; phase <= lastPhase; phase++ {
+					if bitsPhaseMatrix[bit][phase] != nil {
+						continue
+					}
+					txUpgrades := txUpgradeMatrix[phase]
+					for _, txUpgrade := range txUpgrades {
+						if bit == as.AddressStateBitConsortium {
+							// resume node, defer is tested below
+							testCaseOK[txUpgrade](t, testData{
+								txStateBit:        bit,
+								executorAddrState: role.ToAddressState(),
+								remove:            true,
+							}, fmt.Sprintf("OK: (%0d) modifies (%0d), resume node", role, bit), phase)
+						}
+						testCaseOK[txUpgrade](t, testData{
+							txStateBit:        bit,
+							executorAddrState: role.ToAddressState(),
+						}, fmt.Sprintf("OK: (%0d) modifies (%0d)", role, bit), phase)
+					}
+				}
+			} else {
+				for phase := firstPhase; phase <= lastPhase; phase++ {
+					if bitsPhaseMatrix[bit][phase] != nil {
+						continue
+					}
+					txUpgrades := txUpgradeMatrix[phase]
+					for _, txUpgrade := range txUpgrades {
+						testCaseFailNoPermission[txUpgrade](t, testData{
+							txStateBit:        bit,
+							executorAddrState: role.ToAddressState(),
+						}, fmt.Sprintf("Fail: (%0d) modifies (%0d)", role, bit), phase)
+					}
+				}
+			}
+		}
+	}
+
+	for _, bit := range validBits {
+		for phase := firstPhase; phase <= lastPhase; phase++ {
+			expectedErr := bitsPhaseMatrix[bit][phase]
+			if expectedErr == nil {
+				continue
+			}
+			txUpgrades := txUpgradeMatrix[phase]
+			for _, txUpgrade := range txUpgrades {
+				testCaseFailBitForbidden[txUpgrade](t, testData{txStateBit: bit},
+					fmt.Sprintf("Forbid bit %d", bit), expectedErr, phase)
+			}
+		}
+	}
+
+	for phase := firstPhase; phase <= lastPhase; phase++ {
+		txUpgrades := txUpgradeMatrix[phase]
+		for _, txUpgrade := range txUpgrades {
+			for name, tt := range simpleOKCases {
+				testCaseOK[txUpgrade](t, tt, name, phase)
+			}
+			testCaseOKMultiInput[txUpgrade](t, phase) // noop for upgr1
+			testCaseFailAdminSelfRemove[txUpgrade](t, phase)
+			testCaseFailWrongExecutorCredential[txUpgrade](t, phase) // noop for upgr0 or sunrise phase
+			testCaseFailMultisigAlias[txUpgrade](t, phase)           // noop for upgr1
+		}
+	}
+
+	testCaseFailUpgradeVersionForbidden[codec.UpgradeVersion1](t, sunrisePhase)
+	for phase := berlinPhase; phase <= lastPhase; phase++ {
+		testCaseFailUpgradeVersionForbidden[codec.UpgradeVersion0](t, phase)
+	}
+
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			env := newCaminoEnvironmentWithMocks(caminoGenesisConf, nil)
+			defer func() { require.NoError(t, shutdownCaminoEnvironment(env)) }()
+
+			avax.SortTransferableInputsWithSigners(tt.utx.Ins, tt.signers)
+			avax.SortTransferableOutputs(tt.utx.Outs, txs.Codec)
+			tx, err := txs.NewSigned(tt.utx, txs.Codec, tt.signers)
+			require.NoError(t, err)
+
+			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
+				StandardTxExecutor{
+					Backend: &env.backend,
+					State:   tt.state(t, gomock.NewController(t), tt.utx, tx.ID(), env.config),
+					Tx:      tx,
+				},
+			})
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
 	}
 }
 
@@ -4372,7 +4704,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Consortium member has already registered node": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr2, nil)
 				return s
@@ -4394,7 +4726,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Old node is in current validator's set": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -4420,7 +4752,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Old node is in pending validator's set": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -4448,7 +4780,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Old node is in deferred validator's set": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -4478,7 +4810,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"OK: change registered node": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -4524,7 +4856,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"OK: consortium member is msig alias": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
 				s.EXPECT().GetShortIDLink(ids.ShortID(utx.NewNodeID), state.ShortLinkKeyRegisterNode).
@@ -4571,7 +4903,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"OK": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(as.AddressStateConsortium, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
 				s.EXPECT().GetShortIDLink(ids.ShortID(utx.NewNodeID), state.ShortLinkKeyRegisterNode).
@@ -4935,178 +5267,6 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 	}
 }
 
-func TestCaminoStandardTxExecutorAddressStateTxSuspendValidator(t *testing.T) {
-	// finding first staker to remove
-	env := newCaminoEnvironment( /*postBanff*/ true, false, api.Camino{LockModeBondDeposit: true})
-	stakerIterator, err := env.state.GetCurrentStakerIterator()
-	require.NoError(t, err)
-	require.True(t, stakerIterator.Next())
-	stakerToRemove := stakerIterator.Value()
-	stakerIterator.Release()
-	nodeID := stakerToRemove.NodeID
-	consortiumMemberAddress, err := env.state.GetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode)
-	require.NoError(t, err)
-	require.NoError(t, shutdownCaminoEnvironment(env))
-
-	initAdmin := caminoPreFundedKeys[0]
-	// other common data
-
-	outputOwners := &secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{consortiumMemberAddress},
-	}
-
-	type args struct {
-		address    ids.ShortID
-		remove     bool
-		keys       []*secp256k1.PrivateKey
-		changeAddr *secp256k1fx.OutputOwners
-	}
-	tests := map[string]struct {
-		generateArgs func() args
-		preExecute   func(*testing.T, *txs.Tx, state.State)
-		expectedErr  error
-		assert       func(*testing.T)
-	}{
-		"Set state to deferred from address with no roles -> ErrAddrStateNotPermitted": {
-			generateArgs: func() args {
-				return args{
-					address:    consortiumMemberAddress,
-					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[1]}, // non-admin address
-					changeAddr: outputOwners,
-				}
-			},
-			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
-			expectedErr: errAddrStateNotPermitted,
-		},
-		"Set state to deferred from kyc address -> ErrAddrStateNotPermitted": {
-			generateArgs: func() args {
-				return args{
-					address:    consortiumMemberAddress,
-					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[1]},
-					changeAddr: outputOwners,
-				}
-			},
-			preExecute: func(t *testing.T, tx *txs.Tx, state state.State) {
-				state.SetAddressStates(caminoPreFundedKeys[1].Address(), as.AddressStateRoleKYC)
-			},
-			expectedErr: errAddrStateNotPermitted,
-		},
-		"Happy path set state to deferred": {
-			generateArgs: func() args {
-				return args{
-					address:    consortiumMemberAddress,
-					keys:       []*secp256k1.PrivateKey{initAdmin},
-					changeAddr: outputOwners,
-				}
-			},
-			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
-			expectedErr: nil,
-		},
-		"Remove deferred state from non-admin address -> ErrAddrStateNotPermitted": {
-			generateArgs: func() args {
-				return args{
-					address:    consortiumMemberAddress,
-					remove:     true,
-					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[1]}, // non-admin address
-					changeAddr: outputOwners,
-				}
-			},
-			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
-			expectedErr: errAddrStateNotPermitted,
-		},
-		"Happy path set state to active": {
-			generateArgs: func() args {
-				return args{
-					address:    consortiumMemberAddress,
-					remove:     true,
-					keys:       []*secp256k1.PrivateKey{initAdmin},
-					changeAddr: outputOwners,
-				}
-			},
-			preExecute: func(t *testing.T, tx *txs.Tx, state state.State) {
-				stakerToTransfer, err := state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-				require.NoError(t, err)
-				state.DeleteCurrentValidator(stakerToTransfer)
-				state.PutDeferredValidator(stakerToTransfer)
-			},
-			expectedErr: nil,
-		},
-		"Remove deferred state of an active validator": {
-			generateArgs: func() args {
-				return args{
-					address:    consortiumMemberAddress,
-					remove:     true,
-					keys:       []*secp256k1.PrivateKey{initAdmin},
-					changeAddr: outputOwners,
-				}
-			},
-			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
-			expectedErr: errValidatorNotFound,
-		},
-	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			caminoGenesisConf := api.Camino{
-				VerifyNodeSignature: true,
-				LockModeBondDeposit: true,
-				InitialAdmin:        initAdmin.Address(),
-			}
-			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
-			env.ctx.Lock.Lock()
-			defer func() {
-				if err := shutdownCaminoEnvironment(env); err != nil {
-					t.Fatal(err)
-				}
-			}()
-
-			env.config.BanffTime = env.state.GetTimestamp()
-			require.NoError(t, env.state.Commit())
-
-			setAddressStateArgs := tt.generateArgs()
-			tx, err := env.txBuilder.NewAddressStateTx(
-				setAddressStateArgs.address,
-				setAddressStateArgs.remove,
-				as.AddressStateBitNodeDeferred,
-				setAddressStateArgs.keys,
-				setAddressStateArgs.changeAddr,
-			)
-			require.NoError(t, err)
-
-			tt.preExecute(t, tx, env.state)
-			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
-			require.NoError(t, err)
-
-			executor := CaminoStandardTxExecutor{
-				StandardTxExecutor{
-					Backend: &env.backend,
-					State:   onAcceptState,
-					Tx:      tx,
-				},
-			}
-
-			err = tx.Unsigned.Visit(&executor)
-			require.ErrorIs(t, err, tt.expectedErr)
-			if tt.expectedErr != nil {
-				return
-			}
-			var stakerIterator state.StakerIterator
-			if setAddressStateArgs.remove {
-				stakerIterator, err = onAcceptState.GetCurrentStakerIterator()
-				require.NoError(t, err)
-			} else {
-				stakerIterator, err = onAcceptState.GetDeferredStakerIterator()
-				require.NoError(t, err)
-			}
-			require.True(t, stakerIterator.Next())
-			stakerToRemove := stakerIterator.Value()
-			stakerIterator.Release()
-			require.Equal(t, stakerToRemove.NodeID, nodeID)
-		})
-	}
-}
-
 func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
 	fakeMSigAlias := preFundedKeys[0].Address()
 	sourceKey := preFundedKeys[1]
@@ -5140,9 +5300,7 @@ func TestCaminoStandardTxExecutorExportTxMultisig(t *testing.T) {
 	env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 	env.ctx.Lock.Lock()
 	defer func() {
-		if err := shutdownCaminoEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, shutdownCaminoEnvironment(env))
 	}()
 
 	type test struct {
@@ -5315,8 +5473,7 @@ func TestCaminoCrossExport(t *testing.T) {
 			}
 			env.ctx.Lock.Lock()
 			defer func() {
-				err := shutdownCaminoEnvironment(env)
-				require.NoError(t, err)
+				require.NoError(t, shutdownCaminoEnvironment(env))
 			}()
 			env.config.BanffTime = env.state.GetTimestamp()
 
@@ -6460,7 +6617,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				return s
 			},
@@ -6484,7 +6641,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
 				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
@@ -6513,7 +6670,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
 				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
@@ -6542,7 +6699,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
 				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
@@ -6568,7 +6725,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
 				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
@@ -6601,7 +6758,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
 				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
@@ -6635,7 +6792,7 @@ func TestCaminoStandardTxExecutorAddVoteTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(proposal.StartTime())
 				s.EXPECT().GetProposal(utx.ProposalID).Return(proposal, nil)
-				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortiumMember, nil)
+				s.EXPECT().GetAddressStates(utx.VoterAddress).Return(as.AddressStateConsortium, nil)
 				expectVerifyMultisigPermission(t, s, []ids.ShortID{utx.VoterAddress}, nil)
 				s.EXPECT().GetBaseFee().Return(defaultTxFee, nil)
 				expectVerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
@@ -7646,7 +7803,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 
 				// * proposalExecutor
 				s.EXPECT().GetAddressStates(earlySuccessfulProposalWithBond.MemberAddress).
-					Return(as.AddressStateConsortiumMember, nil)
+					Return(as.AddressStateConsortium, nil)
 				s.EXPECT().SetAddressStates(earlySuccessfulProposalWithBond.MemberAddress, as.AddressStateEmpty)
 				s.EXPECT().GetShortIDLink(earlySuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
 					Return(memberNodeShortID1, nil)
@@ -7659,7 +7816,7 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 				s.EXPECT().DeletePendingValidator(pendingValidator1)
 
 				s.EXPECT().GetAddressStates(expiredSuccessfulProposalWithBond.MemberAddress).
-					Return(as.AddressStateConsortiumMember, nil)
+					Return(as.AddressStateConsortium, nil)
 				s.EXPECT().SetAddressStates(expiredSuccessfulProposalWithBond.MemberAddress, as.AddressStateEmpty)
 				s.EXPECT().GetShortIDLink(expiredSuccessfulProposalWithBond.MemberAddress, state.ShortLinkKeyRegisterNode).
 					Return(memberNodeShortID2, nil)
@@ -7725,5 +7882,37 @@ func TestCaminoStandardTxExecutorFinishProposalsTx(t *testing.T) {
 			})
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
+	}
+}
+
+func getBitsFromAddressState(addrState as.AddressState) []as.AddressStateBit {
+	bit := as.AddressStateBit(0)
+	var addrStateBits []as.AddressStateBit
+	for addrState > 0 {
+		if addrState&1 == 1 {
+			addrStateBits = append(addrStateBits, bit)
+		}
+		addrState >>= 1
+		bit++
+	}
+	return addrStateBits
+}
+
+func TestGetBitsFromAddressState(t *testing.T) {
+	tests := []struct {
+		addressState             as.AddressState
+		expectedAddressStateBits []as.AddressStateBit
+	}{
+		{0b00100101, []as.AddressStateBit{0, 2, 5}},
+		{0b00000000, nil},
+		{0b00000001, []as.AddressStateBit{0}},
+		{0b11111111, []as.AddressStateBit{0, 1, 2, 3, 4, 5, 6, 7}},
+		{0b10000000, []as.AddressStateBit{7}},
+		{0b1111111111, []as.AddressStateBit{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
+	}
+
+	for _, tt := range tests {
+		addressStateBits := getBitsFromAddressState(tt.addressState)
+		require.Equal(t, tt.expectedAddressStateBits, addressStateBits)
 	}
 }

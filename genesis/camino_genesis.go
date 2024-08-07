@@ -370,7 +370,7 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	for _, allocation := range config.Camino.Allocations {
 		var addrState as.AddressState
 		if allocation.AddressStates.ConsortiumMember {
-			addrState |= as.AddressStateConsortiumMember
+			addrState |= as.AddressStateConsortium
 		}
 		if allocation.AddressStates.KYCVerified {
 			addrState |= as.AddressStateKYCVerified

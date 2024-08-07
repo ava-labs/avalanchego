@@ -78,6 +78,7 @@ var (
 	errAdminCannotBeDeleted              = errors.New("admin cannot be deleted")
 	errNotAthensPhase                    = errors.New("not allowed before AthensPhase")
 	errNotBerlinPhase                    = errors.New("not allowed before BerlinPhase")
+	errBerlinPhase                       = errors.New("not allowed after BerlinPhase")
 	errOfferCreatorCredentialMismatch    = errors.New("offer creator credential isn't matching")
 	errNotOfferCreator                   = errors.New("address isn't allowed to create deposit offers")
 	errDepositCreatorCredentialMismatch  = errors.New("deposit creator credential isn't matching")
@@ -1161,7 +1162,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		return err
 	}
 
-	if consortiumMemberAddressState.IsNot(as.AddressStateConsortiumMember) {
+	if consortiumMemberAddressState.IsNot(as.AddressStateConsortium) {
 		return errNotConsortiumMember
 	}
 
@@ -1885,7 +1886,7 @@ func (e *CaminoStandardTxExecutor) AddVoteTx(tx *txs.AddVoteTx) error {
 		return err
 	}
 
-	if voterAddressState.IsNot(as.AddressStateConsortiumMember) {
+	if voterAddressState.IsNot(as.AddressStateConsortium) {
 		return errNotConsortiumMember
 	}
 
@@ -2158,12 +2159,29 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		return err
 	}
 
-	roles := as.AddressStateEmpty
-	creds := e.Tx.Creds
-
 	chainTime := e.State.GetTimestamp()
-	isAthensPhase := e.Config.IsAthensPhaseActivated(chainTime)
+	txAddressState := tx.StateBit.ToAddressState()
 
+	// Check for bits that was affected or introduced in AthensPhase
+	isAthensPhase := e.Config.IsAthensPhaseActivated(chainTime)
+	if !isAthensPhase && txAddressState&as.AddressStateAthensPhaseBits != 0 {
+		return fmt.Errorf("%w: can't modify bit (%d) before AthensPhase", errNotAthensPhase, tx.StateBit)
+	}
+
+	// Check for bits that was affected or introduced in BerlinPhase
+	isBerlinPhase := e.Config.IsBerlinPhaseActivated(chainTime)
+	if !isBerlinPhase && txAddressState&as.AddressStateBerlinPhaseBits != 0 {
+		return fmt.Errorf("%w: can't modify bit (%d) before BerlinPhase", errNotBerlinPhase, tx.StateBit)
+	}
+	if isBerlinPhase && tx.StateBit == as.AddressStateBitConsortium { // Berlin phase moved consortium handling to admin proposals
+		return fmt.Errorf("%w: can't modify 'Consortium' bit (%d) after BerlinPhase", errBerlinPhase, tx.StateBit)
+	}
+
+	creds := e.Tx.Creds
+	roles := as.AddressStateEmpty
+	isRemovingAdminRole := tx.Remove && tx.StateBit == as.AddressStateBitRoleAdmin
+
+	// Getting executor roles and verifying executor credential
 	if tx.UpgradeVersionID.Version() > 0 {
 		if !isAthensPhase {
 			return errNotAthensPhase
@@ -2178,70 +2196,43 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 			},
 			e.State,
 		); err != nil {
-			return fmt.Errorf("%w: %s", errSignatureMissing, err)
+			return fmt.Errorf("%w: missing executor's signature: %s", errSignatureMissing, err)
 		}
 		creds = e.Tx.Creds[:len(e.Tx.Creds)-1]
+
+		if isRemovingAdminRole && tx.Address == tx.Executor {
+			return errAdminCannotBeDeleted
+		}
 
 		roles, err = e.State.GetAddressStates(tx.Executor)
 		if err != nil {
 			return err
 		}
-		if tx.Remove && tx.State == as.AddressStateBitRoleAdmin && tx.Address == tx.Executor {
-			return errAdminCannotBeDeleted
-		}
 	} else {
+		if isBerlinPhase {
+			return errBerlinPhase
+		}
 		addresses, err := e.Fx.RecoverAddresses(tx.Bytes(), e.Tx.Creds)
 		if err != nil {
 			return fmt.Errorf("%w: %s", errRecoverAddresses, err)
 		}
 
-		if len(addresses) == 0 {
-			return errWrongNumberOfCredentials
-		}
-
 		// Accumulate roles over all signers
-		checkSelfRemove := tx.Remove && tx.State == as.AddressStateBitRoleAdmin
 		for address := range addresses {
+			if isRemovingAdminRole && address == tx.Address {
+				return errAdminCannotBeDeleted
+			}
 			states, err := e.State.GetAddressStates(address)
 			if err != nil {
 				return err
 			}
-			if checkSelfRemove && address == tx.Address {
-				return errAdminCannotBeDeleted
-			}
 			roles |= states
 		}
 	}
-	statesBit := as.AddressState(1) << tx.State
 
-	// Check for bits that was affected or introduced in AthensPhase
-	if !isAthensPhase && statesBit&as.AddressStateAthensPhaseBits != 0 {
-		return errAddrStateNotPermitted
-	}
-
-	// Check for bits that was affected or introduced in BerlinPhase
-	isBerlinPhase := e.Config.IsBerlinPhaseActivated(chainTime)
-	if !isBerlinPhase && statesBit&as.AddressStateBerlinPhaseBits != 0 ||
-		isBerlinPhase && tx.State == as.AddressStateBitConsortium { // Berlin phase moved consortium handling to admin proposals
-		return errAddrStateNotPermitted
-	}
-
-	// Verify that roles are allowed to modify tx.State
-	if !verifyAccess(roles, statesBit) {
-		return fmt.Errorf("%w (addr: %s, bit: %b)", errAddrStateNotPermitted, tx.Address, tx.State)
-	}
-
-	// Get the current state
-	states, err := e.State.GetAddressStates(tx.Address)
-	if err != nil {
-		return err
-	}
-	// Calculate new states
-	newStates := states
-	if tx.Remove && (states&statesBit) != 0 {
-		newStates ^= statesBit
-	} else if !tx.Remove {
-		newStates |= statesBit
+	// Verify that executor roles are allowed to modify tx.State
+	if !isPermittedToModifyAddrStateBit(roles, txAddressState) {
+		return fmt.Errorf("%w (addr: %s, bit: %b)", errAddrStateNotPermitted, tx.Address, tx.StateBit)
 	}
 
 	// Verify the flowcheck
@@ -2249,7 +2240,6 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	if err != nil {
 		return err
 	}
-
 	if err := e.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -2263,9 +2253,9 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		return err
 	}
 
-	txID := e.Tx.ID()
-
-	if tx.State == as.AddressStateBitNodeDeferred {
+	// Special case: if addrStateBit is nodeDeferred, perform
+	// additional actions that will defer or resume validator
+	if tx.StateBit == as.AddressStateBitNodeDeferred {
 		nodeShortID, err := e.State.GetShortIDLink(tx.Address, state.ShortLinkKeyRegisterNode)
 		if err != nil {
 			return fmt.Errorf("couldn't get consortium member registered nodeID: %w", err)
@@ -2290,23 +2280,37 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		}
 	}
 
+	// Get the current state
+	addrState, err := e.State.GetAddressStates(tx.Address)
+	if err != nil {
+		return err
+	}
+	// Calculate new state
+	newAddrState := addrState
+	if tx.Remove && (addrState&txAddressState) != 0 {
+		newAddrState ^= txAddressState
+	} else if !tx.Remove {
+		newAddrState |= txAddressState
+	}
+	// Set the new state if changed
+	if addrState != newAddrState {
+		e.State.SetAddressStates(tx.Address, newAddrState)
+	}
+
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	avax.Produce(e.State, txID, tx.Outs)
-	// Set the new states if changed
-	if states != newStates {
-		e.State.SetAddressStates(tx.Address, newStates)
-	}
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 
 	return nil
 }
 
 // [state] must have only one bit set
-func verifyAccess(roles, state as.AddressState) bool {
+func isPermittedToModifyAddrStateBit(roles, state as.AddressState) bool {
+	const addressStateKYCAll = as.AddressStateKYCVerified | as.AddressStateKYCExpired
 	switch {
 	case roles.Is(as.AddressStateRoleAdmin): // admin can do anything
-	case as.AddressStateKYCAll&state != 0 && roles.Is(as.AddressStateRoleKYC): // kyc role can change kyc status
+	case addressStateKYCAll&state != 0 && roles.Is(as.AddressStateRoleKYCAdmin): // kyc role can change kyc status
 	case state == as.AddressStateOffersCreator && roles.Is(as.AddressStateRoleOffersAdmin): // offers admin can assign offers creator role
 	default:
 		return false

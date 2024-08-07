@@ -189,7 +189,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 		caminoGenesisConfig.ValidatorConsortiumMembers[i] = key.Address()
 		caminoGenesisConfig.AddressStates = append(caminoGenesisConfig.AddressStates, genesis.AddressState{
 			Address: key.Address(),
-			State:   as.AddressStateConsortiumMember,
+			State:   as.AddressStateConsortium,
 		})
 	}
 

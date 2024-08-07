@@ -11,7 +11,7 @@ const (
 
 	AddressStateBitRoleAdmin AddressStateBit = 0 // super role
 
-	AddressStateBitRoleKYC                     AddressStateBit = 1 // allows to set KYCVerified and KYCExpired
+	AddressStateBitRoleKYCAdmin                AddressStateBit = 1 // allows to set KYCVerified and KYCExpired
 	AddressStateBitRoleOffersAdmin             AddressStateBit = 2 // allows to set OffersCreator
 	AddressStateBitRoleConsortiumAdminProposer AddressStateBit = 3 // allows to create admin add/exclude member proposals
 
@@ -28,30 +28,33 @@ const (
 
 	AddressStateEmpty AddressState = 0
 
-	AddressStateRoleAdmin                   AddressState = AddressState(1) << AddressStateBitRoleAdmin                   // 0b1
-	AddressStateRoleKYC                     AddressState = AddressState(1) << AddressStateBitRoleKYC                     // 0b10
-	AddressStateRoleOffersAdmin             AddressState = AddressState(1) << AddressStateBitRoleOffersAdmin             // 0b100
-	AddressStateRoleConsortiumAdminProposer AddressState = AddressState(1) << AddressStateBitRoleConsortiumAdminProposer // 0b1000
-	AddressStateRoleAll                     AddressState = AddressStateRoleAdmin | AddressStateRoleKYC |                 // 0b1111
-		AddressStateRoleOffersAdmin | AddressStateRoleConsortiumAdminProposer
+	AddressStateRoleAdmin                   = AddressState(1) << AddressStateBitRoleAdmin                   // 0b1
+	AddressStateRoleKYCAdmin                = AddressState(1) << AddressStateBitRoleKYCAdmin                // 0b10
+	AddressStateRoleOffersAdmin             = AddressState(1) << AddressStateBitRoleOffersAdmin             // 0b100
+	AddressStateRoleConsortiumAdminProposer = AddressState(1) << AddressStateBitRoleConsortiumAdminProposer // 0b1000
 
-	AddressStateKYCVerified AddressState = AddressState(1) << AddressStateBitKYCVerified    // 0b0100000000000000000000000000000000
-	AddressStateKYCExpired  AddressState = AddressState(1) << AddressStateBitKYCExpired     // 0b1000000000000000000000000000000000
-	AddressStateKYCAll      AddressState = AddressStateKYCVerified | AddressStateKYCExpired // 0b1100000000000000000000000000000000
+	AddressStateKYCVerified = AddressState(1) << AddressStateBitKYCVerified // 0b0100000000000000000000000000000000
+	AddressStateKYCExpired  = AddressState(1) << AddressStateBitKYCExpired  // 0b1000000000000000000000000000000000
 
-	AddressStateConsortiumMember AddressState = AddressState(1) << AddressStateBitConsortium            // 0b0100000000000000000000000000000000000000
-	AddressStateNodeDeferred     AddressState = AddressState(1) << AddressStateBitNodeDeferred          // 0b1000000000000000000000000000000000000000
-	AddressStateVotableBits      AddressState = AddressStateConsortiumMember | AddressStateNodeDeferred // 0b1100000000000000000000000000000000000000
+	AddressStateConsortium   = AddressState(1) << AddressStateBitConsortium   // 0b0100000000000000000000000000000000000000
+	AddressStateNodeDeferred = AddressState(1) << AddressStateBitNodeDeferred // 0b1000000000000000000000000000000000000000
 
-	AddressStateOffersCreator  AddressState = AddressState(1) << AddressStateBitOffersCreator  // 0b00100000000000000000000000000000000000000000000000000
-	AddressStateCaminoProposer AddressState = AddressState(1) << AddressStateBitCaminoProposer // 0b01000000000000000000000000000000000000000000000000000
+	AddressStateOffersCreator  = AddressState(1) << AddressStateBitOffersCreator  // 0b0100000000000000000000000000000000000000000000000000
+	AddressStateCaminoProposer = AddressState(1) << AddressStateBitCaminoProposer // 0b1000000000000000000000000000000000000000000000000000
 
-	AddressStateAthensPhaseBits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
-	AddressStateBerlinPhaseBits = AddressStateCaminoProposer | AddressStateRoleOffersAdmin
+	// Bit groups (as AddressState)
 
-	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits |
+	AddressStateSunrisePhaseBits = AddressStateRoleAdmin | AddressStateRoleKYCAdmin | // 0b1100001100000000000000000000000000000011
+		AddressStateKYCVerified | AddressStateKYCExpired | AddressStateConsortium |
+		AddressStateNodeDeferred
+
+	AddressStateAthensPhaseBits = AddressStateRoleOffersAdmin | AddressStateOffersCreator // 0b0100000000000000000000000000000000000000000000000100
+
+	AddressStateBerlinPhaseBits = AddressStateCaminoProposer | AddressStateRoleConsortiumAdminProposer // 0b1000000000000000000000000000000000000000000000001000
+
+	AddressStateValidBits = AddressStateSunrisePhaseBits | // 0b1100000000001100001100000000000000000000000000001111
 		AddressStateAthensPhaseBits |
-		AddressStateBerlinPhaseBits // 0b1100000000001100001100000000000000000000000000001111
+		AddressStateBerlinPhaseBits
 )
 
 func (as AddressState) Is(state AddressState) bool {
@@ -60,4 +63,8 @@ func (as AddressState) Is(state AddressState) bool {
 
 func (as AddressState) IsNot(state AddressState) bool {
 	return as&state != state
+}
+
+func (asb AddressStateBit) ToAddressState() AddressState {
+	return AddressState(1) << asb
 }

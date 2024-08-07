@@ -376,6 +376,7 @@ func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *s
 		nodeOwnerAddress,
 		false,
 		as.AddressStateBitNodeDeferred,
+		key.Address(),
 		[]*secp256k1.PrivateKey{key},
 		outputOwners,
 	)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -32,12 +33,14 @@ var (
 	fakeTreasuryKey      = secp256k1.FakePrivateKey(treasury.Addr)
 	fakeTreasuryKeychain = secp256k1fx.NewKeychain(fakeTreasuryKey)
 
-	errKeyMissing       = errors.New("couldn't find key matching address")
-	errWrongNodeKeyType = errors.New("node key type isn't *secp256k1.PrivateKey")
-	errNotSECPOwner     = errors.New("owner is not *secp256k1fx.OutputOwners")
-	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errNoUTXOsForImport = errors.New("no utxos for import")
-	errWrongOutType     = errors.New("wrong output type")
+	errKeyMissing           = errors.New("couldn't find key matching address")
+	errWrongNodeKeyType     = errors.New("node key type isn't *secp256k1.PrivateKey")
+	errNotSECPOwner         = errors.New("owner is not *secp256k1fx.OutputOwners")
+	errWrongLockMode        = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errNoUTXOsForImport     = errors.New("no utxos for import")
+	errWrongOutType         = errors.New("wrong output type")
+	errEmptyAddress         = errors.New("address is empty")
+	errEmptyExecutorAddress = errors.New("executor address is empty")
 )
 
 type CaminoBuilder interface {
@@ -63,6 +66,7 @@ type CaminoTxBuilder interface {
 		address ids.ShortID,
 		remove bool,
 		state as.AddressStateBit,
+		executor ids.ShortID,
 		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
@@ -302,6 +306,7 @@ func (b *caminoBuilder) NewAddressStateTx(
 	address ids.ShortID,
 	remove bool,
 	state as.AddressStateBit,
+	executor ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
@@ -310,18 +315,51 @@ func (b *caminoBuilder) NewAddressStateTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	// Create the tx
-	utx := &txs.AddressStateTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    b.ctx.NetworkID,
-			BlockchainID: b.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-		}},
-		Address: address,
-		Remove:  remove,
-		State:   state,
+	isBerlin := b.cfg.IsBerlinPhaseActivated(b.state.GetTimestamp())
+
+	switch {
+	case address == ids.ShortEmpty:
+		return nil, errEmptyAddress
+	case isBerlin && executor == ids.ShortEmpty:
+		return nil, errEmptyExecutorAddress
 	}
+
+	executorSigner, err := getSigner(keys, executor)
+	if err != nil {
+		return nil, err
+	}
+
+	var utx *txs.AddressStateTx
+	if isBerlin {
+		utx = &txs.AddressStateTx{
+			UpgradeVersionID: codec.UpgradeVersion1,
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    b.ctx.NetworkID,
+				BlockchainID: b.ctx.ChainID,
+				Ins:          ins,
+				Outs:         outs,
+			}},
+			Address:      address,
+			Remove:       remove,
+			StateBit:     state,
+			Executor:     executor,
+			ExecutorAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
+		}
+		signers = append(signers, executorSigner)
+	} else {
+		utx = &txs.AddressStateTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    b.ctx.NetworkID,
+				BlockchainID: b.ctx.ChainID,
+				Ins:          ins,
+				Outs:         outs,
+			}},
+			Address:  address,
+			Remove:   remove,
+			StateBit: state,
+		}
+	}
+
 	tx, err := txs.NewSigned(utx, txs.Codec, signers)
 	if err != nil {
 		return nil, err

@@ -146,7 +146,7 @@ func (e *proposalVerifier) AddMemberProposal(proposal *dac.AddMemberProposal) er
 	switch {
 	case err != nil:
 		return err
-	case applicantAddress.Is(as.AddressStateConsortiumMember):
+	case applicantAddress.Is(as.AddressStateConsortium):
 		return fmt.Errorf("%w (applicant)", errConsortiumMember)
 	case applicantAddress.IsNot(as.AddressStateKYCVerified):
 		return fmt.Errorf("%w (applicant)", errNotKYCVerified)
@@ -185,7 +185,7 @@ func (e *proposalExecutor) AddMemberProposal(proposal *dac.AddMemberProposalStat
 	if err != nil {
 		return err
 	}
-	newAddrState := addrState | as.AddressStateConsortiumMember
+	newAddrState := addrState | as.AddressStateConsortium
 	if newAddrState == addrState {
 		// c-member was somehow already added
 		// this should never happen, cause adding only done via addMemberProposal
@@ -208,7 +208,7 @@ func (e *proposalVerifier) ExcludeMemberProposal(proposal *dac.ExcludeMemberProp
 	switch {
 	case err != nil:
 		return err
-	case memberAddressState.IsNot(as.AddressStateConsortiumMember):
+	case memberAddressState.IsNot(as.AddressStateConsortium):
 		return fmt.Errorf("%w (member)", errNotConsortiumMember)
 	}
 
@@ -218,7 +218,7 @@ func (e *proposalVerifier) ExcludeMemberProposal(proposal *dac.ExcludeMemberProp
 		switch {
 		case err != nil:
 			return err
-		case proposerAddressState.IsNot(as.AddressStateConsortiumMember):
+		case proposerAddressState.IsNot(as.AddressStateConsortium):
 			return fmt.Errorf("%w (proposer)", errNotConsortiumMember)
 		}
 
@@ -262,7 +262,7 @@ func (e *proposalExecutor) ExcludeMemberProposal(proposal *dac.ExcludeMemberProp
 	if err != nil {
 		return err
 	}
-	newAddrState := addrState ^ as.AddressStateConsortiumMember
+	newAddrState := addrState ^ as.AddressStateConsortium
 	if newAddrState == addrState {
 		// c-member was somehow already excluded
 		// this should never happen, cause excluding only done via excludeMemberProposal
@@ -341,7 +341,7 @@ func (e *proposalVerifier) GeneralProposal(*dac.GeneralProposal) error {
 	switch {
 	case err != nil:
 		return err
-	case proposerAddressState.IsNot(as.AddressStateConsortiumMember):
+	case proposerAddressState.IsNot(as.AddressStateConsortium):
 		return fmt.Errorf("%w (proposer)", errNotConsortiumMember)
 	}
 

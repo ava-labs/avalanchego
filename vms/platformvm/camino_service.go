@@ -280,10 +280,11 @@ func (s *CaminoService) SetAddressState(_ *http.Request, args *SetAddressStateAr
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddressStateTx(
-		targetAddr,  // Address to change state
-		args.Remove, // Add or remove State
-		args.State,  // The state to change
-		privKeys,    // Keys providing the staked tokens
+		targetAddr,     // Address to change state
+		args.Remove,    // Add or remove State
+		args.State,     // The state to change
+		ids.ShortEmpty, // executor address
+		privKeys,       // Keys providing the staked tokens
 		change,
 	)
 	if err != nil {

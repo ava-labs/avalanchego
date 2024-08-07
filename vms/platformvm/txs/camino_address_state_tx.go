@@ -5,6 +5,7 @@ package txs
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,8 +18,10 @@ import (
 var (
 	_ UnsignedTx = (*AddressStateTx)(nil)
 
-	ErrEmptyAddress = errors.New("address is empty")
-	ErrInvalidState = errors.New("invalid state")
+	ErrEmptyExecutorAddress = errors.New("executor address is empty")
+	errEmptyAddress         = errors.New("address is empty")
+	errBadExecutorAuth      = errors.New("bad executor auth")
+	errInvalidAddrStateBit  = errors.New("invalid address state bit")
 )
 
 // AddressStateTx is an unsigned AddressStateTx
@@ -30,7 +33,7 @@ type AddressStateTx struct {
 	// The address to add / remove state
 	Address ids.ShortID `serialize:"true" json:"address"`
 	// The state to set / unset
-	State as.AddressStateBit `serialize:"true" json:"state"`
+	StateBit as.AddressStateBit `serialize:"true" json:"state"`
 	// Remove or add the flag ?
 	Remove bool `serialize:"true" json:"remove"`
 	// The executor of this TX (needs access role)
@@ -47,17 +50,17 @@ func (tx *AddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.Address == ids.ShortEmpty:
-		return ErrEmptyAddress
-	case tx.State > as.AddressStateBitMax || as.AddressStateValidBits&as.AddressState(uint64(1)<<tx.State) == 0:
-		return ErrInvalidState
+		return errEmptyAddress
+	case tx.StateBit > as.AddressStateBitMax || tx.StateBit.ToAddressState()&as.AddressStateValidBits == 0:
+		return fmt.Errorf("%w: bit (%d)", errInvalidAddrStateBit, tx.StateBit)
 	}
 
 	if tx.UpgradeVersionID.Version() > 0 {
 		if err := tx.ExecutorAuth.Verify(); err != nil {
-			return err
+			return fmt.Errorf("%w: %s", errBadExecutorAuth, err)
 		}
 		if tx.Executor == ids.ShortEmpty {
-			return ErrEmptyAddress
+			return ErrEmptyExecutorAddress
 		}
 	}
 

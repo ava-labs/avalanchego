@@ -40,6 +40,7 @@ func TestCaminoEnv(t *testing.T) {
 	env.config.BanffTime = env.state.GetTimestamp()
 }
 
+// only support upgr version 0
 func TestCaminoBuilderTxAddressState(t *testing.T) {
 	caminoConfig := api.Camino{
 		VerifyNodeSignature: true,
@@ -56,39 +57,32 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 
 	tests := map[string]struct {
 		remove      bool
-		state       as.AddressStateBit
+		stateBit    as.AddressStateBit
 		address     ids.ShortID
 		expectedErr error
 	}{
 		"KYC Role: Add": {
-			remove:      false,
-			state:       as.AddressStateBitRoleKYC,
-			address:     caminoPreFundedKeys[0].PublicKey().Address(),
-			expectedErr: nil,
+			stateBit: as.AddressStateBitRoleKYCAdmin,
+			address:  caminoPreFundedKeys[0].Address(),
 		},
 		"KYC Role: Remove": {
-			remove:      true,
-			state:       as.AddressStateBitRoleKYC,
-			address:     caminoPreFundedKeys[0].PublicKey().Address(),
-			expectedErr: nil,
+			remove:   true,
+			stateBit: as.AddressStateBitRoleKYCAdmin,
+			address:  caminoPreFundedKeys[0].Address(),
 		},
 		"Admin Role: Add": {
-			remove:      false,
-			state:       as.AddressStateBitRoleAdmin,
-			address:     caminoPreFundedKeys[0].PublicKey().Address(),
-			expectedErr: nil,
+			stateBit: as.AddressStateBitRoleAdmin,
+			address:  caminoPreFundedKeys[0].Address(),
 		},
 		"Admin Role: Remove": {
-			remove:      true,
-			state:       as.AddressStateBitRoleAdmin,
-			address:     caminoPreFundedKeys[0].PublicKey().Address(),
-			expectedErr: nil,
+			remove:   true,
+			stateBit: as.AddressStateBitRoleAdmin,
+			address:  caminoPreFundedKeys[0].Address(),
 		},
-		"Empty Address": {
-			remove:      false,
-			state:       as.AddressStateBitRoleKYC,
+		"Empty address": {
+			stateBit:    as.AddressStateBitRoleKYCAdmin,
 			address:     ids.ShortEmpty,
-			expectedErr: txs.ErrEmptyAddress,
+			expectedErr: errEmptyAddress,
 		},
 	}
 
@@ -97,7 +91,8 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 			_, err := env.txBuilder.NewAddressStateTx(
 				tt.address,
 				tt.remove,
-				tt.state,
+				tt.stateBit,
+				caminoPreFundedKeys[0].Address(),
 				caminoPreFundedKeys,
 				nil,
 			)
@@ -190,7 +185,7 @@ func TestUnlockDepositTx(t *testing.T) {
 	outputOwners := secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
-		Addrs:     []ids.ShortID{testKey.PublicKey().Address()},
+		Addrs:     []ids.ShortID{testKey.Address()},
 	}
 	depositTxID := ids.GenerateTestID()
 	depositStartTime := time.Now()
