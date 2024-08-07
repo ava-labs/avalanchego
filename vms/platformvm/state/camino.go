@@ -108,7 +108,7 @@ type CaminoDiff interface {
 	// Multisig Owners
 
 	GetMultisigAlias(ids.ShortID) (*multisig.AliasWithNonce, error)
-	SetMultisigAlias(*multisig.AliasWithNonce)
+	SetMultisigAlias(ids.ShortID, *multisig.AliasWithNonce)
 
 	// ShortIDsLink
 
@@ -425,7 +425,7 @@ func (cs *caminoState) syncGenesis(s *state, g *genesis.State) error {
 	// adding msig aliases
 
 	for _, multisigAlias := range g.Camino.MultisigAliases {
-		cs.SetMultisigAlias(&multisig.AliasWithNonce{Alias: *multisigAlias})
+		cs.SetMultisigAlias(multisigAlias.ID, &multisig.AliasWithNonce{Alias: *multisigAlias})
 	}
 
 	// adding blocks (validators and deposits)

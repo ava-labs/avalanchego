@@ -19,7 +19,7 @@ import (
 var (
 	_ UnsignedTx = (*DepositTx)(nil)
 
-	errTooBigDeposit         = errors.New("to big deposit")
+	errTooBigDeposit         = errors.New("too big deposit")
 	errInvalidRewardOwner    = errors.New("invalid reward owner")
 	errBadOfferOwnerAuth     = errors.New("bad offer owner auth")
 	errBadDepositCreatorAuth = errors.New("bad deposit creator auth")

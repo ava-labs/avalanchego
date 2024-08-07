@@ -273,8 +273,8 @@ func (d *diff) GetNextToUnlockDepositIDsAndTime(removedDepositIDs set.Set[ids.ID
 	return nextDepositIDs, nextUnlockTime, nil
 }
 
-func (d *diff) SetMultisigAlias(alias *multisig.AliasWithNonce) {
-	d.caminoDiff.modifiedMultisigAliases[alias.ID] = alias
+func (d *diff) SetMultisigAlias(id ids.ShortID, alias *multisig.AliasWithNonce) {
+	d.caminoDiff.modifiedMultisigAliases[id] = alias
 }
 
 func (d *diff) GetMultisigAlias(alias ids.ShortID) (*multisig.AliasWithNonce, error) {
@@ -682,8 +682,8 @@ func (d *diff) ApplyCaminoState(baseState State) error {
 		}
 	}
 
-	for _, v := range d.caminoDiff.modifiedMultisigAliases {
-		baseState.SetMultisigAlias(v)
+	for multisigAliasID, multisigAlias := range d.caminoDiff.modifiedMultisigAliases {
+		baseState.SetMultisigAlias(multisigAliasID, multisigAlias)
 	}
 
 	for fullKey, link := range d.caminoDiff.modifiedShortLinks {

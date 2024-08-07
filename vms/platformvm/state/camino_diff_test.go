@@ -2383,7 +2383,7 @@ func TestDiffSetMultisigAlias(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tt.diff.SetMultisigAlias(tt.alias)
+			tt.diff.SetMultisigAlias(tt.alias.ID, tt.alias)
 			require.Equal(t, tt.expectedDiff, tt.diff)
 		})
 	}
@@ -5185,8 +5185,8 @@ func TestDiffApplyCaminoState(t *testing.T) {
 						s.EXPECT().ModifyDeposit(depositTxID, depositDiff.Deposit)
 					}
 				}
-				for _, v := range d.caminoDiff.modifiedMultisigAliases {
-					s.EXPECT().SetMultisigAlias(v)
+				for multisigAliasID, multisigAlias := range d.caminoDiff.modifiedMultisigAliases {
+					s.EXPECT().SetMultisigAlias(multisigAliasID, multisigAlias)
 				}
 				for fullKey, link := range d.caminoDiff.modifiedShortLinks {
 					id, key := fromShortLinkKey(fullKey)

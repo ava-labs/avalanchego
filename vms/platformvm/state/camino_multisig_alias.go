@@ -9,20 +9,19 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 type msigAlias struct {
 	Memo   types.JSONByteSlice `serialize:"true"`
-	Owners verify.State        `serialize:"true"`
+	Owners multisig.Owners     `serialize:"true"`
 	Nonce  uint64              `serialize:"true"`
 }
 
-func (cs *caminoState) SetMultisigAlias(ma *multisig.AliasWithNonce) {
-	cs.modifiedMultisigAliases[ma.ID] = ma
-	cs.multisigAliasesCache.Evict(ma.ID)
+func (cs *caminoState) SetMultisigAlias(id ids.ShortID, ma *multisig.AliasWithNonce) {
+	cs.modifiedMultisigAliases[id] = ma
+	cs.multisigAliasesCache.Evict(id)
 }
 
 func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.AliasWithNonce, error) {

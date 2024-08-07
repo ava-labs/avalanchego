@@ -68,7 +68,7 @@ func TestGeneralProposalVerify(t *testing.T) {
 			},
 			expectedErr: errEndNotAfterStart,
 		},
-		"To small duration": {
+		"Too small duration": {
 			proposal: &GeneralProposal{
 				Start:   100,
 				End:     100 + GeneralProposalMinDuration - 1,
@@ -81,7 +81,7 @@ func TestGeneralProposalVerify(t *testing.T) {
 			},
 			expectedErr: errWrongDuration,
 		},
-		"To big duration": {
+		"Too big duration": {
 			proposal: &GeneralProposal{
 				Start:   100,
 				End:     100 + generalProposalMaxDuration + 1,
@@ -105,7 +105,7 @@ func TestGeneralProposalVerify(t *testing.T) {
 				End:     100 + GeneralProposalMinDuration,
 				Options: [][]byte{make([]byte, generalProposalMaxOptionSize+1)},
 			},
-			expectedErr: errGeneralProposalOptionIsToBig,
+			expectedErr: errGeneralProposalOptionIsTooBig,
 		},
 		"Not unique option": {
 			proposal: &GeneralProposal{

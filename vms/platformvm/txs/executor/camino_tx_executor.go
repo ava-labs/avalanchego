@@ -54,6 +54,7 @@ var (
 	errDepositDurationTooBig             = errors.New("deposit duration is greater than deposit offer maximum duration")
 	errSupplyOverflow                    = errors.New("resulting total supply would be more than allowed maximum")
 	errNotConsortiumMember               = errors.New("address isn't consortium member")
+	errConsortiumMember                  = errors.New("address is consortium member")
 	errValidatorNotFound                 = errors.New("validator not found")
 	errConsortiumMemberHasNode           = errors.New("consortium member already has registered node")
 	errSignatureMissing                  = errors.New("wrong signature")
@@ -1514,15 +1515,7 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 		return err
 	}
 
-	baseCreds := e.Tx.Creds[:len(e.Tx.Creds)]
-
-	var aliasID ids.ShortID
-	nonce := uint64(0)
-
-	txID := e.Tx.ID()
-
 	// verify that alias isn't nesting another alias
-
 	isNestedMsig, err := e.Fx.IsNestedMultisig(tx.MultisigAlias.Owners, e.State)
 	switch {
 	case err != nil:
@@ -1531,14 +1524,21 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 		return errNestedMsigAlias
 	}
 
-	// Update existing multisig definition
+	aliasAddrState := as.AddressStateEmpty
+	baseCreds := e.Tx.Creds[:len(e.Tx.Creds)]
+	var aliasID ids.ShortID
+	nonce := uint64(0)
+	txID := e.Tx.ID()
+	isRemoval := tx.MultisigAlias.Owners.IsZero()
+	isUpdating := tx.MultisigAlias.ID != ids.ShortEmpty
+	// syntactically valid multisig alias ensures that is removal is also updating
 
-	if tx.MultisigAlias.ID != ids.ShortEmpty {
+	if isUpdating {
 		if len(e.Tx.Creds) < 2 {
 			return errWrongCredentialsNumber
 		}
 
-		alias, err := e.State.GetMultisigAlias(tx.MultisigAlias.ID)
+		oldAlias, err := e.State.GetMultisigAlias(tx.MultisigAlias.ID)
 		if err != nil {
 			return fmt.Errorf("%w, alias: %s", errAliasNotFound, tx.MultisigAlias.ID)
 		}
@@ -1549,14 +1549,28 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 			e.Tx.Unsigned,
 			tx.Auth,
 			e.Tx.Creds[len(e.Tx.Creds)-1],
-			alias.Owners,
+			oldAlias.Owners,
 			e.State,
 		); err != nil {
 			return fmt.Errorf("%w: %s", errAliasCredentialMismatch, err)
 		}
 
-		aliasID = alias.ID
-		nonce = alias.Nonce + 1
+		if isRemoval {
+			// verify that alias isn't consortium member or role admin
+			aliasAddrState, err = e.State.GetAddressStates(tx.MultisigAlias.ID)
+			switch {
+			case err != nil:
+				return err
+			case aliasAddrState.Is(as.AddressStateConsortium):
+				return errConsortiumMember
+			case aliasAddrState.Is(as.AddressStateRoleAdmin):
+				return errAdminCannotBeDeleted
+			}
+		} else {
+			nonce = oldAlias.Nonce + 1
+		}
+
+		aliasID = oldAlias.ID
 	} else {
 		aliasID = multisig.ComputeAliasID(txID)
 	}
@@ -1583,14 +1597,21 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 
 	// update state
 
-	e.State.SetMultisigAlias(&multisig.AliasWithNonce{
-		Alias: multisig.Alias{
-			ID:     aliasID,
-			Memo:   tx.MultisigAlias.Memo,
-			Owners: tx.MultisigAlias.Owners,
-		},
-		Nonce: nonce,
-	})
+	var msigAlias *multisig.AliasWithNonce
+	if isRemoval && aliasAddrState != as.AddressStateEmpty {
+		e.State.SetAddressStates(tx.MultisigAlias.ID, as.AddressStateEmpty)
+	} else if !isRemoval {
+		msigAlias = &multisig.AliasWithNonce{
+			Alias: multisig.Alias{
+				ID:     aliasID,
+				Memo:   tx.MultisigAlias.Memo,
+				Owners: tx.MultisigAlias.Owners,
+			},
+			Nonce: nonce,
+		}
+	}
+
+	e.State.SetMultisigAlias(aliasID, msigAlias)
 
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)

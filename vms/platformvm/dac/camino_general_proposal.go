@@ -27,8 +27,8 @@ var (
 	_ Proposal      = (*GeneralProposal)(nil)
 	_ ProposalState = (*GeneralProposalState)(nil)
 
-	errGeneralProposalOptionIsToBig = errors.New("option size is to big")
-	errNotImplemented               = errors.New("not implemented, should never be called")
+	errGeneralProposalOptionIsTooBig = errors.New("option size is too big")
+	errNotImplemented                = errors.New("not implemented, should never be called")
 )
 
 type GeneralProposal struct {
@@ -83,7 +83,7 @@ func (p *GeneralProposal) Verify() error {
 	for i := 0; i < len(p.Options); i++ {
 		if len(p.Options[i]) > generalProposalMaxOptionSize {
 			return fmt.Errorf("%w (expected: no more than %d, actual: %d, option index: %d)",
-				errGeneralProposalOptionIsToBig, generalProposalMaxOptionSize, len(p.Options[i]), i)
+				errGeneralProposalOptionIsTooBig, generalProposalMaxOptionSize, len(p.Options[i]), i)
 		}
 		for j := i + 1; j < len(p.Options); j++ {
 			if bytes.Equal(p.Options[i], p.Options[j]) {

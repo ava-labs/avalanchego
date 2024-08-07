@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	_                            UnsignedTx = (*MultisigAliasTx)(nil)
-	errFailedToVerifyAliasOrAuth            = errors.New("failed to verify alias or auth")
+	_ UnsignedTx = (*MultisigAliasTx)(nil)
+
+	errFailedToVerifyAliasOrAuth = errors.New("failed to verify alias or auth")
 )
 
 // MultisigAliasTx is an unsigned multisig alias tx

@@ -44,7 +44,7 @@ func (cs *caminoState) GetAddressStates(address ids.ShortID) (as.AddressState, e
 func (cs *caminoState) writeAddressStates() error {
 	for key, val := range cs.modifiedAddressStates {
 		delete(cs.modifiedAddressStates, key)
-		if val == 0 {
+		if val == as.AddressStateEmpty {
 			if err := cs.addressStateDB.Delete(key[:]); err != nil {
 				return err
 			}

@@ -37,7 +37,7 @@ func TestDepositTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: errInvalidRewardOwner,
 		},
-		"To big total deposit amount": {
+		"Too big total deposit amount": {
 			tx: &DepositTx{
 				BaseTx: BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    ctx.NetworkID,

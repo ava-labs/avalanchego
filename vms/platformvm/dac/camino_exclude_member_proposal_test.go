@@ -38,7 +38,7 @@ func TestExcludeMemberProposalVerify(t *testing.T) {
 			},
 			expectedErr: errEndNotAfterStart,
 		},
-		"To small duration": {
+		"Too small duration": {
 			proposal: &ExcludeMemberProposal{
 				Start: 100,
 				End:   100 + ExcludeMemberProposalMinDuration - 1,
@@ -49,7 +49,7 @@ func TestExcludeMemberProposalVerify(t *testing.T) {
 			},
 			expectedErr: errWrongDuration,
 		},
-		"To big duration": {
+		"Too big duration": {
 			proposal: &ExcludeMemberProposal{
 				Start: 100,
 				End:   100 + ExcludeMemberProposalMaxDuration + 1,

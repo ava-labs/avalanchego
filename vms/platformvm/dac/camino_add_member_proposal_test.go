@@ -38,7 +38,7 @@ func TestAddMemberProposalVerify(t *testing.T) {
 			},
 			expectedErr: errEndNotAfterStart,
 		},
-		"To small duration": {
+		"Too small duration": {
 			proposal: &AddMemberProposal{
 				Start: 100,
 				End:   100 + AddMemberProposalDuration - 1,
@@ -49,7 +49,7 @@ func TestAddMemberProposalVerify(t *testing.T) {
 			},
 			expectedErr: errWrongDuration,
 		},
-		"To big duration": {
+		"Too big duration": {
 			proposal: &AddMemberProposal{
 				Start: 100,
 				End:   100 + AddMemberProposalDuration + 1,

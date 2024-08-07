@@ -12,31 +12,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ Owners = (*testOwners)(nil)
+
+type testOwners struct {
+	avax.TestVerifiable
+	isEmpty bool
+}
+
+func (o testOwners) IsZero() bool { return o.isEmpty }
+
 func TestVerify(t *testing.T) {
 	tests := map[string]struct {
-		alias               Alias
-		message             string
-		expectedErrorString string
+		alias       Alias
+		expectedErr error
 	}{
-		"MemoSizeShouldBeLowerThanMaxMemoSize": {
+		"Memo size should be lower than maxMemoSize": {
 			alias: Alias{
-				Owners: &avax.TestVerifiable{},
+				Owners: &testOwners{},
 				Memo:   make([]byte, avax.MaxMemoSize+1),
 				ID:     hashing.ComputeHash160Array(ids.Empty[:]),
 			},
-			message:             "memo size should be lower than max memo size",
-			expectedErrorString: "msig alias memo is larger (257 bytes) than max of 256 bytes",
+			expectedErr: errMemoIsTooBig,
+		},
+		"Zero owners": {
+			alias: Alias{
+				ID:     ids.ShortEmpty,
+				Owners: &testOwners{isEmpty: true},
+			},
+			expectedErr: errEmptyAlias,
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			err := tt.alias.Verify()
-			if tt.expectedErrorString != "" {
-				require.Error(t, err, tt.message)
-				require.Equal(t, err.Error(), tt.expectedErrorString)
-			} else {
-				require.NoError(t, err, tt.message)
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
