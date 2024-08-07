@@ -48,7 +48,10 @@ type Camino struct {
 	MultisigAliases            []*multisig.Alias      `json:"multisigAliases"`
 }
 
-func (c Camino) ParseToGenesis() genesis.Camino {
+func (c *Camino) ParseToGenesis() genesis.Camino {
+	if c == nil {
+		return genesis.Camino{}
+	}
 	return genesis.Camino{
 		VerifyNodeSignature: c.VerifyNodeSignature,
 		LockModeBondDeposit: c.LockModeBondDeposit,

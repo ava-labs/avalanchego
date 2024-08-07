@@ -202,7 +202,7 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 		Chains:        nil,
 		Time:          json.Uint64(defaultGenesisTime.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Camino:        caminoGenesisConfig,
+		Camino:        &caminoGenesisConfig,
 	}
 
 	buildGenesisResponse := api.BuildGenesisReply{}

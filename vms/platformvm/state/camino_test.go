@@ -384,7 +384,7 @@ func testGenesisConfig(lockModeBondDeposit bool, validator, deposit bool) *root_
 		InitialStakeDurationOffset: 10,
 		InitialStakedFunds:         avaxInitialStakerFunds,
 		InitialStakers:             avaxInitialStakers,
-		Camino: root_genesis.Camino{
+		Camino: &root_genesis.Camino{
 			VerifyNodeSignature: true,
 			LockModeBondDeposit: lockModeBondDeposit,
 			InitialAdmin:        initialAdmin,

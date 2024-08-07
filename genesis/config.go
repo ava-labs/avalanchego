@@ -93,7 +93,7 @@ type Config struct {
 	InitialStakeDurationOffset uint64        `json:"initialStakeDurationOffset"`
 	InitialStakedFunds         []ids.ShortID `json:"initialStakedFunds"`
 	InitialStakers             []Staker      `json:"initialStakers"`
-	Camino                     Camino        `json:"camino"`
+	Camino                     *Camino       `json:"camino"`
 
 	CChainGenesis string `json:"cChainGenesis"`
 
@@ -137,10 +137,12 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 		}
 		uc.InitialStakers[i] = uis
 	}
-	var err error
-	uc.Camino, err = c.Camino.Unparse(c.NetworkID, c.StartTime)
-	if err != nil {
-		return uc, err
+	if c.Camino != nil {
+		caminoUnparsedConfig, err := c.Camino.Unparse(c.NetworkID, c.StartTime)
+		if err != nil {
+			return uc, err
+		}
+		uc.Camino = &caminoUnparsedConfig
 	}
 
 	return uc, nil
@@ -162,14 +164,16 @@ func (c *Config) InitialSupply() (uint64, error) {
 		initialSupply = newInitialSupply
 	}
 
-	caminoInitialSupply, err := c.Camino.InitialSupply()
-	if err != nil {
-		return 0, err
-	}
+	if c.Camino != nil {
+		caminoInitialSupply, err := c.Camino.InitialSupply()
+		if err != nil {
+			return 0, err
+		}
 
-	initialSupply, err = math.Add64(initialSupply, caminoInitialSupply)
-	if err != nil {
-		return 0, err
+		initialSupply, err = math.Add64(initialSupply, caminoInitialSupply)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return initialSupply, nil

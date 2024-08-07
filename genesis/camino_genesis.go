@@ -226,8 +226,11 @@ func validateCaminoConfig(config *Config) error {
 	return nil
 }
 
-func caminoArgFromConfig(config *Config) api.Camino {
-	return api.Camino{
+func caminoArgFromConfig(config *Config) *api.Camino {
+	if config.Camino == nil {
+		return nil
+	}
+	return &api.Camino{
 		VerifyNodeSignature: config.Camino.VerifyNodeSignature,
 		LockModeBondDeposit: config.Camino.LockModeBondDeposit,
 		InitialAdmin:        config.Camino.InitialAdmin,

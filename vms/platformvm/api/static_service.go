@@ -185,7 +185,7 @@ type BuildGenesisArgs struct {
 	UTXOs         []UTXO                    `json:"utxos"`
 	Validators    []PermissionlessValidator `json:"validators"`
 	Chains        []Chain                   `json:"chains"`
-	Camino        Camino                    `json:"camino"`
+	Camino        *Camino                   `json:"camino"`
 	Time          json.Uint64               `json:"time"`
 	InitialSupply json.Uint64               `json:"initialSupply"`
 	Message       string                    `json:"message"`
@@ -211,7 +211,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	var vdrs txheap.TimedHeap
-	if args.Camino.LockModeBondDeposit {
+	if args.Camino != nil && args.Camino.LockModeBondDeposit {
 		return buildCaminoGenesis(args, reply)
 	}
 

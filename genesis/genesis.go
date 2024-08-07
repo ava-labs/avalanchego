@@ -146,13 +146,15 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 		return errNoCChainGenesis
 	}
 
-	if err := validateCaminoConfig(config); err != nil {
-		return err
-	}
+	if config.Camino != nil {
+		if err := validateCaminoConfig(config); err != nil {
+			return err
+		}
 
-	// the rest of the checks are only for LockModeBondDeposit == false
-	if config.Camino.LockModeBondDeposit {
-		return nil
+		// the rest of the checks are only for LockModeBondDeposit == false
+		if config.Camino.LockModeBondDeposit {
+			return nil
+		}
 	}
 
 	// We don't impose any restrictions on the minimum
@@ -281,7 +283,7 @@ func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	hrp := constants.GetHRP(config.NetworkID)
 
-	if config.Camino.LockModeBondDeposit {
+	if config.Camino != nil && config.Camino.LockModeBondDeposit {
 		return buildCaminoGenesis(config, hrp)
 	}
 
@@ -368,6 +370,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		Encoding:      defaultEncoding,
 		Camino:        caminoArgFromConfig(config),
 	}
+
 	for _, allocation := range config.Allocations {
 		if initiallyStaked.Contains(allocation.AVAXAddr) {
 			skippedAllocations = append(skippedAllocations, allocation)

@@ -78,7 +78,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					}},
 				}},
 				Chains: []Chain{},
-				Camino: Camino{
+				Camino: &Camino{
 					VerifyNodeSignature:        true,
 					LockModeBondDeposit:        true,
 					ValidatorConsortiumMembers: []ids.ShortID{addr},
@@ -365,7 +365,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 				},
 				Chains: []Chain{},
-				Camino: Camino{
+				Camino: &Camino{
 					VerifyNodeSignature: true,
 					LockModeBondDeposit: false,
 					ValidatorConsortiumMembers: []ids.ShortID{
@@ -410,7 +410,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 				Validators: []PermissionlessValidator{},
 				Time:       5,
 				Encoding:   formatting.Hex,
-				Camino: Camino{
+				Camino: &Camino{
 					VerifyNodeSignature: true,
 					LockModeBondDeposit: true,
 					UTXODeposits: []UTXODeposit{
@@ -454,7 +454,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 				},
 				Time:     5,
 				Encoding: formatting.Hex,
-				Camino: Camino{
+				Camino: &Camino{
 					VerifyNodeSignature: true,
 					LockModeBondDeposit: true,
 					ValidatorDeposits: [][]UTXODeposit{
@@ -499,7 +499,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 				},
 				Time:     5,
 				Encoding: formatting.Hex,
-				Camino: Camino{
+				Camino: &Camino{
 					VerifyNodeSignature: true,
 					LockModeBondDeposit: true,
 					ValidatorConsortiumMembers: []ids.ShortID{
@@ -548,7 +548,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 					},
 				},
 				Chains: []Chain{},
-				Camino: Camino{
+				Camino: &Camino{
 					VerifyNodeSignature: true,
 					LockModeBondDeposit: true,
 					ValidatorConsortiumMembers: []ids.ShortID{

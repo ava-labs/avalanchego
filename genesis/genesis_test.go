@@ -376,11 +376,11 @@ func TestGenesis(t *testing.T) {
 	}{
 		{
 			networkID:  constants.MainnetID,
-			expectedID: "2eP2teFA41Pb61nQyQYJY38onkCqkrJDPSVeQz8v9ahbEma18S",
+			expectedID: "2uwgsacDoMYttQLfRsPQf9WcfZnpC4nVVHoMd5zkdMheKKqbuj",
 		},
 		{
 			networkID:  constants.FujiID,
-			expectedID: "2fAKF9ph6o4jxr12QVWmbww8dVfkNKepBt547QFEJ5eyD9x2Z9",
+			expectedID: "ijL3TnG4omtuTSsoMBN2gsvZ9P4bNeBqdLBGsxxqTN97VJiPy",
 		},
 		{
 			networkID:  constants.CaminoID,
@@ -396,7 +396,7 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			networkID:  constants.LocalID,
-			expectedID: "294HrmVEniYX2mrvLjww9AmpV9NZnFhEi6eRrCsAzxZ2PkvdVb",
+			expectedID: "yxYqABea8kNeLqgh59wprEAYPQ7KqCatCBRGT5MWAUQ9fdDEr",
 		},
 	}
 	for _, test := range tests {
