@@ -5,11 +5,34 @@ run:
   skip-files:
     - ".*\\.pb\\.go$"
     - ".*mock.*"
+  # Enables skipping of directories:
+  # - vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
+  # Default: true
+  skip-dirs-use-default: false
   skip-dirs:
     - "tools/camino-network-runner"
+  # If set we pass it to "go list -mod={option}". From "go help modules":
+  # If invoked with -mod=readonly, the go command is disallowed from the implicit
+  # automatic updating of go.mod described above. Instead, it fails when any changes
+  # to go.mod are needed. This setting is most useful to check that go.mod does
+  # not need updates, such as in a continuous integration and testing system.
+  # If invoked with -mod=vendor, the go command assumes that the vendor
+  # directory holds the correct copies of dependencies and ignores
+  # the dependency descriptions in go.mod.
+  #
+  # Allowed values: readonly|vendor|mod
+  # By default, it isn't set.
+  modules-download-mode: readonly
 
 issues:
-  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
   max-same-issues: 0
 
 linters:
@@ -51,23 +74,11 @@ linters:
     # - lll
 
 linters-settings:
-  staticcheck:
-    go: "1.19"
-    # https://staticcheck.io/docs/options#checks
-    checks:
-      - "all"
-      - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
-      - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
-  # https://golangci-lint.run/usage/linters#gosec
-  gosec:
-    excludes:
-      - G107 # https://securego.io/docs/rules/g107.html
-  depguard:
-    list-type: blacklist
-    packages-with-error-message:
-      - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
-      - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
-    include-go-root: true
+  errorlint:
+    # Check for plain type assertions and type switches.
+    asserts: false
+    # Check for plain error comparisons.
+    comparison: false
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
@@ -94,11 +105,11 @@ linters-settings:
       - name: unhandled-error
         disabled: false
         arguments:
-          - "fmt.Fprint"
-          - "fmt.Fprintf"
-          - "fmt.Print"
-          - "fmt.Printf"
-          - "fmt.Println"
+          - "fmt\\.Fprint"
+          - "fmt\\.Fprintf"
+          - "fmt\\.Print"
+          - "fmt\\.Printf"
+          - "fmt\\.Println"
           - "math/rand\\.Read"
           - "strings\\.Builder\\.WriteString"
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
@@ -110,3 +121,25 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
       - name: useless-break
         disabled: false
+  staticcheck:
+    go: "1.19"
+    # https://staticcheck.io/docs/options#checks
+    checks:
+      - "all"
+      - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
+      - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
+  # https://golangci-lint.run/usage/linters#gosec
+  gosec:
+    excludes:
+      - G107 # https://securego.io/docs/rules/g107.html
+  depguard:
+    rules:
+      prevent_unmaintained_packages:
+        list-mode: lax # allow unless explicitely denied
+        files:
+          - $all
+        deny:
+          - pkg: io/ioutil
+            desc: "io/ioutil is deprecated. Use package io or os instead."
+          - pkg: github.com/stretchr/testify/assert
+            desc: "github.com/stretchr/testify/require should be used instead."

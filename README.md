@@ -63,7 +63,7 @@ Make sure docker is installed on the machine - so commands like `docker run` etc
 Building the docker image of latest caminogo branch can be done by running:
 
 ```sh
-./scripts/build_local_image.sh
+./scripts/build_image.sh
 ```
 
 To check the built image, run:
@@ -165,7 +165,7 @@ This should only be necessary when modifying exported interfaces or after modify
 
 ### Version Semantics
 
-AvalancheGo is first and foremost a client for the Avalanche network. The versioning of AvalancheGo follows that of the Avalanche network.
+CaminoGo is first and foremost a client for the Camino network. The versioning of CaminoGo follows that of the Camino network.
 
 - `v0.x.x` indicates a development network version.
 - `v1.x.x` indicates a production network version.
@@ -174,11 +174,11 @@ AvalancheGo is first and foremost a client for the Avalanche network. The versio
 
 ### Library Compatibility Guarantees
 
-Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
+Because CaminoGo's version denotes the network version, it is expected that interfaces exported by CaminoGo's packages may change in `Patch` version updates.
 
 ### API Compatibility Guarantees
 
-APIs exposed when running AvalancheGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
+APIs exposed when running CaminoGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
 
 ## Supported Platforms
 

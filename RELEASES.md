@@ -4,8 +4,8 @@
 
 This version is the first one running on our testnet. The supported plugin version is `20`.
 
-### AvalancheGo version
-- Based on avalanchego [v1.9.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.4)
+### CaminoGo version
+- Based on caminogo [v1.1.0](https://github.com/chain4travel/caminogo/releases/tag/v1.1.0)
 
 ### Camino features
 - Added AddressStates to track KYC and other address related states

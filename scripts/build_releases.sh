@@ -39,19 +39,20 @@ publish () {
 		--upload-file "$1" \
 		--header "Content-Type:application/octet-stream" \
 		--write-out "%{http_code}" \
-		--output $logOut \
+		--output "$logOut" \
 		"${UPLOAD_URL}")
 
-        if [ "$?" -ne 0 ]; then
-                echo "err: curl command failed!!!"
-		rm $logOut
-                return 1
-        fi
+   curl_success=$?
+   if [ $curl_success -ne 0 ]; then
+        echo "err: curl command failed!!!"
+		    rm "$logOut"
+        return 1
+    fi
 
-	cat $logOut && echo ""
-	rm $logOut
+	cat "$logOut" && echo ""
+	rm "$logOut"
 
-	if [ $response -ge 400 ]; then
+	if [ "$response" -ge 400 ]; then
 		echo "err: upload not successful ($response)!!!"
  		return 1
 	fi
@@ -59,35 +60,34 @@ publish () {
 
 if [ -n "$AUTH_HEADER" ]; then
 	GH_API="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-	GH_TAGS="${GH_API}/releases/tags/$RELEASE_TAG"
 
 	# release the version
-	response=$(curl  -sH "${AUTH_HEADER}" --data "{\"tag_name\":\"$RELEASE_TAG\", \"draft\":true, \"generate_release_notes\":true}" "$GH_API/releases")
+	response="$(curl  -sH "${AUTH_HEADER}" --data "{\"tag_name\":\"$RELEASE_TAG\", \"draft\":true, \"generate_release_notes\":true}" "$GH_API/releases")"
 
 	# extract id out of response
-	eval $(echo "$response" | grep -m 1 "id.:" | grep -w id | tr : = | tr -cd '[[:alnum:]]=')
-	[ "$id" ] || { echo "Error: Failed to get release id for tag: $tag"; echo "$response\n" >&2; exit 1; }
+	eval "$(echo "$response" | grep -m 1 "id.:" | grep -w id | tr : = | tr -cd '[[:alnum:]]=')"
+	[ "$id" ] || { echo "Error: Failed to get release id for tag: $RELEASE_TAG"; printf "%s\n" "$response" >&2; exit 1; }
 	RELEASE_ID=$id
 fi
 
 echo "Building release OS=linux and ARCH=amd64 using GOAMD64 V2 for caminogo version $RELEASE_ID"
-rm -rf $CAMINOGO_PATH/build/*
+rm -rf "$CAMINOGO_PATH"/build/*
 
 DEST_PATH=$CAMINOGO_PATH/dist/
 ARCHIVE_PATH=caminogo-$RELEASE_TAG
 # prepare a fresh dist folder
-rm -rf $DEST_PATH && mkdir -p $DEST_PATH
+rm -rf "$DEST_PATH" && mkdir -p "$DEST_PATH"
 
 # build executables into build dir
-GOOS=linux GOARCH=amd64 GOAMD64=v2 $CAMINOGO_PATH/scripts/build.sh
+GOOS=linux GOARCH=amd64 GOAMD64=v2 "$CAMINOGO_PATH"/scripts/build.sh
 # build tools into build dir
-GOOS=linux GOARCH=amd64 GOAMD64=v2 $CAMINOGO_PATH/scripts/build_tools.sh
+GOOS=linux GOARCH=amd64 GOAMD64=v2 "$CAMINOGO_PATH"/scripts/build_tools.sh
 # copy the license file
-cp $CAMINOGO_PATH/LICENSE $CAMINOGO_PATH/build
+cp "$CAMINOGO_PATH"/LICENSE "$CAMINOGO_PATH"/build
 
 # create the package
 echo "building artifact"
 ARTIFACT=$DEST_PATH/caminogo-linux-amd64-$RELEASE_TAG.tar.gz
-tar -czf $ARTIFACT -C $CAMINOGO_PATH build --transform "s,build,$ARCHIVE_PATH,"
+tar -czf "$ARTIFACT" -C "$CAMINOGO_PATH" build --transform "s,build,$ARCHIVE_PATH,"
 # publish the newly generated file
-publish $ARTIFACT
+publish "$ARTIFACT"

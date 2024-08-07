@@ -1,5 +1,5 @@
-Package: camino-go
-Version: 0.2.0
+Package: caminogo
+Version: 1.1.0
 Section: misc
 Priority: optional
 Architecture: arm64

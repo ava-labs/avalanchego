@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o pipefail
-set -e
+set -euo pipefail
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
+
+# The -P option is not supported by the grep version installed by
+# default on macos. Since `-o errexit` is ignored in an if
+# conditional, triggering the problem here ensures script failure when
+# using an unsupported version of grep.
+grep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
+  >&2 echo "error: This script requires a recent version of gnu grep.";\
+  >&2 echo "       On macos, gnu grep can be installed with 'brew install grep'.";\
+  >&2 echo "       It will also be necessary to ensure that gnu grep is available in the path.";\
+  exit 255 )
 
 if [ "$#" -eq 0 ]; then
   # by default, check all source code
@@ -21,12 +29,10 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header"}
+TESTS=${TESTS:-"golangci_lint"}
 
 function test_golangci_lint {
-  if ! [ -x "$(command -v golangci-lint)" ]; then
-    go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
-  fi
+  go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
   golangci-lint run --config .golangci.yml
 }
 
@@ -35,27 +41,6 @@ function test_golangci_lint {
 function find_go_files {
   local target="${1}"
   go fmt -n "${target}"  | grep -Eo "([^ ]*)$" | grep -vE "(\\.pb\\.go|\\.pb\\.gw.go)"
-}
-
-# automatically checks license headers
-# to modify the file headers (if missing), remove "--check" flag
-# TESTS='license_header' ADDLICENSE_FLAGS="-v" ./scripts/lint.sh
-_addlicense_flags=${ADDLICENSE_FLAGS:-"--check -v"}
-function test_license_header {
-  go install -v github.com/google/addlicense@latest
-  local target="${1}"
-  local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find_go_files "${target}")
-
-  # ignore 3rd party code
-  addlicense \
-  -f ./LICENSE.header \
-  ${_addlicense_flags} \
-  --ignore 'utils/ip_test.go' \
-  --ignore 'utils/logging/highlight.go' \
-  --ignore 'utils/ulimit/ulimit_non_unix.go.go' \
-  --ignore 'utils/ulimit/ulimit_unix.go' \
-  "${files[@]}"
 }
 
 function run {

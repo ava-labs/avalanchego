@@ -13,11 +13,11 @@ source "$CAMINOGO_PATH"/scripts/constants.sh
 source "$CAMINOGO_PATH"/scripts/constants.sh
 
 echo "Downloading dependencies..."
-(cd $CAMINOGO_PATH && go mod download)
+(cd "$CAMINOGO_PATH" && go mod download)
 
 # Create tools directory
 tools_dir=$build_dir/tools/
-mkdir -p $tools_dir
+mkdir -p "$tools_dir"
 
 target="$tools_dir/genesis-generator"
 go build -ldflags="-s -w" -o "$target" "$CAMINOGO_PATH/tools/genesis/"*.go

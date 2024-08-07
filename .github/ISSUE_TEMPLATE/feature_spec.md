@@ -1,6 +1,6 @@
 ---
 name: Feature specification
-about: Discussion on design and implementation of new features for avalanchego.
+about: Discussion on design and implementation of new features for caminogo.
 title: ''
 labels: enhancement
 assignees: ''

@@ -1,2 +1,0 @@
-camino_daemon_user: camino
-camino_daemon_group: "{{ camino_daemon_user }}"
