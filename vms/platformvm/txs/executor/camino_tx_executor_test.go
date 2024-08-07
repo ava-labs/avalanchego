@@ -2088,6 +2088,7 @@ func TestCaminoStandardTxExecutorAddressStateTx(t *testing.T) {
 	for _, permissionsMatrix := range permissionsMatrix {
 		permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCVerified] = nil
 		permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYCExpired] = nil
+		permissionsMatrix[as.AddressStateBitRoleKYCAdmin][as.AddressStateBitKYBVerified] = nil
 		permissionsMatrix[as.AddressStateBitRoleOffersAdmin][as.AddressStateBitOffersCreator] = nil
 		permissionsMatrix[as.AddressStateBitRoleValidatorAdmin][as.AddressStateBitNodeDeferred] = nil
 	}

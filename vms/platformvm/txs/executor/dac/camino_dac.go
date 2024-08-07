@@ -22,7 +22,7 @@ var (
 	_ dac.Executor        = (*proposalExecutor)(nil)
 	_ dac.BondTxIDsGetter = (*proposalBondTxIDsGetter)(nil)
 
-	errNotKYCVerified               = errors.New("address is not KYC verified")
+	errNotVerifiedAddress           = errors.New("address is not KYC or KYB verified")
 	errNotConsortiumMember          = errors.New("address isn't consortium member")
 	errConsortiumMember             = errors.New("address is consortium member")
 	errNotPermittedToCreateProposal = errors.New("don't have permission to create proposal of this type")
@@ -144,14 +144,14 @@ func (*proposalBondTxIDsGetter) BaseFeeProposal(*dac.BaseFeeProposalState) ([]id
 
 func (e *proposalVerifier) AddMemberProposal(proposal *dac.AddMemberProposal) error {
 	// verify that address isn't consortium member and is KYC verified
-	applicantAddress, err := e.state.GetAddressStates(proposal.ApplicantAddress)
+	applicantAddrState, err := e.state.GetAddressStates(proposal.ApplicantAddress)
 	switch {
 	case err != nil:
 		return err
-	case applicantAddress.Is(as.AddressStateConsortium):
+	case applicantAddrState.Is(as.AddressStateConsortium):
 		return fmt.Errorf("%w (applicant)", errConsortiumMember)
-	case applicantAddress.IsNot(as.AddressStateKYCVerified):
-		return fmt.Errorf("%w (applicant)", errNotKYCVerified)
+	case !isVerifiedAddrState(applicantAddrState):
+		return fmt.Errorf("%w (applicant)", errNotVerifiedAddress)
 	}
 
 	// verify that there is no existing add member proposal for this address
@@ -427,4 +427,10 @@ func mustHaveActiveValidator(s state.Chain, address ids.ShortID) error {
 		return errNoActiveValidator
 	}
 	return err
+}
+
+const addrStateVerifiedBits = as.AddressStateKYCVerified | as.AddressStateKYBVerified
+
+func isVerifiedAddrState(addrState as.AddressState) bool {
+	return addrState&addrStateVerifiedBits != 0
 }

@@ -27,6 +27,8 @@ const (
 	AddressStateBitKYCVerified AddressStateBit = 32
 	// Indicates that address KYC verification is expired. (not yet implemented)
 	AddressStateBitKYCExpired AddressStateBit = 33
+	// Indicates that address passed KYB verification
+	AddressStateBitKYBVerified AddressStateBit = 34
 	// Indicates that address is member of consortium
 	AddressStateBitConsortium AddressStateBit = 38
 	// Indicates that a node owned by this address (as consortium member) is deferred
@@ -58,6 +60,9 @@ const (
 	AddressStateKYCVerified = AddressState(1) << AddressStateBitKYCVerified
 	// 0b0000000000000000000000000000001000000000000000000000000000000000
 	AddressStateKYCExpired = AddressState(1) << AddressStateBitKYCExpired
+	// 0b0000000000000000000000000000010000000000000000000000000000000000
+	AddressStateKYBVerified = AddressState(1) << AddressStateBitKYBVerified
+
 	// 0b0000000000000000000000000100000000000000000000000000000000000000
 	AddressStateConsortium = AddressState(1) << AddressStateBitConsortium
 	// 0b0000000000000000000000001000000000000000000000000000000000000000
@@ -75,10 +80,10 @@ const (
 		AddressStateNodeDeferred
 	// 0b0000000000000100000000000000000000000000000000000000000000000100
 	AddressStateAthensPhaseBits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
-	// 0b0000000000001000000000000000000000000000000000000000000000001000
+	// 0b0000000000001000000000000000010000000000000000000000000000001000
 	AddressStateBerlinPhaseBits = AddressStateFoundationAdmin | AddressStateRoleConsortiumSecretary |
-		AddressStateRoleValidatorAdmin
-	// 0b0000000000001100000000001100001100000000000000000000000000011111
+		AddressStateRoleValidatorAdmin | AddressStateKYBVerified
+	// 0b0000000000001100000000001100011100000000000000000000000000011111
 	AddressStateValidBits = AddressStateSunrisePhaseBits |
 		AddressStateAthensPhaseBits |
 		AddressStateBerlinPhaseBits

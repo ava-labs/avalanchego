@@ -262,7 +262,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 			},
 			expectedErr: errConsortiumMember,
 		},
-		"Applicant address is not kyc verified": {
+		"Applicant address is not kyc or kyb verified": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateEmpty, nil)
@@ -279,7 +279,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
 			},
-			expectedErr: errNotKYCVerified,
+			expectedErr: errNotVerifiedAddress,
 		},
 		"Already active AddMemberProposal for this applicant": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
@@ -307,7 +307,7 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 			},
 			expectedErr: errAlreadyActiveProposal,
 		},
-		"OK": {
+		"OK: Applicant address is kyc verified": {
 			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				proposalsIterator := state.NewMockProposalsIterator(c)
@@ -320,6 +320,30 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 				return s
 			},
 			config: defaultConfig,
+			utx: func() *txs.AddProposalTx {
+				return &txs.AddProposalTx{
+					BaseTx:          baseTx,
+					ProposalPayload: proposalBytes,
+					ProposerAddress: proposerAddr,
+					ProposerAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {bondOwnerKey}, {proposerKey},
+			},
+		},
+		"OK: Applicant address is kyb verified": {
+			state: func(c *gomock.Controller, utx *txs.AddProposalTx) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				proposalsIterator := state.NewMockProposalsIterator(c)
+				proposalsIterator.EXPECT().Next().Return(false)
+				proposalsIterator.EXPECT().Release()
+				proposalsIterator.EXPECT().Error().Return(nil)
+
+				s.EXPECT().GetAddressStates(applicantAddress).Return(as.AddressStateKYBVerified, nil)
+				s.EXPECT().GetProposalIterator().Return(proposalsIterator, nil)
+				return s
+			},
 			utx: func() *txs.AddProposalTx {
 				return &txs.AddProposalTx{
 					BaseTx:          baseTx,

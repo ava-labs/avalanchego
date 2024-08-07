@@ -2306,7 +2306,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 }
 
 const (
-	addressStateKYCAll   = as.AddressStateKYCVerified | as.AddressStateKYCExpired
+	addressStateKYCAll   = as.AddressStateKYCVerified | as.AddressStateKYCExpired | as.AddressStateKYBVerified
 	addressStateRoleBits = as.AddressStateRoleAdmin | as.AddressStateRoleKYCAdmin |
 		as.AddressStateRoleConsortiumSecretary | as.AddressStateRoleOffersAdmin |
 		as.AddressStateRoleValidatorAdmin | as.AddressStateFoundationAdmin
@@ -2317,7 +2317,7 @@ func isPermittedToModifyAddrStateBit(isBerlinPhase bool, roles, state as.Address
 	switch {
 	// admin can do anything before BerlinPhase, after that admin can only modify other roles
 	case roles.Is(as.AddressStateRoleAdmin) && (!isBerlinPhase || addressStateRoleBits&state != 0):
-	// kyc role can change kyc status
+	// kyc role can change kyc/kyb bits
 	case addressStateKYCAll&state != 0 && roles.Is(as.AddressStateRoleKYCAdmin):
 	// offers admin can assign offers creator role
 	case state == as.AddressStateOffersCreator && roles.Is(as.AddressStateRoleOffersAdmin):

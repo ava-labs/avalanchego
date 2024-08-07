@@ -9,7 +9,7 @@ fi
 
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
-# conditional, triggering the problem here ensures script failure whenTESTS
+# conditional, triggering the problem here ensures script failure when
 # using an unsupported version of grep.
 grep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
   >&2 echo "error: This script requires a recent version of gnu grep.";\
