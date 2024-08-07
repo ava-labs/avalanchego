@@ -11,8 +11,8 @@ import (
 
 func TestCurrentRPCChainVMCompatible(t *testing.T) {
 	compatibleVersions := RPCChainVMProtocolCompatibility[RPCChainVMProtocol]
-	for _, version := range compatibleVersions {
-		_ = version.String()
+	for _, ver := range compatibleVersions {
+		_ = ver.String()
 	}
 	require.Contains(t, compatibleVersions, Current)
 }

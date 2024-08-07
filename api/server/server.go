@@ -1,13 +1,3 @@
-// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
-//
-// This file is a derived work, based on ava-labs code whose
-// original notices appear below.
-//
-// It is distributed under the same license conditions as the
-// original code from which it is derived.
-//
-// Much love to the original authors for their work.
-// **********************************************************
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -137,21 +127,10 @@ func New(
 	}
 
 	router := newRouter()
-	corsOptions := cors.Options{
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	}
-
-	// If and only if allowed origin only contains the wildcard, copy the hostname to the allow
-	// origins header
-	if len(allowedOrigins) == 1 && allowedOrigins[0] == "*" {
-		corsOptions.AllowOriginFunc = func(origin string) bool {
-			return true
-		}
-	} else {
-		corsOptions.AllowedOrigins = allowedOrigins
-	}
-
-	corsHandler := cors.New(corsOptions).Handler(router)
+	}).Handler(router)
 	gzipHandler := gziphandler.GzipHandler(corsHandler)
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {

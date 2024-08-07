@@ -11,8 +11,6 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:generate mockgen -source cache_internal_state.go -destination mock_cache_internal_state.go -package platformvm -aux_files github.com/chain4travel/caminogo/vms/platformvm=cache_versioned_state.go,github.com/chain4travel/caminogo/vms/platformvm=cache_validator_state.go
-
 package platformvm
 
 import (

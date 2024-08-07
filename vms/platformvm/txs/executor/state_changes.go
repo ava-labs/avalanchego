@@ -148,9 +148,6 @@ func AdvanceTimeTo(
 		if stakerToRemove.StartTime.After(newChainTime) {
 			break
 		}
-		if stakerToRemove.EndTime.Equal(stakerToRemove.StartTime) {
-			continue
-		}
 
 		stakerToAdd := *stakerToRemove
 		stakerToAdd.NextTime = stakerToRemove.EndTime
