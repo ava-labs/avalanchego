@@ -9,14 +9,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
-
-	"github.com/ava-labs/coreth/core"
 )
 
 func TestUpgrade(t *testing.T) {
