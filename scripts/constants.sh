@@ -2,11 +2,10 @@
 #
 # Use lower_case variables in the scripts and UPPER_CASE variables for override
 # Use the constants.sh for env overrides
-# Use the versions.sh to specify versions
-#
 
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
+CAMINOGO_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Where CaminoGo binary goes
 build_dir="$CAMINOGO_PATH/build"
@@ -21,11 +20,13 @@ plugin_dir="$build_dir/plugins"
 camino_node_dockerhub_repo=${DOCKER_REPO:-"c4tplatform"}"/camino-node"
 
 # Current branch
-current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags || echo unknown)
+current_branch_temp=$(git symbolic-ref -q --short HEAD || git describe --tags --always || echo unknown)
+# replace / with - to be a docker tag compatible
+current_branch=${current_branch_temp////-}
 
 # caminogo and caminoethvm git tag and sha
 git_commit=${CAMINO_NODE_COMMIT:-$(git rev-parse --short HEAD)}
-git_tag=${CAMINO_NODE_TAG:-$(git describe --tags --abbrev=0 || echo unknown)}
+git_tag=${CAMINO_NODE_TAG:-$(git describe --tags --abbrev=0 --always || echo unknown)}
 caminoethvm_tag=${CAMINO_ETHVM_VERSION:-'v1.1.0-rc4'}
 caminoethvm_commit=${CAMINOETHVM_COMMIT:-'07e50749e3c371001c92dff14dc91ef6109a368a'}
 

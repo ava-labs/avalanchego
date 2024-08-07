@@ -5,6 +5,8 @@ run:
   skip-files:
     - ".*\\.pb\\.go$"
     - ".*mock.*"
+  skip-dirs:
+    - "tools/camino-network-runner"
 
 issues:
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.

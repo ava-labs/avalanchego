@@ -12,7 +12,6 @@ WORKDIR /build
 # Copy and download caminogo dependencies using go mod
 COPY go.mod .
 COPY go.sum .
-COPY dependencies dependencies/
 RUN go mod download
 
 # Copy the code into the container

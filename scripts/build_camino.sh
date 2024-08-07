@@ -55,7 +55,7 @@ mkdir -p $plugin_dir
 
 # Exit build successfully if the binaries are created
 if [[ -f "$caminogo_path" ]]; then
-    ln -s caminogo $camino_node_symlink_path
+    ln -sf caminogo $camino_node_symlink_path
     echo "Build Successful"
     exit 0
 else
