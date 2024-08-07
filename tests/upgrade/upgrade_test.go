@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/coreth/core"
 )
 
@@ -60,11 +59,12 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			cChainGenesis := new(core.Genesis)
 			cChainGenesisStr := network.Genesis.CChainGenesis
 			require.NoError(json.Unmarshal([]byte(cChainGenesisStr), cChainGenesis))
-			unscheduledActivationTime := uint64(upgrade.UnscheduledActivationTime.Unix())
-			cChainGenesis.Config.EUpgradeTime = &unscheduledActivationTime
+			// unscheduledActivationTime := uint64(upgrade.UnscheduledActivationTime.Unix())
+			cChainGenesis.Config.EUpgradeTime = nil // &unscheduledActivationTime
 			cChainGenesisBytes, err := json.Marshal(cChainGenesis)
 			require.NoError(err)
 			network.Genesis.CChainGenesis = string(cChainGenesisBytes)
+			require.NoError(network.Write())
 		}
 
 		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
