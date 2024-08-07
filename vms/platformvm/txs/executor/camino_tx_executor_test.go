@@ -4869,7 +4869,11 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 		LockModeBondDeposit: caminoGenesisConf.LockModeBondDeposit,
 	}
 
-	blockTime := time.Unix(1000, 0)
+	defaultCfg := test.Config(t, test.PhaseLast)
+	athensBlockTime := defaultCfg.AthensPhaseTime
+	athensBlockTimestamp := uint64(athensBlockTime.Unix())
+	beforeAthensBlockTime := defaultCfg.AthensPhaseTime.Add(-1 * time.Second)
+	beforeAthensBlockTimestamp := uint64(beforeAthensBlockTime.Unix())
 
 	shmWithUTXOs := func(t *testing.T, c *gomock.Controller, utxos []*avax.TimedUTXO) *atomic.MockSharedMemory {
 		shm := atomic.NewMockSharedMemory(c)
@@ -4908,7 +4912,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
-				s.EXPECT().GetTimestamp().Return(blockTime)
+				s.EXPECT().GetTimestamp().Return(athensBlockTime)
 				return s
 			},
 			sharedMemory: shmWithUTXOs,
@@ -4925,15 +4929,15 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			utxos: []*avax.TimedUTXO{
 				{
 					UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
-					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{
 					UTXO:      *generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
-					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{
 					UTXO:      *generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
-					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 			},
 			expectedErr: errInputsUTXOSMismatch,
@@ -4942,7 +4946,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
-				s.EXPECT().GetTimestamp().Return(blockTime)
+				s.EXPECT().GetTimestamp().Return(athensBlockTime)
 				return s
 			},
 			sharedMemory: shmWithUTXOs,
@@ -4957,7 +4961,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			utxos: []*avax.TimedUTXO{{
 				UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
-				Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 			}},
 			expectedErr: errImportedUTXOMismatch,
 		},
@@ -4965,7 +4969,7 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
-				s.EXPECT().GetTimestamp().Return(blockTime)
+				s.EXPECT().GetTimestamp().Return(athensBlockTime)
 				return s
 			},
 			sharedMemory: shmWithUTXOs,
@@ -4985,15 +4989,15 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			},
 			utxos: []*avax.TimedUTXO{{
 				UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
-				Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+				Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 			}},
 			expectedErr: errInputAmountMismatch,
 		},
-		"OK": {
+		"OK: after AthensPhase": {
 			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
 				s := state.NewMockDiff(c)
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
-				s.EXPECT().GetTimestamp().Return(blockTime)
+				s.EXPECT().GetTimestamp().Return(athensBlockTime)
 
 				rewardOwner1 := &secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -5089,18 +5093,148 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 			utxos: []*avax.TimedUTXO{
 				{ // timed utxo, old enough
 					UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty, true),
-					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{ // not timed utxo
 					UTXO: *generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty, true),
 				},
 				{ // timed utxo, old enough
 					UTXO:      *generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty, true),
-					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
+					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound,
 				},
 				{ // timed utxo, not old enough
 					UTXO:      *generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
-					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound + 1,
+					Timestamp: athensBlockTimestamp - atomic.SharedMemorySyncBound + 1,
+				},
+			},
+			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
+				return set.Set[ids.ID]{
+					utxos[0].InputID(): struct{}{},
+					utxos[2].InputID(): struct{}{},
+				}
+			},
+			expectedAtomicRequests: func(utxos []*avax.TimedUTXO) map[ids.ID]*atomic.Requests {
+				utxoID0 := utxos[0].InputID()
+				utxoID2 := utxos[2].InputID()
+				return map[ids.ID]*atomic.Requests{ctx.CChainID: {
+					RemoveRequests: [][]byte{utxoID0[:], utxoID2[:]},
+				}}
+			},
+		},
+		"OK: before AthensPhase": {
+			state: func(c *gomock.Controller, utx *txs.RewardsImportTx, txID ids.ID) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
+				s.EXPECT().GetTimestamp().Return(beforeAthensBlockTime)
+
+				nodeID1 := ids.ShortID{0, 0, 1}
+				nodeID2 := ids.ShortID{0, 0, 2}
+				nodeID3 := ids.ShortID{0, 0, 3}
+				nodeID4 := ids.ShortID{0, 0, 4}
+				nodeID5 := ids.ShortID{0, 0, 5}
+
+				cMemberAddr1 := ids.ShortID{0, 0, 11}
+				cMemberAddr2 := ids.ShortID{0, 0, 12}
+				cMemberAddr4 := ids.ShortID{0, 0, 14}
+
+				rewardOwner1 := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{cMemberAddr1},
+				}
+				rewardOwner2 := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{cMemberAddr2},
+				}
+				rewardOwner4 := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{cMemberAddr4},
+				}
+
+				staker1 := &state.Staker{TxID: ids.ID{0, 1}, NodeID: ids.NodeID(nodeID1), SubnetID: constants.PrimaryNetworkID}
+				staker2 := &state.Staker{TxID: ids.ID{0, 2}, NodeID: ids.NodeID(nodeID2), SubnetID: constants.PrimaryNetworkID}
+				staker3 := &state.Staker{TxID: ids.ID{0, 3}, NodeID: ids.NodeID(nodeID3), SubnetID: ids.ID{0, 0, 1}}
+				staker4 := &state.Staker{TxID: ids.ID{0, 4}, NodeID: ids.NodeID(nodeID4), SubnetID: constants.PrimaryNetworkID}
+				staker5 := &state.Staker{TxID: ids.ID{0, 5}, NodeID: ids.NodeID(nodeID5), SubnetID: constants.PrimaryNetworkID}
+
+				currentStakerIterator := state.NewMockStakerIterator(c)
+				currentStakerIterator.EXPECT().Next().Return(true).Times(5)
+				currentStakerIterator.EXPECT().Value().Return(staker1)
+				currentStakerIterator.EXPECT().Value().Return(staker2)
+				currentStakerIterator.EXPECT().Value().Return(staker3)
+				currentStakerIterator.EXPECT().Value().Return(staker4)
+				currentStakerIterator.EXPECT().Value().Return(staker5)
+				currentStakerIterator.EXPECT().Next().Return(false)
+				currentStakerIterator.EXPECT().Release()
+
+				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIterator, nil)
+				s.EXPECT().GetShortIDLink(nodeID1, state.ShortLinkKeyRegisterNode).Return(cMemberAddr1, nil)
+				s.EXPECT().GetShortIDLink(nodeID2, state.ShortLinkKeyRegisterNode).Return(cMemberAddr2, nil)
+				s.EXPECT().GetShortIDLink(nodeID4, state.ShortLinkKeyRegisterNode).Return(cMemberAddr4, nil)
+				s.EXPECT().GetShortIDLink(nodeID5, state.ShortLinkKeyRegisterNode).Return(cMemberAddr1, nil)
+				s.EXPECT().GetNotDistributedValidatorReward().Return(uint64(1), nil) // old
+				s.EXPECT().SetNotDistributedValidatorReward(uint64(2))               // new
+				rewardOwnerID1, err := txs.GetOwnerID(rewardOwner1)
+				require.NoError(t, err)
+				rewardOwnerID2, err := txs.GetOwnerID(rewardOwner2)
+				require.NoError(t, err)
+				rewardOwnerID4, err := txs.GetOwnerID(rewardOwner4)
+				require.NoError(t, err)
+
+				s.EXPECT().GetClaimable(rewardOwnerID1).Return(&state.Claimable{
+					Owner:                rewardOwner1,
+					ValidatorReward:      10,
+					ExpiredDepositReward: 100,
+				}, nil)
+				s.EXPECT().GetClaimable(rewardOwnerID2).Return(&state.Claimable{
+					Owner:                rewardOwner2,
+					ValidatorReward:      20,
+					ExpiredDepositReward: 200,
+				}, nil)
+				s.EXPECT().GetClaimable(rewardOwnerID4).Return(nil, database.ErrNotFound)
+
+				s.EXPECT().SetClaimable(rewardOwnerID1, &state.Claimable{
+					Owner:                rewardOwner1,
+					ValidatorReward:      12,
+					ExpiredDepositReward: 100,
+				})
+				s.EXPECT().SetClaimable(rewardOwnerID2, &state.Claimable{
+					Owner:                rewardOwner2,
+					ValidatorReward:      21,
+					ExpiredDepositReward: 200,
+				})
+				s.EXPECT().SetClaimable(rewardOwnerID4, &state.Claimable{
+					Owner:           rewardOwner4,
+					ValidatorReward: 1,
+				})
+
+				return s
+			},
+			sharedMemory: shmWithUTXOs,
+			utx: func(utxos []*avax.TimedUTXO) *txs.RewardsImportTx {
+				return &txs.RewardsImportTx{BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+					Ins: []*avax.TransferableInput{
+						generate.InFromUTXO(t, &utxos[0].UTXO, []uint32{0}, false),
+						generate.InFromUTXO(t, &utxos[2].UTXO, []uint32{0}, false),
+					},
+				}}}
+			},
+			utxos: []*avax.TimedUTXO{
+				{ // timed utxo, old enough
+					UTXO:      *generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty, true),
+					Timestamp: beforeAthensBlockTimestamp - atomic.SharedMemorySyncBound,
+				},
+				{ // not timed utxo
+					UTXO: *generate.UTXO(ids.ID{2}, ctx.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty, true),
+				},
+				{ // timed utxo, old enough
+					UTXO:      *generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty, true),
+					Timestamp: beforeAthensBlockTimestamp - atomic.SharedMemorySyncBound,
+				},
+				{ // timed utxo, not old enough
+					UTXO:      *generate.UTXO(ids.ID{4}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty, true),
+					Timestamp: beforeAthensBlockTimestamp - atomic.SharedMemorySyncBound + 1,
 				},
 			},
 			expectedAtomicInputs: func(utxos []*avax.TimedUTXO) set.Set[ids.ID] {
