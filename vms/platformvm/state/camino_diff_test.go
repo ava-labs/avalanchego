@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -153,7 +154,6 @@ func TestDiffGetDeposit(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			actualDeposit, err := actualDiff.GetDeposit(depositTxID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -930,7 +930,6 @@ func TestDiffGetNextToUnlockDepositTime(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl, tt.removedDepositIDs)
 			nextUnlockTime, err := actualDiff.GetNextToUnlockDepositTime(tt.removedDepositIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -1737,7 +1736,6 @@ func TestDiffGetNextToUnlockDepositIDsAndTime(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl, tt.removedDepositIDs)
 			nextUnlockIDs, nextUnlockTime, err := actualDiff.GetNextToUnlockDepositIDsAndTime(tt.removedDepositIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -1758,17 +1756,17 @@ func TestDiffLockedUTXOs(t *testing.T) {
 	lockState := locked.StateBonded
 	testErr := errors.New("test err")
 
-	parentUTXO1 := generateTestUTXO(ids.ID{1}, assetID, 1, owner, ids.Empty, bondTxID)
-	parentUTXO2 := generateTestUTXO(ids.ID{2}, assetID, 1, owner, ids.Empty, bondTxID)
-	parentUTXO3 := generateTestUTXO(ids.ID{3}, assetID, 1, owner, ids.Empty, bondTxID)
-	parentUTXO4 := generateTestUTXO(ids.ID{4}, assetID, 1, owner, ids.Empty, bondTxID)
-	parentUTXO5 := generateTestUTXO(ids.ID{5}, assetID, 1, owner, ids.Empty, bondTxID)
-	addedUTXO1 := generateTestUTXO(ids.ID{6}, assetID, 1, owner, ids.Empty, bondTxID)
-	addedUTXO2 := generateTestUTXO(ids.ID{7}, assetID, 1, owner, ids.Empty, bondTxID)
-	addedUTXO3 := generateTestUTXO(ids.ID{8}, assetID, 1, owner, ids.Empty, ids.Empty)
-	addedUTXO4 := generateTestUTXO(ids.ID{9}, assetID, 1, owner, ids.Empty, ids.Empty)
-	removedUTXO1 := generateTestUTXO(ids.ID{10}, assetID, 1, owner, ids.Empty, ids.Empty)
-	removedUTXO2 := generateTestUTXO(ids.ID{11}, assetID, 1, owner, ids.Empty, ids.Empty)
+	parentUTXO1 := generate.UTXO(ids.ID{1}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	parentUTXO2 := generate.UTXO(ids.ID{2}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	parentUTXO3 := generate.UTXO(ids.ID{3}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	parentUTXO4 := generate.UTXO(ids.ID{4}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	parentUTXO5 := generate.UTXO(ids.ID{5}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	addedUTXO1 := generate.UTXO(ids.ID{6}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	addedUTXO2 := generate.UTXO(ids.ID{7}, assetID, 1, owner, ids.Empty, bondTxID, true)
+	addedUTXO3 := generate.UTXO(ids.ID{8}, assetID, 1, owner, ids.Empty, ids.Empty, true)
+	addedUTXO4 := generate.UTXO(ids.ID{9}, assetID, 1, owner, ids.Empty, ids.Empty, true)
+	removedUTXO1 := generate.UTXO(ids.ID{10}, assetID, 1, owner, ids.Empty, ids.Empty, true)
+	removedUTXO2 := generate.UTXO(ids.ID{11}, assetID, 1, owner, ids.Empty, ids.Empty, true)
 	parentUTXOs := []*avax.UTXO{parentUTXO1, parentUTXO2, parentUTXO3, parentUTXO4, parentUTXO5}
 
 	tests := map[string]struct {
@@ -1892,7 +1890,6 @@ func TestDiffLockedUTXOs(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(t, ctrl)
 			utxos, err := actualDiff.LockedUTXOs(lockTxIDs, addresses, locked.StateBonded)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -1950,7 +1947,6 @@ func TestDiffConfig(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			config, err := actualDiff.Config()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2008,7 +2004,6 @@ func TestDiffCaminoConfig(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			caminoConfig, err := actualDiff.CaminoConfig()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2138,7 +2133,6 @@ func TestDiffGetAddressStates(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			addressStates, err := actualDiff.GetAddressStates(tt.address)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2267,7 +2261,6 @@ func TestDiffGetDepositOffer(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			offer, err := actualDiff.GetDepositOffer(tt.offerID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2361,7 +2354,6 @@ func TestDiffGetAllDepositOffers(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			offers, err := actualDiff.GetAllDepositOffers()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2489,7 +2481,6 @@ func TestDiffGetMultisigAlias(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			alias, err := actualDiff.GetMultisigAlias(tt.aliasID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2638,7 +2629,6 @@ func TestDiffGetShortIDLink(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			linkedID, err := actualDiff.GetShortIDLink(tt.id, tt.key)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2779,7 +2769,6 @@ func TestDiffGetClaimable(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			claimable, err := actualDiff.GetClaimable(tt.ownerID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2879,7 +2868,6 @@ func TestDiffGetNotDistributedValidatorReward(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			reward, err := actualDiff.GetNotDistributedValidatorReward()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -2992,7 +2980,6 @@ func TestDiffGetDeferredValidator(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			reward, err := actualDiff.GetDeferredValidator(tt.subnetID, tt.nodeID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -3037,7 +3024,6 @@ func TestDiffGetDeferredStakerIterator(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			_, err := actualDiff.GetDeferredStakerIterator()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -3176,7 +3162,6 @@ func TestDiffGetProposal(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			actualProposal, err := actualDiff.GetProposal(proposalID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -3520,7 +3505,6 @@ func TestDiffGetProposalIDsToFinish(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			diff := tt.diff(ctrl)
 			proposalIDsToFinish, err := diff.GetProposalIDsToFinish()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -4204,7 +4188,6 @@ func TestDiffGetNextProposalExpirationTime(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl, tt.removedProposalIDs)
 			nextExpirationTime, err := actualDiff.GetNextProposalExpirationTime(tt.removedProposalIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -5011,7 +4994,6 @@ func TestDiffGetNextToExpireProposalIDsAndTime(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl, tt.removedProposalIDs)
 			nextToExpireIDs, nextExpirationTime, err := actualDiff.GetNextToExpireProposalIDsAndTime(tt.removedProposalIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -5088,7 +5070,6 @@ func TestDiffGetBaseFee(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualDiff := tt.diff(ctrl)
 			baseFee, err := actualDiff.GetBaseFee()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -5300,7 +5281,6 @@ func TestDiffApplyCaminoState(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			err := tt.diff.ApplyCaminoState(tt.state(ctrl, tt.diff))
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedDiff, tt.diff)

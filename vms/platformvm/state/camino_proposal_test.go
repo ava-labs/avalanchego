@@ -194,7 +194,6 @@ func TestGetProposal(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			actualProposal, err := caminoState.GetProposal(tt.proposalID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -273,7 +272,6 @@ func TestModifyProposal(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			actualCaminoState.ModifyProposal(tt.proposalID, tt.proposal)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
@@ -317,7 +315,6 @@ func TestRemoveProposal(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			actualCaminoState.RemoveProposal(tt.proposalID, tt.proposal)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
@@ -661,7 +658,6 @@ func TestGetNextProposalExpirationTime(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			nextExpirationTime, err := caminoState.GetNextProposalExpirationTime(tt.removedProposalIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -814,7 +810,6 @@ func TestGetNextToExpireProposalIDsAndTime(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			nextToExpireIDs, nextExpirationTime, err := caminoState.GetNextToExpireProposalIDsAndTime(tt.removedProposalIDs)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -1056,7 +1051,6 @@ func TestWriteProposals(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.writeProposals(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
@@ -1140,7 +1134,6 @@ func TestLoadProposals(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.loadProposals(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)

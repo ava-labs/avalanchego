@@ -46,7 +46,7 @@ func TestSpendMultiSigNoMSig(t *testing.T) {
 		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
 		kc.Add(sk)
-		addresses = append(addresses, sk.PublicKey().Address())
+		addresses = append(addresses, sk.Address())
 	}
 
 	transfer := TransferOutput{
@@ -80,7 +80,7 @@ func TestSpendMultiSigMSig(t *testing.T) {
 		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
 		kc.Add(sk)
-		addresses = append(addresses, sk.PublicKey().Address())
+		addresses = append(addresses, sk.Address())
 	}
 
 	transfer := TransferOutput{
@@ -116,7 +116,7 @@ func TestSpendMultiSigFakeKeys(t *testing.T) {
 		sk := secp256k1.FakePrivateKey(addrBytes)
 		kc.Add(sk)
 
-		addresses = append(addresses, sk.PublicKey().Address())
+		addresses = append(addresses, sk.Address())
 	}
 
 	transfer := TransferOutput{
@@ -148,7 +148,7 @@ func TestSpendMultiSigCycle(t *testing.T) {
 		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
 		kc.Add(sk)
-		addresses = append(addresses, sk.PublicKey().Address())
+		addresses = append(addresses, sk.Address())
 	}
 
 	transfer := TransferOutput{
@@ -190,7 +190,7 @@ func TestUnverifiedNestedOwner(t *testing.T) {
 		if i == 1 {
 			kc.Add(sk)
 		}
-		addresses = append(addresses, sk.PublicKey().Address())
+		addresses = append(addresses, sk.Address())
 	}
 
 	transfer := TransferOutput{

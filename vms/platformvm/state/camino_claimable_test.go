@@ -175,7 +175,6 @@ func TestGetClaimable(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			claimable, err := actualCaminoState.GetClaimable(tt.claimableOwnerID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -223,7 +222,6 @@ func TestSetClaimable(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			caminoState.SetClaimable(tt.claimableOwnerID, tt.claimable)
 			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
@@ -252,8 +250,6 @@ func TestSetNotDistributedValidatorReward(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			tt.caminoState.SetNotDistributedValidatorReward(tt.reward)
 			require.Equal(t, tt.expectedCaminoState(tt.reward), tt.caminoState)
 		})
@@ -306,7 +302,6 @@ func TestGetNotDistributedValidatorReward(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			notDistributedValidatorReward, err := actualCaminoState.GetNotDistributedValidatorReward()
 			require.NoError(t, err)
@@ -424,7 +419,6 @@ func TestWriteClaimableAndValidatorRewards(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.writeClaimableAndValidatorRewards(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)

@@ -138,7 +138,6 @@ func TestGetAddressStates(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			addressStates, err := actualCaminoState.GetAddressStates(tt.address)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -182,7 +181,6 @@ func TestSetAddressStates(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			caminoState.SetAddressStates(tt.address, tt.addressStates)
 			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
@@ -277,7 +275,6 @@ func TestWriteAddressStates(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.writeAddressStates(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)

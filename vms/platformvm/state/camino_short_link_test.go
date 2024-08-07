@@ -179,7 +179,6 @@ func TestGetShortIDLink(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			linkedShortID, err := caminoState.GetShortIDLink(tt.shortID, tt.shortLinkKey)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -247,7 +246,6 @@ func TestSetShortIDLink(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			caminoState.SetShortIDLink(tt.shortID, tt.shortLinkKey, tt.linkedShortID)
 			require.Equal(t, tt.expectedCaminoState(caminoState), caminoState)
@@ -342,7 +340,6 @@ func TestWriteShortLinks(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.writeShortLinks(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)

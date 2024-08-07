@@ -642,7 +642,7 @@ func (h *handler) UnlockDeposit(
 ) {
 	addrs := set.NewSet[ids.ShortID](len(keys)) // The addresses controlled by [keys]
 	for _, key := range keys {
-		addrs.Add(key.PublicKey().Address())
+		addrs.Add(key.Address())
 	}
 
 	depositTxSet := set.NewSet[ids.ID](len(depositTxIDs))

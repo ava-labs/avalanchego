@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -31,11 +30,9 @@ var (
 )
 
 type proposalVerifier struct {
-	state               state.Chain
-	fx                  fx.Fx
-	signedAddProposalTx *txs.Tx
-	addProposalTx       *txs.AddProposalTx
-	isAdminProposal     bool
+	state           state.Chain
+	addProposalTx   *txs.AddProposalTx
+	isAdminProposal bool
 }
 
 // Executor calls should never error.
@@ -45,7 +42,6 @@ type proposalVerifier struct {
 // And proposal execution is a system tx, so it should always succeed.
 type proposalExecutor struct {
 	state state.Chain
-	fx    fx.Fx
 }
 
 // We should always mind possible proposals conflict, when implementing proposal execution logic.
@@ -56,18 +52,16 @@ type proposalBondTxIDsGetter struct {
 	state state.Chain
 }
 
-func NewProposalVerifier(state state.Chain, fx fx.Fx, signedTx *txs.Tx, tx *txs.AddProposalTx, isAdminProposal bool) dac.Verifier {
+func NewProposalVerifier(state state.Chain, tx *txs.AddProposalTx, isAdminProposal bool) dac.Verifier {
 	return &proposalVerifier{
-		state:               state,
-		fx:                  fx,
-		signedAddProposalTx: signedTx,
-		addProposalTx:       tx,
-		isAdminProposal:     isAdminProposal,
+		state:           state,
+		addProposalTx:   tx,
+		isAdminProposal: isAdminProposal,
 	}
 }
 
-func NewProposalExecutor(state state.Chain, fx fx.Fx) dac.Executor {
-	return &proposalExecutor{state: state, fx: fx}
+func NewProposalExecutor(state state.Chain) dac.Executor {
+	return &proposalExecutor{state: state}
 }
 
 func GetBondTxIDs(state state.Chain, tx *txs.FinishProposalsTx) ([]ids.ID, error) {

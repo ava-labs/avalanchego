@@ -74,7 +74,7 @@ func getPublicKey(t *testing.T, tlsCert *tls.Certificate) []byte {
 	secpPrivateKey := RsaPrivateKeyToSecp256PrivateKey(rsaPrivateKey)
 	nodePrivateKey, err := secp256Factory.ToPrivateKey(secpPrivateKey.Serialize())
 	require.NoError(t, err)
-	return nodePrivateKey.PublicKey().Address().Bytes()
+	return nodePrivateKey.Address().Bytes()
 }
 
 func TestRecoverSecp256PublicKey(t *testing.T) {

@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,65 +25,65 @@ func TestLockedUTXOs(t *testing.T) {
 	assetID := ids.ID{}
 
 	// addr1, bond1
-	utxoAddr1Bond1_1 := generateTestUTXO(
-		ids.ID{1}, assetID, 1, owner1, ids.Empty, bondTxID1)
-	utxoAddr1Bond1_2 := generateTestUTXO(
-		ids.ID{2}, assetID, 1, owner1, ids.Empty, bondTxID1)
+	utxoAddr1Bond1_1 := generate.UTXO(
+		ids.ID{1}, assetID, 1, owner1, ids.Empty, bondTxID1, true)
+	utxoAddr1Bond1_2 := generate.UTXO(
+		ids.ID{2}, assetID, 1, owner1, ids.Empty, bondTxID1, true)
 	// addr2, bond1
-	utxoAddr2Bond1_1 := generateTestUTXO(
-		ids.ID{3}, assetID, 1, owner2, ids.Empty, bondTxID1)
-	utxoAddr2Bond1_2 := generateTestUTXO(
-		ids.ID{4}, assetID, 1, owner2, ids.Empty, bondTxID1)
+	utxoAddr2Bond1_1 := generate.UTXO(
+		ids.ID{3}, assetID, 1, owner2, ids.Empty, bondTxID1, true)
+	utxoAddr2Bond1_2 := generate.UTXO(
+		ids.ID{4}, assetID, 1, owner2, ids.Empty, bondTxID1, true)
 	// addr1, bond2
-	utxoAddr1Bond2_1 := generateTestUTXO(
-		ids.ID{5}, assetID, 1, owner1, ids.Empty, bondTxID2)
-	utxoAddr1Bond2_2 := generateTestUTXO(
-		ids.ID{6}, assetID, 1, owner1, ids.Empty, bondTxID2)
+	utxoAddr1Bond2_1 := generate.UTXO(
+		ids.ID{5}, assetID, 1, owner1, ids.Empty, bondTxID2, true)
+	utxoAddr1Bond2_2 := generate.UTXO(
+		ids.ID{6}, assetID, 1, owner1, ids.Empty, bondTxID2, true)
 	// addr2, bond2
-	utxoAddr2Bond2_1 := generateTestUTXO(
-		ids.ID{7}, assetID, 1, owner2, ids.Empty, bondTxID2)
-	utxoAddr2Bond2_2 := generateTestUTXO(
-		ids.ID{8}, assetID, 1, owner2, ids.Empty, bondTxID2)
+	utxoAddr2Bond2_1 := generate.UTXO(
+		ids.ID{7}, assetID, 1, owner2, ids.Empty, bondTxID2, true)
+	utxoAddr2Bond2_2 := generate.UTXO(
+		ids.ID{8}, assetID, 1, owner2, ids.Empty, bondTxID2, true)
 	// addr1, deposit1
-	utxoAddr1Deposit1_1 := generateTestUTXO(
-		ids.ID{9}, assetID, 1, owner1, depositTxID1, ids.Empty)
-	utxoAddr1Deposit1_2 := generateTestUTXO(
-		ids.ID{10}, assetID, 1, owner1, depositTxID1, ids.Empty)
+	utxoAddr1Deposit1_1 := generate.UTXO(
+		ids.ID{9}, assetID, 1, owner1, depositTxID1, ids.Empty, true)
+	utxoAddr1Deposit1_2 := generate.UTXO(
+		ids.ID{10}, assetID, 1, owner1, depositTxID1, ids.Empty, true)
 	// addr2, deposit1
-	utxoAddr2Deposit1_1 := generateTestUTXO(
-		ids.ID{11}, assetID, 1, owner2, depositTxID1, ids.Empty)
-	utxoAddr2Deposit1_2 := generateTestUTXO(
-		ids.ID{12}, assetID, 1, owner2, depositTxID1, ids.Empty)
+	utxoAddr2Deposit1_1 := generate.UTXO(
+		ids.ID{11}, assetID, 1, owner2, depositTxID1, ids.Empty, true)
+	utxoAddr2Deposit1_2 := generate.UTXO(
+		ids.ID{12}, assetID, 1, owner2, depositTxID1, ids.Empty, true)
 	// addr1, deposit2
-	utxoAddr1Deposit2_1 := generateTestUTXO(
-		ids.ID{13}, assetID, 1, owner1, depositTxID2, ids.Empty)
-	utxoAddr1Deposit2_2 := generateTestUTXO(
-		ids.ID{14}, assetID, 1, owner1, depositTxID2, ids.Empty)
+	utxoAddr1Deposit2_1 := generate.UTXO(
+		ids.ID{13}, assetID, 1, owner1, depositTxID2, ids.Empty, true)
+	utxoAddr1Deposit2_2 := generate.UTXO(
+		ids.ID{14}, assetID, 1, owner1, depositTxID2, ids.Empty, true)
 	// addr2, deposit2
-	utxoAddr2Deposit2_1 := generateTestUTXO(
-		ids.ID{15}, assetID, 1, owner2, depositTxID2, ids.Empty)
-	utxoAddr2Deposit2_2 := generateTestUTXO(
-		ids.ID{16}, assetID, 1, owner2, depositTxID2, ids.Empty)
+	utxoAddr2Deposit2_1 := generate.UTXO(
+		ids.ID{15}, assetID, 1, owner2, depositTxID2, ids.Empty, true)
+	utxoAddr2Deposit2_2 := generate.UTXO(
+		ids.ID{16}, assetID, 1, owner2, depositTxID2, ids.Empty, true)
 	// addr1, deposit1, bond1
-	utxoAddr1Deposit1Bond1_1 := generateTestUTXO(
-		ids.ID{17}, assetID, 1, owner1, depositTxID1, bondTxID1)
-	utxoAddr1Deposit1Bond1_2 := generateTestUTXO(
-		ids.ID{18}, assetID, 1, owner1, depositTxID1, bondTxID1)
+	utxoAddr1Deposit1Bond1_1 := generate.UTXO(
+		ids.ID{17}, assetID, 1, owner1, depositTxID1, bondTxID1, true)
+	utxoAddr1Deposit1Bond1_2 := generate.UTXO(
+		ids.ID{18}, assetID, 1, owner1, depositTxID1, bondTxID1, true)
 	// addr2, deposit1, bond1
-	utxoAddr2Deposit1Bond1_1 := generateTestUTXO(
-		ids.ID{19}, assetID, 1, owner2, depositTxID1, bondTxID1)
-	utxoAddr2Deposit1Bond1_2 := generateTestUTXO(
-		ids.ID{20}, assetID, 1, owner2, depositTxID1, bondTxID1)
+	utxoAddr2Deposit1Bond1_1 := generate.UTXO(
+		ids.ID{19}, assetID, 1, owner2, depositTxID1, bondTxID1, true)
+	utxoAddr2Deposit1Bond1_2 := generate.UTXO(
+		ids.ID{20}, assetID, 1, owner2, depositTxID1, bondTxID1, true)
 	// addr1, deposit2, bond1
-	utxoAddr1Deposit2Bond1_1 := generateTestUTXO(
-		ids.ID{21}, assetID, 1, owner1, depositTxID2, bondTxID1)
-	utxoAddr1Deposit2Bond1_2 := generateTestUTXO(
-		ids.ID{22}, assetID, 1, owner1, depositTxID2, bondTxID1)
+	utxoAddr1Deposit2Bond1_1 := generate.UTXO(
+		ids.ID{21}, assetID, 1, owner1, depositTxID2, bondTxID1, true)
+	utxoAddr1Deposit2Bond1_2 := generate.UTXO(
+		ids.ID{22}, assetID, 1, owner1, depositTxID2, bondTxID1, true)
 	// addr2, deposit2, bond1
-	utxoAddr2Deposit2Bond1_1 := generateTestUTXO(
-		ids.ID{23}, assetID, 1, owner2, depositTxID2, bondTxID1)
-	utxoAddr2Deposit2Bond1_2 := generateTestUTXO(
-		ids.ID{24}, assetID, 1, owner2, depositTxID2, bondTxID1)
+	utxoAddr2Deposit2Bond1_1 := generate.UTXO(
+		ids.ID{23}, assetID, 1, owner2, depositTxID2, bondTxID1, true)
+	utxoAddr2Deposit2Bond1_2 := generate.UTXO(
+		ids.ID{24}, assetID, 1, owner2, depositTxID2, bondTxID1, true)
 
 	allUTXOs := []*avax.UTXO{
 		utxoAddr1Bond1_1, utxoAddr1Bond1_2,
@@ -203,9 +203,6 @@ func TestLockedUTXOs(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
 			lockTxIDs := set.Set[ids.ID]{}
 			addresses := set.Set[ids.ShortID]{}
 			for _, lockTxID := range tt.lockTxIDs {

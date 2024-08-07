@@ -6,10 +6,12 @@ package txs
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/stretchr/testify/require"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 )
 
 func TestRewardsImportTxSyntacticVerify(t *testing.T) {
@@ -24,8 +26,8 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+					generate.In(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+					generate.In(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
 				},
 			}}},
 		},
@@ -37,8 +39,8 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
-					generateTestIn(ids.GenerateTestID(), 1, ids.Empty, ids.Empty, []uint32{}),
+					generate.In(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+					generate.In(ids.GenerateTestID(), 1, ids.Empty, ids.Empty, []uint32{}),
 				},
 			}}},
 			expectedErr: errNotAVAXAsset,
@@ -48,7 +50,7 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.GenerateTestID(), ids.Empty, []uint32{}),
+					generate.In(ctx.AVAXAssetID, 1, ids.GenerateTestID(), ids.Empty, []uint32{}),
 				},
 			}}},
 			expectedErr: locked.ErrWrongInType,
@@ -58,7 +60,7 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{
-					generateTestStakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{}),
+					generate.StakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{}),
 				},
 			}}},
 			expectedErr: locked.ErrWrongInType,
@@ -69,7 +71,8 @@ func TestRewardsImportTxSyntacticVerify(t *testing.T) {
 			if tt.tx != nil {
 				avax.SortTransferableInputs(tt.tx.Ins)
 			}
-			require.ErrorIs(t, tt.tx.SyntacticVerify(ctx), tt.expectedErr)
+			err := tt.tx.SyntacticVerify(ctx)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

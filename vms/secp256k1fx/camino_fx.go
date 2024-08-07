@@ -341,7 +341,7 @@ func ExtractFromAndSigners(keys []*secp256k1.PrivateKey) (set.Set[ids.ShortID], 
 	if splitIndex == len(keys) {
 		from := set.NewSet[ids.ShortID](len(keys))
 		for _, key := range keys {
-			from.Add(key.PublicKey().Address())
+			from.Add(key.Address())
 		}
 		return from, keys
 	}
@@ -349,7 +349,7 @@ func ExtractFromAndSigners(keys []*secp256k1.PrivateKey) (set.Set[ids.ShortID], 
 	// Addresses we get UTXOs for
 	from := set.NewSet[ids.ShortID](splitIndex)
 	for index := 0; index < splitIndex; index++ {
-		from.Add(keys[index].PublicKey().Address())
+		from.Add(keys[index].Address())
 	}
 
 	// Signers which will signe the Outputs

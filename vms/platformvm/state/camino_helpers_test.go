@@ -82,35 +82,3 @@ func newMockStateVersions(c *gomock.Controller, parentStateID ids.ID, parentStat
 	stateVersions.EXPECT().GetState(parentStateID).Return(parentState, true)
 	return stateVersions
 }
-
-func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID) *avax.UTXO { //nolint:unparam
-	return generateTestUTXOWithIndex(txID, 0, assetID, amount, outputOwners, depositTxID, bondTxID, true)
-}
-
-func generateTestUTXOWithIndex(txID ids.ID, outIndex uint32, assetID ids.ID, amount uint64, outputOwners secp256k1fx.OutputOwners, depositTxID, bondTxID ids.ID, init bool) *avax.UTXO {
-	var out avax.TransferableOut = &secp256k1fx.TransferOutput{
-		Amt:          amount,
-		OutputOwners: outputOwners,
-	}
-	if depositTxID != ids.Empty || bondTxID != ids.Empty {
-		out = &locked.Out{
-			IDs: locked.IDs{
-				DepositTxID: depositTxID,
-				BondTxID:    bondTxID,
-			},
-			TransferableOut: out,
-		}
-	}
-	testUTXO := &avax.UTXO{
-		UTXOID: avax.UTXOID{
-			TxID:        txID,
-			OutputIndex: outIndex,
-		},
-		Asset: avax.Asset{ID: assetID},
-		Out:   out,
-	}
-	if init {
-		testUTXO.InputID()
-	}
-	return testUTXO
-}

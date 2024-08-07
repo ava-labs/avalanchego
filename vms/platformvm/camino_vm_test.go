@@ -12,11 +12,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
@@ -29,96 +29,78 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 func TestRemoveDeferredValidator(t *testing.T) {
 	require := require.New(t)
-	addr := caminoPreFundedKeys[0].Address()
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-	bech32Addr, err := address.FormatBech32(hrp, addr.Bytes())
-	require.NoError(err)
 
-	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
+	nodeKey, nodeID := test.Keys[0], ids.NodeID(test.Keys[0].Address())
+	rootAdminKey := test.FundedKeys[0]
+	adminProposerKey := test.FundedKeys[0]
+	consortiumMemberKey := test.Keys[1]
 
-	rootAdminKey := caminoPreFundedKeys[0]
-	adminProposerKey := caminoPreFundedKeys[0]
-	consortiumMemberKey, err := testKeyFactory.NewPrivateKey()
-	require.NoError(err)
-
-	outputOwners := &secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{addr},
-	}
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
-		InitialAdmin:        addr,
-	}
-	genesisUTXOs := []api.UTXO{
-		{
-			Amount:  json.Uint64(defaultCaminoValidatorWeight),
-			Address: bech32Addr,
-		},
+		InitialAdmin:        rootAdminKey.Address(),
 	}
 
-	vm := newCaminoVM(caminoGenesisConf, genesisUTXOs, nil)
+	vm := newCaminoVM(t, caminoGenesisConf, test.PhaseLast, []api.UTXO{{
+		Amount:  json.Uint64(test.ValidatorWeight * 2),
+		Address: test.FundedKeysBech32[0],
+	}})
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
-
-	utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
-	vm.state.AddUTXO(utxo)
-	err = vm.state.Commit()
-	require.NoError(err)
+	defer vm.ctx.Lock.Unlock()
 
 	// Set consortium member
+	// add admin proposer role to root admin
 	tx, err := vm.txBuilder.NewAddressStateTx(
 		adminProposerKey.Address(),
 		false,
 		as.AddressStateBitRoleConsortiumAdminProposer,
 		rootAdminKey.Address(),
 		[]*secp256k1.PrivateKey{rootAdminKey},
-		outputOwners,
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
+	// set kyc flag for test consortium member (not member yet)
 	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitKYCVerified,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
 		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, addrStateTx)
-	proposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
+	// make admin proposal to add consortium member
+	proposalTx := buildAddMemberProposalTx(t, vm, test.FundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
 		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
 	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
-	// Register node
+	// Register node for new consortium member
 	tx, err = vm.txBuilder.NewRegisterNodeTx(
 		ids.EmptyNodeID,
 		nodeID,
 		consortiumMemberKey.Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
-		outputOwners,
+		[]*secp256k1.PrivateKey{test.FundedKeys[0], nodeKey, consortiumMemberKey},
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
 
-	// Add the validator
+	// Add validator for new consortium member and registered node
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := defaultValidateEndTime.Add(-1 * time.Hour)
 	addValidatorTx, err := vm.txBuilder.NewCaminoAddValidatorTx(
@@ -129,35 +111,23 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], consortiumMemberKey},
+		[]*secp256k1.PrivateKey{test.FundedKeys[0], consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, addValidatorTx)
 
-	staker, err := state.NewCurrentStaker(
-		addValidatorTx.ID(),
-		addValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx),
-		0,
-	)
-	require.NoError(err)
-	vm.state.PutCurrentValidator(staker)
-	vm.state.AddTx(addValidatorTx, status.Committed)
-	err = vm.state.Commit()
-	require.NoError(err)
-
-	utxo = generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
-	vm.state.AddUTXO(utxo)
-	err = vm.state.Commit()
-	require.NoError(err)
+	// Fast-forward clock to time for validator to be moved from pending to current
+	vm.clock.Set(startTime)
 
 	// Defer the validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitNodeDeferred,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
-		outputOwners,
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
@@ -180,8 +150,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	require.NoError(err)
 
 	// Assert preferences are correct
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options(context.Background())
+	options, err := blk.(snowman.OracleBlock).Options(context.Background())
 	require.NoError(err)
 
 	commit := options[1].(*blockexecutor.Block)
@@ -192,7 +161,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
-	require.NoError(block.Accept(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 
@@ -229,86 +198,69 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 func TestRemoveReactivatedValidator(t *testing.T) {
 	require := require.New(t)
-	addr := caminoPreFundedKeys[0].Address()
-	hrp := constants.NetworkIDToHRP[testNetworkID]
-	bech32Addr, err := address.FormatBech32(hrp, addr.Bytes())
-	require.NoError(err)
 
-	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
+	nodeKey, nodeID := test.Keys[0], ids.NodeID(test.Keys[0].Address())
+	rootAdminKey := test.FundedKeys[0]
+	adminProposerKey := test.FundedKeys[0]
+	consortiumMemberKey := test.Keys[1]
 
-	rootAdminKey := caminoPreFundedKeys[0]
-	adminProposerKey := caminoPreFundedKeys[0]
-	consortiumMemberKey, err := testKeyFactory.NewPrivateKey()
-	require.NoError(err)
-
-	outputOwners := &secp256k1fx.OutputOwners{
-		Locktime:  0,
-		Threshold: 1,
-		Addrs:     []ids.ShortID{addr},
-	}
 	caminoGenesisConf := api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
-		InitialAdmin:        addr,
+		InitialAdmin:        rootAdminKey.Address(),
 	}
 	genesisUTXOs := []api.UTXO{
 		{
-			Amount:  json.Uint64(defaultCaminoValidatorWeight),
-			Address: bech32Addr,
+			Amount:  json.Uint64(test.ValidatorWeight * 2),
+			Address: test.FundedKeysBech32[0],
 		},
 	}
 
-	vm := newCaminoVM(caminoGenesisConf, genesisUTXOs, nil)
+	vm := newCaminoVM(t, caminoGenesisConf, test.PhaseLast, genesisUTXOs)
 	vm.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
-	}()
-
-	utxo := generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
-	vm.state.AddUTXO(utxo)
-	err = vm.state.Commit()
-	require.NoError(err)
+	defer vm.ctx.Lock.Unlock()
 
 	// Set consortium member
+	// add admin proposer role to root admin
 	tx, err := vm.txBuilder.NewAddressStateTx(
 		adminProposerKey.Address(),
 		false,
 		as.AddressStateBitRoleConsortiumAdminProposer,
 		rootAdminKey.Address(),
 		[]*secp256k1.PrivateKey{rootAdminKey},
-		outputOwners,
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
+	// set kyc flag for test consortium member (not member yet)
 	addrStateTx, err := vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitKYCVerified,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
 		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, addrStateTx)
-	proposalTx := buildAddMemberProposalTx(t, vm, caminoPreFundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
+	// make admin proposal to add consortium member
+	proposalTx := buildAddMemberProposalTx(t, vm, test.FundedKeys[0], vm.Config.CaminoConfig.DACProposalBondAmount, defaultTxFee,
 		adminProposerKey, consortiumMemberKey.Address(), vm.clock.Time(), true)
 	_, _, _, _ = makeProposalWithTx(t, vm, proposalTx) // add admin proposal
 	_ = buildAndAcceptBlock(t, vm, nil)                // execute admin proposal
 
-	// Register node
+	// Register node for new consortium member
 	tx, err = vm.txBuilder.NewRegisterNodeTx(
 		ids.EmptyNodeID,
 		nodeID,
 		consortiumMemberKey.Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
-		outputOwners,
+		[]*secp256k1.PrivateKey{test.FundedKeys[0], nodeKey, consortiumMemberKey},
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
 
-	// Add the validator
-	vm.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr)
+	// Add validator for new consortium member and registered node
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := defaultValidateEndTime.Add(-1 * time.Hour)
 	addValidatorTx, err := vm.txBuilder.NewCaminoAddValidatorTx(
@@ -319,35 +271,23 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{test.FundedKeys[0], nodeKey, consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
+	_ = buildAndAcceptBlock(t, vm, addValidatorTx)
 
-	staker, err := state.NewCurrentStaker(
-		addValidatorTx.ID(),
-		addValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx),
-		0,
-	)
-	require.NoError(err)
-	vm.state.PutCurrentValidator(staker)
-	vm.state.AddTx(addValidatorTx, status.Committed)
-	err = vm.state.Commit()
-	require.NoError(err)
-
-	utxo = generateTestUTXO(ids.GenerateTestID(), avaxAssetID, defaultBalance, *outputOwners, ids.Empty, ids.Empty)
-	vm.state.AddUTXO(utxo)
-	err = vm.state.Commit()
-	require.NoError(err)
+	// Fast-forward clock to time for validator to be moved from pending to current
+	vm.clock.Set(startTime)
 
 	// Defer the validator
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
 		as.AddressStateBitNodeDeferred,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
-		outputOwners,
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
@@ -363,9 +303,9 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		true,
 		as.AddressStateBitNodeDeferred,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
-		outputOwners,
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
+		nil,
 	)
 	require.NoError(err)
 	_ = buildAndAcceptBlock(t, vm, tx)
@@ -384,8 +324,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	require.NoError(err)
 
 	// Assert preferences are correct
-	block := blk.(smcon.OracleBlock)
-	options, err := block.Options(context.Background())
+	options, err := blk.(snowman.OracleBlock).Options(context.Background())
 	require.NoError(err)
 
 	commit := options[1].(*blockexecutor.Block)
@@ -396,7 +335,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	_, ok = abort.Block.(*blocks.BanffAbortBlock)
 	require.True(ok)
 
-	require.NoError(block.Accept(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
 	require.NoError(commit.Verify(context.Background()))
 	require.NoError(abort.Verify(context.Background()))
 
@@ -430,7 +369,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 func TestDepositsAutoUnlock(t *testing.T) {
 	require := require.New(t)
 
-	depositOwnerKey, depositOwnerAddr, depositOwner := generateKeyAndOwner(t)
+	depositOwnerKey, depositOwnerAddr, depositOwner := generate.KeyAndOwner(t, test.Keys[0])
 	ownerID, err := txs.GetOwnerID(depositOwner)
 	require.NoError(err)
 	depositOwnerAddrBech32, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], depositOwnerAddr.Bytes())
@@ -449,12 +388,12 @@ func TestDepositsAutoUnlock(t *testing.T) {
 	}
 	require.NoError(genesis.SetDepositOfferID(caminoGenesisConf.DepositOffers[0]))
 
-	vm := newCaminoVM(caminoGenesisConf, []api.UTXO{{
+	vm := newCaminoVM(t, caminoGenesisConf, test.PhaseLast, []api.UTXO{{
 		Amount:  json.Uint64(depositOffer.MinAmount + defaultTxFee),
 		Address: depositOwnerAddrBech32,
-	}}, nil)
+	}})
 	vm.ctx.Lock.Lock()
-	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+	defer vm.ctx.Lock.Unlock()
 
 	// Add deposit
 	depositTx, err := vm.txBuilder.NewDepositTx(
@@ -506,13 +445,13 @@ func TestDepositsAutoUnlock(t *testing.T) {
 }
 
 func TestProposals(t *testing.T) {
-	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
-	proposerAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], proposerAddr.Bytes())
+	proposerKey, proposerAddr := test.Keys[0], test.Keys[0].Address()
+	proposerAddrStr, err := address.FormatBech32(constants.UnitTestHRP, proposerAddr.Bytes())
 	require.NoError(t, err)
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.UnitTestHRP, test.FundedKeys[0].Address().Bytes())
 	require.NoError(t, err)
 
-	defaultConfig := defaultCaminoConfig(true)
+	defaultConfig := test.Config(t, test.PhaseLast)
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
 	newFee := (defaultTxFee + 7) * 10
 
@@ -578,11 +517,11 @@ func TestProposals(t *testing.T) {
 			balance := proposalBondAmount + defaultTxFee*(uint64(len(tt.votes))+1) + newFee
 
 			// Prepare vm
-			vm := newCaminoVM(api.Camino{
+			vm := newCaminoVM(t, api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				InitialAdmin:        caminoPreFundedKeys[0].Address(),
-			}, []api.UTXO{
+				InitialAdmin:        test.FundedKeys[0].Address(),
+			}, test.PhaseLast, []api.UTXO{
 				{
 					Amount:  json.Uint64(balance),
 					Address: proposerAddrStr,
@@ -591,9 +530,9 @@ func TestProposals(t *testing.T) {
 					Amount:  json.Uint64(defaultTxFee),
 					Address: caminoPreFundedKey0AddrStr,
 				},
-			}, &defaultConfig.BanffTime)
+			})
 			vm.ctx.Lock.Lock()
-			defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+			defer vm.ctx.Lock.Unlock()
 			checkBalance(t, vm.state, proposerAddr,
 				balance,          // total
 				0, 0, 0, balance, // unlocked
@@ -607,8 +546,8 @@ func TestProposals(t *testing.T) {
 				proposerAddr,
 				false,
 				as.AddressStateBitCaminoProposer,
-				caminoPreFundedKeys[0].Address(),
-				[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+				test.FundedKeys[0].Address(),
+				[]*secp256k1.PrivateKey{test.FundedKeys[0]},
 				nil,
 			)
 			require.NoError(err)
@@ -637,14 +576,15 @@ func TestProposals(t *testing.T) {
 			// Fast-forward clock to time a bit forward, but still before proposals start
 			// Try to vote on proposal, expect to fail
 			vm.clock.Set(baseFeeProposalState.StartTime().Add(-time.Second))
-			addVoteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[0], 0)
-			require.Error(vm.Builder.AddUnverifiedTx(addVoteTx))
+			addVoteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), test.FundedKeys[0], 0)
+			err = vm.Builder.AddUnverifiedTx(addVoteTx)
+			require.ErrorIs(err, txexecutor.ErrProposalInactive)
 			vm.clock.Set(baseFeeProposalState.StartTime())
 
 			optionWeights := make([]uint32, len(baseFeeProposalState.Options))
 			for i, vote := range tt.votes {
 				optionWeights[vote.option]++
-				voteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), caminoPreFundedKeys[i], vote.option)
+				voteTx := buildSimpleVoteTx(t, vm, proposerKey, fee, proposalTx.ID(), test.FundedKeys[i], vote.option)
 				proposalState = voteWithTx(t, vm, voteTx, proposalTx.ID(), optionWeights)
 				proposalIDsToFinish, err = vm.state.GetProposalIDsToFinish()
 				require.NoError(err)
@@ -707,24 +647,24 @@ func TestProposals(t *testing.T) {
 func TestAdminProposals(t *testing.T) {
 	require := require.New(t)
 
-	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
-	proposerAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], proposerAddr.Bytes())
+	proposerKey, proposerAddr := test.Keys[0], test.Keys[0].Address()
+	proposerAddrStr, err := address.FormatBech32(constants.UnitTestHRP, proposerAddr.Bytes())
 	require.NoError(err)
-	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], caminoPreFundedKeys[0].Address().Bytes())
+	caminoPreFundedKey0AddrStr, err := address.FormatBech32(constants.UnitTestHRP, test.FundedKeys[0].Address().Bytes())
 	require.NoError(err)
 
 	applicantAddr := proposerAddr
 
-	defaultConfig := defaultCaminoConfig(true)
+	defaultConfig := test.Config(t, test.PhaseLast)
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
 	balance := proposalBondAmount + defaultTxFee
 
 	// Prepare vm
-	vm := newCaminoVM(api.Camino{
+	vm := newCaminoVM(t, api.Camino{
 		VerifyNodeSignature: true,
 		LockModeBondDeposit: true,
-		InitialAdmin:        caminoPreFundedKeys[0].Address(),
-	}, []api.UTXO{
+		InitialAdmin:        test.FundedKeys[0].Address(),
+	}, test.PhaseLast, []api.UTXO{
 		{
 			Amount:  json.Uint64(balance),
 			Address: proposerAddrStr,
@@ -733,9 +673,9 @@ func TestAdminProposals(t *testing.T) {
 			Amount:  json.Uint64(defaultTxFee * 2),
 			Address: caminoPreFundedKey0AddrStr,
 		},
-	}, &defaultConfig.BanffTime)
+	})
 	vm.ctx.Lock.Lock()
-	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+	defer vm.ctx.Lock.Unlock()
 	checkBalance(t, vm.state, proposerAddr,
 		balance,          // total
 		0, 0, 0, balance, // unlocked
@@ -749,8 +689,8 @@ func TestAdminProposals(t *testing.T) {
 		proposerAddr,
 		false,
 		as.AddressStateBitRoleConsortiumAdminProposer,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
 		nil,
 	)
 	require.NoError(err)
@@ -766,8 +706,8 @@ func TestAdminProposals(t *testing.T) {
 		applicantAddr,
 		false,
 		as.AddressStateBitKYCVerified,
-		caminoPreFundedKeys[0].Address(),
-		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+		test.FundedKeys[0].Address(),
+		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
 		nil,
 	)
 	require.NoError(err)
@@ -820,37 +760,29 @@ func TestAdminProposals(t *testing.T) {
 
 func TestExcludeMemberProposals(t *testing.T) {
 	// member to exclude
-	memberToExcludeKey, memberToExcludeAddr, _ := generateKeyAndOwner(t)
-	memberToExcludeNodeKey, memberToExcludeNodeShortID, _ := generateKeyAndOwner(t)
+	memberToExcludeKey, memberToExcludeAddr := test.Keys[0], test.Keys[0].Address()
+	memberToExcludeNodeKey, memberToExcludeNodeShortID := test.Keys[1], test.Keys[1].Address()
 	memberToExcludeNodeID := ids.NodeID(memberToExcludeNodeShortID)
 
 	// admin & funds & proposer
-	rootAdminKey := caminoPreFundedKeys[0]
-	consortiumAdminKey := caminoPreFundedKeys[0]
-	proposerMemberKey := caminoPreFundedKeys[0]
-	fundsKey := caminoPreFundedKeys[0]
-	fundsAddr := caminoPreFundedKeys[0].Address()
-	fundsKeyAddrStr, err := address.FormatBech32(constants.NetworkIDToHRP[testNetworkID], fundsKey.Address().Bytes())
-	require.NoError(t, err)
+	rootAdminKey := test.FundedKeys[0]
+	consortiumAdminKey := test.FundedKeys[0]
+	proposerMemberKey := test.FundedKeys[0]
+	fundsKey := test.FundedKeys[0]
+	fundsAddr := test.FundedKeys[0].Address()
 
-	defaultConfig := defaultCaminoConfig(true)
+	defaultConfig := test.Config(t, test.PhaseLast)
 	fee := defaultConfig.TxFee
 	addValidatorFee := defaultConfig.AddPrimaryNetworkValidatorFee
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
 	validatorBondAmount := defaultConfig.MaxValidatorStake // is equal to min
+	initialBalance := test.PreFundedBalance + test.ValidatorWeight
+	initialHeight := uint64(2)
+
 	// for simplicity: member == member that will be excluded
 	//                 proposer == member that creates excludeMember proposal
-	initialBalance := validatorBondAmount + // proposer validator's bond
-		validatorBondAmount + addValidatorFee*2 + // bond and fee for validators (both pending and current just in case) of member
-		proposalBondAmount + fee + // bond and fee for admin proposal to add member that we'll try to exclude later
-		proposalBondAmount + fee + // bond and fee for excludeMember proposal
-		proposalBondAmount + fee + // bond and fee for 2nd excludeMember proposal
-		fee + // fee to give KYC verified status to member before adding him to consortium
-		fee // fee to give consortiumAdmin role to root admin so he can add member to consortium
-	initialHeight := uint64(3)
-
 	tests := map[string]struct {
-		moreExlcude      bool // try to exclude member with additional proposal
+		moreExclude      bool // try to exclude member with additional proposal
 		registerNode     bool // member has registered node
 		currentValidator bool // member has current validator
 		pendingValidator bool // member has pending validator
@@ -859,7 +791,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 		excluded         bool // means that most voted option is "yes", proposal is successful and member was excluded
 	}{
 		"Failed: tried to exclude with another proposal": {
-			moreExlcude: true,
+			moreExclude: true,
 		},
 		"Excluded: no registered node": {
 			success:  true,
@@ -922,13 +854,13 @@ func TestExcludeMemberProposals(t *testing.T) {
 			expectedHeight := initialHeight
 
 			// Prepare vm
-			vm := newCaminoVM(api.Camino{
+			vm := newCaminoVM(t, api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
 				InitialAdmin:        rootAdminKey.Address(),
-			}, []api.UTXO{{Amount: json.Uint64(initialBalance - defaultCaminoValidatorWeight), Address: fundsKeyAddrStr}}, &defaultConfig.BanffTime)
+			}, test.PhaseLast, nil)
 			vm.ctx.Lock.Lock()
-			defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
+			defer vm.ctx.Lock.Unlock()
 			height, err := vm.GetCurrentHeight(context.Background())
 			require.NoError(err)
 			require.Equal(expectedHeight, height)
@@ -1156,7 +1088,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 
 			vm.clock.Set(excludeMemberProposalState.StartTime())
 
-			if tt.moreExlcude {
+			if tt.moreExclude {
 				excludeMemberProposalTx := buildExcludeMemberProposalTx(t, vm, fundsKey, proposalBondAmount, fee,
 					consortiumAdminKey, memberToExcludeAddr, proposalStartTime, proposalStartTime.Add(time.Duration(dac.ExcludeMemberProposalMinDuration)*time.Second), true)
 				require.Error(vm.Builder.AddUnverifiedTx(excludeMemberProposalTx))
@@ -1181,7 +1113,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 
 			for i := 0; i < numberOfVotesToSuccess; i++ {
 				optionWeights[optionIndex]++
-				voteTx := buildSimpleVoteTx(t, vm, fundsKey, fee, excludeMemberProposalTx.ID(), caminoPreFundedKeys[i], optionIndex)
+				voteTx := buildSimpleVoteTx(t, vm, fundsKey, fee, excludeMemberProposalTx.ID(), test.FundedKeys[i], optionIndex)
 				proposalState = voteWithTx(t, vm, voteTx, excludeMemberProposalTx.ID(), optionWeights)
 				expectedHeight++
 				height, err = vm.GetCurrentHeight(context.Background())

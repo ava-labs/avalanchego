@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -15,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
@@ -22,15 +25,15 @@ import (
 )
 
 func TestProposalVerifierBaseFeeProposal(t *testing.T) {
-	ctx := defaultCtx(nil)
+	ctx := snow.DefaultContextTest()
 
-	feeOwnerKey, _, feeOwner := generateKeyAndOwner(t)
-	bondOwnerKey, _, bondOwner := generateKeyAndOwner(t)
-	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
+	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
+	proposerKey, proposerAddr := test.Keys[2], test.Keys[2].Address()
 
 	proposalBondAmt := uint64(100)
-	feeUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
-	bondUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty)
+	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
 
 	proposal := &txs.ProposalWrapper{Proposal: &dac.BaseFeeProposal{End: 1, Options: []uint64{1}}}
 	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposal)
@@ -40,11 +43,11 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 		NetworkID:    ctx.NetworkID,
 		BlockchainID: ctx.ChainID,
 		Ins: []*avax.TransferableInput{
-			generateTestInFromUTXO(feeUTXO, []uint32{0}),
-			generateTestInFromUTXO(bondUTXO, []uint32{0}),
+			generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
+			generate.InFromUTXO(t, bondUTXO, []uint32{0}, false),
 		},
 		Outs: []*avax.TransferableOutput{
-			generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
+			generate.Out(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
 		},
 	}}
 
@@ -126,19 +129,13 @@ func TestProposalVerifierBaseFeeProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-
 			utx := tt.utx()
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
-			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
-			require.NoError(t, err)
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -167,26 +164,23 @@ func TestProposalExecutorBaseFeeProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(ctrl), fx))
+			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(gomock.NewController(t))))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
 
 func TestProposalVerifierAddMemberProposal(t *testing.T) {
-	ctx := defaultCtx(nil)
+	ctx := snow.DefaultContextTest()
 
-	feeOwnerKey, _, feeOwner := generateKeyAndOwner(t)
-	bondOwnerKey, _, bondOwner := generateKeyAndOwner(t)
-	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
+	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
+	proposerKey, proposerAddr := test.Keys[2], test.Keys[2].Address()
 	applicantAddress := ids.ShortID{1}
 
 	proposalBondAmt := uint64(100)
-	feeUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
-	bondUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty)
+	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
 
 	proposal := &txs.ProposalWrapper{Proposal: &dac.AddMemberProposal{End: 1, ApplicantAddress: applicantAddress}}
 	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposal)
@@ -196,11 +190,11 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 		NetworkID:    ctx.NetworkID,
 		BlockchainID: ctx.ChainID,
 		Ins: []*avax.TransferableInput{
-			generateTestInFromUTXO(feeUTXO, []uint32{0}),
-			generateTestInFromUTXO(bondUTXO, []uint32{0}),
+			generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
+			generate.InFromUTXO(t, bondUTXO, []uint32{0}, false),
 		},
 		Outs: []*avax.TransferableOutput{
-			generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
+			generate.Out(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
 		},
 	}}
 
@@ -301,19 +295,13 @@ func TestProposalVerifierAddMemberProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-
 			utx := tt.utx()
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
-			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
-			require.NoError(t, err)
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -346,29 +334,26 @@ func TestProposalExecutorAddMemberProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(ctrl), fx))
+			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(gomock.NewController(t))))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
 
 func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
-	ctx := defaultCtx(nil)
+	ctx := snow.DefaultContextTest()
 
-	feeOwnerKey, _, feeOwner := generateKeyAndOwner(t)
-	bondOwnerKey, _, bondOwner := generateKeyAndOwner(t)
-	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
+	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
+	proposerKey, proposerAddr := test.Keys[2], test.Keys[2].Address()
 	memberAddress := ids.ShortID{1}
 	memberNodeShortID := ids.ShortID{2}
 	memberNodeID := ids.NodeID(memberNodeShortID)
 	memberValidator := &state.Staker{TxID: ids.ID{3}}
 
 	proposalBondAmt := uint64(100)
-	feeUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
-	bondUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty)
+	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
 
 	proposal := &txs.ProposalWrapper{Proposal: &dac.ExcludeMemberProposal{End: 1, MemberAddress: memberAddress}}
 	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposal)
@@ -378,11 +363,11 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 		NetworkID:    ctx.NetworkID,
 		BlockchainID: ctx.ChainID,
 		Ins: []*avax.TransferableInput{
-			generateTestInFromUTXO(feeUTXO, []uint32{0}),
-			generateTestInFromUTXO(bondUTXO, []uint32{0}),
+			generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
+			generate.InFromUTXO(t, bondUTXO, []uint32{0}, false),
 		},
 		Outs: []*avax.TransferableOutput{
-			generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
+			generate.Out(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
 		},
 	}}
 
@@ -558,19 +543,13 @@ func TestProposalVerifierExcludeMemberProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-
 			utx := tt.utx()
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
-			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
-			require.NoError(t, err)
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -688,10 +667,7 @@ func TestProposalExecutorExcludeMemberProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(ctrl), fx))
+			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(gomock.NewController(t))))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -775,7 +751,6 @@ func TestProposalBondTxIDsGetterExcludeMemberProposal(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			bondTxIDs, err := tt.proposal.GetBondTxIDsWith(&proposalBondTxIDsGetter{tt.state(ctrl, tt.proposal)})
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedBondTxIDs, bondTxIDs)
@@ -811,8 +786,6 @@ func TestGetBondTxIDs(t *testing.T) {
 	}
 
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	state := state.NewMockDiff(ctrl)
 
 	state.EXPECT().GetProposal(earlyFinishedSuccessfulProposalWithAdditionalBondID).Return(earlyFinishedSuccessfulProposalWithAdditionalBond, nil)
@@ -835,15 +808,15 @@ func TestGetBondTxIDs(t *testing.T) {
 }
 
 func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
-	ctx := defaultCtx(nil)
+	ctx := snow.DefaultContextTest()
 
-	feeOwnerKey, _, feeOwner := generateKeyAndOwner(t)
-	bondOwnerKey, _, bondOwner := generateKeyAndOwner(t)
-	proposerKey, proposerAddr, _ := generateKeyAndOwner(t)
+	feeOwnerKey, _, feeOwner := generate.KeyAndOwner(t, test.Keys[0])
+	bondOwnerKey, _, bondOwner := generate.KeyAndOwner(t, test.Keys[1])
+	proposerKey, proposerAddr := test.Keys[2], test.Keys[2].Address()
 
 	proposalBondAmt := uint64(100)
-	feeUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, defaultTxFee, feeOwner, ids.Empty, ids.Empty)
-	bondUTXO := generateTestUTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty)
+	feeUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 5}, ctx.AVAXAssetID, test.TxFee, feeOwner, ids.Empty, ids.Empty, true)
+	bondUTXO := generate.UTXO(ids.ID{1, 2, 3, 4, 6}, ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, ids.Empty, true)
 
 	proposal := &txs.ProposalWrapper{Proposal: &dac.FeeDistributionProposal{End: 1, Options: [][dac.FeeDistributionFractionsCount]uint64{{1}}}}
 	proposalBytes, err := txs.Codec.Marshal(txs.Version, proposal)
@@ -853,11 +826,11 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 		NetworkID:    ctx.NetworkID,
 		BlockchainID: ctx.ChainID,
 		Ins: []*avax.TransferableInput{
-			generateTestInFromUTXO(feeUTXO, []uint32{0}),
-			generateTestInFromUTXO(bondUTXO, []uint32{0}),
+			generate.InFromUTXO(t, feeUTXO, []uint32{0}, false),
+			generate.InFromUTXO(t, bondUTXO, []uint32{0}, false),
 		},
 		Outs: []*avax.TransferableOutput{
-			generateTestOut(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
+			generate.Out(ctx.AVAXAssetID, proposalBondAmt, bondOwner, ids.Empty, locked.ThisTxID),
 		},
 	}}
 
@@ -939,19 +912,13 @@ func TestProposalVerifierFeeDistributionProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-
 			utx := tt.utx()
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)
 			avax.SortTransferableOutputs(utx.Outs, txs.Codec)
-			tx, err := txs.NewSigned(utx, txs.Codec, tt.signers)
-			require.NoError(t, err)
 
 			proposal, err := utx.Proposal()
 			require.NoError(t, err)
-			err = proposal.VerifyWith(NewProposalVerifier(tt.state(ctrl, utx), fx, tx, utx, tt.isAdminProposal))
+			err = proposal.VerifyWith(NewProposalVerifier(tt.state(gomock.NewController(t), utx), utx, tt.isAdminProposal))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -980,10 +947,7 @@ func TestProposalExecutorFeeDistributionProposal(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			fx := defaultFx(true)
-			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(ctrl), fx))
+			err := tt.proposal.ExecuteWith(NewProposalExecutor(tt.state(gomock.NewController(t))))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

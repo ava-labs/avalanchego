@@ -161,7 +161,6 @@ func TestGetDepositOffer(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			actualDepositOffer, err := caminoState.GetDepositOffer(tt.depositOfferID)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -269,7 +268,6 @@ func TestGetAllDepositOffers(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			caminoState := tt.caminoState(ctrl)
 			depositOffers, err := caminoState.GetAllDepositOffers()
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -393,7 +391,6 @@ func TestWriteDepositOffers(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.writeDepositOffers(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)
@@ -480,7 +477,6 @@ func TestLoadDepositOffers(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			actualCaminoState := tt.caminoState(ctrl)
 			require.ErrorIs(t, actualCaminoState.loadDepositOffers(), tt.expectedErr)
 			require.Equal(t, tt.expectedCaminoState(actualCaminoState), actualCaminoState)

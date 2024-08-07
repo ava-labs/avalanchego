@@ -15,7 +15,6 @@ func TestGetGenesisBytes(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockLog := logging.NewMockLogger(ctrl)
 	service := Info{log: mockLog}
-	defer ctrl.Finish()
 
 	mockLog.EXPECT().Debug(gomock.Any()).Times(1)
 

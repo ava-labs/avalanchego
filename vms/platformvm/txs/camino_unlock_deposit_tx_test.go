@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/require"
 )
@@ -25,8 +26,8 @@ func TestUnlockDepositTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{
-					generateTestIn(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
-					generateTestIn(ctx.AVAXAssetID, 1, ids.ID{1}, ids.Empty, []uint32{}),
+					generate.In(ctx.AVAXAssetID, 1, ids.Empty, ids.Empty, []uint32{}),
+					generate.In(ctx.AVAXAssetID, 1, ids.ID{1}, ids.Empty, []uint32{}),
 				},
 				Outs: []*avax.TransferableOutput{},
 			}}},
@@ -39,7 +40,7 @@ func TestUnlockDepositTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Ins: []*avax.TransferableInput{
-					generateTestStakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{0}),
+					generate.StakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{0}),
 				},
 			}}},
 			expectedErr: locked.ErrWrongInType,
@@ -49,7 +50,7 @@ func TestUnlockDepositTxSyntacticVerify(t *testing.T) {
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 				Outs: []*avax.TransferableOutput{
-					generateTestStakeableOut(ctx.AVAXAssetID, 1, 1, secp256k1fx.OutputOwners{}),
+					generate.StakeableOut(ctx.AVAXAssetID, 1, 1, secp256k1fx.OutputOwners{}),
 				},
 			}}},
 			expectedErr: locked.ErrWrongOutType,

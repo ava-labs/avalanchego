@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/dac"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test/generate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/require"
 )
@@ -66,7 +67,7 @@ func TestAddVoteTxSyntacticVerify(t *testing.T) {
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 					Ins: []*avax.TransferableInput{
-						generateTestIn(ctx.AVAXAssetID, 1, ids.ID{1}, ids.Empty, []uint32{0}),
+						generate.In(ctx.AVAXAssetID, 1, ids.ID{1}, ids.Empty, []uint32{0}),
 					},
 				}},
 				VotePayload: voteBytes,
@@ -80,7 +81,7 @@ func TestAddVoteTxSyntacticVerify(t *testing.T) {
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 					Outs: []*avax.TransferableOutput{
-						generateTestOut(ctx.AVAXAssetID, 1, owner1, ids.ID{1}, ids.Empty),
+						generate.Out(ctx.AVAXAssetID, 1, owner1, ids.ID{1}, ids.Empty),
 					},
 				}},
 				VotePayload: voteBytes,
@@ -94,7 +95,7 @@ func TestAddVoteTxSyntacticVerify(t *testing.T) {
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 					Ins: []*avax.TransferableInput{
-						generateTestStakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{0}),
+						generate.StakeableIn(ctx.AVAXAssetID, 1, 1, []uint32{0}),
 					},
 				}},
 				VotePayload: voteBytes,
@@ -108,7 +109,7 @@ func TestAddVoteTxSyntacticVerify(t *testing.T) {
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 					Outs: []*avax.TransferableOutput{
-						generateTestStakeableOut(ctx.AVAXAssetID, 1, 1, owner1),
+						generate.StakeableOut(ctx.AVAXAssetID, 1, 1, owner1),
 					},
 				}},
 				VotePayload: voteBytes,
