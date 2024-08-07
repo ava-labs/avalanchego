@@ -344,7 +344,14 @@ func (b *builder) NewBaseTx(
 		return nil, err
 	}
 
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, changeOutputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +442,14 @@ func (b *builder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +500,14 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +540,14 @@ func (b *builder) NewAddDelegatorTx(
 		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, 0, feecomponent.Dimensions{}, nil, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		feecomponent.Dimensions{},
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -591,7 +619,14 @@ func (b *builder) NewCreateChainTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -641,7 +676,14 @@ func (b *builder) NewCreateSubnetTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -697,7 +739,14 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		return nil, err
 	}
 
-	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -829,7 +878,14 @@ func (b *builder) NewImportTx(
 		excessFee = 0
 	}
 
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, excessFee, complexity, to, ops)
+	inputs, changeOutputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		excessFee,
+		complexity,
+		to,
+		ops,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -885,7 +941,14 @@ func (b *builder) NewExportTx(
 		return nil, err
 	}
 
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, changeOutputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -922,18 +985,26 @@ func (b *builder) NewTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.context.AVAXAssetID: b.context.StaticFeeConfig.TransformSubnetTxFee,
+		assetID:               maxSupply - initialSupply,
+	}
+	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.StaticFeeConfig.TransformSubnetTxFee,
-		assetID:               maxSupply - initialSupply,
-	}
-	toStake := map[ids.ID]uint64{}
-	inputs, outputs, _, err := b.spend(toBurn, toStake, 0, feecomponent.Dimensions{}, nil, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		feecomponent.Dimensions{},
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,7 +1083,14 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 		return nil, err
 	}
 
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1071,7 +1149,14 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, 0, complexity, nil, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
