@@ -57,12 +57,12 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	val := make([]byte, r.Intn(64)) // #nosec G404
 	_, _ = r.Read(val)              // #nosec G404
 
-	children := map[byte]ids.ID{}
+	children := map[byte][]byte{}
 	for j := 0; j < 16; j++ {
 		if r.Float64() < 0.5 {
 			var childID ids.ID
 			_, _ = r.Read(childID[:]) // #nosec G404
-			children[byte(j)] = childID
+			children[byte(j)] = childID[:]
 		}
 	}
 
