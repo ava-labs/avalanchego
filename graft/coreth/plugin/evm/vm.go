@@ -458,9 +458,6 @@ func (vm *VM) Initialize(
 		config := *params.AvalancheFujiChainConfig
 		g.Config = &config
 		extDataHashes = fujiExtDataHashes
-	case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
-		config := *params.AvalancheLocalChainConfig
-		g.Config = &config
 	}
 	// If the Durango is activated, activate the Warp Precompile at the same time
 	if g.Config.DurangoBlockTimestamp != nil {
