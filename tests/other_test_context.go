@@ -49,17 +49,20 @@ func (tc *OtherTestContext) Cleanup() {
 	}
 	tc.cleanupCalled = true
 
+	// Only exit non-zero if a cleanup caused a panic
+	exitNonZero := false
+
 	var panicData any
 	if r := recover(); r != nil {
 		errorString, ok := r.(string)
 		if !ok || errorString != failNowMessage {
 			// Retain the panic data to raise after cleanup
 			panicData = r
+		} else {
+			exitNonZero = true
 		}
 	}
 
-	// Only exit non-zero if a cleanup caused a panic
-	exitNonZero := false
 	for _, cleanupFunc := range tc.cleanupFuncs {
 		func() {
 			// Ensure a failed cleanup doesn't prevent subsequent cleanup functions from running
