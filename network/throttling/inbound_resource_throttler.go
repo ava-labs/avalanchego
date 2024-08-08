@@ -162,28 +162,21 @@ func (t *systemThrottler) Acquire(ctx context.Context, nodeID ids.NodeID) {
 			waitDuration = t.MaxRecheckDelay
 		}
 
-		// Reset [timer].
 		if timer == nil {
 			// Note this is called at most once.
 			t.metrics.awaitingAcquire.Inc()
 
 			timer = t.timerPool.Get().(*time.Timer)
-			defer func() {
-				// Satisfy [t.timerPool] invariant.
-				if !timer.Stop() {
-					// The default ensures we don't wait forever in the case
-					// that the channel was already drained.
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-				t.timerPool.Put(timer)
-			}()
+			defer t.timerPool.Put(timer)
 		}
+
 		timer.Reset(waitDuration)
 		select {
 		case <-ctx.Done():
+			// Satisfy [t.timerPool] invariant.
+			if !timer.Stop() {
+				<-timer.C
+			}
 			return
 		case <-timer.C:
 		}
