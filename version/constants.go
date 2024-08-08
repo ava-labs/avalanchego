@@ -8,9 +8,6 @@ import (
 	"time"
 
 	_ "embed"
-
-	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const (
@@ -67,78 +64,6 @@ var (
 	// set of avalanchego versions that supported that version. This is not used
 	// by avalanchego, but is useful for downstream libraries.
 	RPCChainVMProtocolCompatibility map[uint][]*Semantic
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhase1Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhase1Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhase1Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhase2Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhase2Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhase2Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhase3Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhase3Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhase3Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhase4Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhase4Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhase4Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhase5Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhase5Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhase5Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhasePre6Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhasePre6Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhasePre6Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhase6Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhase6Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhase6Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	ApricotPhasePost6Times = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.ApricotPhasePost6Time,
-		constants.FujiID:    upgrade.Fuji.ApricotPhasePost6Time,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	BanffTimes = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.BanffTime,
-		constants.FujiID:    upgrade.Fuji.BanffTime,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	CortinaTimes = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.CortinaTime,
-		constants.FujiID:    upgrade.Fuji.CortinaTime,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	DurangoTimes = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.DurangoTime,
-		constants.FujiID:    upgrade.Fuji.DurangoTime,
-	}
-
-	// Deprecated: This will be removed once coreth no longer uses it.
-	EUpgradeTimes = map[uint32]time.Time{
-		constants.MainnetID: upgrade.Mainnet.EtnaTime,
-		constants.FujiID:    upgrade.Fuji.EtnaTime,
-	}
 )
 
 func init() {

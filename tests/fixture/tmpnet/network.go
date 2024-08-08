@@ -295,18 +295,7 @@ func (n *Network) Create(rootDir string) error {
 	}
 
 	if n.NetworkID == 0 && n.Genesis == nil {
-		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
-		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
-		// keys exposed by a network. Since allocation will not be exclusive, a test using a
-		// legacy key is unlikely to be a good candidate for parallel execution.
-		keysToFund := []*secp256k1.PrivateKey{
-			genesis.VMRQKey,
-			genesis.EWOQKey,
-			HardhatKey,
-		}
-		keysToFund = append(keysToFund, n.PreFundedKeys...)
-
-		genesis, err := NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
+		genesis, err := n.DefaultGenesis()
 		if err != nil {
 			return err
 		}
@@ -323,6 +312,21 @@ func (n *Network) Create(rootDir string) error {
 
 	// Ensure configuration on disk is current
 	return n.Write()
+}
+
+func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
+	// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
+	// require knowing the key beforehand rather than retrieving it from the set of pre-funded
+	// keys exposed by a network. Since allocation will not be exclusive, a test using a
+	// legacy key is unlikely to be a good candidate for parallel execution.
+	keysToFund := []*secp256k1.PrivateKey{
+		genesis.VMRQKey,
+		genesis.EWOQKey,
+		HardhatKey,
+	}
+	keysToFund = append(keysToFund, n.PreFundedKeys...)
+
+	return NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
 }
 
 // Starts the specified nodes

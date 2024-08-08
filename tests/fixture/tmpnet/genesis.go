@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -149,7 +150,8 @@ func NewTestGenesis(
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
 		Config:     params.AvalancheLocalChainConfig,
-		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
+		Difficulty: big.NewInt(0),                              // Difficulty is a mandatory field
+		Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), // This time enables Avalanche upgrades by default
 		GasLimit:   defaultGasLimit,
 		Alloc:      cChainBalances,
 	}
