@@ -16,6 +16,7 @@
       - [Bloom Filter](#bloom-filter)
       - [GetPeerList](#getpeerlist)
       - [PeerList](#peerlist)
+      - [Avoiding Persistent Network Traffic](#avoiding-persistent-network-traffic)
 
 ## Overview
 
@@ -33,15 +34,15 @@ Peers communicate by enqueuing messages between one another. Each peer on either
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
+    actor Morty
+    actor Rick
     loop 
-        Alice->>Bob: Write outbound messages
-        Bob->>Alice: Read incoming messages
+        Morty->>Rick: Write outbound messages
+        Rick->>Morty: Read incoming messages
     end
     loop
-        Bob->>Alice: Write outbound messages
-        Alice->>Bob: Read incoming messages
+        Rick->>Morty: Write outbound messages
+        Morty->>Rick: Read incoming messages
     end
 ```
 
@@ -55,50 +56,50 @@ A peer will then read the full message and attempt to parse it into either a net
 
 Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing the compatibility of the nodes. If the `Handshake` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [Peerlist Gossip](#peerlist-gossip).
+When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing the configuration of the node. If the `Handshake` message is successfully received and the peer decides that it will allow a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [PeerList Gossip](#peerlist-gossip).
 
 As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note over Alice,Bob: Connection Created
+    actor Morty
+    actor Rick
+    Note over Morty,Rick: Connection Created
     par
-        Alice->>Bob: AvalancheGo v1.0.0
+        Morty->>Rick: AvalancheGo v1.0.0
     and
-        Bob->>Alice: AvalancheGo v1.11.4
+        Rick->>Morty: AvalancheGo v1.11.4
     end
-    Note right of Bob: v1.0.0 is incompatible with v1.11.4.
-    Note left of Alice: v1.11.4 could be compatible with v1.0.0!
+    Note right of Rick: v1.0.0 is incompatible with v1.11.4.
+    Note left of Morty: v1.11.4 could be compatible with v1.0.0!
     par
-        Bob-->>Alice: Disconnect
+        Rick-->>Morty: Disconnect
     and
-        Alice-XBob: Peerlist
+        Morty-XRick: Peerlist
     end
-    Note over Alice,Bob: Handshake Failed
+    Note over Morty,Rick: Handshake Failed
 ```
 
 Nodes that mutually desire the connection will both respond with `PeerList` messages and complete the handshake.
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note over Alice,Bob: Connection Created
+    actor Morty
+    actor Rick
+    Note over Morty,Rick: Connection Created
     par
-        Alice->>Bob: AvalancheGo v1.11.0
+        Morty->>Rick: AvalancheGo v1.11.0
     and
-        Bob->>Alice: AvalancheGo v1.11.4
+        Rick->>Morty: AvalancheGo v1.11.4
     end
-    Note right of Bob: v1.11.0 is compatible with v1.11.4!
-    Note left of Alice: v1.11.4 could be compatible with v1.11.0!
+    Note right of Rick: v1.11.0 is compatible with v1.11.4!
+    Note left of Morty: v1.11.4 could be compatible with v1.11.0!
     par
-        Bob->>Alice: Peerlist
+        Rick->>Morty: Peerlist
     and
-        Alice->>Bob: Peerlist
+        Morty->>Rick: Peerlist
     end
-    Note over Alice,Bob: Handshake Complete
+    Note over Morty,Rick: Handshake Complete
 ```
 
 ### Ping-Pong Messages
@@ -107,12 +108,12 @@ Peers periodically send `Ping` messages containing perceived uptime information.
 
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note left of Alice: Send Ping
-    Alice->>Bob: I think your uptime is 95%
-    Note right of Bob: Send Pong
-    Bob->>Alice: ACK
+    actor Morty
+    actor Rick
+    Note left of Morty: Send Ping
+    Morty->>Rick: I think your uptime is 95%
+    Note right of Rick: Send Pong
+    Rick->>Morty: ACK
 ```
 
 ## Peer Discovery
@@ -127,10 +128,12 @@ It is expected for Avalanche nodes to allow inbound connections. If a validator 
 
 Avalanche nodes that have identified the `IP:Port` pair of a node they want to connect to will initiate outbound connections to this `IP:Port` pair. If the connection is not able to complete the [Peer Handshake](#peer-handshake), the connection will be re-attempted with an [Exponential Backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
 
-A node should initiate outbound connections to an `IP:Port` pair that is believed to belong to a node that is not connected and meets at least one of the following conditions:
-- The node is in the initial bootstrapper set.
-- The node is in the default bootstrapper set.
-- The node in the current Primary Network validator set.
+A node should initiate outbound connections to an `IP:Port` pair that is believed to belong to another node that is not connected and meets at least one of the following conditions:
+- The peer is in the initial bootstrapper set.
+- The peer is in the default bootstrapper set.
+- The peer is a Primary Network validator.
+- The peer is a validator of a tracked Subnet.
+- The peer is a validator of a Subnet and the local node is a Primary Network validator.
 
 #### IP Authentication
 
@@ -148,7 +151,16 @@ Once connected to an initial set of peers, a node can use these connections to d
 
 Peers are discovered by receiving [`PeerList`](#peerlist) messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
 
-To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
+To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected Primary Network validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
+
+#### Gossipable Peers
+
+The peers that a node may include into a [`GetPeerList`](#getpeerlist) message are considered `gossipable`.
+
+
+#### Trackable Peers
+
+The peers that a node would attempt to connect to if included in a [`PeerList`](#peerlist) message are considered `trackable`.
 
 #### Bloom Filter
 
@@ -171,32 +183,42 @@ A `GetPeerList` message contains the Bloom Filter of the currently known peers a
 `PeerList` messages are expected to contain `IP:Port` pairs that satisfy all of the following constraints:
 - The Bloom Filter sent when requesting the `PeerList` message does not contain the node claiming the `IP:Port` pair.
 - The node claiming the `IP:Port` pair is currently connected.
-- The `IP:Port` pair the node shared during the `Handshake` message is the node's most recently known `IP:Port` pair.
-- The node claiming the `IP:Port` pair is either in the default bootstrapper set or is a current Primary Network validator.
+- The node claiming the `IP:Port` pair is either in the default bootstrapper set, is a current Primary Network validator, is a validator of a tracked Subnet, or is a validator of a Subnet and the peer is a Primary Network validator.
 
-#### Example PeerList Gossip
+#### Avoiding Persistent Network Traffic
 
-The following diagram shows an example of `Alice` repeatedly learning about new peers from `Bob`.
+To avoid persistent network traffic, it must eventually hold that the set of [`gossipable peers`](#gossipable-peers) is a subset of the [`trackable peers`](#trackable-peers) for all nodes in the network.
 
+For example, say there are 3 nodes: `Rick`, `Morty`, and `Summer`.
+
+First we consider the case that `Rick` and `Morty` consider `Summer` [`gossipable`](#gossipable-peers) and [`trackable`](#trackable-peers), respectively.
 ```mermaid
 sequenceDiagram
-    actor Alice
-    actor Bob
-    Note left of Alice: Initialize Bloom Filter
-    Note left of Alice: Bloom: [0, 0, 0]
-    Alice->>Bob: GetPeerList [0, 0, 0]
-    Note right of Bob: Any peers can be sent.
-    Bob->>Alice: PeerList - Peer-1
-    Note left of Alice: Bloom: [1, 0, 0]
-    Alice->>Bob: GetPeerList [1, 0, 0]
-    Note right of Bob: Either Peer-2 or Peer-3 can be sent.
-    Bob->>Alice: PeerList - Peer-3
-    Note left of Alice: Bloom: [1, 0, 1]
-    Alice->>Bob: GetPeerList [1, 0, 1]
-    Note right of Bob: Only Peer-2 can be sent.
-    Bob->>Alice: PeerList - Peer-2
-    Note left of Alice: Bloom: [1, 1, 1]
-    Alice->>Bob: GetPeerList [1, 1, 1]
-    Note right of Bob: There are no more peers left to send!
-    Bob->>Alice: PeerList - Empty
+    actor Morty
+    actor Rick
+    Note left of Morty: Not currently tracking Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+    Note left of Morty: Track Summer and add to bloom filter
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer is in the bloom filter
+    Rick->>Morty: PeerList - Empty
 ```
+This case is ideal, as `Rick` only notifies `Morty` about `Summer` once, and never uses bandwidth for their connection again.
+
+Now we consider the case that `Rick` considers `Summer` [`gossipable`](#gossipable-peers), but `Morty` does not consider `Summer` [`trackable`](#trackable-peers).
+```mermaid
+sequenceDiagram
+    actor Morty
+    actor Rick
+    Note left of Morty: Not currently tracking Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+    Note left of Morty: Ignore Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+```
+This case is suboptimal, because `Rick` told `Morty` about `Summer` multiple times. If this case were to happen consistently, `Rick` may waste a significant amount of bandwidth trying to teach `Morty` about `Summer`.
