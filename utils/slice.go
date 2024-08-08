@@ -3,7 +3,7 @@
 
 package utils
 
-// join the provided slices into a single slice.
+// Join merges the provided slices into a single slice.
 //
 // TODO: Use slices.Concat once the minimum go version is 1.22.
 func Join[T any](slices ...[]T) []T {
