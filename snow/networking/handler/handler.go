@@ -118,8 +118,6 @@ type handler struct {
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
 
-	subnetConnector validators.SubnetConnector
-
 	subnet subnets.Subnet
 
 	// Tracks the peers that are currently connected to this subnet
@@ -136,7 +134,6 @@ func New(
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
-	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
 	p2pTracker *p2p.PeerTracker,
@@ -152,7 +149,6 @@ func New(
 		closingChan:     make(chan struct{}),
 		closed:          make(chan struct{}),
 		resourceTracker: resourceTracker,
-		subnetConnector: subnetConnector,
 		subnet:          subnet,
 		peerTracker:     peerTracker,
 		p2pTracker:      p2pTracker,
@@ -768,9 +764,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 		h.p2pTracker.Connected(nodeID, msg.NodeVersion)
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
-
-	case *message.ConnectedSubnet:
-		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
 
 	case *message.Disconnected:
 		err := h.peerTracker.Disconnected(ctx, nodeID)

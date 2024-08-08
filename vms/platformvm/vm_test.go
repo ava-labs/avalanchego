@@ -1545,7 +1545,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		time.Hour,
 		2,
 		cpuTracker,
-		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
 		peerTracker,

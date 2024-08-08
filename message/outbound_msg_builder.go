@@ -49,7 +49,6 @@ type OutboundMsgBuilder interface {
 
 	Ping(
 		primaryUptime uint32,
-		subnetUptimes []*p2p.SubnetUptime,
 	) (OutboundMessage, error)
 
 	Pong() (OutboundMessage, error)
@@ -198,14 +197,12 @@ func newOutboundBuilder(compressionType compression.Type, builder *msgBuilder) O
 
 func (b *outMsgBuilder) Ping(
 	primaryUptime uint32,
-	subnetUptimes []*p2p.SubnetUptime,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Ping{
 				Ping: &p2p.Ping{
-					Uptime:        primaryUptime,
-					SubnetUptimes: subnetUptimes,
+					Uptime: primaryUptime,
 				},
 			},
 		},

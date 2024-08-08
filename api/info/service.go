@@ -313,18 +313,13 @@ type UptimeResponse struct {
 	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
 }
 
-type UptimeRequest struct {
-	// if omitted, defaults to primary network
-	SubnetID ids.ID `json:"subnetID"`
-}
-
-func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
+func (i *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
 	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "uptime"),
 	)
 
-	result, err := i.networking.NodeUptime(args.SubnetID)
+	result, err := i.networking.NodeUptime()
 	if err != nil {
 		return fmt.Errorf("couldn't get node uptime: %w", err)
 	}

@@ -175,10 +175,8 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
 	}
 
-	// TODO: calculate subnet uptimes
 	uptime, err := o.uptimes.CalculateUptimePercentFrom(
 		nodeID,
-		constants.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {

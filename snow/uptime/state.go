@@ -10,34 +10,25 @@ import (
 )
 
 type State interface {
-	// GetUptime returns [upDuration] and [lastUpdated] of [nodeID] on
-	// [subnetID].
-	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator of
-	// the subnet.
+	// GetUptime returns [upDuration] and [lastUpdated] of [nodeID]
+	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator.
 	GetUptime(
 		nodeID ids.NodeID,
-		subnetID ids.ID,
 	) (upDuration time.Duration, lastUpdated time.Time, err error)
 
-	// SetUptime updates [upDuration] and [lastUpdated] of [nodeID] on
-	// [subnetID].
-	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator of
-	// the subnet.
+	// SetUptime updates [upDuration] and [lastUpdated] of [nodeID]
+	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator
 	// Invariant: expects [lastUpdated] to be truncated (floored) to the nearest
 	//            second.
 	SetUptime(
 		nodeID ids.NodeID,
-		subnetID ids.ID,
 		upDuration time.Duration,
 		lastUpdated time.Time,
 	) error
 
-	// GetStartTime returns the time that [nodeID] started validating
-	// [subnetID].
-	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator of
-	// the subnet.
+	// GetStartTime returns the time that [nodeID] started validating.
+	// Returns [database.ErrNotFound] if [nodeID] isn't currently a validator.
 	GetStartTime(
 		nodeID ids.NodeID,
-		subnetID ids.ID,
 	) (startTime time.Time, err error)
 }
