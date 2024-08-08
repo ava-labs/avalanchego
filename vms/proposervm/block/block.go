@@ -85,18 +85,6 @@ func (b *statelessBlock) VRFSig() []byte {
 	return b.StatelessBlock.VRFSig
 }
 
-func (b *statelessBlock) PChainHeight() uint64 {
-	return b.StatelessBlock.PChainHeight
-}
-
-func (b *statelessBlock) Timestamp() time.Time {
-	return b.timestamp
-}
-
-func (b *statelessBlock) Proposer() ids.NodeID {
-	return b.proposer
-}
-
 func (b *statelessBlock) Bytes() []byte {
 	return b.bytes
 }
@@ -187,4 +175,16 @@ func (b *statelessBlock) verify(chainID ids.ID) error {
 		headerBytes,
 		b.Signature,
 	)
+}
+
+func (b *statelessBlock) PChainHeight() uint64 {
+	return b.StatelessBlock.PChainHeight
+}
+
+func (b *statelessBlock) Timestamp() time.Time {
+	return b.timestamp
+}
+
+func (b *statelessBlock) Proposer() ids.NodeID {
+	return b.proposer
 }
