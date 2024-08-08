@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
-	utils_timer "github.com/ava-labs/avalanchego/utils/timer"
+	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 )
 
 var (
@@ -133,7 +133,7 @@ func (n *inboundConnUpgradeThrottler) ShouldUpgrade(addrPort netip.AddrPort) boo
 }
 
 func (n *inboundConnUpgradeThrottler) Dispatch() {
-	timer := utils_timer.StoppedTimer()
+	timer := timerpkg.StoppedTimer()
 
 	defer timer.Stop()
 	for {

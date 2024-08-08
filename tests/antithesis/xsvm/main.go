@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/status"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 
-	utils_timer "github.com/ava-labs/avalanchego/utils/timer"
+	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 )
 
 const (
@@ -120,7 +120,7 @@ type workload struct {
 }
 
 func (w *workload) run(ctx context.Context) {
-	timer := utils_timer.StoppedTimer()
+	timer := timerpkg.StoppedTimer()
 
 	uri := w.uris[w.id%len(w.uris)]
 
