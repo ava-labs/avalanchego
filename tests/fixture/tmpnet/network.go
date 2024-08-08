@@ -865,7 +865,7 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	for {
 		for node := range unhealthyNodes {
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, ErrNotRunning) {
+			if err != nil {
 				return err
 			}
 			if !healthy {

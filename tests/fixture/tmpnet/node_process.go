@@ -31,7 +31,10 @@ const (
 	defaultNodeInitTimeout = 10 * time.Second
 )
 
-var errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
+var (
+	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
+	errNotRunning         = errors.New("node is not running")
+)
 
 func checkNodeHealth(ctx context.Context, uri string) (bool, error) {
 	// Check that the node is reporting healthy
@@ -194,7 +197,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, ErrNotRunning
+		return false, errNotRunning
 	}
 
 	return checkNodeHealth(ctx, p.node.URI)
