@@ -1235,7 +1235,6 @@ func (b *builder) spend(
 	}
 
 	if excessFee > 0 {
-		// It is worth adding the change output
 		newOutput := &avax.TransferableOutput{
 			Asset: avax.Asset{
 				ID: b.context.AVAXAssetID,
