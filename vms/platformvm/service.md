@@ -696,8 +696,8 @@ platform.getCurrentValidators({
   - `delegationFeeRate` is the percent fee this validator charges when others delegate stake to
     them. Omitted if `subnetID` is not a PoS Subnet.
   - `uptime` is the % of time the queried node has reported the peer as online and validating the
-    Subnet. Omitted if `subnetID` is not a PoS Subnet.
-  - `connected` is if the node is connected and tracks the Subnet.
+    Subnet. Omitted if `subnetID` is not a PoS Subnet. (Deprecated: uptime is deprecated for Subnet Validators. It will be available only for Primary Network Validators.)
+  - `connected` is if the node is connected and tracks the Subnet. (Deprecated: connected is deprecated for Subnet Validators. It will be available only for Primary Network Validators.)
   - `signer` is the node's BLS public key and proof of possession. Omitted if the validator doesn't
     have a BLS public key.
   - `delegatorCount` is the number of delegators on this validator.
@@ -1222,11 +1222,11 @@ platform.getSubnet({
 ```
 
 - `subnetID` is the ID of the Subnet to get information about. If omitted, fails.
-- `threshold` signatures from addresses in `controlKeys` are needed to make changes to 
+- `threshold` signatures from addresses in `controlKeys` are needed to make changes to
   a permissioned subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys`
   will be empty.
 - changes can not be made into the subnet until `locktime` is in the past.
-- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into a elastic one, 
+- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into a elastic one,
   for when this change was performed.
 
 **Example Call:**

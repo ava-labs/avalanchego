@@ -64,7 +64,7 @@ message Message {
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // Uptime percentage on subnets
+  // Deprecated
   repeated SubnetUptime subnet_uptimes = 2;
 }
 

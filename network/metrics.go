@@ -34,13 +34,12 @@ type metrics struct {
 	numUselessPeerListBytes         prometheus.Counter
 	nodeUptimeWeightedAverage       prometheus.Gauge
 	nodeUptimeRewardingStake        prometheus.Gauge
-	nodeSubnetUptimeWeightedAverage *prometheus.GaugeVec
-	nodeSubnetUptimeRewardingStake  *prometheus.GaugeVec
+	nodeSubnetUptimeWeightedAverage *prometheus.GaugeVec // Deprecated
+	nodeSubnetUptimeRewardingStake  *prometheus.GaugeVec // Deprecated
 	peerConnectedLifetimeAverage    prometheus.Gauge
-
-	lock                       sync.RWMutex
-	peerConnectedStartTimes    map[ids.NodeID]float64
-	peerConnectedStartTimesSum float64
+	lock                            sync.RWMutex
+	peerConnectedStartTimes         map[ids.NodeID]float64
+	peerConnectedStartTimesSum      float64
 }
 
 func newMetrics(

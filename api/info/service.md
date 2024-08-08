@@ -542,7 +542,7 @@ info.peers({
 - `lastReceived` is the timestamp of last message received from the peer.
 - `benched` shows chain IDs that the peer is being benched.
 - `observedUptime` is this node's primary network uptime, observed by the peer.
-- `observedSubnetUptime` is a map of Subnet IDs to this node's Subnet uptimes, observed by the peer.
+- `observedSubnetUptime` (Deprecated) is a map of Subnet IDs to this node's Subnet uptimes, observed by the peer.
 
 **Example Call:**
 
@@ -632,7 +632,7 @@ info.uptime({
 }
 ```
 
-- `subnetID` is the Subnet to get the uptime of. If not provided, returns the uptime of the node on
+- `subnetID` (Deprecated) is the Subnet to get the uptime of. If not provided, returns the uptime of the node on
   the primary network.
 
 - `rewardingStakePercentage` is the percent of stake which thinks this node is above the uptime
