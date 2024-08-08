@@ -74,7 +74,7 @@ func main() {
 	initialAmount := 100 * units.KiloAvax
 	for i := 1; i < NumKeys; i++ {
 		key, err := secp256k1.NewPrivateKey()
-		require.NoError(err, "failed to generate key: %s")
+		require.NoError(err, "failed to generate key")
 
 		var (
 			addr          = key.Address()
