@@ -1007,42 +1007,6 @@ func (b *builder) getBalance(
 	return balance, nil
 }
 
-func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to fetch subnet owner for %q: %w",
-			subnetID,
-			err,
-		)
-	}
-	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
-	if !ok {
-		return nil, ErrUnknownOwnerType
-	}
-
-	addrs := options.Addresses(b.addrs)
-	minIssuanceTime := options.MinIssuanceTime()
-	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
-	if !ok {
-		// We can't authorize the subnet
-		return nil, ErrInsufficientAuthorization
-	}
-	return &secp256k1fx.Input{
-		SigIndices: inputSigIndices,
-	}, nil
-}
-
-func (b *builder) initCtx(tx txs.UnsignedTx) error {
-	ctx, err := NewSnowContext(b.context.NetworkID, b.context.AVAXAssetID)
-	if err != nil {
-		return err
-	}
-
-	tx.InitCtx(ctx)
-	return nil
-}
-
 // spend takes in the requested burn amounts and the requested stake amounts.
 //
 //   - [amountsToBurn] maps assetID to the amount of the asset to spend without
@@ -1288,6 +1252,42 @@ func (b *builder) spend(
 	avax.SortTransferableOutputs(s.changeOutputs, txs.Codec) // sort the change outputs
 	avax.SortTransferableOutputs(s.stakeOutputs, txs.Codec)  // sort stake outputs
 	return s.inputs, s.changeOutputs, s.stakeOutputs, nil
+}
+
+func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
+	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to fetch subnet owner for %q: %w",
+			subnetID,
+			err,
+		)
+	}
+	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return nil, ErrUnknownOwnerType
+	}
+
+	addrs := options.Addresses(b.addrs)
+	minIssuanceTime := options.MinIssuanceTime()
+	inputSigIndices, ok := common.MatchOwners(owner, addrs, minIssuanceTime)
+	if !ok {
+		// We can't authorize the subnet
+		return nil, ErrInsufficientAuthorization
+	}
+	return &secp256k1fx.Input{
+		SigIndices: inputSigIndices,
+	}, nil
+}
+
+func (b *builder) initCtx(tx txs.UnsignedTx) error {
+	ctx, err := NewSnowContext(b.context.NetworkID, b.context.AVAXAssetID)
+	if err != nil {
+		return err
+	}
+
+	tx.InitCtx(ctx)
+	return nil
 }
 
 type spendHelper struct {
