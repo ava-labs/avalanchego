@@ -1067,7 +1067,7 @@ func (b *builder) spend(
 		stakeOutputs:  make([]*avax.TransferableOutput, 0),
 	}
 
-	lockedUTXOs, unlockedUTXOs := splitLockedStakeableUTXOs(utxos, minIssuanceTime)
+	unlockedUTXOs, lockedUTXOs := splitUTXOsByLocktime(utxos, minIssuanceTime)
 	for _, utxo := range lockedUTXOs {
 		assetID := utxo.AssetID()
 		if !s.shouldConsumeLockedAsset(assetID) {
@@ -1146,7 +1146,7 @@ func (b *builder) spend(
 	}
 
 	// AVAX is handled last to account for fees.
-	avaxUTXOs, nonAVAXUTXOs := splitAVAXUTXOs(unlockedUTXOs, b.context.AVAXAssetID)
+	avaxUTXOs, nonAVAXUTXOs := splitUTXOsByAssetID(unlockedUTXOs, b.context.AVAXAssetID)
 	for _, utxo := range nonAVAXUTXOs {
 		assetID := utxo.AssetID()
 		if !s.shouldConsumeAsset(assetID) {
@@ -1367,10 +1367,13 @@ func (s *spendHelper) verifyAssetsConsumed() error {
 	return nil
 }
 
-func splitLockedStakeableUTXOs(utxos []*avax.UTXO, minIssuanceTime uint64) ([]*avax.UTXO, []*avax.UTXO) {
+// splitUTXOsByLocktime separates the provided UTXOs into two slices:
+// 1. UTXOs that are unlocked with the provided issuance time
+// 2. UTXOs that are locked with the provided issuance time
+func splitUTXOsByLocktime(utxos []*avax.UTXO, minIssuanceTime uint64) ([]*avax.UTXO, []*avax.UTXO) {
 	var (
-		lockedUTXOs   = make([]*avax.UTXO, 0, len(utxos))
 		unlockedUTXOs = make([]*avax.UTXO, 0, len(utxos))
+		lockedUTXOs   = make([]*avax.UTXO, 0, len(utxos))
 	)
 	for _, utxo := range utxos {
 		lockedOut, ok := utxo.Out.(*stakeable.LockOut)
@@ -1384,22 +1387,25 @@ func splitLockedStakeableUTXOs(utxos []*avax.UTXO, minIssuanceTime uint64) ([]*a
 		}
 		lockedUTXOs = append(lockedUTXOs, utxo)
 	}
-	return lockedUTXOs, unlockedUTXOs
+	return unlockedUTXOs, lockedUTXOs
 }
 
-func splitAVAXUTXOs(utxos []*avax.UTXO, avaxAssetID ids.ID) ([]*avax.UTXO, []*avax.UTXO) {
+// splitUTXOsByAssetID separates the provided UTXOs into two slices:
+// 1. UTXOs with the provided assetID
+// 2. UTXOs with a different assetID
+func splitUTXOsByAssetID(utxos []*avax.UTXO, assetID ids.ID) ([]*avax.UTXO, []*avax.UTXO) {
 	var (
-		avaxUTXOs    = make([]*avax.UTXO, 0, len(utxos))
-		nonAVAXUTXOs = make([]*avax.UTXO, 0, len(utxos))
+		requestedUTXOs = make([]*avax.UTXO, 0, len(utxos))
+		otherUTXOs     = make([]*avax.UTXO, 0, len(utxos))
 	)
 	for _, utxo := range utxos {
-		if utxo.AssetID() == avaxAssetID {
-			avaxUTXOs = append(avaxUTXOs, utxo)
+		if utxo.AssetID() == assetID {
+			requestedUTXOs = append(requestedUTXOs, utxo)
 		} else {
-			nonAVAXUTXOs = append(nonAVAXUTXOs, utxo)
+			otherUTXOs = append(otherUTXOs, utxo)
 		}
 	}
-	return avaxUTXOs, nonAVAXUTXOs
+	return requestedUTXOs, otherUTXOs
 }
 
 func unwrapOutput(output verify.State) (*secp256k1fx.TransferOutput, uint64, error) {
