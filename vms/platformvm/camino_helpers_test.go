@@ -12,11 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -53,12 +50,6 @@ func newCaminoVM(t *testing.T, genesisConfig api.Camino, phase test.Phase, genes
 	msgChan := make(chan common.Message, 1)
 	ctx := test.ContextWithSharedMemory(t, atomicDB)
 
-	// utxo with funds for testSubnet1 (see below)
-	genesisUTXOs = append(genesisUTXOs, api.UTXO{
-		Amount:  json.Uint64(vm.Config.CreateSubnetTxFee),
-		Address: test.FundedKeysBech32[0],
-	})
-
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	genesisBytes := test.Genesis(t, ctx.AVAXAssetID, genesisConfig, genesisUTXOs)
@@ -84,29 +75,6 @@ func newCaminoVM(t *testing.T, genesisConfig api.Camino, phase test.Phase, genes
 	vm.state.SetTimestamp(vm.clock.Time())
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
-
-	// Create a subnet and store it in testSubnet1
-	// Note: following Banff activation, block acceptance will move
-	// chain time ahead
-	var err error
-	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		[]ids.ShortID{ // control keys
-			test.FundedKeys[0].Address(),
-			test.FundedKeys[1].Address(),
-			test.FundedKeys[2].Address(),
-		},
-		[]*secp256k1.PrivateKey{test.FundedKeys[0]},
-		test.FundedKeys[0].Address(),
-	)
-
-	require.NoError(err)
-	require.NoError(vm.Builder.AddUnverifiedTx(testSubnet1))
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	t.Cleanup(func() {
 		vm.ctx.Lock.Lock()

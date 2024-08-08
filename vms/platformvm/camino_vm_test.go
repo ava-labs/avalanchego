@@ -834,7 +834,7 @@ func TestExcludeMemberProposals(t *testing.T) {
 	proposalBondAmount := defaultConfig.CaminoConfig.DACProposalBondAmount
 	validatorBondAmount := defaultConfig.MaxValidatorStake // is equal to min
 	initialBalance := test.PreFundedBalance + test.ValidatorWeight
-	initialHeight := uint64(2)
+	initialHeight := uint64(1)
 
 	// for simplicity: member == member that will be excluded
 	//                 proposer == member that creates excludeMember proposal

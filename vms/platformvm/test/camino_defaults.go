@@ -84,22 +84,21 @@ func Config(t *testing.T, phase Phase) *config.Config {
 	case PhaseCairo:
 		cairoTime = LatestPhaseTime
 		fallthrough
-	case PhaseBerlin: // same time, as PhaseCortina
+	case PhaseBerlin:
 		berlinTime = LatestPhaseTime
+		cortinaTime = LatestPhaseTime
 		fallthrough
 	case PhaseAthens:
 		athensTime = LatestPhaseTime
 		fallthrough
-	case PhaseSunrise: // Banff is considered to be part of SunrisePhase release
+	case PhaseSunrise:
 		banffTime = LatestPhaseTime
 		fallthrough
 	case PhaseApricot5:
 		apricotPhase5Time = LatestPhaseTime
-		fallthrough
-	case PhaseApricot3:
 		apricotPhase3Time = LatestPhaseTime
 	default:
-		require.FailNow(t, "unhandled fork %d", phase)
+		require.FailNowf(t, "", "unknown phase %d (%s)", phase)
 	}
 
 	vdrs := validators.NewManager()
