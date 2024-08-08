@@ -38,11 +38,11 @@ const (
 // Flags appropriate for networks used for all types of testing.
 func DefaultTestFlags() FlagsMap {
 	return FlagsMap{
-		config.NetworkPeerListPullGossipFreqKey: "250ms",
-		config.NetworkMaxReconnectDelayKey:      "1s",
-		config.HealthCheckFreqKey:               "2s",
-		config.AdminAPIEnabledKey:               true,
-		config.IndexEnabledKey:                  true,
+		config.NetworkPeersPullGossipFreqKey: "250ms",
+		config.NetworkMaxReconnectDelayKey:   "1s",
+		config.HealthCheckFreqKey:            "2s",
+		config.AdminAPIEnabledKey:            true,
+		config.IndexEnabledKey:               true,
 	}
 }
 

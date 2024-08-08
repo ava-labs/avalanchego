@@ -125,10 +125,10 @@ func NewTestNetwork(
 				MaxSendFailRate:              constants.DefaultNetworkHealthMaxSendFailRate,
 				SendFailRateHalflife:         constants.DefaultHealthCheckAveragerHalflife,
 			},
-			PeerListGossipConfig: PeerListGossipConfig{
-				PeerListNumValidatorIPs: constants.DefaultNetworkPeerListNumValidatorIPs,
-				PeerListPullGossipFreq:  constants.DefaultNetworkPeerListPullGossipFreq,
-				PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
+			PeerGossipConfig: PeerGossipConfig{
+				PeersNumValidatorIPs: constants.DefaultNetworkPeersNumValidatorIPs,
+				PeersPullGossipFreq:  constants.DefaultNetworkPeersPullGossipFreq,
+				PeersBloomResetFreq:  constants.DefaultNetworkPeersBloomResetFreq,
 			},
 			TimeoutConfig: TimeoutConfig{
 				PingPongTimeout:      constants.DefaultPingPongTimeout,
