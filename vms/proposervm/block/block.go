@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -147,13 +148,21 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	b.proposer = ids.NodeIDFromCert(b.cert)
 
 	// The following ensures that we would initialize the vrfSig member only when
-	// the provided signature is 96 bytes long. That supports both statelessUnsignedBlockV0 & statelessUnsignedBlock
+	// the provided signature is 96 bytes long. That supports both v0 & v1
 	// variations, as well as optional 32-byte hashes stored in the VRFSig.
-	if len(b.StatelessBlock.VRFSig) == bls.SignatureLen {
+	switch len(b.StatelessBlock.VRFSig) {
+	case 0:
+		// no VRFSig
+	case hashing.HashLen:
+		// it's a hash
+	case bls.SignatureLen:
 		b.vrfSig, err = bls.SignatureFromBytes(b.StatelessBlock.VRFSig)
 		if err != nil {
 			return fmt.Errorf("%w: %w", errFailedToParseVRFSignature, err)
 		}
+	default:
+		// unexpected cases.
+		return fmt.Errorf("%w: VRF Signature length is %d", errFailedToParseVRFSignature, len(b.StatelessBlock.VRFSig))
 	}
 
 	return nil
