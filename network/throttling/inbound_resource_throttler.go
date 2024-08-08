@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 )
 
 const epsilon = time.Millisecond
@@ -107,11 +109,7 @@ func NewSystemThrottler(
 		timerPool: sync.Pool{
 			New: func() interface{} {
 				// Satisfy invariant that timer is stopped and drained.
-				timer := time.NewTimer(0)
-				if !timer.Stop() {
-					<-timer.C
-				}
-				return timer
+				return timerpkg.StoppedTimer()
 			},
 		},
 	}, nil
