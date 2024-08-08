@@ -124,18 +124,6 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) 
 	return n.router.AppGossip(ctx, nodeID, msg)
 }
 
-func (n *Network) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	return n.router.CrossChainAppRequest(ctx, chainID, requestID, deadline, request)
-}
-
-func (n *Network) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	return n.router.CrossChainAppResponse(ctx, chainID, requestID, response)
-}
-
-func (n *Network) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
-	return n.router.CrossChainAppRequestFailed(ctx, chainID, requestID, appErr)
-}
-
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
 	n.Peers.add(nodeID)
 	return nil

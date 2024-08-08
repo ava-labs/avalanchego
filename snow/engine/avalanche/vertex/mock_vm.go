@@ -148,48 +148,6 @@ func (mr *MockLinearizableVMMockRecorder) CreateHandlers(arg0 any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHandlers", reflect.TypeOf((*MockLinearizableVM)(nil).CreateHandlers), arg0)
 }
 
-// CrossChainAppRequest mocks base method.
-func (m *MockLinearizableVM) CrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequest", arg0, arg1, arg2, arg3, arg4)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CrossChainAppRequest indicates an expected call of CrossChainAppRequest.
-func (mr *MockLinearizableVMMockRecorder) CrossChainAppRequest(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequest", reflect.TypeOf((*MockLinearizableVM)(nil).CrossChainAppRequest), arg0, arg1, arg2, arg3, arg4)
-}
-
-// CrossChainAppRequestFailed mocks base method.
-func (m *MockLinearizableVM) CrossChainAppRequestFailed(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 *common.AppError) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppRequestFailed", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CrossChainAppRequestFailed indicates an expected call of CrossChainAppRequestFailed.
-func (mr *MockLinearizableVMMockRecorder) CrossChainAppRequestFailed(arg0, arg1, arg2, arg3 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppRequestFailed", reflect.TypeOf((*MockLinearizableVM)(nil).CrossChainAppRequestFailed), arg0, arg1, arg2, arg3)
-}
-
-// CrossChainAppResponse mocks base method.
-func (m *MockLinearizableVM) CrossChainAppResponse(arg0 context.Context, arg1 ids.ID, arg2 uint32, arg3 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CrossChainAppResponse", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CrossChainAppResponse indicates an expected call of CrossChainAppResponse.
-func (mr *MockLinearizableVMMockRecorder) CrossChainAppResponse(arg0, arg1, arg2, arg3 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossChainAppResponse", reflect.TypeOf((*MockLinearizableVM)(nil).CrossChainAppResponse), arg0, arg1, arg2, arg3)
-}
-
 // Disconnected mocks base method.
 func (m *MockLinearizableVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
 	m.ctrl.T.Helper()

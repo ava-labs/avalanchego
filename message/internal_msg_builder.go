@@ -6,7 +6,6 @@ package message
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -47,21 +46,6 @@ var (
 	_ fmt.Stringer    = (*QueryFailed)(nil)
 	_ chainIDGetter   = (*QueryFailed)(nil)
 	_ requestIDGetter = (*QueryFailed)(nil)
-
-	_ fmt.Stringer        = (*CrossChainAppRequest)(nil)
-	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
-	_ chainIDGetter       = (*CrossChainAppRequest)(nil)
-	_ requestIDGetter     = (*CrossChainAppRequest)(nil)
-
-	_ fmt.Stringer        = (*CrossChainAppRequestFailed)(nil)
-	_ sourceChainIDGetter = (*CrossChainAppRequestFailed)(nil)
-	_ chainIDGetter       = (*CrossChainAppRequestFailed)(nil)
-	_ requestIDGetter     = (*CrossChainAppRequestFailed)(nil)
-
-	_ fmt.Stringer        = (*CrossChainAppResponse)(nil)
-	_ sourceChainIDGetter = (*CrossChainAppResponse)(nil)
-	_ chainIDGetter       = (*CrossChainAppResponse)(nil)
-	_ requestIDGetter     = (*CrossChainAppResponse)(nil)
 
 	_ fmt.Stringer = (*Disconnected)(nil)
 
@@ -324,148 +308,6 @@ func InternalQueryFailed(
 		message: &QueryFailed{
 			ChainID:   chainID,
 			RequestID: requestID,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
-type CrossChainAppRequest struct {
-	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
-	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
-	RequestID          uint32 `json:"request_id,omitempty"`
-	Message            []byte `json:"message,omitempty"`
-}
-
-func (m *CrossChainAppRequest) String() string {
-	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: 0x%x",
-		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message,
-	)
-}
-
-func (m *CrossChainAppRequest) GetSourceChainID() ids.ID {
-	return m.SourceChainID
-}
-
-func (m *CrossChainAppRequest) GetChainId() []byte {
-	return m.DestinationChainID[:]
-}
-
-func (m *CrossChainAppRequest) GetRequestId() uint32 {
-	return m.RequestID
-}
-
-func InternalCrossChainAppRequest(
-	nodeID ids.NodeID,
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	deadline time.Duration,
-	msg []byte,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     CrossChainAppRequestOp,
-		message: &CrossChainAppRequest{
-			SourceChainID:      sourceChainID,
-			DestinationChainID: destinationChainID,
-			RequestID:          requestID,
-			Message:            msg,
-		},
-		expiration: time.Now().Add(deadline),
-	}
-}
-
-type CrossChainAppRequestFailed struct {
-	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
-	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
-	RequestID          uint32 `json:"request_id,omitempty"`
-	ErrorCode          int32  `json:"error_code,omitempty"`
-	ErrorMessage       string `json:"error_message,omitempty"`
-}
-
-func (m *CrossChainAppRequestFailed) String() string {
-	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s RequestID: %d",
-		m.SourceChainID, m.DestinationChainID, m.RequestID,
-	)
-}
-
-func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
-	return m.SourceChainID
-}
-
-func (m *CrossChainAppRequestFailed) GetChainId() []byte {
-	return m.DestinationChainID[:]
-}
-
-func (m *CrossChainAppRequestFailed) GetRequestId() uint32 {
-	return m.RequestID
-}
-
-func InternalCrossChainAppError(
-	nodeID ids.NodeID,
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	errorCode int32,
-	errorMessage string,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     CrossChainAppErrorOp,
-		message: &CrossChainAppRequestFailed{
-			SourceChainID:      sourceChainID,
-			DestinationChainID: destinationChainID,
-			RequestID:          requestID,
-			ErrorCode:          errorCode,
-			ErrorMessage:       errorMessage,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
-type CrossChainAppResponse struct {
-	SourceChainID      ids.ID `json:"source_chain_id,omitempty"`
-	DestinationChainID ids.ID `json:"destination_chain_id,omitempty"`
-	RequestID          uint32 `json:"request_id,omitempty"`
-	Message            []byte `json:"message,omitempty"`
-}
-
-func (m *CrossChainAppResponse) String() string {
-	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: 0x%x",
-		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message,
-	)
-}
-
-func (m *CrossChainAppResponse) GetSourceChainID() ids.ID {
-	return m.SourceChainID
-}
-
-func (m *CrossChainAppResponse) GetChainId() []byte {
-	return m.DestinationChainID[:]
-}
-
-func (m *CrossChainAppResponse) GetRequestId() uint32 {
-	return m.RequestID
-}
-
-func InternalCrossChainAppResponse(
-	nodeID ids.NodeID,
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
-	requestID uint32,
-	msg []byte,
-) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     CrossChainAppResponseOp,
-		message: &CrossChainAppResponse{
-			SourceChainID:      sourceChainID,
-			DestinationChainID: destinationChainID,
-			RequestID:          requestID,
-			Message:            msg,
 		},
 		expiration: mockable.MaxTime,
 	}

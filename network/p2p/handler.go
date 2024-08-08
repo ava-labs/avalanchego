@@ -46,15 +46,6 @@ type Handler interface {
 		deadline time.Time,
 		requestBytes []byte,
 	) ([]byte, *common.AppError)
-	// CrossChainAppRequest is called when handling a CrossChainAppRequest
-	// message.
-	// Returns the bytes for the response corresponding to [requestBytes]
-	CrossChainAppRequest(
-		ctx context.Context,
-		chainID ids.ID,
-		deadline time.Time,
-		requestBytes []byte,
-	) ([]byte, error)
 }
 
 // NoOpHandler drops all messages
@@ -63,10 +54,6 @@ type NoOpHandler struct{}
 func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
-	return nil, nil
-}
-
-func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 	return nil, nil
 }
 
@@ -109,10 +96,6 @@ func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, dea
 	return v.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
 
-func (v ValidatorHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	return v.handler.CrossChainAppRequest(ctx, chainID, deadline, requestBytes)
-}
-
 // responder automatically sends the response for a given request
 type responder struct {
 	Handler
@@ -140,29 +123,9 @@ func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID
 	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
 }
 
-// CrossChainAppRequest calls the underlying handler and sends back the response
-// to chainID
-func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	appResponse, err := r.Handler.CrossChainAppRequest(ctx, chainID, deadline, request)
-	if err != nil {
-		r.log.Debug("failed to handle message",
-			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
-			zap.Stringer("chainID", chainID),
-			zap.Uint32("requestID", requestID),
-			zap.Time("deadline", deadline),
-			zap.Uint64("handlerID", r.handlerID),
-			zap.Binary("message", request),
-		)
-		return nil //nolint:nilerr
-	}
-
-	return r.sender.SendCrossChainAppResponse(ctx, chainID, requestID, appResponse)
-}
-
 type TestHandler struct {
-	AppGossipF            func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte)
-	AppRequestF           func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError)
-	CrossChainAppRequestF func(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error)
+	AppGossipF  func(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte)
+	AppRequestF func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError)
 }
 
 func (t TestHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
@@ -179,12 +142,4 @@ func (t TestHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline
 	}
 
 	return t.AppRequestF(ctx, nodeID, deadline, requestBytes)
-}
-
-func (t TestHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if t.CrossChainAppRequestF == nil {
-		return nil, nil
-	}
-
-	return t.CrossChainAppRequestF(ctx, chainID, deadline, requestBytes)
 }
