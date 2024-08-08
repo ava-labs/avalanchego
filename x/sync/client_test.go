@@ -148,7 +148,7 @@ func sendRangeProofRequest(
 		},
 	).AnyTimes()
 
-	return client.GetRangeProof(ctx, request)
+	return client.GetRangeProof(ctx, request, serverDB)
 }
 
 func TestGetRangeProof(t *testing.T) {
@@ -772,6 +772,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 	_, err = client.GetRangeProof(
 		context.Background(),
 		&pb.SyncGetRangeProofRequest{},
+		nil, // database is unused
 	)
 	require.ErrorIs(err, errAppSendFailed)
 }
