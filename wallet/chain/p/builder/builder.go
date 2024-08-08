@@ -398,7 +398,13 @@ func (b *builder) NewAddSubnetValidatorTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.AddSubnetValidatorFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	if err != nil {
+		return nil, err
+	}
+
 	inputs, outputs, _, err := b.spend(
 		toBurn,
 		toStake,
@@ -406,11 +412,6 @@ func (b *builder) NewAddSubnetValidatorTx(
 		nil,
 		ops,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +439,13 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
 	inputs, outputs, _, err := b.spend(
 		toBurn,
 		toStake,
@@ -446,11 +453,6 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		nil,
 		ops,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +524,13 @@ func (b *builder) NewCreateChainTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.CreateBlockchainTxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
 	inputs, outputs, _, err := b.spend(
 		toBurn,
 		toStake,
@@ -530,11 +538,6 @@ func (b *builder) NewCreateChainTx(
 		nil,
 		ops,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +604,13 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
 	inputs, outputs, _, err := b.spend(
 		toBurn,
 		toStake,
@@ -609,11 +618,6 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		nil,
 		ops,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -818,7 +822,13 @@ func (b *builder) NewTransformSubnetTx(
 		assetID:               maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
 	inputs, outputs, _, err := b.spend(
 		toBurn,
 		toStake,
@@ -826,11 +836,6 @@ func (b *builder) NewTransformSubnetTx(
 		nil,
 		ops,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
