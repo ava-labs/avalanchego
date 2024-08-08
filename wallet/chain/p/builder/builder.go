@@ -1311,14 +1311,11 @@ func (s *spendHelper) addStakedOutput(output *avax.TransferableOutput) {
 }
 
 func (s *spendHelper) shouldConsumeLockedAsset(assetID ids.ID) bool {
-	remainingAmountToStake := s.amountsToStake[assetID]
-	return remainingAmountToStake != 0
+	return s.amountsToStake[assetID] != 0
 }
 
 func (s *spendHelper) shouldConsumeAsset(assetID ids.ID) bool {
-	remainingAmountToBurn := s.amountsToBurn[assetID]
-	remainingAmountToStake := s.amountsToStake[assetID]
-	return remainingAmountToBurn != 0 || remainingAmountToStake != 0
+	return s.amountsToBurn[assetID] != 0 || s.shouldConsumeLockedAsset(assetID)
 }
 
 func (s *spendHelper) consumeLockedAsset(assetID ids.ID, amount uint64) uint64 {
