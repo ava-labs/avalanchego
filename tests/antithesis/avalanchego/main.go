@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	utils_timer "github.com/ava-labs/avalanchego/utils/timer"
 	xtxs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	ptxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
@@ -148,10 +149,7 @@ type workload struct {
 }
 
 func (w *workload) run(ctx context.Context) {
-	timer := time.NewTimer(0)
-	if !timer.Stop() {
-		<-timer.C
-	}
+	timer := utils_timer.StoppedTimer()
 
 	var (
 		xWallet  = w.wallet.X()
