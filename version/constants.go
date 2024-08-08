@@ -40,7 +40,7 @@ var (
 	PrevMinimumCompatibleVersion = &Application{
 		Name:  Client,
 		Major: 1,
-		Minor: 10,
+		Minor: 11,
 		Patch: 0,
 	}
 
