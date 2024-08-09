@@ -56,7 +56,7 @@ func CalculateVRFOut(vrfSig []byte) [32]byte {
 	// |  vrfSig :               | [96]byte |  96 bytes  |
 	// +-------------------------+----------+------------+
 	if len(vrfSig) != bls.SignatureLen {
-		return [32]byte{0}
+		return [32]byte{}
 	}
 
 	buffer := make([]byte, len(vrfOutPrefix)+bls.SignatureLen)
