@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -121,26 +119,9 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		}
 		pChainTxs[txID] = tx
 	}
-	subnetIDs := []ids.ID{}
-	for _, tx := range pChainTxs {
-		switch unsignedTx := tx.Unsigned.(type) {
-		case *txs.CreateSubnetTx:
-			subnetIDs = append(subnetIDs, tx.ID())
-		case *txs.TransferSubnetOwnershipTx:
-			subnetIDs = append(subnetIDs, unsignedTx.Subnet)
-		}
-	}
-	subnetOwners := map[ids.ID]fx.Owner{}
-	for _, subnetID := range subnetIDs {
-		subnetInfo, err := avaxState.PClient.GetSubnet(ctx, subnetID)
-		if err != nil {
-			return nil, err
-		}
-		subnetOwners[subnetID] = &secp256k1fx.OutputOwners{
-			Locktime:  subnetInfo.Locktime,
-			Threshold: subnetInfo.Threshold,
-			Addrs:     subnetInfo.ControlKeys,
-		}
+	subnetOwners, err := ExtractTxSubnetOwners(ctx, avaxState.PClient, pChainTxs)
+	if err != nil {
+		return nil, err
 	}
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
 	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
