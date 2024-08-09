@@ -62,9 +62,13 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 					pChainTxs,
 				)
 				require.NoError(err)
-				subnetOwner, found := subnetOwners[subnetID]
+				subnetOwnerI, found := subnetOwners[subnetID]
 				require.True(found)
-				require.Equal(subnetOwner, owner)
+				subnetOwner, ok := subnetOwnerI.(*secp256k1fx.OutputOwners)
+				require.True(ok)
+				require.Equal(owner.Locktime, subnetOwner.Locktime)
+				require.Equal(owner.Threshold, subnetOwner.Threshold)
+				require.Equal(owner.Addrs, subnetOwner.Addrs)
 			})
 
 			newKeychain := env.NewKeychain(1)
@@ -96,9 +100,13 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 					pChainTxs,
 				)
 				require.NoError(err)
-				subnetOwner, found := subnetOwners[subnetID]
+				subnetOwnerI, found := subnetOwners[subnetID]
 				require.True(found)
-				require.Equal(subnetOwner, newOwner)
+				subnetOwner, ok := subnetOwnerI.(*secp256k1fx.OutputOwners)
+				require.True(ok)
+				require.Equal(newOwner.Locktime, subnetOwner.Locktime)
+				require.Equal(newOwner.Threshold, subnetOwner.Threshold)
+				require.Equal(newOwner.Addrs, subnetOwner.Addrs)
 			})
 
 			ginkgo.By("verify new owner from TransferSubnetOwnershipTx", func() {
@@ -111,9 +119,13 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 					pChainTxs,
 				)
 				require.NoError(err)
-				subnetOwner, found := subnetOwners[subnetID]
+				subnetOwnerI, found := subnetOwners[subnetID]
 				require.True(found)
-				require.Equal(subnetOwner, newOwner)
+				subnetOwner, ok := subnetOwnerI.(*secp256k1fx.OutputOwners)
+				require.True(ok)
+				require.Equal(newOwner.Locktime, subnetOwner.Locktime)
+				require.Equal(newOwner.Threshold, subnetOwner.Threshold)
+				require.Equal(newOwner.Addrs, subnetOwner.Addrs)
 			})
 		})
 })
