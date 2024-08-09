@@ -864,18 +864,14 @@ func (b *builder) NewImportTx(
 	}
 
 	var (
-		toBurn     map[ids.ID]uint64
+		toBurn     = map[ids.ID]uint64{}
 		toStake    = map[ids.ID]uint64{}
 		excessAVAX uint64
 	)
-	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX > txFee {
-		toBurn = map[ids.ID]uint64{}
-		excessAVAX = importedAVAX - txFee
+	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX < txFee {
+		toBurn[avaxAssetID] = txFee - importedAVAX
 	} else {
-		toBurn = map[ids.ID]uint64{
-			avaxAssetID: txFee - importedAVAX,
-		}
-		excessAVAX = 0
+		excessAVAX = importedAVAX - txFee
 	}
 
 	inputs, changeOutputs, _, err := b.spend(
@@ -1251,10 +1247,10 @@ func (b *builder) spend(
 	ownerOverride *secp256k1fx.OutputOwners,
 	options *common.Options,
 ) (
-	[]*avax.TransferableInput,
-	[]*avax.TransferableOutput,
-	[]*avax.TransferableOutput,
-	error,
+	inputs []*avax.TransferableInput,
+	changeOutputs []*avax.TransferableOutput,
+	stakeOutputs []*avax.TransferableOutput,
+	err error,
 ) {
 	utxos, err := b.backend.UTXOs(options.Context(), constants.PlatformChainID)
 	if err != nil {
