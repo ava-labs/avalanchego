@@ -18,15 +18,18 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
+	tc := e2e.NewTestContext()
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("owner retrieval",
 		func() {
-			nodeURI := e2e.Env.GetRandomNodeURI()
+			env := e2e.GetEnv(tc)
+
+			nodeURI := env.GetRandomNodeURI()
 			pChainClient := platformvm.NewClient(nodeURI.URI)
 
-			keychain := e2e.Env.NewKeychain(1)
-			baseWallet := e2e.NewWallet(keychain, nodeURI)
+			keychain := env.NewKeychain(1)
+			baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet := baseWallet.P()
 
 			owner := &secp256k1fx.OutputOwners{
@@ -42,7 +45,7 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 				var err error
 				subnetTx, err = pWallet.IssueCreateSubnetTx(
 					owner,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				subnetID = subnetTx.ID()
 				require.NoError(err)
@@ -54,7 +57,7 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 					subnetID: subnetTx,
 				}
 				subnetOwners, err := primary.ExtractTxSubnetOwners(
-					e2e.DefaultContext(),
+					tc.DefaultContext(),
 					pChainClient,
 					pChainTxs,
 				)
@@ -64,7 +67,7 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 				require.Equal(subnetOwner, owner)
 			})
 
-			newKeychain := e2e.Env.NewKeychain(1)
+			newKeychain := env.NewKeychain(1)
 			newOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
@@ -78,7 +81,7 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 				transferSubnetOwnershipTx, err = pWallet.IssueTransferSubnetOwnershipTx(
 					subnetID,
 					newOwner,
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 			})
@@ -88,7 +91,7 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 					subnetID: subnetTx,
 				}
 				subnetOwners, err := primary.ExtractTxSubnetOwners(
-					e2e.DefaultContext(),
+					tc.DefaultContext(),
 					pChainClient,
 					pChainTxs,
 				)
@@ -103,7 +106,7 @@ var _ = e2e.DescribePChain("[Retrieving Owner from Subnet Txs]", func() {
 					subnetID: transferSubnetOwnershipTx,
 				}
 				subnetOwners, err := primary.ExtractTxSubnetOwners(
-					e2e.DefaultContext(),
+					tc.DefaultContext(),
 					pChainClient,
 					pChainTxs,
 				)
