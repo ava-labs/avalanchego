@@ -38,6 +38,7 @@ func NewXSVMOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Nod
 				VMID:         constants.XSVMID,
 				Genesis:      genesisBytes,
 				PreFundedKey: key,
+				VersionArgs:  []string{"version-json"},
 			},
 		},
 		ValidatorIDs: tmpnet.NodesToIDs(nodes...),
