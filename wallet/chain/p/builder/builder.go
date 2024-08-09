@@ -714,18 +714,14 @@ func (b *builder) NewImportTx(
 	}
 
 	var (
-		toBurn     map[ids.ID]uint64
+		toBurn     = map[ids.ID]uint64{}
 		toStake    = map[ids.ID]uint64{}
 		excessAVAX uint64
 	)
-	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX > txFee {
-		toBurn = map[ids.ID]uint64{}
-		excessAVAX = importedAVAX - txFee
+	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX < txFee {
+		toBurn[avaxAssetID] = txFee - importedAVAX
 	} else {
-		toBurn = map[ids.ID]uint64{
-			avaxAssetID: txFee - importedAVAX,
-		}
-		excessAVAX = 0
+		excessAVAX = importedAVAX - txFee
 	}
 
 	inputs, changeOutputs, _, err := b.spend(
