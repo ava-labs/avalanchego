@@ -714,24 +714,24 @@ func (b *builder) NewImportTx(
 	}
 
 	var (
-		toBurn    map[ids.ID]uint64
-		toStake   = map[ids.ID]uint64{}
-		excessFee uint64
+		toBurn     map[ids.ID]uint64
+		toStake    = map[ids.ID]uint64{}
+		excessAVAX uint64
 	)
 	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX > txFee {
 		toBurn = map[ids.ID]uint64{}
-		excessFee = importedAVAX - txFee
+		excessAVAX = importedAVAX - txFee
 	} else {
 		toBurn = map[ids.ID]uint64{
 			avaxAssetID: txFee - importedAVAX,
 		}
-		excessFee = 0
+		excessAVAX = 0
 	}
 
 	inputs, changeOutputs, _, err := b.spend(
 		toBurn,
 		toStake,
-		excessFee,
+		excessAVAX,
 		to,
 		ops,
 	)
@@ -1023,7 +1023,7 @@ func (b *builder) getBalance(
 //     place into the staked outputs. First locked UTXOs are attempted to be
 //     used for these funds, and then unlocked UTXOs will be attempted to be
 //     used. There is no preferential ordering on the unlock times.
-//   - [excessFee] contains the amount of extra AVAX that spend can produce in
+//   - [excessAVAX] contains the amount of extra AVAX that spend can produce in
 //     the change outputs in addition to the consumed and not burned AVAX.
 //   - [ownerOverride] optionally specifies the output owners to use for the
 //     unlocked AVAX change output if no additional AVAX was needed to be
@@ -1031,7 +1031,7 @@ func (b *builder) getBalance(
 func (b *builder) spend(
 	amountsToBurn map[ids.ID]uint64,
 	amountsToStake map[ids.ID]uint64,
-	excessFee uint64,
+	excessAVAX uint64,
 	ownerOverride *secp256k1fx.OutputOwners,
 	options *common.Options,
 ) (
@@ -1225,7 +1225,7 @@ func (b *builder) spend(
 		})
 
 		excess := s.consumeAsset(b.context.AVAXAssetID, out.Amt)
-		excessFee, err = math.Add(excessFee, excess)
+		excessAVAX, err = math.Add(excessAVAX, excess)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -1239,13 +1239,13 @@ func (b *builder) spend(
 		return nil, nil, nil, err
 	}
 
-	if excessFee > 0 {
+	if excessAVAX > 0 {
 		newOutput := &avax.TransferableOutput{
 			Asset: avax.Asset{
 				ID: b.context.AVAXAssetID,
 			},
 			Out: &secp256k1fx.TransferOutput{
-				Amt:          excessFee,
+				Amt:          excessAVAX,
 				OutputOwners: *ownerOverride,
 			},
 		}
@@ -1350,24 +1350,28 @@ func (s *spendHelper) consumeAsset(assetID ids.ID, amount uint64) uint64 {
 
 func (s *spendHelper) verifyAssetsConsumed() error {
 	for assetID, amount := range s.amountsToStake {
-		if amount != 0 {
-			return fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q to stake",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
+		if amount == 0 {
+			continue
 		}
+
+		return fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q to stake",
+			ErrInsufficientFunds,
+			amount,
+			assetID,
+		)
 	}
 	for assetID, amount := range s.amountsToBurn {
-		if amount != 0 {
-			return fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
+		if amount == 0 {
+			continue
 		}
+
+		return fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q",
+			ErrInsufficientFunds,
+			amount,
+			assetID,
+		)
 	}
 	return nil
 }

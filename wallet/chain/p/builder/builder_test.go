@@ -1,6 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//nolint:gosec // This file does not need cryptographically strong randomness
 package builder
 
 import (
@@ -17,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-//nolint:gosec // This does not need cryptographically strong random numbers
 func generateUTXOs(assetID ids.ID, locktime uint64) []*avax.UTXO {
 	utxos := make([]*avax.UTXO, rand.Intn(10))
 	for i := range utxos {
@@ -53,11 +53,12 @@ func TestSplitUTXOsByLocktime(t *testing.T) {
 	var (
 		require = require.New(t)
 
-		expectedUnlockedUTXOsPart0 = generateUTXOs(ids.GenerateTestID(), 0)
-		expectedUnlockedUTXOsPart1 = generateUTXOs(ids.GenerateTestID(), 100)
-		expectedLockedUTXOsPart0   = generateUTXOs(ids.GenerateTestID(), 10000)
-		expectedUnlockedUTXOsPart2 = generateUTXOs(ids.GenerateTestID(), 0)
-		expectedLockedUTXOsPart1   = generateUTXOs(ids.GenerateTestID(), 101)
+		unlockedTime               uint64 = 100
+		expectedUnlockedUTXOsPart0        = generateUTXOs(ids.GenerateTestID(), 0)
+		expectedUnlockedUTXOsPart1        = generateUTXOs(ids.GenerateTestID(), unlockedTime)
+		expectedLockedUTXOsPart0          = generateUTXOs(ids.GenerateTestID(), unlockedTime+100)
+		expectedUnlockedUTXOsPart2        = generateUTXOs(ids.GenerateTestID(), unlockedTime-1)
+		expectedLockedUTXOsPart1          = generateUTXOs(ids.GenerateTestID(), unlockedTime+1)
 
 		utxos = utils.Join(
 			expectedUnlockedUTXOsPart0,
@@ -77,7 +78,7 @@ func TestSplitUTXOsByLocktime(t *testing.T) {
 		)
 	)
 
-	utxosWithAssetID, utxosWithOtherAssetID := splitUTXOsByLocktime(utxos, 100)
+	utxosWithAssetID, utxosWithOtherAssetID := splitUTXOsByLocktime(utxos, unlockedTime)
 	require.Equal(expectedUnlockedUTXOs, utxosWithAssetID)
 	require.Equal(expectedLockedUTXOs, utxosWithOtherAssetID)
 }
@@ -87,11 +88,11 @@ func TestSplitUTXOsByAssetID(t *testing.T) {
 		require = require.New(t)
 
 		assetID                            = ids.GenerateTestID()
-		expectedUTXOsWithAssetIDPart0      = generateUTXOs(assetID, 0)
-		expectedUTXOsWithAssetIDPart1      = generateUTXOs(assetID, 100)
-		expectedUTXOsWithAssetIDPart2      = generateUTXOs(assetID, 10000)
-		expectedUTXOsWithOtherAssetIDPart0 = generateUTXOs(ids.GenerateTestID(), 0)
-		expectedUTXOsWithOtherAssetIDPart1 = generateUTXOs(ids.GenerateTestID(), 100)
+		expectedUTXOsWithAssetIDPart0      = generateUTXOs(assetID, rand.Uint64())
+		expectedUTXOsWithAssetIDPart1      = generateUTXOs(assetID, rand.Uint64())
+		expectedUTXOsWithAssetIDPart2      = generateUTXOs(assetID, rand.Uint64())
+		expectedUTXOsWithOtherAssetIDPart0 = generateUTXOs(ids.GenerateTestID(), rand.Uint64())
+		expectedUTXOsWithOtherAssetIDPart1 = generateUTXOs(ids.GenerateTestID(), rand.Uint64())
 
 		utxos = utils.Join(
 			expectedUTXOsWithAssetIDPart0,
