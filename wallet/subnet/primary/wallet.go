@@ -108,7 +108,6 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	if pChainTxs == nil {
 		pChainTxs = make(map[ids.ID]*txs.Tx)
 	}
-
 	for txID := range config.PChainTxsToFetch {
 		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
 		if err != nil {
@@ -120,9 +119,12 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		}
 		pChainTxs[txID] = tx
 	}
-
+	subnetOwners, err := ExtractTxSubnetOwners(ctx, avaxState.PClient, pChainTxs)
+	if err != nil {
+		return nil, err
+	}
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
+	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)
 

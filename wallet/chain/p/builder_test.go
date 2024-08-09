@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -118,15 +119,11 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
+		subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: subnetOwner,
 		}
 
-		backend = NewBackend(testContext, chainUTXOs, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnetOwners)
 
 		// builder
 		utxoAddr = utxosKey.Address()
@@ -176,15 +173,11 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
+		subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: subnetOwner,
 		}
 
-		backend = NewBackend(testContext, chainUTXOs, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnetOwners)
 
 		// builder
 		utxoAddr = utxosKey.Address()
@@ -228,15 +221,11 @@ func TestCreateChainTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
+		subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: subnetOwner,
 		}
 
-		backend = NewBackend(testContext, chainUTXOs, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnetOwners)
 
 		utxoAddr = utxosKey.Address()
 		builder  = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContext, backend)
@@ -288,15 +277,11 @@ func TestCreateSubnetTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
+		subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: subnetOwner,
 		}
 
-		backend = NewBackend(testContext, chainUTXOs, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnetOwners)
 
 		// builder
 		utxoAddr = utxosKey.Address()
@@ -337,15 +322,11 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
+		subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: subnetOwner,
 		}
 
-		backend = NewBackend(testContext, chainUTXOs, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnetOwners)
 
 		// builder
 		utxoAddr = utxosKey.Address()
@@ -491,15 +472,11 @@ func TestTransformSubnetTx(t *testing.T) {
 			Threshold: 1,
 			Addrs:     []ids.ShortID{subnetAuthAddr},
 		}
-		subnets = map[ids.ID]*txs.Tx{
-			subnetID: {
-				Unsigned: &txs.CreateSubnetTx{
-					Owner: subnetOwner,
-				},
-			},
+		subnetOwners = map[ids.ID]fx.Owner{
+			subnetID: subnetOwner,
 		}
 
-		backend = NewBackend(testContext, chainUTXOs, subnets)
+		backend = NewBackend(testContext, chainUTXOs, subnetOwners)
 
 		// builder
 		utxoAddr = utxosKey.Address()
