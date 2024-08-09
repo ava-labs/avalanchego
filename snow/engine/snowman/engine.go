@@ -107,10 +107,16 @@ func New(config Config) (*Engine, error) {
 	acceptedFrontiers := tracker.NewAccepted()
 	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
+	confidences := make([]int, 0, len(config.Params.TerminationCriteria))
+	for _, confidence := range config.Params.TerminationCriteria {
+		confidences = append(confidences, confidence.VoteThreshold)
+	}
+
 	factory, err := poll.NewEarlyTermNoTraversalFactory(
 		config.Params.AlphaPreference,
 		config.Params.AlphaConfidence,
 		config.Ctx.Registerer,
+		confidences,
 	)
 	if err != nil {
 		return nil, err

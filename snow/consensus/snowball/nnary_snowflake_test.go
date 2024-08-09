@@ -16,7 +16,8 @@ func TestNnarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sf := newNnarySnowflake(alphaPreference, terminationConditions, Red)
 	sf.Add(Blue)
@@ -55,7 +56,7 @@ func TestNnarySnowflakeConfidenceReset(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 4
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sf := newNnarySnowflake(alphaPreference, terminationConditions, Red)
 	sf.Add(Blue)
@@ -89,7 +90,7 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 
 	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
-	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
+	terminationConditions := newTerminationCondition([]TerminationCriteria{{VoteThreshold: alphaConfidence, ConsecutiveSuccesses: beta}})
 
 	sb := newNnarySnowflake(alphaPreference, terminationConditions, Red)
 	require.Equal(Red, sb.Preference())

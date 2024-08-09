@@ -13,7 +13,7 @@ import (
 )
 
 func newEarlyTermNoTraversalTestFactory(require *require.Assertions, alpha int) Factory {
-	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry())
+	factory, err := NewEarlyTermNoTraversalFactory(alpha, alpha, prometheus.NewRegistry(), nil)
 	require.NoError(err)
 	return factory
 }
@@ -99,7 +99,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaPreference(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 5
 
-	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry())
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), nil)
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
@@ -116,6 +116,59 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaPreference(t *testing.T) {
 	require.True(poll.Finished())
 }
 
+// Tests case 3a with multiple termination criteria
+func TestEarlyMultiTermATerminatesEarlyWithAlphaPreference(t *testing.T) {
+	require := require.New(t)
+
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 2
+	terminationCriteria := []int{2, 3, 5}
+
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, 0, prometheus.NewRegistry(), terminationCriteria)
+	require.NoError(err)
+	poll := factory.New(vdrs)
+
+	poll.Drop(vdr1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr3, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr4, blkID1)
+	require.True(poll.Finished())
+}
+
+// Tests case 3b with multiple termination criteria
+func TestEarlyMultiTermBTerminatesEarlyWithAlphaPreference(t *testing.T) {
+	require := require.New(t)
+
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 2
+	terminationCriteria := []int{4, 5}
+
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, 0, prometheus.NewRegistry(), terminationCriteria)
+	require.NoError(err)
+	poll := factory.New(vdrs)
+
+	poll.Drop(vdr1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr3, blkID1)
+	require.False(poll.Finished())
+
+	poll.Drop(vdr4)
+	require.True(poll.Finished())
+
+	poll.Drop(vdr5) // Last poll doesn't do anything
+	require.True(poll.Finished())
+}
+
 // Tests case 4
 func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
 	require := require.New(t)
@@ -124,7 +177,29 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 3
 
-	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry())
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), nil)
+	require.NoError(err)
+	poll := factory.New(vdrs)
+
+	poll.Vote(vdr1, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID1)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr3, blkID1)
+	require.True(poll.Finished())
+}
+
+// Tests case 4 with multiple termination criteria
+func TestEarlyMultiTermNoTerminatesEarlyWithAlphaConfidence(t *testing.T) {
+	require := require.New(t)
+
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 3
+	terminationCriteria := []int{2, 3}
+
+	factory, err := NewEarlyTermNoTraversalFactory(alphaPreference, 0, prometheus.NewRegistry(), terminationCriteria)
 	require.NoError(err)
 	poll := factory.New(vdrs)
 

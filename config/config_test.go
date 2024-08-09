@@ -446,6 +446,32 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 	}
 }
 
+func TestGetSubnetConfigsFromFlagsInvalidJSON(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+
+	require := require.New(t)
+
+	encodedFileContent := base64.StdEncoding.EncodeToString([]byte(`{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+                        "terminationCriteria":{"consecutiveSuccesses":5,"voteThreshold":10},
+						"k": 30,
+						"alphaPreference": 16,
+						"alphaConfidence": 15
+					},
+					"validatorOnly": true
+				}
+			}`))
+
+	// build viper config
+	v := setupViperFlags()
+	v.Set(SubnetConfigContentKey, encodedFileContent)
+
+	_, err = getSubnetConfigs(v, []ids.ID{subnetID})
+	require.Errorf(err, "json: cannot unmarshal object into Go struct field Parameters.consensusParameters.terminationCriteria of type []snowball.TerminationCriteria")
+}
+
 func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 	require.NoError(t, err)
@@ -518,6 +544,58 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,
+		},
+		"correct config with termination criteria": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+                        "terminationCriteria":[{"consecutiveSuccesses":5,"voteThreshold":10},{"consecutiveSuccesses":4,"voteThreshold":11}],
+						"k": 30,
+						"alphaPreference": 16,
+						"alphaConfidence": 0
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal([]snowball.TerminationCriteria{{ConsecutiveSuccesses: 5, VoteThreshold: 10}, {ConsecutiveSuccesses: 4, VoteThreshold: 11}},
+					config.ConsensusParameters.TerminationCriteria)
+				require.Equal(16, config.ConsensusParameters.AlphaPreference)
+				require.Equal(30, config.ConsensusParameters.K)
+				// must still respect defaults
+				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
+			},
+			expectedErr: nil,
+		},
+		"conflict between alpha confidence and termination criteria": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusParameters": {
+                        "terminationCriteria":[{"consecutiveSuccesses":5,"voteThreshold":10},{"consecutiveSuccesses":4,"voteThreshold":11}],
+						"k": 30,
+						"alphaPreference": 16,
+						"alphaConfidence": 15
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				require.True(config.ValidatorOnly)
+				require.Equal([]snowball.TerminationCriteria{{ConsecutiveSuccesses: 5, VoteThreshold: 10}, {ConsecutiveSuccesses: 4, VoteThreshold: 11}},
+					config.ConsensusParameters.TerminationCriteria)
+				require.Equal(16, config.ConsensusParameters.AlphaPreference)
+				require.Equal(30, config.ConsensusParameters.K)
+				// must still respect defaults
+				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
+			},
+			expectedErr: snowball.ErrParametersInvalid,
 		},
 	}
 

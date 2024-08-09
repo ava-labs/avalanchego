@@ -99,10 +99,10 @@ func (m *earlyTermNoTraversalMetrics) observeEarlyAlphaConf(duration time.Durati
 }
 
 type earlyTermNoTraversalFactory struct {
-	alphaPreference int
-	alphaConfidence int
-
-	metrics *earlyTermNoTraversalMetrics
+	alphaPreference  int
+	alphaConfidence  int
+	alphaConfidences []int
+	metrics          *earlyTermNoTraversalMetrics
 }
 
 // NewEarlyTermNoTraversalFactory returns a factory that returns polls with
@@ -111,6 +111,7 @@ func NewEarlyTermNoTraversalFactory(
 	alphaPreference int,
 	alphaConfidence int,
 	reg prometheus.Registerer,
+	alphaConfidences []int,
 ) (Factory, error) {
 	metrics, err := newEarlyTermNoTraversalMetrics(reg)
 	if err != nil {
@@ -118,9 +119,10 @@ func NewEarlyTermNoTraversalFactory(
 	}
 
 	return &earlyTermNoTraversalFactory{
-		alphaPreference: alphaPreference,
-		alphaConfidence: alphaConfidence,
-		metrics:         metrics,
+		alphaPreference:  alphaPreference,
+		alphaConfidence:  alphaConfidence,
+		metrics:          metrics,
+		alphaConfidences: alphaConfidences,
 	}, nil
 }
 
@@ -131,6 +133,7 @@ func (f *earlyTermNoTraversalFactory) New(vdrs bag.Bag[ids.NodeID]) Poll {
 		alphaConfidence: f.alphaConfidence,
 		metrics:         f.metrics,
 		start:           time.Now(),
+		confidences:     f.alphaConfidences,
 	}
 }
 
@@ -142,6 +145,7 @@ type earlyTermNoTraversalPoll struct {
 	polled          bag.Bag[ids.NodeID]
 	alphaPreference int
 	alphaConfidence int
+	confidences     []int
 
 	metrics  *earlyTermNoTraversalMetrics
 	start    time.Time
@@ -193,6 +197,15 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 	}
 
 	_, freq := p.votes.Mode()
+
+	if len(p.confidences) > 0 {
+		if p.shouldTerminateEarlyErrDriven(freq, maxPossibleVotes) {
+			p.finished = true
+			return true
+		}
+		return false
+	}
+
 	if freq >= p.alphaPreference && maxPossibleVotes < p.alphaConfidence {
 		p.finished = true
 		p.metrics.observeEarlyAlphaPref(time.Since(p.start))
@@ -203,6 +216,36 @@ func (p *earlyTermNoTraversalPoll) Finished() bool {
 		p.finished = true
 		p.metrics.observeEarlyAlphaConf(time.Since(p.start))
 		return true // Case 4
+	}
+
+	return false
+}
+
+func (p *earlyTermNoTraversalPoll) shouldTerminateEarlyErrDriven(freq, maxPossibleVotes int) bool {
+	// Case 4 - First check if we collected the highest alpha confidence
+	if freq >= p.confidences[len(p.confidences)-1] {
+		p.metrics.observeEarlyAlphaConf(time.Since(p.start))
+		return true
+	}
+
+	if freq < p.alphaPreference {
+		return false
+	}
+
+	// Case 3a: We have collected the maximum votes, but it is below any of the confidence thresholds.
+	if maxPossibleVotes < p.confidences[0] {
+		p.metrics.observeEarlyAlphaPref(time.Since(p.start))
+		return true
+	}
+
+	// Case 3b - We don't have an outstanding query response that improves our confidence,
+	// because we have collected a threshold below a threshold we cannot pass due to reaching maximum possible votes.
+
+	for i := 0; i < len(p.confidences)-1; i++ {
+		if freq >= p.confidences[i] && maxPossibleVotes < p.confidences[i+1] {
+			p.metrics.observeEarlyAlphaPref(time.Since(p.start))
+			return true
+		}
 	}
 
 	return false
