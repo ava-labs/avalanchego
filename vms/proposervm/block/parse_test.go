@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -23,6 +24,11 @@ func TestParseBlocks(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
+	parentBlockSig := []byte{1, 2, 3}
+	networkID := uint32(5)
+
+	blsSignKey, err := bls.NewSecretKey()
+	require.NoError(t, err)
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(t, err)
@@ -30,6 +36,7 @@ func TestParseBlocks(t *testing.T) {
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(t, err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
+	vrfSig := NextBlockVRFSig(parentBlockSig, blsSignKey, chainID, networkID)
 
 	signedBlock, err := Build(
 		parentID,
@@ -39,6 +46,7 @@ func TestParseBlocks(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
+		vrfSig,
 	)
 	require.NoError(t, err)
 
@@ -83,6 +91,10 @@ func TestParse(t *testing.T) {
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
+	networkID := uint32(5)
+	parentBlockSig := []byte{1, 2, 3}
+	blsSignKey, err := bls.NewSecretKey()
+	require.NoError(t, err)
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(t, err)
@@ -90,6 +102,8 @@ func TestParse(t *testing.T) {
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(t, err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	vrfSig := NextBlockVRFSig(parentBlockSig, blsSignKey, chainID, networkID)
 
 	signedBlock, err := Build(
 		parentID,
@@ -99,13 +113,14 @@ func TestParse(t *testing.T) {
 		innerBlockBytes,
 		chainID,
 		key,
+		vrfSig,
 	)
 	require.NoError(t, err)
 
-	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	unsignedBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(t, err)
 
-	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	signedWithoutCertBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes, parentBlockSig)
 	require.NoError(t, err)
 	signedWithoutCertBlock := signedWithoutCertBlockIntf.(*statelessBlock)
 	signedWithoutCertBlock.Signature = []byte{5}
@@ -184,8 +199,8 @@ func TestParseBytes(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name:        "gibberish",
-			hex:         "000102030405",
+			name:        "unsupported codec version",
+			hex:         "000402030405",
 			expectedErr: codec.ErrUnknownVersion,
 		},
 	}

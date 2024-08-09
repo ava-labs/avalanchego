@@ -184,6 +184,11 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			emptyParentBlockSig,
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -267,6 +272,11 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			emptyParentBlockSig,
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -353,6 +363,11 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			emptyParentBlockSig,
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -424,6 +439,11 @@ func TestParseStateSummary(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			emptyParentBlockSig,
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -477,6 +497,11 @@ func TestStateSummaryAccept(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			emptyParentBlockSig,
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 
@@ -547,7 +572,6 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
-
 	slb, err := statelessblock.Build(
 		vm.preferred,
 		innerBlk.Timestamp(),
@@ -556,6 +580,11 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
 		vm.StakingLeafSigner,
+		statelessblock.NextBlockVRFSig(
+			emptyParentBlockSig,
+			vm.StakingBLSKey,
+			vm.ctx.ChainID,
+			vm.ctx.NetworkID),
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{

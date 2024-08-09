@@ -38,6 +38,8 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errInvalidVRFSignature      = errors.New("invalid VRF signature")
+	errUnexpectedVRFSignature   = errors.New("unexpected VRF signature present")
 )
 
 type Block interface {
@@ -165,7 +167,8 @@ func (p *postForkCommonComponents) Verify(
 	return p.vm.verifyAndRecordInnerBlk(
 		ctx,
 		&smblock.Context{
-			PChainHeight: parentPChainHeight,
+			PChainHeight:   parentPChainHeight,
+			RandomnessSeed: block.CalculateVRFOut(child.VRFSig()),
 		},
 		child,
 	)
@@ -177,6 +180,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentBlockVRFSig []byte,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -218,10 +222,23 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	var childBlockVrfSig []byte
+	// do we have the VRFSig activated ? if so, figure out the child block vrf signature.
+	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+		if shouldBuildSignedBlock {
+			childBlockVrfSig = block.NextBlockVRFSig(parentBlockVRFSig, p.vm.Config.StakingBLSKey, p.vm.ctx.ChainID, p.vm.ctx.NetworkID)
+		} else {
+			// in this case, we can't sign with BLS key, since we're not going to include the Certificate, which is required
+			// for the signature validation. Instead, we'll just hash the parent block VRF signature.
+			childBlockVrfSig = block.NextHashBlockSignature(parentBlockVRFSig)
+		}
+	}
+
 	var innerBlock snowman.Block
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
-			PChainHeight: parentPChainHeight,
+			PChainHeight:   parentPChainHeight,
+			RandomnessSeed: block.CalculateVRFOut(childBlockVrfSig),
 		})
 	} else {
 		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)
@@ -241,6 +258,7 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
 			p.vm.StakingLeafSigner,
+			childBlockVrfSig,
 		)
 	} else {
 		statelessChild, err = block.BuildUnsigned(
@@ -248,6 +266,7 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
+			childBlockVrfSig,
 		)
 	}
 	if err != nil {
