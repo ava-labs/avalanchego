@@ -311,7 +311,6 @@ func GenesisVMWithClock(
 	*enginetest.Sender,
 ) {
 	vm := &VM{clock: clock}
-	vm.p2pSender = &enginetest.SenderStub{}
 	ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	appSender := &enginetest.Sender{T: t}
 	appSender.CantSendAppGossip = true
