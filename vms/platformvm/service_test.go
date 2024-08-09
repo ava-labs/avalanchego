@@ -768,7 +768,7 @@ func TestGetBlock(t *testing.T) {
 			service, _, factory := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.StaticFeeConfig.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
 			builder, signer := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 			utx, err := builder.NewCreateChainTx(

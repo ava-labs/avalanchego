@@ -673,7 +673,7 @@ func (c *genericCodec) unmarshal(
 		if err != nil {
 			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
-		// Go through the fields and umarshal into them
+		// Go through the fields and unmarshal into them
 		for _, fieldIndex := range serializedFieldIndices {
 			if err := c.unmarshal(p, value.Field(fieldIndex), typeStack); err != nil {
 				return err

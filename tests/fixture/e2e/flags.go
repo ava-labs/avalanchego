@@ -19,7 +19,9 @@ type FlagVars struct {
 	reuseNetwork         bool
 	delayNetworkShutdown bool
 	stopNetwork          bool
+	restartNetwork       bool
 	nodeCount            int
+	activateEtna         bool
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -44,6 +46,10 @@ func (v *FlagVars) ReuseNetwork() bool {
 	return v.reuseNetwork
 }
 
+func (v *FlagVars) RestartNetwork() bool {
+	return v.restartNetwork
+}
+
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	if v.delayNetworkShutdown {
 		// Only return a non-zero value if the delay is enabled.  Make sure this value takes
@@ -59,6 +65,10 @@ func (v *FlagVars) StopNetwork() bool {
 
 func (v *FlagVars) NodeCount() int {
 	return v.nodeCount
+}
+
+func (v *FlagVars) ActivateEtna() bool {
+	return v.activateEtna
 }
 
 func RegisterFlags() *FlagVars {
@@ -88,6 +98,12 @@ func RegisterFlags() *FlagVars {
 		"[optional] reuse an existing network. If an existing network is not already running, create a new one and leave it running for subsequent usage.",
 	)
 	flag.BoolVar(
+		&vars.restartNetwork,
+		"restart-network",
+		false,
+		"[optional] restarts an existing network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
+	)
+	flag.BoolVar(
 		&vars.delayNetworkShutdown,
 		"delay-network-shutdown",
 		false,
@@ -104,6 +120,12 @@ func RegisterFlags() *FlagVars {
 		"node-count",
 		tmpnet.DefaultNodeCount,
 		"number of nodes the network should initially consist of",
+	)
+	flag.BoolVar(
+		&vars.activateEtna,
+		"activate-etna",
+		false,
+		"[optional] activate the etna upgrade",
 	)
 
 	return &vars

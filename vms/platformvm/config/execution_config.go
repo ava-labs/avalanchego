@@ -21,6 +21,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	ChainDBCacheSize:             2048,
 	BlockIDCacheSize:             8192,
 	FxOwnerCacheSize:             4 * units.MiB,
+	SubnetManagerCacheSize:       4 * units.MiB,
 	ChecksumsEnabled:             false,
 	MempoolPruneFrequency:        30 * time.Minute,
 }
@@ -36,6 +37,7 @@ type ExecutionConfig struct {
 	ChainDBCacheSize             int            `json:"chain-db-cache-size"`
 	BlockIDCacheSize             int            `json:"block-id-cache-size"`
 	FxOwnerCacheSize             int            `json:"fx-owner-cache-size"`
+	SubnetManagerCacheSize       int            `json:"subnet-manager-cache-size"`
 	ChecksumsEnabled             bool           `json:"checksums-enabled"`
 	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
 }
