@@ -212,6 +212,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		newTimestamp,
 		pChainHeight,
 		innerBlock.Bytes(),
+		nil,
 	)
 	if err != nil {
 		return nil, err

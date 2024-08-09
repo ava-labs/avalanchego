@@ -538,9 +538,9 @@ func (vm *VM) parsePostForkBlock(ctx context.Context, b []byte, verifySignature 
 	)
 
 	if verifySignature {
-		statelessBlock, err = statelessblock.Parse(b, vm.ctx.ChainID)
+		statelessBlock, err = statelessblock.Parse(b, vm.Upgrades, vm.ctx.ChainID)
 	} else {
-		statelessBlock, err = statelessblock.ParseWithoutVerification(b)
+		statelessBlock, err = statelessblock.ParseWithoutVerification(b, vm.Upgrades)
 	}
 	if err != nil {
 		return nil, err

@@ -13,9 +13,9 @@ type Header interface {
 }
 
 type statelessHeader struct {
-	Chain  ids.ID `serialize:"true"`
-	Parent ids.ID `serialize:"true"`
-	Body   ids.ID `serialize:"true"`
+	Chain  ids.ID `v0:"true"`
+	Parent ids.ID `v0:"true"`
+	Body   ids.ID `v0:"true"`
 
 	bytes []byte
 }

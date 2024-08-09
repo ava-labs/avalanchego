@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/indexer"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
@@ -34,7 +35,7 @@ func main() {
 		}
 
 		platformvmBlockBytes := container.Bytes
-		proposerVMBlock, err := proposervmblock.Parse(container.Bytes, constants.PlatformChainID)
+		proposerVMBlock, err := proposervmblock.Parse(container.Bytes, upgrade.Default, constants.PlatformChainID)
 		if err == nil {
 			platformvmBlockBytes = proposerVMBlock.Block()
 		}

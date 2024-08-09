@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -109,7 +110,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, error) {
 	}
 
 	// The key was in the database
-	blk, err := block.ParseWithoutVerification(blkWrapper.Block)
+	blk, err := block.ParseWithoutVerification(blkWrapper.Block, upgrade.Default)
 	if err != nil {
 		return nil, err
 	}

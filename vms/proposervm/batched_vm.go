@@ -94,7 +94,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		innerBlockBytes     = make([][]byte, 0, len(blks))
 	)
 
-	parsingResults := statelessblock.ParseBlocks(blks, vm.ctx.ChainID)
+	parsingResults := statelessblock.ParseBlocks(blks, vm.Upgrades, vm.ctx.ChainID)
 
 	for ; blocksIndex < len(blks); blocksIndex++ {
 		statelessBlock, err := parsingResults[blocksIndex].Block, parsingResults[blocksIndex].Err

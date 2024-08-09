@@ -9,8 +9,8 @@ import (
 )
 
 type option struct {
-	PrntID     ids.ID `serialize:"true"`
-	InnerBytes []byte `serialize:"true"`
+	PrntID     ids.ID `v0:"true"`
+	InnerBytes []byte `v0:"true"`
 
 	id    ids.ID
 	bytes []byte
