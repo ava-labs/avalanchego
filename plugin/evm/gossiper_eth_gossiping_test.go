@@ -21,14 +21,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
 func fundAddressByGenesis(addrs []common.Address) (string, error) {
@@ -115,17 +113,9 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	// prepare a tx
 	tx := getValidEthTxs(key, 1, common.Big1)[0]
 
-	// show that unknown subnet-evm hashes is requested
-	txBytes, err := rlp.EncodeToBytes([]*types.Transaction{tx})
-	assert.NoError(err)
-	msg := message.EthTxsGossip{
-		Txs: txBytes,
-	}
-	msgBytes, err := message.BuildGossipMessage(vm.networkCodec, msg)
-	assert.NoError(err)
-
-	nodeID := ids.GenerateTestNodeID()
-	err = vm.AppGossip(context.Background(), nodeID, msgBytes)
+	// Txs must be submitted over the API to be included in push gossip.
+	// (i.e., txs received via p2p are not included in push gossip)
+	vm.eth.APIBackend.SendTx(context.Background(), tx)
 	assert.NoError(err)
 	assert.False(txRequested, "tx should not be requested")
 
