@@ -170,19 +170,13 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	assert.False(mempool.has(txID))
 
-	// Gossip the transaction that conflicts with the originally
-	// discarded tx and ensure it is accepted into the mempool and gossipped
-	// to the network.
-	nodeID = ids.GenerateTestNodeID()
-	msg = message.AtomicTxGossip{
-		Tx: conflictingTx.SignedBytes(),
-	}
-	msgBytes, err = message.BuildGossipMessage(vm.networkCodec, msg)
-	assert.NoError(err)
-
 	vm.ctx.Lock.Unlock()
 
-	assert.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	// Conflicting tx must be submitted over the API to be included in push gossip.
+	// (i.e., txs received via p2p are not included in push gossip)
+	// This test adds it directly to the mempool + gossiper to simulate that.
+	vm.mempool.AddTx(conflictingTx)
+	vm.atomicTxPushGossiper.Add(&GossipAtomicTx{conflictingTx})
 	time.Sleep(500 * time.Millisecond)
 
 	vm.ctx.Lock.Lock()
