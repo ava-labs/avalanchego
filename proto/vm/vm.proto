@@ -116,6 +116,8 @@ message InitializeRequest {
   // the messenger, keystore, shared memory, blockchain alias,
   // subnet alias, and appSender services
   string server_addr = 14;
+  // network_upgrades_bytes is the json encoded network upgrades
+  bytes network_upgrades_bytes = 15;
 }
 
 message InitializeResponse {

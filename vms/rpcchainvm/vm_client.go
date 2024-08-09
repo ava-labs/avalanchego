@@ -191,21 +191,27 @@ func (vm *VMClient) Initialize(
 		zap.String("address", serverAddr),
 	)
 
+	networkUpgradeBytes, err := json.Marshal(chainCtx.NetworkUpgrades)
+	if err != nil {
+		return err
+	}
+
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
-		NetworkId:    chainCtx.NetworkID,
-		SubnetId:     chainCtx.SubnetID[:],
-		ChainId:      chainCtx.ChainID[:],
-		NodeId:       chainCtx.NodeID.Bytes(),
-		PublicKey:    bls.PublicKeyToCompressedBytes(chainCtx.PublicKey),
-		XChainId:     chainCtx.XChainID[:],
-		CChainId:     chainCtx.CChainID[:],
-		AvaxAssetId:  chainCtx.AVAXAssetID[:],
-		ChainDataDir: chainCtx.ChainDataDir,
-		GenesisBytes: genesisBytes,
-		UpgradeBytes: upgradeBytes,
-		ConfigBytes:  configBytes,
-		DbServerAddr: dbServerAddr,
-		ServerAddr:   serverAddr,
+		NetworkId:            chainCtx.NetworkID,
+		SubnetId:             chainCtx.SubnetID[:],
+		ChainId:              chainCtx.ChainID[:],
+		NodeId:               chainCtx.NodeID.Bytes(),
+		PublicKey:            bls.PublicKeyToCompressedBytes(chainCtx.PublicKey),
+		NetworkUpgradesBytes: networkUpgradeBytes,
+		XChainId:             chainCtx.XChainID[:],
+		CChainId:             chainCtx.CChainID[:],
+		AvaxAssetId:          chainCtx.AVAXAssetID[:],
+		ChainDataDir:         chainCtx.ChainDataDir,
+		GenesisBytes:         genesisBytes,
+		UpgradeBytes:         upgradeBytes,
+		ConfigBytes:          configBytes,
+		DbServerAddr:         dbServerAddr,
+		ServerAddr:           serverAddr,
 	})
 	if err != nil {
 		return err

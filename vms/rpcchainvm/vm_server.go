@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -112,6 +113,11 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
+	networkUpgrades := upgrade.Config{}
+	if err := json.Unmarshal(req.NetworkUpgradesBytes, &networkUpgrades); err != nil {
+		return nil, err
+	}
+
 	xChainID, err := ids.ToID(req.XChainId)
 	if err != nil {
 		return nil, err
@@ -230,11 +236,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}()
 
 	vm.ctx = &snow.Context{
-		NetworkID: req.NetworkId,
-		SubnetID:  subnetID,
-		ChainID:   chainID,
-		NodeID:    nodeID,
-		PublicKey: publicKey,
+		NetworkID:       req.NetworkId,
+		SubnetID:        subnetID,
+		ChainID:         chainID,
+		NodeID:          nodeID,
+		PublicKey:       publicKey,
+		NetworkUpgrades: networkUpgrades,
 
 		XChainID:    xChainID,
 		CChainID:    cChainID,
