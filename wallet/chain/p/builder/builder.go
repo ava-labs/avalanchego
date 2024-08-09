@@ -1149,6 +1149,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
+
 	inputs, baseOutputs, stakeOutputs, err := b.spend(
 		toBurn,
 		toStake,
