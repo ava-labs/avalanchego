@@ -2538,7 +2538,7 @@ func TestLocalParse(t *testing.T) {
 
 	signedBlock, err := statelessblock.Build(
 		ids.ID{1},
-		time.Unix(123, 0),
+		upgrade.InitiallyActiveTime,
 		uint64(42),
 		cert,
 		[]byte{1, 2, 3},

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -33,7 +34,7 @@ func main() {
 			continue
 		}
 
-		proposerVMBlock, err := block.Parse(container.Bytes, xChainID)
+		proposerVMBlock, err := block.Parse(container.Bytes, upgrade.Default, xChainID)
 		if err != nil {
 			log.Fatalf("failed to parse proposervm block: %s\n", err)
 		}

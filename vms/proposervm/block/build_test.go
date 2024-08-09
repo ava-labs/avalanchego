@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -20,7 +21,7 @@ func TestBuild(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
-	timestamp := time.Unix(123, 0)
+	timestamp := upgrade.InitiallyActiveTime
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}

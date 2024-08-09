@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 type ParseResult struct {
@@ -17,7 +18,7 @@ type ParseResult struct {
 
 // ParseBlocks parses the given raw blocks into tuples of (Block, error).
 // Each ParseResult is returned in the same order as its corresponding bytes in the input.
-func ParseBlocks(blks [][]byte, chainID ids.ID) []ParseResult {
+func ParseBlocks(blks [][]byte, upgradeConfig upgrade.Config, chainID ids.ID) []ParseResult {
 	results := make([]ParseResult, len(blks))
 
 	var wg sync.WaitGroup
@@ -26,7 +27,7 @@ func ParseBlocks(blks [][]byte, chainID ids.ID) []ParseResult {
 	for i, blk := range blks {
 		go func(i int, blkBytes []byte) {
 			defer wg.Done()
-			results[i].Block, results[i].Err = Parse(blkBytes, chainID)
+			results[i].Block, results[i].Err = Parse(blkBytes, upgradeConfig, chainID)
 		}(i, blk)
 	}
 
@@ -37,8 +38,8 @@ func ParseBlocks(blks [][]byte, chainID ids.ID) []ParseResult {
 
 // Parse a block and verify that the signature attached to the block is valid
 // for the certificate provided in the block.
-func Parse(bytes []byte, chainID ids.ID) (Block, error) {
-	block, err := ParseWithoutVerification(bytes)
+func Parse(bytes []byte, upgradeConfig upgrade.Config, chainID ids.ID) (Block, error) {
+	block, err := ParseWithoutVerification(bytes, upgradeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func Parse(bytes []byte, chainID ids.ID) (Block, error) {
 
 // ParseWithoutVerification parses a block without verifying that the signature
 // on the block is correct.
-func ParseWithoutVerification(bytes []byte) (Block, error) {
+func ParseWithoutVerification(bytes []byte, upgradeConfig upgrade.Config) (Block, error) {
 	var block Block
 	parsedVersion, err := Codec.Unmarshal(bytes, &block)
 	if err != nil {
@@ -56,7 +57,16 @@ func ParseWithoutVerification(bytes []byte) (Block, error) {
 	if parsedVersion > CodecVersion {
 		return nil, fmt.Errorf("expected codec version up to %d but got %d", CodecVersion, parsedVersion)
 	}
-	return block, block.initialize(bytes)
+	if err = block.initialize(bytes); err != nil {
+		return block, err
+	}
+	if statelessBlock, ok := block.(*statelessBlock); ok {
+		if !upgradeConfig.IsEtnaActivated(statelessBlock.Timestamp()) && parsedVersion == CodecVersion {
+			return nil, fmt.Errorf("stateless block encoded using a codec version %d that is not yet enabled", CodecVersion)
+		}
+	}
+
+	return block, nil
 }
 
 func ParseHeader(bytes []byte) (Header, error) {

@@ -594,7 +594,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 
 func TestBatchedParseBlockParallel(t *testing.T) {
 	parentID := ids.ID{1}
-	timestamp := time.Unix(123, 0)
+	timestamp := upgrade.InitiallyActiveTime
 	pChainHeight := uint64(2)
 	chainID := ids.GenerateTestID()
 
