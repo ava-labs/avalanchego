@@ -117,7 +117,7 @@ func TestCalculateVRFOut(t *testing.T) {
 		{"nil input", nil, [32]byte{}},
 		{"empty input", []byte{}, [32]byte{}},
 		{"one byte input", []byte{1}, [32]byte{}},
-		{"three bytes input", []byte{1, 2, 3}, [32]byte}},
+		{"three bytes input", []byte{1, 2, 3}, [32]byte{}},
 		{"70 bytes input", make([]byte, 70), [32]byte{}},
 		{"too long input", make([]byte, bls.SignatureLen+1), [32]byte{}},
 		{"valid empty input", make([]byte, bls.SignatureLen), [32]byte{0xc9, 0x28, 0x64, 0xd4, 0x5a, 0x33, 0xac, 0xd4, 0x42, 0x10, 0xfa, 0x67, 0xda, 0x71, 0x9d, 0xa3, 0x48, 0x2b, 0xf8, 0xab, 0xb0, 0xbc, 0xbb, 0x9e, 0x48, 0x94, 0x4e, 0x2c, 0xd, 0x72, 0xd7, 0x9b}},
