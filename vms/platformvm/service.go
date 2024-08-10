@@ -1836,6 +1836,12 @@ func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *fee.Config) 
 		zap.String("method", "getFeeConfig"),
 	)
 
+	// TODO: Remove after Etna is activated.
+	now := time.Now()
+	if !s.vm.Config.UpgradeConfig.IsEtnaActivated(now) {
+		return nil
+	}
+
 	*reply = s.vm.DynamicFeeConfig
 	return nil
 }
