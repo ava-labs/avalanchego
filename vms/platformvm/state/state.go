@@ -68,6 +68,7 @@ var (
 	DelegatorPrefix               = []byte("delegator")
 	SubnetValidatorPrefix         = []byte("subnetValidator")
 	SubnetDelegatorPrefix         = []byte("subnetDelegator")
+	SubnetOnlyValidatorPrefix     = []byte("subnetOnlyValidator")
 	ValidatorWeightDiffsPrefix    = []byte("flatValidatorDiffs")
 	ValidatorPublicKeyDiffsPrefix = []byte("flatPublicKeyDiffs")
 	TxPrefix                      = []byte("tx")
@@ -233,6 +234,9 @@ type stateBlk struct {
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> potential reward
+ * | | |-. subnetOnlyValidator
+ * | | | '-. list
+ * | | |   '-- validationID -> subnet + nodeID + minNonce + balance + endTime
  * | |-. pending
  * | | |-. validator
  * | | | '-. list
@@ -267,6 +271,8 @@ type stateBlk struct {
  * |   '-- txID -> nil
  * |-. subnetOwners
  * | '-. subnetID -> owner
+ * |-. subnetManagers
+ * | '-. subnetID -> manager
  * |-. chains
  * | '-. subnetID
  * |   '-. list
@@ -291,8 +297,9 @@ type state struct {
 
 	baseDB *versiondb.Database
 
-	currentStakers *baseStakers
-	pendingStakers *baseStakers
+	currentStakers       *baseStakers
+	pendingStakers       *baseStakers
+	subnetOnlyValidators *subnetOnlyValidators
 
 	currentHeight uint64
 
@@ -304,25 +311,26 @@ type state struct {
 	blockCache  cache.Cacher[ids.ID, block.Block] // cache of blockID -> Block; if the entry is nil, it is not in the database
 	blockDB     database.Database
 
-	validatorsDB                 database.Database
-	currentValidatorsDB          database.Database
-	currentValidatorBaseDB       database.Database
-	currentValidatorList         linkeddb.LinkedDB
-	currentDelegatorBaseDB       database.Database
-	currentDelegatorList         linkeddb.LinkedDB
-	currentSubnetValidatorBaseDB database.Database
-	currentSubnetValidatorList   linkeddb.LinkedDB
-	currentSubnetDelegatorBaseDB database.Database
-	currentSubnetDelegatorList   linkeddb.LinkedDB
-	pendingValidatorsDB          database.Database
-	pendingValidatorBaseDB       database.Database
-	pendingValidatorList         linkeddb.LinkedDB
-	pendingDelegatorBaseDB       database.Database
-	pendingDelegatorList         linkeddb.LinkedDB
-	pendingSubnetValidatorBaseDB database.Database
-	pendingSubnetValidatorList   linkeddb.LinkedDB
-	pendingSubnetDelegatorBaseDB database.Database
-	pendingSubnetDelegatorList   linkeddb.LinkedDB
+	validatorsDB                     database.Database
+	currentValidatorsDB              database.Database
+	currentValidatorBaseDB           database.Database
+	currentValidatorList             linkeddb.LinkedDB
+	currentDelegatorBaseDB           database.Database
+	currentDelegatorList             linkeddb.LinkedDB
+	currentSubnetValidatorBaseDB     database.Database
+	currentSubnetValidatorList       linkeddb.LinkedDB
+	currentSubnetDelegatorBaseDB     database.Database
+	currentSubnetDelegatorList       linkeddb.LinkedDB
+	currentSubnetOnlyValidatorBaseDB database.Database
+	pendingValidatorsDB              database.Database
+	pendingValidatorBaseDB           database.Database
+	pendingValidatorList             linkeddb.LinkedDB
+	pendingDelegatorBaseDB           database.Database
+	pendingDelegatorList             linkeddb.LinkedDB
+	pendingSubnetValidatorBaseDB     database.Database
+	pendingSubnetValidatorList       linkeddb.LinkedDB
+	pendingSubnetDelegatorBaseDB     database.Database
+	pendingSubnetDelegatorList       linkeddb.LinkedDB
 
 	validatorWeightDiffsDB    database.Database
 	validatorPublicKeyDiffsDB database.Database
@@ -517,6 +525,7 @@ func newState(
 	currentDelegatorBaseDB := prefixdb.New(DelegatorPrefix, currentValidatorsDB)
 	currentSubnetValidatorBaseDB := prefixdb.New(SubnetValidatorPrefix, currentValidatorsDB)
 	currentSubnetDelegatorBaseDB := prefixdb.New(SubnetDelegatorPrefix, currentValidatorsDB)
+	currentSubnetOnlyValidatorBaseDB := prefixdb.New(SubnetOnlyValidatorPrefix, currentValidatorsDB)
 
 	pendingValidatorsDB := prefixdb.New(PendingPrefix, validatorsDB)
 	pendingValidatorBaseDB := prefixdb.New(ValidatorPrefix, pendingValidatorsDB)
@@ -634,28 +643,40 @@ func newState(
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
+		subnetOnlyValidators: newSubnetOnlyValidators(
+			&fee.ValidatorState{
+				Current:  0,
+				Target:   10_000,
+				Capacity: 20_000,
+				Excess:   0,
+				MinFee:   2048,
+				K:        60_480_000_000,
+			},
+			linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
+		),
 
-		validatorsDB:                 validatorsDB,
-		currentValidatorsDB:          currentValidatorsDB,
-		currentValidatorBaseDB:       currentValidatorBaseDB,
-		currentValidatorList:         linkeddb.NewDefault(currentValidatorBaseDB),
-		currentDelegatorBaseDB:       currentDelegatorBaseDB,
-		currentDelegatorList:         linkeddb.NewDefault(currentDelegatorBaseDB),
-		currentSubnetValidatorBaseDB: currentSubnetValidatorBaseDB,
-		currentSubnetValidatorList:   linkeddb.NewDefault(currentSubnetValidatorBaseDB),
-		currentSubnetDelegatorBaseDB: currentSubnetDelegatorBaseDB,
-		currentSubnetDelegatorList:   linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
-		pendingValidatorsDB:          pendingValidatorsDB,
-		pendingValidatorBaseDB:       pendingValidatorBaseDB,
-		pendingValidatorList:         linkeddb.NewDefault(pendingValidatorBaseDB),
-		pendingDelegatorBaseDB:       pendingDelegatorBaseDB,
-		pendingDelegatorList:         linkeddb.NewDefault(pendingDelegatorBaseDB),
-		pendingSubnetValidatorBaseDB: pendingSubnetValidatorBaseDB,
-		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
-		pendingSubnetDelegatorBaseDB: pendingSubnetDelegatorBaseDB,
-		pendingSubnetDelegatorList:   linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
-		validatorWeightDiffsDB:       validatorWeightDiffsDB,
-		validatorPublicKeyDiffsDB:    validatorPublicKeyDiffsDB,
+		validatorsDB:                     validatorsDB,
+		currentValidatorsDB:              currentValidatorsDB,
+		currentValidatorBaseDB:           currentValidatorBaseDB,
+		currentValidatorList:             linkeddb.NewDefault(currentValidatorBaseDB),
+		currentDelegatorBaseDB:           currentDelegatorBaseDB,
+		currentDelegatorList:             linkeddb.NewDefault(currentDelegatorBaseDB),
+		currentSubnetValidatorBaseDB:     currentSubnetValidatorBaseDB,
+		currentSubnetValidatorList:       linkeddb.NewDefault(currentSubnetValidatorBaseDB),
+		currentSubnetDelegatorBaseDB:     currentSubnetDelegatorBaseDB,
+		currentSubnetDelegatorList:       linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
+		currentSubnetOnlyValidatorBaseDB: currentSubnetOnlyValidatorBaseDB,
+		pendingValidatorsDB:              pendingValidatorsDB,
+		pendingValidatorBaseDB:           pendingValidatorBaseDB,
+		pendingValidatorList:             linkeddb.NewDefault(pendingValidatorBaseDB),
+		pendingDelegatorBaseDB:           pendingDelegatorBaseDB,
+		pendingDelegatorList:             linkeddb.NewDefault(pendingDelegatorBaseDB),
+		pendingSubnetValidatorBaseDB:     pendingSubnetValidatorBaseDB,
+		pendingSubnetValidatorList:       linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
+		pendingSubnetDelegatorBaseDB:     pendingSubnetDelegatorBaseDB,
+		pendingSubnetDelegatorList:       linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
+		validatorWeightDiffsDB:           validatorWeightDiffsDB,
+		validatorPublicKeyDiffsDB:        validatorPublicKeyDiffsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
 		txDB:     prefixdb.New(TxPrefix, baseDB),
@@ -1720,6 +1741,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
+		s.subnetOnlyValidators.Write(),
 		s.writeMetadata(),
 	)
 }
@@ -1733,6 +1755,7 @@ func (s *state) Close() error {
 		s.pendingValidatorsDB.Close(),
 		s.currentSubnetValidatorBaseDB.Close(),
 		s.currentSubnetDelegatorBaseDB.Close(),
+		s.currentSubnetOnlyValidatorBaseDB.Close(),
 		s.currentDelegatorBaseDB.Close(),
 		s.currentValidatorBaseDB.Close(),
 		s.currentValidatorsDB.Close(),

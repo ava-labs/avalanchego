@@ -1,0 +1,279 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package state
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"math"
+
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/heap"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+)
+
+var (
+	_ SubnetOnlyValidators = (*subnetOnlyValidators)(nil)
+
+	ErrAlreadyValidator  = errors.New("already a validator")
+	ErrValidatorNotFound = errors.New("validator not found")
+	ErrNonZeroWeight     = errors.New("weight must be 0 when minNonce is MaxUint64")
+)
+
+type SubnetOnlyValidators interface {
+	AddValidator(
+		validationID ids.ID,
+		subnetID ids.ID,
+		nodeID ids.NodeID,
+		weight uint64,
+		balance uint64,
+		endTime uint64,
+	) error
+
+	ExitValidator(validationID ids.ID) (uint64, error)
+
+	SetValidatorWeight(validationID ids.ID, newWeight uint64, newNonce uint64) (uint64, error)
+
+	IncreaseValidatorBalance(validationID ids.ID, toAdd uint64) error
+
+	AdvanceTime(duration uint64, maxToRemove int) ([]ids.ID, bool)
+
+	Prune(maxToRemove int) ([]ids.ID, bool)
+}
+
+type subnetOnlyValidator struct {
+	ValidationID ids.ID
+	SubnetID     ids.ID     `serialize:"true"`
+	NodeID       ids.NodeID `serialize:"true"`
+	MinNonce     uint64     `serialize:"true"`
+	Weight       uint64     `serialize:"true"`
+	Balance      uint64     `serialize:"true"`
+
+	// If non-zero, this validator was added via an [Owner] key.
+	EndTime uint64 `serialize:"true"`
+}
+
+// A *subnetOnlyValidator is considered to be less than another *subnetOnlyValidator when:
+//
+//  1. If its Balance is less than the other's.
+//  2. If the Balances are the same, the one with the lesser NodeID is the
+//     lesser one.
+func (v *subnetOnlyValidator) Less(than *subnetOnlyValidator) bool {
+	if v.Balance < than.Balance {
+		return true
+	}
+
+	if than.Balance < v.Balance {
+		return false
+	}
+
+	return bytes.Compare(v.ValidationID[:], than.ValidationID[:]) == -1
+}
+
+type subnetOnlyValidators struct {
+	aggregatedBalance uint64
+	calculator        *fee.ValidatorState
+
+	validators heap.Map[ids.ID, *subnetOnlyValidator] // validationID -> *subnetOnlyValidator
+
+	// validationID -> added for that validator since the last db write
+	validatorDiffs map[ids.ID]bool
+	validatorDB    linkeddb.LinkedDB
+}
+
+func newSubnetOnlyValidators(calculator *fee.ValidatorState, validatorDB linkeddb.LinkedDB) *subnetOnlyValidators {
+	return &subnetOnlyValidators{
+		aggregatedBalance: 0,
+		calculator:        calculator,
+
+		validators:     heap.NewMap[ids.ID, *subnetOnlyValidator]((*subnetOnlyValidator).Less),
+		validatorDiffs: make(map[ids.ID]bool),
+		validatorDB:    validatorDB,
+	}
+}
+
+func (s *subnetOnlyValidators) AddValidator(
+	validationID ids.ID,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	weight uint64,
+	balance uint64,
+	endTime uint64,
+) error {
+	if s.validators.Contains(validationID) {
+		return ErrAlreadyValidator
+	}
+
+	s.validators.Push(validationID, &subnetOnlyValidator{
+		ValidationID: validationID,
+		SubnetID:     subnetID,
+		NodeID:       nodeID,
+		MinNonce:     0,
+		Weight:       weight,
+		Balance:      s.aggregatedBalance + balance,
+
+		EndTime: endTime,
+	})
+
+	s.validatorDiffs[validationID] = true
+	s.calculator.Current += 1
+	return nil
+}
+
+func (s *subnetOnlyValidators) ExitValidator(validationID ids.ID) (uint64, error) {
+	vdr, ok := s.validators.Remove(validationID)
+	if !ok {
+		return 0, ErrValidatorNotFound
+	}
+
+	// Note: s.validatorDiffs is not updated here as the validator is only
+	// purged when its weight is set to 0 via SetValidatorWeight()
+	s.calculator.Current -= 1
+
+	toRefund := vdr.Balance - s.aggregatedBalance
+	return toRefund, nil
+}
+
+func (s *subnetOnlyValidators) SetValidatorWeight(validationID ids.ID, newWeight uint64, newNonce uint64) (uint64, error) {
+	vdr, ok := s.validators.Get(validationID)
+	if !ok {
+		return 0, ErrValidatorNotFound
+	}
+
+	// Silently drop stale modifications.
+	if vdr.MinNonce <= newNonce {
+		return 0, nil
+	}
+
+	if vdr.MinNonce == math.MaxUint64 && newWeight != 0 {
+		return 0, ErrNonZeroWeight
+	}
+
+	if newWeight == 0 {
+		s.validators.Remove(validationID)
+
+		s.validatorDiffs[validationID] = false
+		s.calculator.Current -= 1
+
+		toRefund := vdr.Balance - s.aggregatedBalance
+		return toRefund, nil
+	}
+
+	vdr.Weight = newWeight
+	vdr.MinNonce = newNonce + 1
+	return 0, nil
+}
+
+func (s *subnetOnlyValidators) IncreaseValidatorBalance(validationID ids.ID, toAdd uint64) error {
+	vdr, ok := s.validators.Get(validationID)
+	if ok {
+		vdr.Balance += toAdd
+		s.validators.Fix(validationID)
+
+		return nil
+	}
+
+	vdr, err := getSubnetOnlyValidator(s.validatorDB, validationID)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrValidatorNotFound, err)
+	}
+
+	vdr.Balance = s.aggregatedBalance + toAdd
+	s.validators.Push(validationID, vdr)
+
+	s.validatorDiffs[validationID] = true
+	s.calculator.Current += 1
+
+	return nil
+}
+
+func (s *subnetOnlyValidators) AdvanceTime(duration uint64, maxToRemove int) ([]ids.ID, bool) {
+	fee := s.calculator.CalculateContinuousFee(duration)
+	s.aggregatedBalance += fee
+
+	return s.Prune(maxToRemove)
+}
+
+func (s *subnetOnlyValidators) Prune(maxToRemove int) ([]ids.ID, bool) {
+	removed := []ids.ID{}
+	for {
+		if len(removed) == maxToRemove {
+			break
+		}
+
+		validationID, vdr, ok := s.validators.Peek()
+		if !ok {
+			break
+		}
+
+		if vdr.Balance > s.aggregatedBalance {
+			break
+		}
+
+		s.validators.Pop()
+		removed = append(removed, validationID)
+	}
+
+	_, vdr, ok := s.validators.Peek()
+	moreToRemove := false
+	if ok {
+		moreToRemove = vdr.Balance <= s.aggregatedBalance
+	}
+
+	return removed, moreToRemove
+}
+
+func (s *subnetOnlyValidators) Write() error {
+	for validationID, added := range s.validatorDiffs {
+		delete(s.validatorDiffs, validationID)
+
+		if !added {
+			if err := deleteSubnetOnlyValidator(s.validatorDB, validationID); err != nil {
+				return fmt.Errorf("failed to delete subnet only validator: %w", err)
+			}
+
+			continue
+		}
+
+		vdr, ok := s.validators.Get(validationID)
+		if !ok {
+			return fmt.Errorf("failed to get subnet only validator: %s", validationID)
+		}
+
+		if err := putSubnetOnlyValidator(s.validatorDB, vdr); err != nil {
+			return fmt.Errorf("failed to write subnet only validator: %w", err)
+		}
+	}
+	return nil
+}
+
+func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (*subnetOnlyValidator, error) {
+	vdrBytes, err := db.Get(validationID[:])
+	if err != nil {
+		return nil, err
+	}
+
+	var vdr subnetOnlyValidator
+	if _, err = block.GenesisCodec.Unmarshal(vdrBytes, &vdr); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal subnet only validator: %w", err)
+	}
+	return &vdr, err
+}
+
+func putSubnetOnlyValidator(db database.KeyValueWriter, vdr *subnetOnlyValidator) error {
+	vdrBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, vdr)
+	if err != nil {
+		return err
+	}
+
+	return db.Put(vdr.ValidationID[:], vdrBytes)
+}
+
+func deleteSubnetOnlyValidator(db database.KeyValueDeleter, validationID ids.ID) error {
+	return db.Delete(validationID[:])
+}
