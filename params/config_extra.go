@@ -127,7 +127,7 @@ func (c *ChainConfig) ToWithUpgradesJSON() *ChainConfigWithUpgradesJSON {
 // code in place of their Ethereum counterparts. The original Ethereum names
 // should be restored for maintainability.
 func (c *ChainConfig) SetEthUpgrades() {
-	if c.EUpgradeTime != nil {
-		c.CancunTime = utils.NewUint64(*c.EUpgradeTime)
+	if c.EtnaTime != nil {
+		c.CancunTime = utils.NewUint64(*c.EtnaTime)
 	}
 }

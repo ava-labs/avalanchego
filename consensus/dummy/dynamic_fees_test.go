@@ -539,14 +539,14 @@ func TestCalcBlockGasCost(t *testing.T) {
 	}
 }
 
-func TestDynamicFeesEUpgrade(t *testing.T) {
+func TestDynamicFeesEtna(t *testing.T) {
 	require := require.New(t)
 	header := &types.Header{
 		Number: big.NewInt(0),
 	}
 
 	timestamp := uint64(1)
-	extra, nextBaseFee, err := CalcBaseFee(params.TestEUpgradeChainConfig, header, timestamp)
+	extra, nextBaseFee, err := CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
 	// Genesis matches the initial base fee
 	require.Equal(params.ApricotPhase3InitialBaseFee, nextBaseFee.Int64())
@@ -558,9 +558,9 @@ func TestDynamicFeesEUpgrade(t *testing.T) {
 		BaseFee: nextBaseFee,
 		Extra:   extra,
 	}
-	_, nextBaseFee, err = CalcBaseFee(params.TestEUpgradeChainConfig, header, timestamp)
+	_, nextBaseFee, err = CalcBaseFee(params.TestEtnaChainConfig, header, timestamp)
 	require.NoError(err)
-	// After some time has passed in the EUpgrade phase, the base fee should drop
+	// After some time has passed in the Etna phase, the base fee should drop
 	// lower than the prior base fee minimum.
 	require.Less(nextBaseFee.Int64(), params.ApricotPhase4MinBaseFee)
 }
