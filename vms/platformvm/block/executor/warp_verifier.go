@@ -10,16 +10,20 @@ import (
 
 var _ block.Visitor = (*warpVerifier)(nil)
 
-// warpVerifier handles the logic for verifying the warp signatures in P-Chain txs.
+// warpVerifier handles the logic for verifying the signatures in the warp
+// messages contained in transactions.
 type warpVerifier struct{}
 
-func (*warpVerifier) BanffAbortBlock(*block.BanffAbortBlock) error           { return nil }
-func (*warpVerifier) BanffCommitBlock(*block.BanffCommitBlock) error         { return nil }
+// Pre-Banff did not contain any transactions with warp messages.
 func (*warpVerifier) ApricotAbortBlock(*block.ApricotAbortBlock) error       { return nil }
 func (*warpVerifier) ApricotCommitBlock(*block.ApricotCommitBlock) error     { return nil }
 func (*warpVerifier) ApricotProposalBlock(*block.ApricotProposalBlock) error { return nil }
 func (*warpVerifier) ApricotStandardBlock(*block.ApricotStandardBlock) error { return nil }
 func (*warpVerifier) ApricotAtomicBlock(*block.ApricotAtomicBlock) error     { return nil }
+
+// No transactions in these blocks.
+func (*warpVerifier) BanffAbortBlock(*block.BanffAbortBlock) error   { return nil }
+func (*warpVerifier) BanffCommitBlock(*block.BanffCommitBlock) error { return nil }
 
 func (v *warpVerifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	return v.verifyStandardTxs(b.Transactions)
