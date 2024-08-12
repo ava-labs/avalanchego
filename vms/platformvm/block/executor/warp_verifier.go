@@ -65,6 +65,7 @@ func (*warpTxVerifier) TransformSubnetTx(*txs.TransformSubnetTx) error          
 func (*warpTxVerifier) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	return nil
 }
+
 func (*warpTxVerifier) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return nil
 }
