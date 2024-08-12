@@ -26,7 +26,7 @@ RUN [ -d ./build ] && rm -rf ./build/* || true
 ARG SUBNET_EVM_COMMIT
 ARG CURRENT_BRANCH
 
-RUN export SUBNET_EVM_COMMIT=$SUBNET_EVM_COMMIT && export CURRENT_BRANCH=$CURRENT_BRANCH && ./scripts/build.sh
+RUN export SUBNET_EVM_COMMIT=$SUBNET_EVM_COMMIT && export CURRENT_BRANCH=$CURRENT_BRANCH && ./scripts/build.sh build/subnet-evm
 
 # ============= Cleanup Stage ================
 FROM avaplatform/avalanchego:$AVALANCHE_VERSION AS builtImage
