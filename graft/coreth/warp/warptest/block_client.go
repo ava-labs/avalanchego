@@ -1,8 +1,6 @@
 // (c) 2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
 // warptest exposes common functionality for testing the warp package.
 package warptest
 
