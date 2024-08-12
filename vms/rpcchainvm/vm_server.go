@@ -113,8 +113,9 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
-	networkUpgrades := upgrade.Config{}
-	if err := json.Unmarshal(req.NetworkUpgradesBytes, &networkUpgrades); err != nil {
+
+	networkUpgrades, err := convertNetworkUpgrades(req.NetworkUpgrades)
+	if err != nil {
 		return nil, err
 	}
 
@@ -849,4 +850,77 @@ func (vm *VMServer) StateSummaryAccept(
 		Mode: vmpb.StateSummaryAcceptResponse_Mode(mode),
 		Err:  errorToErrEnum[err],
 	}, errorToRPCError(err)
+}
+
+func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, error) {
+	ap1, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_1Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap2, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_2Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap3, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_3Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap4, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_4Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap5, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_5Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	apPre6, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhasePre_6Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap6, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_6Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	apPost6, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhasePost_6Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	banff, err := grpcutils.TimestampAsTime(pbUpgrades.BanffTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	cortina, err := grpcutils.TimestampAsTime(pbUpgrades.CortinaTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	durango, err := grpcutils.TimestampAsTime(pbUpgrades.DurangoTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	etna, err := grpcutils.TimestampAsTime(pbUpgrades.EtnaTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+
+	cortinaXChainStopVertexID, err := ids.ToID(pbUpgrades.CortinaXChainStopVertexId)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+
+	return upgrade.Config{
+		ApricotPhase1Time:            ap1,
+		ApricotPhase2Time:            ap2,
+		ApricotPhase3Time:            ap3,
+		ApricotPhase4Time:            ap4,
+		ApricotPhase4MinPChainHeight: pbUpgrades.ApricotPhase_4MinPChainHeight,
+		ApricotPhase5Time:            ap5,
+		ApricotPhasePre6Time:         apPre6,
+		ApricotPhase6Time:            ap6,
+		ApricotPhasePost6Time:        apPost6,
+		BanffTime:                    banff,
+		CortinaTime:                  cortina,
+		CortinaXChainStopVertexID:    cortinaXChainStopVertexID,
+		DurangoTime:                  durango,
+		EtnaTime:                     etna,
+	}, nil
 }
