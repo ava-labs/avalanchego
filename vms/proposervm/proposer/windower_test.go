@@ -58,7 +58,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		nonValidatorID = ids.GenerateTestNodeID()
 	)
 
-	vdrState := &validatorstest.TestState{
+	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -445,13 +445,13 @@ func TestProposerDistribution(t *testing.T) {
 	require.Less(maxSTDDeviation, 3.)
 }
 
-func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validatorstest.TestState) {
+func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validatorstest.State) {
 	validatorIDs := make([]ids.NodeID, count)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
 	}
 
-	vdrState := &validatorstest.TestState{
+	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, MaxVerifyWindows)

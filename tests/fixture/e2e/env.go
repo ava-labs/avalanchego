@@ -110,6 +110,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				tc.Outf("No network to stop\n")
 			}
 			os.Exit(0)
+		} else if network != nil && flagVars.RestartNetwork() {
+			// A network is only restarted if it is already running and stop was not requested
+			require.NoError(network.Restart(tc.DefaultContext(), tc.GetWriter()))
 		}
 	}
 

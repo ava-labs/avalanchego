@@ -12,10 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var _ common.Timer = (*TimerTest)(nil)
+var _ common.Timer = (*Timer)(nil)
 
-// TimerTest is a test timer
-type TimerTest struct {
+// Timer is a test timer
+type Timer struct {
 	T *testing.T
 
 	CantRegisterTimout bool
@@ -24,11 +24,11 @@ type TimerTest struct {
 }
 
 // Default set the default callable value to [cant]
-func (t *TimerTest) Default(cant bool) {
+func (t *Timer) Default(cant bool) {
 	t.CantRegisterTimout = cant
 }
 
-func (t *TimerTest) RegisterTimeout(delay time.Duration) {
+func (t *Timer) RegisterTimeout(delay time.Duration) {
 	if t.RegisterTimeoutF != nil {
 		t.RegisterTimeoutF(delay)
 	} else if t.CantRegisterTimout && t.T != nil {

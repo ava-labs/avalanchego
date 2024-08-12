@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	_ block.StateSyncableVM = (*TestStateSyncableVM)(nil)
+	_ block.StateSyncableVM = (*StateSyncableVM)(nil)
 
 	errStateSyncEnabled           = errors.New("unexpectedly called StateSyncEnabled")
 	errStateSyncGetOngoingSummary = errors.New("unexpectedly called StateSyncGetOngoingSummary")
@@ -23,7 +23,7 @@ var (
 	errGetStateSummary            = errors.New("unexpectedly called GetStateSummary")
 )
 
-type TestStateSyncableVM struct {
+type StateSyncableVM struct {
 	T *testing.T
 
 	CantStateSyncEnabled,
@@ -39,7 +39,7 @@ type TestStateSyncableVM struct {
 	GetStateSummaryF            func(ctx context.Context, summaryHeight uint64) (block.StateSummary, error)
 }
 
-func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
+func (vm *StateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 	if vm.StateSyncEnabledF != nil {
 		return vm.StateSyncEnabledF(ctx)
 	}
@@ -49,7 +49,7 @@ func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, erro
 	return false, errStateSyncEnabled
 }
 
-func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
+func (vm *StateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateSummary, error) {
 	if vm.GetOngoingSyncStateSummaryF != nil {
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
@@ -59,7 +59,7 @@ func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (
 	return nil, errStateSyncGetOngoingSummary
 }
 
-func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (block.StateSummary, error) {
+func (vm *StateSyncableVM) GetLastStateSummary(ctx context.Context) (block.StateSummary, error) {
 	if vm.GetLastStateSummaryF != nil {
 		return vm.GetLastStateSummaryF(ctx)
 	}
@@ -69,7 +69,7 @@ func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (block.S
 	return nil, errGetLastStateSummary
 }
 
-func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
+func (vm *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	if vm.ParseStateSummaryF != nil {
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
@@ -79,7 +79,7 @@ func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryByt
 	return nil, errParseStateSummary
 }
 
-func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
+func (vm *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
 	if vm.GetStateSummaryF != nil {
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}

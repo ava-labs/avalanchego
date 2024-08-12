@@ -179,7 +179,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				logging.NoLog{},
 				ids.EmptyNodeID,
 				ids.Empty,
-				&validatorstest.TestState{
+				&validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},
@@ -273,7 +273,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 				logging.NoLog{},
 				ids.EmptyNodeID,
 				ids.Empty,
-				&validatorstest.TestState{
+				&validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},

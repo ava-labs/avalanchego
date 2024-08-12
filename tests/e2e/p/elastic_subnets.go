@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -24,7 +25,7 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
-var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
+var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
@@ -33,6 +34,17 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			env := e2e.GetEnv(tc)
 
 			nodeURI := env.GetRandomNodeURI()
+
+			infoClient := info.NewClient(nodeURI.URI)
+
+			tc.By("get upgrade config")
+			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
+			now := time.Now()
+			if upgrades.IsEtnaActivated(now) {
+				ginkgo.Skip("Etna is activated. Elastic Subnets are disabled post-Etna, skipping test.")
+			}
 
 			keychain := env.NewKeychain(1)
 			baseWallet := e2e.NewWallet(tc, keychain, nodeURI)

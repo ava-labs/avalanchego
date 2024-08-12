@@ -9,7 +9,7 @@ FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 FROM golang:$GO_VERSION-bullseye
 
 WORKDIR /build
-# Copy and download avalanche dependencies using go mod
+# Copy and download dependencies using go mod
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
@@ -28,19 +28,19 @@ COPY --from=instrumentor /opt/antithesis /opt/antithesis
 COPY --from=instrumentor /opt/antithesis/lib /lib
 
 # Create the destination output directory for the instrumented code
-RUN mkdir -p /avalanchego_instrumented
+RUN mkdir -p /instrumented
 
 # Park the .git file in a safe location
 RUN mkdir -p /opt/tmp/
 RUN cp -r .git /opt/tmp/
 
-# Instrument avalanchego
+# Instrument the code
 RUN /opt/antithesis/bin/goinstrumentor \
     -stderrthreshold=INFO \
     -antithesis /opt/antithesis/instrumentation \
     . \
-    /avalanchego_instrumented
+    /instrumented
 
-WORKDIR /avalanchego_instrumented/customer
+WORKDIR /instrumented/customer
 RUN go mod download
 RUN ln -s /opt/tmp/.git .git

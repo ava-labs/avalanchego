@@ -120,7 +120,7 @@ type test struct {
 type environment struct {
 	blkManager Manager
 	mempool    mempool.Mempool
-	sender     *enginetest.SenderTest
+	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -192,7 +192,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f fork) *environment 
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &enginetest.SenderTest{T: t}
+	res.sender = &enginetest.Sender{T: t}
 
 	metrics := metrics.Noop
 

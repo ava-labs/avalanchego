@@ -97,14 +97,14 @@ func TestHealthCheckSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
-			bootstrapper := &enginetest.BootstrapperTest{
-				EngineTest: enginetest.EngineTest{
+			bootstrapper := &enginetest.Bootstrapper{
+				Engine: enginetest.Engine{
 					T: t,
 				},
 			}
 			bootstrapper.Default(false)
 
-			engine := &enginetest.EngineTest{T: t}
+			engine := &enginetest.Engine{T: t}
 			engine.Default(false)
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx

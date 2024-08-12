@@ -30,13 +30,13 @@ func TestInterface(t *testing.T) {
 		{
 			description: "sized cache LRU",
 			setup: func(size int) cache.Cacher[ids.ID, int64] {
-				return cache.NewSizedLRU[ids.ID, int64](size*cachetest.TestIntSize, cachetest.TestIntSizeFunc)
+				return cache.NewSizedLRU[ids.ID, int64](size*cachetest.IntSize, cachetest.IntSizeFunc)
 			},
 		},
 	}
 
 	for _, scenario := range scenarios {
-		for _, test := range cachetest.CacherTests {
+		for _, test := range cachetest.Tests {
 			baseCache := scenario.setup(test.Size)
 			c, err := New("", prometheus.NewRegistry(), baseCache)
 			require.NoError(t, err)

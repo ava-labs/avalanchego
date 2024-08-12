@@ -65,7 +65,7 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 	}
 }
 
-func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *enginetest.SenderTest, *blocktest.TestVM, *Engine) {
+func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *enginetest.Sender, *blocktest.VM, *Engine) {
 	require := require.New(t)
 
 	vdr := ids.GenerateTestNodeID()
@@ -73,11 +73,11 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *engine
 	require.NoError(config.ConnectedValidators.Connected(context.Background(), vdr, version.CurrentApp))
 	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, config.ConnectedValidators)
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	config.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	config.VM = vm
 
@@ -327,11 +327,11 @@ func TestEngineMultipleQuery(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -651,11 +651,11 @@ func TestVoteCanceling(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr2, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -720,11 +720,11 @@ func TestEngineNoQuery(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
@@ -760,11 +760,11 @@ func TestEngineNoRepollQuery(t *testing.T) {
 
 	engCfg := DefaultConfig(t)
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{snowmantest.Genesis},
@@ -1401,11 +1401,11 @@ func TestEngineAggressivePolling(t *testing.T) {
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1488,12 +1488,12 @@ func TestEngineDoubleChit(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -1575,11 +1575,11 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2159,12 +2159,12 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2253,12 +2253,12 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 	vals := validators.NewManager()
 	engCfg.Validators = vals
 
-	sender := &enginetest.SenderTest{T: t}
+	sender := &enginetest.Sender{T: t}
 	engCfg.Sender = sender
 
 	sender.Default(true)
 
-	vm := &blocktest.TestVM{}
+	vm := &blocktest.VM{}
 	vm.T = t
 	engCfg.VM = vm
 
@@ -2392,7 +2392,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID1, nil, ids.Empty, 1))
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID2, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{
+	sender := &enginetest.Sender{
 		T:          t,
 		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
 	}
@@ -2402,8 +2402,8 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	acceptedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
 	rejectedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
 
-	vm := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+	vm := &blocktest.VM{
+		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -2612,7 +2612,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{
+	sender := &enginetest.Sender{
 		T:          t,
 		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
 	}
@@ -2620,8 +2620,8 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 	config.Sender = sender
 
 	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
-	vm := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+	vm := &blocktest.VM{
+		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(
 				context.Context,
@@ -2757,7 +2757,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, nodeID, nil, ids.Empty, 1))
 
-	sender := &enginetest.SenderTest{
+	sender := &enginetest.Sender{
 		T:          t,
 		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
 	}
@@ -2770,8 +2770,8 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 	)
 	rejectedChain[1].VerifyV = errInvalid
 
-	vm := &blocktest.TestVM{
-		TestVM: enginetest.TestVM{
+	vm := &blocktest.VM{
+		VM: enginetest.VM{
 			T: t,
 			InitializeF: func(
 				context.Context,
