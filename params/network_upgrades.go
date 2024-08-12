@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
@@ -143,10 +143,11 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 // getDefaultNetworkUpgrades returns the network upgrades for the specified network ID.
 // These should not return nil values.
 func getDefaultNetworkUpgrades(networkID uint32) NetworkUpgrades {
+	agoUpgrade := upgrade.GetConfig(networkID)
 	return NetworkUpgrades{
 		SubnetEVMTimestamp: utils.NewUint64(0),
-		DurangoTimestamp:   utils.TimeToNewUint64(version.GetDurangoTime(networkID)),
-		EUpgradeTimestamp:  utils.TimeToNewUint64(version.GetEUpgradeTime(networkID)),
+		DurangoTimestamp:   utils.TimeToNewUint64(agoUpgrade.DurangoTime),
+		EUpgradeTimestamp:  utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 	}
 }
 

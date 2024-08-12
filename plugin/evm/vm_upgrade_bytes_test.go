@@ -14,7 +14,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
@@ -32,7 +33,7 @@ import (
 )
 
 var (
-	DefaultEUpgradeTime = uint64(version.GetEUpgradeTime(testNetworkID).Unix())
+	DefaultEUpgradeTime = uint64(upgrade.GetConfig(testNetworkID).EtnaTime.Unix())
 )
 
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
@@ -183,7 +184,7 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 
 	vm := &VM{}
 	ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, string(genesisBytes))
-	appSender := &commonEng.SenderTest{T: t}
+	appSender := &enginetest.Sender{T: t}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 	err = vm.Initialize(
@@ -212,7 +213,7 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 	require.False(t, vm.chainConfig.IsSubnetEVM(0))
 	require.True(t, vm.chainConfig.IsSubnetEVM(2))
 	require.False(t, vm.chainConfig.IsDurango(0))
-	require.False(t, vm.chainConfig.IsDurango(uint64(version.DefaultUpgradeTime.Unix())))
+	require.False(t, vm.chainConfig.IsDurango(uint64(params.DefaultGenesisTime.Unix())))
 	require.True(t, vm.chainConfig.IsDurango(1607144402))
 }
 

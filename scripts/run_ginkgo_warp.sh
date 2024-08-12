@@ -27,4 +27,4 @@ if [[ -n "${AVALANCHEGO_BUILD_PATH}" ]]; then
   echo "Running with extra args:" "${EXTRA_ARGS[@]}"
 fi
 
-ginkgo -tags=test -vv --label-filter="${GINKGO_LABEL_FILTER:-}" ./tests/warp -- "${EXTRA_ARGS[@]}"
+ginkgo -vv --label-filter="${GINKGO_LABEL_FILTER:-}" ./tests/warp -- "${EXTRA_ARGS[@]}"

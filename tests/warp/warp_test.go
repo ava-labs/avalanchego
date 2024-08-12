@@ -91,9 +91,11 @@ func TestE2E(t *testing.T) {
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
+	tc := e2e.NewTestContext()
 	nodes := utils.NewTmpnetNodes(tmpnet.DefaultNodeCount)
 
 	env := e2e.NewTestEnvironment(
+		tc,
 		flagVars,
 		utils.NewTmpnetNetwork(
 			"subnet-evm-warp-e2e",
@@ -109,13 +111,14 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run in every ginkgo process
 
 	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
 
 	// Initialize the local test environment from the global state
 	if len(envBytes) > 0 {
-		e2e.InitSharedTestEnvironment(envBytes)
+		e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
 	}
 
-	network := e2e.Env.GetNetwork()
+	network := e2e.GetEnv(tc).GetNetwork()
 
 	// By default all nodes are validating all subnets
 	validatorURIs := make([]string, len(network.Nodes))
@@ -142,7 +145,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	}
 
 	infoClient := info.NewClient(network.Nodes[0].URI)
-	cChainBlockchainID, err := infoClient.GetBlockchainID(e2e.DefaultContext(), "C")
+	cChainBlockchainID, err := infoClient.GetBlockchainID(tc.DefaultContext(), "C")
 	require.NoError(err)
 
 	cChainSubnetDetails = &Subnet{
@@ -155,7 +158,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 var _ = ginkgo.Describe("[Warp]", func() {
 	testFunc := func(sendingSubnet *Subnet, receivingSubnet *Subnet) {
-		w := newWarpTest(e2e.DefaultContext(), sendingSubnet, receivingSubnet)
+		tc := e2e.NewTestContext()
+		w := newWarpTest(tc.DefaultContext(), sendingSubnet, receivingSubnet)
 
 		log.Info("Sending message from A to B")
 		w.sendMessageFromSendingSubnet()
@@ -294,7 +298,8 @@ func (w *warpTest) getBlockHashAndNumberFromTxReceipt(ctx context.Context, clien
 }
 
 func (w *warpTest) sendMessageFromSendingSubnet() {
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 	require := require.New(ginkgo.GinkgoT())
 
 	client := w.sendingSubnetClients[0]
@@ -375,7 +380,8 @@ func (w *warpTest) sendMessageFromSendingSubnet() {
 
 func (w *warpTest) aggregateSignaturesViaAPI() {
 	require := require.New(ginkgo.GinkgoT())
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	warpAPIs := make(map[ids.NodeID]warpBackend.Client, len(w.sendingSubnetURIs))
 	for _, uri := range w.sendingSubnetURIs {
@@ -434,7 +440,8 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 
 func (w *warpTest) aggregateSignatures() {
 	require := require.New(ginkgo.GinkgoT())
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	// Verify that the signature aggregation matches the results of manually constructing the warp message
 	client, err := warpBackend.NewClient(w.sendingSubnetURIs[0], w.sendingSubnet.BlockchainID.String())
@@ -457,7 +464,8 @@ func (w *warpTest) aggregateSignatures() {
 
 func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 	require := require.New(ginkgo.GinkgoT())
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	client := w.receivingSubnetClients[0]
 	log.Info("Subscribing to new heads")
@@ -511,7 +519,8 @@ func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 
 func (w *warpTest) deliverBlockHashPayload() {
 	require := require.New(ginkgo.GinkgoT())
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	client := w.receivingSubnetClients[0]
 	log.Info("Subscribing to new heads")
@@ -565,7 +574,8 @@ func (w *warpTest) deliverBlockHashPayload() {
 
 func (w *warpTest) executeHardHatTest() {
 	require := require.New(ginkgo.GinkgoT())
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	client := w.sendingSubnetClients[0]
 	log.Info("Subscribing to new heads")
@@ -593,7 +603,8 @@ func (w *warpTest) executeHardHatTest() {
 
 func (w *warpTest) warpLoad() {
 	require := require.New(ginkgo.GinkgoT())
-	ctx := e2e.DefaultContext()
+	tc := e2e.NewTestContext()
+	ctx := tc.DefaultContext()
 
 	var (
 		numWorkers           = len(w.sendingSubnetClients)

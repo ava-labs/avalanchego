@@ -53,10 +53,12 @@ var _ = ginkgo.Describe("[Load Simulator]", ginkgo.Ordered, func() {
 	var env *e2e.TestEnvironment
 
 	ginkgo.BeforeAll(func() {
+		tc := e2e.NewTestContext()
 		genesisPath := filepath.Join(repoRootPath, "tests/load/genesis/genesis.json")
 
 		nodes := utils.NewTmpnetNodes(nodeCount)
 		env = e2e.NewTestEnvironment(
+			tc,
 			flagVars,
 			utils.NewTmpnetNetwork(
 				"subnet-evm-small-load",
