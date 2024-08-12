@@ -1,12 +1,12 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//nolint:gosec // This file does not need cryptographically strong randomness
 package builder
 
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -18,13 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func generateUTXOs(assetID ids.ID, locktime uint64) []*avax.UTXO {
-	utxos := make([]*avax.UTXO, rand.Intn(10))
+func generateUTXOs(random *rand.Rand, assetID ids.ID, locktime uint64) []*avax.UTXO {
+	utxos := make([]*avax.UTXO, random.Intn(10))
 	for i := range utxos {
 		var output avax.TransferableOut = &secp256k1fx.TransferOutput{
-			Amt: rand.Uint64(),
+			Amt: random.Uint64(),
 			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  rand.Uint64(),
+				Locktime:  random.Uint64(),
 				Threshold: 1,
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			},
@@ -38,7 +38,7 @@ func generateUTXOs(assetID ids.ID, locktime uint64) []*avax.UTXO {
 		utxos[i] = &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
+				OutputIndex: random.Uint32(),
 			},
 			Asset: avax.Asset{
 				ID: assetID,
@@ -49,72 +49,61 @@ func generateUTXOs(assetID ids.ID, locktime uint64) []*avax.UTXO {
 	return utxos
 }
 
-func TestSplitUTXOsByLocktime(t *testing.T) {
+func TestSplitByLocktime(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Logf("Seed: %d", seed)
+	random := rand.New(rand.NewSource(seed)) // #nosec G404
+
 	var (
 		require = require.New(t)
 
-		unlockedTime               uint64 = 100
-		expectedUnlockedUTXOsPart0        = generateUTXOs(ids.GenerateTestID(), 0)
-		expectedUnlockedUTXOsPart1        = generateUTXOs(ids.GenerateTestID(), unlockedTime)
-		expectedLockedUTXOsPart0          = generateUTXOs(ids.GenerateTestID(), unlockedTime+100)
-		expectedUnlockedUTXOsPart2        = generateUTXOs(ids.GenerateTestID(), unlockedTime-1)
-		expectedLockedUTXOsPart1          = generateUTXOs(ids.GenerateTestID(), unlockedTime+1)
-
+		unlockedTime     uint64 = 100
+		expectedUnlocked        = utils.Join(
+			generateUTXOs(random, ids.GenerateTestID(), 0),
+			generateUTXOs(random, ids.GenerateTestID(), unlockedTime-1),
+			generateUTXOs(random, ids.GenerateTestID(), unlockedTime),
+		)
+		expectedLocked = utils.Join(
+			generateUTXOs(random, ids.GenerateTestID(), unlockedTime+100),
+			generateUTXOs(random, ids.GenerateTestID(), unlockedTime+1),
+		)
 		utxos = utils.Join(
-			expectedUnlockedUTXOsPart0,
-			expectedUnlockedUTXOsPart1,
-			expectedLockedUTXOsPart0,
-			expectedUnlockedUTXOsPart2,
-			expectedLockedUTXOsPart1,
-		)
-		expectedUnlockedUTXOs = utils.Join(
-			expectedUnlockedUTXOsPart0,
-			expectedUnlockedUTXOsPart1,
-			expectedUnlockedUTXOsPart2,
-		)
-		expectedLockedUTXOs = utils.Join(
-			expectedLockedUTXOsPart0,
-			expectedLockedUTXOsPart1,
+			expectedUnlocked,
+			expectedLocked,
 		)
 	)
+	random.Shuffle(len(utxos), func(i, j int) {
+		utxos[i], utxos[j] = utxos[j], utxos[i]
+	})
 
-	utxosWithAssetID, utxosWithOtherAssetID := splitUTXOsByLocktime(utxos, unlockedTime)
-	require.Equal(expectedUnlockedUTXOs, utxosWithAssetID)
-	require.Equal(expectedLockedUTXOs, utxosWithOtherAssetID)
+	utxosByLocktime := splitByLocktime(utxos, unlockedTime)
+	require.ElementsMatch(expectedUnlocked, utxosByLocktime.unlocked)
+	require.ElementsMatch(expectedLocked, utxosByLocktime.locked)
 }
 
-func TestSplitUTXOsByAssetID(t *testing.T) {
+func TestByAssetID(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Logf("Seed: %d", seed)
+	random := rand.New(rand.NewSource(seed)) // #nosec G404
+
 	var (
 		require = require.New(t)
 
-		assetID                            = ids.GenerateTestID()
-		expectedUTXOsWithAssetIDPart0      = generateUTXOs(assetID, rand.Uint64())
-		expectedUTXOsWithAssetIDPart1      = generateUTXOs(assetID, rand.Uint64())
-		expectedUTXOsWithAssetIDPart2      = generateUTXOs(assetID, rand.Uint64())
-		expectedUTXOsWithOtherAssetIDPart0 = generateUTXOs(ids.GenerateTestID(), rand.Uint64())
-		expectedUTXOsWithOtherAssetIDPart1 = generateUTXOs(ids.GenerateTestID(), rand.Uint64())
-
-		utxos = utils.Join(
-			expectedUTXOsWithAssetIDPart0,
-			expectedUTXOsWithOtherAssetIDPart0,
-			expectedUTXOsWithAssetIDPart1,
-			expectedUTXOsWithOtherAssetIDPart1,
-			expectedUTXOsWithAssetIDPart2,
-		)
-		expectedUTXOsWithAssetID = utils.Join(
-			expectedUTXOsWithAssetIDPart0,
-			expectedUTXOsWithAssetIDPart1,
-			expectedUTXOsWithAssetIDPart2,
-		)
-		expectedUTXOsWithOtherAssetID = utils.Join(
-			expectedUTXOsWithOtherAssetIDPart0,
-			expectedUTXOsWithOtherAssetIDPart1,
+		assetID           = ids.GenerateTestID()
+		expectedRequested = generateUTXOs(random, assetID, random.Uint64())
+		expectedOther     = generateUTXOs(random, ids.GenerateTestID(), random.Uint64())
+		utxos             = utils.Join(
+			expectedRequested,
+			expectedOther,
 		)
 	)
+	random.Shuffle(len(utxos), func(i, j int) {
+		utxos[i], utxos[j] = utxos[j], utxos[i]
+	})
 
-	utxosWithAssetID, utxosWithOtherAssetID := splitUTXOsByAssetID(utxos, assetID)
-	require.Equal(expectedUTXOsWithAssetID, utxosWithAssetID)
-	require.Equal(expectedUTXOsWithOtherAssetID, utxosWithOtherAssetID)
+	utxosByAssetID := splitByAssetID(utxos, assetID)
+	require.ElementsMatch(expectedRequested, utxosByAssetID.requested)
+	require.ElementsMatch(expectedOther, utxosByAssetID.other)
 }
 
 func TestUnwrapOutput(t *testing.T) {
@@ -175,9 +164,9 @@ func TestUnwrapOutput(t *testing.T) {
 			require := require.New(t)
 
 			output, locktime, err := unwrapOutput(test.output)
+			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expectedOutput, output)
 			require.Equal(test.expectedLocktime, locktime)
-			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }
