@@ -652,7 +652,10 @@ func newState(
 				MinFee:   2048,
 				K:        60_480_000_000,
 			},
-			linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
+			linkeddb.NewDefault(currentSubnetOnlyValidatorBaseDB),
+			cfg.Validators,
+			validatorWeightDiffsDB,
+			validatorPublicKeyDiffsDB,
 		),
 
 		validatorsDB:                     validatorsDB,
@@ -1741,7 +1744,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.subnetOnlyValidators.Write(),
+		s.subnetOnlyValidators.Write(height),
 		s.writeMetadata(),
 	)
 }

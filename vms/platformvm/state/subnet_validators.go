@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -33,6 +35,7 @@ type SubnetOnlyValidators interface {
 		weight uint64,
 		balance uint64,
 		endTime uint64,
+		pk *bls.PublicKey,
 	) error
 
 	ExitValidator(validationID ids.ID) (uint64, error)
@@ -44,6 +47,8 @@ type SubnetOnlyValidators interface {
 	AdvanceTime(duration uint64, maxToRemove int) ([]ids.ID, bool)
 
 	Prune(maxToRemove int) ([]ids.ID, bool)
+
+	Write(height uint64) error
 }
 
 type subnetOnlyValidator struct {
@@ -53,6 +58,7 @@ type subnetOnlyValidator struct {
 	MinNonce     uint64     `serialize:"true"`
 	Weight       uint64     `serialize:"true"`
 	Balance      uint64     `serialize:"true"`
+	PublicKey    *bls.PublicKey
 
 	// If non-zero, this validator was added via an [Owner] key.
 	EndTime uint64 `serialize:"true"`
@@ -75,6 +81,11 @@ func (v *subnetOnlyValidator) Less(than *subnetOnlyValidator) bool {
 	return bytes.Compare(v.ValidationID[:], than.ValidationID[:]) == -1
 }
 
+type subnetOnlyValidatorDiff struct {
+	weightDiff *ValidatorWeightDiff
+	status     diffValidatorStatus
+}
+
 type subnetOnlyValidators struct {
 	aggregatedBalance uint64
 	calculator        *fee.ValidatorState
@@ -82,18 +93,30 @@ type subnetOnlyValidators struct {
 	validators heap.Map[ids.ID, *subnetOnlyValidator] // validationID -> *subnetOnlyValidator
 
 	// validationID -> added for that validator since the last db write
-	validatorDiffs map[ids.ID]bool
-	validatorDB    linkeddb.LinkedDB
+	validatorDiffs            map[ids.ID]*subnetOnlyValidatorDiff
+	validatorDB               linkeddb.LinkedDB
+	validatorManager          validators.Manager
+	validatorWeightDiffsDB    database.Database
+	validatorPublicKeyDiffsDB database.Database
 }
 
-func newSubnetOnlyValidators(calculator *fee.ValidatorState, validatorDB linkeddb.LinkedDB) *subnetOnlyValidators {
+func newSubnetOnlyValidators(
+	calculator *fee.ValidatorState,
+	validatorDB linkeddb.LinkedDB,
+	validatorManager validators.Manager,
+	validatorWeightDiffsDB database.Database,
+	validatorPublicKeyDiffsDB database.Database,
+) *subnetOnlyValidators {
 	return &subnetOnlyValidators{
 		aggregatedBalance: 0,
 		calculator:        calculator,
 
-		validators:     heap.NewMap[ids.ID, *subnetOnlyValidator]((*subnetOnlyValidator).Less),
-		validatorDiffs: make(map[ids.ID]bool),
-		validatorDB:    validatorDB,
+		validators:                heap.NewMap[ids.ID, *subnetOnlyValidator]((*subnetOnlyValidator).Less),
+		validatorDiffs:            make(map[ids.ID]*subnetOnlyValidatorDiff),
+		validatorDB:               validatorDB,
+		validatorManager:          validatorManager,
+		validatorWeightDiffsDB:    validatorWeightDiffsDB,
+		validatorPublicKeyDiffsDB: validatorPublicKeyDiffsDB,
 	}
 }
 
@@ -104,6 +127,7 @@ func (s *subnetOnlyValidators) AddValidator(
 	weight uint64,
 	balance uint64,
 	endTime uint64,
+	pk *bls.PublicKey,
 ) error {
 	if s.validators.Contains(validationID) {
 		return ErrAlreadyValidator
@@ -116,11 +140,18 @@ func (s *subnetOnlyValidators) AddValidator(
 		MinNonce:     0,
 		Weight:       weight,
 		Balance:      s.aggregatedBalance + balance,
+		PublicKey:    pk,
 
 		EndTime: endTime,
 	})
 
-	s.validatorDiffs[validationID] = true
+	s.validatorDiffs[validationID] = &subnetOnlyValidatorDiff{
+		weightDiff: &ValidatorWeightDiff{
+			Decrease: false,
+			Amount:   weight,
+		},
+		status: added,
+	}
 	s.calculator.Current += 1
 	return nil
 }
@@ -154,14 +185,41 @@ func (s *subnetOnlyValidators) SetValidatorWeight(validationID ids.ID, newWeight
 		return 0, ErrNonZeroWeight
 	}
 
+	currentWeight := s.validatorManager.GetWeight(vdr.SubnetID, vdr.NodeID)
+
 	if newWeight == 0 {
 		s.validators.Remove(validationID)
 
-		s.validatorDiffs[validationID] = false
+		s.validatorDiffs[validationID] = &subnetOnlyValidatorDiff{
+			weightDiff: &ValidatorWeightDiff{
+				Decrease: false,
+				Amount:   currentWeight,
+			},
+			status: deleted,
+		}
 		s.calculator.Current -= 1
 
 		toRefund := vdr.Balance - s.aggregatedBalance
 		return toRefund, nil
+	}
+
+	if newWeight != currentWeight {
+		var weightDiff *ValidatorWeightDiff
+		if newWeight > currentWeight {
+			weightDiff = &ValidatorWeightDiff{
+				Decrease: false,
+				Amount:   newWeight - currentWeight,
+			}
+		} else {
+			weightDiff = &ValidatorWeightDiff{
+				Decrease: true,
+				Amount:   currentWeight - newWeight,
+			}
+		}
+
+		s.validatorDiffs[validationID] = &subnetOnlyValidatorDiff{
+			weightDiff: weightDiff,
+		}
 	}
 
 	vdr.Weight = newWeight
@@ -186,9 +244,7 @@ func (s *subnetOnlyValidators) IncreaseValidatorBalance(validationID ids.ID, toA
 	vdr.Balance = s.aggregatedBalance + toAdd
 	s.validators.Push(validationID, vdr)
 
-	s.validatorDiffs[validationID] = true
 	s.calculator.Current += 1
-
 	return nil
 }
 
@@ -228,11 +284,36 @@ func (s *subnetOnlyValidators) Prune(maxToRemove int) ([]ids.ID, bool) {
 	return removed, moreToRemove
 }
 
-func (s *subnetOnlyValidators) Write() error {
-	for validationID, added := range s.validatorDiffs {
+func (s *subnetOnlyValidators) Write(height uint64) error {
+	for validationID, diff := range s.validatorDiffs {
 		delete(s.validatorDiffs, validationID)
 
-		if !added {
+		vdr, ok := s.validators.Get(validationID)
+		if !ok {
+			return fmt.Errorf("failed to get subnet only validator: %s", validationID)
+		}
+
+		if err := s.validatorWeightDiffsDB.Put(
+			marshalDiffKey(vdr.SubnetID, height, vdr.NodeID),
+			marshalWeightDiff(diff.weightDiff),
+		); err != nil {
+			return err
+		}
+
+		err := s.validatorPublicKeyDiffsDB.Put(
+			marshalDiffKey(vdr.SubnetID, height, vdr.NodeID),
+			bls.PublicKeyToUncompressedBytes(vdr.PublicKey),
+		)
+		if err != nil {
+			return err
+		}
+
+		switch diff.status {
+		case added:
+			if err := putSubnetOnlyValidator(s.validatorDB, vdr); err != nil {
+				return fmt.Errorf("failed to write subnet only validator: %w", err)
+			}
+		case deleted:
 			if err := deleteSubnetOnlyValidator(s.validatorDB, validationID); err != nil {
 				return fmt.Errorf("failed to delete subnet only validator: %w", err)
 			}
@@ -240,13 +321,14 @@ func (s *subnetOnlyValidators) Write() error {
 			continue
 		}
 
-		vdr, ok := s.validators.Get(validationID)
-		if !ok {
-			return fmt.Errorf("failed to get subnet only validator: %s", validationID)
-		}
-
-		if err := putSubnetOnlyValidator(s.validatorDB, vdr); err != nil {
-			return fmt.Errorf("failed to write subnet only validator: %w", err)
+		if diff.weightDiff.Decrease {
+			if err := s.validatorManager.RemoveWeight(vdr.SubnetID, vdr.NodeID, diff.weightDiff.Amount); err != nil {
+				return fmt.Errorf("failed to remove weight: %w", err)
+			}
+		} else {
+			if err := s.validatorManager.AddWeight(vdr.SubnetID, vdr.NodeID, diff.weightDiff.Amount); err != nil {
+				return fmt.Errorf("failed to add weight: %w", err)
+			}
 		}
 	}
 	return nil
