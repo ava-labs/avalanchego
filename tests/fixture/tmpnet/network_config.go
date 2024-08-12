@@ -48,7 +48,10 @@ func (n *Network) Write() error {
 	if err := n.writeEnvFile(); err != nil {
 		return err
 	}
-	return n.writeNodes()
+	if err := n.writeNodes(); err != nil {
+		return err
+	}
+	return n.writeSubnets()
 }
 
 // Read network configuration from disk.
@@ -75,6 +78,15 @@ func (n *Network) readNodes() error {
 func (n *Network) writeNodes() error {
 	for _, node := range n.Nodes {
 		if err := node.Write(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n *Network) writeSubnets() error {
+	for _, subnet := range n.Subnets {
+		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
 	}

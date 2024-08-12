@@ -220,9 +220,9 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-		if err == nil {
-			return fmt.Errorf("a subnet with name %s already exists", s.Name)
-		}
+		// if err == nil {
+		// 	return fmt.Errorf("a subnet with name %s already exists", s.Name)
+		// }
 	}
 
 	// Write subnet configuration for tmpnet
