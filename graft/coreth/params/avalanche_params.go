@@ -30,7 +30,7 @@ const (
 	ApricotPhase4BaseFeeChangeDenominator uint64 = 12
 	ApricotPhase5TargetGas                uint64 = 15_000_000
 	ApricotPhase5BaseFeeChangeDenominator uint64 = 36
-	EUpgradeMinBaseFee                    int64  = GWei
+	EtnaMinBaseFee                        int64  = GWei
 
 	DynamicFeeExtraDataSize        = 80
 	RollupWindow            uint64 = 10

@@ -89,7 +89,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 		DurangoBlockTimestamp:           utils.NewUint64(0),
-		EUpgradeTime:                    utils.NewUint64(0),
+		EtnaTime:                        utils.NewUint64(0),
 	}
 
 	TestLaunchConfig = &ChainConfig{
@@ -117,7 +117,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhase1Config = &ChainConfig{
@@ -145,7 +145,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhase2Config = &ChainConfig{
@@ -173,7 +173,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhase3Config = &ChainConfig{
@@ -201,7 +201,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhase4Config = &ChainConfig{
@@ -229,7 +229,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhase5Config = &ChainConfig{
@@ -257,7 +257,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhasePre6Config = &ChainConfig{
@@ -285,7 +285,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhase6Config = &ChainConfig{
@@ -313,7 +313,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestApricotPhasePost6Config = &ChainConfig{
@@ -341,7 +341,7 @@ var (
 		BanffBlockTimestamp:             nil,
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestBanffChainConfig = &ChainConfig{
@@ -369,7 +369,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           nil,
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestCortinaChainConfig = &ChainConfig{
@@ -397,7 +397,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 		DurangoBlockTimestamp:           nil,
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
 	TestDurangoChainConfig = &ChainConfig{
@@ -425,10 +425,10 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 		DurangoBlockTimestamp:           utils.NewUint64(0),
-		EUpgradeTime:                    nil,
+		EtnaTime:                        nil,
 	}
 
-	TestEUpgradeChainConfig = &ChainConfig{
+	TestEtnaChainConfig = &ChainConfig{
 		AvalancheContext:                AvalancheContext{utils.TestSnowContext()},
 		ChainID:                         big.NewInt(1),
 		HomesteadBlock:                  big.NewInt(0),
@@ -453,7 +453,7 @@ var (
 		BanffBlockTimestamp:             utils.NewUint64(0),
 		CortinaBlockTimestamp:           utils.NewUint64(0),
 		DurangoBlockTimestamp:           utils.NewUint64(0),
-		EUpgradeTime:                    utils.NewUint64(0),
+		EtnaTime:                        utils.NewUint64(0),
 	}
 
 	TestRules = TestChainConfig.Rules(new(big.Int), 0)
@@ -485,7 +485,7 @@ func getChainConfig(networkID uint32, chainID *big.Int) *ChainConfig {
 		BanffBlockTimestamp:             utils.TimeToNewUint64(agoUpgrade.BanffTime),
 		CortinaBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.CortinaTime),
 		DurangoBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.DurangoTime),
-		EUpgradeTime:                    utils.TimeToNewUint64(agoUpgrade.EtnaTime),
+		EtnaTime:                        utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 	}
 }
 
@@ -540,11 +540,11 @@ type ChainConfig struct {
 	// and Avalanche Warp Messaging. (nil = no fork, 0 = already activated)
 	// Note: EIP-4895 is excluded since withdrawals are not relevant to the Avalanche C-Chain or Subnets running the EVM.
 	DurangoBlockTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
-	// EUpgrade activates Cancun from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
+	// Etna activates Cancun from Ethereum (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
 	// and reduces the min base fee. (nil = no fork, 0 = already activated)
 	// Note: EIP-4844 BlobTxs are not enabled in the mempool and blocks are not
 	// allowed to contain them. For details see https://github.com/avalanche-foundation/ACPs/pull/131
-	EUpgradeTime *uint64 `json:"eUpgradeTime,omitempty"`
+	EtnaTime *uint64 `json:"etnaTime,omitempty"`
 
 	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	CancunTime *uint64 `json:"cancunTime,omitempty"`
@@ -596,7 +596,7 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf(" - Banff Timestamp:                  @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", ptrToString(c.BanffBlockTimestamp))
 	banner += fmt.Sprintf(" - Cortina Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(c.CortinaBlockTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(c.DurangoBlockTimestamp))
-	banner += fmt.Sprintf(" - EUpgrade Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.EUpgradeTime))
+	banner += fmt.Sprintf(" - Etna Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.EtnaTime))
 	banner += "\n"
 
 	upgradeConfigBytes, err := json.Marshal(c.UpgradeConfig)
@@ -728,10 +728,10 @@ func (c *ChainConfig) IsDurango(time uint64) bool {
 	return utils.IsTimestampForked(c.DurangoBlockTimestamp, time)
 }
 
-// IsEUpgrade returns whether [time] represents a block
-// with a timestamp after the EUpgrade upgrade time.
-func (c *ChainConfig) IsEUpgrade(time uint64) bool {
-	return utils.IsTimestampForked(c.EUpgradeTime, time)
+// IsEtna returns whether [time] represents a block
+// with a timestamp after the Etna upgrade time.
+func (c *ChainConfig) IsEtna(time uint64) bool {
+	return utils.IsTimestampForked(c.EtnaTime, time)
 }
 
 // IsCancun returns whether [time] represents a block
@@ -964,8 +964,8 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 	if isForkTimestampIncompatible(c.DurangoBlockTimestamp, newcfg.DurangoBlockTimestamp, time) {
 		return newTimestampCompatError("Durango fork block timestamp", c.DurangoBlockTimestamp, newcfg.DurangoBlockTimestamp)
 	}
-	if isForkTimestampIncompatible(c.EUpgradeTime, newcfg.EUpgradeTime, time) {
-		return newTimestampCompatError("EUpgrade fork block timestamp", c.EUpgradeTime, newcfg.EUpgradeTime)
+	if isForkTimestampIncompatible(c.EtnaTime, newcfg.EtnaTime, time) {
+		return newTimestampCompatError("Etna fork block timestamp", c.EtnaTime, newcfg.EtnaTime)
 	}
 	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
 		return newTimestampCompatError("Cancun fork block timestamp", c.CancunTime, newcfg.CancunTime)
