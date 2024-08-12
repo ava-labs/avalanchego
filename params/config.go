@@ -133,7 +133,7 @@ var (
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.TimeToNewUint64(InactiveUpgradeTime),
 			DurangoTimestamp:   utils.TimeToNewUint64(InactiveUpgradeTime),
-			EUpgradeTimestamp:  utils.TimeToNewUint64(InactiveUpgradeTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(InactiveUpgradeTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
@@ -156,7 +156,7 @@ var (
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 			DurangoTimestamp:   utils.TimeToNewUint64(InactiveUpgradeTime),
-			EUpgradeTimestamp:  utils.TimeToNewUint64(InactiveUpgradeTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(InactiveUpgradeTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
@@ -179,13 +179,13 @@ var (
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 			DurangoTimestamp:   utils.NewUint64(0),
-			EUpgradeTimestamp:  utils.TimeToNewUint64(InactiveUpgradeTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(InactiveUpgradeTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
 	}
 
-	TestEUpgradeChainConfig = &ChainConfig{
+	TestEtnaChainConfig = &ChainConfig{
 		AvalancheContext:    AvalancheContext{utils.TestSnowContext()},
 		ChainID:             big.NewInt(1),
 		FeeConfig:           DefaultFeeConfig,
@@ -202,7 +202,7 @@ var (
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 			DurangoTimestamp:   utils.NewUint64(0),
-			EUpgradeTimestamp:  utils.NewUint64(0),
+			EtnaTimestamp:      utils.NewUint64(0),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},

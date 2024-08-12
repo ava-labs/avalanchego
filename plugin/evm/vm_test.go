@@ -107,8 +107,8 @@ var (
 	genesisJSONPreSubnetEVM = genesisJSON(params.TestPreSubnetEVMChainConfig)
 	genesisJSONSubnetEVM    = genesisJSON(params.TestSubnetEVMChainConfig)
 	genesisJSONDurango      = genesisJSON(params.TestDurangoChainConfig)
-	genesisJSONEUpgrade     = genesisJSON(params.TestEUpgradeChainConfig)
-	genesisJSONLatest       = genesisJSONEUpgrade
+	genesisJSONEtna         = genesisJSON(params.TestEtnaChainConfig)
+	genesisJSONLatest       = genesisJSONEtna
 )
 
 func init() {
@@ -3226,20 +3226,20 @@ func TestParentBeaconRootBlock(t *testing.T) {
 		},
 		{
 			name:          "non-empty parent beacon root in E-Upgrade (Cancun)",
-			genesisJSON:   genesisJSONEUpgrade,
+			genesisJSON:   genesisJSONEtna,
 			beaconRoot:    &common.Hash{0x01},
 			expectedError: true,
 			errString:     "expected empty hash",
 		},
 		{
 			name:          "empty parent beacon root in E-Upgrade (Cancun)",
-			genesisJSON:   genesisJSONEUpgrade,
+			genesisJSON:   genesisJSONEtna,
 			beaconRoot:    &common.Hash{},
 			expectedError: false,
 		},
 		{
 			name:          "nil parent beacon root in E-Upgrade (Cancun)",
-			genesisJSON:   genesisJSONEUpgrade,
+			genesisJSON:   genesisJSONEtna,
 			beaconRoot:    nil,
 			expectedError: true,
 			errString:     "header is missing parentBeaconRoot",

@@ -182,7 +182,7 @@ func (c *ChainConfig) SetNetworkUpgradeDefaults() {
 
 // SetEVMUpgrades sets the mapped upgrades  Avalanche > EVM upgrades) for the chain config.
 func (c *ChainConfig) SetEVMUpgrades(avalancheUpgrades NetworkUpgrades) {
-	if avalancheUpgrades.EUpgradeTimestamp != nil {
-		c.CancunTime = utils.NewUint64(*avalancheUpgrades.EUpgradeTimestamp)
+	if avalancheUpgrades.EtnaTimestamp != nil {
+		c.CancunTime = utils.NewUint64(*avalancheUpgrades.EtnaTimestamp)
 	}
 }
