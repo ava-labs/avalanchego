@@ -38,7 +38,7 @@ func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error
 	blkID := b.ID()
 	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
 		if !blkState.verifiedHeights.Contains(pChainHeight) {
-			if err := b.Visit(&warpVerifier{}); err != nil {
+			if err := b.Visit(&warpBlockVerifier{}); err != nil {
 				return err
 			}
 
@@ -49,7 +49,7 @@ func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error
 		return nil
 	}
 
-	if err := b.Visit(&warpVerifier{}); err != nil {
+	if err := b.Visit(&warpBlockVerifier{}); err != nil {
 		return err
 	}
 
