@@ -1225,23 +1225,25 @@ func (b *builder) getBalance(
 
 // spend takes in the requested burn amounts and the requested stake amounts.
 //
-//   - [amountsToBurn] maps assetID to the amount of the asset to spend without
+//   - [toBurn] maps assetID to the amount of the asset to spend without
 //     producing an output. This is typically used for fees. However, it can
 //     also be used to consume some of an asset that will be produced in
 //     separate outputs, such as ExportedOutputs. Only unlocked UTXOs are able
 //     to be burned here.
-//   - [amountsToStake] maps assetID to the amount of the asset to spend and
-//     place into the staked outputs. First locked UTXOs are attempted to be
-//     used for these funds, and then unlocked UTXOs will be attempted to be
-//     used. There is no preferential ordering on the unlock times.
+//   - [toStake] maps assetID to the amount of the asset to spend and place into
+//     the staked outputs. First locked UTXOs are attempted to be used for these
+//     funds, and then unlocked UTXOs will be attempted to be used. There is no
+//     preferential ordering on the unlock times.
 //   - [excessAVAX] contains the amount of extra AVAX that spend can produce in
 //     the change outputs in addition to the consumed and not burned AVAX.
+//   - [complexity] contains the currently accrued transaction complexity that
+//     will be used to calculate the required fees to be burned.
 //   - [ownerOverride] optionally specifies the output owners to use for the
 //     unlocked AVAX change output if no additional AVAX was needed to be
 //     burned. If this value is nil, the default change owner is used.
 func (b *builder) spend(
-	amountsToBurn map[ids.ID]uint64,
-	amountsToStake map[ids.ID]uint64,
+	toBurn map[ids.ID]uint64,
+	toStake map[ids.ID]uint64,
 	excessAVAX uint64,
 	complexity feecomponent.Dimensions,
 	ownerOverride *secp256k1fx.OutputOwners,
@@ -1276,9 +1278,9 @@ func (b *builder) spend(
 		weights:  b.context.ComplexityWeights,
 		gasPrice: b.context.GasPrice,
 
-		amountsToBurn:  amountsToBurn,
-		amountsToStake: amountsToStake,
-		complexity:     complexity,
+		toBurn:     toBurn,
+		toStake:    toStake,
+		complexity: complexity,
 
 		// Initialize the return values with empty slices to preserve backward
 		// compatibility of the json representation of transactions with no
@@ -1288,8 +1290,8 @@ func (b *builder) spend(
 		stakeOutputs:  make([]*avax.TransferableOutput, 0),
 	}
 
-	unlockedUTXOs, lockedUTXOs := splitUTXOsByLocktime(utxos, minIssuanceTime)
-	for _, utxo := range lockedUTXOs {
+	utxosByLocktime := splitByLocktime(utxos, minIssuanceTime)
+	for _, utxo := range utxosByLocktime.locked {
 		assetID := utxo.AssetID()
 		if !s.shouldConsumeLockedAsset(assetID) {
 			continue
@@ -1359,7 +1361,7 @@ func (b *builder) spend(
 	}
 
 	// Add all the remaining stake amounts assuming unlocked UTXOs.
-	for assetID, amount := range s.amountsToStake {
+	for assetID, amount := range s.toStake {
 		if amount == 0 {
 			continue
 		}
@@ -1379,8 +1381,8 @@ func (b *builder) spend(
 	}
 
 	// AVAX is handled last to account for fees.
-	avaxUTXOs, nonAVAXUTXOs := splitUTXOsByAssetID(unlockedUTXOs, b.context.AVAXAssetID)
-	for _, utxo := range nonAVAXUTXOs {
+	utxosByAVAXAssetID := splitByAssetID(utxosByLocktime.unlocked, b.context.AVAXAssetID)
+	for _, utxo := range utxosByAVAXAssetID.other {
 		assetID := utxo.AssetID()
 		if !s.shouldConsumeAsset(assetID) {
 			continue
@@ -1429,7 +1431,7 @@ func (b *builder) spend(
 		}
 	}
 
-	for _, utxo := range avaxUTXOs {
+	for _, utxo := range utxosByAVAXAssetID.requested {
 		requiredFee, err := s.calculateFee()
 		if err != nil {
 			return nil, nil, nil, err
@@ -1564,9 +1566,9 @@ type spendHelper struct {
 	weights  feecomponent.Dimensions
 	gasPrice feecomponent.GasPrice
 
-	amountsToBurn  map[ids.ID]uint64
-	amountsToStake map[ids.ID]uint64
-	complexity     feecomponent.Dimensions
+	toBurn     map[ids.ID]uint64
+	toStake    map[ids.ID]uint64
+	complexity feecomponent.Dimensions
 
 	inputs        []*avax.TransferableInput
 	changeOutputs []*avax.TransferableOutput
@@ -1607,33 +1609,30 @@ func (s *spendHelper) addOutputComplexity(output *avax.TransferableOutput) error
 }
 
 func (s *spendHelper) shouldConsumeLockedAsset(assetID ids.ID) bool {
-	return s.amountsToStake[assetID] != 0
+	return s.toStake[assetID] != 0
 }
 
 func (s *spendHelper) shouldConsumeAsset(assetID ids.ID) bool {
-	return s.amountsToBurn[assetID] != 0 || s.shouldConsumeLockedAsset(assetID)
+	return s.toBurn[assetID] != 0 || s.shouldConsumeLockedAsset(assetID)
 }
 
 func (s *spendHelper) consumeLockedAsset(assetID ids.ID, amount uint64) uint64 {
-	remainingAmountToStake := s.amountsToStake[assetID]
 	// Stake any value that should be staked
 	amountToStake := min(
-		remainingAmountToStake, // Amount we still need to stake
-		amount,                 // Amount available to stake
+		s.toStake[assetID], // Amount we still need to stake
+		amount,             // Amount available to stake
 	)
-	s.amountsToStake[assetID] -= amountToStake
+	s.toStake[assetID] -= amountToStake
 	return amount - amountToStake
 }
 
 func (s *spendHelper) consumeAsset(assetID ids.ID, amount uint64) uint64 {
-	remainingAmountToBurn := s.amountsToBurn[assetID]
-
 	// Burn any value that should be burned
 	amountToBurn := min(
-		remainingAmountToBurn, // Amount we still need to burn
-		amount,                // Amount available to burn
+		s.toBurn[assetID], // Amount we still need to burn
+		amount,            // Amount available to burn
 	)
-	s.amountsToBurn[assetID] -= amountToBurn
+	s.toBurn[assetID] -= amountToBurn
 
 	// Stake any remaining value that should be staked
 	return s.consumeLockedAsset(assetID, amount-amountToBurn)
@@ -1648,7 +1647,7 @@ func (s *spendHelper) calculateFee() (uint64, error) {
 }
 
 func (s *spendHelper) verifyAssetsConsumed() error {
-	for assetID, amount := range s.amountsToStake {
+	for assetID, amount := range s.toStake {
 		if amount == 0 {
 			continue
 		}
@@ -1660,7 +1659,7 @@ func (s *spendHelper) verifyAssetsConsumed() error {
 			assetID,
 		)
 	}
-	for assetID, amount := range s.amountsToBurn {
+	for assetID, amount := range s.toBurn {
 		if amount == 0 {
 			continue
 		}
@@ -1675,47 +1674,60 @@ func (s *spendHelper) verifyAssetsConsumed() error {
 	return nil
 }
 
-// splitUTXOsByLocktime separates the provided UTXOs into two slices:
+type utxosByLocktime struct {
+	unlocked []*avax.UTXO
+	locked   []*avax.UTXO
+}
+
+// splitByLocktime separates the provided UTXOs into two slices:
 // 1. UTXOs that are unlocked with the provided issuance time
 // 2. UTXOs that are locked with the provided issuance time
-func splitUTXOsByLocktime(utxos []*avax.UTXO, minIssuanceTime uint64) ([]*avax.UTXO, []*avax.UTXO) {
-	var (
-		unlockedUTXOs = make([]*avax.UTXO, 0, len(utxos))
-		lockedUTXOs   = make([]*avax.UTXO, 0, len(utxos))
-	)
-	for _, utxo := range utxos {
-		lockedOut, ok := utxo.Out.(*stakeable.LockOut)
-		if !ok {
-			unlockedUTXOs = append(unlockedUTXOs, utxo)
-			continue
-		}
-		if minIssuanceTime >= lockedOut.Locktime {
-			unlockedUTXOs = append(unlockedUTXOs, utxo)
-			continue
-		}
-		lockedUTXOs = append(lockedUTXOs, utxo)
+func splitByLocktime(utxos []*avax.UTXO, minIssuanceTime uint64) utxosByLocktime {
+	split := utxosByLocktime{
+		unlocked: make([]*avax.UTXO, 0, len(utxos)),
+		locked:   make([]*avax.UTXO, 0, len(utxos)),
 	}
-	return unlockedUTXOs, lockedUTXOs
+	for _, utxo := range utxos {
+		if lockedOut, ok := utxo.Out.(*stakeable.LockOut); ok && minIssuanceTime < lockedOut.Locktime {
+			split.locked = append(split.locked, utxo)
+		} else {
+			split.unlocked = append(split.unlocked, utxo)
+		}
+	}
+	return split
 }
 
-// splitUTXOsByAssetID separates the provided UTXOs into two slices:
+type utxosByAssetID struct {
+	requested []*avax.UTXO
+	other     []*avax.UTXO
+}
+
+// splitByAssetID separates the provided UTXOs into two slices:
 // 1. UTXOs with the provided assetID
 // 2. UTXOs with a different assetID
-func splitUTXOsByAssetID(utxos []*avax.UTXO, assetID ids.ID) ([]*avax.UTXO, []*avax.UTXO) {
-	var (
-		requestedUTXOs = make([]*avax.UTXO, 0, len(utxos))
-		otherUTXOs     = make([]*avax.UTXO, 0, len(utxos))
-	)
+func splitByAssetID(utxos []*avax.UTXO, assetID ids.ID) utxosByAssetID {
+	split := utxosByAssetID{
+		requested: make([]*avax.UTXO, 0, len(utxos)),
+		other:     make([]*avax.UTXO, 0, len(utxos)),
+	}
 	for _, utxo := range utxos {
 		if utxo.AssetID() == assetID {
-			requestedUTXOs = append(requestedUTXOs, utxo)
+			split.requested = append(split.requested, utxo)
 		} else {
-			otherUTXOs = append(otherUTXOs, utxo)
+			split.other = append(split.other, utxo)
 		}
 	}
-	return requestedUTXOs, otherUTXOs
+	return split
 }
 
+// unwrapOutput returns the *secp256k1fx.TransferOutput that was, potentially,
+// wrapped by a *stakeable.LockOut.
+//
+// If the output was stakeable and locked, the locktime is returned. Otherwise,
+// the locktime returned will be 0.
+//
+// If the output is not a, potentially wrapped, *secp256k1fx.TransferOutput, an
+// error is returned.
 func unwrapOutput(output verify.State) (*secp256k1fx.TransferOutput, uint64, error) {
 	var locktime uint64
 	if lockedOut, ok := output.(*stakeable.LockOut); ok {
@@ -1723,9 +1735,9 @@ func unwrapOutput(output verify.State) (*secp256k1fx.TransferOutput, uint64, err
 		locktime = lockedOut.Locktime
 	}
 
-	out, ok := output.(*secp256k1fx.TransferOutput)
+	unwrappedOutput, ok := output.(*secp256k1fx.TransferOutput)
 	if !ok {
 		return nil, 0, ErrUnknownOutputType
 	}
-	return out, locktime, nil
+	return unwrappedOutput, locktime, nil
 }
