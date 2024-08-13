@@ -60,15 +60,16 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 
-			pWallet             = baseWallet.P()
-			pBuilder            = pWallet.Builder()
-			pContext            = pBuilder.Context()
-			avaxAssetID         = pContext.AVAXAssetID
-			pChainFeeCalculator = feeCalculatorFromContext(pContext)
+			pWallet        = baseWallet.P()
+			pBuilder       = pWallet.Builder()
+			pContext       = pBuilder.Context()
+			pFeeCalculator = feeCalculatorFromContext(pContext)
 
 			xWallet  = baseWallet.X()
 			xBuilder = xWallet.Builder()
 			xContext = xBuilder.Context()
+
+			avaxAssetID = pContext.AVAXAssetID
 		)
 
 		tc.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
@@ -146,7 +147,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			)
 			require.NoError(err)
 
-			exportFee, err := pChainFeeCalculator.CalculateFee(exportTx.Unsigned)
+			exportFee, err := pFeeCalculator.CalculateFee(exportTx.Unsigned)
 			require.NoError(err)
 
 			balances, err = pBuilder.GetBalance()
