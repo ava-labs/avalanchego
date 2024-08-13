@@ -103,6 +103,10 @@ var (
 			AddSubnetDelegatorFee:         9 * units.Avax,
 		},
 	}
+	staticFeeCalculator = txfee.NewStaticCalculator(
+		testContextPreEtna.StaticFeeConfig,
+	)
+
 	testContextPostEtna = &builder.Context{
 		NetworkID:   constants.UnitTestID,
 		AVAXAssetID: avaxAssetID,
@@ -115,6 +119,10 @@ var (
 		},
 		GasPrice: 1,
 	}
+	dynamicFeeCalculator = txfee.NewDynamicCalculator(
+		testContextPostEtna.ComplexityWeights,
+		testContextPostEtna.GasPrice,
+	)
 
 	testEnvironment = []struct {
 		name          string
@@ -122,19 +130,14 @@ var (
 		feeCalculator txfee.Calculator
 	}{
 		{
-			name:    "Pre-Etna",
-			context: testContextPreEtna,
-			feeCalculator: txfee.NewStaticCalculator(
-				testContextPreEtna.StaticFeeConfig,
-			),
+			name:          "Pre-Etna",
+			context:       testContextPreEtna,
+			feeCalculator: staticFeeCalculator,
 		},
 		{
-			name:    "Post-Etna",
-			context: testContextPostEtna,
-			feeCalculator: txfee.NewDynamicCalculator(
-				testContextPostEtna.ComplexityWeights,
-				testContextPostEtna.GasPrice,
-			),
+			name:          "Post-Etna",
+			context:       testContextPostEtna,
+			feeCalculator: dynamicFeeCalculator,
 		},
 	}
 )
@@ -157,18 +160,14 @@ func TestBaseTx(t *testing.T) {
 			utx, err := builder.NewBaseTx([]*avax.TransferableOutput{avaxOutput})
 			require.NoError(err)
 			require.Contains(utx.Outs, avaxOutput)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -197,18 +196,14 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
 			require.NoError(err)
 			require.Equal(utx.SubnetValidator, *subnetValidator)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -233,18 +228,14 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			require.NoError(err)
 			require.Equal(utx.NodeID, nodeID)
 			require.Equal(utx.Subnet, subnetID)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -282,18 +273,14 @@ func TestCreateChainTx(t *testing.T) {
 			require.Equal(utx.VMID, vmID)
 			require.ElementsMatch(utx.FxIDs, fxIDs)
 			require.Equal(utx.GenesisData, genesisBytes)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -313,18 +300,14 @@ func TestCreateSubnetTx(t *testing.T) {
 
 			utx, err := builder.NewCreateSubnetTx(subnetOwner)
 			require.NoError(err)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -348,18 +331,14 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			)
 			require.NoError(err)
 			require.Equal(utx.Subnet, subnetID)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -390,18 +369,14 @@ func TestImportTx(t *testing.T) {
 			require.NoError(err)
 			require.Empty(utx.Ins)                              // The imported input should be sufficient for fees
 			require.Len(utx.ImportedInputs, len(importedUTXOs)) // All utxos should be imported
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins, utx.ImportedInputs),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				utx.ImportedInputs,
+				nil,
+				nil,
 			)
 		})
 	}
@@ -427,18 +402,14 @@ func TestExportTx(t *testing.T) {
 			)
 			require.NoError(err)
 			require.ElementsMatch(utx.ExportedOutputs, exportedOutputs)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs, utx.ExportedOutputs),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				utx.ExportedOutputs,
+				nil,
 			)
 		})
 	}
@@ -498,17 +469,16 @@ func TestTransformSubnetTx(t *testing.T) {
 	require.Equal(utx.MinDelegatorStake, minDelegatorStake)
 	require.Equal(utx.MaxValidatorWeightFactor, maxValidatorWeightFactor)
 	require.Equal(utx.UptimeRequirement, uptimeRequirement)
-
-	// Verify that the fee was calculated correctly
-	require.Equal(
-		addAmounts(
-			addOutputAmounts(utx.Outs),
-			map[ids.ID]uint64{
-				avaxAssetID:   testContextPreEtna.StaticFeeConfig.TransformSubnetTxFee,
-				subnetAssetID: maxSupply - initialSupply,
-			},
-		),
-		addInputAmounts(utx.Ins),
+	requireFeeIsCorrect(
+		require,
+		staticFeeCalculator,
+		utx,
+		&utx.BaseTx.BaseTx,
+		nil,
+		nil,
+		map[ids.ID]uint64{
+			subnetAssetID: maxSupply - initialSupply,
+		},
 	)
 }
 
@@ -583,18 +553,14 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			require.Equal(utx.ValidatorRewardsOwner, validationRewardsOwner)
 			require.Equal(utx.DelegatorRewardsOwner, delegationRewardsOwner)
 			require.Equal(utx.DelegationShares, delegationShares)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs, utx.StakeOuts),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				utx.StakeOuts,
+				nil,
 			)
 		})
 	}
@@ -628,18 +594,14 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				addOutputAmounts(utx.StakeOuts),
 			)
 			require.Equal(utx.DelegationRewardsOwner, rewardsOwner)
-
-			// Verify that the fee was calculated correctly
-			expectedFee, err := e.feeCalculator.CalculateFee(utx)
-			require.NoError(err)
-			require.Equal(
-				addAmounts(
-					addOutputAmounts(utx.Outs, utx.StakeOuts),
-					map[ids.ID]uint64{
-						avaxAssetID: expectedFee,
-					},
-				),
-				addInputAmounts(utx.Ins),
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				utx.StakeOuts,
+				nil,
 			)
 		})
 	}
@@ -733,6 +695,32 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 			},
 		},
 	}
+}
+
+// requireFeeIsCorrect calculates the required fee for the unsigned transaction
+// and verifies that the burned amount is exactly the required fee.
+func requireFeeIsCorrect(
+	require *require.Assertions,
+	feeCalculator txfee.Calculator,
+	utx txs.UnsignedTx,
+	baseTx *avax.BaseTx,
+	additionalIns []*avax.TransferableInput,
+	additionalOuts []*avax.TransferableOutput,
+	additionalFee map[ids.ID]uint64,
+) {
+	amountConsumed := addInputAmounts(baseTx.Ins, additionalIns)
+	amountProduced := addOutputAmounts(baseTx.Outs, additionalOuts)
+
+	expectedFee, err := feeCalculator.CalculateFee(utx)
+	require.NoError(err)
+	expectedAmountBurned := addAmounts(
+		map[ids.ID]uint64{
+			avaxAssetID: expectedFee,
+		},
+		additionalFee,
+	)
+	expectedAmountConsumed := addAmounts(amountProduced, expectedAmountBurned)
+	require.Equal(expectedAmountConsumed, amountConsumed)
 }
 
 func addAmounts(allAmounts ...map[ids.ID]uint64) map[ids.ID]uint64 {
