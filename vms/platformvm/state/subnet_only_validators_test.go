@@ -37,8 +37,6 @@ func TestAddValidator(t *testing.T) {
 			calculator,
 			validatorLinkedDB,
 			validatorManager,
-			validatorWeightDiffsDB,
-			validatorPublicKeyDiffsDB,
 		)
 
 		validationID = ids.GenerateTestID()
@@ -65,7 +63,11 @@ func TestAddValidator(t *testing.T) {
 	}, subnetOnlyValidators.validatorDiffs[validationID])
 	require.Equal(fee.Gas(1), subnetOnlyValidators.calculator.Current)
 
-	require.NoError(subnetOnlyValidators.Write(height))
+	require.NoError(subnetOnlyValidators.Write(
+		height,
+		validatorWeightDiffsDB,
+		validatorPublicKeyDiffsDB,
+	))
 
 	got, err := getSubnetOnlyValidator(subnetOnlyValidators.validatorDB, validationID)
 	require.NoError(err)

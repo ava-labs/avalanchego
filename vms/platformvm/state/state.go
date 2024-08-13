@@ -654,8 +654,6 @@ func newState(
 			},
 			linkeddb.NewDefault(currentSubnetOnlyValidatorBaseDB),
 			cfg.Validators,
-			validatorWeightDiffsDB,
-			validatorPublicKeyDiffsDB,
 		),
 
 		validatorsDB:                     validatorsDB,
@@ -1744,7 +1742,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.subnetOnlyValidators.Write(height),
+		s.subnetOnlyValidators.Write(height, s.validatorWeightDiffsDB, s.validatorPublicKeyDiffsDB),
 		s.writeMetadata(),
 	)
 }

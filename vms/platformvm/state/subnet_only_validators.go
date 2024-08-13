@@ -48,7 +48,11 @@ type SubnetOnlyValidators interface {
 
 	Prune(maxToRemove int) ([]ids.ID, bool)
 
-	Write(height uint64) error
+	Write(
+		height uint64,
+		validatorWeightDiffsDB,
+		validatorPublicKeyDiffsDB database.KeyValueWriter,
+	) error
 }
 
 type subnetOnlyValidator struct {
@@ -93,30 +97,24 @@ type subnetOnlyValidators struct {
 	validators heap.Map[ids.ID, *subnetOnlyValidator] // validationID -> *subnetOnlyValidator
 
 	// validationID -> added for that validator since the last db write
-	validatorDiffs            map[ids.ID]*subnetOnlyValidatorDiff
-	validatorDB               linkeddb.LinkedDB
-	validatorManager          validators.Manager
-	validatorWeightDiffsDB    database.Database
-	validatorPublicKeyDiffsDB database.Database
+	validatorDiffs   map[ids.ID]*subnetOnlyValidatorDiff
+	validatorDB      linkeddb.LinkedDB
+	validatorManager validators.Manager
 }
 
 func newSubnetOnlyValidators(
 	calculator *fee.ValidatorState,
 	validatorDB linkeddb.LinkedDB,
 	validatorManager validators.Manager,
-	validatorWeightDiffsDB database.Database,
-	validatorPublicKeyDiffsDB database.Database,
 ) *subnetOnlyValidators {
 	return &subnetOnlyValidators{
 		aggregatedBalance: 0,
 		calculator:        calculator,
 
-		validators:                heap.NewMap[ids.ID, *subnetOnlyValidator]((*subnetOnlyValidator).Less),
-		validatorDiffs:            make(map[ids.ID]*subnetOnlyValidatorDiff),
-		validatorDB:               validatorDB,
-		validatorManager:          validatorManager,
-		validatorWeightDiffsDB:    validatorWeightDiffsDB,
-		validatorPublicKeyDiffsDB: validatorPublicKeyDiffsDB,
+		validators:       heap.NewMap[ids.ID, *subnetOnlyValidator]((*subnetOnlyValidator).Less),
+		validatorDiffs:   make(map[ids.ID]*subnetOnlyValidatorDiff),
+		validatorDB:      validatorDB,
+		validatorManager: validatorManager,
 	}
 }
 
@@ -284,7 +282,11 @@ func (s *subnetOnlyValidators) Prune(maxToRemove int) ([]ids.ID, bool) {
 	return removed, moreToRemove
 }
 
-func (s *subnetOnlyValidators) Write(height uint64) error {
+func (s *subnetOnlyValidators) Write(
+	height uint64,
+	validatorWeightDiffsDB,
+	validatorPublicKeyDiffsDB database.KeyValueWriter,
+) error {
 	for validationID, diff := range s.validatorDiffs {
 		delete(s.validatorDiffs, validationID)
 
@@ -294,7 +296,7 @@ func (s *subnetOnlyValidators) Write(height uint64) error {
 		}
 
 		err := writeValidatorWeightDiff(
-			s.validatorWeightDiffsDB,
+			validatorWeightDiffsDB,
 			vdr.SubnetID,
 			height,
 			vdr.NodeID,
@@ -305,7 +307,7 @@ func (s *subnetOnlyValidators) Write(height uint64) error {
 		}
 
 		err = writeValidatorPublicKeyDiff(
-			s.validatorPublicKeyDiffsDB,
+			validatorPublicKeyDiffsDB,
 			vdr.SubnetID,
 			height,
 			vdr.NodeID,
