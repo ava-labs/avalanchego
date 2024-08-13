@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm"
@@ -16,7 +17,7 @@ import (
 
 type vmVersions struct {
 	Name       string            `json:"name"`
-	VMID       string            `json:"vmid"`
+	VMID       ids.ID            `json:"vmid"`
 	Version    *version.Semantic `json:"version"`
 	RPCChainVM uint64            `json:"rpcchainvm"`
 }
@@ -32,7 +33,7 @@ func Command() *cobra.Command {
 func versionFunc(*cobra.Command, []string) error {
 	versions := vmVersions{
 		Name:       constants.XSVMName,
-		VMID:       constants.XSVMID.String(),
+		VMID:       constants.XSVMID,
 		Version:    xsvm.Version,
 		RPCChainVM: uint64(version.RPCChainVMProtocol),
 	}
