@@ -15,7 +15,7 @@ import (
 
 // VM describes the interface that all consensus VMs must implement
 type VM interface {
-	AppHandler
+	NetworkAppHandler
 
 	// Returns nil if the VM is healthy.
 	// Periodically called and reported via the node's Health API.
@@ -53,7 +53,7 @@ type VM interface {
 		configBytes []byte,
 		toEngine chan<- Message,
 		fxs []*Fx,
-		appSender AppSender,
+		appSender NetworkAppSender,
 	) error
 
 	// SetState communicates to VM its next state it starts

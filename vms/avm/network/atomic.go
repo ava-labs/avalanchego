@@ -15,16 +15,16 @@ import (
 var _ Atomic = (*atomic)(nil)
 
 type Atomic interface {
-	common.AppHandler
+	common.NetworkAppHandler
 
-	Set(common.AppHandler)
+	Set(common.NetworkAppHandler)
 }
 
 type atomic struct {
-	handler utils.Atomic[common.AppHandler]
+	handler utils.Atomic[common.NetworkAppHandler]
 }
 
-func NewAtomic(h common.AppHandler) Atomic {
+func NewAtomic(h common.NetworkAppHandler) Atomic {
 	a := &atomic{}
 	a.handler.Set(h)
 	return a
@@ -90,6 +90,6 @@ func (a *atomic) AppGossip(
 	)
 }
 
-func (a *atomic) Set(h common.AppHandler) {
+func (a *atomic) Set(h common.NetworkAppHandler) {
 	a.handler.Set(h)
 }

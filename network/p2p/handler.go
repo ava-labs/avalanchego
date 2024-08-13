@@ -101,7 +101,7 @@ type responder struct {
 	Handler
 	handlerID uint64
 	log       logging.Logger
-	sender    common.AppSender
+	sender    common.NetworkAppSender
 }
 
 // AppRequest calls the underlying handler and sends back the response to nodeID

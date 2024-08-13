@@ -940,7 +940,7 @@ func initTestRemoteProposerVM(
 		[]byte,
 		chan<- common.Message,
 		[]*common.Fx,
-		common.AppSender,
+		common.NetworkAppSender,
 	) error {
 		return nil
 	}

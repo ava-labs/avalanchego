@@ -37,7 +37,7 @@ var (
 )
 
 type VM struct {
-	common.AppHandler
+	common.NetworkAppHandler
 
 	chainContext *snow.Context
 	db           database.Database
@@ -57,9 +57,9 @@ func (vm *VM) Initialize(
 	_ []byte,
 	engineChan chan<- common.Message,
 	_ []*common.Fx,
-	_ common.AppSender,
+	_ common.NetworkAppSender,
 ) error {
-	vm.AppHandler = common.NewNoOpAppHandler(chainContext.Log)
+	vm.NetworkAppHandler = common.NewNoOpAppHandler(chainContext.Log)
 
 	chainContext.Log.Info("initializing xsvm",
 		zap.Stringer("version", Version),

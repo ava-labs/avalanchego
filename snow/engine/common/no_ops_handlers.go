@@ -25,7 +25,7 @@ var (
 	_ PutHandler                  = (*noOpPutHandler)(nil)
 	_ QueryHandler                = (*noOpQueryHandler)(nil)
 	_ ChitsHandler                = (*noOpChitsHandler)(nil)
-	_ AppHandler                  = (*noOpAppHandler)(nil)
+	_ NetworkAppHandler           = (*noOpAppHandler)(nil)
 	_ InternalHandler             = (*noOpInternalHandler)(nil)
 )
 
@@ -264,7 +264,7 @@ type noOpAppHandler struct {
 	log logging.Logger
 }
 
-func NewNoOpAppHandler(log logging.Logger) AppHandler {
+func NewNoOpAppHandler(log logging.Logger) NetworkAppHandler {
 	return &noOpAppHandler{log: log}
 }
 

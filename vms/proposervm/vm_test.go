@@ -102,7 +102,7 @@ func initTestProposerVM(
 
 	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender,
+		[]*common.Fx, common.NetworkAppSender,
 	) error {
 		return nil
 	}
@@ -856,7 +856,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		_ []byte,
 		toEngineChan chan<- common.Message,
 		_ []*common.Fx,
-		_ common.AppSender,
+		_ common.NetworkAppSender,
 	) error {
 		toScheduler = toEngineChan
 		return nil
@@ -1093,7 +1093,7 @@ func TestInnerVMRollback(t *testing.T) {
 				[]byte,
 				chan<- common.Message,
 				[]*common.Fx,
-				common.AppSender,
+				common.NetworkAppSender,
 			) error {
 				return nil
 			},
@@ -1573,7 +1573,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 
 	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender,
+		[]*common.Fx, common.NetworkAppSender,
 	) error {
 		return nil
 	}
@@ -1746,7 +1746,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 
 	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.AppSender,
+		[]*common.Fx, common.NetworkAppSender,
 	) error {
 		return nil
 	}
@@ -2174,7 +2174,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	coreVM := &blocktest.VM{
 		VM: enginetest.VM{
 			T: t,
-			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
+			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.NetworkAppSender) error {
 				return nil
 			},
 		},

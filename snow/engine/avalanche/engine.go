@@ -29,7 +29,7 @@ type engine struct {
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
-	common.AppHandler
+	common.NetworkAppHandler
 	common.InternalHandler
 
 	ctx *snow.ConsensusContext
@@ -51,7 +51,7 @@ func New(
 		PutHandler:                  common.NewNoOpPutHandler(ctx.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(ctx.Log),
-		AppHandler:                  common.NewNoOpAppHandler(ctx.Log),
+		NetworkAppHandler:           common.NewNoOpAppHandler(ctx.Log),
 		InternalHandler:             common.NewNoOpInternalHandler(ctx.Log),
 		ctx:                         ctx,
 		vm:                          vm,

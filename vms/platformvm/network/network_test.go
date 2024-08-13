@@ -63,7 +63,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		mempoolFunc               func(*gomock.Controller) pmempool.Mempool
 		txVerifier                testTxVerifier
 		partialSyncPrimaryNetwork bool
-		appSenderFunc             func(*gomock.Controller) common.AppSender
+		appSenderFunc             func(*gomock.Controller) common.NetworkAppSender
 		expectedErr               error
 	}
 
@@ -75,7 +75,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(tx, true)
 				return mempool
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+			appSenderFunc: func(ctrl *gomock.Controller) common.NetworkAppSender {
 				return common.NewMockSender(ctrl)
 			},
 			expectedErr: mempool.ErrDuplicateTx,
@@ -88,7 +88,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool.EXPECT().GetDropReason(gomock.Any()).Return(errTest)
 				return mempool
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+			appSenderFunc: func(ctrl *gomock.Controller) common.NetworkAppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
 			},
@@ -104,7 +104,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return mempool
 			},
 			txVerifier: testTxVerifier{err: errTest},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+			appSenderFunc: func(ctrl *gomock.Controller) common.NetworkAppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
 			},
@@ -120,7 +120,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool.EXPECT().MarkDropped(gomock.Any(), gomock.Any())
 				return mempool
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+			appSenderFunc: func(ctrl *gomock.Controller) common.NetworkAppSender {
 				// Shouldn't gossip the tx
 				return common.NewMockSender(ctrl)
 			},
@@ -132,7 +132,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return pmempool.NewMockMempool(ctrl)
 			},
 			partialSyncPrimaryNetwork: true,
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+			appSenderFunc: func(ctrl *gomock.Controller) common.NetworkAppSender {
 				return common.NewMockSender(ctrl)
 			},
 			expectedErr: errMempoolDisabledWithPartialSync,
@@ -149,7 +149,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				mempool.EXPECT().Get(gomock.Any()).Return(nil, true).Times(2)
 				return mempool
 			},
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+			appSenderFunc: func(ctrl *gomock.Controller) common.NetworkAppSender {
 				appSender := common.NewMockSender(ctrl)
 				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender

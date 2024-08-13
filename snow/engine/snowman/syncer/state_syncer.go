@@ -46,7 +46,7 @@ type stateSyncer struct {
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
-	common.AppHandler
+	common.NetworkAppHandler
 
 	started bool
 
@@ -103,7 +103,7 @@ func New(
 		PutHandler:              common.NewNoOpPutHandler(cfg.Ctx.Log),
 		QueryHandler:            common.NewNoOpQueryHandler(cfg.Ctx.Log),
 		ChitsHandler:            common.NewNoOpChitsHandler(cfg.Ctx.Log),
-		AppHandler:              cfg.VM,
+		NetworkAppHandler:       cfg.VM,
 		stateSyncVM:             ssVM,
 		onDoneStateSyncing:      onDoneStateSyncing,
 	}

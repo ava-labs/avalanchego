@@ -60,7 +60,7 @@ func New(
 		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:                  config.VM,
+		NetworkAppHandler:           config.VM,
 
 		outstandingRequests:     bimap.New[common.Request, ids.ID](),
 		outstandingRequestTimes: make(map[common.Request]time.Time),
@@ -85,7 +85,7 @@ type bootstrapper struct {
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
-	common.AppHandler
+	common.NetworkAppHandler
 
 	metrics
 

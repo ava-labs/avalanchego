@@ -36,7 +36,7 @@ type Client struct {
 	handlerIDStr  string
 	handlerPrefix []byte
 	router        *router
-	sender        common.AppSender
+	sender        common.NetworkAppSender
 	options       *clientOptions
 }
 

@@ -85,11 +85,11 @@ type networkClient struct {
 	// tracking of peers & bandwidth usage
 	peers *p2p.PeerTracker
 	// For sending messages to peers
-	appSender common.AppSender
+	appSender common.NetworkAppSender
 }
 
 func NewNetworkClient(
-	appSender common.AppSender,
+	appSender common.NetworkAppSender,
 	myNodeID ids.NodeID,
 	maxActiveRequests int64,
 	log logging.Logger,
