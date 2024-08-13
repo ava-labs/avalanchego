@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -126,12 +127,7 @@ var (
 		testContextPostEtna.GasPrice,
 	)
 
-	testEnvironment = []struct {
-		name          string
-		context       *builder.Context
-		feeCalculator txfee.Calculator
-		memo          []byte
-	}{
+	testEnvironmentPreEtna = []environment{
 		{
 			name:          "Pre-Etna",
 			context:       testContextPreEtna,
@@ -143,19 +139,32 @@ var (
 			feeCalculator: staticFeeCalculator,
 			memo:          []byte("memo"),
 		},
+	}
+	testEnvironmentPostEtna = []environment{
 		{
 			name:          "Post-Etna",
 			context:       testContextPostEtna,
 			feeCalculator: dynamicFeeCalculator,
 		},
 		{
-			name:          "Pre-Etna with memo",
-			context:       testContextPreEtna,
-			feeCalculator: staticFeeCalculator,
+			name:          "Post-Etna with memo",
+			context:       testContextPostEtna,
+			feeCalculator: dynamicFeeCalculator,
 			memo:          []byte("memo"),
 		},
 	}
+	testEnvironment = utils.Join(
+		testEnvironmentPreEtna,
+		testEnvironmentPostEtna,
+	)
 )
+
+type environment struct {
+	name          string
+	context       *builder.Context
+	feeCalculator txfee.Calculator
+	memo          []byte
+}
 
 // These tests create a tx, then verify that utxos included in the tx are
 // exactly necessary to pay fees for it.
@@ -456,9 +465,8 @@ func TestExportTx(t *testing.T) {
 	}
 }
 
-// TransformSubnetTx is not valid to be issued post-Etna
 func TestTransformSubnetTx(t *testing.T) {
-	var (
+	const (
 		initialSupply                   = 40 * units.MegaAvax
 		maxSupply                       = 100 * units.MegaAvax
 		minConsumptionRate       uint64 = reward.PercentDenominator
@@ -471,57 +479,65 @@ func TestTransformSubnetTx(t *testing.T) {
 		minDelegatorStake        uint64 = 1
 		maxValidatorWeightFactor byte   = 5
 		uptimeRequirement        uint32 = .80 * reward.PercentDenominator
+	)
 
-		require    = require.New(t)
-		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
-			constants.PlatformChainID: utxos,
+	// TransformSubnetTx is not valid to be issued post-Etna
+	for _, e := range testEnvironmentPreEtna {
+		t.Run(e.name, func(t *testing.T) {
+			var (
+				require    = require.New(t)
+				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+					constants.PlatformChainID: utxos,
+				})
+				backend = NewBackend(testContextPreEtna, chainUTXOs, subnets)
+				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContextPreEtna, backend)
+			)
+
+			utx, err := builder.NewTransformSubnetTx(
+				subnetID,
+				subnetAssetID,
+				initialSupply,
+				maxSupply,
+				minConsumptionRate,
+				maxConsumptionRate,
+				minValidatorStake,
+				maxValidatorStake,
+				minStakeDuration,
+				maxStakeDuration,
+				minDelegationFee,
+				minDelegatorStake,
+				maxValidatorWeightFactor,
+				uptimeRequirement,
+				common.WithMemo(e.memo),
+			)
+			require.NoError(err)
+			require.Equal(subnetID, utx.Subnet)
+			require.Equal(subnetAssetID, utx.AssetID)
+			require.Equal(initialSupply, utx.InitialSupply)
+			require.Equal(maxSupply, utx.MaximumSupply)
+			require.Equal(minConsumptionRate, utx.MinConsumptionRate)
+			require.Equal(minValidatorStake, utx.MinValidatorStake)
+			require.Equal(maxValidatorStake, utx.MaxValidatorStake)
+			require.Equal(uint32(minStakeDuration/time.Second), utx.MinStakeDuration)
+			require.Equal(uint32(maxStakeDuration/time.Second), utx.MaxStakeDuration)
+			require.Equal(minDelegationFee, utx.MinDelegationFee)
+			require.Equal(minDelegatorStake, utx.MinDelegatorStake)
+			require.Equal(maxValidatorWeightFactor, utx.MaxValidatorWeightFactor)
+			require.Equal(uptimeRequirement, utx.UptimeRequirement)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			requireFeeIsCorrect(
+				require,
+				staticFeeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				map[ids.ID]uint64{
+					subnetAssetID: maxSupply - initialSupply,
+				},
+			)
 		})
-		backend = NewBackend(testContextPreEtna, chainUTXOs, subnets)
-		builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContextPreEtna, backend)
-	)
-
-	utx, err := builder.NewTransformSubnetTx(
-		subnetID,
-		subnetAssetID,
-		initialSupply,
-		maxSupply,
-		minConsumptionRate,
-		maxConsumptionRate,
-		minValidatorStake,
-		maxValidatorStake,
-		minStakeDuration,
-		maxStakeDuration,
-		minDelegationFee,
-		minDelegatorStake,
-		maxValidatorWeightFactor,
-		uptimeRequirement,
-	)
-	require.NoError(err)
-	require.Equal(subnetID, utx.Subnet)
-	require.Equal(subnetAssetID, utx.AssetID)
-	require.Equal(initialSupply, utx.InitialSupply)
-	require.Equal(maxSupply, utx.MaximumSupply)
-	require.Equal(minConsumptionRate, utx.MinConsumptionRate)
-	require.Equal(minValidatorStake, utx.MinValidatorStake)
-	require.Equal(maxValidatorStake, utx.MaxValidatorStake)
-	require.Equal(uint32(minStakeDuration/time.Second), utx.MinStakeDuration)
-	require.Equal(uint32(maxStakeDuration/time.Second), utx.MaxStakeDuration)
-	require.Equal(minDelegationFee, utx.MinDelegationFee)
-	require.Equal(minDelegatorStake, utx.MinDelegatorStake)
-	require.Equal(maxValidatorWeightFactor, utx.MaxValidatorWeightFactor)
-	require.Equal(uptimeRequirement, utx.UptimeRequirement)
-	require.Empty(utx.Memo)
-	requireFeeIsCorrect(
-		require,
-		staticFeeCalculator,
-		utx,
-		&utx.BaseTx.BaseTx,
-		nil,
-		nil,
-		map[ids.ID]uint64{
-			subnetAssetID: maxSupply - initialSupply,
-		},
-	)
+	}
 }
 
 func TestAddPermissionlessValidatorTx(t *testing.T) {
