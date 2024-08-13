@@ -53,7 +53,11 @@ func NewContextFromClients(
 			NetworkID:         networkID,
 			AVAXAssetID:       asset.AssetID,
 			ComplexityWeights: dynamicFeeConfig.Weights,
-			GasPrice:          gasPrice,
+			// The gas price is doubled to attempt to handle concurrent tx
+			// issuance.
+			//
+			// TODO: Handle this better. Either here or in the mempool.
+			GasPrice: 2 * gasPrice,
 		}, nil
 	}
 
