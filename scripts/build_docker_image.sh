@@ -13,10 +13,17 @@ source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
 # WARNING: this will use the most recent commit even if there are un-committed changes present
 BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"${CURRENT_BRANCH}"}
+DOCKERHUB_TAG=${SUBNET_EVM_COMMIT::8}
+
+VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
+if [[ "${VM_ID}" != "${DEFAULT_VM_ID}"  ]]; then
+  DOCKERHUB_TAG="${VM_ID}-${DOCKERHUB_TAG}"
+fi
 
 echo "Building Docker Image: $DOCKERHUB_REPO:$BUILD_IMAGE_ID based of AvalancheGo@$AVALANCHE_VERSION"
-docker build -t "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" -t "$DOCKERHUB_REPO:${SUBNET_EVM_COMMIT::8}" \
+docker build -t "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" -t "$DOCKERHUB_REPO:${DOCKERHUB_TAG}" \
  "$SUBNET_EVM_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg AVALANCHE_VERSION="$AVALANCHE_VERSION" \
   --build-arg SUBNET_EVM_COMMIT="$SUBNET_EVM_COMMIT" \
-  --build-arg CURRENT_BRANCH="$CURRENT_BRANCH"
+  --build-arg CURRENT_BRANCH="$CURRENT_BRANCH" \
+  --build-arg VM_ID="$VM_ID"
