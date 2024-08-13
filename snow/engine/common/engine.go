@@ -348,7 +348,7 @@ type ChitsHandler interface {
 	) error
 }
 
-type NetworkAppHandler interface {
+type AppHandler interface {
 	AppRequestHandler
 	AppResponseHandler
 	AppGossipHandler
@@ -413,10 +413,6 @@ type AppGossipHandler interface {
 		nodeID ids.NodeID,
 		msg []byte,
 	) error
-}
-
-type AppHandler interface {
-	NetworkAppHandler
 }
 
 type InternalHandler interface {
