@@ -193,7 +193,7 @@ message StateSummaryFrontier {
 // GetAcceptedStateSummary requests a set of state summaries at a set of
 // block heights
 message GetAcceptedStateSummary {
-  // Chain bein requested from
+  // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
   uint32 request_id = 2;
