@@ -1437,7 +1437,7 @@ func (b *builder) spend(
 			return nil, nil, nil, err
 		}
 
-		// If we have consumed enough of the asset, then we have no need burn
+		// If we have consumed enough of the asset, then we have no need to burn
 		// more.
 		if !s.shouldConsumeAsset(b.context.AVAXAssetID) && excessAVAX >= requiredFee {
 			break
