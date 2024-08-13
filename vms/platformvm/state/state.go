@@ -1989,8 +1989,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 					// Record that the public key for the validator is being
 					// added. This means the prior value for the public key was
 					// nil.
-					err := s.validatorPublicKeyDiffsDB.Put(
-						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
+					err := writeValidatorPublicKeyDiff(
+						s.validatorPublicKeyDiffsDB,
+						constants.PrimaryNetworkID,
+						height,
+						nodeID,
 						nil,
 					)
 					if err != nil {
@@ -2038,9 +2041,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 					// Note: We store the uncompressed public key here as it is
 					// significantly more efficient to parse when applying
 					// diffs.
-					err := s.validatorPublicKeyDiffsDB.Put(
-						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
-						bls.PublicKeyToUncompressedBytes(staker.PublicKey),
+					err := writeValidatorPublicKeyDiff(
+						s.validatorPublicKeyDiffsDB,
+						constants.PrimaryNetworkID,
+						height,
+						nodeID,
+						staker.PublicKey,
 					)
 					if err != nil {
 						return err
@@ -2069,9 +2075,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 				continue
 			}
 
-			err = s.validatorWeightDiffsDB.Put(
-				marshalDiffKey(subnetID, height, nodeID),
-				marshalWeightDiff(weightDiff),
+			err = writeValidatorWeightDiff(
+				s.validatorWeightDiffsDB,
+				subnetID,
+				height,
+				nodeID,
+				weightDiff,
 			)
 			if err != nil {
 				return err
@@ -2596,4 +2605,35 @@ func getFeeState(db database.KeyValueReader) (fee.State, error) {
 		return fee.State{}, err
 	}
 	return feeState, nil
+}
+
+func writeValidatorWeightDiff(
+	db database.KeyValueWriter,
+	subnetID ids.ID,
+	height uint64,
+	nodeID ids.NodeID,
+	weightDiff *ValidatorWeightDiff,
+) error {
+	return db.Put(
+		marshalDiffKey(subnetID, height, nodeID),
+		marshalWeightDiff(weightDiff),
+	)
+}
+
+func writeValidatorPublicKeyDiff(
+	db database.KeyValueWriter,
+	subnetID ids.ID,
+	height uint64,
+	nodeID ids.NodeID,
+	pk *bls.PublicKey,
+) error {
+	value := []byte(nil)
+	if pk != nil {
+		value = bls.PublicKeyToUncompressedBytes(pk)
+	}
+
+	return db.Put(
+		marshalDiffKey(subnetID, height, nodeID),
+		value,
+	)
 }

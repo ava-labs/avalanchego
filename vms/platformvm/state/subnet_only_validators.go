@@ -297,16 +297,23 @@ func (s *subnetOnlyValidators) Write(height uint64) error {
 			return fmt.Errorf("failed to get subnet only validator: %s", validationID)
 		}
 
-		if err := s.validatorWeightDiffsDB.Put(
-			marshalDiffKey(vdr.SubnetID, height, vdr.NodeID),
-			marshalWeightDiff(diff.weightDiff),
-		); err != nil {
+		err := writeValidatorWeightDiff(
+			s.validatorWeightDiffsDB,
+			vdr.SubnetID,
+			height,
+			vdr.NodeID,
+			diff.weightDiff,
+		)
+		if err != nil {
 			return err
 		}
 
-		err := s.validatorPublicKeyDiffsDB.Put(
-			marshalDiffKey(vdr.SubnetID, height, vdr.NodeID),
-			bls.PublicKeyToUncompressedBytes(vdr.PublicKey),
+		err = writeValidatorPublicKeyDiff(
+			s.validatorPublicKeyDiffsDB,
+			vdr.SubnetID,
+			height,
+			vdr.NodeID,
+			vdr.PublicKey,
 		)
 		if err != nil {
 			return err
