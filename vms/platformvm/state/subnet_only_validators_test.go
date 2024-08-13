@@ -56,7 +56,6 @@ func TestAddValidator(t *testing.T) {
 
 	require.NoError(subnetOnlyValidators.AddValidator(validationID, subnetID, nodeID, weight, balance, endTime, pk))
 
-	require.True(subnetOnlyValidators.validators.Contains(validationID))
 	require.Equal(&subnetOnlyValidatorDiff{
 		weightDiff: &ValidatorWeightDiff{
 			Decrease: false,

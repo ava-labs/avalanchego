@@ -133,10 +133,6 @@ func (s *subnetOnlyValidators) AddValidator(
 		return ErrAlreadyValidator
 	}
 
-	if err := s.validatorManager.AddStaker(subnetID, nodeID, pk, validationID, weight); err != nil {
-		return fmt.Errorf("failed to add staker: %w", err)
-	}
-
 	s.validators.Push(validationID, &subnetOnlyValidator{
 		ValidationID: validationID,
 		SubnetID:     subnetID,
@@ -321,6 +317,17 @@ func (s *subnetOnlyValidators) Write(height uint64) error {
 
 		switch diff.status {
 		case added:
+			err := s.validatorManager.AddStaker(
+				vdr.SubnetID,
+				vdr.NodeID,
+				vdr.PublicKey,
+				validationID,
+				vdr.Weight,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to add staker: %w", err)
+			}
+
 			if err := putSubnetOnlyValidator(s.validatorDB, vdr); err != nil {
 				return fmt.Errorf("failed to write subnet only validator: %w", err)
 			}
