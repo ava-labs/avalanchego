@@ -59,6 +59,7 @@ var (
 	originalStderr = os.Stderr
 
 	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
+	errNilNetworkUpgradesPB           = errors.New("network upgrades protobuf is nil")
 )
 
 // VMServer is a VM that is managed over RPC.
@@ -853,6 +854,10 @@ func (vm *VMServer) StateSummaryAccept(
 }
 
 func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, error) {
+	if pbUpgrades == nil {
+		return upgrade.Config{}, errNilNetworkUpgradesPB
+	}
+
 	ap1, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_1Time)
 	if err != nil {
 		return upgrade.Config{}, err
