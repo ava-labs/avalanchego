@@ -489,8 +489,8 @@ func TestTransformSubnetTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(testContextPreEtna, chainUTXOs, subnets)
-				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContextPreEtna, backend)
+				backend = NewBackend(e.context, chainUTXOs, subnets)
+				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
 			utx, err := builder.NewTransformSubnetTx(
@@ -527,7 +527,7 @@ func TestTransformSubnetTx(t *testing.T) {
 			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
-				staticFeeCalculator,
+				e.feeCalculator,
 				utx,
 				&utx.BaseTx.BaseTx,
 				nil,
