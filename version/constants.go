@@ -76,6 +76,7 @@ var (
 
 	DefaultUpgradeTime    = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	unreachableFutureTime = time.Date(10000, time.January, 1, 0, 0, 0, 0, time.UTC)
+	pastTime              = time.Date(1000, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	caminoEarliestTime     = time.Date(2022, time.May, 16, 8, 0, 0, 0, time.UTC)
 	columbusEarliestTime   = time.Date(2022, time.May, 16, 8, 0, 0, 0, time.UTC)
@@ -190,7 +191,7 @@ var (
 
 	// TODO @evlekht update this before release
 	BerlinPhaseTimes = map[uint32]time.Time{
-		constants.KopernikusID: unreachableFutureTime,
+		constants.KopernikusID: pastTime,
 		constants.ColumbusID:   unreachableFutureTime,
 		constants.CaminoID:     unreachableFutureTime,
 	}
