@@ -178,7 +178,7 @@ func TestBaseTx(t *testing.T) {
 			)
 			require.NoError(err)
 			require.Contains(utx.Outs, avaxOutput)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -217,8 +217,8 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.SubnetValidator, *subnetValidator)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(*subnetValidator, utx.SubnetValidator)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -250,9 +250,9 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.NodeID, nodeID)
-			require.Equal(utx.Subnet, subnetID)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(nodeID, utx.NodeID)
+			require.Equal(subnetID, utx.Subnet)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -294,12 +294,12 @@ func TestCreateChainTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.SubnetID, subnetID)
-			require.Equal(utx.GenesisData, genesisBytes)
-			require.Equal(utx.VMID, vmID)
-			require.ElementsMatch(utx.FxIDs, fxIDs)
-			require.Equal(utx.ChainName, chainName)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(subnetID, utx.SubnetID)
+			require.Equal(genesisBytes, utx.GenesisData)
+			require.Equal(vmID, utx.VMID)
+			require.ElementsMatch(fxIDs, utx.FxIDs)
+			require.Equal(chainName, utx.ChainName)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -330,8 +330,8 @@ func TestCreateSubnetTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.Owner, subnetOwner)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(subnetOwner, utx.Owner)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -363,9 +363,9 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.Subnet, subnetID)
-			require.Equal(utx.Owner, subnetOwner)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(subnetID, utx.Subnet)
+			require.Equal(subnetOwner, utx.Owner)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -403,8 +403,8 @@ func TestImportTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.SourceChain, sourceChainID)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(sourceChainID, utx.SourceChain)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			require.Empty(utx.Ins)                              // The imported input should be sufficient for fees
 			require.Len(utx.ImportedInputs, len(importedUTXOs)) // All utxos should be imported
 			requireFeeIsCorrect(
@@ -440,9 +440,9 @@ func TestExportTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.DestinationChain, subnetID)
-			require.ElementsMatch(utx.ExportedOutputs, exportedOutputs)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(subnetID, utx.DestinationChain)
+			require.ElementsMatch(exportedOutputs, utx.ExportedOutputs)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -497,19 +497,19 @@ func TestTransformSubnetTx(t *testing.T) {
 		uptimeRequirement,
 	)
 	require.NoError(err)
-	require.Equal(utx.Subnet, subnetID)
-	require.Equal(utx.AssetID, subnetAssetID)
-	require.Equal(utx.InitialSupply, initialSupply)
-	require.Equal(utx.MaximumSupply, maxSupply)
-	require.Equal(utx.MinConsumptionRate, minConsumptionRate)
-	require.Equal(utx.MinValidatorStake, minValidatorStake)
-	require.Equal(utx.MaxValidatorStake, maxValidatorStake)
-	require.Equal(utx.MinStakeDuration, uint32(minStakeDuration/time.Second))
-	require.Equal(utx.MaxStakeDuration, uint32(maxStakeDuration/time.Second))
-	require.Equal(utx.MinDelegationFee, minDelegationFee)
-	require.Equal(utx.MinDelegatorStake, minDelegatorStake)
-	require.Equal(utx.MaxValidatorWeightFactor, maxValidatorWeightFactor)
-	require.Equal(utx.UptimeRequirement, uptimeRequirement)
+	require.Equal(subnetID, utx.Subnet)
+	require.Equal(subnetAssetID, utx.AssetID)
+	require.Equal(initialSupply, utx.InitialSupply)
+	require.Equal(maxSupply, utx.MaximumSupply)
+	require.Equal(minConsumptionRate, utx.MinConsumptionRate)
+	require.Equal(minValidatorStake, utx.MinValidatorStake)
+	require.Equal(maxValidatorStake, utx.MaxValidatorStake)
+	require.Equal(uint32(minStakeDuration/time.Second), utx.MinStakeDuration)
+	require.Equal(uint32(maxStakeDuration/time.Second), utx.MaxStakeDuration)
+	require.Equal(minDelegationFee, utx.MinDelegationFee)
+	require.Equal(minDelegatorStake, utx.MinDelegatorStake)
+	require.Equal(maxValidatorWeightFactor, utx.MaxValidatorWeightFactor)
+	require.Equal(uptimeRequirement, utx.UptimeRequirement)
 	require.Empty(utx.Memo)
 	requireFeeIsCorrect(
 		require,
@@ -579,9 +579,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.Validator, primaryNetworkPermissionlessStaker.Validator)
-			require.Equal(utx.Subnet, primaryNetworkPermissionlessStaker.Subnet)
-			require.Equal(utx.Signer, pop)
+			require.Equal(primaryNetworkPermissionlessStaker.Validator, utx.Validator)
+			require.Equal(primaryNetworkPermissionlessStaker.Subnet, utx.Subnet)
+			require.Equal(pop, utx.Signer)
 			// Outputs should be merged if possible. For example, if there are two
 			// unlocked inputs consumed for staking, this should only produce one staked
 			// output.
@@ -593,10 +593,10 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				addOutputAmounts(utx.StakeOuts),
 			)
-			require.Equal(utx.ValidatorRewardsOwner, validationRewardsOwner)
-			require.Equal(utx.DelegatorRewardsOwner, delegationRewardsOwner)
-			require.Equal(utx.DelegationShares, delegationShares)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(validationRewardsOwner, utx.ValidatorRewardsOwner)
+			require.Equal(delegationRewardsOwner, utx.DelegatorRewardsOwner)
+			require.Equal(delegationShares, utx.DelegationShares)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -629,8 +629,8 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
-			require.Equal(utx.Validator, primaryNetworkPermissionlessStaker.Validator)
-			require.Equal(utx.Subnet, primaryNetworkPermissionlessStaker.Subnet)
+			require.Equal(primaryNetworkPermissionlessStaker.Validator, utx.Validator)
+			require.Equal(primaryNetworkPermissionlessStaker.Subnet, utx.Subnet)
 			// check stake amount
 			require.Equal(
 				map[ids.ID]uint64{
@@ -638,8 +638,8 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				},
 				addOutputAmounts(utx.StakeOuts),
 			)
-			require.Equal(utx.DelegationRewardsOwner, rewardsOwner)
-			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
+			require.Equal(rewardsOwner, utx.DelegationRewardsOwner)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
