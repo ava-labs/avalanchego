@@ -19,20 +19,10 @@ but compaction is not required to maintain the index. Firewood was first conceiv
 a very fast storage layer for the EVM but could be used on any blockchain that
 requires an authenticated state.
 
-Firewood only attempts to store the latest state on-disk and will actively clean up
-unused data when state diffs are committed. To avoid reference counting trie nodes,
-Firewood does not copy-on-write (COW) the state trie and instead keeps
-the latest version of the trie index on disk and applies in-place updates to it.
-Firewood keeps some configurable number of previous states in memory to power
-state sync (which may occur at a few roots behind the current state).
+Firewood only attempts to store recent revisions on-disk and will actively clean up
+unused data when revisions expire. Firewood keeps some configurable number of previous states in memory and on disk to power state sync (which may occur at a few roots behind the current state). To do this, a new root is always created for each revision that can reference either new nodes from this revision or nodes from a prior revision. When creating a revision, a list of nodes that are no longer needed are computed and saved to disk in a future-delete log (FDL) as well as kept in memory. When a revision expires, the nodes that were deleted when it was created are returned to the free space.
 
-Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL
-guarantees atomicity and durability in the database, but also offers
-“reversibility”: some portion of the old WAL can be optionally kept around to
-allow a fast in-memory rollback to recover some past versions of the entire
-store back in memory. While running the store, new changes will also contribute
-to the configured window of changes (at batch granularity) to access any past
-versions with no additional cost at all.
+Firewood guarantees recoverability by not referencing the new nodes in a new revision before they are flushed to disk, as well as carefully managing the free list during the creation and expiration of revisions.
 
 ## Architecture Diagram
 
@@ -73,69 +63,11 @@ versions with no additional cost at all.
   `Revision`.
 
 ## Roadmap
-
-**LEGEND**
-
-- [ ] Not started
-- [ ] :runner: In progress
-- [x] Complete
-
-### Green Milestone
-
-This milestone will focus on additional code cleanup, including supporting
-concurrent access to a specific revision, as well as cleaning up the basic
-reader and writer interfaces to have consistent read/write semantics.
-
-- [x] Concurrent readers of pinned revisions while allowing additional batches
-      to commit, to support parallel reads for the past consistent states. The revisions
-      are uniquely identified by root hashes.
-- [x] Pin a reader to a specific revision, so that future commits or other
-      operations do not see any changes.
-- [x] Be able to read-your-write in a batch that is not committed. Uncommitted
-      changes will not be shown to any other concurrent readers.
-- [x] Add some metrics framework to support timings and volume for future milestones
-      To support this, a new method Db::metrics() returns an object that can be serialized
-      into prometheus metrics or json (it implements [serde::Serialize])
-
-### Seasoned milestone
-
-This milestone will add support for proposals, including proposed future
-branches, with a cache to make committing these branches efficient.
-
-- [x] Be able to support multiple proposed revisions against the latest committed
-      version.
-- [x] Be able to propose a batch against the existing committed revision, or
-      propose a batch against any existing proposed revision.
-- [x] Committing a batch that has been proposed will invalidate all other proposals
-      that are not children of the committed proposed batch.
-- [x] Be able to quickly commit a batch that has been proposed.
-- [x] Remove RLP encoding
-
-### Dried milestone
-
-The focus of this milestone will be to support synchronization to other
-instances to replicate the state. A synchronization library should also
-be developed for this milestone.
-
-- [x] Migrate to a fully async interface
-- [x] Pluggable encoding for nodes, for optional compatibility with MerkleDB
-- [ ] :runner: MerkleDB root hash in parity for a seamless transition between MerkleDB
-      and Firewood.
-- [ ] :runner: Support replicating the full state with corresponding range proofs that
-      verify the correctness of the data.
-- [ ] Pluggable IO subsystem (tokio\_uring, monoio, etc)
-- [ ] Add metric reporting
-- [ ] Enforce limits on the size of the range proof as well as keys to make
-      synchronization easier for clients.
-- [ ] Add support for Ava Labs generic test tool via grpc client
-- [ ] Support replicating the delta state from the last sync point with
-      corresponding change proofs that verify the correctness of the data.
-- [ ] Refactor `Shale` to be more idiomatic, consider rearchitecting it
-
-## Build
-
-Firewood currently is Linux-only, as it has a dependency on the asynchronous
-I/O provided by the Linux kernel (see `libaio`).
+ - [ ] Complete the proof code
+ - [ ] Complete the revision manager
+ - [ ] Complete the API implementation
+ - [ ] Implement a node cache
+ - [ ] Hook up the RPC
 
 ## Run
 

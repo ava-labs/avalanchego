@@ -2,8 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::db::{Db, DbConfig};
-use firewood::storage::WalConfig;
-use firewood::v2::{api::Db as _, api::Error};
+use firewood::v2::api::Error;
 
 use std::path::Path;
 use std::{
@@ -21,11 +20,11 @@ pub mod database;
 pub mod db;
 pub mod process;
 
-trait IntoStatusResultExt<T> {
+trait _IntoStatusResultExt<T> {
     fn into_status_result(self) -> Result<T, Status>;
 }
 
-impl<T> IntoStatusResultExt<T> for Result<T, Error> {
+impl<T> _IntoStatusResultExt<T> for Result<T, Error> {
     // We map errors from bad arguments into Status::invalid_argument; all other errors are Status::internal errors
     fn into_status_result(self) -> Result<T, Status> {
         self.map_err(|err| match err {
@@ -47,17 +46,14 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn new<P: AsRef<Path>>(path: P, history_length: u32) -> Result<Self, Error> {
+    pub async fn new<P: AsRef<Path>>(path: P, _history_length: u32) -> Result<Self, Error> {
         // try to create the parents for this directory, but it's okay if it fails; it will get caught in Db::new
         std::fs::create_dir_all(&path).ok();
         // TODO: truncate should be false
         // see https://github.com/ava-labs/firewood/issues/418
-        let cfg = DbConfig::builder()
-            .wal(WalConfig::builder().max_revisions(history_length).build())
-            .truncate(true)
-            .build();
+        let cfg = DbConfig::builder().truncate(true).build();
 
-        let db = Db::new(path, &cfg).await?;
+        let db = Db::new(path, cfg).await?;
 
         Ok(Self {
             db,
@@ -74,12 +70,12 @@ impl Deref for Database {
     }
 }
 
-impl Database {
-    async fn latest(&self) -> Result<Arc<<Db as firewood::v2::api::Db>::Historical>, Error> {
-        let root_hash = self.root_hash().await?;
-        self.revision(root_hash).await
-    }
-}
+// impl Database {
+//     async fn latest(&self) -> Result<Arc<<Db as firewood::v2::api::Db>::Historical>, Error> {
+//         let root_hash = self.root_hash().await?;
+//         self.revision(root_hash).await
+//     }
+// }
 
 // TODO: implement Iterator
 #[derive(Debug)]

@@ -2,10 +2,6 @@
 // See the file LICENSE.md for licensing terms.
 
 use clap::Args;
-use firewood::{
-    db::{Db, DbConfig, WalConfig},
-    v2::api::{self, Db as _, DbView},
-};
 use std::str;
 
 #[derive(Debug, Args)]
@@ -25,26 +21,24 @@ pub struct Options {
     pub db: String,
 }
 
-pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-    log::debug!("get key value pair {:?}", opts);
-    let cfg = DbConfig::builder()
-        .truncate(false)
-        .wal(WalConfig::builder().max_revisions(10).build());
+// pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
+//     log::debug!("get key value pair {:?}", opts);
+//     let cfg = DbConfig::builder().truncate(false);
 
-    let db = Db::new(opts.db.clone(), &cfg.build()).await?;
+//     let db = Db::new(opts.db.clone(), cfg.build()).await?;
 
-    let rev = db.revision(db.root_hash().await?).await?;
+//     let rev = db.revision(db.root_hash().await?).await?;
 
-    match rev.val(opts.key.as_bytes()).await {
-        Ok(Some(val)) => {
-            let s = String::from_utf8_lossy(val.as_ref());
-            println!("{s:?}");
-            Ok(())
-        }
-        Ok(None) => {
-            eprintln!("Key '{}' not found", opts.key);
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
-}
+//     match rev.val(opts.key.as_bytes()).await {
+//         Ok(Some(val)) => {
+//             let s = String::from_utf8_lossy(val.as_ref());
+//             println!("{s:?}");
+//             Ok(())
+//         }
+//         Ok(None) => {
+//             eprintln!("Key '{}' not found", opts.key);
+//             Ok(())
+//         }
+//         Err(e) => Err(e),
+//     }
+// }

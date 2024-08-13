@@ -2,8 +2,7 @@
 members = [
   "firewood",
   "fwdctl",
-  "growth-ring",
-  "libaio",
+  "storage",
   "grpc-testtool",
 ]
 resolver = "2"

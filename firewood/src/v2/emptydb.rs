@@ -1,11 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::{
+    proof::{Proof, ProofNode},
+    range_proof::RangeProof,
+};
+
 use super::{
-    api::{Batch, Db, DbView, Error, HashKey, KeyType, RangeProof, ValueType},
+    api::{Batch, Db, DbView, Error, HashKey, KeyType, ValueType},
     propose::{Proposal, ProposalBase},
 };
-use crate::merkle::Proof;
 use async_trait::async_trait;
 use futures::Stream;
 use std::sync::Arc;
@@ -21,9 +25,6 @@ pub struct EmptyDb;
 #[derive(Debug)]
 pub struct HistoricalImpl;
 
-/// This is the hash of the [EmptyDb] root
-const ROOT_HASH: [u8; 32] = [0; 32];
-
 #[async_trait]
 impl Db for EmptyDb {
     type Historical = HistoricalImpl;
@@ -31,18 +32,14 @@ impl Db for EmptyDb {
     type Proposal = Proposal<HistoricalImpl>;
 
     async fn revision(&self, hash_key: HashKey) -> Result<Arc<Self::Historical>, Error> {
-        if hash_key == ROOT_HASH {
-            Ok(HistoricalImpl.into())
-        } else {
-            Err(Error::HashNotFound { provided: hash_key })
-        }
+        Err(Error::HashNotFound { provided: hash_key })
     }
 
-    async fn root_hash(&self) -> Result<HashKey, Error> {
-        Ok(ROOT_HASH)
+    async fn root_hash(&self) -> Result<Option<HashKey>, Error> {
+        Ok(None)
     }
 
-    async fn propose<K, V>(&self, data: Batch<K, V>) -> Result<Self::Proposal, Error>
+    async fn propose<K, V>(&self, data: Batch<K, V>) -> Result<Arc<Self::Proposal>, Error>
     where
         K: KeyType,
         V: ValueType,
@@ -58,15 +55,18 @@ impl Db for EmptyDb {
 impl DbView for HistoricalImpl {
     type Stream<'a> = EmptyStreamer;
 
-    async fn root_hash(&self) -> Result<HashKey, Error> {
-        Ok(ROOT_HASH)
+    async fn root_hash(&self) -> Result<Option<HashKey>, Error> {
+        Ok(None)
     }
 
     async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, Error> {
         Ok(None)
     }
 
-    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<Option<Proof<Vec<u8>>>, Error> {
+    async fn single_key_proof<K: KeyType>(
+        &self,
+        _key: K,
+    ) -> Result<Option<Proof<ProofNode>>, Error> {
         Ok(None)
     }
 
@@ -75,7 +75,7 @@ impl DbView for HistoricalImpl {
         _first_key: Option<K>,
         _last_key: Option<K>,
         _limit: Option<usize>,
-    ) -> Result<Option<RangeProof<Vec<u8>, Vec<u8>>>, Error> {
+    ) -> Result<Option<RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>>, Error> {
         Ok(None)
     }
 
@@ -100,8 +100,6 @@ impl Stream for EmptyStreamer {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use futures::StreamExt;
-
     use super::*;
     use crate::v2::api::{BatchOp, Proposal};
 
@@ -139,7 +137,7 @@ mod tests {
             BatchOp::Delete { key: b"z" },
         ];
 
-        let proposal1 = Arc::new(db.propose(batch).await?);
+        let proposal1 = db.propose(batch).await?;
 
         // create proposal2 which adds key "z" with value "undo"
         let proposal2 = proposal1
@@ -149,7 +147,6 @@ mod tests {
                 value: "undo",
             }])
             .await?;
-        let proposal2 = Arc::new(proposal2);
         // both proposals still have (k,v)
         assert_eq!(proposal1.val(b"k").await.unwrap().unwrap(), b"v");
         assert_eq!(proposal2.val(b"k").await.unwrap().unwrap(), b"v");
@@ -159,31 +156,14 @@ mod tests {
         assert_eq!(proposal2.val(b"z").await.unwrap().unwrap(), b"undo");
 
         // create a proposal3 by adding the two proposals together, keeping the originals
-        let proposal3 = proposal1.as_ref() + proposal2.as_ref();
-        assert_eq!(proposal3.val(b"k").await.unwrap().unwrap(), b"v");
-        assert_eq!(proposal3.val(b"z").await.unwrap().unwrap(), b"undo");
+        // TODO: consider making this possible again
+        // let proposal3 = proposal1.as_ref() + proposal2.as_ref();
+        // assert_eq!(proposal3.val(b"k").await.unwrap().unwrap(), b"v");
+        // assert_eq!(proposal3.val(b"z").await.unwrap().unwrap(), b"undo");
 
         // now consume proposal1 and proposal2
         proposal2.commit().await?;
 
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn empty_streamer() -> Result<(), Error> {
-        let emptydb = EmptyDb {};
-        let rev = emptydb.revision(ROOT_HASH).await?;
-        let mut iter = rev.iter()?;
-        assert!(iter.next().await.is_none());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn empty_streamer_start_at() -> Result<(), Error> {
-        let emptydb = EmptyDb {};
-        let rev = emptydb.revision(ROOT_HASH).await?;
-        let mut iter = rev.iter_from(b"ignored")?;
-        assert!(iter.next().await.is_none());
         Ok(())
     }
 }

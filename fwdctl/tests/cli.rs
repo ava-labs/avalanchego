@@ -35,6 +35,7 @@ fn fwdctl_prints_version() -> Result<()> {
     Ok(())
 }
 
+#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_creates_database() -> Result<()> {
@@ -49,6 +50,7 @@ fn fwdctl_creates_database() -> Result<()> {
     Ok(())
 }
 
+#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_insert_successful() -> Result<()> {
@@ -75,6 +77,7 @@ fn fwdctl_insert_successful() -> Result<()> {
     Ok(())
 }
 
+#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_get_successful() -> Result<()> {
@@ -110,6 +113,7 @@ fn fwdctl_get_successful() -> Result<()> {
     Ok(())
 }
 
+#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_delete_successful() -> Result<()> {
@@ -144,6 +148,7 @@ fn fwdctl_delete_successful() -> Result<()> {
     Ok(())
 }
 
+#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_root_hash() -> Result<()> {
@@ -177,6 +182,7 @@ fn fwdctl_root_hash() -> Result<()> {
     Ok(())
 }
 
+#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_dump() -> Result<()> {

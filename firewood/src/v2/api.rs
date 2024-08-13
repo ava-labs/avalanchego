@@ -1,8 +1,10 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::MerkleError;
-pub use crate::merkle::Proof;
+use crate::manager::RevisionManagerError;
+use crate::proof::ProofNode;
+use crate::range_proof::RangeProof;
+use crate::{merkle::MerkleError, proof::Proof};
 use async_trait::async_trait;
 use futures::Stream;
 use std::{fmt::Debug, sync::Arc};
@@ -30,7 +32,7 @@ impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug + 'static {}
 ///    in time
 ///  - They are used to provide integrity at different points in a
 ///    proof
-pub type HashKey = [u8; 32];
+pub type HashKey = storage::TrieHash;
 
 /// A key/value pair operation. Only put (upsert) and delete are
 /// supported
@@ -67,14 +69,14 @@ pub enum Error {
     IncorrectRootHash { provided: HashKey, current: HashKey },
 
     /// Invalid range
-    #[error("Invalid range: {first_key:?} > {last_key:?}")]
+    #[error("Invalid range: {start_key:?} > {end_key:?}")]
     InvalidRange {
-        first_key: Vec<u8>,
-        last_key: Vec<u8>,
+        start_key: Box<[u8]>,
+        end_key: Box<[u8]>,
     },
 
     #[error("IO error: {0}")]
-    IO(std::io::Error),
+    IO(#[from] std::io::Error),
 
     #[error("Invalid proposal")]
     InvalidProposal,
@@ -84,6 +86,9 @@ pub enum Error {
 
     #[error("Range too small")]
     RangeTooSmall,
+
+    #[error("request RangeProof for empty trie")]
+    RangeProofOnEmptyTrie,
 }
 
 impl From<MerkleError> for Error {
@@ -93,13 +98,11 @@ impl From<MerkleError> for Error {
     }
 }
 
-/// A range proof, consisting of a proof of the first key and the last key,
-/// and a vector of all key/value pairs
-#[derive(Debug)]
-pub struct RangeProof<K, V> {
-    pub first_key_proof: Proof<Vec<u8>>,
-    pub last_key_proof: Proof<Vec<u8>>,
-    pub middle: Vec<(K, V)>,
+impl From<RevisionManagerError> for Error {
+    fn from(err: RevisionManagerError) -> Self {
+        // TODO: do a better job
+        Error::InternalError(Box::new(err))
+    }
 }
 
 /// The database interface, which includes a type for a static view of
@@ -119,7 +122,7 @@ pub trait Db {
     async fn revision(&self, hash: HashKey) -> Result<Arc<Self::Historical>, Error>;
 
     /// Get the hash of the most recently committed version
-    async fn root_hash(&self) -> Result<HashKey, Error>;
+    async fn root_hash(&self) -> Result<Option<HashKey>, Error>;
 
     /// Propose a change to the database via a batch
     ///
@@ -134,7 +137,7 @@ pub trait Db {
     async fn propose<K: KeyType, V: ValueType>(
         &self,
         data: Batch<K, V>,
-    ) -> Result<Self::Proposal, Error>;
+    ) -> Result<Arc<Self::Proposal>, Error>;
 }
 
 /// A view of the database at a specific time. These are wrapped with
@@ -153,13 +156,14 @@ pub trait DbView {
         Self: 'a;
 
     /// Get the root hash for the current DbView
-    async fn root_hash(&self) -> Result<HashKey, Error>;
+    async fn root_hash(&self) -> Result<Option<HashKey>, Error>;
 
     /// Get the value of a specific key
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, Error>;
 
     /// Obtain a proof for a single key
-    async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<Option<Proof<Vec<u8>>>, Error>;
+    async fn single_key_proof<K: KeyType>(&self, key: K)
+        -> Result<Option<Proof<ProofNode>>, Error>;
 
     /// Obtain a range proof over a set of keys
     ///
@@ -174,7 +178,7 @@ pub trait DbView {
         first_key: Option<K>,
         last_key: Option<K>,
         limit: Option<usize>,
-    ) -> Result<Option<RangeProof<Vec<u8>, Vec<u8>>>, Error>;
+    ) -> Result<Option<RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>>, Error>;
 
     /// Obtain a stream over the keys/values of this view, using an optional starting point
     ///
@@ -231,5 +235,5 @@ pub trait Proposal: DbView + Send + Sync {
     async fn propose<K: KeyType, V: ValueType>(
         self: Arc<Self>,
         data: Batch<K, V>,
-    ) -> Result<Self::Proposal, Error>;
+    ) -> Result<Arc<Self::Proposal>, Error>;
 }

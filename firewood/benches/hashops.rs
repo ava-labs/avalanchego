@@ -4,25 +4,12 @@
 // hash benchmarks; run with 'cargo bench'
 
 use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
-use firewood::{
-    db::{BatchOp, DbConfig},
-    merkle::{Bincode, Merkle, TrieHash, TRIE_HASH_LEN},
-    shale::{
-        compact::{ChunkHeader, Store},
-        disk_address::DiskAddress,
-        in_mem::InMemLinearStore,
-        LinearStore, ObjCache, Storable, StoredView,
-    },
-    storage::WalConfig,
-    v2::api::{Db, Proposal},
-};
+use firewood::merkle::Merkle;
 use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
-use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path, sync::Arc};
-
-pub type MerkleWithEncoder = Merkle<InMemLinearStore, Bincode>;
-
-const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
+use std::sync::Arc;
+use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path};
+use storage::{MemStore, NodeStore};
 
 // To enable flamegraph output
 // cargo bench --bench shale-bench -- --profile-time=N
@@ -65,25 +52,27 @@ impl Profiler for FlamegraphProfiler {
     }
 }
 
-fn bench_trie_hash(criterion: &mut Criterion) {
-    let mut to = [1u8; TRIE_HASH_LEN];
-    let mut store = InMemLinearStore::new(TRIE_HASH_LEN as u64, 0u8);
-    store.write(0, &*ZERO_HASH).expect("write should succeed");
+// TODO danlaine use or remove
+// fn bench_trie_hash(criterion: &mut Criterion) {
+//     let mut to = [1u8; TRIE_HASH_LEN];
+//     let mut store = InMemLinearStore::new(TRIE_HASH_LEN as u64, 0u8);
+//     store.write(0, &*ZERO_HASH).expect("write should succeed");
 
-    #[allow(clippy::unwrap_used)]
-    criterion
-        .benchmark_group("TrieHash")
-        .bench_function("dehydrate", |b| {
-            b.iter(|| ZERO_HASH.serialize(&mut to).unwrap());
-        })
-        .bench_function("hydrate", |b| {
-            b.iter(|| TrieHash::deserialize(0, &store).unwrap());
-        });
-}
+//     #[allow(clippy::unwrap_used)]
+//     criterion
+//         .benchmark_group("TrieHash")
+//         .bench_function("dehydrate", |b| {
+//             b.iter(|| ZERO_HASH.serialize(&mut to).unwrap());
+//         })
+//         .bench_function("hydrate", |b| {
+//             b.iter(|| TrieHash::deserialize(0, &store).unwrap());
+//         });
+// }
 
-fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
-    const TEST_MEM_SIZE: u64 = 20_000_000;
-    const KEY_LEN: usize = 4;
+// This benchmark peeks into the merkle layer and times how long it takes
+// to insert NKEYS with a key length of KEYSIZE
+#[allow(clippy::unwrap_used)]
+fn bench_merkle<const NKEYS: usize, const KEYSIZE: usize>(criterion: &mut Criterion) {
     let mut rng = StdRng::seed_from_u64(1234);
 
     criterion
@@ -92,105 +81,83 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
         .bench_function("insert", |b| {
             b.iter_batched(
                 || {
-                    let merkle_payload_header = DiskAddress::from(0);
-
-                    #[allow(clippy::unwrap_used)]
-                    let merkle_payload_header_ref = StoredView::addr_to_obj(
-                        &InMemLinearStore::new(2 * ChunkHeader::SERIALIZED_LEN, 9),
-                        merkle_payload_header,
-                        ChunkHeader::SERIALIZED_LEN,
-                    )
-                    .unwrap();
-
-                    #[allow(clippy::unwrap_used)]
-                    let store = Store::new(
-                        InMemLinearStore::new(TEST_MEM_SIZE, 0),
-                        InMemLinearStore::new(TEST_MEM_SIZE, 1),
-                        merkle_payload_header_ref,
-                        ObjCache::new(1 << 20),
-                        4096,
-                        4096,
-                    )
-                    .unwrap();
-
-                    let merkle = MerkleWithEncoder::new(store);
-                    #[allow(clippy::unwrap_used)]
-                    let sentinel_addr = merkle.init_sentinel().unwrap();
+                    let store = Arc::new(MemStore::new(vec![]));
+                    let nodestore = NodeStore::new_empty_proposal(store);
+                    let merkle = Merkle::from(nodestore);
 
                     let keys: Vec<Vec<u8>> = repeat_with(|| {
                         (&mut rng)
                             .sample_iter(&Alphanumeric)
-                            .take(KEY_LEN)
+                            .take(KEYSIZE)
                             .collect()
                     })
-                    .take(N)
+                    .take(NKEYS)
                     .collect();
 
-                    (merkle, sentinel_addr, keys)
+                    (merkle, keys)
                 },
                 #[allow(clippy::unwrap_used)]
-                |(mut merkle, sentinel_addr, keys)| {
+                |(mut merkle, keys)| {
                     keys.into_iter()
-                        .for_each(|key| merkle.insert(key, vec![b'v'], sentinel_addr).unwrap())
+                        .for_each(|key| merkle.insert(&key, Box::new(*b"v")).unwrap());
+                    let _frozen = merkle.hash();
                 },
                 BatchSize::SmallInput,
             );
         });
 }
 
-fn bench_db<const N: usize>(criterion: &mut Criterion) {
-    const KEY_LEN: usize = 4;
-    let mut rng = StdRng::seed_from_u64(1234);
+// This bechmark does the same thing as bench_merkle except it uses the revision manager
+// TODO: Enable again once the revision manager is stable
+// fn _bench_db<const N: usize>(criterion: &mut Criterion) {
+//     const KEY_LEN: usize = 4;
+//     let mut rng = StdRng::seed_from_u64(1234);
 
-    #[allow(clippy::unwrap_used)]
-    criterion
-        .benchmark_group("Db")
-        .sample_size(30)
-        .bench_function("commit", |b| {
-            b.to_async(tokio::runtime::Runtime::new().unwrap())
-                .iter_batched(
-                    || {
-                        let batch_ops: Vec<_> = repeat_with(|| {
-                            (&mut rng)
-                                .sample_iter(&Alphanumeric)
-                                .take(KEY_LEN)
-                                .collect()
-                        })
-                        .map(|key: Vec<_>| BatchOp::Put {
-                            key,
-                            value: vec![b'v'],
-                        })
-                        .take(N)
-                        .collect();
-                        batch_ops
-                    },
-                    |batch_ops| async {
-                        let db_path = std::env::temp_dir();
-                        let db_path = db_path.join("benchmark_db");
-                        let cfg =
-                            DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
+//     #[allow(clippy::unwrap_used)]
+//     criterion
+//         .benchmark_group("Db")
+//         .sample_size(30)
+//         .bench_function("commit", |b| {
+//             b.to_async(tokio::runtime::Runtime::new().unwrap())
+//                 .iter_batched(
+//                     || {
+//                         let batch_ops: Vec<_> = repeat_with(|| {
+//                             (&mut rng)
+//                                 .sample_iter(&Alphanumeric)
+//                                 .take(KEY_LEN)
+//                                 .collect()
+//                         })
+//                         .map(|key: Vec<_>| BatchOp::Put {
+//                             key,
+//                             value: vec![b'v'],
+//                         })
+//                         .take(N)
+//                         .collect();
+//                         batch_ops
+//                     },
+//                     |batch_ops| async {
+//                         let db_path = std::env::temp_dir();
+//                         let db_path = db_path.join("benchmark_db");
+//                         let cfg = DbConfig::builder();
 
-                        #[allow(clippy::unwrap_used)]
-                        let db =
-                            firewood::db::Db::new(db_path, &cfg.clone().truncate(true).build())
-                                .await
-                                .unwrap();
+//                         #[allow(clippy::unwrap_used)]
+//                         let db = firewood::db::Db::new(db_path, cfg.clone().truncate(true).build())
+//                             .await
+//                             .unwrap();
 
-                        #[allow(clippy::unwrap_used)]
-                        Arc::new(db.propose(batch_ops).await.unwrap())
-                            .commit()
-                            .await
-                            .unwrap()
-                    },
-                    BatchSize::SmallInput,
-                );
-        });
-}
+//                         #[allow(clippy::unwrap_used)]
+//                         db.propose(batch_ops).await.unwrap().commit().await.unwrap()
+//                     },
+//                     BatchSize::SmallInput,
+//                 );
+//         });
+// }
 
 criterion_group! {
     name = benches;
     config = Criterion::default().with_profiler(FlamegraphProfiler::Init(100));
-    targets = bench_trie_hash, bench_merkle::<3>, bench_db::<100>
+    // targets = bench_trie_hash, bench_merkle::<3, 32>, bench_db::<100>
+    targets = bench_merkle::<3, 4>, bench_merkle<3, 32>
 }
 
 criterion_main!(benches);

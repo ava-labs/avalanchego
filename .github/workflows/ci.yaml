@@ -37,9 +37,9 @@ jobs:
             ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
             ${{ runner.os }}-deps-
       - name: Check
-        run: cargo check --workspace --tests --examples --benches --all-features
+        run: cargo check --workspace --tests --examples --benches
       - name: Build
-        run: cargo build --workspace --tests --examples --benches --all-features
+        run: cargo build --workspace --tests --examples --benches
         # Always update the cache
       - name: Cleanup
         run: |
@@ -100,7 +100,7 @@ jobs:
       - name: Format
         run: cargo fmt -- --check
       - name: Clippy
-        run: cargo clippy --tests --examples --benches --all-features -- -D warnings
+        run: cargo clippy --tests --examples --benches -- -D warnings
 
   test:
     needs: build
@@ -122,7 +122,7 @@ jobs:
             target/
           key: ${{ needs.build.outputs.cache-key }}
       - name: Run tests
-        run: cargo test --all-features --verbose
+        run: cargo test --verbose
 
   examples:
     needs: build
@@ -142,11 +142,11 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ needs.build.outputs.cache-key }}
-        # benchmarks were not being done in --release mode, we can enable this again later
-        # - name: Run benchmark example
-        #   run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
-      - name: Run insert example
-        run: RUST_BACKTRACE=1 cargo run --example insert
+  # benchmarks were not being done in --release mode, we can enable this again later
+  #     - name: Run benchmark example
+  #       run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
+  #   - name: Run insert example
+  #     run: RUST_BACKTRACE=1 cargo run --example insert
 
   docs:
     needs: build

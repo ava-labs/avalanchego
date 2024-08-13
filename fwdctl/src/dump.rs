@@ -2,12 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use clap::Args;
-use firewood::{
-    db::{Db, DbConfig, WalConfig},
-    merkle::Key,
-    v2::api::{self, Db as _},
-};
-use futures_util::StreamExt;
+use firewood::merkle::Key;
 use std::borrow::Cow;
 
 #[derive(Debug, Args)]
@@ -32,30 +27,28 @@ pub struct Options {
     pub start_key: Option<Key>,
 }
 
-pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-    log::debug!("dump database {:?}", opts);
-    let cfg = DbConfig::builder()
-        .truncate(false)
-        .wal(WalConfig::builder().max_revisions(10).build());
+// pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
+//     log::debug!("dump database {:?}", opts);
+//     let cfg = DbConfig::builder().truncate(false);
 
-    let db = Db::new(opts.db.clone(), &cfg.build()).await?;
-    let latest_hash = db.root_hash().await?;
-    let latest_rev = db.revision(latest_hash).await?;
-    let start_key = opts.start_key.clone().unwrap_or(Box::new([]));
-    let mut stream = latest_rev.stream_from(start_key);
-    loop {
-        match stream.next().await {
-            None => break,
-            Some(Ok((key, value))) => {
-                println!("'{}': '{}'", u8_to_string(&key), u8_to_string(&value));
-            }
-            Some(Err(e)) => return Err(e),
-        }
-    }
-    Ok(())
-}
+//     let db = Db::new(opts.db.clone(), cfg.build()).await?;
+//     let latest_hash = db.root_hash().await?;
+//     let latest_rev = db.revision(latest_hash).await?;
+//     let start_key = opts.start_key.clone().unwrap_or(Box::new([]));
+//     let mut stream = latest_rev.stream_from(&start_key);
+//     loop {
+//         match stream.next().await {
+//             None => break,
+//             Some(Ok((key, value))) => {
+//                 println!("'{}': '{}'", u8_to_string(&key), u8_to_string(&value));
+//             }
+//             Some(Err(e)) => return Err(e),
+//         }
+//     }
+//     Ok(())
+// }
 
-fn u8_to_string(data: &[u8]) -> Cow<'_, str> {
+fn _u8_to_string(data: &[u8]) -> Cow<'_, str> {
     String::from_utf8_lossy(data)
 }
 

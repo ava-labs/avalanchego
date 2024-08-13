@@ -105,7 +105,7 @@
 //! store. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
 //! virtual store into pages (yeah it appears to be more and more like an OS) and keep track of the
 //! dirty pages in some `CachedStore` instantiation (see `storage::StoreRevMut`). When a
-//! [`db::Proposal`] commits, both the recorded interval writes and the aggregated in-memory
+//! `db::Proposal` commits, both the recorded interval writes and the aggregated in-memory
 //! dirty pages induced by this write batch are taken out from the linear store. Although they are
 //! mathematically equivalent, interval writes are more compact than pages (which are 4K in size,
 //! become dirty even if a single byte is touched upon) . So interval writes are fed into the WAL
@@ -182,15 +182,11 @@
 //! some very old ghost store to keep the size of the rolling window invariant.
 //!
 pub mod db;
-pub(crate) mod file;
+pub mod manager;
 pub mod merkle;
-pub mod merkle_util;
-pub mod storage;
-
-pub mod config;
-pub mod nibbles;
-// TODO: shale should not be pub, but there are integration test dependencies :(
-pub mod shale;
+pub mod proof;
+pub mod range_proof;
+pub mod stream;
 
 pub mod logger;
 pub mod v2;
