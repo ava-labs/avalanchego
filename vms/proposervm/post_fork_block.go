@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -120,12 +121,53 @@ func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
+
+	// TODO: Both verifyVRFSig and Verify below calls GetValidatorSet; we might want to refactor that
+	// so we'll make that call only once.
+	if err := b.verifyVRFSig(ctx, child, parentPChainHeight); err != nil {
+		return err
+	}
+
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
 		child,
 	)
+}
+
+func (b *postForkBlock) verifyVRFSig(ctx context.Context, child *postForkBlock, parentPChainHeight uint64) error {
+	if !b.vm.Upgrades.IsEtnaActivated(child.Timestamp()) {
+		// if the VRFSig has yet to be activated, verify that the VRF signature isn't there.
+		if len(child.SignedBlock.VRFSig()) != 0 {
+			return errUnexpectedVRFSignature
+		}
+		return nil
+	}
+
+	var proposerPublicKey *bls.PublicKey
+	// find out the proposer for this block.
+	// if there is a known proposer. ( i.e. block was signed )
+	if childProposer := child.SignedBlock.Proposer(); childProposer != ids.EmptyNodeID {
+		// get the validators set.
+		validatorSet, err := child.vm.ctx.ValidatorState.GetValidatorSet(ctx, parentPChainHeight, b.vm.ctx.SubnetID)
+		if err != nil {
+			return err
+		}
+
+		// get the validator for this proposer
+		if childValidator, ok := validatorSet[childProposer]; !ok || childValidator == nil {
+			return errProposersNotActivated
+		} else {
+			proposerPublicKey = childValidator.PublicKey
+		}
+	}
+	// verify that the VRFSig was generated correctly.
+	// ( this works for both signed and unsigned blocks ).
+	if !child.SignedBlock.VerifySignature(proposerPublicKey, b.SignedBlock.VRFSig(), b.vm.ctx.ChainID, b.vm.ctx.NetworkID) {
+		return errInvalidVRFSignature
+	}
+	return nil
 }
 
 func (b *postForkBlock) verifyPostForkOption(ctx context.Context, child *postForkOption) error {
@@ -150,6 +192,7 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
+		b.SignedBlock.VRFSig(),
 	)
 }
 

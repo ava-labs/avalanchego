@@ -212,6 +212,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		newTimestamp,
 		pChainHeight,
 		innerBlock.Bytes(),
+		[]byte{}, // the parent of a prefork block is always a prefork, hence the blockVrfSig is known to be empty
 	)
 	if err != nil {
 		return nil, err

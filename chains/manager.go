@@ -796,6 +796,7 @@ func (m *manager) createAvalancheChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			StakingBLSKey:       m.StakingBLSKey,
 		},
 	)
 
@@ -1196,6 +1197,7 @@ func (m *manager) createSnowmanChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			StakingBLSKey:       m.StakingBLSKey,
 		},
 	)
 

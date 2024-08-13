@@ -6,7 +6,6 @@ package state
 import (
 	"crypto"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -15,15 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 func testBlockState(require *require.Assertions, bs BlockState) {
 	parentID := ids.ID{1}
-	timestamp := time.Unix(123, 0)
+	timestamp := upgrade.InitiallyActiveTime
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
+	networkID := uint32(5)
 
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
@@ -31,6 +33,9 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	var parentBlockSig []byte
+	var blsSignKey *bls.SecretKey
 
 	b, err := block.Build(
 		parentID,
@@ -40,6 +45,11 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		innerBlockBytes,
 		chainID,
 		key,
+		block.NextBlockVRFSig(
+			parentBlockSig,
+			blsSignKey,
+			chainID,
+			networkID),
 	)
 	require.NoError(err)
 
