@@ -42,7 +42,7 @@ func NewContextFromClients(
 		return nil, err
 	}
 
-	// TOOD: After Etna is activated, assume the gas price is always non-zero.
+	// TODO: After Etna is activated, assume the gas price is always non-zero.
 	if dynamicFeeConfig.MinGasPrice != 0 {
 		_, gasPrice, _, err := pChainClient.GetFeeState(ctx)
 		if err != nil {
