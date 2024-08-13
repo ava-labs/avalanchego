@@ -112,6 +112,25 @@ message InitializeRequest {
   // the messenger, keystore, shared memory, blockchain alias,
   // subnet alias, and appSender services
   string server_addr = 14;
+  // network_upgrades_bytes is the json encoded network upgrades
+  NetworkUpgrades network_upgrades = 15;
+}
+
+message NetworkUpgrades {
+  google.protobuf.Timestamp apricot_phase_1_time = 1;
+  google.protobuf.Timestamp apricot_phase_2_time = 2;
+  google.protobuf.Timestamp apricot_phase_3_time = 3;
+  google.protobuf.Timestamp apricot_phase_4_time = 4;
+  uint64 apricot_phase_4_min_p_chain_height = 5;
+  google.protobuf.Timestamp apricot_phase_5_time = 6;
+  google.protobuf.Timestamp apricot_phase_pre_6_time = 7;
+  google.protobuf.Timestamp apricot_phase_6_time = 8;
+  google.protobuf.Timestamp apricot_phase_post_6_time = 9;
+  google.protobuf.Timestamp banff_time = 10;
+  google.protobuf.Timestamp cortina_time = 11;
+  bytes cortina_x_chain_stop_vertex_id = 12;
+  google.protobuf.Timestamp durango_time = 13;
+  google.protobuf.Timestamp etna_time = 14;
 }
 
 message InitializeResponse {
