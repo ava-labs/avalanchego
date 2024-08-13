@@ -5531,17 +5531,20 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		state       func(*testing.T, *gomock.Controller, *txs.MultisigAliasTx, ids.ID) *state.MockDiff
+		state       func(*testing.T, *gomock.Controller, *txs.MultisigAliasTx, ids.ID, *config.Config) *state.MockDiff
+		phase       test.Phase
 		utx         *txs.MultisigAliasTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
-		"Add nested alias": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+		"BerlinPhase, Add nested alias": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetMultisigAlias(msigAliasOwners.Addrs[0]).Return(&multisig.AliasWithNonce{}, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: baseTx,
 				MultisigAlias: multisig.Alias{
@@ -5557,12 +5560,14 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errNestedMsigAlias,
 		},
 		"Updating alias which does not exist": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				expect.GetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(nil, database.ErrNotFound)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx:        baseTx,
 				MultisigAlias: msigAlias.Alias,
@@ -5575,8 +5580,9 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errAliasNotFound,
 		},
 		"Updating existing alias with less signatures than threshold": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				expect.GetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{
@@ -5585,6 +5591,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				}, []*multisig.AliasWithNonce{})
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx:        baseTx,
 				MultisigAlias: msigAlias.Alias,
@@ -5597,8 +5604,9 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errAliasCredentialMismatch,
 		},
 		"Removing alias with consortium addr state": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
@@ -5607,6 +5615,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				s.EXPECT().GetAddressStates(msigAlias.Alias.ID).Return(as.AddressStateConsortium, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: baseTx,
 				MultisigAlias: multisig.Alias{
@@ -5622,8 +5631,9 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			expectedErr: errConsortiumMember,
 		},
 		"Removing alias with role admin addr state": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
@@ -5632,6 +5642,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				s.EXPECT().GetAddressStates(msigAlias.Alias.ID).Return(as.AddressStateRoleAdmin, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: baseTx,
 				MultisigAlias: multisig.Alias{
@@ -5646,9 +5657,10 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			},
 			expectedErr: errAdminCannotBeDeleted,
 		},
-		"OK, update existing alias": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+		"OK: update existing alias": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				expect.GetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{
@@ -5665,6 +5677,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx:        baseTx,
 				MultisigAlias: msigAlias.Alias,
@@ -5675,9 +5688,10 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				{msigKeys[0], msigKeys[1]},
 			},
 		},
-		"OK, remove existing alias with non-empty addr state": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+		"OK: remove existing alias with non-empty addr state": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
@@ -5692,6 +5706,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: baseTx,
 				MultisigAlias: multisig.Alias{
@@ -5706,9 +5721,10 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				{msigKeys[0], msigKeys[1]},
 			},
 		},
-		"OK, remove existing alias with empty addr state": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+		"OK: remove existing alias with empty addr state": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetMultisigAlias(msigAlias.ID).Return(msigAlias, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{
 					msigAliasOwners.Addrs[0],
@@ -5722,6 +5738,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: baseTx,
 				MultisigAlias: multisig.Alias{
@@ -5736,9 +5753,10 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				{msigKeys[0], msigKeys[1]},
 			},
 		},
-		"OK, add new alias": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+		"OK: add new alias": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				expect.GetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
@@ -5755,6 +5773,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: baseTx,
 				MultisigAlias: multisig.Alias{
@@ -5768,9 +5787,10 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				{ownerKey},
 			},
 		},
-		"OK, add new alias with multisig sender": {
-			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID) *state.MockDiff {
+		"OK: add new alias with multisig sender": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				expect.GetMultisigAliases(t, s, msigAliasOwners.Addrs, nil)
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{msigUTXO}, []ids.ShortID{
@@ -5791,6 +5811,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: &txs.MultisigAliasTx{
 				BaseTx: txs.BaseTx{
 					BaseTx: avax.BaseTx{
@@ -5814,7 +5835,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
-			backend := newExecutorBackend(t, caminoGenesisConf, test.PhaseLast, nil)
+			backend := newExecutorBackend(t, caminoGenesisConf, tt.phase, nil)
 
 			avax.SortTransferableInputsWithSigners(tt.utx.Ins, tt.signers)
 
@@ -5824,7 +5845,7 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			err = tx.Unsigned.Visit(&CaminoStandardTxExecutor{
 				StandardTxExecutor{
 					Backend: backend,
-					State:   tt.state(t, gomock.NewController(t), tt.utx, tx.ID()),
+					State:   tt.state(t, gomock.NewController(t), tt.utx, tx.ID(), backend.Config),
 					Tx:      tx,
 				},
 			})

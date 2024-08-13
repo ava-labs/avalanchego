@@ -1534,13 +1534,15 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 		return err
 	}
 
-	// verify that alias isn't nesting another alias
-	isNestedMsig, err := e.Fx.IsNestedMultisig(tx.MultisigAlias.Owners, e.State)
-	switch {
-	case err != nil:
-		return err
-	case isNestedMsig:
-		return errNestedMsigAlias
+	if e.Config.IsBerlinPhaseActivated(e.State.GetTimestamp()) {
+		// verify that alias isn't nesting another alias
+		isNestedMsig, err := e.Fx.IsNestedMultisig(tx.MultisigAlias.Owners, e.State)
+		switch {
+		case err != nil:
+			return err
+		case isNestedMsig:
+			return errNestedMsigAlias
+		}
 	}
 
 	aliasAddrState := as.AddressStateEmpty
