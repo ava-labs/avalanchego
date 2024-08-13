@@ -191,9 +191,3 @@ type NetworkAppSender interface {
 		appGossipBytes []byte,
 	) error
 }
-
-// AppSender sends application (VM) level messages.
-// See also common.AppHandler.
-type AppSender interface {
-	NetworkAppSender
-}
