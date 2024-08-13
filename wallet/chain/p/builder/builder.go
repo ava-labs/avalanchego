@@ -1490,7 +1490,7 @@ func (b *builder) spend(
 	}
 	if excessAVAX < requiredFee {
 		return nil, nil, nil, fmt.Errorf(
-			"%w: provided UTXOs need %d more nAVAX (%q)",
+			"%w: provided UTXOs needed %d more nAVAX (%q)",
 			ErrInsufficientFunds,
 			requiredFee-excessAVAX,
 			b.context.AVAXAssetID,
