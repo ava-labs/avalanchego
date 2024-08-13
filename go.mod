@@ -4,7 +4,7 @@ go 1.21.12
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.11.11-0.20240805141503-7e985b530bef
+	github.com/ava-labs/avalanchego v1.11.11-0.20240813180138-7520071656af
 	github.com/cespare/cp v0.1.0
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
 	github.com/davecgh/go-spew v1.1.1
