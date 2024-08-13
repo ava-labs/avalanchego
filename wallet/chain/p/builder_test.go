@@ -21,7 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common/utxotest"
 
 	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
@@ -128,6 +130,7 @@ var (
 		name          string
 		context       *builder.Context
 		feeCalculator txfee.Calculator
+		memo          []byte
 	}{
 		{
 			name:          "Pre-Etna",
@@ -135,9 +138,21 @@ var (
 			feeCalculator: staticFeeCalculator,
 		},
 		{
+			name:          "Pre-Etna with memo",
+			context:       testContextPreEtna,
+			feeCalculator: staticFeeCalculator,
+			memo:          []byte("memo"),
+		},
+		{
 			name:          "Post-Etna",
 			context:       testContextPostEtna,
 			feeCalculator: dynamicFeeCalculator,
+		},
+		{
+			name:          "Pre-Etna with memo",
+			context:       testContextPreEtna,
+			feeCalculator: staticFeeCalculator,
+			memo:          []byte("memo"),
 		},
 	}
 )
@@ -157,9 +172,13 @@ func TestBaseTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewBaseTx([]*avax.TransferableOutput{avaxOutput})
+			utx, err := builder.NewBaseTx(
+				[]*avax.TransferableOutput{avaxOutput},
+				common.WithMemo(e.memo),
+			)
 			require.NoError(err)
 			require.Contains(utx.Outs, avaxOutput)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -193,9 +212,13 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
+			utx, err := builder.NewAddSubnetValidatorTx(
+				subnetValidator,
+				common.WithMemo(e.memo),
+			)
 			require.NoError(err)
 			require.Equal(utx.SubnetValidator, *subnetValidator)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -224,10 +247,12 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			utx, err := builder.NewRemoveSubnetValidatorTx(
 				nodeID,
 				subnetID,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
 			require.Equal(utx.NodeID, nodeID)
 			require.Equal(utx.Subnet, subnetID)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -266,13 +291,15 @@ func TestCreateChainTx(t *testing.T) {
 				vmID,
 				fxIDs,
 				chainName,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
 			require.Equal(utx.SubnetID, subnetID)
-			require.Equal(utx.ChainName, chainName)
+			require.Equal(utx.GenesisData, genesisBytes)
 			require.Equal(utx.VMID, vmID)
 			require.ElementsMatch(utx.FxIDs, fxIDs)
-			require.Equal(utx.GenesisData, genesisBytes)
+			require.Equal(utx.ChainName, chainName)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -298,8 +325,13 @@ func TestCreateSubnetTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewCreateSubnetTx(subnetOwner)
+			utx, err := builder.NewCreateSubnetTx(
+				subnetOwner,
+				common.WithMemo(e.memo),
+			)
 			require.NoError(err)
+			require.Equal(utx.Owner, subnetOwner)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -328,9 +360,12 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			utx, err := builder.NewTransferSubnetOwnershipTx(
 				subnetID,
 				subnetOwner,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
 			require.Equal(utx.Subnet, subnetID)
+			require.Equal(utx.Owner, subnetOwner)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -365,8 +400,11 @@ func TestImportTx(t *testing.T) {
 			utx, err := builder.NewImportTx(
 				sourceChainID,
 				importOwner,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
+			require.Equal(utx.SourceChain, sourceChainID)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			require.Empty(utx.Ins)                              // The imported input should be sufficient for fees
 			require.Len(utx.ImportedInputs, len(importedUTXOs)) // All utxos should be imported
 			requireFeeIsCorrect(
@@ -399,9 +437,12 @@ func TestExportTx(t *testing.T) {
 			utx, err := builder.NewExportTx(
 				subnetID,
 				exportedOutputs,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
+			require.Equal(utx.DestinationChain, subnetID)
 			require.ElementsMatch(utx.ExportedOutputs, exportedOutputs)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -469,6 +510,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	require.Equal(utx.MinDelegatorStake, minDelegatorStake)
 	require.Equal(utx.MaxValidatorWeightFactor, maxValidatorWeightFactor)
 	require.Equal(utx.UptimeRequirement, uptimeRequirement)
+	require.Empty(utx.Memo)
 	requireFeeIsCorrect(
 		require,
 		staticFeeCalculator,
@@ -534,6 +576,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				validationRewardsOwner,
 				delegationRewardsOwner,
 				delegationShares,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
 			require.Equal(utx.Validator, primaryNetworkPermissionlessStaker.Validator)
@@ -553,6 +596,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			require.Equal(utx.ValidatorRewardsOwner, validationRewardsOwner)
 			require.Equal(utx.DelegatorRewardsOwner, delegationRewardsOwner)
 			require.Equal(utx.DelegationShares, delegationShares)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -582,6 +626,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				primaryNetworkPermissionlessStaker,
 				avaxAssetID,
 				rewardsOwner,
+				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
 			require.Equal(utx.Validator, primaryNetworkPermissionlessStaker.Validator)
@@ -594,6 +639,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				addOutputAmounts(utx.StakeOuts),
 			)
 			require.Equal(utx.DelegationRewardsOwner, rewardsOwner)
+			require.Equal(utx.Memo, types.JSONByteSlice(e.memo))
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
