@@ -95,7 +95,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			Subnet: constants.PrimaryNetworkID,
 		}
 
-		tc.By("issue add validator tx", func() {
+		tc.By("issue AddPermissionlessValidatorTx", func() {
 			sk, err := bls.NewSecretKey()
 			require.NoError(err)
 			pop := signer.NewProofOfPossession(sk)
@@ -112,7 +112,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 		})
 
-		tc.By("issue add delegator tx", func() {
+		tc.By("issue AddPermissionlessDelegatorTx", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				vdr,
 				avaxAssetID,
@@ -122,7 +122,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 		})
 
-		tc.By("export avax from P to X chain", func() {
+		tc.By("issue ExportTx on the P-chain", func() {
 			balances, err := pBuilder.GetBalance()
 			require.NoError(err)
 
@@ -158,7 +158,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.Equal(initialAVAXBalance-toTransfer-exportFee, finalAVAXBalance)
 		})
 
-		tc.By("import avax from P into X chain", func() {
+		tc.By("issue ImportTx on the X-Chain", func() {
 			balances, err := xBuilder.GetFTBalance()
 			require.NoError(err)
 
