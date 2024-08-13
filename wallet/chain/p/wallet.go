@@ -4,7 +4,9 @@
 package p
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -508,6 +510,9 @@ func (w *wallet) IssueTx(
 	ctx := ops.Context()
 	txID, err := w.client.IssueTx(ctx, tx.Bytes())
 	if err != nil {
+		if txJSON, jsonErr := json.MarshalIndent(tx, "", "\t"); jsonErr == nil {
+			err = fmt.Errorf("failed to issue tx:\n%s\n%w", string(txJSON), err)
+		}
 		return err
 	}
 

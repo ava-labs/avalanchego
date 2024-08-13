@@ -45,7 +45,7 @@ var (
 				MaxGasPerSecond:          1_000,
 				TargetGasPerSecond:       500,
 				MinGasPrice:              1,
-				ExcessConversionConstant: 1,
+				ExcessConversionConstant: 5_000,
 			},
 		},
 		StakingConfig: StakingConfig{
