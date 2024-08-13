@@ -30,6 +30,7 @@ import (
 
 var (
 	subnetID = ids.GenerateTestID()
+	nodeID   = ids.GenerateTestNodeID()
 
 	testKeys       = secp256k1.TestKeys()
 	subnetAuthKey  = testKeys[0]
@@ -38,13 +39,21 @@ var (
 		Threshold: 1,
 		Addrs:     []ids.ShortID{subnetAuthAddr},
 	}
-	importKey  = testKeys[0]
-	importAddr = importKey.Address()
-	rewardKey  = testKeys[0]
-	rewardAddr = rewardKey.Address()
-	utxoKey    = testKeys[1]
-	utxoAddr   = utxoKey.Address()
-	utxoOwner  = secp256k1fx.OutputOwners{
+	importKey   = testKeys[0]
+	importAddr  = importKey.Address()
+	importOwner = &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{importAddr},
+	}
+	rewardKey    = testKeys[0]
+	rewardAddr   = rewardKey.Address()
+	rewardsOwner = &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{rewardAddr},
+	}
+	utxoKey   = testKeys[1]
+	utxoAddr  = utxoKey.Address()
+	utxoOwner = secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs:     []ids.ShortID{utxoAddr},
 	}
@@ -73,7 +82,7 @@ var (
 
 	primaryNetworkPermissionlessStaker = &txs.SubnetValidator{
 		Validator: txs.Validator{
-			NodeID: ids.GenerateTestNodeID(),
+			NodeID: nodeID,
 			End:    uint64(time.Now().Add(time.Hour).Unix()),
 			Wght:   2 * units.Avax,
 		},
@@ -147,8 +156,6 @@ func TestBaseTx(t *testing.T) {
 
 			utx, err := builder.NewBaseTx([]*avax.TransferableOutput{avaxOutput})
 			require.NoError(err)
-
-			// check that the output is included in the transaction
 			require.Contains(utx.Outs, avaxOutput)
 
 			// check fee calculation
@@ -168,14 +175,14 @@ func TestBaseTx(t *testing.T) {
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
-	// data to build the transaction
 	subnetValidator := &txs.SubnetValidator{
 		Validator: txs.Validator{
-			NodeID: ids.GenerateTestNodeID(),
+			NodeID: nodeID,
 			End:    uint64(time.Now().Add(time.Hour).Unix()),
 		},
 		Subnet: subnetID,
 	}
+
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -190,6 +197,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 			// build the transaction
 			utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
 			require.NoError(err)
+			require.Equal(utx.SubnetValidator, *subnetValidator)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -221,10 +229,12 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 			// build the transaction
 			utx, err := builder.NewRemoveSubnetValidatorTx(
-				ids.GenerateTestNodeID(),
+				nodeID,
 				subnetID,
 			)
 			require.NoError(err)
+			require.Equal(utx.NodeID, nodeID)
+			require.Equal(utx.Subnet, subnetID)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -244,12 +254,12 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 
 func TestCreateChainTx(t *testing.T) {
 	var (
-		// data to build the transaction
 		genesisBytes = []byte{'a', 'b', 'c'}
 		vmID         = ids.GenerateTestID()
 		fxIDs        = []ids.ID{ids.GenerateTestID()}
 		chainName    = "dummyChain"
 	)
+
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -270,6 +280,11 @@ func TestCreateChainTx(t *testing.T) {
 				chainName,
 			)
 			require.NoError(err)
+			require.Equal(utx.SubnetID, subnetID)
+			require.Equal(utx.ChainName, chainName)
+			require.Equal(utx.VMID, vmID)
+			require.ElementsMatch(utx.FxIDs, fxIDs)
+			require.Equal(utx.GenesisData, genesisBytes)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -337,6 +352,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 				subnetOwner,
 			)
 			require.NoError(err)
+			require.Equal(utx.Subnet, subnetID)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -358,15 +374,8 @@ func TestImportTx(t *testing.T) {
 	var (
 		sourceChainID = ids.GenerateTestID()
 		importedUTXOs = utxos[:1]
-
-		// data to build the transaction
-		importTo = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				importAddr,
-			},
-		}
 	)
+
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -382,11 +391,11 @@ func TestImportTx(t *testing.T) {
 			// build the transaction
 			utx, err := builder.NewImportTx(
 				sourceChainID,
-				importTo,
+				importOwner,
 			)
 			require.NoError(err)
-
-			require.Empty(utx.Ins) // we spend the imported input (at least partially)
+			require.Empty(utx.Ins)                              // The imported input should be sufficient for fees
+			require.Len(utx.ImportedInputs, len(importedUTXOs)) // All utxos should be imported
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -405,8 +414,8 @@ func TestImportTx(t *testing.T) {
 }
 
 func TestExportTx(t *testing.T) {
-	// data to build the transaction
 	exportedOutputs := []*avax.TransferableOutput{avaxOutput}
+
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -424,8 +433,7 @@ func TestExportTx(t *testing.T) {
 				exportedOutputs,
 			)
 			require.NoError(err)
-
-			require.Equal(utx.ExportedOutputs, exportedOutputs)
+			require.ElementsMatch(utx.ExportedOutputs, exportedOutputs)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -443,44 +451,61 @@ func TestExportTx(t *testing.T) {
 	}
 }
 
-// TestTransformSubnetTx is not valid to be issued post-Etna
+// TransformSubnetTx is not valid to be issued post-Etna
 func TestTransformSubnetTx(t *testing.T) {
 	var (
-		require = require.New(t)
+		initialSupply                   = 40 * units.MegaAvax
+		maxSupply                       = 100 * units.MegaAvax
+		minConsumptionRate       uint64 = reward.PercentDenominator
+		maxConsumptionRate       uint64 = reward.PercentDenominator
+		minValidatorStake        uint64 = 1
+		maxValidatorStake               = 100 * units.MegaAvax
+		minStakeDuration                = time.Second
+		maxStakeDuration                = 365 * 24 * time.Hour
+		minDelegationFee         uint32 = 0
+		minDelegatorStake        uint64 = 1
+		maxValidatorWeightFactor byte   = 5
+		uptimeRequirement        uint32 = .80 * reward.PercentDenominator
 
-		// backend
+		require    = require.New(t)
 		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 			constants.PlatformChainID: utxos,
 		})
-
 		backend = NewBackend(testContextPreEtna, chainUTXOs, subnets)
-
-		// builder
 		builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContextPreEtna, backend)
-
-		// data to build the transaction
-		initialSupply = 40 * units.MegaAvax
-		maxSupply     = 100 * units.MegaAvax
 	)
 
 	// build the transaction
 	utx, err := builder.NewTransformSubnetTx(
 		subnetID,
 		subnetAssetID,
-		initialSupply,                 // initial supply
-		maxSupply,                     // max supply
-		reward.PercentDenominator,     // min consumption rate
-		reward.PercentDenominator,     // max consumption rate
-		1,                             // min validator stake
-		100*units.MegaAvax,            // max validator stake
-		time.Second,                   // min stake duration
-		365*24*time.Hour,              // max stake duration
-		0,                             // min delegation fee
-		1,                             // min delegator stake
-		5,                             // max validator weight factor
-		.80*reward.PercentDenominator, // uptime requirement
+		initialSupply,
+		maxSupply,
+		minConsumptionRate,
+		maxConsumptionRate,
+		minValidatorStake,
+		maxValidatorStake,
+		minStakeDuration,
+		maxStakeDuration,
+		minDelegationFee,
+		minDelegatorStake,
+		maxValidatorWeightFactor,
+		uptimeRequirement,
 	)
 	require.NoError(err)
+	require.Equal(utx.Subnet, subnetID)
+	require.Equal(utx.AssetID, subnetAssetID)
+	require.Equal(utx.InitialSupply, initialSupply)
+	require.Equal(utx.MaximumSupply, maxSupply)
+	require.Equal(utx.MinConsumptionRate, minConsumptionRate)
+	require.Equal(utx.MinValidatorStake, minValidatorStake)
+	require.Equal(utx.MaxValidatorStake, maxValidatorStake)
+	require.Equal(utx.MinStakeDuration, uint32(minStakeDuration/time.Second))
+	require.Equal(utx.MaxStakeDuration, uint32(maxStakeDuration/time.Second))
+	require.Equal(utx.MinDelegationFee, minDelegationFee)
+	require.Equal(utx.MinDelegatorStake, minDelegatorStake)
+	require.Equal(utx.MaxValidatorWeightFactor, maxValidatorWeightFactor)
+	require.Equal(utx.UptimeRequirement, uptimeRequirement)
 
 	// check fee calculation
 	require.Equal(
@@ -520,19 +545,16 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		}
 
 		// data to build the transaction
-		validationRewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardAddr,
-			},
-		}
-		delegationRewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				rewardAddr,
-			},
-		}
+		validationRewardsOwner        = rewardsOwner
+		delegationRewardsOwner        = rewardsOwner
+		delegationShares       uint32 = reward.PercentDenominator
 	)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	pop := signer.NewProofOfPossession(sk)
+
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -544,20 +566,23 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, rewardAddr), e.context, backend)
 			)
 
-			sk, err := bls.NewSecretKey()
-			require.NoError(err)
-
 			// build the transaction
 			utx, err := builder.NewAddPermissionlessValidatorTx(
 				primaryNetworkPermissionlessStaker,
-				signer.NewProofOfPossession(sk),
+				pop,
 				avaxAssetID,
 				validationRewardsOwner,
 				delegationRewardsOwner,
-				reward.PercentDenominator,
+				delegationShares,
 			)
 			require.NoError(err)
-
+			require.Equal(utx.Validator, primaryNetworkPermissionlessStaker.Validator)
+			require.Equal(utx.Subnet, primaryNetworkPermissionlessStaker.Subnet)
+			require.Equal(utx.Signer, pop)
+			// Outputs should be merged if possible. For example, if there are two
+			// unlocked inputs consumed for staking, this should only produce one staked
+			// output.
+			require.Len(utx.StakeOuts, 1)
 			// check stake amount
 			require.Equal(
 				map[ids.ID]uint64{
@@ -565,6 +590,9 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				addOutputAmounts(utx.StakeOuts),
 			)
+			require.Equal(utx.ValidatorRewardsOwner, validationRewardsOwner)
+			require.Equal(utx.DelegatorRewardsOwner, delegationRewardsOwner)
+			require.Equal(utx.DelegationShares, delegationShares)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
@@ -578,23 +606,11 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				),
 				addInputAmounts(utx.Ins),
 			)
-
-			// Outputs should be merged if possible. For example, if there are two
-			// unlocked inputs consumed for staking, this should only produce one staked
-			// output.
-			require.Len(utx.StakeOuts, 1)
 		})
 	}
 }
 
 func TestAddPermissionlessDelegatorTx(t *testing.T) {
-	// data to build the transaction
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			rewardAddr,
-		},
-	}
 	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -613,7 +629,8 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				rewardsOwner,
 			)
 			require.NoError(err)
-
+			require.Equal(utx.Validator, primaryNetworkPermissionlessStaker.Validator)
+			require.Equal(utx.Subnet, primaryNetworkPermissionlessStaker.Subnet)
 			// check stake amount
 			require.Equal(
 				map[ids.ID]uint64{
@@ -621,6 +638,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				},
 				addOutputAmounts(utx.StakeOuts),
 			)
+			require.Equal(utx.DelegationRewardsOwner, rewardsOwner)
 
 			// check fee calculation
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
