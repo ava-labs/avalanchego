@@ -251,18 +251,8 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
-	var blockTxs []*txs.Tx
-	if b.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
-		blockTxs, err = packEtnaBlockTxs(
-			preferredID,
-			preferredState,
-			b.Mempool,
-			b.txExecutorBackend,
-			b.blkManager,
-			timestamp,
-		)
-	} else {
-		blockTxs, err = packDurangoBlockTxs(
+	if !b.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		return packDurangoBlockTxs(
 			preferredID,
 			preferredState,
 			b.Mempool,
@@ -272,7 +262,24 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 			math.MaxInt,
 		)
 	}
-	return blockTxs, err
+
+	stateDiff, err := state.NewDiffOn(preferredState)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := txexecutor.AdvanceTimeTo(b.txExecutorBackend, stateDiff, timestamp); err != nil {
+		return nil, err
+	}
+
+	return packEtnaBlockTxsOn(
+		preferredID,
+		stateDiff,
+		b.Mempool,
+		b.txExecutorBackend,
+		b.blkManager,
+		math.MaxUint64,
+	)
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
