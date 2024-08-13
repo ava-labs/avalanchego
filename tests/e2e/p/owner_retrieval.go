@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -48,13 +46,10 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 		require.NotEqual(subnetID, constants.PrimaryNetworkID)
 
 		tc.By("verifying owner", func() {
-			pChainTxs := map[ids.ID]*txs.Tx{
-				subnetID: subnetTx,
-			}
-			subnetOwners, err := primary.ExtractTxSubnetOwners(
-				tc.DefaultContext(),
+			subnetOwners, err := platformvm.GetSubnetOwners(
 				pChainClient,
-				pChainTxs,
+				tc.DefaultContext(),
+				subnetID,
 			)
 			require.NoError(err)
 			subnetOwnerI, found := subnetOwners[subnetID]
@@ -75,40 +70,18 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 		}
 
 		tc.By("changing subnet owner")
-		transferSubnetOwnershipTx, err := pWallet.IssueTransferSubnetOwnershipTx(
+		_, err = pWallet.IssueTransferSubnetOwnershipTx(
 			subnetID,
 			newOwner,
 			tc.WithDefaultContext(),
 		)
 		require.NoError(err)
 
-		tc.By("verifying new owner from CreateSubnetTx", func() {
-			pChainTxs := map[ids.ID]*txs.Tx{
-				subnetID: subnetTx,
-			}
-			subnetOwners, err := primary.ExtractTxSubnetOwners(
-				tc.DefaultContext(),
+		tc.By("verifying new owner", func() {
+			subnetOwners, err := platformvm.GetSubnetOwners(
 				pChainClient,
-				pChainTxs,
-			)
-			require.NoError(err)
-			subnetOwnerI, found := subnetOwners[subnetID]
-			require.True(found)
-			subnetOwner, ok := subnetOwnerI.(*secp256k1fx.OutputOwners)
-			require.True(ok)
-			require.Equal(newOwner.Locktime, subnetOwner.Locktime)
-			require.Equal(newOwner.Threshold, subnetOwner.Threshold)
-			require.Equal(newOwner.Addrs, subnetOwner.Addrs)
-		})
-
-		tc.By("verifying new owner from TransferSubnetOwnershipTx", func() {
-			pChainTxs := map[ids.ID]*txs.Tx{
-				subnetID: transferSubnetOwnershipTx,
-			}
-			subnetOwners, err := primary.ExtractTxSubnetOwners(
 				tc.DefaultContext(),
-				pChainClient,
-				pChainTxs,
+				subnetID,
 			)
 			require.NoError(err)
 			subnetOwnerI, found := subnetOwners[subnetID]
