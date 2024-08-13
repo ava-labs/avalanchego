@@ -1497,17 +1497,17 @@ func (b *builder) spend(
 		)
 	}
 
-	secpOutput := &secp256k1fx.TransferOutput{
+	secpExcessAVAXOutput := &secp256k1fx.TransferOutput{
 		Amt:          0, // Populated later if used
 		OutputOwners: *ownerOverride,
 	}
-	newOutput := &avax.TransferableOutput{
+	excessAVAXOutput := &avax.TransferableOutput{
 		Asset: avax.Asset{
 			ID: b.context.AVAXAssetID,
 		},
-		Out: secpOutput,
+		Out: secpExcessAVAXOutput,
 	}
-	if err := s.addOutputComplexity(newOutput); err != nil {
+	if err := s.addOutputComplexity(excessAVAXOutput); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -1517,8 +1517,8 @@ func (b *builder) spend(
 	}
 	if excessAVAX > requiredFeeWithChange {
 		// It is worth adding the change output
-		secpOutput.Amt = excessAVAX - requiredFeeWithChange
-		s.changeOutputs = append(s.changeOutputs, newOutput)
+		secpExcessAVAXOutput.Amt = excessAVAX - requiredFeeWithChange
+		s.changeOutputs = append(s.changeOutputs, excessAVAXOutput)
 	}
 
 	utils.Sort(s.inputs)                                     // sort inputs
