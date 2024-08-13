@@ -104,6 +104,7 @@ var (
 	errExpiredProposalsMismatch          = errors.New("expired proposals mismatch")
 	errWrongAdminProposal                = errors.New("this type of proposal can't be admin-proposal")
 	errNotPermittedToCreateProposal      = errors.New("don't have permission to create proposal of this type")
+	errZeroDepositOfferLimits            = errors.New("deposit offer TotalMaxAmount and TotalMaxRewardAmount are zero")
 
 	ErrInvalidProposal = errors.New("proposal is semantically invalid")
 )
@@ -1648,6 +1649,11 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 
 	if !e.Config.IsAthensPhaseActivated(chainTime) {
 		return errNotAthensPhase
+	}
+
+	if e.Config.IsBerlinPhaseActivated(chainTime) &&
+		tx.DepositOffer.TotalMaxAmount == 0 && tx.DepositOffer.TotalMaxRewardAmount == 0 {
+		return errZeroDepositOfferLimits
 	}
 
 	if len(e.Tx.Creds) < 2 {

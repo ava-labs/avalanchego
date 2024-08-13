@@ -22,7 +22,6 @@ var (
 	errEmptyDepositOfferCreatorAddress = errors.New("deposit offer creator address is empty")
 	errWrongDepositOfferVersion        = errors.New("wrong deposit offer version")
 	errNotZeroDepositOfferAmounts      = errors.New("deposit offer rewardedAmount or depositedAmount isn't zero")
-	errZeroDepositOfferLimits          = errors.New("deposit offer TotalMaxAmount and TotalMaxRewardAmount are zero")
 )
 
 // AddDepositOfferTx is an unsigned depositTx
@@ -50,8 +49,6 @@ func (tx *AddDepositOfferTx) SyntacticVerify(ctx *snow.Context) error {
 		return errWrongDepositOfferVersion
 	case tx.DepositOffer.RewardedAmount > 0 || tx.DepositOffer.DepositedAmount > 0:
 		return errNotZeroDepositOfferAmounts
-	case tx.DepositOffer.TotalMaxAmount == 0 && tx.DepositOffer.TotalMaxRewardAmount == 0:
-		return errZeroDepositOfferLimits
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

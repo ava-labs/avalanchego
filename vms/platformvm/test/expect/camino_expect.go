@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -194,4 +196,9 @@ func Lock(t *testing.T, s *state.MockState, utxosMap map[ids.ShortID][]*avax.UTX
 	for addr := range utxosMap {
 		s.EXPECT().GetMultisigAlias(addr).Return(nil, database.ErrNotFound).AnyTimes()
 	}
+}
+
+func PhaseTime(t *testing.T, s *state.MockDiff, cfg *config.Config, phase test.Phase) {
+	t.Helper()
+	s.EXPECT().GetTimestamp().Return(test.PhaseTime(t, phase, cfg))
 }

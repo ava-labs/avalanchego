@@ -5855,6 +5855,14 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 		InterestRateNominator: 1,
 		TotalMaxRewardAmount:  100,
 	}
+	offerZeroLimits := &deposit.Offer{
+		UpgradeVersionID: codec.UpgradeVersion1,
+		Start:            0,
+		End:              1,
+		MinDuration:      1,
+		MaxDuration:      1,
+		MinAmount:        deposit.OfferMinDepositAmount,
+	}
 
 	baseTx := txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    ctx.NetworkID,
@@ -5864,6 +5872,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 
 	tests := map[string]struct {
 		state       func(*testing.T, *gomock.Controller, *txs.AddDepositOfferTx, ids.ID, *config.Config) *state.MockDiff
+		phase       test.Phase
 		utx         func() *txs.AddDepositOfferTx
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
@@ -5874,6 +5883,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime.Add(-1 * time.Second))
 				return s
 			},
+			phase: test.PhaseSunrise,
 			utx: func() *txs.AddDepositOfferTx {
 				return &txs.AddDepositOfferTx{
 					BaseTx:                     baseTx,
@@ -5887,15 +5897,36 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			},
 			expectedErr: errNotAthensPhase,
 		},
+		"BerlinPhase, zero TotalMaxAmount and TotalMaxRewardAmount": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				s.EXPECT().GetTimestamp().Return(cfg.BerlinPhaseTime)
+				return s
+			},
+			phase: test.PhaseLast,
+			utx: func() *txs.AddDepositOfferTx {
+				return &txs.AddDepositOfferTx{
+					BaseTx:                     baseTx,
+					DepositOffer:               offerZeroLimits,
+					DepositOfferCreatorAddress: offerCreatorAddr,
+					DepositOfferCreatorAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {offerCreatorKey},
+			},
+			expectedErr: errZeroDepositOfferLimits,
+		},
 		"Not offer creator": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(as.AddressStateEmpty, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: func() *txs.AddDepositOfferTx {
 				return &txs.AddDepositOfferTx{
 					BaseTx:                     baseTx,
@@ -5912,13 +5943,14 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 		"Bad offer creator signature": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(as.AddressStateOffersCreator, nil)
 				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: func() *txs.AddDepositOfferTx {
 				return &txs.AddDepositOfferTx{
 					BaseTx:                     baseTx,
@@ -5935,7 +5967,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 		"Supply overflow (v1, no existing offers)": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(as.AddressStateOffersCreator, nil)
@@ -5945,6 +5977,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s.EXPECT().GetAllDepositOffers().Return(nil, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: func() *txs.AddDepositOfferTx {
 				return &txs.AddDepositOfferTx{
 					BaseTx:                     baseTx,
@@ -5961,7 +5994,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 		},
 		"Supply overflow (v1, existing offers)": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
-				chainTime := cfg.AthensPhaseTime
+				chainTime := test.PhaseTime(t, test.PhaseLast, cfg)
 				existingOffers := []*deposit.Offer{
 					{ // [0], expired
 						UpgradeVersionID:     1,
@@ -6031,6 +6064,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s.EXPECT().GetAllDepositOffers().Return(existingOffers, nil)
 				return s
 			},
+			phase: test.PhaseLast,
 			utx: func() *txs.AddDepositOfferTx {
 				return &txs.AddDepositOfferTx{
 					BaseTx:                     baseTx,
@@ -6045,10 +6079,10 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			},
 			expectedErr: errSupplyOverflow,
 		},
-		"OK: v1": {
+		"OK: v1, not BerlinPhase, zero TotalMaxAmount and TotalMaxRewardAmount": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime)
+				expect.PhaseTime(t, s, cfg, test.PhaseAthens)
 				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
 				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
 				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(as.AddressStateOffersCreator, nil)
@@ -6064,6 +6098,39 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				expect.ConsumeUTXOs(t, s, utx.Ins)
 				return s
 			},
+			phase: test.PhaseAthens,
+			utx: func() *txs.AddDepositOfferTx {
+				return &txs.AddDepositOfferTx{
+					BaseTx:                     baseTx,
+					DepositOffer:               offerZeroLimits,
+					DepositOfferCreatorAddress: offerCreatorAddr,
+					DepositOfferCreatorAuth:    &secp256k1fx.Input{SigIndices: []uint32{0}},
+				}
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{feeOwnerKey}, {offerCreatorKey},
+			},
+		},
+		"OK: v1": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
+				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
+				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
+				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(as.AddressStateOffersCreator, nil)
+				expect.VerifyMultisigPermission(t, s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
+				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
+					Return(cfg.RewardConfig.SupplyCap-offer1.TotalMaxRewardAmount, nil)
+				s.EXPECT().GetAllDepositOffers().Return(nil, nil)
+
+				offer := *utx.DepositOffer
+				offer.ID = txID
+				s.EXPECT().SetDepositOffer(&offer)
+
+				expect.ConsumeUTXOs(t, s, utx.Ins)
+				return s
+			},
+			phase: test.PhaseLast,
 			utx: func() *txs.AddDepositOfferTx {
 				return &txs.AddDepositOfferTx{
 					BaseTx:                     baseTx,
@@ -6080,7 +6147,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			backend := newExecutorBackend(t, caminoGenesisConf, test.PhaseLast, nil)
+			backend := newExecutorBackend(t, caminoGenesisConf, tt.phase, nil)
 
 			utx := tt.utx()
 			avax.SortTransferableInputsWithSigners(utx.Ins, tt.signers)

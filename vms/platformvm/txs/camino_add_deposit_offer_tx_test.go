@@ -72,16 +72,6 @@ func TestAddDepositOfferTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: errNotZeroDepositOfferAmounts,
 		},
-		"Zero TotalMaxAmount and TotalMaxRewardAmount": {
-			tx: &AddDepositOfferTx{
-				BaseTx:                     baseTx,
-				DepositOfferCreatorAddress: creatorAddress,
-				DepositOffer: &deposit.Offer{
-					UpgradeVersionID: codec.UpgradeVersion1,
-				},
-			},
-			expectedErr: errZeroDepositOfferLimits,
-		},
 		"Bad deposit offer": {
 			tx: &AddDepositOfferTx{
 				BaseTx:                     baseTx,
