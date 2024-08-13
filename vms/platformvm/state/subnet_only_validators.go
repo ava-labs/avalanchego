@@ -52,13 +52,13 @@ type SubnetOnlyValidators interface {
 }
 
 type subnetOnlyValidator struct {
-	ValidationID ids.ID
-	SubnetID     ids.ID     `serialize:"true"`
-	NodeID       ids.NodeID `serialize:"true"`
-	MinNonce     uint64     `serialize:"true"`
-	Weight       uint64     `serialize:"true"`
-	Balance      uint64     `serialize:"true"`
-	PublicKey    *bls.PublicKey
+	ValidationID ids.ID         `serialize:"true"`
+	SubnetID     ids.ID         `serialize:"true"`
+	NodeID       ids.NodeID     `serialize:"true"`
+	MinNonce     uint64         `serialize:"true"`
+	Weight       uint64         `serialize:"true"`
+	Balance      uint64         `serialize:"true"`
+	PublicKey    *bls.PublicKey `serialize:"true"`
 
 	// If non-zero, this validator was added via an [Owner] key.
 	EndTime uint64 `serialize:"true"`
@@ -131,6 +131,10 @@ func (s *subnetOnlyValidators) AddValidator(
 ) error {
 	if s.validators.Contains(validationID) {
 		return ErrAlreadyValidator
+	}
+
+	if err := s.validatorManager.AddStaker(subnetID, nodeID, pk, validationID, weight); err != nil {
+		return fmt.Errorf("failed to add staker: %w", err)
 	}
 
 	s.validators.Push(validationID, &subnetOnlyValidator{
