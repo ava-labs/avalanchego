@@ -207,7 +207,7 @@ func (mr *MockChainVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *MockChainVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.NetworkAppSender) error {
+func (m *MockChainVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	ret0, _ := ret[0].(error)

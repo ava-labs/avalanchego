@@ -60,7 +60,7 @@ func (vm *blockVM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	appSender common.NetworkAppSender,
+	appSender common.AppSender,
 ) error {
 	err := vm.blockMetrics.Initialize(
 		vm.buildBlockVM != nil,

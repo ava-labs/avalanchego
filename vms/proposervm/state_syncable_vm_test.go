@@ -46,7 +46,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	// load innerVM expectations
 	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
 		[]byte, []byte, []byte, chan<- common.Message,
-		[]*common.Fx, common.NetworkAppSender,
+		[]*common.Fx, common.AppSender,
 	) error {
 		return nil
 	}

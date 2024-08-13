@@ -13,7 +13,7 @@ import (
 	appsenderpb "github.com/ava-labs/avalanchego/proto/pb/appsender"
 )
 
-var _ common.NetworkAppSender = (*Client)(nil)
+var _ common.AppSender = (*Client)(nil)
 
 type Client struct {
 	client appsenderpb.AppSenderClient

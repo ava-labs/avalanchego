@@ -19,11 +19,11 @@ var _ appsenderpb.AppSenderServer = (*Server)(nil)
 
 type Server struct {
 	appsenderpb.UnsafeAppSenderServer
-	appSender common.NetworkAppSender
+	appSender common.AppSender
 }
 
 // NewServer returns a messenger connected to a remote channel
-func NewServer(appSender common.NetworkAppSender) *Server {
+func NewServer(appSender common.AppSender) *Server {
 	return &Server{appSender: appSender}
 }
 

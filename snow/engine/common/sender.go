@@ -164,8 +164,8 @@ type QuerySender interface {
 	)
 }
 
-// NetworkAppSender sends VM-level messages to nodes in the network.
-type NetworkAppSender interface {
+// AppSender sends VM-level messages to nodes in the network.
+type AppSender interface {
 	// Send an application-level request.
 	//
 	// The VM corresponding to this AppSender may receive either:

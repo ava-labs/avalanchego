@@ -103,7 +103,7 @@ func (vm *blockVM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	appSender common.NetworkAppSender,
+	appSender common.AppSender,
 ) error {
 	ctx, span := vm.tracer.Start(ctx, vm.initializeTag)
 	defer span.End()

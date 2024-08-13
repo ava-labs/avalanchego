@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	_ common.Sender           = (*Sender)(nil)
-	_ common.NetworkAppSender = (*SenderStub)(nil)
+	_ common.Sender    = (*Sender)(nil)
+	_ common.AppSender = (*SenderStub)(nil)
 
 	errSendAppRequest  = errors.New("unexpectedly called SendAppRequest")
 	errSendAppResponse = errors.New("unexpectedly called SendAppResponse")

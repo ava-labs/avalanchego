@@ -134,7 +134,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	appSender common.NetworkAppSender,
+	appSender common.AppSender,
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))

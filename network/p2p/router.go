@@ -25,7 +25,7 @@ var (
 	ErrExistingAppProtocol = errors.New("existing app protocol")
 	ErrUnrequestedResponse = errors.New("unrequested response")
 
-	_ common.NetworkAppHandler = (*router)(nil)
+	_ common.AppHandler = (*router)(nil)
 )
 
 type pendingAppRequest struct {
@@ -65,7 +65,7 @@ func (m *metrics) observe(labels prometheus.Labels, start time.Time) error {
 // corresponding Client.
 type router struct {
 	log     logging.Logger
-	sender  common.NetworkAppSender
+	sender  common.AppSender
 	metrics metrics
 
 	lock               sync.RWMutex
@@ -77,7 +77,7 @@ type router struct {
 // newRouter returns a new instance of Router
 func newRouter(
 	log logging.Logger,
-	sender common.NetworkAppSender,
+	sender common.AppSender,
 	metrics metrics,
 ) *router {
 	return &router{

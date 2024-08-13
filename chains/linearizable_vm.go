@@ -35,7 +35,7 @@ type initializeOnLinearizeVM struct {
 	configBytes  []byte
 	toEngine     chan<- common.Message
 	fxs          []*common.Fx
-	appSender    common.NetworkAppSender
+	appSender    common.AppSender
 }
 
 func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
@@ -76,7 +76,7 @@ func (vm *linearizeOnInitializeVM) Initialize(
 	_ []byte,
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
-	_ common.NetworkAppSender,
+	_ common.AppSender,
 ) error {
 	return vm.Linearize(ctx, vm.stopVertexID, toEngine)
 }

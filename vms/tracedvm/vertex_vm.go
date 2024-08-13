@@ -41,7 +41,7 @@ func (vm *vertexVM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	appSender common.NetworkAppSender,
+	appSender common.AppSender,
 ) error {
 	ctx, span := vm.tracer.Start(ctx, "vertexVM.Initialize")
 	defer span.End()

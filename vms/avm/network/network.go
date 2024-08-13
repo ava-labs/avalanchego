@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	_ common.NetworkAppHandler = (*Network)(nil)
-	_ validators.Connector     = (*Network)(nil)
+	_ common.AppHandler    = (*Network)(nil)
+	_ validators.Connector = (*Network)(nil)
 )
 
 type Network struct {
@@ -30,7 +30,7 @@ type Network struct {
 	log       logging.Logger
 	parser    txs.Parser
 	mempool   *gossipMempool
-	appSender common.NetworkAppSender
+	appSender common.AppSender
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
 	txPushGossipFrequency time.Duration
@@ -46,7 +46,7 @@ func New(
 	parser txs.Parser,
 	txVerifier TxVerifier,
 	mempool mempool.Mempool,
-	appSender common.NetworkAppSender,
+	appSender common.AppSender,
 	registerer prometheus.Registerer,
 	config Config,
 ) (*Network, error) {

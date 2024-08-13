@@ -45,7 +45,7 @@ type VM struct {
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF       func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.NetworkAppSender) error
+	InitializeF       func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
 	SetStateF         func(ctx context.Context, state snow.State) error
 	ShutdownF         func(context.Context) error
 	CreateHandlersF   func(context.Context) (map[string]http.Handler, error)
@@ -83,7 +83,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	msgChan chan<- common.Message,
 	fxs []*common.Fx,
-	appSender common.NetworkAppSender,
+	appSender common.AppSender,
 ) error {
 	if vm.InitializeF != nil {
 		return vm.InitializeF(

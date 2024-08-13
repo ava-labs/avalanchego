@@ -2415,7 +2415,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 				[]byte,
 				chan<- common.Message,
 				[]*common.Fx,
-				common.NetworkAppSender,
+				common.AppSender,
 			) error {
 				return nil
 			},
@@ -2633,7 +2633,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 				[]byte,
 				chan<- common.Message,
 				[]*common.Fx,
-				common.NetworkAppSender,
+				common.AppSender,
 			) error {
 				return nil
 			},
@@ -2783,7 +2783,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 				[]byte,
 				chan<- common.Message,
 				[]*common.Fx,
-				common.NetworkAppSender,
+				common.AppSender,
 			) error {
 				return nil
 			},

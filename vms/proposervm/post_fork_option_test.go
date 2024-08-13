@@ -550,7 +550,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		[]byte,
 		chan<- common.Message,
 		[]*common.Fx,
-		common.NetworkAppSender,
+		common.AppSender,
 	) error {
 		return nil
 	}

@@ -51,7 +51,7 @@ type Engine struct {
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
 	common.AncestorsHandler
-	common.NetworkAppHandler
+	common.AppHandler
 	validators.Connector
 
 	requestID uint32
@@ -137,7 +137,7 @@ func New(config Config) (*Engine, error) {
 		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
 		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
 		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
-		NetworkAppHandler:           config.VM,
+		AppHandler:                  config.VM,
 		Connector:                   config.VM,
 		pending:                     make(map[ids.ID]snowman.Block),
 		unverifiedIDToAncestor:      ancestor.NewTree(),
