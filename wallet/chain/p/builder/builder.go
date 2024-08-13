@@ -1437,8 +1437,9 @@ func (b *builder) spend(
 			return nil, nil, nil, err
 		}
 
-		// If we have consumed enough of the asset, then we have no need to burn
-		// more.
+		// If we don't need to burn or stake additional AVAX and we have
+		// consumed enough AVAX to pay the required fee, we should stop
+		// consuming UTXOs.
 		if !s.shouldConsumeAsset(b.context.AVAXAssetID) && excessAVAX >= requiredFee {
 			break
 		}
