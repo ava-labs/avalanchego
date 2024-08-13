@@ -17,33 +17,32 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-const failNowMessage = "OtherTestContext.FailNow called"
+const failNowMessage = "SimpleTestContext.FailNow called"
 
-// TODO(marun) Consider a more descriptive name for this type
-type OtherTestContext struct {
+type SimpleTestContext struct {
 	cleanupFuncs  []func()
 	cleanupCalled bool
 }
 
-func NewTestContext() *OtherTestContext {
-	return &OtherTestContext{}
+func NewTestContext() *SimpleTestContext {
+	return &SimpleTestContext{}
 }
 
-func (*OtherTestContext) Errorf(format string, args ...interface{}) {
+func (*SimpleTestContext) Errorf(format string, args ...interface{}) {
 	log.Printf("error: "+format, args...)
 }
 
-func (*OtherTestContext) FailNow() {
+func (*SimpleTestContext) FailNow() {
 	panic(failNowMessage)
 }
 
-func (*OtherTestContext) GetWriter() io.Writer {
+func (*SimpleTestContext) GetWriter() io.Writer {
 	return os.Stdout
 }
 
 // Cleanup is intended to be deferred by the caller to ensure cleanup is performed even
 // in the event that a panic occurs.
-func (tc *OtherTestContext) Cleanup() {
+func (tc *SimpleTestContext) Cleanup() {
 	if tc.cleanupCalled {
 		return
 	}
@@ -84,36 +83,36 @@ func (tc *OtherTestContext) Cleanup() {
 	}
 }
 
-func (tc *OtherTestContext) DeferCleanup(cleanup func()) {
+func (tc *SimpleTestContext) DeferCleanup(cleanup func()) {
 	tc.cleanupFuncs = append(tc.cleanupFuncs, cleanup)
 }
 
-func (tc *OtherTestContext) By(_ string, _ ...func()) {
+func (tc *SimpleTestContext) By(_ string, _ ...func()) {
 	tc.Errorf("By not yet implemented")
 	tc.FailNow()
 }
 
 // TODO(marun) Enable color output equivalent to GinkgoTestContext.Outf
-func (*OtherTestContext) Outf(format string, args ...interface{}) {
+func (*SimpleTestContext) Outf(format string, args ...interface{}) {
 	s := formatter.F(format, args...)
 	log.Print(s)
 }
 
 // Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
-func (tc *OtherTestContext) ContextWithTimeout(duration time.Duration) context.Context {
+func (tc *SimpleTestContext) ContextWithTimeout(duration time.Duration) context.Context {
 	return ContextWithTimeout(tc, duration)
 }
 
 // Helper simplifying use of a timed context configured with the default timeout.
-func (tc *OtherTestContext) DefaultContext() context.Context {
+func (tc *SimpleTestContext) DefaultContext() context.Context {
 	return DefaultContext(tc)
 }
 
 // Helper simplifying use via an option of a timed context configured with the default timeout.
-func (tc *OtherTestContext) WithDefaultContext() common.Option {
+func (tc *SimpleTestContext) WithDefaultContext() common.Option {
 	return WithDefaultContext(tc)
 }
 
-func (tc *OtherTestContext) Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string) {
+func (tc *SimpleTestContext) Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string) {
 	require.Eventually(tc, condition, waitFor, tick, msg)
 }
