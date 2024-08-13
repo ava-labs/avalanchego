@@ -77,7 +77,7 @@ func TestAddValidator(t *testing.T) {
 		MinNonce:     0,
 		Weight:       weight,
 		Balance:      balance,
-		PublicKey:    pk,
+		PublicKey:    new(bls.PublicKey), // TODO: Populate
 
 		EndTime: endTime,
 	}, got)

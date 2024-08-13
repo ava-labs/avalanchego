@@ -52,7 +52,7 @@ type SubnetOnlyValidators interface {
 }
 
 type subnetOnlyValidator struct {
-	ValidationID ids.ID         `serialize:"true"`
+	ValidationID ids.ID
 	SubnetID     ids.ID         `serialize:"true"`
 	NodeID       ids.NodeID     `serialize:"true"`
 	MinNonce     uint64         `serialize:"true"`
@@ -344,11 +344,13 @@ func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (*s
 		return nil, err
 	}
 
-	var vdr subnetOnlyValidator
-	if _, err = block.GenesisCodec.Unmarshal(vdrBytes, &vdr); err != nil {
+	vdr := &subnetOnlyValidator{
+		ValidationID: validationID,
+	}
+	if _, err = block.GenesisCodec.Unmarshal(vdrBytes, vdr); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal subnet only validator: %w", err)
 	}
-	return &vdr, err
+	return vdr, err
 }
 
 func putSubnetOnlyValidator(db database.KeyValueWriter, vdr *subnetOnlyValidator) error {
