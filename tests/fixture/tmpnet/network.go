@@ -141,6 +141,9 @@ func BootstrapNewNetwork(
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
 	}
+	if err := checkVMBinariesExist(network.Subnets, pluginDir); err != nil {
+		return err
+	}
 	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
 		return err
 	}
@@ -284,7 +287,7 @@ func (n *Network) Create(rootDir string) error {
 	n.Dir = canonicalDir
 
 	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.DefaultFlags.GetStringVal(config.PluginDirKey)
+	pluginDir, err := n.getPluginDir()
 	if err != nil {
 		return err
 	}
@@ -456,6 +459,16 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
+	// This check is duplicative for a network that is starting, but ensures
+	// that individual node start/restart won't fail due to missing binaries.
+	pluginDir, err := n.getPluginDir()
+	if err != nil {
+		return err
+	}
+	if err := checkVMBinariesExist(n.Subnets, pluginDir); err != nil {
+		return err
+	}
+
 	if err := n.EnsureNodeConfig(node); err != nil {
 		return err
 	}
@@ -860,6 +873,10 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
+func (n *Network) getPluginDir() (string, error) {
+	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
+}
+
 // Waits until the provided nodes are healthy.
 func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
@@ -920,4 +937,17 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(networkPath, "latest_"+owner), nil
+}
+
+func checkVMBinariesExist(subnets []*Subnet, pluginDir string) error {
+	errs := []error{}
+	for _, subnet := range subnets {
+		for _, chain := range subnet.Chains {
+			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
+			if _, err := os.Stat(pluginPath); err != nil {
+				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %w", subnet.Name, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
