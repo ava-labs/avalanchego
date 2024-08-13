@@ -19,6 +19,7 @@ type FlagVars struct {
 	reuseNetwork         bool
 	delayNetworkShutdown bool
 	stopNetwork          bool
+	restartNetwork       bool
 	nodeCount            int
 	activateEtna         bool
 }
@@ -43,6 +44,10 @@ func (v *FlagVars) NetworkDir() string {
 
 func (v *FlagVars) ReuseNetwork() bool {
 	return v.reuseNetwork
+}
+
+func (v *FlagVars) RestartNetwork() bool {
+	return v.restartNetwork
 }
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
@@ -91,6 +96,12 @@ func RegisterFlags() *FlagVars {
 		"reuse-network",
 		false,
 		"[optional] reuse an existing network. If an existing network is not already running, create a new one and leave it running for subsequent usage.",
+	)
+	flag.BoolVar(
+		&vars.restartNetwork,
+		"restart-network",
+		false,
+		"[optional] restarts an existing network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
 	flag.BoolVar(
 		&vars.delayNetworkShutdown,

@@ -191,21 +191,39 @@ func (vm *VMClient) Initialize(
 		zap.String("address", serverAddr),
 	)
 
+	networkUpgrades := &vmpb.NetworkUpgrades{
+		ApricotPhase_1Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase1Time),
+		ApricotPhase_2Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase2Time),
+		ApricotPhase_3Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase3Time),
+		ApricotPhase_4Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase4Time),
+		ApricotPhase_4MinPChainHeight: chainCtx.NetworkUpgrades.ApricotPhase4MinPChainHeight,
+		ApricotPhase_5Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase5Time),
+		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhasePre6Time),
+		ApricotPhase_6Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase6Time),
+		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhasePost6Time),
+		BanffTime:                     grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.BanffTime),
+		CortinaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.CortinaTime),
+		CortinaXChainStopVertexId:     chainCtx.NetworkUpgrades.CortinaXChainStopVertexID[:],
+		DurangoTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.DurangoTime),
+		EtnaTime:                      grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.EtnaTime),
+	}
+
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
-		NetworkId:    chainCtx.NetworkID,
-		SubnetId:     chainCtx.SubnetID[:],
-		ChainId:      chainCtx.ChainID[:],
-		NodeId:       chainCtx.NodeID.Bytes(),
-		PublicKey:    bls.PublicKeyToCompressedBytes(chainCtx.PublicKey),
-		XChainId:     chainCtx.XChainID[:],
-		CChainId:     chainCtx.CChainID[:],
-		AvaxAssetId:  chainCtx.AVAXAssetID[:],
-		ChainDataDir: chainCtx.ChainDataDir,
-		GenesisBytes: genesisBytes,
-		UpgradeBytes: upgradeBytes,
-		ConfigBytes:  configBytes,
-		DbServerAddr: dbServerAddr,
-		ServerAddr:   serverAddr,
+		NetworkId:       chainCtx.NetworkID,
+		SubnetId:        chainCtx.SubnetID[:],
+		ChainId:         chainCtx.ChainID[:],
+		NodeId:          chainCtx.NodeID.Bytes(),
+		PublicKey:       bls.PublicKeyToCompressedBytes(chainCtx.PublicKey),
+		NetworkUpgrades: networkUpgrades,
+		XChainId:        chainCtx.XChainID[:],
+		CChainId:        chainCtx.CChainID[:],
+		AvaxAssetId:     chainCtx.AVAXAssetID[:],
+		ChainDataDir:    chainCtx.ChainDataDir,
+		GenesisBytes:    genesisBytes,
+		UpgradeBytes:    upgradeBytes,
+		ConfigBytes:     configBytes,
+		DbServerAddr:    dbServerAddr,
+		ServerAddr:      serverAddr,
 	})
 	if err != nil {
 		return err
