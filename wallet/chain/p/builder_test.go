@@ -158,7 +158,7 @@ func TestBaseTx(t *testing.T) {
 			require.NoError(err)
 			require.Contains(utx.Outs, avaxOutput)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -194,12 +194,11 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewAddSubnetValidatorTx(subnetValidator)
 			require.NoError(err)
 			require.Equal(utx.SubnetValidator, *subnetValidator)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -227,7 +226,6 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewRemoveSubnetValidatorTx(
 				nodeID,
 				subnetID,
@@ -236,7 +234,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 			require.Equal(utx.NodeID, nodeID)
 			require.Equal(utx.Subnet, subnetID)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -271,7 +269,6 @@ func TestCreateChainTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewCreateChainTx(
 				subnetID,
 				genesisBytes,
@@ -286,7 +283,7 @@ func TestCreateChainTx(t *testing.T) {
 			require.ElementsMatch(utx.FxIDs, fxIDs)
 			require.Equal(utx.GenesisData, genesisBytes)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -314,11 +311,10 @@ func TestCreateSubnetTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewCreateSubnetTx(subnetOwner)
 			require.NoError(err)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -346,7 +342,6 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewTransferSubnetOwnershipTx(
 				subnetID,
 				subnetOwner,
@@ -354,7 +349,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 			require.NoError(err)
 			require.Equal(utx.Subnet, subnetID)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -388,7 +383,6 @@ func TestImportTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewImportTx(
 				sourceChainID,
 				importOwner,
@@ -397,7 +391,7 @@ func TestImportTx(t *testing.T) {
 			require.Empty(utx.Ins)                              // The imported input should be sufficient for fees
 			require.Len(utx.ImportedInputs, len(importedUTXOs)) // All utxos should be imported
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -427,7 +421,6 @@ func TestExportTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewExportTx(
 				subnetID,
 				exportedOutputs,
@@ -435,7 +428,7 @@ func TestExportTx(t *testing.T) {
 			require.NoError(err)
 			require.ElementsMatch(utx.ExportedOutputs, exportedOutputs)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -475,7 +468,6 @@ func TestTransformSubnetTx(t *testing.T) {
 		builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), testContextPreEtna, backend)
 	)
 
-	// build the transaction
 	utx, err := builder.NewTransformSubnetTx(
 		subnetID,
 		subnetAssetID,
@@ -507,7 +499,7 @@ func TestTransformSubnetTx(t *testing.T) {
 	require.Equal(utx.MaxValidatorWeightFactor, maxValidatorWeightFactor)
 	require.Equal(utx.UptimeRequirement, uptimeRequirement)
 
-	// check fee calculation
+	// Verify that the fee was calculated correctly
 	require.Equal(
 		addAmounts(
 			addOutputAmounts(utx.Outs),
@@ -544,7 +536,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			makeUTXO(9 * units.Avax),     // large UTXO
 		}
 
-		// data to build the transaction
 		validationRewardsOwner        = rewardsOwner
 		delegationRewardsOwner        = rewardsOwner
 		delegationShares       uint32 = reward.PercentDenominator
@@ -566,7 +557,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, rewardAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewAddPermissionlessValidatorTx(
 				primaryNetworkPermissionlessStaker,
 				pop,
@@ -594,7 +584,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 			require.Equal(utx.DelegatorRewardsOwner, delegationRewardsOwner)
 			require.Equal(utx.DelegationShares, delegationShares)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
@@ -622,7 +612,6 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, rewardAddr), e.context, backend)
 			)
 
-			// build the transaction
 			utx, err := builder.NewAddPermissionlessDelegatorTx(
 				primaryNetworkPermissionlessStaker,
 				avaxAssetID,
@@ -640,7 +629,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 			)
 			require.Equal(utx.DelegationRewardsOwner, rewardsOwner)
 
-			// check fee calculation
+			// Verify that the fee was calculated correctly
 			expectedFee, err := e.feeCalculator.CalculateFee(utx)
 			require.NoError(err)
 			require.Equal(
