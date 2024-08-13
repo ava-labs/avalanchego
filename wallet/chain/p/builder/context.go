@@ -12,21 +12,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const Alias = "P"
 
 type Context struct {
-	NetworkID                     uint32
-	AVAXAssetID                   ids.ID
-	BaseTxFee                     uint64
-	CreateSubnetTxFee             uint64
-	TransformSubnetTxFee          uint64
-	CreateBlockchainTxFee         uint64
-	AddPrimaryNetworkValidatorFee uint64
-	AddPrimaryNetworkDelegatorFee uint64
-	AddSubnetValidatorFee         uint64
-	AddSubnetDelegatorFee         uint64
+	NetworkID         uint32
+	AVAXAssetID       ids.ID
+	StaticFeeConfig   txfee.StaticConfig
+	ComplexityWeights feecomponent.Dimensions
+	GasPrice          feecomponent.GasPrice
 }
 
 func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
@@ -56,16 +54,22 @@ func NewContextFromClients(
 	}
 
 	return &Context{
-		NetworkID:                     networkID,
-		AVAXAssetID:                   asset.AssetID,
-		BaseTxFee:                     uint64(txFees.TxFee),
-		CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
-		TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
-		CreateBlockchainTxFee:         uint64(txFees.CreateBlockchainTxFee),
-		AddPrimaryNetworkValidatorFee: uint64(txFees.AddPrimaryNetworkValidatorFee),
-		AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
-		AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
-		AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+		NetworkID:   networkID,
+		AVAXAssetID: asset.AssetID,
+		StaticFeeConfig: txfee.StaticConfig{
+			TxFee:                         uint64(txFees.TxFee),
+			CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
+			TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
+			CreateBlockchainTxFee:         uint64(txFees.CreateBlockchainTxFee),
+			AddPrimaryNetworkValidatorFee: uint64(txFees.AddPrimaryNetworkValidatorFee),
+			AddPrimaryNetworkDelegatorFee: uint64(txFees.AddPrimaryNetworkDelegatorFee),
+			AddSubnetValidatorFee:         uint64(txFees.AddSubnetValidatorFee),
+			AddSubnetDelegatorFee:         uint64(txFees.AddSubnetDelegatorFee),
+		},
+
+		// TODO: Populate these fields once they are exposed by the API
+		ComplexityWeights: feecomponent.Dimensions{},
+		GasPrice:          0,
 	}, nil
 }
 

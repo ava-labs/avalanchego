@@ -1,11 +1,11 @@
-# TAG should identify the builder image
-ARG TAG
+# BUILDER_IMAGE_TAG should identify the builder image
+ARG BUILDER_IMAGE_TAG
 
 # AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
 ARG AVALANCHEGO_NODE_IMAGE
 
 # ============= Compilation Stage ================
-FROM antithesis-avalanchego-builder:$TAG AS builder
+FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
 
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR

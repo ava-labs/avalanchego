@@ -4,15 +4,18 @@
 package upgrade
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -40,25 +43,45 @@ func init() {
 }
 
 var _ = ginkgo.Describe("[Upgrade]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	ginkgo.It("can upgrade versions", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
-		e2e.StartNetwork(network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
 
-		ginkgo.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
+		{
+			// Get the default genesis so we can modify it
+			genesis, err := network.DefaultGenesis()
+			require.NoError(err)
+			network.Genesis = genesis
+			// Etna enables Cancun which modifies the outcome of the C-Chain genesis
+			// This is because of new header fields that modify the genesis block hash.
+			// This code can be removed once the Etna upgrade is activated.
+			cChainGenesis := new(core.Genesis)
+			cChainGenesisStr := network.Genesis.CChainGenesis
+			require.NoError(json.Unmarshal([]byte(cChainGenesisStr), cChainGenesis))
+			unscheduledActivationTime := uint64(upgrade.UnscheduledActivationTime.Unix())
+			cChainGenesis.Config.EtnaTime = &unscheduledActivationTime
+			cChainGenesisBytes, err := json.Marshal(cChainGenesis)
+			require.NoError(err)
+			network.Genesis.CChainGenesis = string(cChainGenesisBytes)
+		}
+
+		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
+
+		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
 		for _, node := range network.Nodes {
-			ginkgo.By(fmt.Sprintf("restarting node %q with %q binary", node.NodeID, avalancheGoExecPathToUpgradeTo))
-			require.NoError(node.Stop(e2e.DefaultContext()))
+			tc.By(fmt.Sprintf("restarting node %q with %q binary", node.NodeID, avalancheGoExecPathToUpgradeTo))
+			require.NoError(node.Stop(tc.DefaultContext()))
 
 			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
 
-			require.NoError(network.StartNode(e2e.DefaultContext(), ginkgo.GinkgoWriter, node))
+			require.NoError(network.StartNode(tc.DefaultContext(), tc.GetWriter(), node))
 
-			ginkgo.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
-			e2e.WaitForHealthy(node)
+			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
+			e2e.WaitForHealthy(tc, node)
 		}
 
-		e2e.CheckBootstrapIsPossible(network)
+		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })

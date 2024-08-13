@@ -84,7 +84,9 @@ type Network struct {
 	// Path where network configuration and data is stored
 	Dir string
 
-	// Id of the network. If zero, must be set in Genesis.
+	// Id of the network. If zero, must be set in Genesis. Consider
+	// using the GetNetworkID method if needing to retrieve the ID of
+	// a running network.
 	NetworkID uint32
 
 	// Configuration common across nodes
@@ -138,6 +140,9 @@ func BootstrapNewNetwork(
 ) error {
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
+	}
+	if err := checkVMBinariesExist(network.Subnets, pluginDir); err != nil {
+		return err
 	}
 	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
 		return err
@@ -282,7 +287,7 @@ func (n *Network) Create(rootDir string) error {
 	n.Dir = canonicalDir
 
 	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.DefaultFlags.GetStringVal(config.PluginDirKey)
+	pluginDir, err := n.getPluginDir()
 	if err != nil {
 		return err
 	}
@@ -293,18 +298,7 @@ func (n *Network) Create(rootDir string) error {
 	}
 
 	if n.NetworkID == 0 && n.Genesis == nil {
-		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
-		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
-		// keys exposed by a network. Since allocation will not be exclusive, a test using a
-		// legacy key is unlikely to be a good candidate for parallel execution.
-		keysToFund := []*secp256k1.PrivateKey{
-			genesis.VMRQKey,
-			genesis.EWOQKey,
-			HardhatKey,
-		}
-		keysToFund = append(keysToFund, n.PreFundedKeys...)
-
-		genesis, err := NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
+		genesis, err := n.DefaultGenesis()
 		if err != nil {
 			return err
 		}
@@ -321,6 +315,21 @@ func (n *Network) Create(rootDir string) error {
 
 	// Ensure configuration on disk is current
 	return n.Write()
+}
+
+func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
+	// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
+	// require knowing the key beforehand rather than retrieving it from the set of pre-funded
+	// keys exposed by a network. Since allocation will not be exclusive, a test using a
+	// legacy key is unlikely to be a good candidate for parallel execution.
+	keysToFund := []*secp256k1.PrivateKey{
+		genesis.VMRQKey,
+		genesis.EWOQKey,
+		HardhatKey,
+	}
+	keysToFund = append(keysToFund, n.PreFundedKeys...)
+
+	return NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
 }
 
 // Starts the specified nodes
@@ -450,6 +459,16 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
+	// This check is duplicative for a network that is starting, but ensures
+	// that individual node start/restart won't fail due to missing binaries.
+	pluginDir, err := n.getPluginDir()
+	if err != nil {
+		return err
+	}
+	if err := checkVMBinariesExist(n.Subnets, pluginDir); err != nil {
+		return err
+	}
+
 	if err := n.EnsureNodeConfig(node); err != nil {
 		return err
 	}
@@ -562,10 +581,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	node.NetworkOwner = n.Owner
 
 	// Set the network name if available
-	networkID := n.NetworkID
-	if networkID == 0 && n.Genesis != nil && n.Genesis.NetworkID > 0 {
-		networkID = n.Genesis.NetworkID
-	}
+	networkID := n.GetNetworkID()
 	if networkID > 0 {
 		// Convert the network id to a string to ensure consistency in JSON round-tripping.
 		flags[config.NetworkNameKey] = strconv.FormatUint(uint64(networkID), 10)
@@ -845,6 +861,22 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 	return bootstrapIPs, bootstrapIDs, nil
 }
 
+// GetNetworkID returns the effective ID of the network. If the network
+// defines a genesis, the network ID in the genesis will be returned. If a
+// genesis is not present (i.e. a network with a genesis included in the
+// avalanchego binary - mainnet, testnet and local), the value of the
+// NetworkID field will be returned
+func (n *Network) GetNetworkID() uint32 {
+	if n.Genesis != nil && n.Genesis.NetworkID > 0 {
+		return n.Genesis.NetworkID
+	}
+	return n.NetworkID
+}
+
+func (n *Network) getPluginDir() (string, error) {
+	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
+}
+
 // Waits until the provided nodes are healthy.
 func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
@@ -854,7 +886,7 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	for {
 		for node := range unhealthyNodes {
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, ErrNotRunning) {
+			if err != nil {
 				return err
 			}
 			if !healthy {
@@ -905,4 +937,17 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(networkPath, "latest_"+owner), nil
+}
+
+func checkVMBinariesExist(subnets []*Subnet, pluginDir string) error {
+	errs := []error{}
+	for _, subnet := range subnets {
+		for _, chain := range subnet.Chains {
+			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
+			if _, err := os.Stat(pluginPath); err != nil {
+				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %w", subnet.Name, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -237,6 +238,7 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 		var connected set.Set[ids.NodeID]
 		net, err := NewNetwork(
 			config,
+			upgrade.InitiallyActiveTime,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -466,6 +468,7 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 
 		net, err := NewNetwork(
 			config,
+			upgrade.InitiallyActiveTime,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -545,6 +548,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 
 		net, err := NewNetwork(
 			config,
+			upgrade.InitiallyActiveTime,
 			msgCreator,
 			registry,
 			logging.NoLog{},
@@ -699,6 +703,7 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 
 		net, err := NewNetwork(
 			config,
+			upgrade.InitiallyActiveTime,
 			msgCreator,
 			registry,
 			logging.NoLog{},

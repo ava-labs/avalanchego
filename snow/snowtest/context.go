@@ -1,8 +1,6 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build test
-
 package snowtest
 
 import (
@@ -16,7 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -65,7 +64,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require.NoError(aliaser.Alias(CChainID, "C"))
 	require.NoError(aliaser.Alias(CChainID, CChainID.String()))
 
-	validatorState := &validators.TestState{
+	validatorState := &validatorstest.State{
 		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			subnetID, ok := map[ids.ID]ids.ID{
 				constants.PlatformChainID: constants.PrimaryNetworkID,
@@ -80,11 +79,12 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	}
 
 	return &snow.Context{
-		NetworkID: constants.UnitTestID,
-		SubnetID:  constants.PrimaryNetworkID,
-		ChainID:   chainID,
-		NodeID:    ids.EmptyNodeID,
-		PublicKey: publicKey,
+		NetworkID:       constants.UnitTestID,
+		SubnetID:        constants.PrimaryNetworkID,
+		ChainID:         chainID,
+		NodeID:          ids.EmptyNodeID,
+		PublicKey:       publicKey,
+		NetworkUpgrades: upgrade.Default,
 
 		XChainID:    XChainID,
 		CChainID:    CChainID,

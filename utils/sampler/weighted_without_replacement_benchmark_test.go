@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// BenchmarkAllWeightedWithoutReplacement
-func BenchmarkAllWeightedWithoutReplacement(b *testing.B) {
+func BenchmarkWeightedWithoutReplacement(b *testing.B) {
 	sizes := []int{
 		1,
 		5,
@@ -20,36 +19,19 @@ func BenchmarkAllWeightedWithoutReplacement(b *testing.B) {
 		75,
 		100,
 	}
-	for _, s := range weightedWithoutReplacementSamplers {
-		for _, size := range sizes {
-			b.Run(fmt.Sprintf("sampler %s with %d elements", s.name, size), func(b *testing.B) {
-				WeightedWithoutReplacementPowBenchmark(
-					b,
-					s.sampler,
-					0,
-					100000,
-					size,
-				)
-			})
-		}
-	}
-}
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("%d elements", size), func(b *testing.B) {
+			require := require.New(b)
+			s := NewWeightedWithoutReplacement()
 
-func WeightedWithoutReplacementPowBenchmark(
-	b *testing.B,
-	s WeightedWithoutReplacement,
-	exponent float64,
-	size int,
-	count int,
-) {
-	require := require.New(b)
+			_, weights, err := CalcWeightedPoW(0, 100000)
+			require.NoError(err)
+			require.NoError(s.Initialize(weights))
 
-	_, weights, err := CalcWeightedPoW(exponent, size)
-	require.NoError(err)
-	require.NoError(s.Initialize(weights))
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(count)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = s.Sample(size)
+			}
+		})
 	}
 }

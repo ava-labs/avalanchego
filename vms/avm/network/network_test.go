@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
@@ -178,7 +179,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				logging.NoLog{},
 				ids.EmptyNodeID,
 				ids.Empty,
-				&validators.TestState{
+				&validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},
@@ -272,7 +273,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 				logging.NoLog{},
 				ids.EmptyNodeID,
 				ids.Empty,
-				&validators.TestState{
+				&validatorstest.State{
 					GetCurrentHeightF: func(context.Context) (uint64, error) {
 						return 0, nil
 					},

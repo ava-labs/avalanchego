@@ -77,7 +77,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/upgrade"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
@@ -633,6 +632,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
+		n.Config.UpgradeConfig.DurangoTime,
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -1184,8 +1184,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
-			ApricotPhase4Time:                       version.GetApricotPhase4Time(n.Config.NetworkID),
-			ApricotPhase4MinPChainHeight:            version.ApricotPhase4MinPChainHeight[n.Config.NetworkID],
+			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,
 			StateSyncBeacons:                        n.Config.StateSyncIDs,
 			TracingEnabled:                          n.Config.TraceConfig.Enabled,
@@ -1217,7 +1216,6 @@ func (n *Node) initVMs() error {
 	}
 
 	// Register the VMs that Avalanche supports
-	eUpgradeTime := version.GetEUpgradeTime(n.Config.NetworkID)
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
@@ -1227,7 +1225,9 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				StaticFeeConfig:           n.Config.StaticConfig,
+				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
+				StaticFeeConfig:           n.Config.StaticFeeConfig,
+				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
 				MinValidatorStake:         n.Config.MinValidatorStake,
 				MaxValidatorStake:         n.Config.MaxValidatorStake,
@@ -1236,22 +1236,15 @@ func (n *Node) initVMs() error {
 				MinStakeDuration:          n.Config.MinStakeDuration,
 				MaxStakeDuration:          n.Config.MaxStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
-				UpgradeConfig: upgrade.Config{
-					ApricotPhase3Time: version.GetApricotPhase3Time(n.Config.NetworkID),
-					ApricotPhase5Time: version.GetApricotPhase5Time(n.Config.NetworkID),
-					BanffTime:         version.GetBanffTime(n.Config.NetworkID),
-					CortinaTime:       version.GetCortinaTime(n.Config.NetworkID),
-					DurangoTime:       version.GetDurangoTime(n.Config.NetworkID),
-					EUpgradeTime:      eUpgradeTime,
-				},
-				UseCurrentHeight: n.Config.UseCurrentHeight,
+				UpgradeConfig:             n.Config.UpgradeConfig,
+				UseCurrentHeight:          n.Config.UseCurrentHeight,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
-				TxFee:            n.Config.TxFee,
+				Upgrades:         n.Config.UpgradeConfig,
+				TxFee:            n.Config.StaticFeeConfig.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
-				EUpgradeTime:     eUpgradeTime,
 			},
 		}),
 		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
@@ -1421,20 +1414,13 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:                       version.CurrentApp,
-			NodeID:                        n.ID,
-			NodePOP:                       signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:                     n.Config.NetworkID,
-			TxFee:                         n.Config.TxFee,
-			CreateAssetTxFee:              n.Config.CreateAssetTxFee,
-			CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
-			TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
-			CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
-			AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
-			AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
-			AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
-			AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
-			VMManager:                     n.VMManager,
+			Version:     version.CurrentApp,
+			NodeID:      n.ID,
+			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NetworkID:   n.Config.NetworkID,
+			TxFeeConfig: n.Config.TxFeeConfig,
+			VMManager:   n.VMManager,
+			Upgrades:    n.Config.UpgradeConfig,
 		},
 		n.Log,
 		n.vdrs,

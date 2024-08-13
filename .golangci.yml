@@ -120,9 +120,9 @@ linters-settings:
       - standard
       - default
       - blank
-      - dot
       - prefix(github.com/ava-labs/avalanchego)
       - alias
+      - dot
     skip-generated: true
     custom-order: true
   gosec:

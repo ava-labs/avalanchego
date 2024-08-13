@@ -1,26 +1,29 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cache
+package cache_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache/cachetest"
 	"github.com/ava-labs/avalanchego/ids"
+
+	. "github.com/ava-labs/avalanchego/cache"
 )
 
 func TestLRU(t *testing.T) {
 	cache := &LRU[ids.ID, int64]{Size: 1}
 
-	TestBasic(t, cache)
+	cachetest.TestBasic(t, cache)
 }
 
 func TestLRUEviction(t *testing.T) {
 	cache := &LRU[ids.ID, int64]{Size: 2}
 
-	TestEviction(t, cache)
+	cachetest.TestEviction(t, cache)
 }
 
 func TestLRUResize(t *testing.T) {

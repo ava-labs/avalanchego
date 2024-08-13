@@ -19,8 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -30,12 +33,12 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	require := require.New(t)
 
 	innerVM := &fullVM{
-		TestVM: &block.TestVM{
-			TestVM: common.TestVM{
+		VM: &blocktest.VM{
+			VM: enginetest.VM{
 				T: t,
 			},
 		},
-		TestStateSyncableVM: &block.TestStateSyncableVM{
+		StateSyncableVM: &blocktest.StateSyncableVM{
 			T: t,
 		},
 	}
@@ -58,9 +61,11 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	vm := New(
 		innerVM,
 		Config{
-			ActivationTime:      time.Unix(0, 0),
-			DurangoTime:         time.Unix(0, 0),
-			MinimumPChainHeight: 0,
+			Upgrades: upgrade.Config{
+				ApricotPhase4Time:            time.Unix(0, 0),
+				ApricotPhase4MinPChainHeight: 0,
+				DurangoTime:                  time.Unix(0, 0),
+			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -120,7 +125,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	innerSummary := &block.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: uint64(2022),
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -203,7 +208,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	innerSummary := &block.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: uint64(2022),
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -287,7 +292,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &block.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -372,7 +377,7 @@ func TestParseStateSummary(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &block.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -449,7 +454,7 @@ func TestStateSummaryAccept(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &block.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},
@@ -516,7 +521,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	}()
 	reqHeight := uint64(1969)
 
-	innerSummary := &block.TestStateSummary{
+	innerSummary := &blocktest.StateSummary{
 		IDV:     ids.ID{'s', 'u', 'm', 'm', 'a', 'r', 'y', 'I', 'D'},
 		HeightV: reqHeight,
 		BytesV:  []byte{'i', 'n', 'n', 'e', 'r'},

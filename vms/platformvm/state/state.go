@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -74,12 +75,14 @@ var (
 	UTXOPrefix                    = []byte("utxo")
 	SubnetPrefix                  = []byte("subnet")
 	SubnetOwnerPrefix             = []byte("subnetOwner")
+	SubnetManagerPrefix           = []byte("subnetManager")
 	TransformedSubnetPrefix       = []byte("transformedSubnet")
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
 	SingletonPrefix               = []byte("singleton")
 
 	TimestampKey       = []byte("timestamp")
+	FeeStateKey        = []byte("fee state")
 	CurrentSupplyKey   = []byte("current supply")
 	LastAcceptedKey    = []byte("last accepted")
 	HeightsIndexedKey  = []byte("heights indexed")
@@ -98,6 +101,9 @@ type Chain interface {
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
 
+	GetFeeState() fee.State
+	SetFeeState(f fee.State)
+
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
 
@@ -107,6 +113,9 @@ type Chain interface {
 
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
+
+	GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error)
+	SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -266,6 +275,7 @@ type stateBlk struct {
  *   |-- initializedKey -> nil
  *   |-- blocksReindexedKey -> nil
  *   |-- timestampKey -> timestamp
+ *   |-- feeStateKey -> feeState
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
@@ -338,6 +348,10 @@ type state struct {
 	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner; if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
+	subnetManagers     map[ids.ID]chainIDAndAddr            // map of subnetID -> manager of the subnet
+	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager
+	subnetManagerDB    database.Database
+
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx; if the entry is nil, it is not in the database
 	transformedSubnetDB    database.Database
@@ -353,6 +367,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
+	feeState, persistedFeeState           fee.State
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -405,6 +420,11 @@ type txAndStatus struct {
 type fxOwnerAndSize struct {
 	owner fx.Owner
 	size  int
+}
+
+type chainIDAndAddr struct {
+	ChainID ids.ID `serialize:"true"`
+	Addr    []byte `serialize:"true"`
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -546,6 +566,18 @@ func newState(
 		return nil, err
 	}
 
+	subnetManagerDB := prefixdb.New(SubnetManagerPrefix, baseDB)
+	subnetManagerCache, err := metercacher.New[ids.ID, chainIDAndAddr](
+		"subnet_manager_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.SubnetManagerCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
+			return 2*ids.IDLen + len(f.Addr)
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
@@ -643,6 +675,10 @@ func newState(
 		subnetOwners:     make(map[ids.ID]fx.Owner),
 		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
+
+		subnetManagers:     make(map[ids.ID]chainIDAndAddr),
+		subnetManagerDB:    subnetManagerDB,
+		subnetManagerCache: subnetManagerCache,
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
@@ -805,6 +841,35 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 
 func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
+}
+
+func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
+	if chainIDAndAddr, exists := s.subnetManagers[subnetID]; exists {
+		return chainIDAndAddr.ChainID, chainIDAndAddr.Addr, nil
+	}
+
+	if chainIDAndAddr, cached := s.subnetManagerCache.Get(subnetID); cached {
+		return chainIDAndAddr.ChainID, chainIDAndAddr.Addr, nil
+	}
+
+	chainIDAndAddrBytes, err := s.subnetManagerDB.Get(subnetID[:])
+	if err != nil {
+		return ids.Empty, nil, err
+	}
+
+	var manager chainIDAndAddr
+	if _, err := block.GenesisCodec.Unmarshal(chainIDAndAddrBytes, &manager); err != nil {
+		return ids.Empty, nil, err
+	}
+	s.subnetManagerCache.Put(subnetID, manager)
+	return manager.ChainID, manager.Addr, nil
+}
+
+func (s *state) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
+	s.subnetManagers[subnetID] = chainIDAndAddr{
+		ChainID: chainID,
+		Addr:    addr,
+	}
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -1003,6 +1068,14 @@ func (s *state) GetTimestamp() time.Time {
 
 func (s *state) SetTimestamp(tm time.Time) {
 	s.timestamp = tm
+}
+
+func (s *state) GetFeeState() fee.State {
+	return s.feeState
+}
+
+func (s *state) SetFeeState(feeState fee.State) {
+	s.feeState = feeState
 }
 
 func (s *state) GetLastAccepted() ids.ID {
@@ -1286,6 +1359,13 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedTimestamp = timestamp
 	s.SetTimestamp(timestamp)
+
+	feeState, err := getFeeState(s.singletonDB)
+	if err != nil {
+		return err
+	}
+	s.persistedFeeState = feeState
+	s.SetFeeState(feeState)
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -1636,6 +1716,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeUTXOs(),
 		s.writeSubnets(),
 		s.writeSubnetOwners(),
+		s.writeSubnetManagers(),
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
@@ -2211,6 +2292,26 @@ func (s *state) writeSubnetOwners() error {
 	return nil
 }
 
+func (s *state) writeSubnetManagers() error {
+	for subnetID, manager := range s.subnetManagers {
+		subnetID := subnetID
+		manager := manager
+		delete(s.subnetManagers, subnetID)
+
+		managerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &manager)
+		if err != nil {
+			return fmt.Errorf("failed to marshal subnet manager: %w", err)
+		}
+
+		s.subnetManagerCache.Put(subnetID, manager)
+
+		if err := s.subnetManagerDB.Put(subnetID[:], managerBytes); err != nil {
+			return fmt.Errorf("failed to write subnet manager: %w", err)
+		}
+	}
+	return nil
+}
+
 func (s *state) writeTransformedSubnets() error {
 	for subnetID, tx := range s.transformedSubnets {
 		txID := tx.ID()
@@ -2260,6 +2361,12 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write timestamp: %w", err)
 		}
 		s.persistedTimestamp = s.timestamp
+	}
+	if s.feeState != s.persistedFeeState {
+		if err := putFeeState(s.singletonDB, s.feeState); err != nil {
+			return fmt.Errorf("failed to write fee state: %w", err)
+		}
+		s.persistedFeeState = s.feeState
 	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
@@ -2439,4 +2546,28 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	)
 
 	return s.Commit()
+}
+
+func putFeeState(db database.KeyValueWriter, feeState fee.State) error {
+	feeStateBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, feeState)
+	if err != nil {
+		return err
+	}
+	return db.Put(FeeStateKey, feeStateBytes)
+}
+
+func getFeeState(db database.KeyValueReader) (fee.State, error) {
+	feeStateBytes, err := db.Get(FeeStateKey)
+	if err == database.ErrNotFound {
+		return fee.State{}, nil
+	}
+	if err != nil {
+		return fee.State{}, err
+	}
+
+	var feeState fee.State
+	if _, err := block.GenesisCodec.Unmarshal(feeStateBytes, &feeState); err != nil {
+		return fee.State{}, err
+	}
+	return feeState, nil
 }
