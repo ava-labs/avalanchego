@@ -119,7 +119,7 @@ var (
 
 	activateEtna = func(cfg *params.ChainConfig, etnaTime uint64) *params.ChainConfig {
 		cpy := *cfg
-		cpy.EtnaTime = &etnaTime
+		cpy.EtnaTimestamp = &etnaTime
 		return &cpy
 	}
 

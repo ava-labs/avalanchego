@@ -238,19 +238,21 @@ type backendMock struct {
 
 func newBackendMock() *backendMock {
 	config := &params.ChainConfig{
-		ChainID:                     big.NewInt(42),
-		HomesteadBlock:              big.NewInt(0),
-		DAOForkBlock:                nil,
-		DAOForkSupport:              true,
-		EIP150Block:                 big.NewInt(0),
-		EIP155Block:                 big.NewInt(0),
-		EIP158Block:                 big.NewInt(0),
-		ByzantiumBlock:              big.NewInt(0),
-		ConstantinopleBlock:         big.NewInt(0),
-		PetersburgBlock:             big.NewInt(0),
-		IstanbulBlock:               big.NewInt(0),
-		MuirGlacierBlock:            big.NewInt(0),
-		ApricotPhase3BlockTimestamp: utils.NewUint64(1000),
+		ChainID:             big.NewInt(42),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		NetworkUpgrades: params.NetworkUpgrades{
+			ApricotPhase3BlockTimestamp: utils.NewUint64(1000),
+		},
 	}
 	return &backendMock{
 		current: &types.Header{
