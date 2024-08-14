@@ -6,7 +6,6 @@ package p
 import (
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 
@@ -222,79 +221,77 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		})
 
 		tc.By("retrieving staking periods from the chain")
-		data, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
+		currentValidators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
 		require.NoError(err)
-		require.Len(data, 1)
-		actualAlphaValidationPeriod := time.Duration(data[0].EndTime-data[0].StartTime) * time.Second
-		delegatorData := data[0].Delegators[0]
-		actualGammaDelegationPeriod := time.Duration(delegatorData.EndTime-delegatorData.StartTime) * time.Second
+		require.Len(currentValidators, 1)
+		alphaValidator := currentValidators[0]
+		require.Len(alphaValidator.Delegators, 1)
+		gammaDelegator := alphaValidator.Delegators[0]
+		actualAlphaValidationPeriod := time.Duration(alphaValidator.EndTime-alphaValidator.StartTime) * time.Second
+		actualGammaDelegationPeriod := time.Duration(gammaDelegator.EndTime-gammaDelegator.StartTime) * time.Second
 
-		tc.By("waiting until all validation periods are over")
-		// The beta validator was the last added and so has the latest end time. The
-		// delegation periods are shorter than the validation periods.
-		time.Sleep(time.Until(betaValidatorEndTime))
+		tc.By("waiting until the alpha and beta nodes are no longer validators", func() {
+			// The beta validator was the last added and so has the latest end
+			// time. The delegation periods are shorter than the validation
+			// periods.
+			time.Sleep(time.Until(betaValidatorEndTime))
 
-		tc.By("waiting until the alpha and beta nodes are no longer validators")
-		tc.Eventually(func() bool {
-			validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, nil)
-			require.NoError(err)
-			for _, validator := range validators {
-				if validator.NodeID == alphaNodeID || validator.NodeID == betaNodeID {
-					return false
+			// To avoid racy behavior, we confirm that the nodes are no longer
+			// validators before advancing.
+			tc.Eventually(func() bool {
+				validators, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PrimaryNetworkID, nil)
+				require.NoError(err)
+				for _, validator := range validators {
+					if validator.NodeID == alphaNodeID || validator.NodeID == betaNodeID {
+						return false
+					}
 				}
+				return true
+			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "nodes failed to stop validating before timeout")
+		})
+
+		tc.By("checking expected rewards against actual rewards", func() {
+			var (
+				adminClient  = admin.NewClient(nodeURI.URI)
+				rewardConfig = getRewardConfig(tc, adminClient)
+				calculator   = reward.NewCalculator(rewardConfig)
+
+				expectedValidationReward = calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+
+				potentialDelegationReward                      = calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
+				expectedDelegationFee, expectedDelegatorReward = reward.Split(potentialDelegationReward, delegationShare)
+			)
+
+			rewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
+			for _, rewardKey := range rewardKeys {
+				var (
+					keychain   = secp256k1fx.NewKeychain(rewardKey)
+					baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
+					pWallet    = baseWallet.P()
+					pBuilder   = pWallet.Builder()
+				)
+
+				balances, err := pBuilder.GetBalance()
+				require.NoError(err)
+				rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
 			}
-			return true
-		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "nodes failed to stop validating before timeout ")
 
-		tc.By("retrieving reward configuration for the network")
-		// TODO(marun) Enable GetConfig to return *node.Config
-		// directly. Currently, due to a circular dependency issue, a
-		// map-based equivalent is used for which manual unmarshaling
-		// is required.
-		adminClient := admin.NewClient(env.GetRandomNodeURI().URI)
-		rawNodeConfigMap, err := adminClient.GetConfig(tc.DefaultContext())
-		require.NoError(err)
-		nodeConfigMap, ok := rawNodeConfigMap.(map[string]interface{})
-		require.True(ok)
-		stakingConfigMap, ok := nodeConfigMap["stakingConfig"].(map[string]interface{})
-		require.True(ok)
-		rawRewardConfig := stakingConfigMap["rewardConfig"]
-		rewardConfig := reward.Config{}
-		require.NoError(mapstructure.Decode(rawRewardConfig, &rewardConfig))
+			require.Equal(
+				map[ids.ShortID]uint64{
+					alphaValidationRewardKey.Address(): expectedValidationReward,
+					alphaDelegationRewardKey.Address(): expectedDelegationFee,
+					betaValidationRewardKey.Address():  0, // Validator didn't meet uptime requirement
+					betaDelegationRewardKey.Address():  0, // Validator didn't meet uptime requirement
+					gammaDelegationRewardKey.Address(): expectedDelegatorReward,
+					deltaDelegationRewardKey.Address(): 0, // Validator didn't meet uptime requirement
+				},
+				rewardBalances,
+			)
+		})
 
-		tc.By("retrieving reward address balances")
-		rewardBalances := make(map[ids.ShortID]uint64, len(rewardKeys))
-		for _, rewardKey := range rewardKeys {
-			keychain := secp256k1fx.NewKeychain(rewardKey)
-			baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
-			pWallet := baseWallet.P()
-			balances, err := pWallet.Builder().GetBalance()
-			require.NoError(err)
-			rewardBalances[rewardKey.Address()] = balances[pContext.AVAXAssetID]
-		}
-		require.Len(rewardBalances, len(rewardKeys))
-
-		tc.By("determining expected validation and delegation rewards")
-		calculator := reward.NewCalculator(rewardConfig)
-		expectedValidationReward := calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
-		potentialDelegationReward := calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
-		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
-
-		tc.By("checking expected rewards against actual rewards")
-		expectedRewardBalances := map[ids.ShortID]uint64{
-			alphaValidationRewardKey.Address(): expectedValidationReward,
-			alphaDelegationRewardKey.Address(): expectedDelegationFee,
-			betaValidationRewardKey.Address():  0, // Validator didn't meet uptime requirement
-			betaDelegationRewardKey.Address():  0, // Validator didn't meet uptime requirement
-			gammaDelegationRewardKey.Address(): expectedDelegatorReward,
-			deltaDelegationRewardKey.Address(): 0, // Validator didn't meet uptime requirement
-		}
-		for address := range expectedRewardBalances {
-			require.Equal(expectedRewardBalances[address], rewardBalances[address])
-		}
-
-		tc.By("stopping alpha to free up resources for a bootstrap check")
-		require.NoError(alphaNode.Stop(tc.DefaultContext()))
+		tc.By("stopping alpha to free up resources for a bootstrap check", func() {
+			require.NoError(alphaNode.Stop(tc.DefaultContext()))
+		})
 
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
