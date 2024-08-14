@@ -276,6 +276,7 @@ func New(
 		log.Info("Unprotected transactions allowed")
 	}
 	gpoParams := config.GPO
+	gpoParams.MinPrice = new(big.Int).SetUint64(config.TxPool.PriceLimit)
 	eth.APIBackend.gpo, err = gasprice.NewOracle(eth.APIBackend, gpoParams)
 	if err != nil {
 		return nil, err
