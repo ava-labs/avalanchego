@@ -151,6 +151,18 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.TransferSubnetOwnershipTx, error)
 
+	// NewConvertSubnetTx converts the subnet to a Permissionless L1.
+	//
+	// - [subnetID] specifies the subnet to be converted
+	// - [chainID] specifies which chain the manager is deployed on
+	// - [address] specifies the address of the manager
+	NewConvertSubnetTx(
+		subnetID ids.ID,
+		chainID ids.ID,
+		address []byte,
+		options ...common.Option,
+	) (*txs.ConvertSubnetTx, error)
+
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
 	//
@@ -762,6 +774,67 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		}},
 		Subnet:     subnetID,
 		Owner:      owner,
+		SubnetAuth: subnetAuth,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewConvertSubnetTx(
+	subnetID ids.ID,
+	chainID ids.ID,
+	address []byte,
+	options ...common.Option,
+) (*txs.ConvertSubnetTx, error) {
+	toBurn := map[ids.ID]uint64{
+		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
+	}
+	toStake := map[ids.ID]uint64{}
+
+	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	memo := ops.Memo()
+	bytesComplexity := feecomponent.Dimensions{
+		feecomponent.Bandwidth: uint64(len(memo)) + uint64(len(address)),
+	}
+	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := txfee.IntrinsicConvertSubnetTxComplexities.Add(
+		&bytesComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.ConvertSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		Subnet:     subnetID,
+		ChainID:    chainID,
+		Address:    address,
 		SubnetAuth: subnetAuth,
 	}
 	return tx, b.initCtx(tx)
