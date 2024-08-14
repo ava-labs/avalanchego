@@ -90,7 +90,13 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
 
-				require.Equal(platformvm.GetSubnetClientResponse{}, res)
+				require.Equal(platformvm.GetSubnetClientResponse{
+					IsPermissioned: false,
+					ControlKeys: []ids.ShortID{
+						keychain.Keys[0].Address(),
+					},
+					Threshold: 1,
+				}, res)
 			})
 		})
 })
