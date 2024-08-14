@@ -20,11 +20,8 @@ type TestContext interface {
 	// Ensures compatibility with ginkgo.By
 	By(text string, callback ...func())
 
-	// Ensures compatibility with ginkgo.DeferCleanup
-	//
-	// TODO(marun) Ensure registered cleanup functions are called at
-	// the end of the registering test.
-	DeferCleanup(args ...interface{})
+	// Provides a simple alternative to ginkgo.DeferCleanup
+	DeferCleanup(cleanup func())
 
 	// Enables color output to stdout
 	Outf(format string, args ...interface{})
