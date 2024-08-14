@@ -495,7 +495,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		response.ManagerAddress = addr
 	case database.ErrNotFound:
 		response.ManagerChainID = ids.Empty
-		response.ManagerAddress = []byte{}
+		response.ManagerAddress = []byte(nil)
 	default:
 		return err
 	}
