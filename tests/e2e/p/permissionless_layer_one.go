@@ -95,7 +95,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					ControlKeys: []ids.ShortID{
 						keychain.Keys[0].Address(),
 					},
-					Threshold: 1,
+					Threshold:      1,
+					ManagerChainID: chainID,
+					ManagerAddress: address,
 				}, res)
 			})
 		})
