@@ -102,16 +102,13 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		})
 
 		tc.By("issuing convert again should not work", func() {
-			convertSubnetTx, err := pWallet.IssueConvertSubnetTx(
+			_, err := pWallet.IssueConvertSubnetTx(
 				subnetID,
 				ids.GenerateTestID(),
 				[]byte{'a', 'd', 'd', 'r', 'e', 's', 's', '2'},
 				tc.WithDefaultContext(),
 			)
-			require.NoError(err)
-
-			err = platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond)
-			require.ErrorIs(executor.ErrIsImmutable, err)
+			require.ErrorIs(err, executor.ErrIsImmutable)
 
 			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
