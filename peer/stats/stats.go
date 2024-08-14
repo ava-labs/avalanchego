@@ -34,10 +34,3 @@ func NewRequestHandlerStats() RequestHandlerStats {
 		droppedRequests:   metrics.GetOrRegisterCounter("net_req_deadline_dropped", nil),
 	}
 }
-
-func NewCrossChainRequestHandlerStats() RequestHandlerStats {
-	return &requestHandlerStats{
-		timeUntilDeadline: metrics.GetOrRegisterTimer("net_cross_chain_req_time_until_deadline", nil),
-		droppedRequests:   metrics.GetOrRegisterCounter("net_cross_chain_req_deadline_dropped", nil),
-	}
-}
