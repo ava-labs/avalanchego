@@ -9,8 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -73,12 +72,9 @@ type WalletConfig struct {
 	// Keys to use for signing all transactions.
 	AVAXKeychain keychain.Keychain // required
 	EthKeychain  c.EthKeychain     // required
-	// Set of P-chain transactions that the wallet should know about to be able
-	// to generate transactions.
-	PChainTxs map[ids.ID]*txs.Tx // optional
-	// Set of P-chain transactions that the wallet should fetch to be able to
+	// Subnet IDs that the wallet should know about to be able to
 	// generate transactions.
-	PChainTxsToFetch set.Set[ids.ID] // optional
+	SubnetIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -104,25 +100,12 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		return nil, err
 	}
 
-	pChainTxs := config.PChainTxs
-	if pChainTxs == nil {
-		pChainTxs = make(map[ids.ID]*txs.Tx)
+	subnetOwners, err := platformvm.GetSubnetOwners(avaxState.PClient, ctx, config.SubnetIDs...)
+	if err != nil {
+		return nil, err
 	}
-
-	for txID := range config.PChainTxsToFetch {
-		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
-		if err != nil {
-			return nil, err
-		}
-		tx, err := txs.Parse(txs.Codec, txBytes)
-		if err != nil {
-			return nil, err
-		}
-		pChainTxs[txID] = tx
-	}
-
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
+	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)
 

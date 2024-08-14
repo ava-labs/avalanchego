@@ -38,22 +38,7 @@ type backend struct {
 	subnetOwner     map[ids.ID]fx.Owner // subnetID -> owner
 }
 
-func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetTxs map[ids.ID]*txs.Tx) Backend {
-	subnetOwner := make(map[ids.ID]fx.Owner)
-	for txID, tx := range subnetTxs { // first get owners from the CreateSubnetTx
-		createSubnetTx, ok := tx.Unsigned.(*txs.CreateSubnetTx)
-		if !ok {
-			continue
-		}
-		subnetOwner[txID] = createSubnetTx.Owner
-	}
-	for _, tx := range subnetTxs { // then check for TransferSubnetOwnershipTx
-		transferSubnetOwnershipTx, ok := tx.Unsigned.(*txs.TransferSubnetOwnershipTx)
-		if !ok {
-			continue
-		}
-		subnetOwner[transferSubnetOwnershipTx.Subnet] = transferSubnetOwnershipTx.Owner
-	}
+func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetOwner map[ids.ID]fx.Owner) Backend {
 	return &backend{
 		ChainUTXOs:  utxos,
 		context:     context,

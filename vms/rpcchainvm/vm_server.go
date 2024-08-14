@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -58,6 +59,7 @@ var (
 	originalStderr = os.Stderr
 
 	errExpectedBlockWithVerifyContext = errors.New("expected block.WithVerifyContext")
+	errNilNetworkUpgradesPB           = errors.New("network upgrades protobuf is nil")
 )
 
 // VMServer is a VM that is managed over RPC.
@@ -112,6 +114,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	if err != nil {
 		return nil, err
 	}
+
+	networkUpgrades, err := convertNetworkUpgrades(req.NetworkUpgrades)
+	if err != nil {
+		return nil, err
+	}
+
 	xChainID, err := ids.ToID(req.XChainId)
 	if err != nil {
 		return nil, err
@@ -230,11 +238,12 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}()
 
 	vm.ctx = &snow.Context{
-		NetworkID: req.NetworkId,
-		SubnetID:  subnetID,
-		ChainID:   chainID,
-		NodeID:    nodeID,
-		PublicKey: publicKey,
+		NetworkID:       req.NetworkId,
+		SubnetID:        subnetID,
+		ChainID:         chainID,
+		NodeID:          nodeID,
+		PublicKey:       publicKey,
+		NetworkUpgrades: networkUpgrades,
 
 		XChainID:    xChainID,
 		CChainID:    cChainID,
@@ -507,39 +516,6 @@ func (vm *VMServer) Version(ctx context.Context, _ *emptypb.Empty) (*vmpb.Versio
 	return &vmpb.VersionResponse{
 		Version: version,
 	}, err
-}
-
-func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	deadline, err := grpcutils.TimestampAsTime(msg.Deadline)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(ctx, chainID, msg.RequestId, deadline, msg.Request)
-}
-
-func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-
-	appErr := &common.AppError{
-		Code:    msg.ErrorCode,
-		Message: msg.ErrorMessage,
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId, appErr)
-}
-
-func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
 }
 
 func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {
@@ -842,4 +818,81 @@ func (vm *VMServer) StateSummaryAccept(
 		Mode: vmpb.StateSummaryAcceptResponse_Mode(mode),
 		Err:  errorToErrEnum[err],
 	}, errorToRPCError(err)
+}
+
+func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, error) {
+	if pbUpgrades == nil {
+		return upgrade.Config{}, errNilNetworkUpgradesPB
+	}
+
+	ap1, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_1Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap2, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_2Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap3, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_3Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap4, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_4Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap5, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_5Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	apPre6, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhasePre_6Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	ap6, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhase_6Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	apPost6, err := grpcutils.TimestampAsTime(pbUpgrades.ApricotPhasePost_6Time)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	banff, err := grpcutils.TimestampAsTime(pbUpgrades.BanffTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	cortina, err := grpcutils.TimestampAsTime(pbUpgrades.CortinaTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	durango, err := grpcutils.TimestampAsTime(pbUpgrades.DurangoTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+	etna, err := grpcutils.TimestampAsTime(pbUpgrades.EtnaTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+
+	cortinaXChainStopVertexID, err := ids.ToID(pbUpgrades.CortinaXChainStopVertexId)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
+
+	return upgrade.Config{
+		ApricotPhase1Time:            ap1,
+		ApricotPhase2Time:            ap2,
+		ApricotPhase3Time:            ap3,
+		ApricotPhase4Time:            ap4,
+		ApricotPhase4MinPChainHeight: pbUpgrades.ApricotPhase_4MinPChainHeight,
+		ApricotPhase5Time:            ap5,
+		ApricotPhasePre6Time:         apPre6,
+		ApricotPhase6Time:            ap6,
+		ApricotPhasePost6Time:        apPost6,
+		BanffTime:                    banff,
+		CortinaTime:                  cortina,
+		CortinaXChainStopVertexID:    cortinaXChainStopVertexID,
+		DurangoTime:                  durango,
+		EtnaTime:                     etna,
+	}, nil
 }
