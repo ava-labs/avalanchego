@@ -22,83 +22,106 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("e2e flow",
-		func() {
-			env := e2e.GetEnv(tc)
+	ginkgo.It("e2e flow", func() {
+		env := e2e.GetEnv(tc)
 
-			nodeURI := env.GetRandomNodeURI()
+		nodeURI := env.GetRandomNodeURI()
 
-			infoClient := info.NewClient(nodeURI.URI)
+		infoClient := info.NewClient(nodeURI.URI)
 
-			tc.By("get upgrade config")
-			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+		tc.By("get upgrade config")
+		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+		require.NoError(err)
+
+		now := time.Now()
+		if !upgrades.IsEtnaActivated(now) {
+			ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
+		}
+
+		keychain := env.NewKeychain(1)
+		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
+
+		pWallet := baseWallet.P()
+		pClient := platformvm.NewClient(nodeURI.URI)
+
+		owner := &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				keychain.Keys[0].Address(),
+			},
+		}
+
+		var subnetID ids.ID
+		tc.By("create a permissioned subnet", func() {
+			subnetTx, err := pWallet.IssueCreateSubnetTx(
+				owner,
+				tc.WithDefaultContext(),
+			)
+
+			subnetID = subnetTx.ID()
+			require.NoError(err)
+			require.NotEqual(subnetID, constants.PrimaryNetworkID)
+
+			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 
-			now := time.Now()
-			if !upgrades.IsEtnaActivated(now) {
-				ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
-			}
-
-			keychain := env.NewKeychain(1)
-			baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
-
-			pWallet := baseWallet.P()
-			pClient := platformvm.NewClient(nodeURI.URI)
-
-			owner := &secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs: []ids.ShortID{
+			require.Equal(platformvm.GetSubnetClientResponse{
+				IsPermissioned: true,
+				ControlKeys: []ids.ShortID{
 					keychain.Keys[0].Address(),
 				},
-			}
-
-			var subnetID ids.ID
-			tc.By("create a permissioned subnet", func() {
-				subnetTx, err := pWallet.IssueCreateSubnetTx(
-					owner,
-					tc.WithDefaultContext(),
-				)
-
-				subnetID = subnetTx.ID()
-				require.NoError(err)
-				require.NotEqual(subnetID, constants.PrimaryNetworkID)
-
-				res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-				require.NoError(err)
-
-				require.Equal(platformvm.GetSubnetClientResponse{
-					IsPermissioned: true,
-					ControlKeys: []ids.ShortID{
-						keychain.Keys[0].Address(),
-					},
-					Threshold: 1,
-				}, res)
-			})
-
-			chainID := ids.GenerateTestID()
-			address := []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
-			tc.By("convert subnet to permissionless L1", func() {
-				convertSubnetTx, err := pWallet.IssueConvertSubnetTx(
-					subnetID,
-					chainID,
-					address,
-					tc.WithDefaultContext(),
-				)
-				require.NoError(err)
-				require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
-
-				res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-				require.NoError(err)
-
-				require.Equal(platformvm.GetSubnetClientResponse{
-					IsPermissioned: false,
-					ControlKeys: []ids.ShortID{
-						keychain.Keys[0].Address(),
-					},
-					Threshold:      1,
-					ManagerChainID: chainID,
-					ManagerAddress: address,
-				}, res)
-			})
+				Threshold: 1,
+			}, res)
 		})
+
+		chainID := ids.GenerateTestID()
+		address := []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
+		tc.By("convert subnet to permissionless L1", func() {
+			convertSubnetTx, err := pWallet.IssueConvertSubnetTx(
+				subnetID,
+				chainID,
+				address,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+			require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
+
+			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+			require.NoError(err)
+
+			require.Equal(platformvm.GetSubnetClientResponse{
+				IsPermissioned: false,
+				ControlKeys: []ids.ShortID{
+					keychain.Keys[0].Address(),
+				},
+				Threshold:      1,
+				ManagerChainID: chainID,
+				ManagerAddress: address,
+			}, res)
+		})
+
+		tc.By("issuing convert again should not work", func() {
+			convertSubnetTx, err := pWallet.IssueConvertSubnetTx(
+				subnetID,
+				ids.GenerateTestID(),
+				[]byte{'a', 'd', 'd', 'r', 'e', 's', 's', '2'},
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+			require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
+
+			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+			require.NoError(err)
+
+			require.Equal(platformvm.GetSubnetClientResponse{
+				IsPermissioned: false,
+				ControlKeys: []ids.ShortID{
+					keychain.Keys[0].Address(),
+				},
+				Threshold:      1,
+				ManagerChainID: chainID,
+				ManagerAddress: address,
+			}, res)
+		})
+	})
 })
