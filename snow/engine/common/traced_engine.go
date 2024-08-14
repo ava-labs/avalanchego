@@ -311,38 +311,6 @@ func (e *tracedEngine) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []b
 	return e.engine.AppGossip(ctx, nodeID, msg)
 }
 
-func (e *tracedEngine) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.CrossChainAppRequest", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("requestLen", len(request)),
-	))
-	defer span.End()
-
-	return e.engine.CrossChainAppRequest(ctx, chainID, requestID, deadline, request)
-}
-
-func (e *tracedEngine) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.CrossChainAppResponse", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("responseLen", len(response)),
-	))
-	defer span.End()
-
-	return e.engine.CrossChainAppResponse(ctx, chainID, requestID, response)
-}
-
-func (e *tracedEngine) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *AppError) error {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.CrossChainAppRequestFailed", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-	))
-	defer span.End()
-
-	return e.engine.CrossChainAppRequestFailed(ctx, chainID, requestID, appErr)
-}
-
 func (e *tracedEngine) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Connected", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),

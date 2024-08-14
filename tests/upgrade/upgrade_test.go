@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			cChainGenesisStr := network.Genesis.CChainGenesis
 			require.NoError(json.Unmarshal([]byte(cChainGenesisStr), cChainGenesis))
 			unscheduledActivationTime := uint64(upgrade.UnscheduledActivationTime.Unix())
-			cChainGenesis.Config.EUpgradeTime = &unscheduledActivationTime
+			cChainGenesis.Config.EtnaTime = &unscheduledActivationTime
 			cChainGenesisBytes, err := json.Marshal(cChainGenesis)
 			require.NoError(err)
 			network.Genesis.CChainGenesis = string(cChainGenesisBytes)
