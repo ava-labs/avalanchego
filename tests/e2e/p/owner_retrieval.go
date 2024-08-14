@@ -52,9 +52,9 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 				subnetID,
 			)
 			require.NoError(err)
-			subnetOwnerI, found := subnetOwners[subnetID]
+			subnetOwnerInterface, found := subnetOwners[subnetID]
 			require.True(found)
-			subnetOwner, ok := subnetOwnerI.(*secp256k1fx.OutputOwners)
+			subnetOwner, ok := subnetOwnerInterface.(*secp256k1fx.OutputOwners)
 			require.True(ok)
 			require.Equal(owner.Locktime, subnetOwner.Locktime)
 			require.Equal(owner.Threshold, subnetOwner.Threshold)
@@ -84,9 +84,9 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 				subnetID,
 			)
 			require.NoError(err)
-			subnetOwnerI, found := subnetOwners[subnetID]
+			subnetOwnerInterface, found := subnetOwners[subnetID]
 			require.True(found)
-			subnetOwner, ok := subnetOwnerI.(*secp256k1fx.OutputOwners)
+			subnetOwner, ok := subnetOwnerInterface.(*secp256k1fx.OutputOwners)
 			require.True(ok)
 			require.Equal(newOwner.Locktime, subnetOwner.Locktime)
 			require.Equal(newOwner.Threshold, subnetOwner.Threshold)
