@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -34,8 +33,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		nodeURI := env.GetRandomNodeURI()
 
 		tc.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		recipientKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		recipientKey := e2e.NewKey(tc)
 		keychain := env.NewKeychain(1)
 		keychain.Add(recipientKey)
 		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
@@ -76,7 +74,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		}
 
 		tc.By("sending funds from one address to another on the X-Chain", func() {
-			_, err = xWallet.IssueBaseTx(
+			_, err := xWallet.IssueBaseTx(
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{
 						ID: avaxAssetID,
