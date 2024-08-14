@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -48,6 +49,13 @@ const (
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
 )
+
+// Create a new key.
+func NewKey(tc tests.TestContext) *secp256k1.PrivateKey {
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(tc, err)
+	return key
+}
 
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {

@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -20,12 +19,6 @@ func feeCalculatorFromContext(context *builder.Context) fee.Calculator {
 		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
 	}
 	return fee.NewStaticCalculator(context.StaticFeeConfig)
-}
-
-func newKey(tc tests.TestContext) *secp256k1.PrivateKey {
-	key, err := secp256k1.NewPrivateKey()
-	require.NoError(tc, err)
-	return key
 }
 
 // TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due

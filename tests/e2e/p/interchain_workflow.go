@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -30,18 +29,20 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
-	tc := e2e.NewTestContext()
-	require := require.New(tc)
-
 	const (
 		transferAmount = 10 * units.Avax
 		weight         = 2_000 * units.Avax // Used for both validation and delegation
 	)
 
+	var (
+		tc      = e2e.NewTestContext()
+		require = require.New(tc)
+	)
 	ginkgo.It("should ensure that funds can be transferred from the P-Chain to the X-Chain and the C-Chain", func() {
-		env := e2e.GetEnv(tc)
-
-		network := env.GetNetwork()
+		var (
+			env     = e2e.GetEnv(tc)
+			network = env.GetNetwork()
+		)
 
 		tc.By("checking that the network has a compatible minimum stake duration", func() {
 			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
@@ -49,26 +50,31 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		tc.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		recipientKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		recipientKey := e2e.NewKey(tc)
 		keychain := env.NewKeychain(1)
 		keychain.Add(recipientKey)
-		nodeURI := env.GetRandomNodeURI()
-		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
-		xWallet := baseWallet.X()
-		cWallet := baseWallet.C()
-		pWallet := baseWallet.P()
 
-		xBuilder := xWallet.Builder()
-		xContext := xBuilder.Context()
-		pBuilder := pWallet.Builder()
-		pContext := pBuilder.Context()
-		cBuilder := cWallet.Builder()
-		cContext := cBuilder.Context()
+		var (
+			nodeURI    = env.GetRandomNodeURI()
+			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
+
+			xWallet  = baseWallet.X()
+			xBuilder = xWallet.Builder()
+			xContext = xBuilder.Context()
+
+			pWallet  = baseWallet.P()
+			pBuilder = pWallet.Builder()
+			pContext = pBuilder.Context()
+
+			cWallet  = baseWallet.C()
+			cBuilder = cWallet.Builder()
+			cContext = cBuilder.Context()
+
+			avaxAssetID = xContext.AVAXAssetID
+		)
 
 		tc.By("defining common configuration")
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
-		avaxAssetID := xContext.AVAXAssetID
 		// Use the same owner for sending to X-Chain and importing funds to P-Chain
 		recipientOwner := secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -106,12 +112,14 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		// Adding a validator should not break interchain transfer.
 		endTime := time.Now().Add(30 * time.Second)
 		tc.By("adding the new node as a validator", func() {
-			rewardKey, err := secp256k1.NewPrivateKey()
-			require.NoError(err)
-
 			const (
 				delegationPercent = 0.10 // 10%
 				delegationShare   = reward.PercentDenominator * delegationPercent
+			)
+
+			var (
+				rewardKey  = e2e.NewKey(tc)
+				rewardAddr = rewardKey.Address()
 			)
 
 			_, err = pWallet.IssueAddPermissionlessValidatorTx(
@@ -127,11 +135,11 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{rewardKey.Address()},
+					Addrs:     []ids.ShortID{rewardAddr},
 				},
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{rewardKey.Address()},
+					Addrs:     []ids.ShortID{rewardAddr},
 				},
 				delegationShare,
 				tc.WithDefaultContext(),
@@ -141,8 +149,10 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		// Adding a delegator should not break interchain transfer.
 		tc.By("adding a delegator to the new node", func() {
-			rewardKey, err := secp256k1.NewPrivateKey()
-			require.NoError(err)
+			var (
+				rewardKey  = e2e.NewKey(tc)
+				rewardAddr = rewardKey.Address()
+			)
 
 			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
@@ -156,7 +166,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				pContext.AVAXAssetID,
 				&secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{rewardKey.Address()},
+					Addrs:     []ids.ShortID{rewardAddr},
 				},
 				tc.WithDefaultContext(),
 			)
