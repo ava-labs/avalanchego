@@ -62,9 +62,10 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 
-			pWallet  = baseWallet.P()
-			pBuilder = pWallet.Builder()
-			pContext = pBuilder.Context()
+			pWallet        = baseWallet.P()
+			pBuilder       = pWallet.Builder()
+			pContext       = pBuilder.Context()
+			pFeeCalculator = e2e.NewPChainFeeCalculatorFromContext(pContext)
 
 			xWallet  = baseWallet.X()
 			xBuilder = xWallet.Builder()
@@ -131,7 +132,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			initialAVAXBalance := balances[avaxAssetID]
 			tc.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", initialAVAXBalance)
 
-			_, err = pWallet.IssueExportTx(
+			exportTx, err := pWallet.IssueExportTx(
 				xContext.BlockchainID,
 				[]*avax.TransferableOutput{
 					{
@@ -148,13 +149,16 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			)
 			require.NoError(err)
 
+			exportFee, err := pFeeCalculator.CalculateFee(exportTx.Unsigned)
+			require.NoError(err)
+
 			balances, err = pBuilder.GetBalance()
 			require.NoError(err)
 
 			finalAVAXBalance := balances[avaxAssetID]
 			tc.Outf("{{blue}} P-chain balance after P->X export: %d {{/}}\n", finalAVAXBalance)
 
-			require.Equal(initialAVAXBalance-toTransfer-pContext.StaticFeeConfig.TxFee, finalAVAXBalance)
+			require.Equal(initialAVAXBalance-toTransfer-exportFee, finalAVAXBalance)
 		})
 
 		tc.By("issuing an ImportTx on the X-Chain", func() {
