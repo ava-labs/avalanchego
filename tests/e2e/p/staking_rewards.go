@@ -29,20 +29,21 @@ import (
 )
 
 var _ = ginkgo.Describe("[Staking Rewards]", func() {
-	const (
-		targetDelegationPeriod = 15 * time.Second
-		targetValidationPeriod = 30 * time.Second
-
-		delegationPercent = 0.10 // 10%
-		delegationShare   = reward.PercentDenominator * delegationPercent
-		weight            = 2_000 * units.Avax
-	)
-
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
 	)
+
 	ginkgo.It("should ensure that validator node uptime determines whether a staking reward is issued", func() {
+		const (
+			targetDelegationPeriod = 15 * time.Second
+			targetValidationPeriod = 30 * time.Second
+
+			delegationPercent = 0.10 // 10%
+			delegationShare   = reward.PercentDenominator * delegationPercent
+			weight            = 2_000 * units.Avax
+		)
+
 		var (
 			env     = e2e.GetEnv(tc)
 			network = env.GetNetwork()

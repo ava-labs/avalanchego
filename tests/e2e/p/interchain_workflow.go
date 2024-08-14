@@ -29,16 +29,17 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
-	const (
-		transferAmount = 10 * units.Avax
-		weight         = 2_000 * units.Avax // Used for both validation and delegation
-	)
-
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
 	)
+
 	ginkgo.It("should ensure that funds can be transferred from the P-Chain to the X-Chain and the C-Chain", func() {
+		const (
+			transferAmount = 10 * units.Avax
+			weight         = 2_000 * units.Avax // Used for both validation and delegation
+		)
+
 		var (
 			env     = e2e.GetEnv(tc)
 			network = env.GetNetwork()

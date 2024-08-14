@@ -26,6 +26,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
 	)
+
 	ginkgo.It("should be identical for every height for all nodes in the network", func() {
 		var (
 			env     = e2e.GetEnv(tc)

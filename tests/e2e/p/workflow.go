@@ -30,17 +30,18 @@ import (
 // - Issues an ImportTx on the X-chain and verifies the expected balances
 
 var _ = e2e.DescribePChain("[Workflow]", func() {
-	const (
-		// amount to transfer from P to X chain
-		toTransfer                 = 1 * units.Avax
-		delegationFeeShares uint32 = 20000 // TODO: retrieve programmatically
-	)
-
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
 	)
+
 	ginkgo.It("P-chain main operations", func() {
+		const (
+			// amount to transfer from P to X chain
+			toTransfer                 = 1 * units.Avax
+			delegationFeeShares uint32 = 20000 // TODO: retrieve programmatically
+		)
+
 		var (
 			env = e2e.GetEnv(tc)
 
