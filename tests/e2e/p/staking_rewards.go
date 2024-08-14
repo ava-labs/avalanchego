@@ -77,12 +77,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		tc.By("creating keychain and P-Chain wallet")
 		var (
-			alphaValidationRewardKey = e2e.NewKey(tc)
-			alphaDelegationRewardKey = e2e.NewKey(tc)
-			betaValidationRewardKey  = e2e.NewKey(tc)
-			betaDelegationRewardKey  = e2e.NewKey(tc)
-			gammaDelegationRewardKey = e2e.NewKey(tc)
-			deltaDelegationRewardKey = e2e.NewKey(tc)
+			alphaValidationRewardKey = e2e.NewPrivateKey(tc)
+			alphaDelegationRewardKey = e2e.NewPrivateKey(tc)
+			betaValidationRewardKey  = e2e.NewPrivateKey(tc)
+			betaDelegationRewardKey  = e2e.NewPrivateKey(tc)
+			gammaDelegationRewardKey = e2e.NewPrivateKey(tc)
+			deltaDelegationRewardKey = e2e.NewPrivateKey(tc)
 
 			rewardKeys = []*secp256k1.PrivateKey{
 				alphaValidationRewardKey,

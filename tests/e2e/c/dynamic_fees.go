@@ -142,7 +142,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("sending funds at the current gas price", func() {
 			// Create a recipient address
 			var (
-				recipientKey        = e2e.NewKey(tc)
+				recipientKey        = e2e.NewPrivateKey(tc)
 				recipientEthAddress = evm.GetEthAddress(recipientKey)
 			)
 

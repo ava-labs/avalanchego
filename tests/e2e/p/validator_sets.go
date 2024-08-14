@@ -46,7 +46,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 		const delegatorCount = 15
 		tc.By(fmt.Sprintf("adding %d delegators", delegatorCount), func() {
 			var (
-				rewardKey = e2e.NewKey(tc)
+				rewardKey = e2e.NewPrivateKey(tc)
 				endTime   = time.Now().Add(time.Second * 360)
 				// This is the default flag value for MinDelegatorStake.
 				weight = genesis.LocalParams.StakingConfig.MinDelegatorStake

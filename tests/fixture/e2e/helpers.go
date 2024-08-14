@@ -52,8 +52,8 @@ const (
 	PrivateNetworksDirName = "private_networks"
 )
 
-// Create a new key.
-func NewKey(tc tests.TestContext) *secp256k1.PrivateKey {
+// Create a new private key.
+func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(tc, err)
 	return key
