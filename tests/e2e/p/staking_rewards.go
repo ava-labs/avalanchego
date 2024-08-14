@@ -94,8 +94,14 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 				deltaDelegationRewardKey,
 			}
 
-			keychain = env.NewKeychain(1)
-			nodeURI  = tmpnet.NodeURI{
+			keychain = secp256k1fx.NewKeychain(rewardKeys...)
+		)
+
+		fundedKey := env.AllocatePreFundedKey()
+		keychain.Add(fundedKey)
+
+		var (
+			nodeURI = tmpnet.NodeURI{
 				NodeID: alphaNodeID,
 				URI:    alphaNode.URI,
 			}
