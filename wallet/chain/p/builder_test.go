@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -75,12 +76,8 @@ var (
 		},
 	}
 
-	subnets = map[ids.ID]*txs.Tx{
-		subnetID: {
-			Unsigned: &txs.CreateSubnetTx{
-				Owner: subnetOwner,
-			},
-		},
+	subnetOwners = map[ids.ID]fx.Owner{
+		subnetID: subnetOwner,
 	}
 
 	primaryNetworkPermissionlessStaker = &txs.SubnetValidator{
@@ -217,7 +214,7 @@ func TestAddSubnetValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(e.context, chainUTXOs, subnets)
+				backend = NewBackend(e.context, chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -249,7 +246,7 @@ func TestRemoveSubnetValidatorTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(e.context, chainUTXOs, subnets)
+				backend = NewBackend(e.context, chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -290,7 +287,7 @@ func TestCreateChainTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(e.context, chainUTXOs, subnets)
+				backend = NewBackend(e.context, chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -330,7 +327,7 @@ func TestCreateSubnetTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(e.context, chainUTXOs, subnets)
+				backend = NewBackend(e.context, chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -362,7 +359,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(e.context, chainUTXOs, subnets)
+				backend = NewBackend(e.context, chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
@@ -489,7 +486,7 @@ func TestTransformSubnetTx(t *testing.T) {
 				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
 					constants.PlatformChainID: utxos,
 				})
-				backend = NewBackend(e.context, chainUTXOs, subnets)
+				backend = NewBackend(e.context, chainUTXOs, subnetOwners)
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 

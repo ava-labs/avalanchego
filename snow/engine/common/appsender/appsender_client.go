@@ -24,44 +24,6 @@ func NewClient(client appsenderpb.AppSenderClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	_, err := c.client.SendCrossChainAppRequest(
-		ctx,
-		&appsenderpb.SendCrossChainAppRequestMsg{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-			Request:   appRequestBytes,
-		},
-	)
-	return err
-}
-
-func (c *Client) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	_, err := c.client.SendCrossChainAppResponse(
-		ctx,
-		&appsenderpb.SendCrossChainAppResponseMsg{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-			Response:  appResponseBytes,
-		},
-	)
-	return err
-}
-
-func (c *Client) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
-	_, err := c.client.SendCrossChainAppError(
-		ctx,
-		&appsenderpb.SendCrossChainAppErrorMsg{
-			ChainId:      chainID[:],
-			RequestId:    requestID,
-			ErrorCode:    errorCode,
-			ErrorMessage: errorMessage,
-		},
-	)
-
-	return err
-}
-
 func (c *Client) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) error {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
