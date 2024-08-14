@@ -74,7 +74,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		}
 
 		tc.By("sending funds from one address to another on the X-Chain", func() {
-			_, err = xWallet.IssueBaseTx(
+			_, err := xWallet.IssueBaseTx(
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{
 						ID: avaxAssetID,

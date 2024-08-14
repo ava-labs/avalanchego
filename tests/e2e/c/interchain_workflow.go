@@ -150,7 +150,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		})
 
 		tc.By("importing AVAX from the C-Chain to the P-Chain", func() {
-			_, err = pWallet.IssueImportTx(
+			_, err := pWallet.IssueImportTx(
 				cContext.BlockchainID,
 				&recipientOwner,
 				tc.WithDefaultContext(),
