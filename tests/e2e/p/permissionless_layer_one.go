@@ -62,6 +62,11 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				subnetID = subnetTx.ID()
 				require.NoError(err)
 				require.NotEqual(subnetID, constants.PrimaryNetworkID)
+
+				res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+
+				require.Equal(platformvm.GetSubnetClientResponse{}, res)
 			})
 
 			chainID := ids.GenerateTestID()
@@ -75,6 +80,11 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				)
 				require.NoError(err)
 				require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
+
+				res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+
+				require.Equal(platformvm.GetSubnetClientResponse{}, res)
 			})
 		})
 })
