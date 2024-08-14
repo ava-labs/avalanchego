@@ -286,8 +286,7 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
-	case message.AppRequestOp, message.AppErrorOp, message.AppResponseOp, message.AppGossipOp,
-		message.CrossChainAppRequestOp, message.CrossChainAppErrorOp, message.CrossChainAppResponseOp:
+	case message.AppRequestOp, message.AppErrorOp, message.AppResponseOp, message.AppGossipOp:
 		h.asyncMessageQueue.Push(ctx, msg)
 	default:
 		h.syncMessageQueue.Push(ctx, msg)
@@ -880,36 +879,6 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 
 	case *p2ppb.AppGossip:
 		return engine.AppGossip(ctx, nodeID, m.AppBytes)
-
-	case *message.CrossChainAppRequest:
-		return engine.CrossChainAppRequest(
-			ctx,
-			m.SourceChainID,
-			m.RequestID,
-			msg.Expiration(),
-			m.Message,
-		)
-
-	case *message.CrossChainAppResponse:
-		return engine.CrossChainAppResponse(
-			ctx,
-			m.SourceChainID,
-			m.RequestID,
-			m.Message,
-		)
-
-	case *message.CrossChainAppRequestFailed:
-		err := &common.AppError{
-			Code:    m.ErrorCode,
-			Message: m.ErrorMessage,
-		}
-
-		return engine.CrossChainAppRequestFailed(
-			ctx,
-			m.SourceChainID,
-			m.RequestID,
-			err,
-		)
 
 	default:
 		return fmt.Errorf(

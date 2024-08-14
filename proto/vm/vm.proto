@@ -47,10 +47,6 @@ service VM {
   rpc AppGossip(AppGossipMsg) returns (google.protobuf.Empty);
   // Attempts to gather metrics from a VM.
   rpc Gather(google.protobuf.Empty) returns (GatherResponse);
-  rpc CrossChainAppRequest(CrossChainAppRequestMsg) returns (google.protobuf.Empty);
-  rpc CrossChainAppRequestFailed(CrossChainAppRequestFailedMsg) returns (google.protobuf.Empty);
-  rpc CrossChainAppResponse(CrossChainAppResponseMsg) returns (google.protobuf.Empty);
-
   // BatchedChainVM
   rpc GetAncestors(GetAncestorsRequest) returns (GetAncestorsResponse);
   rpc BatchedParseBlock(BatchedParseBlockRequest) returns (BatchedParseBlockResponse);
@@ -116,6 +112,25 @@ message InitializeRequest {
   // the messenger, keystore, shared memory, blockchain alias,
   // subnet alias, and appSender services
   string server_addr = 14;
+  // network_upgrades_bytes is the json encoded network upgrades
+  NetworkUpgrades network_upgrades = 15;
+}
+
+message NetworkUpgrades {
+  google.protobuf.Timestamp apricot_phase_1_time = 1;
+  google.protobuf.Timestamp apricot_phase_2_time = 2;
+  google.protobuf.Timestamp apricot_phase_3_time = 3;
+  google.protobuf.Timestamp apricot_phase_4_time = 4;
+  uint64 apricot_phase_4_min_p_chain_height = 5;
+  google.protobuf.Timestamp apricot_phase_5_time = 6;
+  google.protobuf.Timestamp apricot_phase_pre_6_time = 7;
+  google.protobuf.Timestamp apricot_phase_6_time = 8;
+  google.protobuf.Timestamp apricot_phase_post_6_time = 9;
+  google.protobuf.Timestamp banff_time = 10;
+  google.protobuf.Timestamp cortina_time = 11;
+  bytes cortina_x_chain_stop_vertex_id = 12;
+  google.protobuf.Timestamp durango_time = 13;
+  google.protobuf.Timestamp etna_time = 14;
 }
 
 message InitializeResponse {
@@ -257,37 +272,6 @@ message AppGossipMsg {
   bytes node_id = 1;
   // The message body
   bytes msg = 2;
-}
-
-message CrossChainAppRequestMsg {
-  // The chain that sent us this request
-  bytes chain_id = 1;
-  // The ID of this request
-  uint32 request_id = 2;
-  // deadline for this request
-  google.protobuf.Timestamp deadline = 3;
-  // The request body
-  bytes request = 4;
-}
-
-message CrossChainAppRequestFailedMsg {
-  // The chain that we failed to get a response from
-  bytes chain_id = 1;
-  // The ID of the request we sent and didn't get a response to
-  uint32 request_id = 2;
-  // Application-defined error code
-  sint32 error_code = 3;
-  // Application-defined error message
-  string error_message = 4;
-}
-
-message CrossChainAppResponseMsg {
-  // The chain that we got a response from
-  bytes chain_id = 1;
-  // Request ID of request that this is in response to
-  uint32 request_id = 2;
-  // The response body
-  bytes response = 3;
 }
 
 message ConnectedRequest {
