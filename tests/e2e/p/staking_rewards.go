@@ -27,19 +27,25 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
-const (
-	targetDelegationPeriod = 15 * time.Second
-	targetValidationPeriod = 30 * time.Second
-)
-
 var _ = ginkgo.Describe("[Staking Rewards]", func() {
-	tc := e2e.NewTestContext()
-	require := require.New(tc)
+	const (
+		targetDelegationPeriod = 15 * time.Second
+		targetValidationPeriod = 30 * time.Second
 
+		delegationPercent = 0.10 // 10%
+		delegationShare   = reward.PercentDenominator * delegationPercent
+		weight            = 2_000 * units.Avax
+	)
+
+	var (
+		tc      = e2e.NewTestContext()
+		require = require.New(tc)
+	)
 	ginkgo.It("should ensure that validator node uptime determines whether a staking reward is issued", func() {
-		env := e2e.GetEnv(tc)
-
-		network := env.GetNetwork()
+		var (
+			env     = e2e.GetEnv(tc)
+			network = env.GetNetwork()
+		)
 
 		tc.By("checking that the network has a compatible minimum stake duration", func() {
 			minStakeDuration := cast.ToDuration(network.DefaultFlags[config.MinStakeDurationKey])
@@ -68,68 +74,50 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
-		tc.By("generating reward keys")
-
-		alphaValidationRewardKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-		alphaDelegationRewardKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-
-		betaValidationRewardKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-		betaDelegationRewardKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-
-		gammaDelegationRewardKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-
-		deltaDelegationRewardKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-
-		rewardKeys := []*secp256k1.PrivateKey{
-			alphaValidationRewardKey,
-			alphaDelegationRewardKey,
-			betaValidationRewardKey,
-			betaDelegationRewardKey,
-			gammaDelegationRewardKey,
-			deltaDelegationRewardKey,
-		}
-
 		tc.By("creating keychain and P-Chain wallet")
-		keychain := secp256k1fx.NewKeychain(rewardKeys...)
-		fundedKey := env.AllocatePreFundedKey()
-		keychain.Add(fundedKey)
-		nodeURI := tmpnet.NodeURI{
-			NodeID: alphaNodeID,
-			URI:    alphaNode.URI,
-		}
-		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
-		pWallet := baseWallet.P()
+		var (
+			alphaValidationRewardKey = newKey(tc)
+			alphaDelegationRewardKey = newKey(tc)
+			betaValidationRewardKey  = newKey(tc)
+			betaDelegationRewardKey  = newKey(tc)
+			gammaDelegationRewardKey = newKey(tc)
+			deltaDelegationRewardKey = newKey(tc)
 
-		pBuilder := pWallet.Builder()
-		pContext := pBuilder.Context()
+			rewardKeys = []*secp256k1.PrivateKey{
+				alphaValidationRewardKey,
+				alphaDelegationRewardKey,
+				betaValidationRewardKey,
+				betaDelegationRewardKey,
+				gammaDelegationRewardKey,
+				deltaDelegationRewardKey,
+			}
 
-		const (
-			delegationPercent = 0.10 // 10%
-			delegationShare   = reward.PercentDenominator * delegationPercent
-			weight            = 2_000 * units.Avax
+			keychain = env.NewKeychain(1)
+			nodeURI  = tmpnet.NodeURI{
+				NodeID: alphaNodeID,
+				URI:    alphaNode.URI,
+			}
+			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
+			pWallet    = baseWallet.P()
+			pBuilder   = pWallet.Builder()
+			pContext   = pBuilder.Context()
+
+			pvmClient = platformvm.NewClient(alphaNode.URI)
 		)
 
-		pvmClient := platformvm.NewClient(alphaNode.URI)
-
-		tc.By("retrieving supply before inserting validators")
-		supplyAtValidatorsStart, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+		tc.By("retrieving supply before adding alpha node as a validator")
+		supplyAtAlphaNodeStart, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
 
-		alphaValidatorsEndTime := time.Now().Add(targetValidationPeriod)
-		tc.Outf("alpha node validation period ending at: %v\n", alphaValidatorsEndTime)
-
 		tc.By("adding alpha node as a validator", func() {
+			endTime := time.Now().Add(targetValidationPeriod)
+			tc.Outf("validation period ending at: %v\n", endTime)
+
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						End:    uint64(alphaValidatorsEndTime.Unix()),
+						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -179,19 +167,19 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		tc.By("retrieving supply before inserting delegators")
-		supplyAtDelegatorsStart, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
+		tc.By("retrieving supply before adding gamma as a delegator")
+		supplyAtGammaDelegatorStart, _, err := pvmClient.GetCurrentSupply(tc.DefaultContext(), constants.PrimaryNetworkID)
 		require.NoError(err)
 
-		gammaDelegatorEndTime := time.Now().Add(targetDelegationPeriod)
-		tc.Outf("gamma delegation period ending at: %v\n", gammaDelegatorEndTime)
+		tc.By("adding gamma as a delegator to the alpha node", func() {
+			endTime := time.Now().Add(targetDelegationPeriod)
+			tc.Outf("delegation period ending at: %v\n", endTime)
 
-		tc.By("adding gamma as delegator to the alpha node", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: alphaNodeID,
-						End:    uint64(gammaDelegatorEndTime.Unix()),
+						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -206,15 +194,15 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		deltaDelegatorEndTime := time.Now().Add(targetDelegationPeriod)
-		tc.Outf("delta delegation period ending at: %v\n", deltaDelegatorEndTime)
-
 		tc.By("adding delta as delegator to the beta node", func() {
+			endTime := time.Now().Add(targetDelegationPeriod)
+			tc.Outf("delegation period ending at: %v\n", endTime)
+
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: betaNodeID,
-						End:    uint64(deltaDelegatorEndTime.Unix()),
+						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -229,8 +217,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			require.NoError(err)
 		})
 
-		tc.By("stopping beta node to prevent it and its delegator from receiving a validation reward")
-		require.NoError(betaNode.Stop(tc.DefaultContext()))
+		tc.By("stopping beta node to prevent it and its delegator from receiving a validation reward", func() {
+			require.NoError(betaNode.Stop(tc.DefaultContext()))
+		})
 
 		tc.By("retrieving staking periods from the chain")
 		data, err := pvmClient.GetCurrentValidators(tc.DefaultContext(), constants.PlatformChainID, []ids.NodeID{alphaNodeID})
@@ -287,8 +276,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		tc.By("determining expected validation and delegation rewards")
 		calculator := reward.NewCalculator(rewardConfig)
-		expectedValidationReward := calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtValidatorsStart)
-		potentialDelegationReward := calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtDelegatorsStart)
+		expectedValidationReward := calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+		potentialDelegationReward := calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
 		expectedDelegationFee, expectedDelegatorReward := reward.Split(potentialDelegationReward, delegationShare)
 
 		tc.By("checking expected rewards against actual rewards")
