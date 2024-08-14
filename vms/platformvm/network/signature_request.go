@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -60,62 +59,40 @@ func (s signatureRequestHandler) AppRequest(
 			Message: "failed to parse unsigned message: " + err.Error(),
 		}
 	}
-	parsed, err := payload.Parse(unsignedMessage.Payload)
-	if err != nil {
-		return nil, &common.AppError{
-			Code:    ErrFailedToParse,
-			Message: "failed to parse payload: " + err.Error(),
-		}
-	}
 
-	var sig []byte
-	switch p := parsed.(type) {
-	case *payload.AddressedCall:
-		msg, err := payload.ParseAddressedCall(unsignedMessage.Payload)
-		if err != nil {
-			return nil, &common.AppError{
-				Code:    ErrFailedToParse,
-				Message: "failed to parse addressed call: " + err.Error(),
-			}
-		}
-		// Check that the addressed call payload is a registered Warp message type
-		var dst messages.Payload
-		ver, err := messages.Codec.Unmarshal(msg.Payload, &dst)
-		if err != nil {
-			return nil, &common.AppError{
-				Code:    ErrUnsupportedWarpMessageType,
-				Message: "unsupported warp message type",
-			}
-		}
-		if ver != uint16(messages.CodecVersion) {
-			return nil, &common.AppError{
-				Code:    ErrInvalidCodecVersion,
-				Message: "invalid codec version",
-			}
-		}
-		sig, err = s.signer.Sign(unsignedMessage)
-		if err != nil {
-			return nil, &common.AppError{
-				Code:    ErrFailedToSignMessage,
-				Message: "failed to sign message: " + err.Error(),
-			}
-		}
-		if len(sig) != bls.SignatureLen {
-			return nil, &common.AppError{
-				Code:    ErrInvalidSignatureLength,
-				Message: "invalid signature length",
-			}
-		}
-	default:
-		return nil, &common.AppError{
-			Code:    ErrFailedToParse,
-			Message: fmt.Sprintf("unknown payload type: %T", p),
-		}
-	}
+	msg, err := payload.ParseAddressedCall(unsignedMessage.Payload)
 	if err != nil {
 		return nil, &common.AppError{
-			Code:    ErrFailedToGetSig,
-			Message: "failed to get signature: " + err.Error(),
+			Code:    ErrFailedToParse,
+			Message: "failed to parse addressed call: " + err.Error(),
+		}
+	}
+	// Check that the addressed call payload is a registered Warp message type
+	var dst messages.Payload
+	ver, err := messages.Codec.Unmarshal(msg.Payload, &dst)
+	if err != nil {
+		return nil, &common.AppError{
+			Code:    ErrUnsupportedWarpMessageType,
+			Message: "unsupported warp message type",
+		}
+	}
+	if ver != uint16(messages.CodecVersion) {
+		return nil, &common.AppError{
+			Code:    ErrInvalidCodecVersion,
+			Message: "invalid codec version",
+		}
+	}
+	sig, err := s.signer.Sign(unsignedMessage)
+	if err != nil {
+		return nil, &common.AppError{
+			Code:    ErrFailedToSignMessage,
+			Message: "failed to sign message: " + err.Error(),
+		}
+	}
+	if len(sig) != bls.SignatureLen {
+		return nil, &common.AppError{
+			Code:    ErrInvalidSignatureLength,
+			Message: "invalid signature length",
 		}
 	}
 
