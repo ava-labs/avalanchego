@@ -715,7 +715,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 // TODO: remove this after Etna is activated
 func (vm *VM) setMinFeeAtEtna() {
 	now := vm.clock.Time()
-	if vm.chainConfig.EtnaTime == nil {
+	if vm.chainConfig.EtnaTimestamp == nil {
 		// If Etna is not set, set the min fee according to the latest upgrade
 		vm.txPool.SetMinFee(big.NewInt(params.ApricotPhase4MinBaseFee))
 		return
@@ -730,7 +730,7 @@ func (vm *VM) setMinFeeAtEtna() {
 	go func() {
 		defer vm.shutdownWg.Done()
 
-		wait := utils.Uint64ToTime(vm.chainConfig.EtnaTime).Sub(now)
+		wait := utils.Uint64ToTime(vm.chainConfig.EtnaTimestamp).Sub(now)
 		t := time.NewTimer(wait)
 		select {
 		case <-t.C: // Wait for Etna to be activated

@@ -255,18 +255,20 @@ func TestStateProcessorErrors(t *testing.T) {
 			db    = rawdb.NewMemoryDatabase()
 			gspec = &Genesis{
 				Config: &params.ChainConfig{
-					ChainID:                     big.NewInt(1),
-					HomesteadBlock:              big.NewInt(0),
-					EIP150Block:                 big.NewInt(0),
-					EIP155Block:                 big.NewInt(0),
-					EIP158Block:                 big.NewInt(0),
-					ByzantiumBlock:              big.NewInt(0),
-					ConstantinopleBlock:         big.NewInt(0),
-					PetersburgBlock:             big.NewInt(0),
-					IstanbulBlock:               big.NewInt(0),
-					MuirGlacierBlock:            big.NewInt(0),
-					ApricotPhase1BlockTimestamp: utils.NewUint64(0),
-					ApricotPhase2BlockTimestamp: utils.NewUint64(0),
+					ChainID:             big.NewInt(1),
+					HomesteadBlock:      big.NewInt(0),
+					EIP150Block:         big.NewInt(0),
+					EIP155Block:         big.NewInt(0),
+					EIP158Block:         big.NewInt(0),
+					ByzantiumBlock:      big.NewInt(0),
+					ConstantinopleBlock: big.NewInt(0),
+					PetersburgBlock:     big.NewInt(0),
+					IstanbulBlock:       big.NewInt(0),
+					MuirGlacierBlock:    big.NewInt(0),
+					NetworkUpgrades: params.NetworkUpgrades{
+						ApricotPhase1BlockTimestamp: utils.NewUint64(0),
+						ApricotPhase2BlockTimestamp: utils.NewUint64(0),
+					},
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{
