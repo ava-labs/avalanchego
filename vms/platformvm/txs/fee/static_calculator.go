@@ -121,6 +121,6 @@ func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
 }
 
 func (c *staticVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
-	c.fee = 0 // TODO: Fix
+	c.fee = c.config.TxFee
 	return nil
 }
