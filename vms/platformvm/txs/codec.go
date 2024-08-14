@@ -43,6 +43,7 @@ func init() {
 		c.SkipRegistrations(4)
 
 		errs.Add(RegisterDurangoUnsignedTxsTypes(c))
+		errs.Add(RegisterEtnaUnsignedTxsTypes(c))
 	}
 
 	Codec = codec.NewDefaultManager()
@@ -107,5 +108,11 @@ func RegisterDurangoUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
 		targetCodec.RegisterType(&BaseTx{}),
+	)
+}
+
+func RegisterEtnaUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
+		targetCodec.RegisterType(&RegisterSubnetValidatorTx{}),
 	)
 }
