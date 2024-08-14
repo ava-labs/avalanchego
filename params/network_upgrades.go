@@ -103,19 +103,19 @@ func (n *NetworkUpgrades) Override(o *NetworkUpgrades) {
 // IsSubnetEVM returns whether [time] represents a block
 // with a timestamp after the SubnetEVM upgrade time.
 func (n *NetworkUpgrades) IsSubnetEVM(time uint64) bool {
-	return utils.IsTimestampForked(n.SubnetEVMTimestamp, time)
+	return isTimestampForked(n.SubnetEVMTimestamp, time)
 }
 
 // IsDurango returns whether [time] represents a block
 // with a timestamp after the Durango upgrade time.
 func (n *NetworkUpgrades) IsDurango(time uint64) bool {
-	return utils.IsTimestampForked(n.DurangoTimestamp, time)
+	return isTimestampForked(n.DurangoTimestamp, time)
 }
 
 // IsEtna returns whether [time] represents a block
 // with a timestamp after the Etna upgrade time.
 func (n *NetworkUpgrades) IsEtna(time uint64) bool {
-	return utils.IsTimestampForked(n.EtnaTimestamp, time)
+	return isTimestampForked(n.EtnaTimestamp, time)
 }
 
 func (n *NetworkUpgrades) Description() string {

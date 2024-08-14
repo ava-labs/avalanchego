@@ -1,11 +1,12 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2024 Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package utils
+package params
 
 import (
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,28 +29,28 @@ func TestIsTimestampForked(t *testing.T) {
 			isForked: false,
 		},
 		"zero fork at genesis": {
-			fork:     NewUint64(0),
+			fork:     utils.NewUint64(0),
 			block:    0,
 			isForked: true,
 		},
 		"pre fork timestamp": {
-			fork:     NewUint64(100),
+			fork:     utils.NewUint64(100),
 			block:    50,
 			isForked: false,
 		},
 		"at fork timestamp": {
-			fork:     NewUint64(100),
+			fork:     utils.NewUint64(100),
 			block:    100,
 			isForked: true,
 		},
 		"post fork timestamp": {
-			fork:     NewUint64(100),
+			fork:     utils.NewUint64(100),
 			block:    150,
 			isForked: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			res := IsTimestampForked(test.fork, test.block)
+			res := isTimestampForked(test.fork, test.block)
 			assert.Equal(t, test.isForked, res)
 		})
 	}
@@ -70,50 +71,50 @@ func TestIsForkTransition(t *testing.T) {
 			transitioned: false,
 		},
 		"activate at genesis": {
-			fork:         NewUint64(0),
+			fork:         utils.NewUint64(0),
 			parent:       nil,
 			current:      0,
 			transitioned: true,
 		},
 		"nil fork arbitrary transition": {
 			fork:         nil,
-			parent:       NewUint64(100),
+			parent:       utils.NewUint64(100),
 			current:      101,
 			transitioned: false,
 		},
 		"nil fork transition same timestamp": {
 			fork:         nil,
-			parent:       NewUint64(100),
+			parent:       utils.NewUint64(100),
 			current:      100,
 			transitioned: false,
 		},
 		"exact match on current timestamp": {
-			fork:         NewUint64(100),
-			parent:       NewUint64(99),
+			fork:         utils.NewUint64(100),
+			parent:       utils.NewUint64(99),
 			current:      100,
 			transitioned: true,
 		},
 		"current same as parent does not transition twice": {
-			fork:         NewUint64(100),
-			parent:       NewUint64(101),
+			fork:         utils.NewUint64(100),
+			parent:       utils.NewUint64(101),
 			current:      101,
 			transitioned: false,
 		},
 		"current, parent, and fork same should not transition twice": {
-			fork:         NewUint64(100),
-			parent:       NewUint64(100),
+			fork:         utils.NewUint64(100),
+			parent:       utils.NewUint64(100),
 			current:      100,
 			transitioned: false,
 		},
 		"current transitions after fork": {
-			fork:         NewUint64(100),
-			parent:       NewUint64(99),
+			fork:         utils.NewUint64(100),
+			parent:       utils.NewUint64(99),
 			current:      101,
 			transitioned: true,
 		},
 		"current and parent come after fork": {
-			fork:         NewUint64(100),
-			parent:       NewUint64(101),
+			fork:         utils.NewUint64(100),
+			parent:       utils.NewUint64(101),
 			current:      102,
 			transitioned: false,
 		},

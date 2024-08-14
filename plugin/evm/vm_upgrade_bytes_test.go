@@ -38,7 +38,7 @@ var (
 
 func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	// Make a TxAllowListConfig upgrade at genesis and convert it to JSON to apply as upgradeBytes.
-	enableAllowListTimestamp := params.DefaultGenesisTime // enable at default genesis time
+	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initial time
 	upgradeConfig := &params.UpgradeConfig{
 		PrecompileUpgrades: []params.PrecompileUpgrade{
 			{
@@ -213,7 +213,7 @@ func TestNetworkUpgradesOverriden(t *testing.T) {
 	require.False(t, vm.chainConfig.IsSubnetEVM(0))
 	require.True(t, vm.chainConfig.IsSubnetEVM(2))
 	require.False(t, vm.chainConfig.IsDurango(0))
-	require.False(t, vm.chainConfig.IsDurango(uint64(params.DefaultGenesisTime.Unix())))
+	require.False(t, vm.chainConfig.IsDurango(uint64(upgrade.InitiallyActiveTime.Unix())))
 	require.True(t, vm.chainConfig.IsDurango(1607144402))
 }
 
@@ -257,7 +257,7 @@ func TestVMStateUpgrade(t *testing.T) {
 		Code:          upgradedCode,
 	}
 
-	upgradeTimestamp := params.DefaultGenesisTime.Add(10 * time.Hour)
+	upgradeTimestamp := upgrade.InitiallyActiveTime.Add(10 * time.Hour)
 	upgradeBytesJSON := fmt.Sprintf(
 		`{
 			"stateUpgrades": [

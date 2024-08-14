@@ -6,10 +6,45 @@ package params
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ethereum/go-ethereum/common"
+)
+
+const (
+	maxJSONLen = 64 * 1024 * 1024 // 64MB
+
+	// Consensus Params
+	RollupWindow            uint64 = 10
+	DynamicFeeExtraDataSize        = 80
+
+	// For legacy tests
+	MinGasPrice        int64 = 225_000_000_000
+	TestInitialBaseFee int64 = 225_000_000_000
+	TestMaxBaseFee     int64 = 225_000_000_000
+)
+
+var (
+	errNonGenesisForkByHeight = errors.New("subnet-evm only supports forking by height at the genesis block")
+
+	DefaultChainID = big.NewInt(43214)
+
+	DefaultFeeConfig = commontype.FeeConfig{
+		GasLimit:        big.NewInt(8_000_000),
+		TargetBlockRate: 2, // in seconds
+
+		MinBaseFee:               big.NewInt(25_000_000_000),
+		TargetGas:                big.NewInt(15_000_000),
+		BaseFeeChangeDenominator: big.NewInt(36),
+
+		MinBlockGasCost:  big.NewInt(0),
+		MaxBlockGasCost:  big.NewInt(1_000_000),
+		BlockGasCostStep: big.NewInt(200_000),
+	}
 )
 
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:
@@ -29,6 +64,13 @@ type UpgradeConfig struct {
 // AvalancheContext provides Avalanche specific context directly into the EVM.
 type AvalancheContext struct {
 	SnowCtx *snow.Context
+}
+
+// SetEthUpgrades sets the mapped upgrades  Avalanche > EVM upgrades) for the chain config.
+func (c *ChainConfig) SetEthUpgrades(avalancheUpgrades NetworkUpgrades) {
+	if avalancheUpgrades.EtnaTimestamp != nil {
+		c.CancunTime = utils.NewUint64(*avalancheUpgrades.EtnaTimestamp)
+	}
 }
 
 // UnmarshalJSON parses the JSON-encoded data and stores the result in the
@@ -138,6 +180,48 @@ func (cu *ChainConfigWithUpgradesJSON) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+// Verify verifies chain config and returns error
+func (c *ChainConfig) Verify() error {
+	if err := c.FeeConfig.Verify(); err != nil {
+		return err
+	}
+
+	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
+	if err := c.verifyPrecompileUpgrades(); err != nil {
+		return fmt.Errorf("invalid precompile upgrades: %w", err)
+	}
+
+	// Verify the state upgrades are internally consistent given the existing chainConfig.
+	if err := c.verifyStateUpgrades(); err != nil {
+		return fmt.Errorf("invalid state upgrades: %w", err)
+	}
+
+	// Verify the network upgrades are internally consistent given the existing chainConfig.
+	if err := c.verifyNetworkUpgrades(c.SnowCtx.NetworkID); err != nil {
+		return fmt.Errorf("invalid network upgrades: %w", err)
+	}
+
+	return nil
+}
+
+// IsPrecompileEnabled returns whether precompile with [address] is enabled at [timestamp].
+func (c *ChainConfig) IsPrecompileEnabled(address common.Address, timestamp uint64) bool {
+	config := c.getActivePrecompileConfig(address, timestamp)
+	return config != nil && !config.IsDisabled()
+}
+
+// GetFeeConfig returns the original FeeConfig contained in the genesis ChainConfig.
+// Implements precompile.ChainConfig interface.
+func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
+	return c.FeeConfig
+}
+
+// AllowedFeeRecipients returns the original AllowedFeeRecipients parameter contained in the genesis ChainConfig.
+// Implements precompile.ChainConfig interface.
+func (c *ChainConfig) AllowedFeeRecipients() bool {
+	return c.AllowFeeRecipients
+}
+
 // ToWithUpgradesJSON converts the ChainConfig to ChainConfigWithUpgradesJSON with upgrades explicitly displayed.
 // ChainConfig does not include upgrades in its JSON output.
 // This is a workaround for showing upgrades in the JSON output.
@@ -180,9 +264,38 @@ func (c *ChainConfig) SetNetworkUpgradeDefaults() {
 	c.NetworkUpgrades.setDefaults(c.SnowCtx.NetworkID)
 }
 
-// SetEVMUpgrades sets the mapped upgrades  Avalanche > EVM upgrades) for the chain config.
-func (c *ChainConfig) SetEVMUpgrades(avalancheUpgrades NetworkUpgrades) {
-	if avalancheUpgrades.EtnaTimestamp != nil {
-		c.CancunTime = utils.NewUint64(*avalancheUpgrades.EtnaTimestamp)
+func (r *Rules) PredicatersExist() bool {
+	return len(r.Predicaters) > 0
+}
+
+func (r *Rules) PredicaterExists(addr common.Address) bool {
+	_, PredicaterExists := r.Predicaters[addr]
+	return PredicaterExists
+}
+
+// IsPrecompileEnabled returns true if the precompile at [addr] is enabled for this rule set.
+func (r *Rules) IsPrecompileEnabled(addr common.Address) bool {
+	_, ok := r.ActivePrecompiles[addr]
+	return ok
+}
+
+func ptrToString(val *uint64) string {
+	if val == nil {
+		return "nil"
 	}
+	return fmt.Sprintf("%d", *val)
+}
+
+// IsForkTransition returns true if [fork] activates during the transition from
+// [parent] to [current].
+// Taking [parent] as a pointer allows for us to pass nil when checking forks
+// that activate during genesis.
+// Note: this works for both block number and timestamp activated forks.
+func IsForkTransition(fork *uint64, parent *uint64, current uint64) bool {
+	var parentForked bool
+	if parent != nil {
+		parentForked = isTimestampForked(fork, *parent)
+	}
+	currentForked := isTimestampForked(fork, current)
+	return !parentForked && currentForked
 }

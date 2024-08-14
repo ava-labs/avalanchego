@@ -170,7 +170,7 @@ func (c *ChainConfig) GetActivatingPrecompileConfigs(address common.Address, fro
 	// First check the embedded [upgrade] for precompiles configured
 	// in the genesis chain config.
 	if config, ok := c.GenesisPrecompiles[key]; ok {
-		if utils.IsForkTransition(config.Timestamp(), from, to) {
+		if IsForkTransition(config.Timestamp(), from, to) {
 			configs = append(configs, config)
 		}
 	}
@@ -178,7 +178,7 @@ func (c *ChainConfig) GetActivatingPrecompileConfigs(address common.Address, fro
 	for _, upgrade := range upgrades {
 		if upgrade.Key() == key {
 			// Check if the precompile activates in the specified range.
-			if utils.IsForkTransition(upgrade.Timestamp(), from, to) {
+			if IsForkTransition(upgrade.Timestamp(), from, to) {
 				configs = append(configs, upgrade.Config)
 			}
 		}

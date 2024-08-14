@@ -28,10 +28,8 @@ package params
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -42,44 +40,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const maxJSONLen = 64 * 1024 * 1024 // 64MB
-
-var (
-	errNonGenesisForkByHeight = errors.New("subnet-evm only supports forking by height at the genesis block")
-
-	SubnetEVMChainID = big.NewInt(43214)
-
-	// For legacy tests
-	MinGasPrice        int64 = 225_000_000_000
-	TestInitialBaseFee int64 = 225_000_000_000
-	TestMaxBaseFee     int64 = 225_000_000_000
-
-	DynamicFeeExtraDataSize        = 80
-	RollupWindow            uint64 = 10
-
-	DefaultGenesisTime = upgrade.InitiallyActiveTime
-
-	DefaultFeeConfig = commontype.FeeConfig{
-		GasLimit:        big.NewInt(8_000_000),
-		TargetBlockRate: 2, // in seconds
-
-		MinBaseFee:               big.NewInt(25_000_000_000),
-		TargetGas:                big.NewInt(15_000_000),
-		BaseFeeChangeDenominator: big.NewInt(36),
-
-		MinBlockGasCost:  big.NewInt(0),
-		MaxBlockGasCost:  big.NewInt(1_000_000),
-		BlockGasCostStep: big.NewInt(200_000),
-	}
-
-	InactiveUpgradeTime = time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC)
-)
-
 var (
 	// SubnetEVMDefaultConfig is the default configuration
 	// without any network upgrades.
 	SubnetEVMDefaultChainConfig = &ChainConfig{
-		ChainID:            SubnetEVMChainID,
+		ChainID:            DefaultChainID,
 		FeeConfig:          DefaultFeeConfig,
 		AllowFeeRecipients: false,
 
@@ -131,9 +96,9 @@ var (
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
-			SubnetEVMTimestamp: utils.TimeToNewUint64(InactiveUpgradeTime),
-			DurangoTimestamp:   utils.TimeToNewUint64(InactiveUpgradeTime),
-			EtnaTimestamp:      utils.TimeToNewUint64(InactiveUpgradeTime),
+			SubnetEVMTimestamp: utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
@@ -155,8 +120,8 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
-			DurangoTimestamp:   utils.TimeToNewUint64(InactiveUpgradeTime),
-			EtnaTimestamp:      utils.TimeToNewUint64(InactiveUpgradeTime),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
@@ -179,7 +144,7 @@ var (
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
 			DurangoTimestamp:   utils.NewUint64(0),
-			EtnaTimestamp:      utils.TimeToNewUint64(InactiveUpgradeTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
@@ -207,7 +172,6 @@ var (
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
 	}
-
 	TestRules = TestChainConfig.Rules(new(big.Int), 0)
 )
 
@@ -232,9 +196,9 @@ type ChainConfig struct {
 	IstanbulBlock       *big.Int `json:"istanbulBlock,omitempty"`       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
 
-	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
-	CancunTime *uint64 `json:"cancunTime,omitempty"`
-	// Verkle activates the Verkle upgrade from Ethereum. (nil = no fork, 0 = already activated)
+	// Fork scheduling was switched from blocks to timestamps here
+
+	CancunTime *uint64 `json:"cancunTime,omitempty"` // Cancun switch time (nil = no fork, 0 = already activated)
 	VerkleTime *uint64 `json:"verkleTime,omitempty"` // Verkle switch time (nil = no fork, 0 = already on verkle)
 
 	NetworkUpgrades // Config for timestamps that enable network upgrades. Skip encoding/decoding directly into ChainConfig.
@@ -306,76 +270,59 @@ func (c *ChainConfig) Description() string {
 
 // IsHomestead returns whether num is either equal to the homestead block or greater.
 func (c *ChainConfig) IsHomestead(num *big.Int) bool {
-	return utils.IsBlockForked(c.HomesteadBlock, num)
+	return isBlockForked(c.HomesteadBlock, num)
 }
 
 // IsEIP150 returns whether num is either equal to the EIP150 fork block or greater.
 func (c *ChainConfig) IsEIP150(num *big.Int) bool {
-	return utils.IsBlockForked(c.EIP150Block, num)
+	return isBlockForked(c.EIP150Block, num)
 }
 
 // IsEIP155 returns whether num is either equal to the EIP155 fork block or greater.
 func (c *ChainConfig) IsEIP155(num *big.Int) bool {
-	return utils.IsBlockForked(c.EIP155Block, num)
+	return isBlockForked(c.EIP155Block, num)
 }
 
 // IsEIP158 returns whether num is either equal to the EIP158 fork block or greater.
 func (c *ChainConfig) IsEIP158(num *big.Int) bool {
-	return utils.IsBlockForked(c.EIP158Block, num)
+	return isBlockForked(c.EIP158Block, num)
 }
 
 // IsByzantium returns whether num is either equal to the Byzantium fork block or greater.
 func (c *ChainConfig) IsByzantium(num *big.Int) bool {
-	return utils.IsBlockForked(c.ByzantiumBlock, num)
+	return isBlockForked(c.ByzantiumBlock, num)
 }
 
 // IsConstantinople returns whether num is either equal to the Constantinople fork block or greater.
 func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
-	return utils.IsBlockForked(c.ConstantinopleBlock, num)
+	return isBlockForked(c.ConstantinopleBlock, num)
 }
 
 // IsMuirGlacier returns whether num is either equal to the Muir Glacier (EIP-2384) fork block or greater.
 func (c *ChainConfig) IsMuirGlacier(num *big.Int) bool {
-	return utils.IsBlockForked(c.MuirGlacierBlock, num)
+	return isBlockForked(c.MuirGlacierBlock, num)
 }
 
 // IsPetersburg returns whether num is either
 // - equal to or greater than the PetersburgBlock fork block,
 // - OR is nil, and Constantinople is active
 func (c *ChainConfig) IsPetersburg(num *big.Int) bool {
-	return utils.IsBlockForked(c.PetersburgBlock, num) || c.PetersburgBlock == nil && utils.IsBlockForked(c.ConstantinopleBlock, num)
+	return isBlockForked(c.PetersburgBlock, num) || c.PetersburgBlock == nil && isBlockForked(c.ConstantinopleBlock, num)
 }
 
 // IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
 func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
-	return utils.IsBlockForked(c.IstanbulBlock, num)
+	return isBlockForked(c.IstanbulBlock, num)
 }
 
-// IsCancun returns whether [time] represents a block
-// with a timestamp after the Cancun upgrade time.
+// IsCancun returns whether time is either equal to the Cancun fork time or greater.
 func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
-	return utils.IsTimestampForked(c.CancunTime, time)
+	return isTimestampForked(c.CancunTime, time)
 }
 
-// IsVerkle returns whether [time] represents a block
-// with a timestamp after the Verkle upgrade time.
+// IsVerkle returns whether time is either equal to the Verkle fork time or greater.
 func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
-	return utils.IsTimestampForked(c.VerkleTime, time)
-}
-
-func (r *Rules) PredicatersExist() bool {
-	return len(r.Predicaters) > 0
-}
-
-func (r *Rules) PredicaterExists(addr common.Address) bool {
-	_, PredicaterExists := r.Predicaters[addr]
-	return PredicaterExists
-}
-
-// IsPrecompileEnabled returns whether precompile with [address] is enabled at [timestamp].
-func (c *ChainConfig) IsPrecompileEnabled(address common.Address, timestamp uint64) bool {
-	config := c.getActivePrecompileConfig(address, timestamp)
-	return config != nil && !config.IsDisabled()
+	return isTimestampForked(c.VerkleTime, time)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -403,30 +350,6 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time u
 	return lasterr
 }
 
-// Verify verifies chain config and returns error
-func (c *ChainConfig) Verify() error {
-	if err := c.FeeConfig.Verify(); err != nil {
-		return err
-	}
-
-	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
-	if err := c.verifyPrecompileUpgrades(); err != nil {
-		return fmt.Errorf("invalid precompile upgrades: %w", err)
-	}
-
-	// Verify the state upgrades are internally consistent given the existing chainConfig.
-	if err := c.verifyStateUpgrades(); err != nil {
-		return fmt.Errorf("invalid state upgrades: %w", err)
-	}
-
-	// Verify the network upgrades are internally consistent given the existing chainConfig.
-	if err := c.verifyNetworkUpgrades(c.SnowCtx.NetworkID); err != nil {
-		return fmt.Errorf("invalid network upgrades: %w", err)
-	}
-
-	return nil
-}
-
 type fork struct {
 	name      string
 	block     *big.Int // some go-ethereum forks use block numbers
@@ -447,7 +370,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "petersburgBlock", block: c.PetersburgBlock},
 		{name: "istanbulBlock", block: c.IstanbulBlock},
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
-		{name: "cancunTime", timestamp: c.CancunTime},
+		{name: "cancunTime", timestamp: c.CancunTime, optional: true},
+		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
 	}
 
 	// Check that forks are enabled in order
@@ -518,60 +442,60 @@ func checkForks(forks []fork, blockFork bool) error {
 // checkCompatible confirms that [newcfg] is backwards compatible with [c] to upgrade with the given head block height and timestamp.
 // This confirms that all Ethereum and Avalanche upgrades are backwards compatible as well as that the precompile config is backwards
 // compatible.
-func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time uint64) *ConfigCompatError {
-	if isForkBlockIncompatible(c.HomesteadBlock, newcfg.HomesteadBlock, height) {
+func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, headTimestamp uint64) *ConfigCompatError {
+	if isForkBlockIncompatible(c.HomesteadBlock, newcfg.HomesteadBlock, headNumber) {
 		return newBlockCompatError("Homestead fork block", c.HomesteadBlock, newcfg.HomesteadBlock)
 	}
-	if isForkBlockIncompatible(c.EIP150Block, newcfg.EIP150Block, height) {
+	if isForkBlockIncompatible(c.EIP150Block, newcfg.EIP150Block, headNumber) {
 		return newBlockCompatError("EIP150 fork block", c.EIP150Block, newcfg.EIP150Block)
 	}
-	if isForkBlockIncompatible(c.EIP155Block, newcfg.EIP155Block, height) {
+	if isForkBlockIncompatible(c.EIP155Block, newcfg.EIP155Block, headNumber) {
 		return newBlockCompatError("EIP155 fork block", c.EIP155Block, newcfg.EIP155Block)
 	}
-	if isForkBlockIncompatible(c.EIP158Block, newcfg.EIP158Block, height) {
+	if isForkBlockIncompatible(c.EIP158Block, newcfg.EIP158Block, headNumber) {
 		return newBlockCompatError("EIP158 fork block", c.EIP158Block, newcfg.EIP158Block)
 	}
-	if c.IsEIP158(height) && !utils.BigNumEqual(c.ChainID, newcfg.ChainID) {
+	if c.IsEIP158(headNumber) && !utils.BigNumEqual(c.ChainID, newcfg.ChainID) {
 		return newBlockCompatError("EIP158 chain ID", c.EIP158Block, newcfg.EIP158Block)
 	}
-	if isForkBlockIncompatible(c.ByzantiumBlock, newcfg.ByzantiumBlock, height) {
+	if isForkBlockIncompatible(c.ByzantiumBlock, newcfg.ByzantiumBlock, headNumber) {
 		return newBlockCompatError("Byzantium fork block", c.ByzantiumBlock, newcfg.ByzantiumBlock)
 	}
-	if isForkBlockIncompatible(c.ConstantinopleBlock, newcfg.ConstantinopleBlock, height) {
+	if isForkBlockIncompatible(c.ConstantinopleBlock, newcfg.ConstantinopleBlock, headNumber) {
 		return newBlockCompatError("Constantinople fork block", c.ConstantinopleBlock, newcfg.ConstantinopleBlock)
 	}
-	if isForkBlockIncompatible(c.PetersburgBlock, newcfg.PetersburgBlock, height) {
+	if isForkBlockIncompatible(c.PetersburgBlock, newcfg.PetersburgBlock, headNumber) {
 		// the only case where we allow Petersburg to be set in the past is if it is equal to Constantinople
 		// mainly to satisfy fork ordering requirements which state that Petersburg fork be set if Constantinople fork is set
-		if isForkBlockIncompatible(c.ConstantinopleBlock, newcfg.PetersburgBlock, height) {
+		if isForkBlockIncompatible(c.ConstantinopleBlock, newcfg.PetersburgBlock, headNumber) {
 			return newBlockCompatError("Petersburg fork block", c.PetersburgBlock, newcfg.PetersburgBlock)
 		}
 	}
-	if isForkBlockIncompatible(c.IstanbulBlock, newcfg.IstanbulBlock, height) {
+	if isForkBlockIncompatible(c.IstanbulBlock, newcfg.IstanbulBlock, headNumber) {
 		return newBlockCompatError("Istanbul fork block", c.IstanbulBlock, newcfg.IstanbulBlock)
 	}
-	if isForkBlockIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, height) {
+	if isForkBlockIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, headNumber) {
 		return newBlockCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
 	}
-	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
-		return newTimestampCompatError("Cancun fork block timestamp", c.CancunTime, c.CancunTime)
+	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, headTimestamp) {
+		return newTimestampCompatError("Cancun fork timestamp", c.CancunTime, newcfg.CancunTime)
 	}
-	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, time) {
-		return newTimestampCompatError("Verkle fork block timestamp", c.VerkleTime, newcfg.VerkleTime)
+	if isForkTimestampIncompatible(c.VerkleTime, newcfg.VerkleTime, headTimestamp) {
+		return newTimestampCompatError("Verkle fork timestamp", c.VerkleTime, newcfg.VerkleTime)
 	}
 
 	// Check avalanche network upgrades
-	if err := c.CheckNetworkUpgradesCompatible(&newcfg.NetworkUpgrades, time); err != nil {
+	if err := c.CheckNetworkUpgradesCompatible(&newcfg.NetworkUpgrades, headTimestamp); err != nil {
 		return err
 	}
 
 	// Check that the precompiles on the new config are compatible with the existing precompile config.
-	if err := c.CheckPrecompilesCompatible(newcfg.PrecompileUpgrades, time); err != nil {
+	if err := c.CheckPrecompilesCompatible(newcfg.PrecompileUpgrades, headTimestamp); err != nil {
 		return err
 	}
 
 	// Check that the state upgrades on the new config are compatible with the existing state upgrade config.
-	if err := c.CheckStateUpgradesCompatible(newcfg.StateUpgrades, time); err != nil {
+	if err := c.CheckStateUpgradesCompatible(newcfg.StateUpgrades, headTimestamp); err != nil {
 		return err
 	}
 
@@ -579,10 +503,20 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 	return nil
 }
 
-// isForkBlockIncompatible returns true if a fork scheduled at s1 cannot be rescheduled to
-// block s2 because head is already past the fork.
+// isForkBlockIncompatible returns true if a fork scheduled at block s1 cannot be
+// rescheduled to block s2 because head is already past the fork.
 func isForkBlockIncompatible(s1, s2, head *big.Int) bool {
-	return (utils.IsBlockForked(s1, head) || utils.IsBlockForked(s2, head)) && !configBlockEqual(s1, s2)
+	return (isBlockForked(s1, head) || isBlockForked(s2, head)) && !configBlockEqual(s1, s2)
+}
+
+// isBlockForked returns whether a fork scheduled at block s is active at the
+// given head block. Whilst this method is the same as isTimestampForked, they
+// are explicitly separate for clearer reading.
+func isBlockForked(s, head *big.Int) bool {
+	if s == nil || head == nil {
+		return false
+	}
+	return s.Cmp(head) <= 0
 }
 
 func configBlockEqual(x, y *big.Int) bool {
@@ -598,7 +532,17 @@ func configBlockEqual(x, y *big.Int) bool {
 // isForkTimestampIncompatible returns true if a fork scheduled at timestamp s1
 // cannot be rescheduled to timestamp s2 because head is already past the fork.
 func isForkTimestampIncompatible(s1, s2 *uint64, head uint64) bool {
-	return (utils.IsTimestampForked(s1, head) || utils.IsTimestampForked(s2, head)) && !configTimestampEqual(s1, s2)
+	return (isTimestampForked(s1, head) || isTimestampForked(s2, head)) && !configTimestampEqual(s1, s2)
+}
+
+// isTimestampForked returns whether a fork scheduled at timestamp s is active
+// at the given head timestamp. Whilst this method is the same as isBlockForked,
+// they are explicitly separate for clearer reading.
+func isTimestampForked(s *uint64, head uint64) bool {
+	if s == nil {
+		return false
+	}
+	return *s <= head
 }
 
 func configTimestampEqual(x, y *uint64) bool {
@@ -680,13 +624,6 @@ func (err *ConfigCompatError) Error() string {
 	return fmt.Sprintf("mismatching %s in database (have timestamp %s, want timestamp %s, rewindto timestamp %d)", err.What, ptrToString(err.StoredTime), ptrToString(err.NewTime), err.RewindToTime)
 }
 
-func ptrToString(val *uint64) string {
-	if val == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("%d", *val)
-}
-
 type EthRules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
@@ -718,12 +655,6 @@ type Rules struct {
 	// AccepterPrecompiles map addresses to stateful precompile accepter functions
 	// that are enabled for this rule set.
 	AccepterPrecompiles map[common.Address]precompileconfig.Accepter
-}
-
-// IsPrecompileEnabled returns true if the precompile at [addr] is enabled for this rule set.
-func (r *Rules) IsPrecompileEnabled(addr common.Address) bool {
-	_, ok := r.ActivePrecompiles[addr]
-	return ok
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -772,16 +703,4 @@ func (c *ChainConfig) Rules(blockNum *big.Int, timestamp uint64) Rules {
 	}
 
 	return rules
-}
-
-// GetFeeConfig returns the original FeeConfig contained in the genesis ChainConfig.
-// Implements precompile.ChainConfig interface.
-func (c *ChainConfig) GetFeeConfig() commontype.FeeConfig {
-	return c.FeeConfig
-}
-
-// AllowedFeeRecipients returns the original AllowedFeeRecipients parameter contained in the genesis ChainConfig.
-// Implements precompile.ChainConfig interface.
-func (c *ChainConfig) AllowedFeeRecipients() bool {
-	return c.AllowFeeRecipients
 }

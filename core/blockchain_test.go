@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
@@ -1216,7 +1217,7 @@ func TestEIP3651(t *testing.T) {
 		funds   = new(big.Int).Mul(common.Big1, big.NewInt(params.Ether))
 		gspec   = &Genesis{
 			Config:    params.TestChainConfig,
-			Timestamp: uint64(params.DefaultGenesisTime.Unix()),
+			Timestamp: uint64(upgrade.InitiallyActiveTime.Unix()),
 			Alloc: GenesisAlloc{
 				addr1: {Balance: funds},
 				addr2: {Balance: funds},
