@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -108,7 +109,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
-			require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
+
+			err = platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond)
+			require.ErrorIs(executor.ErrIsImmutable, err)
 
 			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)

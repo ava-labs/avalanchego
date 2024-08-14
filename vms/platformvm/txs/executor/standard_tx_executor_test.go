@@ -927,7 +927,7 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		Tx:      tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, errIsImmutable)
+	require.ErrorIs(err, ErrIsImmutable)
 }
 
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
@@ -2314,7 +2314,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			err: errIsImmutable,
+			err: ErrIsImmutable,
 		},
 		{
 			name: "valid tx",
@@ -2629,7 +2629,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			err: errIsImmutable,
+			err: ErrIsImmutable,
 		},
 		{
 			name: "invalid if subnet is converted",
@@ -2663,7 +2663,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
-			err: errIsImmutable,
+			err: ErrIsImmutable,
 		},
 		{
 			name: "valid tx",
