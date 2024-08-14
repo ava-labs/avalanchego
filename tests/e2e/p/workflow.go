@@ -64,7 +64,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pWallet        = baseWallet.P()
 			pBuilder       = pWallet.Builder()
 			pContext       = pBuilder.Context()
-			pFeeCalculator = feeCalculatorFromContext(pContext)
+			pFeeCalculator = e2e.NewPChainFeeCalculatorFromContext(pContext)
 
 			xWallet  = baseWallet.X()
 			xBuilder = xWallet.Builder()
