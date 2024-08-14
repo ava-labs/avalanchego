@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -30,7 +29,6 @@ var (
 	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
 	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
-	errCreateChainManagedSubnet   = errors.New("CreateChainTx cannot be used to create a Chain on a Subnet with a manager")
 )
 
 type StandardTxExecutor struct {
@@ -65,13 +63,6 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return err
-	}
-
-	if e.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
-		_, _, err := e.State.GetSubnetManager(tx.SubnetID)
-		if err != database.ErrNotFound {
-			return errCreateChainManagedSubnet
-		}
 	}
 
 	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.SubnetID, tx.SubnetAuth)
