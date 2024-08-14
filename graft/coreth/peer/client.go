@@ -30,10 +30,6 @@ type NetworkClient interface {
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// SendCrossChainRequest sends a request to a specific blockchain running on this node.
-	// Returns response bytes, and ErrRequestFailed if the request failed.
-	SendCrossChainRequest(ctx context.Context, chainID ids.ID, request []byte) ([]byte, error)
-
 	// TrackBandwidth should be called for each valid request with the bandwidth
 	// (length of response divided by request time), and with 0 if the response is invalid.
 	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
@@ -72,16 +68,6 @@ func (c *client) SendAppRequestAny(ctx context.Context, minVersion *version.Appl
 func (c *client) SendAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
 	waitingHandler := newWaitingResponseHandler()
 	if err := c.network.SendAppRequest(ctx, nodeID, request, waitingHandler); err != nil {
-		return nil, err
-	}
-	return waitingHandler.WaitForResult(ctx)
-}
-
-// SendCrossChainRequest synchronously sends request to the specified chainID
-// Returns response bytes and ErrRequestFailed if the request should be retried.
-func (c *client) SendCrossChainRequest(ctx context.Context, chainID ids.ID, request []byte) ([]byte, error) {
-	waitingHandler := newWaitingResponseHandler()
-	if err := c.network.SendCrossChainRequest(ctx, chainID, request, waitingHandler); err != nil {
 		return nil, err
 	}
 	return waitingHandler.WaitForResult(ctx)
