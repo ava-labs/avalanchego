@@ -139,6 +139,13 @@ func (m *txMetrics) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return nil
 }
 
+func (m *txMetrics) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "register_subnet_validator",
+	}).Inc()
+	return nil
+}
+
 func (m *txMetrics) BaseTx(*txs.BaseTx) error {
 	m.numTxs.With(prometheus.Labels{
 		txLabel: "base",

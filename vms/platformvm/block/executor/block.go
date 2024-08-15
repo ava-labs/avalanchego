@@ -29,23 +29,38 @@ func (*Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error {
+func (b *Block) VerifyWithContext(ctx context.Context, smCtx *smblock.Context) error {
 	pChainHeight := uint64(0)
-	if ctx != nil {
-		pChainHeight = ctx.PChainHeight
+	if smCtx != nil {
+		pChainHeight = smCtx.PChainHeight
 	}
 
 	blkID := b.ID()
 	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
 		if !blkState.verifiedHeights.Contains(pChainHeight) {
-			// PlatformVM blocks are currently valid regardless of the ProposerVM's
-			// PChainHeight. If this changes, those validity checks should be done prior
-			// to adding [pChainHeight] to [verifiedHeights].
+			if err := b.Visit(&warpBlockVerifier{
+				ctx:          ctx,
+				chainCtx:     b.manager.ctx,
+				state:        b.manager.state,
+				pChainHeight: pChainHeight,
+			}); err != nil {
+				return err
+			}
+
 			blkState.verifiedHeights.Add(pChainHeight)
 		}
 
 		// This block has already been verified.
 		return nil
+	}
+
+	if err := b.Visit(&warpBlockVerifier{
+		ctx:          ctx,
+		chainCtx:     b.manager.ctx,
+		state:        b.manager.state,
+		pChainHeight: pChainHeight,
+	}); err != nil {
+		return err
 	}
 
 	return b.Visit(&verifier{

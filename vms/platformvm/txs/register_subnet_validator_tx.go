@@ -47,6 +47,7 @@ type RegisterSubnetValidatorTx struct {
 	SyntacticallyVerified bool `json:"-"`
 
 	// Populated during syntactic verification
+	SourceAddress []byte                           `json:"-"`
 	ParsedMessage *message.RegisterSubnetValidator `json:"-"`
 }
 
@@ -99,6 +100,7 @@ func (tx *RegisterSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 
 	// cache that this is valid
 	tx.SyntacticallyVerified = true
+	tx.SourceAddress = addressedCall.SourceAddress
 	tx.ParsedMessage = msg
 	return nil
 }
