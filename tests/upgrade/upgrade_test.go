@@ -4,6 +4,7 @@
 package upgrade
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -66,6 +68,14 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			require.NoError(err)
 			network.Genesis.CChainGenesis = string(cChainGenesisBytes)
 		}
+
+		// Previous version does not have unactivated upgrades.
+		// The default upgrade config usually sets the latest upgrade to be activated
+		// Use unscheduled
+		upgradeJSON, err := json.Marshal(upgrade.LatestUnscheduled)
+		require.NoError(err)
+		upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
+		network.DefaultFlags[config.UpgradeFileContentKey] = string(upgradeBase64)
 
 		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
 

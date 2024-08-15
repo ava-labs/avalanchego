@@ -114,8 +114,9 @@ type Network struct {
 
 func NewDefaultNetwork(owner string) *Network {
 	return &Network{
-		Owner: owner,
-		Nodes: NewNodesOrPanic(DefaultNodeCount),
+		Owner:        owner,
+		DefaultFlags: FlagsMap{},
+		Nodes:        NewNodesOrPanic(DefaultNodeCount),
 	}
 }
 

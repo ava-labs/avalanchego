@@ -147,7 +147,7 @@ func NewTestGenesis(
 		)
 	}
 
-	chainID := big.NewInt(defaultNetworkID)
+	chainID := big.NewInt(int64(networkID))
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
 		Config:     params.GetChainConfig(upgrade.Default, chainID), // upgrade will be again set by VM according to the snow.Context
