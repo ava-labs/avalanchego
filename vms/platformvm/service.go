@@ -1863,7 +1863,8 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 	defer s.vm.ctx.Lock.Unlock()
 
 	reply.State = s.vm.state.GetFeeState()
-	reply.Price = s.vm.DynamicFeeConfig.MinGasPrice.MulExp(
+	reply.Price = fee.CalculateGasPrice(
+		s.vm.DynamicFeeConfig.MinGasPrice,
 		reply.State.Excess,
 		s.vm.DynamicFeeConfig.ExcessConversionConstant,
 	)
