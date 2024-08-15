@@ -28,6 +28,11 @@ const (
 		wrappers.LongLen + // end
 		wrappers.LongLen // weight
 
+	intrinsicRecoveredSubnetOnlyValidatorBandwidth = ids.NodeIDLen + // nodeID
+		wrappers.LongLen + // weight
+		wrappers.LongLen + // end
+		wrappers.LongLen // balance
+
 	intrinsicSubnetValidatorBandwidth = intrinsicValidatorBandwidth + // validator
 		ids.IDLen // subnetID
 
@@ -180,6 +185,17 @@ var (
 			ids.IDLen + // subnetID
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen + // owner typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		fee.DBRead:  1,
+		fee.DBWrite: 1,
+		fee.Compute: 0,
+	}
+	IntrinsicRecoverSubnetTxComplexities = fee.Dimensions{
+		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+			ids.IDLen + // subnetID
+			wrappers.IntLen + // validators length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen + // owner typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
@@ -615,6 +631,61 @@ func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	if err != nil {
 		return err
 	}
+	c.output = output
+	return nil
+}
+
+func (c *complexityVisitor) RecoverSubnetTx(tx *txs.RecoverSubnetTx) error {
+	bandwidth, err := math.Mul(uint64(len(tx.Validators)), intrinsicRecoveredSubnetOnlyValidatorBandwidth)
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.Memo)))
+	if err != nil {
+		return err
+	}
+	dynamicComplexity := fee.Dimensions{
+		fee.Bandwidth: bandwidth,
+		fee.DBRead:    0,
+		fee.DBWrite:   0,
+		fee.Compute:   0,
+	}
+
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	output, err := IntrinsicRecoverSubnetTxComplexities.Add(
+		&dynamicComplexity,
+		&baseTxComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return err
+	}
+	for _, vdr := range tx.Validators {
+		signerComplexity, err := SignerComplexity(vdr.Signer)
+		if err != nil {
+			return err
+		}
+		ownerComplexity, err := OwnerComplexity(vdr.ChangeOwner)
+		if err != nil {
+			return err
+		}
+		output, err = output.Add(
+			&output,
+			&signerComplexity,
+			&ownerComplexity,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	c.output = output
 	return nil
 }

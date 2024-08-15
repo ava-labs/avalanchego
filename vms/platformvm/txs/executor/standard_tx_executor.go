@@ -14,7 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -30,6 +32,7 @@ var (
 	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
 	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errHasValidators              = errors.New("cannot recover a Subnet with validators")
 )
 
 type StandardTxExecutor struct {
@@ -543,6 +546,77 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	avax.Produce(e.State, txID, tx.Outs)
 	// Set the new Subnet manager in the database
 	e.State.SetSubnetManager(tx.Subnet, tx.ChainID, tx.Address)
+	return nil
+}
+
+func (e *StandardTxExecutor) RecoverSubnetTx(tx *txs.RecoverSubnetTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	vdrMap := e.Config.Validators.GetMap(tx.Subnet)
+	if len(vdrMap) > 0 {
+		return errHasValidators
+	}
+
+	baseTxCreds, err := verifySubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+
+	totalAVAX := uint64(0)
+	for _, vdr := range tx.Validators {
+		totalAVAX, err = math.Add(totalAVAX, vdr.Balance)
+		if err != nil {
+			return err
+		}
+
+		// TODO: Replace 10*units.Avax with 2 weeks of the continuous fee
+		if vdr.Balance < 10*units.Avax {
+			return txs.ErrBalanceTooSmall
+		}
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	totalAVAX, err = math.Add(totalAVAX, fee)
+	if err != nil {
+		return err
+	}
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: totalAVAX,
+		},
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
 	return nil
 }
 

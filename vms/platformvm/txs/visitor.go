@@ -20,5 +20,6 @@ type Visitor interface {
 	AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error
 	TransferSubnetOwnershipTx(*TransferSubnetOwnershipTx) error
 	ConvertSubnetTx(*ConvertSubnetTx) error
+	RecoverSubnetTx(*RecoverSubnetTx) error
 	BaseTx(*BaseTx) error
 }

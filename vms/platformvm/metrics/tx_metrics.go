@@ -139,6 +139,13 @@ func (m *txMetrics) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return nil
 }
 
+func (m *txMetrics) RecoverSubnetTx(*txs.RecoverSubnetTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "recover_subnet",
+	}).Inc()
+	return nil
+}
+
 func (m *txMetrics) BaseTx(*txs.BaseTx) error {
 	m.numTxs.With(prometheus.Labels{
 		txLabel: "base",

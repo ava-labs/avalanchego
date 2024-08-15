@@ -86,6 +86,10 @@ func (*AtomicTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return ErrWrongTxType
 }
 
+func (*AtomicTxExecutor) RecoverSubnetTx(*txs.RecoverSubnetTx) error {
+	return ErrWrongTxType
+}
+
 func (e *AtomicTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	return e.atomicTx(tx)
 }

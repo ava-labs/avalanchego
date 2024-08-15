@@ -124,3 +124,8 @@ func (c *staticVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	c.fee = c.config.TxFee
 	return nil
 }
+
+func (c *staticVisitor) RecoverSubnetTx(*txs.RecoverSubnetTx) error {
+	c.fee = c.config.TxFee
+	return nil
+}
