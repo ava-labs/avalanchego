@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -1106,4 +1107,66 @@ func TestServiceGetSubnets(t *testing.T) {
 			Threshold:   0,
 		},
 	}, response.Subnets)
+}
+
+func TestGetFeeConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		etnaTime time.Time
+		expected fee.Config
+	}{
+		{
+			name:     "pre-etna",
+			etnaTime: time.Now().Add(time.Hour),
+			expected: fee.Config{},
+		},
+		{
+			name:     "post-etna",
+			etnaTime: time.Now().Add(-time.Hour),
+			expected: defaultDynamicFeeConfig,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			service, _, _ := defaultService(t)
+			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
+
+			var reply fee.Config
+			require.NoError(service.GetFeeConfig(nil, nil, &reply))
+			require.Equal(test.expected, reply)
+		})
+	}
+}
+
+func TestGetFeeState(t *testing.T) {
+	require := require.New(t)
+
+	seed := time.Now().UnixNano()
+	t.Logf("Seed: %d", seed)
+	random := rand.New(rand.NewSource(seed)) // #nosec G404
+
+	service, _, _ := defaultService(t)
+
+	expectedState := fee.State{
+		Capacity: fee.Gas(random.Uint64()),
+		Excess:   fee.Gas(random.Uint64()),
+	}
+	service.vm.state.SetFeeState(expectedState)
+	timestamp := time.Now()
+	service.vm.state.SetTimestamp(timestamp)
+
+	expectedReply := GetFeeStateReply{
+		State: expectedState,
+		Price: defaultDynamicFeeConfig.MinGasPrice.MulExp(
+			expectedState.Excess,
+			defaultDynamicFeeConfig.ExcessConversionConstant,
+		),
+		Time: timestamp,
+	}
+
+	var reply GetFeeStateReply
+	require.NoError(service.GetFeeState(nil, nil, &reply))
+	require.Equal(expectedReply, reply)
 }
