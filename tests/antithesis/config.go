@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -54,15 +55,15 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	flag.Parse()
 
 	// Env vars take priority over flags
-	envURIs := os.Getenv(envVarName(URIsKey))
+	envURIs := os.Getenv(envVarName(EnvPrefix, URIsKey))
 	if len(envURIs) > 0 {
 		// CSV.Set doesn't actually return an error
 		_ = uris.Set(envURIs)
 	}
-	envChainIDs := os.Getenv(envVarName(ChainIDsKey))
+	envChainIDs := os.Getenv(envVarName(EnvPrefix, ChainIDsKey))
 	if len(envChainIDs) > 0 {
 		// CSV.Set doesn't actually return an error
-		_ = uris.Set(envChainIDs)
+		_ = chainIDs.Set(envChainIDs)
 	}
 
 	// Use the network configuration provided
@@ -126,6 +127,7 @@ func (c *CSV) Set(value string) error {
 	return nil
 }
 
-func envVarName(key string) string {
-	return strings.ToUpper(EnvPrefix + "_" + key)
+func envVarName(prefix string, key string) string {
+	// e.g. MY_PREFIX, network-id -> MY_PREFIX_NETWORK_ID
+	return strings.ToUpper(prefix + "_" + config.DashesToUnderscores.Replace(key))
 }
