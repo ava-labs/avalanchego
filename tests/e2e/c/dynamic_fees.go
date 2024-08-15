@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -142,9 +141,10 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		tc.By("sending funds at the current gas price", func() {
 			// Create a recipient address
-			recipientKey, err := secp256k1.NewPrivateKey()
-			require.NoError(err)
-			recipientEthAddress := evm.GetEthAddress(recipientKey)
+			var (
+				recipientKey        = e2e.NewPrivateKey(tc)
+				recipientEthAddress = evm.GetEthAddress(recipientKey)
+			)
 
 			// Create transaction
 			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
