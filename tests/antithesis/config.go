@@ -57,12 +57,12 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	// Env vars take priority over flags
 	envURIs := os.Getenv(envVarName(EnvPrefix, URIsKey))
 	if len(envURIs) > 0 {
-		//nolint:errcheck,revive // CSV.Set doesn't actually return an error
+		//nolint:errcheck // CSV.Set doesn't actually return an error
 		uris.Set(envURIs)
 	}
 	envChainIDs := os.Getenv(envVarName(EnvPrefix, ChainIDsKey))
 	if len(envChainIDs) > 0 {
-		//nolint:errcheck,revive // CSV.Set doesn't actually return an error
+		//nolint:errcheck // CSV.Set doesn't actually return an error
 		chainIDs.Set(envChainIDs)
 	}
 
