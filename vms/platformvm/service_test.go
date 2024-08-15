@@ -1145,7 +1145,7 @@ func TestGetFeeState(t *testing.T) {
 
 	seed := time.Now().UnixNano()
 	t.Logf("Seed: %d", seed)
-	random := rand.New(rand.NewSource(seed))
+	random := rand.New(rand.NewSource(seed)) // #nosec G404
 
 	service, _, _ := defaultService(t)
 
