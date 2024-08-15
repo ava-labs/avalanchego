@@ -1154,7 +1154,8 @@ func FuzzGetFeeState(f *testing.F) {
 			expectedTime  = time.Now()
 			expectedReply = GetFeeStateReply{
 				State: expectedState,
-				Price: defaultDynamicFeeConfig.MinGasPrice.MulExp(
+				Price: fee.CalculateGasPrice(
+					defaultDynamicFeeConfig.MinGasPrice,
 					expectedState.Excess,
 					defaultDynamicFeeConfig.ExcessConversionConstant,
 				),
