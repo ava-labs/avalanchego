@@ -21,7 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -48,6 +51,13 @@ const (
 	// under the shared network dir.
 	PrivateNetworksDirName = "private_networks"
 )
+
+// NewPrivateKey returns a new private key.
+func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(tc, err)
+	return key
+}
 
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
@@ -233,4 +243,13 @@ func StartNetwork(
 		defer cancel()
 		require.NoError(network.Stop(ctx))
 	})
+}
+
+// NewPChainFeeCalculatorFromContext returns either a static or dynamic fee
+// calculator depending on the provided context.
+func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator {
+	if context.GasPrice != 0 {
+		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
+	}
+	return fee.NewStaticCalculator(context.StaticFeeConfig)
 }
