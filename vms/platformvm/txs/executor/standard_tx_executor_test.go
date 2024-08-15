@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -49,7 +50,7 @@ var errTest = errors.New("non-nil error")
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, apricotPhase5)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -195,7 +196,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(env.state.Commit())
 	}
 
-	env := newEnvironment(t, apricotPhase5)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
 	currentTimestamp := env.state.GetTimestamp()
 
 	type test struct {
@@ -327,7 +328,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, apricotPhase5)
+			env := newEnvironment(t, upgradetest.ApricotPhase5)
 			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
 			builder, signer := env.factory.NewWallet(tt.feeKeys...)
@@ -371,7 +372,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, apricotPhase5)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -894,7 +895,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, upgradetest.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -1152,7 +1153,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, durango)
+			env := newEnvironment(t, upgradetest.Durango)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -1569,7 +1570,7 @@ func TestDurangoMemoField(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, durango)
+			env := newEnvironment(t, upgradetest.Durango)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -1601,7 +1602,7 @@ func TestDurangoMemoField(t *testing.T) {
 func TestEtnaDisabledTransactions(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, etna)
+	env := newEnvironment(t, upgradetest.Etna)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -1743,7 +1744,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1771,7 +1772,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1799,7 +1800,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1830,7 +1831,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1859,7 +1860,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1887,7 +1888,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1917,7 +1918,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -1950,7 +1951,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(errTest)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -2108,7 +2109,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -2135,7 +2136,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -2163,7 +2164,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2198,7 +2199,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2238,7 +2239,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := defaultTestConfig(t, durango, env.latestForkTime)
+				cfg := defaultTestConfig(t, upgradetest.Durango, env.latestForkTime)
 				cfg.MaxStakeDuration = math.MaxInt64
 
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2272,7 +2273,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	}
 }
 
-func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
+func defaultTestConfig(t *testing.T, f upgradetest.Fork, tm time.Time) *config.Config {
 	c := &config.Config{
 		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: mockable.MaxTime,
@@ -2285,22 +2286,22 @@ func defaultTestConfig(t *testing.T, f fork, tm time.Time) *config.Config {
 	}
 
 	switch f {
-	case etna:
+	case upgradetest.Etna:
 		c.UpgradeConfig.EtnaTime = tm
 		fallthrough
-	case durango:
+	case upgradetest.Durango:
 		c.UpgradeConfig.DurangoTime = tm
 		fallthrough
-	case cortina:
+	case upgradetest.Cortina:
 		c.UpgradeConfig.CortinaTime = tm
 		fallthrough
-	case banff:
+	case upgradetest.Banff:
 		c.UpgradeConfig.BanffTime = tm
 		fallthrough
-	case apricotPhase5:
+	case upgradetest.ApricotPhase5:
 		c.UpgradeConfig.ApricotPhase5Time = tm
 		fallthrough
-	case apricotPhase3:
+	case upgradetest.ApricotPhase3:
 		c.UpgradeConfig.ApricotPhase3Time = tm
 	default:
 		require.FailNow(t, "unhandled fork", f)

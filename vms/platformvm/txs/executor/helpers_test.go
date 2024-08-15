@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -55,13 +56,6 @@ import (
 const (
 	defaultWeight = 5 * units.MilliAvax
 	trackChecksum = false
-
-	apricotPhase3 fork = iota
-	apricotPhase5
-	banff
-	cortina
-	durango
-	etna
 )
 
 var (
@@ -89,8 +83,6 @@ func init() {
 		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
-
-type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -124,7 +116,7 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(t *testing.T, f fork) *environment {
+func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -275,7 +267,7 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, f fork) *config.Config {
+func defaultConfig(t *testing.T, f upgradetest.Fork) *config.Config {
 	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -307,22 +299,22 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	}
 
 	switch f {
-	case etna:
+	case upgradetest.Etna:
 		c.UpgradeConfig.EtnaTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
-	case durango:
+	case upgradetest.Durango:
 		c.UpgradeConfig.DurangoTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
-	case cortina:
+	case upgradetest.Cortina:
 		c.UpgradeConfig.CortinaTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
-	case banff:
+	case upgradetest.Banff:
 		c.UpgradeConfig.BanffTime = defaultValidateStartTime.Add(-2 * time.Second)
 		fallthrough
-	case apricotPhase5:
+	case upgradetest.ApricotPhase5:
 		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
-	case apricotPhase3:
+	case upgradetest.ApricotPhase3:
 		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
@@ -331,9 +323,9 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	return c
 }
 
-func defaultClock(f fork) *mockable.Clock {
+func defaultClock(f upgradetest.Fork) *mockable.Clock {
 	now := defaultGenesisTime
-	if f >= banff {
+	if f >= upgradetest.Banff {
 		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)
 	}

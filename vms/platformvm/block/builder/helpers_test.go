@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -61,15 +62,6 @@ import (
 const (
 	defaultWeight = 10000
 	trackChecksum = false
-
-	apricotPhase3 fork = iota
-	apricotPhase5
-	banff
-	cortina
-	durango
-	etna
-
-	latestFork = durango
 )
 
 var (
@@ -97,8 +89,6 @@ func init() {
 	}
 }
 
-type fork uint8
-
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
@@ -124,7 +114,7 @@ type environment struct {
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
+func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:unparam
 	require := require.New(t)
 
 	res := &environment{
@@ -303,7 +293,7 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, f fork) *config.Config {
+func defaultConfig(t *testing.T, f upgradetest.Fork) *config.Config {
 	c := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -335,22 +325,22 @@ func defaultConfig(t *testing.T, f fork) *config.Config {
 	}
 
 	switch f {
-	case etna:
+	case upgradetest.Etna:
 		c.UpgradeConfig.EtnaTime = time.Time{} // neglecting fork ordering this for package tests
 		fallthrough
-	case durango:
+	case upgradetest.Durango:
 		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case cortina:
+	case upgradetest.Cortina:
 		c.UpgradeConfig.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case banff:
+	case upgradetest.Banff:
 		c.UpgradeConfig.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
 		fallthrough
-	case apricotPhase5:
+	case upgradetest.ApricotPhase5:
 		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
 		fallthrough
-	case apricotPhase3:
+	case upgradetest.ApricotPhase3:
 		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
 	default:
 		require.FailNow(t, "unhandled fork", f)
