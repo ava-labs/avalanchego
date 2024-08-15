@@ -1140,33 +1140,35 @@ func TestGetFeeConfig(t *testing.T) {
 	}
 }
 
-func TestGetFeeState(t *testing.T) {
-	require := require.New(t)
+func FuzzGetFeeState(f *testing.F) {
+	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
+		require := require.New(t)
 
-	seed := time.Now().UnixNano()
-	t.Logf("Seed: %d", seed)
-	random := rand.New(rand.NewSource(seed)) // #nosec G404
+		service, _, _ := defaultService(t)
 
-	service, _, _ := defaultService(t)
+		var (
+			expectedState = fee.State{
+				Capacity: fee.Gas(capacity),
+				Excess:   fee.Gas(excess),
+			}
+			expectedTime  = time.Now()
+			expectedReply = GetFeeStateReply{
+				State: expectedState,
+				Price: defaultDynamicFeeConfig.MinGasPrice.MulExp(
+					expectedState.Excess,
+					defaultDynamicFeeConfig.ExcessConversionConstant,
+				),
+				Time: expectedTime,
+			}
+		)
 
-	expectedState := fee.State{
-		Capacity: fee.Gas(random.Uint64()),
-		Excess:   fee.Gas(random.Uint64()),
-	}
-	service.vm.state.SetFeeState(expectedState)
-	timestamp := time.Now()
-	service.vm.state.SetTimestamp(timestamp)
+		service.vm.ctx.Lock.Lock()
+		service.vm.state.SetFeeState(expectedState)
+		service.vm.state.SetTimestamp(expectedTime)
+		service.vm.ctx.Lock.Unlock()
 
-	expectedReply := GetFeeStateReply{
-		State: expectedState,
-		Price: defaultDynamicFeeConfig.MinGasPrice.MulExp(
-			expectedState.Excess,
-			defaultDynamicFeeConfig.ExcessConversionConstant,
-		),
-		Time: timestamp,
-	}
-
-	var reply GetFeeStateReply
-	require.NoError(service.GetFeeState(nil, nil, &reply))
-	require.Equal(expectedReply, reply)
+		var reply GetFeeStateReply
+		require.NoError(service.GetFeeState(nil, nil, &reply))
+		require.Equal(expectedReply, reply)
+	})
 }
