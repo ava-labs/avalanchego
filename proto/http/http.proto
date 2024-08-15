@@ -2,14 +2,12 @@ syntax = "proto3";
 
 package http;
 
-import "google/protobuf/empty.proto";
-
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/http";
 
 service HTTP {
   // Handle wraps http1 over http2 and provides support for websockets by implementing
   // net conn and responsewriter in http2.
-  rpc Handle(HTTPRequest) returns (google.protobuf.Empty);
+  rpc Handle(HTTPRequest) returns (HttpResponse);
   // HandleSimple wraps http1 requests over http2 similar to Handle but only passes headers
   // and body bytes. Because the request and response are single protos with no inline
   // gRPC servers the CPU cost as well as file descriptor overhead is less
@@ -108,8 +106,6 @@ message Request {
   // header contains the request header fields either received
   // by the server or to be sent by the client
   repeated Element header = 6;
-  // body is the request payload in bytes
-  bytes body = 7;
   // content_length records the length of the associated content
   int64 content_length = 8;
   // transfer_encoding lists the transfer encodings from outermost to
@@ -147,6 +143,12 @@ message HTTPRequest {
   ResponseWriter response_writer = 1;
   // request is an http request
   Request request = 2;
+}
+
+message HttpResponse {
+  // header is sent to synchronize any header modifications from the plugin
+  // process
+  repeated Element header = 1;
 }
 
 message HandleSimpleHTTPRequest {
