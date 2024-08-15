@@ -1151,22 +1151,21 @@ func FuzzGetFeeState(f *testing.F) {
 				Capacity: fee.Gas(capacity),
 				Excess:   fee.Gas(excess),
 			}
-			timestamp = time.Now()
+			timestamp     = time.Now()
+			expectedReply = GetFeeStateReply{
+				State: expectedState,
+				Price: defaultDynamicFeeConfig.MinGasPrice.MulExp(
+					expectedState.Excess,
+					defaultDynamicFeeConfig.ExcessConversionConstant,
+				),
+				Time: timestamp,
+			}
 		)
 
 		service.vm.ctx.Lock.Lock()
 		service.vm.state.SetFeeState(expectedState)
 		service.vm.state.SetTimestamp(timestamp)
 		service.vm.ctx.Lock.Unlock()
-
-		expectedReply := GetFeeStateReply{
-			State: expectedState,
-			Price: defaultDynamicFeeConfig.MinGasPrice.MulExp(
-				expectedState.Excess,
-				defaultDynamicFeeConfig.ExcessConversionConstant,
-			),
-			Time: timestamp,
-		}
 
 		var reply GetFeeStateReply
 		require.NoError(service.GetFeeState(nil, nil, &reply))
