@@ -348,7 +348,7 @@ type ChitsHandler interface {
 	) error
 }
 
-type NetworkAppHandler interface {
+type AppHandler interface {
 	AppRequestHandler
 	AppResponseHandler
 	AppGossipHandler
@@ -413,66 +413,6 @@ type AppGossipHandler interface {
 		nodeID ids.NodeID,
 		msg []byte,
 	) error
-}
-
-type CrossChainAppHandler interface {
-	CrossChainAppRequestHandler
-	CrossChainAppResponseHandler
-}
-
-type CrossChainAppRequestHandler interface {
-	// Notify this engine of a request for a CrossChainAppResponse with the same
-	// requestID.
-	//
-	// The meaning of request, and what should be sent in response to it, is
-	// application (VM) specific.
-	//
-	// Guarantees surrounding the request are specific to the implementation of
-	// the requesting VM. For example, the request may or may not be guaranteed
-	// to be well-formed/valid depending on the implementation of the requesting
-	// VM.
-	CrossChainAppRequest(
-		ctx context.Context,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		request []byte,
-	) error
-}
-
-type CrossChainAppResponseHandler interface {
-	// Notify this engine of the response to a previously sent
-	// CrossChainAppRequest with the same requestID.
-	//
-	// The meaning of response is application (VM) specifc.
-	//
-	// Guarantees surrounding the response are specific to the implementation of
-	// the responding VM. For example, the response may or may not be guaranteed
-	// to be well-formed/valid depending on the implementation of the requesting
-	// VM.
-	CrossChainAppResponse(
-		ctx context.Context,
-		chainID ids.ID,
-		requestID uint32,
-		response []byte,
-	) error
-
-	// Notify this engine that a CrossChainAppRequest it issued has failed.
-	//
-	// This function will be called if a CrossChainAppRequest message with
-	// nodeID and requestID was previously sent by this engine and will not
-	// receive a response.
-	CrossChainAppRequestFailed(
-		ctx context.Context,
-		chainID ids.ID,
-		requestID uint32,
-		appErr *AppError,
-	) error
-}
-
-type AppHandler interface {
-	NetworkAppHandler
-	CrossChainAppHandler
 }
 
 type InternalHandler interface {

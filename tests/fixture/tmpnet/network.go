@@ -6,10 +6,12 @@ package tmpnet
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -140,6 +142,9 @@ func BootstrapNewNetwork(
 ) error {
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
+	}
+	if err := checkVMBinaries(w, network.Subnets, avalancheGoExecPath, pluginDir); err != nil {
+		return err
 	}
 	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
 		return err
@@ -284,7 +289,7 @@ func (n *Network) Create(rootDir string) error {
 	n.Dir = canonicalDir
 
 	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.DefaultFlags.GetStringVal(config.PluginDirKey)
+	pluginDir, err := n.getPluginDir()
 	if err != nil {
 		return err
 	}
@@ -295,18 +300,7 @@ func (n *Network) Create(rootDir string) error {
 	}
 
 	if n.NetworkID == 0 && n.Genesis == nil {
-		// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
-		// require knowing the key beforehand rather than retrieving it from the set of pre-funded
-		// keys exposed by a network. Since allocation will not be exclusive, a test using a
-		// legacy key is unlikely to be a good candidate for parallel execution.
-		keysToFund := []*secp256k1.PrivateKey{
-			genesis.VMRQKey,
-			genesis.EWOQKey,
-			HardhatKey,
-		}
-		keysToFund = append(keysToFund, n.PreFundedKeys...)
-
-		genesis, err := NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
+		genesis, err := n.DefaultGenesis()
 		if err != nil {
 			return err
 		}
@@ -323,6 +317,21 @@ func (n *Network) Create(rootDir string) error {
 
 	// Ensure configuration on disk is current
 	return n.Write()
+}
+
+func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
+	// Pre-fund known legacy keys to support ad-hoc testing. Usage of a legacy key will
+	// require knowing the key beforehand rather than retrieving it from the set of pre-funded
+	// keys exposed by a network. Since allocation will not be exclusive, a test using a
+	// legacy key is unlikely to be a good candidate for parallel execution.
+	keysToFund := []*secp256k1.PrivateKey{
+		genesis.VMRQKey,
+		genesis.EWOQKey,
+		HardhatKey,
+	}
+	keysToFund = append(keysToFund, n.PreFundedKeys...)
+
+	return NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
 }
 
 // Starts the specified nodes
@@ -452,7 +461,19 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
+	// This check is duplicative for a network that is starting, but ensures
+	// that individual node start/restart won't fail due to missing binaries.
+	pluginDir, err := n.getPluginDir()
+	if err != nil {
+		return err
+	}
+
 	if err := n.EnsureNodeConfig(node); err != nil {
+		return err
+	}
+
+	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
+	if err := checkVMBinaries(w, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
@@ -856,6 +877,10 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
+func (n *Network) getPluginDir() (string, error) {
+	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
+}
+
 // Waits until the provided nodes are healthy.
 func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
@@ -865,7 +890,7 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 	for {
 		for node := range unhealthyNodes {
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, ErrNotRunning) {
+			if err != nil {
 				return err
 			}
 			if !healthy {
@@ -916,4 +941,71 @@ func GetReusableNetworkPathForOwner(owner string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(networkPath, "latest_"+owner), nil
+}
+
+const invalidRPCVersion = 0
+
+// checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
+// binaries have the same rpcchainvm version as the indicated avalanchego binary.
+func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
+	if len(subnets) == 0 {
+		return nil
+	}
+
+	expectedRPCVersion, err := getRPCVersion(avalanchegoPath, "--version-json")
+	if err != nil {
+		// Only warn if the rpc version is not available to ensure backwards compatibility.
+		if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for avalanchego: %v\n", err); err != nil {
+			return err
+		}
+	}
+
+	errs := []error{}
+	for _, subnet := range subnets {
+		for _, chain := range subnet.Chains {
+			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
+
+			// Check that the path exists
+			if _, err := os.Stat(pluginPath); err != nil {
+				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %w", subnet.Name, err))
+			}
+
+			if len(chain.VersionArgs) == 0 || expectedRPCVersion == invalidRPCVersion {
+				// Not possible to check the rpcchainvm version
+				continue
+			}
+
+			// Check that the VM's rpcchainvm version matches avalanchego's version
+			rpcVersion, err := getRPCVersion(pluginPath, chain.VersionArgs...)
+			if err != nil {
+				if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for VM Binary for subnet %q: %v\n", subnet.Name, err); err != nil {
+					return err
+				}
+			} else if expectedRPCVersion != rpcVersion {
+				errs = append(errs, fmt.Errorf("unexpected rpcchainvm version for VM binary of subnet %q: %q reports %d, but %q reports %d", subnet.Name, avalanchegoPath, expectedRPCVersion, pluginPath, rpcVersion))
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+type RPCChainVMVersion struct {
+	RPCChainVM uint64 `json:"rpcchainvm"`
+}
+
+// getRPCVersion attempts to invoke the given command with the specified version arguments and
+// retrieve an rpcchainvm version from its output.
+func getRPCVersion(command string, versionArgs ...string) (uint64, error) {
+	cmd := exec.Command(command, versionArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("command %q failed with output: %s", command, output)
+	}
+	version := &RPCChainVMVersion{}
+	if err := json.Unmarshal(output, version); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
+	}
+
+	return version.RPCChainVM, nil
 }
