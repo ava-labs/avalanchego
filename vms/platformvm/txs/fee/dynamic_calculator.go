@@ -16,7 +16,7 @@ var (
 
 	ErrCalculatingComplexity = errors.New("error calculating complexity")
 	ErrCalculatingGas        = errors.New("error calculating gas")
-	ErrCalculatingFee        = errors.New("error calculating fee")
+	ErrCalculatingCost       = errors.New("error calculating cost")
 )
 
 func NewDynamicCalculator(
@@ -53,7 +53,7 @@ func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf(
 			"%w with gas (%d) and price (%d): %w",
-			ErrCalculatingFee,
+			ErrCalculatingCost,
 			gas,
 			c.price,
 			err,
