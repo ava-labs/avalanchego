@@ -20,11 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/state"
@@ -522,6 +524,11 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	backend := &txexecutor.Backend{
 		Ctx: &snow.Context{
 			Log: logging.NoLog{},
+		},
+		Config: &config.Config{
+			Upgrades: upgrade.Config{
+				EtnaTime: mockable.MaxTime,
+			},
 		},
 		Codec: parser.Codec(),
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
@@ -940,11 +941,13 @@ func defaultTestBackend(bootstrapped bool, sharedMemory atomic.SharedMemory) *ex
 			Log:          logging.NoLog{},
 		},
 		Config: &config.Config{
+			StaticConfig: fee.StaticConfig{
+				TxFee:            0,
+				CreateAssetTxFee: 0,
+			},
 			Upgrades: upgrade.Config{
 				EtnaTime: mockable.MaxTime,
 			},
-			TxFee:            0,
-			CreateAssetTxFee: 0,
 		},
 	}
 }
