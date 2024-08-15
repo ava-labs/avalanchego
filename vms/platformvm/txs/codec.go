@@ -113,6 +113,7 @@ func RegisterDurangoUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 
 func RegisterEtnaUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
+		targetCodec.RegisterType(&ConvertSubnetTx{}),
 		targetCodec.RegisterType(&RegisterSubnetValidatorTx{}),
 	)
 }

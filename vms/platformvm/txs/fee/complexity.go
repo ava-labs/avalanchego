@@ -175,6 +175,18 @@ var (
 		fee.DBWrite: 1,
 		fee.Compute: 0,
 	}
+	IntrinsicConvertSubnetTxComplexities = fee.Dimensions{
+		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+			ids.IDLen + // subnetID
+			ids.IDLen + // chainID
+			wrappers.IntLen + // address length
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen + // owner typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		fee.DBRead:  1,
+		fee.DBWrite: 1,
+		fee.Compute: 0,
+	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
@@ -578,6 +590,33 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		&ownerComplexity,
 	)
 	return err
+}
+
+func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	output, err := IntrinsicConvertSubnetTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return err
+	}
+	output[fee.Bandwidth], err = math.Add(
+		output[fee.Bandwidth],
+		uint64(len(tx.Memo)),
+	)
+	if err != nil {
+		return err
+	}
+	c.output = output
+	return nil
 }
 
 func baseTxComplexity(tx *txs.BaseTx) (fee.Dimensions, error) {

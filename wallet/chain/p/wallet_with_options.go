@@ -143,6 +143,20 @@ func (w *walletWithOptions) IssueTransferSubnetOwnershipTx(
 	)
 }
 
+func (w *walletWithOptions) IssueConvertSubnetTx(
+	subnetID ids.ID,
+	chainID ids.ID,
+	address []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueConvertSubnetTx(
+		subnetID,
+		chainID,
+		address,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *walletWithOptions) IssueImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,

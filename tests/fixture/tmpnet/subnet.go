@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,7 +26,10 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-const defaultSubnetDirName = "subnets"
+const (
+	defaultSubnetDirName = "subnets"
+	jsonFileSuffix       = ".json"
+)
 
 type Chain struct {
 	// Set statically
@@ -83,16 +87,16 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (primary.Wallet, err
 
 	// Only fetch the subnet transaction if a subnet ID is present. This won't be true when
 	// the wallet is first used to create the subnet.
-	txIDs := set.Set[ids.ID]{}
+	subnetIDs := []ids.ID{}
 	if s.SubnetID != ids.Empty {
-		txIDs.Add(s.SubnetID)
+		subnetIDs = append(subnetIDs, s.SubnetID)
 	}
 
 	return primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:              uri,
-		AVAXKeychain:     keychain,
-		EthKeychain:      keychain,
-		PChainTxsToFetch: txIDs,
+		URI:          uri,
+		AVAXKeychain: keychain,
+		EthKeychain:  keychain,
+		SubnetIDs:    subnetIDs,
 	})
 }
 
@@ -209,7 +213,7 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 	if err := os.MkdirAll(subnetDir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create subnet dir: %w", err)
 	}
-	tmpnetConfigPath := filepath.Join(subnetDir, s.Name+".json")
+	tmpnetConfigPath := filepath.Join(subnetDir, s.Name+jsonFileSuffix)
 
 	// Since subnets are expected to be serialized for the first time
 	// without their chains having been created (i.e. chains will have
@@ -249,13 +253,8 @@ func (s *Subnet) Write(subnetDir string, chainDir string) error {
 			return fmt.Errorf("failed to marshal avalanchego subnet config %s: %w", s.Name, err)
 		}
 
-		avgoConfigDir := filepath.Join(subnetDir, s.SubnetID.String())
-		if err := os.MkdirAll(avgoConfigDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create avalanchego subnet config dir: %w", err)
-		}
-
-		avgoConfigPath := filepath.Join(avgoConfigDir, defaultConfigFilename)
-		if err := os.WriteFile(avgoConfigPath, bytes, perms.ReadWrite); err != nil {
+		subnetConfigPath := filepath.Join(subnetDir, s.SubnetID.String()+jsonFileSuffix)
+		if err := os.WriteFile(subnetConfigPath, bytes, perms.ReadWrite); err != nil {
 			return fmt.Errorf("failed to write avalanchego subnet config %s: %w", s.Name, err)
 		}
 	}
@@ -351,12 +350,19 @@ func readSubnets(subnetDir string) ([]*Subnet, error) {
 			// Looking only for files
 			continue
 		}
-		if filepath.Ext(entry.Name()) != ".json" {
+		fileName := entry.Name()
+		if filepath.Ext(fileName) != jsonFileSuffix {
 			// Subnet files should have a .json extension
 			continue
 		}
+		fileNameWithoutSuffix := strings.TrimSuffix(fileName, jsonFileSuffix)
+		// Skip actual subnet config files, which are named [subnetID].json
+		if _, err := ids.FromString(fileNameWithoutSuffix); err == nil {
+			// Skip files that are named by their SubnetID
+			continue
+		}
 
-		subnetPath := filepath.Join(subnetDir, entry.Name())
+		subnetPath := filepath.Join(subnetDir, fileName)
 		bytes, err := os.ReadFile(subnetPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read subnet file %s: %w", subnetPath, err)
