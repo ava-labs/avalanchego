@@ -27,13 +27,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -457,12 +455,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: mockable.MaxTime,
-			DurangoTime: mockable.MaxTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Banff, latestForkTime),
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

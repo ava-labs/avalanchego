@@ -4,11 +4,17 @@
 package upgradetest
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 func GetConfig(fork Fork) upgrade.Config {
+	return GetConfigWithUpgradeTime(fork, upgrade.InitiallyActiveTime)
+}
+
+func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 	c := upgrade.Config{
 		ApricotPhase1Time:            upgrade.UnscheduledActivationTime,
 		ApricotPhase2Time:            upgrade.UnscheduledActivationTime,
@@ -28,40 +34,40 @@ func GetConfig(fork Fork) upgrade.Config {
 
 	switch fork {
 	case Etna:
-		c.EtnaTime = upgrade.InitiallyActiveTime
+		c.EtnaTime = upgradeTime
 		fallthrough
 	case Durango:
-		c.DurangoTime = upgrade.InitiallyActiveTime
+		c.DurangoTime = upgradeTime
 		fallthrough
 	case Cortina:
-		c.CortinaTime = upgrade.InitiallyActiveTime
+		c.CortinaTime = upgradeTime
 		fallthrough
 	case Banff:
-		c.BanffTime = upgrade.InitiallyActiveTime
+		c.BanffTime = upgradeTime
 		fallthrough
 	case ApricotPhasePost6:
-		c.ApricotPhasePost6Time = upgrade.InitiallyActiveTime
+		c.ApricotPhasePost6Time = upgradeTime
 		fallthrough
 	case ApricotPhase6:
-		c.ApricotPhase6Time = upgrade.InitiallyActiveTime
+		c.ApricotPhase6Time = upgradeTime
 		fallthrough
 	case ApricotPhasePre6:
-		c.ApricotPhasePre6Time = upgrade.InitiallyActiveTime
+		c.ApricotPhasePre6Time = upgradeTime
 		fallthrough
 	case ApricotPhase5:
-		c.ApricotPhase5Time = upgrade.InitiallyActiveTime
+		c.ApricotPhase5Time = upgradeTime
 		fallthrough
 	case ApricotPhase4:
-		c.ApricotPhase4Time = upgrade.InitiallyActiveTime
+		c.ApricotPhase4Time = upgradeTime
 		fallthrough
 	case ApricotPhase3:
-		c.ApricotPhase3Time = upgrade.InitiallyActiveTime
+		c.ApricotPhase3Time = upgradeTime
 		fallthrough
 	case ApricotPhase2:
-		c.ApricotPhase2Time = upgrade.InitiallyActiveTime
+		c.ApricotPhase2Time = upgradeTime
 		fallthrough
 	case ApricotPhase1:
-		c.ApricotPhase1Time = upgrade.InitiallyActiveTime
+		c.ApricotPhase1Time = upgradeTime
 	}
 	return c
 }

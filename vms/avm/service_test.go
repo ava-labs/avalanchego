@@ -22,14 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -2721,7 +2719,6 @@ func TestSendMultiple(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
-				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2729,9 +2726,7 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					Upgrades: upgrade.Config{
-						EtnaTime: mockable.MaxTime,
-					},
+					Upgrades: upgradetest.GetConfig(upgradetest.Durango),
 				},
 			})
 			service := &Service{vm: env.vm}

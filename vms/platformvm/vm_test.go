@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -49,7 +48,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -218,40 +216,10 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 
 func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
-	var (
-		apricotPhase3Time = mockable.MaxTime
-		apricotPhase5Time = mockable.MaxTime
-		banffTime         = mockable.MaxTime
-		cortinaTime       = mockable.MaxTime
-		durangoTime       = mockable.MaxTime
-		etnaTime          = mockable.MaxTime
-	)
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = defaultGenesisTime.Add(time.Second)
-	switch f {
-	case upgradetest.Etna:
-		etnaTime = latestForkTime
-		fallthrough
-	case upgradetest.Durango:
-		durangoTime = latestForkTime
-		fallthrough
-	case upgradetest.Cortina:
-		cortinaTime = latestForkTime
-		fallthrough
-	case upgradetest.Banff:
-		banffTime = latestForkTime
-		fallthrough
-	case upgradetest.ApricotPhase5:
-		apricotPhase5Time = latestForkTime
-		fallthrough
-	case upgradetest.ApricotPhase3:
-		apricotPhase3Time = latestForkTime
-	default:
-		require.FailNow("unhandled fork", f)
-	}
-
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -265,14 +233,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, d
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			ApricotPhase3Time: apricotPhase3Time,
-			ApricotPhase5Time: apricotPhase5Time,
-			BanffTime:         banffTime,
-			CortinaTime:       cortinaTime,
-			DurangoTime:       durangoTime,
-			EtnaTime:          etnaTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
 	}}
 
 	db := memdb.New()
@@ -1209,12 +1170,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1299,12 +1255,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1350,12 +1301,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1701,12 +1647,7 @@ func TestUnverifiedParent(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	initialClkTime := latestForkTime.Add(time.Second)
@@ -1864,12 +1805,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	firstCtx := snowtest.Context(t, snowtest.PChainID)
@@ -1915,12 +1851,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
@@ -2017,12 +1948,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		RewardConfig:           defaultRewardConfig,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
-		UpgradeConfig: upgrade.Config{
-			BanffTime:   latestForkTime,
-			CortinaTime: latestForkTime,
-			DurangoTime: latestForkTime,
-			EtnaTime:    mockable.MaxTime,
-		},
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, latestForkTime),
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)

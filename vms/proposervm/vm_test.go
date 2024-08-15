@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -1910,11 +1911,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	vm := New(
 		innerVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
-			},
+			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2022,11 +2019,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	vm := New(
 		innerVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
-			},
+			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
