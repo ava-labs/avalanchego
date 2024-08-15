@@ -10,7 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -75,18 +77,19 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
-func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
+func PickFeeCalculator(cfg *config.Config, state Chain) txfee.Calculator {
 	timestamp := state.GetTimestamp()
 	if !cfg.UpgradeConfig.IsEtnaActivated(timestamp) {
 		return NewStaticFeeCalculator(cfg, timestamp)
 	}
 
 	feeState := state.GetFeeState()
-	gasPrice := cfg.DynamicFeeConfig.MinGasPrice.MulExp(
+	gasPrice := feecomponent.CalculateGasPrice(
+		cfg.DynamicFeeConfig.MinGasPrice,
 		feeState.Excess,
 		cfg.DynamicFeeConfig.ExcessConversionConstant,
 	)
-	return fee.NewDynamicCalculator(
+	return txfee.NewDynamicCalculator(
 		cfg.DynamicFeeConfig.Weights,
 		gasPrice,
 	)
@@ -94,11 +97,11 @@ func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set
 // to either the pre-AP3 or post-AP3 config.
-func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) fee.Calculator {
+func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) txfee.Calculator {
 	config := cfg.StaticFeeConfig
 	if !cfg.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
 		config.CreateSubnetTxFee = cfg.CreateAssetTxFee
 		config.CreateBlockchainTxFee = cfg.CreateAssetTxFee
 	}
-	return fee.NewStaticCalculator(config)
+	return txfee.NewStaticCalculator(config)
 }
