@@ -29,16 +29,17 @@ import (
 )
 
 var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
-	const (
-		transferAmount = 10 * units.Avax
-		weight         = 2_000 * units.Avax // Used for both validation and delegation
-	)
-
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
 	)
+
 	ginkgo.It("should ensure that funds can be transferred from the P-Chain to the X-Chain and the C-Chain", func() {
+		const (
+			transferAmount = 10 * units.Avax
+			weight         = 2_000 * units.Avax // Used for both validation and delegation
+		)
+
 		var (
 			env     = e2e.GetEnv(tc)
 			network = env.GetNetwork()
@@ -50,7 +51,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		})
 
 		tc.By("creating wallet with a funded key to send from and recipient key to deliver to")
-		recipientKey := e2e.NewKey(tc)
+		recipientKey := e2e.NewPrivateKey(tc)
 		keychain := env.NewKeychain(1)
 		keychain.Add(recipientKey)
 
@@ -118,7 +119,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 			)
 
 			var (
-				rewardKey  = e2e.NewKey(tc)
+				rewardKey  = e2e.NewPrivateKey(tc)
 				rewardAddr = rewardKey.Address()
 			)
 
@@ -150,7 +151,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		// Adding a delegator should not break interchain transfer.
 		tc.By("adding a delegator to the new node", func() {
 			var (
-				rewardKey  = e2e.NewKey(tc)
+				rewardKey  = e2e.NewPrivateKey(tc)
 				rewardAddr = rewardKey.Address()
 			)
 

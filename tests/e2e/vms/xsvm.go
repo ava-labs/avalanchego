@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		destinationAPINode := destinationValidators[0]
 		tc.Outf(" issuing transactions for destination subnet on %s (%s)\n", destinationAPINode.NodeID, destinationAPINode.URI)
 
-		destinationKey := e2e.NewKey(tc)
+		destinationKey := e2e.NewPrivateKey(tc)
 
 		tc.By("checking that the funded key has sufficient funds for the export")
 		sourceClient := api.NewClient(sourceAPINode.URI, sourceChain.ChainID.String())
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		tc.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
 			destinationChain.ChainID, destinationSubnet.SubnetID))
-		recipientKey := e2e.NewKey(tc)
+		recipientKey := e2e.NewPrivateKey(tc)
 		transferTxStatus, err := transfer.Transfer(
 			tc.DefaultContext(),
 			&transfer.Config{

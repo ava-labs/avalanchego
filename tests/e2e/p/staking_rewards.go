@@ -6,6 +6,7 @@ package p
 import (
 	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -27,20 +29,21 @@ import (
 )
 
 var _ = ginkgo.Describe("[Staking Rewards]", func() {
-	const (
-		targetDelegationPeriod = 15 * time.Second
-		targetValidationPeriod = 30 * time.Second
-
-		delegationPercent = 0.10 // 10%
-		delegationShare   = reward.PercentDenominator * delegationPercent
-		weight            = 2_000 * units.Avax
-	)
-
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
 	)
+
 	ginkgo.It("should ensure that validator node uptime determines whether a staking reward is issued", func() {
+		const (
+			targetDelegationPeriod = 15 * time.Second
+			targetValidationPeriod = 30 * time.Second
+
+			delegationPercent = 0.10 // 10%
+			delegationShare   = reward.PercentDenominator * delegationPercent
+			weight            = 2_000 * units.Avax
+		)
+
 		var (
 			env     = e2e.GetEnv(tc)
 			network = env.GetNetwork()
@@ -75,12 +78,12 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 
 		tc.By("creating keychain and P-Chain wallet")
 		var (
-			alphaValidationRewardKey = e2e.NewKey(tc)
-			alphaDelegationRewardKey = e2e.NewKey(tc)
-			betaValidationRewardKey  = e2e.NewKey(tc)
-			betaDelegationRewardKey  = e2e.NewKey(tc)
-			gammaDelegationRewardKey = e2e.NewKey(tc)
-			deltaDelegationRewardKey = e2e.NewKey(tc)
+			alphaValidationRewardKey = e2e.NewPrivateKey(tc)
+			alphaDelegationRewardKey = e2e.NewPrivateKey(tc)
+			betaValidationRewardKey  = e2e.NewPrivateKey(tc)
+			betaDelegationRewardKey  = e2e.NewPrivateKey(tc)
+			gammaDelegationRewardKey = e2e.NewPrivateKey(tc)
+			deltaDelegationRewardKey = e2e.NewPrivateKey(tc)
 
 			rewardKeys = []*secp256k1.PrivateKey{
 				alphaValidationRewardKey,
@@ -296,3 +299,24 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
+
+// TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due
+// to a circular dependency issue, a map-based equivalent is used for which
+// manual unmarshaling is required.
+func getRewardConfig(tc tests.TestContext, client admin.Client) reward.Config {
+	require := require.New(tc)
+
+	rawNodeConfigMap, err := client.GetConfig(tc.DefaultContext())
+	require.NoError(err)
+	nodeConfigMap, ok := rawNodeConfigMap.(map[string]interface{})
+	require.True(ok)
+	stakingConfigMap, ok := nodeConfigMap["stakingConfig"].(map[string]interface{})
+	require.True(ok)
+
+	var rewardConfig reward.Config
+	require.NoError(mapstructure.Decode(
+		stakingConfigMap["rewardConfig"],
+		&rewardConfig,
+	))
+	return rewardConfig
+}
