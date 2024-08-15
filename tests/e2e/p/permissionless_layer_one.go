@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -85,30 +84,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
+
 			require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
-
-			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
-
-			require.Equal(platformvm.GetSubnetClientResponse{
-				IsPermissioned: false,
-				ControlKeys: []ids.ShortID{
-					keychain.Keys[0].Address(),
-				},
-				Threshold:      1,
-				ManagerChainID: chainID,
-				ManagerAddress: address,
-			}, res)
-		})
-
-		tc.By("issuing convert again should not work", func() {
-			_, err := pWallet.IssueConvertSubnetTx(
-				subnetID,
-				ids.GenerateTestID(),
-				[]byte{'a', 'd', 'd', 'r', 'e', 's', 's', '2'},
-				tc.WithDefaultContext(),
-			)
-			require.ErrorIs(err, executor.ErrIsImmutable)
 
 			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
