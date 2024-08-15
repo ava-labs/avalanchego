@@ -146,15 +146,6 @@ func (s *SignatureRequestHandlerP2P) GetBlockSignature(blockID ids.ID) ([bls.Sig
 	return s.backend.GetBlockSignature(blockID)
 }
 
-func (s *SignatureRequestHandlerP2P) CrossChainAppRequest(
-	ctx context.Context,
-	chainID ids.ID,
-	deadline time.Time,
-	requestBytes []byte,
-) ([]byte, error) {
-	return nil, nil
-}
-
 func (s *SignatureRequestHandlerP2P) AppGossip(
 	ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
 }
