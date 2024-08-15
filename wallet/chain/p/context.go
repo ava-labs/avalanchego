@@ -9,9 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func NewContextFromURI(ctx context.Context, uri string) (*builder.Context, error) {
@@ -69,7 +68,7 @@ func NewContextFromClients(
 	return &builder.Context{
 		NetworkID:   networkID,
 		AVAXAssetID: asset.AssetID,
-		StaticFeeConfig: txfee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                         uint64(staticFeeConfig.TxFee),
 			CreateSubnetTxFee:             uint64(staticFeeConfig.CreateSubnetTxFee),
 			TransformSubnetTxFee:          uint64(staticFeeConfig.TransformSubnetTxFee),
