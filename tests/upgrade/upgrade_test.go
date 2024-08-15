@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		upgradeJSON, err := json.Marshal(upgrade.LatestUnscheduled)
 		require.NoError(err)
 		upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
-		network.DefaultFlags[config.UpgradeFileContentKey] = string(upgradeBase64)
+		network.DefaultFlags[config.UpgradeFileContentKey] = upgradeBase64
 
 		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
 
