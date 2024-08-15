@@ -16,7 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ Client = (*client)(nil)
@@ -228,6 +230,9 @@ type GetSubnetClientResponse struct {
 	Locktime    uint64
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID
+	// subnet manager information for a permissionless L1
+	ManagerChainID ids.ID
+	ManagerAddress []byte
 }
 
 func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
@@ -249,6 +254,8 @@ func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.
 		Threshold:                uint32(res.Threshold),
 		Locktime:                 uint64(res.Locktime),
 		SubnetTransformationTxID: res.SubnetTransformationTxID,
+		ManagerChainID:           res.ManagerChainID,
+		ManagerAddress:           res.ManagerAddress,
 	}, nil
 }
 
@@ -542,4 +549,25 @@ func AwaitTxAccepted(
 			return ctx.Err()
 		}
 	}
+}
+
+// GetSubnetOwners returns a map of subnet ID to current subnet's owner
+func GetSubnetOwners(
+	c Client,
+	ctx context.Context,
+	subnetIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	subnetOwners := map[ids.ID]fx.Owner{}
+	for _, subnetID := range subnetIDs {
+		subnetInfo, err := c.GetSubnet(ctx, subnetID)
+		if err != nil {
+			return nil, err
+		}
+		subnetOwners[subnetID] = &secp256k1fx.OutputOwners{
+			Locktime:  subnetInfo.Locktime,
+			Threshold: subnetInfo.Threshold,
+			Addrs:     subnetInfo.ControlKeys,
+		}
+	}
+	return subnetOwners, nil
 }

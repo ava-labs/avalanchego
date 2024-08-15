@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -3078,7 +3079,7 @@ func TestShouldIssueBlock(t *testing.T) {
 		chain4Through6   = snowmantest.BuildDescendants(chain0Through3[0], 3)
 		chain7Through10  = snowmantest.BuildDescendants(snowmantest.Genesis, 4)
 		chain11Through11 = snowmantest.BuildDescendants(chain7Through10[1], 1)
-		blocks           = join(chain0Through3, chain4Through6, chain7Through10, chain11Through11)
+		blocks           = utils.Join(chain0Through3, chain4Through6, chain7Through10, chain11Through11)
 	)
 
 	require.NoError(t, blocks[0].Accept(context.Background()))
@@ -3180,19 +3181,4 @@ func TestShouldIssueBlock(t *testing.T) {
 			require.Equal(t, test.expectedShouldIssue, shouldIssue)
 		})
 	}
-}
-
-// join the provided slices into a single slice.
-//
-// TODO: Use slices.Concat once the minimum go version is 1.22.
-func join[T any](slices ...[]T) []T {
-	size := 0
-	for _, s := range slices {
-		size += len(s)
-	}
-	newSlice := make([]T, 0, size)
-	for _, s := range slices {
-		newSlice = append(newSlice, s...)
-	}
-	return newSlice
 }

@@ -119,3 +119,8 @@ func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
 	c.fee = c.config.TxFee
 	return nil
 }
+
+func (c *staticVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+	c.fee = c.config.TxFee
+	return nil
+}

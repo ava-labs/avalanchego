@@ -35,8 +35,12 @@ func (*GinkgoTestContext) GetWriter() io.Writer {
 	return ginkgo.GinkgoWriter
 }
 
-func (*GinkgoTestContext) DeferCleanup(args ...interface{}) {
-	ginkgo.DeferCleanup(args...)
+func (*GinkgoTestContext) Cleanup() {
+	// No-op - ginkgo does this automatically
+}
+
+func (*GinkgoTestContext) DeferCleanup(cleanup func()) {
+	ginkgo.DeferCleanup(cleanup)
 }
 
 func (*GinkgoTestContext) By(text string, callback ...func()) {
