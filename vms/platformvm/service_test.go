@@ -1146,14 +1146,16 @@ func FuzzGetFeeState(f *testing.F) {
 
 		service, _, _ := defaultService(t)
 
-		expectedState := fee.State{
-			Capacity: fee.Gas(capacity),
-			Excess:   fee.Gas(excess),
-		}
+		var (
+			expectedState = fee.State{
+				Capacity: fee.Gas(capacity),
+				Excess:   fee.Gas(excess),
+			}
+			timestamp = time.Now()
+		)
 
 		service.vm.ctx.Lock.Lock()
 		service.vm.state.SetFeeState(expectedState)
-		timestamp := time.Now()
 		service.vm.state.SetTimestamp(timestamp)
 		service.vm.ctx.Lock.Unlock()
 
