@@ -75,6 +75,10 @@ func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) RecoverSubnetTx(tx *txs.RecoverSubnetTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
 	return b.baseTx(tx)
 }
