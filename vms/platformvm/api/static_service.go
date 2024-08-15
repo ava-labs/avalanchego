@@ -120,11 +120,11 @@ type PermissionlessValidator struct {
 	AccruedDelegateeReward *json.Uint64 `json:"accruedDelegateeReward,omitempty"`
 	DelegationFee          json.Float32 `json:"delegationFee"`
 	ExactDelegationFee     *json.Uint32 `json:"exactDelegationFee,omitempty"`
-	// Deprecated: Uptime is deprecated for Subnet Validators.
-	//             It will be available only for Primary Network Validators.
+	// Uptime is deprecated for Subnet Validators.
+	// It will be available only for Primary Network Validators.
 	Uptime *json.Float32 `json:"uptime,omitempty"`
-	// Deprecated: Connected is deprecated for Subnet Validators.
-	//             It will be available only for Primary Network Validators.
+	// Connected is deprecated for Subnet Validators.
+	// It will be available only for Primary Network Validators.
 	Connected bool                      `json:"connected"`
 	Staked    []UTXO                    `json:"staked,omitempty"`
 	Signer    *signer.ProofOfPossession `json:"signer,omitempty"`
