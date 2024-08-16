@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"gopkg.in/yaml.v3"
@@ -47,12 +46,12 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 
 	// Subnet testing requires creating an initial db state for the bootstrap node
 	if len(network.Subnets) > 0 {
-		avalancheGoPath := os.Getenv("AVALANCHEGO_PATH")
+		avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
 		if len(avalancheGoPath) == 0 {
 			return errAvalancheGoEvVarNotSet
 		}
 
-		pluginDir := os.Getenv("AVALANCHEGO_PLUGIN_DIR")
+		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
 		if len(pluginDir) == 0 {
 			return errPluginDirEnvVarNotSet
 		}
@@ -129,7 +128,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	baseNetworkAddress := "10.0.20"
 
 	services := make(types.Services, len(network.Nodes)+1)
-	uris := make([]string, len(network.Nodes))
+	uris := make(CSV, len(network.Nodes))
 	var (
 		bootstrapIP  string
 		bootstrapIDs string
@@ -230,16 +229,16 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	}
 
 	workloadEnv := types.Mapping{
-		"AVAWL_URIS": strings.Join(uris, " "),
+		envVarName(EnvPrefix, URIsKey): uris.String(),
 	}
-	chainIDs := []string{}
+	chainIDs := CSV{}
 	for _, subnet := range network.Subnets {
 		for _, chain := range subnet.Chains {
 			chainIDs = append(chainIDs, chain.ChainID.String())
 		}
 	}
 	if len(chainIDs) > 0 {
-		workloadEnv["AVAWL_CHAIN_IDS"] = strings.Join(chainIDs, " ")
+		workloadEnv[envVarName(EnvPrefix, ChainIDsKey)] = chainIDs.String()
 	}
 
 	workloadName := "workload"
@@ -277,8 +276,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 	envVarMap := make(types.Mapping, len(keyMap))
 	for key, val := range keyMap {
-		// e.g. network-id -> AVAGO_NETWORK_ID
-		envVar := strings.ToUpper(config.EnvPrefix + "_" + config.DashesToUnderscores.Replace(key))
+		envVar := envVarName(config.EnvPrefix, key)
 		envVarMap[envVar] = val
 	}
 	return envVarMap

@@ -59,7 +59,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -68,9 +67,11 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -122,6 +123,26 @@ var (
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
 	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
+
+	defaultStaticFeeConfig = txfee.StaticConfig{
+		TxFee:                 defaultTxFee,
+		CreateSubnetTxFee:     100 * defaultTxFee,
+		TransformSubnetTxFee:  100 * defaultTxFee,
+		CreateBlockchainTxFee: 100 * defaultTxFee,
+	}
+	defaultDynamicFeeConfig = feecomponent.Config{
+		Weights: feecomponent.Dimensions{
+			feecomponent.Bandwidth: 1,
+			feecomponent.DBRead:    1,
+			feecomponent.DBWrite:   1,
+			feecomponent.Compute:   1,
+		},
+		MaxGasCapacity:           10_000,
+		MaxGasPerSecond:          1_000,
+		TargetGasPerSecond:       500,
+		MinGasPrice:              1,
+		ExcessConversionConstant: 5_000,
+	}
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -248,18 +269,14 @@ func defaultVM(t *testing.T, f fork) (*VM, *txstest.WalletFactory, database.Data
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			TransformSubnetTxFee:  100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
-		MinValidatorStake: defaultMinValidatorStake,
-		MaxValidatorStake: defaultMaxValidatorStake,
-		MinDelegatorStake: defaultMinDelegatorStake,
-		MinStakeDuration:  defaultMinStakingDuration,
-		MaxStakeDuration:  defaultMaxStakingDuration,
-		RewardConfig:      defaultRewardConfig,
+		StaticFeeConfig:        defaultStaticFeeConfig,
+		DynamicFeeConfig:       defaultDynamicFeeConfig,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig: upgrade.Config{
 			ApricotPhase3Time: apricotPhase3Time,
 			ApricotPhase5Time: apricotPhase5Time,
