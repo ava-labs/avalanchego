@@ -55,7 +55,7 @@ func (*AddDelegatorTx) SubnetID() ids.ID {
 }
 
 func (tx *AddDelegatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+	return ids.NodeIDFromShortNodeID(tx.Validator.NodeID)
 }
 
 func (*AddDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
@@ -99,7 +99,7 @@ func (tx *AddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("output verification failed: %w", err)
 		}
-		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}

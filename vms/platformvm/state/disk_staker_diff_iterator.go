@@ -14,8 +14,6 @@ import (
 const (
 	// startDiffKey = [subnetID] + [inverseHeight]
 	startDiffKeyLength = ids.IDLen + database.Uint64Size
-	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	diffKeyLength = startDiffKeyLength + ids.NodeIDLen
 	// diffKeyNodeIDOffset = [subnetIDLen] + [inverseHeightLen]
 	diffKeyNodeIDOffset = ids.IDLen + database.Uint64Size
 
@@ -23,10 +21,7 @@ const (
 	weightValueLength = database.BoolSize + database.Uint64Size
 )
 
-var (
-	errUnexpectedDiffKeyLength     = fmt.Errorf("expected diff key length %d", diffKeyLength)
-	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
-)
+var errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 
 // marshalStartDiffKey is used to determine the starting key when iterating.
 //
@@ -40,16 +35,17 @@ func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 }
 
 func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
-	key := make([]byte, diffKeyLength)
+	nodeIDBytes := nodeID.Bytes()
+	key := make([]byte, startDiffKeyLength+len(nodeIDBytes))
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
-	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
+	copy(key[diffKeyNodeIDOffset:], nodeIDBytes)
 	return key
 }
 
 func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
-	if len(key) != diffKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
+	if len(key) < startDiffKeyLength {
+		return ids.Empty, 0, ids.EmptyNodeID, ids.ErrBadNodeIDLength
 	}
 	var (
 		subnetID ids.ID
@@ -57,8 +53,9 @@ func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	)
 	copy(subnetID[:], key)
 	height := unpackIterableHeight(key[ids.IDLen:])
-	copy(nodeID[:], key[diffKeyNodeIDOffset:])
-	return subnetID, height, nodeID, nil
+	nodeBytes := key[diffKeyNodeIDOffset:]
+	nodeID, err := ids.ToNodeID(nodeBytes)
+	return subnetID, height, nodeID, err
 }
 
 func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {

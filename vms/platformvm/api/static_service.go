@@ -4,7 +4,6 @@
 package api
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"net/http"
@@ -52,10 +51,10 @@ type UTXO struct {
 
 // TODO can we define this on *UTXO?
 func (utxo UTXO) Compare(other UTXO) int {
-	if locktimeCmp := cmp.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
+	if locktimeCmp := utils.Compare(utxo.Locktime, other.Locktime); locktimeCmp != 0 {
 		return locktimeCmp
 	}
-	if amountCmp := cmp.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
+	if amountCmp := utils.Compare(utxo.Amount, other.Amount); amountCmp != 0 {
 		return amountCmp
 	}
 
@@ -94,8 +93,16 @@ type Staker struct {
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
 }
 
-// GenesisValidator should to be used for genesis validators only.
-type GenesisValidator Staker
+// GenesisValidator is very similar to Staker, but it explicitly uses a ShortNodeID
+// GenesisValidator should be used to generate genesis content only.
+// APIs should use Staker struct only
+type GenesisValidator struct {
+	TxID      ids.ID          `json:"txID"`
+	StartTime json.Uint64     `json:"startTime"`
+	EndTime   json.Uint64     `json:"endTime"`
+	Weight    json.Uint64     `json:"weight"`
+	NodeID    ids.ShortNodeID `json:"nodeID"`
+}
 
 // Owner is the repr. of a reward owner sent over APIs.
 type Owner struct {
@@ -115,19 +122,15 @@ type PermissionlessValidator struct {
 	ValidationRewardOwner *Owner `json:"validationRewardOwner,omitempty"`
 	// The owner of the rewards from delegations during the validation period,
 	// if applicable.
-	DelegationRewardOwner  *Owner       `json:"delegationRewardOwner,omitempty"`
-	PotentialReward        *json.Uint64 `json:"potentialReward,omitempty"`
-	AccruedDelegateeReward *json.Uint64 `json:"accruedDelegateeReward,omitempty"`
-	DelegationFee          json.Float32 `json:"delegationFee"`
-	ExactDelegationFee     *json.Uint32 `json:"exactDelegationFee,omitempty"`
-	// Uptime is deprecated for Subnet Validators.
-	// It will be available only for Primary Network Validators.
-	Uptime *json.Float32 `json:"uptime,omitempty"`
-	// Connected is deprecated for Subnet Validators.
-	// It will be available only for Primary Network Validators.
-	Connected bool                      `json:"connected"`
-	Staked    []UTXO                    `json:"staked,omitempty"`
-	Signer    *signer.ProofOfPossession `json:"signer,omitempty"`
+	DelegationRewardOwner  *Owner                    `json:"delegationRewardOwner,omitempty"`
+	PotentialReward        *json.Uint64              `json:"potentialReward,omitempty"`
+	AccruedDelegateeReward *json.Uint64              `json:"accruedDelegateeReward,omitempty"`
+	DelegationFee          json.Float32              `json:"delegationFee"`
+	ExactDelegationFee     *json.Uint32              `json:"exactDelegationFee,omitempty"`
+	Uptime                 *json.Float32             `json:"uptime,omitempty"`
+	Connected              bool                      `json:"connected"`
+	Staked                 []UTXO                    `json:"staked,omitempty"`
+	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
 	// The delegators delegating to this validator
 	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
@@ -200,7 +203,7 @@ type BuildGenesisReply struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// bech32ToID takes bech32 address and produces a shortID
+// beck32ToID takes bech32 address and produces a shortID
 func bech32ToID(addrStr string) (ids.ShortID, error) {
 	_, addrBytes, err := address.ParseBech32(addrStr)
 	if err != nil {
@@ -284,7 +287,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			}
 			stake[i] = utxo
 
-			newWeight, err := math.Add(weight, uint64(apiUTXO.Amount))
+			newWeight, err := math.Add64(weight, uint64(apiUTXO.Amount))
 			if err != nil {
 				return errStakeOverflow
 			}

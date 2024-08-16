@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -22,11 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -36,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -45,31 +45,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
+	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
 	defaultWeight = 10000
 	trackChecksum = false
-
-	apricotPhase3 fork = iota
-	apricotPhase5
-	banff
-	cortina
-	durango
-	etna
-
-	latestFork = durango
 )
 
 var (
@@ -87,17 +75,15 @@ var (
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 
 	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs []ids.NodeID
+	genesisNodeIDs []ids.ShortNodeID
 )
 
 func init() {
-	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	genesisNodeIDs = make([]ids.ShortNodeID, len(preFundedKeys))
 	for i := range preFundedKeys {
-		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+		genesisNodeIDs[i] = ids.GenerateTestShortNodeID()
 	}
 }
-
-type fork uint8
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -107,8 +93,8 @@ type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
 	mempool    mempool.Mempool
-	network    *network.Network
-	sender     *enginetest.Sender
+	network    network.Network
+	sender     *common.SenderTest
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
@@ -118,18 +104,19 @@ type environment struct {
 	msm            *mutableSharedMemory
 	fx             fx.Fx
 	state          state.State
+	atomicUTXOs    avax.AtomicUTXOManager
 	uptimes        uptime.Manager
-	utxosVerifier  utxo.Verifier
-	factory        *txstest.WalletFactory
+	utxosHandler   utxo.Handler
+	txBuilder      txbuilder.Builder
 	backend        txexecutor.Backend
 }
 
-func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
+func newEnvironment(t *testing.T) *environment {
 	require := require.New(t)
 
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
-		config:         defaultConfig(t, f),
+		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
@@ -152,9 +139,19 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
+	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state, res.clk)
-	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
+	res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
+
+	res.txBuilder = txbuilder.New(
+		res.ctx,
+		res.config,
+		res.clk,
+		res.fx,
+		res.state,
+		res.atomicUTXOs,
+		res.utxosHandler,
+	)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
@@ -163,18 +160,18 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 		Clk:          res.clk,
 		Bootstrapped: res.isBootstrapped,
 		Fx:           res.fx,
-		FlowChecker:  res.utxosVerifier,
+		FlowChecker:  res.utxosHandler,
 		Uptimes:      res.uptimes,
 		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
-	res.sender = &enginetest.Sender{T: t}
-	res.sender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
+	res.sender = &common.SenderTest{T: t}
+	res.sender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
 
-	metrics, err := metrics.New(registerer)
+	metrics, err := metrics.New("", registerer)
 	require.NoError(err)
 
 	res.mempool, err = mempool.New("mempool", registerer, nil)
@@ -205,6 +202,7 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 
 	res.Builder = New(
 		res.mempool,
+		res.txBuilder,
 		&res.backend,
 		res.blkManager,
 	)
@@ -213,65 +211,40 @@ func newEnvironment(t *testing.T, f fork) *environment { //nolint:unparam
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
 
-	t.Cleanup(func() {
-		res.ctx.Lock.Lock()
-		defer res.ctx.Lock.Unlock()
-
-		res.Builder.ShutdownBlockTimer()
-
-		if res.isBootstrapped.Get() {
-			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
-
-			require.NoError(res.state.Commit())
-		}
-
-		require.NoError(res.state.Close())
-		require.NoError(res.baseDB.Close())
-	})
-
 	return res
 }
 
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
-	utx, err := builder.NewCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 2,
-			Addrs: []ids.ShortID{
-				preFundedKeys[0].PublicKey().Address(),
-				preFundedKeys[1].PublicKey().Address(),
-				preFundedKeys[2].PublicKey().Address(),
-			},
+	// Create a subnet
+	var err error
+	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+		[]ids.ShortID{ // control keys
+			preFundedKeys[0].PublicKey().Address(),
+			preFundedKeys[1].PublicKey().Address(),
+			preFundedKeys[2].PublicKey().Address(),
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-		}),
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(),
 	)
 	require.NoError(err)
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
-	require.NoError(err)
 
+	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
 	require.NoError(err)
 
-	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
 	executor := txexecutor.StandardTxExecutor{
-		Backend:       &env.backend,
-		State:         stateDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            testSubnet1,
+		Backend: &env.backend,
+		State:   stateDiff,
+		Tx:      testSubnet1,
 	}
 	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
-	require.NoError(env.state.Commit())
 }
 
 func defaultState(
@@ -303,60 +276,29 @@ func defaultState(
 	return state
 }
 
-func defaultConfig(t *testing.T, f fork) *config.Config {
-	c := &config.Config{
+func defaultConfig() *config.Config {
+	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
-		MinValidatorStake: 5 * units.MilliAvax,
-		MaxValidatorStake: 500 * units.MilliAvax,
-		MinDelegatorStake: 1 * units.MilliAvax,
-		MinStakeDuration:  defaultMinStakingDuration,
-		MaxStakeDuration:  defaultMaxStakingDuration,
+		TxFee:                  defaultTxFee,
+		CreateSubnetTxFee:      100 * defaultTxFee,
+		CreateBlockchainTxFee:  100 * defaultTxFee,
+		MinValidatorStake:      5 * units.MilliAvax,
+		MaxValidatorStake:      500 * units.MilliAvax,
+		MinDelegatorStake:      1 * units.MilliAvax,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		UpgradeConfig: upgrade.Config{
-			ApricotPhase3Time: mockable.MaxTime,
-			ApricotPhase5Time: mockable.MaxTime,
-			BanffTime:         mockable.MaxTime,
-			CortinaTime:       mockable.MaxTime,
-			DurangoTime:       mockable.MaxTime,
-			EtnaTime:          mockable.MaxTime,
-		},
+		ApricotPhase3Time: defaultValidateEndTime,
+		ApricotPhase5Time: defaultValidateEndTime,
+		BanffTime:         time.Time{}, // neglecting fork ordering this for package tests
 	}
-
-	switch f {
-	case etna:
-		c.UpgradeConfig.EtnaTime = time.Time{} // neglecting fork ordering this for package tests
-		fallthrough
-	case durango:
-		c.UpgradeConfig.DurangoTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case cortina:
-		c.UpgradeConfig.CortinaTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case banff:
-		c.UpgradeConfig.BanffTime = time.Time{} // neglecting fork ordering for this package's tests
-		fallthrough
-	case apricotPhase5:
-		c.UpgradeConfig.ApricotPhase5Time = defaultValidateEndTime
-		fallthrough
-	case apricotPhase3:
-		c.UpgradeConfig.ApricotPhase3Time = defaultValidateEndTime
-	default:
-		require.FailNow(t, "unhandled fork", f)
-	}
-
-	return c
 }
 
 func defaultClock() *mockable.Clock {
@@ -455,4 +397,24 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 	require.NoError(err)
 
 	return genesisBytes
+}
+
+func shutdownEnvironment(env *environment) error {
+	env.Builder.ShutdownBlockTimer()
+
+	if env.isBootstrapped.Get() {
+		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+
+		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
+			return err
+		}
+		if err := env.state.Commit(); err != nil {
+			return err
+		}
+	}
+
+	return utils.Err(
+		env.state.Close(),
+		env.baseDB.Close(),
+	)
 }

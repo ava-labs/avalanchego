@@ -58,7 +58,7 @@ func (*AddValidatorTx) SubnetID() ids.ID {
 }
 
 func (tx *AddValidatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+	return ids.NodeIDFromShortNodeID(tx.Validator.NodeID)
 }
 
 func (*AddValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
@@ -112,7 +112,7 @@ func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("failed to verify output: %w", err)
 		}
-		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}

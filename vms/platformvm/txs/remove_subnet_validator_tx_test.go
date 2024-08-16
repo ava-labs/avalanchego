@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -50,7 +51,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	}
-	nodeID := ids.BuildTestNodeID([]byte{
+	nodeID := ids.BuildTestShortNodeID([]byte{
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 		0x11, 0x22, 0x33, 0x44,
@@ -575,7 +576,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					// Set subnetID so we don't error on that check.
 					Subnet: ids.GenerateTestID(),
 					// Set NodeID so we don't error on that check.
-					NodeID: ids.GenerateTestNodeID(),
+					NodeID: ids.GenerateTestShortNodeID(),
 					BaseTx: invalidBaseTx,
 				}
 			},
@@ -587,7 +588,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 				return &RemoveSubnetValidatorTx{
 					BaseTx: validBaseTx,
 					// Set NodeID so we don't error on that check.
-					NodeID: ids.GenerateTestNodeID(),
+					NodeID: ids.GenerateTestShortNodeID(),
 					Subnet: constants.PrimaryNetworkID,
 				}
 			},
@@ -603,7 +604,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					// Set subnetID so we don't error on that check.
 					Subnet: ids.GenerateTestID(),
 					// Set NodeID so we don't error on that check.
-					NodeID:     ids.GenerateTestNodeID(),
+					NodeID:     ids.GenerateTestShortNodeID(),
 					BaseTx:     validBaseTx,
 					SubnetAuth: invalidSubnetAuth,
 				}
@@ -620,7 +621,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					// Set subnetID so we don't error on that check.
 					Subnet: ids.GenerateTestID(),
 					// Set NodeID so we don't error on that check.
-					NodeID:     ids.GenerateTestNodeID(),
+					NodeID:     ids.GenerateTestShortNodeID(),
 					BaseTx:     validBaseTx,
 					SubnetAuth: validSubnetAuth,
 				}
