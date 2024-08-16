@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -77,7 +78,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
-	vm, factory, _, mutableSharedMemory := defaultVM(t, latestFork)
+	vm, factory, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
 
 	return &Service{
 		vm:          vm,
