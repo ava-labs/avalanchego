@@ -10,13 +10,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const (
@@ -46,8 +46,7 @@ var (
 type ProposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
-	FeeCalculator fee.Calculator
-	Tx            *txs.Tx
+	Tx *txs.Tx
 	// [OnCommitState] is the state used for validation.
 	// [OnCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
@@ -58,6 +57,12 @@ type ProposalTxExecutor struct {
 	// [OnAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
 	OnAbortState state.Diff
+
+	// outputs populated by this struct's methods:
+	//
+	// [PrefersCommit] is true iff this node initially prefers to
+	// commit this block transaction.
+	PrefersCommit bool
 }
 
 func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
@@ -105,18 +110,17 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.UpgradeConfig.BanffTime,
+			e.Config.BanffTime,
 		)
 	}
 
 	onAbortOuts, err := verifyAddValidatorTx(
 		e.Backend,
-		e.FeeCalculator,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -145,6 +149,8 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, onAbortOuts)
+
+	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
@@ -153,18 +159,17 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.UpgradeConfig.BanffTime,
+			e.Config.BanffTime,
 		)
 	}
 
 	if err := verifyAddSubnetValidatorTx(
 		e.Backend,
-		e.FeeCalculator,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -192,6 +197,8 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, tx.Outs)
+
+	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
@@ -200,18 +207,17 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
 	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+	if e.Config.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.UpgradeConfig.BanffTime,
+			e.Config.BanffTime,
 		)
 	}
 
 	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
-		e.FeeCalculator,
 		e.OnCommitState,
 		e.Tx,
 		tx,
@@ -240,6 +246,8 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
 	avax.Produce(e.OnAbortState, txID, onAbortOuts)
+
+	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
 }
 
@@ -253,12 +261,12 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Validate [newChainTime]
 	newChainTime := tx.Timestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(newChainTime) {
+	if e.Config.IsBanffActivated(newChainTime) {
 		return fmt.Errorf(
 			"%w: proposed timestamp (%s) >= Banff fork time (%s)",
 			ErrAdvanceTimeTxIssuedAfterBanff,
 			newChainTime,
-			e.Config.UpgradeConfig.BanffTime,
+			e.Config.BanffTime,
 		)
 	}
 
@@ -274,7 +282,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	// Only allow timestamp to move forward as far as the time of next staker
 	// set change time
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(e.OnCommitState)
+	nextStakerChangeTime, err := GetNextStakerChangeTime(e.OnCommitState)
 	if err != nil {
 		return err
 	}
@@ -288,9 +296,19 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
+	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
+	if err != nil {
+		return err
+	}
+
+	// Update the state if this tx is committed
+	e.OnCommitState.SetTimestamp(newChainTime)
+	changes.Apply(e.OnCommitState)
+
+	e.PrefersCommit = !newChainTime.After(now.Add(SyncBound))
+
 	// Note that state doesn't change if this proposal is aborted
-	_, err = AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
-	return err
+	return nil
 }
 
 func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
@@ -332,6 +350,17 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 			currentChainTime,
 			stakerToReward.EndTime,
 		)
+	}
+
+	// retrieve primaryNetworkValidator before possibly removing it.
+	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
+		constants.PrimaryNetworkID,
+		stakerToReward.NodeID,
+	)
+	if err != nil {
+		// This should never error because the staker set is in memory and
+		// primary network validators are removed last.
+		return err
 	}
 
 	stakerTx, _, err := e.OnCommitState.GetTx(stakerToReward.TxID)
@@ -376,7 +405,10 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return err
 	}
 	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
-	return nil
+
+	// handle option preference
+	e.PrefersCommit, err = e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
+	return err
 }
 
 func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
@@ -563,7 +595,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Reward the delegatee here
-	if e.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
+	if e.Config.IsCortinaActivated(validator.StartTime) {
 		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
@@ -612,4 +644,27 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		e.OnCommitState.AddRewardUTXO(txID, utxo)
 	}
 	return nil
+}
+
+func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
+	expectedUptimePercentage := e.Config.UptimePercentage
+	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
+		transformSubnet, err := GetTransformSubnetTx(e.OnCommitState, stakerToReward.SubnetID)
+		if err != nil {
+			return false, fmt.Errorf("failed to calculate uptime: %w", err)
+		}
+
+		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	}
+
+	// TODO: calculate subnet uptimes
+	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
+		primaryNetworkValidator.NodeID,
+		constants.PrimaryNetworkID,
+		primaryNetworkValidator.StartTime,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate uptime: %w", err)
+	}
+	return uptime >= expectedUptimePercentage, nil
 }

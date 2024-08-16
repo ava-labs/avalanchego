@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -13,43 +13,47 @@ import (
 	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
-func TestNodeIDShortNodeIDConversion(t *testing.T) {
+func TestShortNodeIDEquality(t *testing.T) {
 	require := require.New(t)
 
-	nonEmptyInputs := []ShortNodeID{
-		{24},
-		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-	}
-
-	for _, input := range nonEmptyInputs {
-		nodeID := NodeIDFromShortNodeID(input)
-		require.Equal(nodeID.String(), input.String())
-		require.Equal(nodeID.Bytes(), input.Bytes())
-
-		output, err := ShortNodeIDFromNodeID(nodeID)
-		require.NoError(err)
-		require.Equal(input, output)
-	}
-
-	// Empty ids work differently
-	require.Equal(EmptyNodeID, NodeIDFromShortNodeID(EmptyShortNodeID))
-	require.NotEqual(EmptyNodeID.String(), EmptyShortNodeID.String())
-	require.NotEqual(EmptyNodeID.Bytes(), EmptyShortNodeID.Bytes())
+	id := ShortNodeID{24}
+	idCopy := ShortNodeID{24}
+	require.Equal(id, idCopy)
+	id2 := EmptyShortNodeID
+	require.NotEqual(id, id2)
 }
 
-func TestNodeIDFromString(t *testing.T) {
+func TestShortIDBytesIsolation(t *testing.T) {
 	require := require.New(t)
 
-	id := BuildTestNodeID([]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'})
+	id := ShortID{24}
+	idBytes := id.Bytes()
+	idBytes[0] = 25
+	require.Equal(ShortID{24}, id)
+}
+
+func TestShortNodeIDBytesIsolation(t *testing.T) {
+	require := require.New(t)
+
+	id := ShortNodeID{24}
+	idBytes := id.Bytes()
+	idBytes[0] = 25
+	require.Equal(ShortNodeID{24}, id)
+}
+
+func TestShortNodeIDFromString(t *testing.T) {
+	require := require.New(t)
+
+	id := ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	idStr := id.String()
-	id2, err := NodeIDFromString(idStr)
+	id2, err := ShortNodeIDFromString(idStr)
 	require.NoError(err)
 	require.Equal(id, id2)
-	expected := "NodeID-jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7"
+	expected := "NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"
 	require.Equal(expected, idStr)
 }
 
-func TestNodeIDFromStringError(t *testing.T) {
+func TestShortNodeIDFromStringError(t *testing.T) {
 	tests := []struct {
 		in          string
 		expectedErr error
@@ -75,23 +79,23 @@ func TestNodeIDFromStringError(t *testing.T) {
 	}
 }
 
-func TestNodeIDMarshalJSON(t *testing.T) {
+func TestShortNodeIDMarshalJSON(t *testing.T) {
 	tests := []struct {
 		label string
-		in    NodeID
+		in    ShortNodeID
 		out   []byte
 		err   error
 	}{
 		{
 			"NodeID{}",
-			NodeID{},
-			[]byte(`"NodeID-45PJLL"`),
+			ShortNodeID{},
+			[]byte(`"NodeID-111111111111111111116DBWJs"`),
 			nil,
 		},
 		{
 			`ID("ava labs")`,
-			BuildTestNodeID([]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
-			[]byte(`"NodeID-jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7"`),
+			ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
 			nil,
 		},
 	}
@@ -106,53 +110,53 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestNodeIDUnmarshalJSON(t *testing.T) {
+func TestShortNodeIDUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		label       string
 		in          []byte
-		out         NodeID
+		out         ShortNodeID
 		expectedErr error
 	}{
 		{
 			"NodeID{}",
 			[]byte("null"),
-			NodeID{},
+			ShortNodeID{},
 			nil,
 		},
 		{
 			`NodeID("ava labs")`,
-			[]byte(`"NodeID-jvYi6Tn9idMi7BaymUVi9zWjg5tpmW7trfKG1AYJLKZJ2fsU7"`),
-			BuildTestNodeID([]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}),
+			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
+			ShortNodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 			nil,
 		},
 		{
 			"missing start quote",
 			[]byte(`NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"`),
-			NodeID{},
+			ShortNodeID{},
 			errMissingQuotes,
 		},
 		{
 			"missing end quote",
 			[]byte(`"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz`),
-			NodeID{},
+			ShortNodeID{},
 			errMissingQuotes,
 		},
 		{
 			"NodeID-",
 			[]byte(`"NodeID-"`),
-			NodeID{},
+			ShortNodeID{},
 			errShortNodeID,
 		},
 		{
 			"NodeID-1",
 			[]byte(`"NodeID-1"`),
-			NodeID{},
+			ShortNodeID{},
 			cb58.ErrMissingChecksum,
 		},
 		{
 			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
 			[]byte(`"NodeID-1"`),
-			NodeID{},
+			ShortNodeID{},
 			cb58.ErrMissingChecksum,
 		},
 	}
@@ -160,7 +164,7 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			require := require.New(t)
 
-			foo := NodeID{}
+			foo := ShortNodeID{}
 			err := foo.UnmarshalJSON(tt.in)
 			require.ErrorIs(err, tt.expectedErr)
 			require.Equal(tt.out, foo)
@@ -168,14 +172,14 @@ func TestNodeIDUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestNodeIDString(t *testing.T) {
+func TestShortNodeIDString(t *testing.T) {
 	tests := []struct {
 		label    string
-		id       NodeID
+		id       ShortNodeID
 		expected string
 	}{
-		{"NodeID{}", NodeID{}, "NodeID-45PJLL"},
-		{"NodeID{24}", BuildTestNodeID([]byte{24}), "NodeID-Ba3mm8Ra8JYYebeZ9p7zw1ayorDbeD1euwxhgzSLsncKqGoNt"},
+		{"NodeID{}", EmptyShortNodeID, "NodeID-111111111111111111116DBWJs"},
+		{"NodeID{24}", ShortNodeID{24}, "NodeID-3BuDc2d1Efme5Apba6SJ8w3Tz7qeh6mHt"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
@@ -184,40 +188,40 @@ func TestNodeIDString(t *testing.T) {
 	}
 }
 
-func TestNodeIDMapMarshalling(t *testing.T) {
+func TestShortNodeIDMapMarshalling(t *testing.T) {
 	require := require.New(t)
 
-	originalMap := map[NodeID]int{
-		BuildTestNodeID([]byte{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}): 1,
-		BuildTestNodeID([]byte{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}): 2,
+	originalMap := map[ShortNodeID]int{
+		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
+		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
 	mapJSON, err := json.Marshal(originalMap)
 	require.NoError(err)
 
-	var unmarshalledMap map[NodeID]int
+	var unmarshalledMap map[ShortNodeID]int
 	require.NoError(json.Unmarshal(mapJSON, &unmarshalledMap))
 	require.Equal(originalMap, unmarshalledMap)
 }
 
-func TestNodeIDCompare(t *testing.T) {
+func TestShortNodeIDCompare(t *testing.T) {
 	tests := []struct {
-		a        NodeID
-		b        NodeID
+		a        ShortNodeID
+		b        ShortNodeID
 		expected int
 	}{
 		{
-			a:        BuildTestNodeID([]byte{1}),
-			b:        BuildTestNodeID([]byte{0}),
+			a:        ShortNodeID{1},
+			b:        ShortNodeID{0},
 			expected: 1,
 		},
 		{
-			a:        BuildTestNodeID([]byte{1}),
-			b:        BuildTestNodeID([]byte{1}),
+			a:        ShortNodeID{1},
+			b:        ShortNodeID{1},
 			expected: 0,
 		},
 		{
-			a:        BuildTestNodeID([]byte{1, 0}),
-			b:        BuildTestNodeID([]byte{1, 2}),
+			a:        ShortNodeID{1, 0},
+			b:        ShortNodeID{1, 2},
 			expected: -1,
 		},
 	}
@@ -229,4 +233,17 @@ func TestNodeIDCompare(t *testing.T) {
 			require.Equal(-test.expected, test.b.Compare(test.a))
 		})
 	}
+}
+
+func TestShortNodeIDToShortNodeIDConversion(t *testing.T) {
+	require := require.New(t)
+
+	// EmptyNodeID --> EmptyShortNodeID
+	outputShort, err := ShortNodeIDFromNodeID(EmptyNodeID)
+	require.NoError(err)
+	require.Equal(EmptyShortNodeID, outputShort)
+
+	// EmptyShortNodeID --> EmptyNodeID
+	output := NodeIDFromShortNodeID(EmptyShortNodeID)
+	require.Equal(EmptyNodeID, output)
 }

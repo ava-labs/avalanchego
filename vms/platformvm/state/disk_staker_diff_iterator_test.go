@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/thepudds/fzgen/fuzzer"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -40,7 +41,7 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 
 		subnetID, height, nodeID, err := unmarshalDiffKey(key)
 		if err != nil {
-			require.ErrorIs(err, errUnexpectedDiffKeyLength)
+			require.ErrorIs(err, ids.ErrBadNodeIDLength)
 			return
 		}
 

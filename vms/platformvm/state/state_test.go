@@ -5,18 +5,16 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"math"
-	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
+
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,22 +23,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/types"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -56,23 +49,23 @@ func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
 	s, db := newUninitializedState(require)
 
-	shouldInit, err := s.shouldInit()
+	shouldInit, err := s.(*state).shouldInit()
 	require.NoError(err)
 	require.True(shouldInit)
 
-	require.NoError(s.doneInit())
+	require.NoError(s.(*state).doneInit())
 	require.NoError(s.Commit())
 
 	s = newStateFromDB(require, db)
 
-	shouldInit, err = s.shouldInit()
+	shouldInit, err = s.(*state).shouldInit()
 	require.NoError(err)
 	require.False(shouldInit)
 }
 
 func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
-	state := newInitializedState(require)
+	state, _ := newInitializedState(require)
 
 	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
@@ -95,630 +88,15 @@ func TestStateSyncGenesis(t *testing.T) {
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
-// Whenever we store a staker, a whole bunch a data structures are updated
-// This test is meant to capture which updates are carried out
-func TestPersistStakers(t *testing.T) {
-	tests := map[string]struct {
-		// Insert or delete a staker to state and store it
-		storeStaker func(*require.Assertions, ids.ID /*=subnetID*/, *state) *Staker
+func newInitializedState(require *require.Assertions) (State, database.Database) {
+	s, db := newUninitializedState(require)
 
-		// Check that the staker is duly stored/removed in P-chain state
-		checkStakerInState func(*require.Assertions, *state, *Staker)
+	initialShortNodeID, err := ids.ShortNodeIDFromNodeID(initialNodeID)
+	require.NoError(err)
 
-		// Check whether validators are duly reported in the validator set,
-		// with the right weight and showing the BLS key
-		checkValidatorsSet func(*require.Assertions, *state, *Staker)
-
-		// Check that node duly track stakers uptimes
-		checkValidatorUptimes func(*require.Assertions, *state, *Staker)
-
-		// Check whether weight/bls keys diffs are duly stored
-		checkDiffs func(*require.Assertions, *state, *Staker, uint64)
-	}{
-		"add current validator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				var (
-					startTime = time.Now().Unix()
-					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						End:    uint64(endTime),
-						Wght:   1234,
-					}
-					validatorReward uint64 = 5678
-				)
-
-				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utx}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				staker, err := NewCurrentStaker(
-					addPermValTx.ID(),
-					utx,
-					time.Unix(startTime, 0),
-					validatorReward,
-				)
-				r.NoError(err)
-
-				s.PutCurrentValidator(staker)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-				return staker
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				retrievedStaker, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-				r.Equal(staker, retrievedStaker)
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 1)
-				valOut, found := valsMap[staker.NodeID]
-				r.True(found)
-				r.Equal(&validators.GetValidatorOutput{
-					NodeID:    staker.NodeID,
-					PublicKey: staker.PublicKey,
-					Weight:    staker.Weight,
-				}, valOut)
-			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-				upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
-				r.NoError(err)
-				r.Equal(upDuration, time.Duration(0))
-				r.Equal(lastUpdated, staker.StartTime)
-			},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.NoError(err)
-				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-				r.NoError(err)
-				r.Equal(&ValidatorWeightDiff{
-					Decrease: false,
-					Amount:   staker.Weight,
-				}, weightDiff)
-
-				blsDiffBytes, err := s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				if staker.SubnetID == constants.PrimaryNetworkID {
-					r.NoError(err)
-					r.Nil(blsDiffBytes)
-				} else {
-					r.ErrorIs(err, database.ErrNotFound)
-				}
-			},
-		},
-		"add current delegator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				// insert the delegator and its validator
-				var (
-					valStartTime = time.Now().Truncate(time.Second).Unix()
-					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
-					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
-					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						End:    uint64(valEndTime),
-						Wght:   1234,
-					}
-					validatorReward uint64 = 5678
-
-					delegatorData = txs.Validator{
-						NodeID: validatorsData.NodeID,
-						End:    uint64(delEndTime),
-						Wght:   validatorsData.Wght / 2,
-					}
-					delegatorReward uint64 = 5432
-				)
-
-				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utxVal}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				val, err := NewCurrentStaker(
-					addPermValTx.ID(),
-					utxVal,
-					time.Unix(valStartTime, 0),
-					validatorReward,
-				)
-				r.NoError(err)
-
-				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
-				addPermDelTx := &txs.Tx{Unsigned: utxDel}
-				r.NoError(addPermDelTx.Initialize(txs.Codec))
-
-				del, err := NewCurrentStaker(
-					addPermDelTx.ID(),
-					utxDel,
-					time.Unix(delStartTime, 0),
-					delegatorReward,
-				)
-				r.NoError(err)
-
-				s.PutCurrentValidator(val)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				s.PutCurrentDelegator(del)
-				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-				return del
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				delIt, err := s.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-				r.True(delIt.Next())
-				retrievedDelegator := delIt.Value()
-				r.False(delIt.Next())
-				delIt.Release()
-				r.Equal(staker, retrievedDelegator)
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 1)
-				valOut, found := valsMap[staker.NodeID]
-				r.True(found)
-				r.Equal(valOut.NodeID, staker.NodeID)
-				r.Equal(valOut.Weight, val.Weight+staker.Weight)
-			},
-			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// validator's weight must increase of delegator's weight amount
-				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.NoError(err)
-				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-				r.NoError(err)
-				r.Equal(&ValidatorWeightDiff{
-					Decrease: false,
-					Amount:   staker.Weight,
-				}, weightDiff)
-			},
-		},
-		"add pending validator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				var (
-					startTime = time.Now().Unix()
-					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(startTime),
-						End:    uint64(endTime),
-						Wght:   1234,
-					}
-				)
-
-				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utx}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				staker, err := NewPendingStaker(
-					addPermValTx.ID(),
-					utx,
-				)
-				r.NoError(err)
-
-				s.PutPendingValidator(staker)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-				return staker
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				retrievedStaker, err := s.GetPendingValidator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-				r.Equal(staker, retrievedStaker)
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				// pending validators are not showed in validators set
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Empty(valsMap)
-			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-				// pending validators uptime is not tracked
-				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// pending validators weight diff and bls diffs are not stored
-				_, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.ErrorIs(err, database.ErrNotFound)
-
-				_, err = s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-		},
-		"add pending delegator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				// insert the delegator and its validator
-				var (
-					valStartTime = time.Now().Truncate(time.Second).Unix()
-					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
-					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
-					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(valStartTime),
-						End:    uint64(valEndTime),
-						Wght:   1234,
-					}
-
-					delegatorData = txs.Validator{
-						NodeID: validatorsData.NodeID,
-						Start:  uint64(delStartTime),
-						End:    uint64(delEndTime),
-						Wght:   validatorsData.Wght / 2,
-					}
-				)
-
-				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utxVal}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				val, err := NewPendingStaker(addPermValTx.ID(), utxVal)
-				r.NoError(err)
-
-				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
-				addPermDelTx := &txs.Tx{Unsigned: utxDel}
-				r.NoError(addPermDelTx.Initialize(txs.Codec))
-
-				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
-				r.NoError(err)
-
-				s.PutPendingValidator(val)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				s.PutPendingDelegator(del)
-				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				return del
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				delIt, err := s.GetPendingDelegatorIterator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-				r.True(delIt.Next())
-				retrievedDelegator := delIt.Value()
-				r.False(delIt.Next())
-				delIt.Release()
-				r.Equal(staker, retrievedDelegator)
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Empty(valsMap)
-			},
-			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
-			checkDiffs:            func(*require.Assertions, *state, *Staker, uint64) {},
-		},
-		"delete current validator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				// add them remove the validator
-				var (
-					startTime = time.Now().Unix()
-					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						End:    uint64(endTime),
-						Wght:   1234,
-					}
-					validatorReward uint64 = 5678
-				)
-
-				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utx}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				staker, err := NewCurrentStaker(
-					addPermValTx.ID(),
-					utx,
-					time.Unix(startTime, 0),
-					validatorReward,
-				)
-				r.NoError(err)
-
-				s.PutCurrentValidator(staker)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				s.DeleteCurrentValidator(staker)
-				r.NoError(s.Commit())
-				return staker
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				_, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				// deleted validators are not showed in the validators set anymore
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Empty(valsMap)
-			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-				// uptimes of delete validators are dropped
-				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.NoError(err)
-				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-				r.NoError(err)
-				r.Equal(&ValidatorWeightDiff{
-					Decrease: true,
-					Amount:   staker.Weight,
-				}, weightDiff)
-
-				blsDiffBytes, err := s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				if staker.SubnetID == constants.PrimaryNetworkID {
-					r.NoError(err)
-					r.Equal(bls.PublicKeyFromValidUncompressedBytes(blsDiffBytes), staker.PublicKey)
-				} else {
-					r.ErrorIs(err, database.ErrNotFound)
-				}
-			},
-		},
-		"delete current delegator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				// insert validator and delegator, then remove the delegator
-				var (
-					valStartTime = time.Now().Truncate(time.Second).Unix()
-					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
-					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
-					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						End:    uint64(valEndTime),
-						Wght:   1234,
-					}
-					validatorReward uint64 = 5678
-
-					delegatorData = txs.Validator{
-						NodeID: validatorsData.NodeID,
-						End:    uint64(delEndTime),
-						Wght:   validatorsData.Wght / 2,
-					}
-					delegatorReward uint64 = 5432
-				)
-
-				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utxVal}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				val, err := NewCurrentStaker(
-					addPermValTx.ID(),
-					utxVal,
-					time.Unix(valStartTime, 0),
-					validatorReward,
-				)
-				r.NoError(err)
-
-				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
-				addPermDelTx := &txs.Tx{Unsigned: utxDel}
-				r.NoError(addPermDelTx.Initialize(txs.Codec))
-
-				del, err := NewCurrentStaker(
-					addPermDelTx.ID(),
-					utxDel,
-					time.Unix(delStartTime, 0),
-					delegatorReward,
-				)
-				r.NoError(err)
-
-				s.PutCurrentValidator(val)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-
-				s.PutCurrentDelegator(del)
-				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				s.DeleteCurrentDelegator(del)
-				r.NoError(s.Commit())
-
-				return del
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				delIt, err := s.GetCurrentDelegatorIterator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-				r.False(delIt.Next())
-				delIt.Release()
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Len(valsMap, 1)
-				valOut, found := valsMap[staker.NodeID]
-				r.True(found)
-				r.Equal(valOut.NodeID, staker.NodeID)
-				r.Equal(valOut.Weight, val.Weight)
-			},
-			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				// validator's weight must decrease of delegator's weight amount
-				weightDiffBytes, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.NoError(err)
-				weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-				r.NoError(err)
-				r.Equal(&ValidatorWeightDiff{
-					Decrease: true,
-					Amount:   staker.Weight,
-				}, weightDiff)
-			},
-		},
-		"delete pending validator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				var (
-					startTime = time.Now().Unix()
-					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(startTime),
-						End:    uint64(endTime),
-						Wght:   1234,
-					}
-				)
-
-				utx := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utx}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				staker, err := NewPendingStaker(
-					addPermValTx.ID(),
-					utx,
-				)
-				r.NoError(err)
-
-				s.PutPendingValidator(staker)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				s.DeletePendingValidator(staker)
-				r.NoError(s.Commit())
-
-				return staker
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				_, err := s.GetPendingValidator(staker.SubnetID, staker.NodeID)
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Empty(valsMap)
-			},
-			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
-				_, _, err := s.GetUptime(staker.NodeID, staker.SubnetID)
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-			checkDiffs: func(r *require.Assertions, s *state, staker *Staker, height uint64) {
-				_, err := s.validatorWeightDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.ErrorIs(err, database.ErrNotFound)
-
-				_, err = s.validatorPublicKeyDiffsDB.Get(marshalDiffKey(staker.SubnetID, height, staker.NodeID))
-				r.ErrorIs(err, database.ErrNotFound)
-			},
-		},
-		"delete pending delegator": {
-			storeStaker: func(r *require.Assertions, subnetID ids.ID, s *state) *Staker {
-				// insert validator and delegator the remove the validator
-				var (
-					valStartTime = time.Now().Truncate(time.Second).Unix()
-					delStartTime = time.Unix(valStartTime, 0).Add(time.Hour).Unix()
-					delEndTime   = time.Unix(delStartTime, 0).Add(30 * 24 * time.Hour).Unix()
-					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
-
-					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						Start:  uint64(valStartTime),
-						End:    uint64(valEndTime),
-						Wght:   1234,
-					}
-
-					delegatorData = txs.Validator{
-						NodeID: validatorsData.NodeID,
-						Start:  uint64(delStartTime),
-						End:    uint64(delEndTime),
-						Wght:   validatorsData.Wght / 2,
-					}
-				)
-
-				utxVal := createPermissionlessValidatorTx(r, subnetID, validatorsData)
-				addPermValTx := &txs.Tx{Unsigned: utxVal}
-				r.NoError(addPermValTx.Initialize(txs.Codec))
-
-				val, err := NewPendingStaker(addPermValTx.ID(), utxVal)
-				r.NoError(err)
-
-				utxDel := createPermissionlessDelegatorTx(subnetID, delegatorData)
-				addPermDelTx := &txs.Tx{Unsigned: utxDel}
-				r.NoError(addPermDelTx.Initialize(txs.Codec))
-
-				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
-				r.NoError(err)
-
-				s.PutPendingValidator(val)
-				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
-
-				s.PutPendingDelegator(del)
-				s.AddTx(addPermDelTx, status.Committed) // this is currently needed to reload the staker
-				r.NoError(s.Commit())
-
-				s.DeletePendingDelegator(del)
-				r.NoError(s.Commit())
-				return del
-			},
-			checkStakerInState: func(r *require.Assertions, s *state, staker *Staker) {
-				delIt, err := s.GetPendingDelegatorIterator(staker.SubnetID, staker.NodeID)
-				r.NoError(err)
-				r.False(delIt.Next())
-				delIt.Release()
-			},
-			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
-				r.Empty(valsMap)
-			},
-			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
-			checkDiffs:            func(*require.Assertions, *state, *Staker, uint64) {},
-		},
-	}
-
-	subnetIDs := []ids.ID{constants.PrimaryNetworkID, ids.GenerateTestID()}
-	for _, subnetID := range subnetIDs {
-		for name, test := range tests {
-			t.Run(fmt.Sprintf("%s - subnetID %s", name, subnetID), func(t *testing.T) {
-				require := require.New(t)
-
-				state, db := newUninitializedState(require)
-
-				// create and store the staker
-				staker := test.storeStaker(require, subnetID, state)
-
-				// check all relevant data are stored
-				test.checkStakerInState(require, state, staker)
-				test.checkValidatorsSet(require, state, staker)
-				test.checkValidatorUptimes(require, state, staker)
-				test.checkDiffs(require, state, staker, 0 /*height*/)
-
-				// rebuild the state
-				rebuiltState := newStateFromDB(require, db)
-
-				// load relevant quantities
-				require.NoError(rebuiltState.loadCurrentValidators())
-				require.NoError(rebuiltState.loadPendingValidators())
-				require.NoError(rebuiltState.initValidatorSets())
-
-				// check again that all relevant data are still available in rebuilt state
-				test.checkStakerInState(require, state, staker)
-				test.checkValidatorsSet(require, state, staker)
-				test.checkValidatorUptimes(require, state, staker)
-				test.checkDiffs(require, state, staker, 0 /*height*/)
-			})
-		}
-	}
-}
-
-func newInitializedState(require *require.Assertions) State {
-	s, _ := newUninitializedState(require)
-	initializeState(require, s)
-	return s
-}
-
-func newUninitializedState(require *require.Assertions) (*state, database.Database) {
-	db := memdb.New()
-	return newStateFromDB(require, db), db
-}
-
-func initializeState(require *require.Assertions, s *state) {
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
-			NodeID: initialNodeID,
+			NodeID: initialShortNodeID,
 			Start:  uint64(initialTime.Unix()),
 			End:    uint64(initialValidatorEndTime.Unix()),
 			Wght:   units.Avax,
@@ -775,10 +153,17 @@ func initializeState(require *require.Assertions, s *state) {
 
 	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
-	require.NoError(s.syncGenesis(genesisBlk, genesisState))
+	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
+
+	return s, db
 }
 
-func newStateFromDB(require *require.Assertions, db database.Database) *state {
+func newUninitializedState(require *require.Assertions) (State, database.Database) {
+	db := memdb.New()
+	return newStateFromDB(require, db), db
+}
+
+func newStateFromDB(require *require.Assertions, db database.Database) State {
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
 		db,
@@ -799,136 +184,6 @@ func newStateFromDB(require *require.Assertions, db database.Database) *state {
 	require.NoError(err)
 	require.NotNil(state)
 	return state
-}
-
-func createPermissionlessValidatorTx(r *require.Assertions, subnetID ids.ID, validatorsData txs.Validator) *txs.AddPermissionlessValidatorTx {
-	var sig signer.Signer = &signer.Empty{}
-	if subnetID == constants.PrimaryNetworkID {
-		sk, err := bls.NewSecretKey()
-		r.NoError(err)
-		sig = signer.NewProofOfPossession(sk)
-	}
-
-	return &txs.AddPermissionlessValidatorTx{
-		BaseTx: txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
-				Outs:         []*avax.TransferableOutput{},
-				Ins: []*avax.TransferableInput{
-					{
-						UTXOID: avax.UTXOID{
-							TxID:        ids.GenerateTestID(),
-							OutputIndex: 1,
-						},
-						Asset: avax.Asset{
-							ID: ids.GenerateTestID(),
-						},
-						In: &secp256k1fx.TransferInput{
-							Amt: 2 * units.KiloAvax,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{1},
-							},
-						},
-					},
-				},
-				Memo: types.JSONByteSlice{},
-			},
-		},
-		Validator: validatorsData,
-		Subnet:    subnetID,
-		Signer:    sig,
-
-		StakeOuts: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{
-					ID: ids.GenerateTestID(),
-				},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 2 * units.KiloAvax,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs: []ids.ShortID{
-							ids.GenerateTestShortID(),
-						},
-					},
-				},
-			},
-		},
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.GenerateTestShortID(),
-			},
-		},
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.GenerateTestShortID(),
-			},
-		},
-		DelegationShares: reward.PercentDenominator,
-	}
-}
-
-func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData txs.Validator) *txs.AddPermissionlessDelegatorTx {
-	return &txs.AddPermissionlessDelegatorTx{
-		BaseTx: txs.BaseTx{
-			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
-				Outs:         []*avax.TransferableOutput{},
-				Ins: []*avax.TransferableInput{
-					{
-						UTXOID: avax.UTXOID{
-							TxID:        ids.GenerateTestID(),
-							OutputIndex: 1,
-						},
-						Asset: avax.Asset{
-							ID: ids.GenerateTestID(),
-						},
-						In: &secp256k1fx.TransferInput{
-							Amt: 2 * units.KiloAvax,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{1},
-							},
-						},
-					},
-				},
-				Memo: types.JSONByteSlice{},
-			},
-		},
-		Validator: delegatorData,
-		Subnet:    subnetID,
-
-		StakeOuts: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{
-					ID: ids.GenerateTestID(),
-				},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 2 * units.KiloAvax,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Locktime:  0,
-						Threshold: 1,
-						Addrs: []ids.ShortID{
-							ids.GenerateTestShortID(),
-						},
-					},
-				},
-			},
-		},
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs: []ids.ShortID{
-				ids.GenerateTestShortID(),
-			},
-		},
-	}
 }
 
 func TestValidatorWeightDiff(t *testing.T) {
@@ -1076,7 +331,7 @@ func TestValidatorWeightDiff(t *testing.T) {
 func TestStateAddRemoveValidator(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state, _ := newInitializedState(require)
 
 	var (
 		numNodes  = 3
@@ -1302,162 +557,10 @@ func requireEqualPublicKeysValidatorSet(
 }
 
 func TestParsedStateBlock(t *testing.T) {
-	var (
-		require = require.New(t)
-		blks    = makeBlocks(require)
-	)
-
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		gotBlk, isStateBlk, err := parseStoredBlock(stBlkBytes)
-		require.NoError(err)
-		require.True(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-
-		gotBlk, isStateBlk, err = parseStoredBlock(blk.Bytes())
-		require.NoError(err)
-		require.False(isStateBlk)
-		require.Equal(blk.ID(), gotBlk.ID())
-	}
-}
-
-func TestReindexBlocks(t *testing.T) {
-	var (
-		require = require.New(t)
-		s       = newInitializedState(require).(*state)
-		blks    = makeBlocks(require)
-	)
-
-	// Populate the blocks using the legacy format.
-	for _, blk := range blks {
-		stBlk := stateBlk{
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
-		require.NoError(err)
-
-		blkID := blk.ID()
-		require.NoError(s.blockDB.Put(blkID[:], stBlkBytes))
-	}
-
-	// Convert the indices to the new format.
-	require.NoError(s.ReindexBlocks(&sync.Mutex{}, logging.NoLog{}))
-
-	// Verify that the blocks are stored in the new format.
-	for _, blk := range blks {
-		blkID := blk.ID()
-		blkBytes, err := s.blockDB.Get(blkID[:])
-		require.NoError(err)
-
-		parsedBlk, err := block.Parse(block.GenesisCodec, blkBytes)
-		require.NoError(err)
-		require.Equal(blkID, parsedBlk.ID())
-	}
-
-	// Verify that the flag has been written to disk to allow skipping future
-	// reindexings.
-	reindexed, err := s.singletonDB.Has(BlocksReindexedKey)
-	require.NoError(err)
-	require.True(reindexed)
-}
-
-func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
-	ctrl := gomock.NewController(t)
-
-	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
-
-		createSubnetTx = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{},
-				Owner:  owner1,
-			},
-		}
-
-		subnetID = createSubnetTx.ID()
-	)
-
-	owner, err := state.GetSubnetOwner(subnetID)
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Nil(owner)
-
-	state.AddSubnet(subnetID)
-	state.SetSubnetOwner(subnetID, owner1)
-
-	owner, err = state.GetSubnetOwner(subnetID)
-	require.NoError(err)
-	require.Equal(owner1, owner)
-
-	state.SetSubnetOwner(subnetID, owner2)
-	owner, err = state.GetSubnetOwner(subnetID)
-	require.NoError(err)
-	require.Equal(owner2, owner)
-}
-
-func TestStateSubnetManager(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte)
-	}{
-		{
-			name: "in-memory",
-			setup: func(_ *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
-				s.SetSubnetManager(subnetID, chainID, addr)
-			},
-		},
-		{
-			name: "cache",
-			setup: func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
-				subnetManagerCache := s.(*state).subnetManagerCache
-
-				require.Zero(t, subnetManagerCache.Len())
-				subnetManagerCache.Put(subnetID, chainIDAndAddr{
-					ChainID: chainID,
-					Addr:    addr,
-				})
-				require.Equal(t, 1, subnetManagerCache.Len())
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			initializedState := newInitializedState(require)
-
-			subnetID := ids.GenerateTestID()
-			chainID, addr, err := initializedState.GetSubnetManager(subnetID)
-			require.ErrorIs(err, database.ErrNotFound)
-			require.Equal(ids.Empty, chainID)
-			require.Nil(addr)
-
-			expectedChainID := ids.GenerateTestID()
-			expectedAddr := []byte{'a', 'd', 'd', 'r'}
-
-			test.setup(t, initializedState, subnetID, expectedChainID, expectedAddr)
-
-			chainID, addr, err = initializedState.GetSubnetManager(subnetID)
-			require.NoError(err)
-			require.Equal(expectedChainID, chainID)
-			require.Equal(expectedAddr, addr)
-		})
-	}
-}
-
-func makeBlocks(require *require.Assertions) []block.Block {
 	var blks []block.Block
+
 	{
 		blk, err := block.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
@@ -1541,97 +644,62 @@ func makeBlocks(require *require.Assertions) []block.Block {
 		require.NoError(err)
 		blks = append(blks, blk)
 	}
-	return blks
+
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Blk:    blk,
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+
+		stBlkBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &stBlk)
+		require.NoError(err)
+
+		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		require.NoError(err)
+		require.True(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+
+		gotBlk, _, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		require.NoError(err)
+		require.False(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+	}
 }
 
-// Verify that committing the state writes the fee state to the database and
-// that loading the state fetches the fee state from the database.
-func TestStateFeeStateCommitAndLoad(t *testing.T) {
+func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
-	s, db := newUninitializedState(require)
-	initializeState(require, s)
+	state, _ := newInitializedState(require)
+	ctrl := gomock.NewController(t)
 
-	expectedFeeState := fee.State{
-		Capacity: 1,
-		Excess:   2,
-	}
-	s.SetFeeState(expectedFeeState)
-	require.NoError(s.Commit())
+	var (
+		owner1 = fx.NewMockOwner(ctrl)
+		owner2 = fx.NewMockOwner(ctrl)
 
-	s = newStateFromDB(require, db)
-	require.NoError(s.load())
-	require.Equal(expectedFeeState, s.GetFeeState())
-}
+		createSubnetTx = &txs.Tx{
+			Unsigned: &txs.CreateSubnetTx{
+				BaseTx: txs.BaseTx{},
+				Owner:  owner1,
+			},
+		}
 
-// Verify that reading from the database returns the same value that was written
-// to it.
-func TestPutAndGetFeeState(t *testing.T) {
-	require := require.New(t)
+		subnetID = createSubnetTx.ID()
+	)
 
-	db := memdb.New()
-	defaultFeeState, err := getFeeState(db)
+	owner, err := state.GetSubnetOwner(subnetID)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(owner)
+
+	state.AddSubnet(createSubnetTx)
+	state.SetSubnetOwner(subnetID, owner1)
+
+	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
-	require.Equal(fee.State{}, defaultFeeState)
+	require.Equal(owner1, owner)
 
-	//nolint:gosec // This does not require a secure random number generator
-	expectedFeeState := fee.State{
-		Capacity: fee.Gas(rand.Uint64()),
-		Excess:   fee.Gas(rand.Uint64()),
-	}
-	require.NoError(putFeeState(db, expectedFeeState))
-
-	actualFeeState, err := getFeeState(db)
+	state.SetSubnetOwner(subnetID, owner2)
+	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
-	require.Equal(expectedFeeState, actualFeeState)
-}
-
-func TestGetFeeStateErrors(t *testing.T) {
-	tests := []struct {
-		value       []byte
-		expectedErr error
-	}{
-		{
-			value: []byte{
-				// truncated codec version
-				0x00,
-			},
-			expectedErr: codec.ErrCantUnpackVersion,
-		},
-		{
-			value: []byte{
-				// codec version
-				0x00, 0x00,
-				// truncated capacity
-				0x12, 0x34, 0x56, 0x78,
-			},
-			expectedErr: wrappers.ErrInsufficientLength,
-		},
-		{
-			value: []byte{
-				// codec version
-				0x00, 0x00,
-				// capacity
-				0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78,
-				// excess
-				0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78,
-				// extra bytes
-				0x00,
-			},
-			expectedErr: codec.ErrExtraSpace,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.expectedErr.Error(), func(t *testing.T) {
-			var (
-				require = require.New(t)
-				db      = memdb.New()
-			)
-			require.NoError(db.Put(FeeStateKey, test.value))
-
-			actualState, err := getFeeState(db)
-			require.Equal(fee.State{}, actualState)
-			require.ErrorIs(err, test.expectedErr)
-		})
-	}
+	require.Equal(owner2, owner)
 }

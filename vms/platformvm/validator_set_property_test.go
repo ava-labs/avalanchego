@@ -15,6 +15,7 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
+
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -25,18 +26,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -44,22 +45,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
 	startPrimaryWithBLS uint8 = iota
+	startPrimaryWithoutBLS
 	startSubnetValidator
-
-	failedValidatorSnapshotString = "could not take validators snapshot: "
-	failedBuildingEventSeqString  = "failed building events sequence: "
 )
 
 var errEmptyEventsList = errors.New("empty events list")
@@ -80,7 +76,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 		func(events []uint8) string {
 			vm, subnetID, err := buildVM(t)
 			if err != nil {
-				return "failed building vm: " + err.Error()
+				return fmt.Sprintf("failed building vm: %s", err.Error())
 			}
 			vm.ctx.Lock.Lock()
 			defer func() {
@@ -97,12 +93,12 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			// random events sequence received as test input
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return "failed building events sequence: " + err.Error()
+				return fmt.Sprintf("failed building events sequence: %s", err.Error())
 			}
 
 			validatorSetByHeightAndSubnet := make(map[uint64]map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
 			if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-				return failedValidatorSnapshotString + err.Error()
+				return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 			}
 
 			// insert validator sequence
@@ -115,12 +111,12 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				if currentSubnetValidator != nil {
 					err := terminateSubnetValidator(vm, currentSubnetValidator)
 					if err != nil {
-						return "could not terminate current subnet validator: " + err.Error()
+						return fmt.Sprintf("could not terminate current subnet validator: %s", err.Error())
 					}
 					currentSubnetValidator = nil
 
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return failedValidatorSnapshotString + err.Error()
+						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 				}
 
@@ -128,10 +124,33 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				case startSubnetValidator:
 					currentSubnetValidator, err = addSubnetValidator(vm, ev, subnetID)
 					if err != nil {
-						return "could not add subnet validator: " + err.Error()
+						return fmt.Sprintf("could not add subnet validator: %s", err.Error())
 					}
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return failedValidatorSnapshotString + err.Error()
+						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+					}
+
+				case startPrimaryWithoutBLS:
+					// when adding a primary validator, also remove the current
+					// primary one
+					if currentPrimaryValidator != nil {
+						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
+						if err != nil {
+							return fmt.Sprintf("could not terminate current primary validator: %s", err.Error())
+						}
+						// no need to nil current primary validator, we'll
+						// reassign immediately
+
+						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
+							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
+						}
+					}
+					currentPrimaryValidator, err = addPrimaryValidatorWithoutBLSKey(vm, ev)
+					if err != nil {
+						return fmt.Sprintf("could not add primary validator without BLS key: %s", err.Error())
+					}
+					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
+						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
 				case startPrimaryWithBLS:
@@ -140,21 +159,21 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					if currentPrimaryValidator != nil {
 						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
 						if err != nil {
-							return "could not terminate current primary validator: " + err.Error()
+							return fmt.Sprintf("could not terminate current primary validator: %s", err.Error())
 						}
 						// no need to nil current primary validator, we'll
 						// reassign immediately
 
 						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-							return failedValidatorSnapshotString + err.Error()
+							return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 						}
 					}
 					currentPrimaryValidator, err = addPrimaryValidatorWithBLSKey(vm, ev)
 					if err != nil {
-						return "could not add primary validator with BLS key: " + err.Error()
+						return fmt.Sprintf("could not add primary validator with BLS key: %s", err.Error())
 					}
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
-						return failedValidatorSnapshotString + err.Error()
+						return fmt.Sprintf("could not take validators snapshot: %s", err.Error())
 					}
 
 				default:
@@ -198,11 +217,12 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			10,
 			gen.OneConstOf(
 				startPrimaryWithBLS,
+				startPrimaryWithoutBLS,
 				startSubnetValidator,
 			),
 		).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && list[0] == startPrimaryWithBLS
+			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	))
 
@@ -259,82 +279,108 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 }
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(keys[0], keys[1])
-	utx, err := builder.NewAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: data.nodeID,
-				Start:  uint64(data.startTime.Unix()),
-				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.Config.MinValidatorStake,
-			},
-			Subnet: subnetID,
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-		}),
+	addr := keys[0].PublicKey().Address()
+	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		vm.Config.MinValidatorStake,
+		uint64(data.startTime.Unix()),
+		uint64(data.endTime.Unix()),
+		data.nodeID,
+		subnetID,
+		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		addr,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not build AddSubnetValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not create AddSubnetValidatorTx: %w", err)
 	}
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign AddSubnetValidatorTx: %w", err)
-	}
-	return internalAddValidator(vm, tx)
+	return internalAddValidator(vm, signedTx)
 }
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
-
-	sk, err := bls.NewSecretKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
-	}
-
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, txSigner := factory.NewWallet(keys[0], keys[1])
-	utx, err := builder.NewAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: data.nodeID,
-				Start:  uint64(data.startTime.Unix()),
-				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.Config.MinValidatorStake,
-			},
-			Subnet: constants.PrimaryNetworkID,
-		},
-		signer.NewProofOfPossession(sk),
-		vm.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}),
+	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
+		vm.state,
+		keys,
+		vm.MinValidatorStake,
+		vm.Config.AddPrimaryNetworkValidatorFee,
+		addr, // change Addresss
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not build AddPermissionlessValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not create inputs/outputs for permissionless validator: %w", err)
 	}
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+	sk, err := bls.NewSecretKey()
 	if err != nil {
-		return nil, fmt.Errorf("could not sign AddPermissionlessValidatorTx: %w", err)
+		return nil, fmt.Errorf("could not create secret key: %w", err)
 	}
-	return internalAddValidator(vm, tx)
+
+	shortNodeID, err := ids.ShortNodeIDFromNodeID(data.nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create shortNodeID from nodeID: %w", err)
+	}
+
+	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: shortNodeID,
+			Start:  uint64(data.startTime.Unix()),
+			End:    uint64(data.endTime.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		Subnet:    constants.PrimaryNetworkID,
+		Signer:    signer.NewProofOfPossession(sk),
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+	signedTx, err := txs.NewSigned(uPrimaryTx, txs.Codec, signers)
+	if err != nil {
+		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx with BLS key: %w", err)
+	}
+	if err := signedTx.SyntacticVerify(vm.ctx); err != nil {
+		return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx: %w", err)
+	}
+	return internalAddValidator(vm, signedTx)
+}
+
+func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
+	addr := keys[0].PublicKey().Address()
+	signedTx, err := vm.txBuilder.NewAddValidatorTx(
+		vm.Config.MinValidatorStake,
+		uint64(data.startTime.Unix()),
+		uint64(data.endTime.Unix()),
+		data.nodeID,
+		addr,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		addr,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create AddValidatorTx: %w", err)
+	}
+	return internalAddValidator(vm, signedTx)
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	vm.ctx.Lock.Unlock()
-	err := vm.issueTxFromRPC(signedTx)
+	err := vm.issueTx(context.Background(), signedTx)
 	vm.ctx.Lock.Lock()
 
 	if err != nil {
@@ -451,6 +497,14 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			nodeID:    nodeID,
 			publicKey: bls.PublicFromSecretKey(sk),
 		})
+	case startPrimaryWithoutBLS:
+		res = append(res, &validatorInputData{
+			eventType: startPrimaryWithoutBLS,
+			startTime: currentTime,
+			endTime:   endTime,
+			nodeID:    nodeID,
+			publicKey: nil,
+		})
 	default:
 		return nil, fmt.Errorf("unexpected initial event %d", events[0])
 	}
@@ -492,6 +546,19 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			}
 			res = append(res, val)
 			currentPrimaryVal = val
+
+		case startPrimaryWithoutBLS:
+			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
+			endTime := currentTime.Add(defaultMinStakingDuration)
+			val := &validatorInputData{
+				eventType: startPrimaryWithoutBLS,
+				startTime: currentTime,
+				endTime:   endTime,
+				nodeID:    nodeID,
+				publicKey: nil,
+			}
+			res = append(res, val)
+			currentPrimaryVal = val
 		}
 	}
 	return res, nil
@@ -506,7 +573,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return failedBuildingEventSeqString + err.Error()
+				return fmt.Sprintf("failed building events sequence: %s", err.Error())
 			}
 
 			if len(validatorsTimes) == 0 {
@@ -544,10 +611,11 @@ func TestTimestampListGenerator(t *testing.T) {
 		},
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
+			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && list[0] == startPrimaryWithBLS
+			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	))
 
@@ -557,7 +625,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return failedBuildingEventSeqString + err.Error()
+				return fmt.Sprintf("failed building events sequence: %s", err.Error())
 			}
 
 			if len(validatorsTimes) == 0 {
@@ -595,10 +663,11 @@ func TestTimestampListGenerator(t *testing.T) {
 		},
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
+			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && list[0] == startPrimaryWithBLS
+			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	))
 
@@ -608,7 +677,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
-				return failedBuildingEventSeqString + err.Error()
+				return fmt.Sprintf("failed building events sequence: %s", err.Error())
 			}
 
 			if len(validatorsTimes) == 0 {
@@ -632,10 +701,11 @@ func TestTimestampListGenerator(t *testing.T) {
 		},
 		gen.SliceOf(gen.OneConstOf(
 			startPrimaryWithBLS,
+			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
 			list := v.([]uint8)
-			return len(list) > 0 && list[0] == startPrimaryWithBLS
+			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	))
 
@@ -651,25 +721,20 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			TransformSubnetTxFee:  100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
-		MinValidatorStake: defaultMinValidatorStake,
-		MaxValidatorStake: defaultMaxValidatorStake,
-		MinDelegatorStake: defaultMinDelegatorStake,
-		MinStakeDuration:  defaultMinStakingDuration,
-		MaxStakeDuration:  defaultMaxStakingDuration,
-		RewardConfig:      defaultRewardConfig,
-		UpgradeConfig: upgrade.Config{
-			ApricotPhase3Time: forkTime,
-			ApricotPhase5Time: forkTime,
-			BanffTime:         forkTime,
-			CortinaTime:       forkTime,
-			EtnaTime:          mockable.MaxTime,
-		},
+		TxFee:                  defaultTxFee,
+		CreateSubnetTxFee:      100 * defaultTxFee,
+		TransformSubnetTxFee:   100 * defaultTxFee,
+		CreateBlockchainTxFee:  100 * defaultTxFee,
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		ApricotPhase3Time:      forkTime,
+		ApricotPhase5Time:      forkTime,
+		BanffTime:              forkTime,
+		CortinaTime:            forkTime,
 	}}
 	vm.clock.Set(forkTime.Add(time.Second))
 
@@ -685,9 +750,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	appSender := &enginetest.Sender{}
+	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, common.SendConfig, []byte) error {
+	appSender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
 
@@ -719,27 +784,17 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(keys[len(keys)-1])
-	utx, err := builder.NewCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-		}),
+	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
+		1, // threshold
+		[]ids.ShortID{keys[0].PublicKey().Address()},
+		[]*secp256k1.PrivateKey{keys[len(keys)-1]}, // pays tx fee
+		keys[0].PublicKey().Address(),              // change addr
 	)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
-	if err != nil {
-		return nil, ids.Empty, err
-	}
 	vm.ctx.Lock.Unlock()
-	err = vm.issueTxFromRPC(testSubnet1)
+	err = vm.issueTx(context.Background(), testSubnet1)
 	vm.ctx.Lock.Lock()
 	if err != nil {
 		return nil, ids.Empty, err

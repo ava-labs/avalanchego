@@ -18,7 +18,7 @@ import (
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
+	nodeID := ids.BuildTestShortNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -62,7 +62,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 
 func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
+	nodeID := ids.BuildTestShortNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -106,7 +106,7 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1, 2, 3})
+	nodeID := ids.BuildTestShortNodeID([]byte{1, 2, 3})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -151,7 +151,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	require := require.New(t)
-	nodeID := ids.BuildTestNodeID([]byte{1})
+	nodeID := ids.BuildTestShortNodeID([]byte{1})
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
@@ -242,9 +242,9 @@ func TestUTXOCompare(t *testing.T) {
 		smallerAddr = ids.ShortID{}
 		largerAddr  = ids.ShortID{1}
 	)
-	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr[:])
+	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr.Bytes())
 	require.NoError(t, err)
-	largerAddrStr, err := address.FormatBech32("avax", largerAddr[:])
+	largerAddrStr, err := address.FormatBech32("avax", largerAddr.Bytes())
 	require.NoError(t, err)
 
 	type test struct {

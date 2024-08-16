@@ -31,7 +31,7 @@ type AddSubnetValidatorTx struct {
 }
 
 func (tx *AddSubnetValidatorTx) NodeID() ids.NodeID {
-	return tx.SubnetValidator.NodeID
+	return ids.NodeIDFromShortNodeID(tx.SubnetValidator.NodeID)
 }
 
 func (*AddSubnetValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {

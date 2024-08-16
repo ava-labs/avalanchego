@@ -53,7 +53,7 @@ func (tx *AddPermissionlessDelegatorTx) SubnetID() ids.ID {
 }
 
 func (tx *AddPermissionlessDelegatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+	return ids.NodeIDFromShortNodeID(tx.Validator.NodeID)
 }
 
 func (*AddPermissionlessDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
@@ -110,7 +110,7 @@ func (tx *AddPermissionlessDelegatorTx) SyntacticVerify(ctx *snow.Context) error
 	stakedAssetID := firstStakeOutput.AssetID()
 	totalStakeWeight := firstStakeOutput.Output().Amount()
 	for _, out := range tx.StakeOuts[1:] {
-		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}
