@@ -934,6 +934,7 @@ func (m *manager) createAvalancheChain(
 		ConnectedValidators: connectedValidators,
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
+		BlockTraversal:      topological,
 	}
 	var snowmanEngine common.Engine
 	snowmanEngine, err = smeng.New(snowmanEngineConfig)
@@ -1319,6 +1320,7 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
+		BlockTraversal:      topological,
 		Ctx:                 ctx,
 		AllGetsServer:       snowGetHandler,
 		VM:                  vm,

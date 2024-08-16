@@ -93,3 +93,7 @@ type ConsensusContext struct {
 	// True iff this chain is currently state-syncing
 	StateSyncing utils.Atomic[bool]
 }
+
+type BlockTraversal interface {
+	GetParent(id ids.ID) ids.ID
+}
