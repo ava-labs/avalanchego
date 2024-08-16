@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -52,7 +53,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, apricotPhase3)
+			env := newEnvironment(t, upgradetest.ApricotPhase3)
 			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
