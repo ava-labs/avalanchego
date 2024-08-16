@@ -16,8 +16,9 @@ func GetConfig(fork Fork) upgrade.Config {
 	return GetConfigWithUpgradeTime(fork, upgrade.InitiallyActiveTime)
 }
 
-// GetConfig returns an upgrade config with the provided fork scheduled to be
-// activated at the provided upgradeTime and all other forks to be unscheduled.
+// GetConfigWithUpgradeTime returns an upgrade config with the provided fork
+// scheduled to be activated at the provided upgradeTime and all other forks to
+// be unscheduled.
 func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 	c := upgrade.Config{
 		ApricotPhase4MinPChainHeight: 0,
