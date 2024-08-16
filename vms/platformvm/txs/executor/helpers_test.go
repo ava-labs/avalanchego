@@ -271,7 +271,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 		f,
 		defaultValidateStartTime.Add(-2*time.Second),
 	)
-	upgradetest.SetConfigTimesTo(
+	upgradetest.SetTimesTo(
 		&upgrades,
 		min(f, upgradetest.ApricotPhase5),
 		defaultValidateEndTime,

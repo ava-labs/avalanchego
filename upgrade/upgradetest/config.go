@@ -24,15 +24,15 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 		CortinaXChainStopVertexID:    ids.Empty,
 	}
 	// Initialize all forks to be unscheduled
-	SetConfigTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
+	SetTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
 	// Schedule the requested forks at the provided upgrade time
-	SetConfigTimesTo(&c, fork, upgradeTime)
+	SetTimesTo(&c, fork, upgradeTime)
 	return c
 }
 
-// SetConfigTimesTo sets the upgrade time of the provided fork, and all prior
-// forks, to the provided upgradeTime.
-func SetConfigTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
+// SetTimesTo sets the upgrade time of the provided fork, and all prior forks,
+// to the provided upgradeTime.
+func SetTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
 	case Etna:
 		c.EtnaTime = upgradeTime

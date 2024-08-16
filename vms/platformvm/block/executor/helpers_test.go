@@ -326,7 +326,7 @@ func defaultState(
 func defaultConfig(f upgradetest.Fork) *config.Config {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(f, time.Time{})
 	// This package neglects fork ordering
-	upgradetest.SetConfigTimesTo(
+	upgradetest.SetTimesTo(
 		&upgrades,
 		min(f, upgradetest.ApricotPhase5),
 		defaultValidateEndTime,
