@@ -6,7 +6,6 @@ package upgradetest
 import (
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
@@ -20,10 +19,7 @@ func GetConfig(fork Fork) upgrade.Config {
 // scheduled to be activated at the provided upgradeTime and all other forks to
 // be unscheduled.
 func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
-	c := upgrade.Config{
-		ApricotPhase4MinPChainHeight: 0,
-		CortinaXChainStopVertexID:    ids.Empty,
-	}
+	c := upgrade.Config{}
 	// Initialize all forks to be unscheduled
 	SetTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
 	// Schedule the requested forks at the provided upgrade time
