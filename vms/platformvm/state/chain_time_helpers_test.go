@@ -17,9 +17,25 @@ import (
 
 func TestPickFeeCalculator(t *testing.T) {
 	var (
-		createAssetTxFee uint64 = 0
-		dynamicFeeConfig        = feecomponent.Config{}
-		staticFeeConfig         = txfee.StaticConfig{}
+		createAssetTxFee uint64 = 9
+		staticFeeConfig         = txfee.StaticConfig{
+			TxFee:                         1,
+			CreateSubnetTxFee:             2,
+			TransformSubnetTxFee:          3,
+			CreateBlockchainTxFee:         4,
+			AddPrimaryNetworkValidatorFee: 5,
+			AddPrimaryNetworkDelegatorFee: 6,
+			AddSubnetValidatorFee:         7,
+			AddSubnetDelegatorFee:         8,
+		}
+		dynamicFeeConfig = feecomponent.Config{
+			Weights:                  feecomponent.Dimensions{1},
+			MaxGasCapacity:           2,
+			MaxGasPerSecond:          3,
+			TargetGasPerSecond:       4,
+			MinGasPrice:              5,
+			ExcessConversionConstant: 6,
+		}
 	)
 
 	apricotPhase2StaticFeeConfig := staticFeeConfig
@@ -27,27 +43,27 @@ func TestPickFeeCalculator(t *testing.T) {
 	apricotPhase2StaticFeeConfig.CreateBlockchainTxFee = createAssetTxFee
 
 	tests := []struct {
-		name     string
 		fork     upgradetest.Fork
 		expected txfee.Calculator
 	}{
 		{
-			name:     "apricot phase 2",
 			fork:     upgradetest.ApricotPhase2,
 			expected: txfee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
 		},
 		{
-			name:     "apricot phase 3",
 			fork:     upgradetest.ApricotPhase3,
 			expected: txfee.NewStaticCalculator(staticFeeConfig),
 		},
-		// {
-		// 	name: "etna",
-		// 	fork: upgradetest.Etna,
-		// },
+		{
+			fork: upgradetest.Etna,
+			expected: txfee.NewDynamicCalculator(
+				dynamicFeeConfig.Weights,
+				dynamicFeeConfig.MinGasPrice,
+			),
+		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.fork.String(), func(t *testing.T) {
 			require := require.New(t)
 
 			var (

@@ -1589,7 +1589,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Unix(0, 0)),
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1758,7 +1758,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Unix(0, 0)),
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2199,7 +2199,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Unix(0, 0)),
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,

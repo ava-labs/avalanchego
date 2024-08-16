@@ -25,41 +25,34 @@ const (
 type Fork int
 
 func (f Fork) String() string {
-	switch fork {
+	switch f {
 	case Etna:
-		c.EtnaTime = upgradeTime
-		fallthrough
+		return "Etna"
 	case Durango:
-		c.DurangoTime = upgradeTime
-		fallthrough
+		return "Durango"
 	case Cortina:
-		c.CortinaTime = upgradeTime
-		fallthrough
+		return "Cortina"
 	case Banff:
-		c.BanffTime = upgradeTime
-		fallthrough
+		return "Banff"
 	case ApricotPhasePost6:
-		c.ApricotPhasePost6Time = upgradeTime
-		fallthrough
+		return "ApricotPhasePost6"
 	case ApricotPhase6:
-		c.ApricotPhase6Time = upgradeTime
-		fallthrough
+		return "ApricotPhase6"
 	case ApricotPhasePre6:
-		c.ApricotPhasePre6Time = upgradeTime
-		fallthrough
+		return "ApricotPhasePre6"
 	case ApricotPhase5:
-		c.ApricotPhase5Time = upgradeTime
-		fallthrough
+		return "ApricotPhase5"
 	case ApricotPhase4:
-		c.ApricotPhase4Time = upgradeTime
-		fallthrough
+		return "ApricotPhase4"
 	case ApricotPhase3:
-		c.ApricotPhase3Time = upgradeTime
-		fallthrough
+		return "ApricotPhase3"
 	case ApricotPhase2:
-		c.ApricotPhase2Time = upgradeTime
-		fallthrough
+		return "ApricotPhase2"
 	case ApricotPhase1:
-		c.ApricotPhase1Time = upgradeTime
+		return "ApricotPhase1"
+	case NoUpgrades:
+		return "NoUpgrades"
+	default:
+		return "Unknown"
 	}
 }
