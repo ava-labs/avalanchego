@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/coreth/core"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -56,17 +55,6 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			genesis, err := network.DefaultGenesis()
 			require.NoError(err)
 			network.Genesis = genesis
-			// Etna enables Cancun which modifies the outcome of the C-Chain genesis
-			// This is because of new header fields that modify the genesis block hash.
-			// This code can be removed once the Etna upgrade is activated.
-			cChainGenesis := new(core.Genesis)
-			cChainGenesisStr := network.Genesis.CChainGenesis
-			require.NoError(json.Unmarshal([]byte(cChainGenesisStr), cChainGenesis))
-			unscheduledActivationTime := uint64(upgrade.UnscheduledActivationTime.Unix())
-			cChainGenesis.Config.EtnaTimestamp = &unscheduledActivationTime
-			cChainGenesisBytes, err := json.Marshal(cChainGenesis)
-			require.NoError(err)
-			network.Genesis.CChainGenesis = string(cChainGenesisBytes)
 		}
 
 		// Previous version does not have unactivated upgrades.
