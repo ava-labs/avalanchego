@@ -110,10 +110,11 @@ func New(config Config) (*Engine, error) {
 	acceptedFrontiers := tracker.NewAccepted()
 	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
-	factory, err := poll.NewEarlyTermNoTraversalFactory(
+	factory, err := poll.NewEarlyTermTraversalFactory(
 		config.Params.AlphaPreference,
 		config.Params.AlphaConfidence,
 		config.Ctx.Registerer,
+		config.BlockTraversal,
 	)
 	if err != nil {
 		return nil, err
