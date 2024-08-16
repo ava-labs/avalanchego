@@ -10,20 +10,28 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
+// GetConfig returns an upgrade config with the provided fork scheduled to have
+// been initially activated and all other forks to be unscheduled.
 func GetConfig(fork Fork) upgrade.Config {
 	return GetConfigWithUpgradeTime(fork, upgrade.InitiallyActiveTime)
 }
 
+// GetConfig returns an upgrade config with the provided fork scheduled to be
+// activated at the provided upgradeTime and all other forks to be unscheduled.
 func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 	c := upgrade.Config{
 		ApricotPhase4MinPChainHeight: 0,
 		CortinaXChainStopVertexID:    ids.Empty,
 	}
+	// Initialize all forks to be unscheduled
 	SetConfigTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
+	// Schedule the requested forks at the provided upgrade time
 	SetConfigTimesTo(&c, fork, upgradeTime)
 	return c
 }
 
+// SetConfigTimesTo sets the upgrade time of the provided fork, and all prior
+// forks, to the provided upgradeTime.
 func SetConfigTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
 	case Etna:
