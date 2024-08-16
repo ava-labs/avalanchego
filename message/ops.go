@@ -22,8 +22,8 @@ const (
 	PingOp Op = iota
 	PongOp
 	HandshakeOp
-	GetPeerListOp
-	PeerListOp
+	GetPeersOp
+	PeersOp
 	// State sync:
 	GetStateSummaryFrontierOp
 	GetStateSummaryFrontierFailedOp
@@ -68,8 +68,8 @@ var (
 		PingOp,
 		PongOp,
 		HandshakeOp,
-		GetPeerListOp,
-		PeerListOp,
+		GetPeersOp,
+		PeersOp,
 	}
 
 	// List of all consensus request message types
@@ -198,10 +198,10 @@ func (op Op) String() string {
 		return "pong"
 	case HandshakeOp:
 		return "handshake"
-	case GetPeerListOp:
-		return "get_peerlist"
-	case PeerListOp:
-		return "peerlist"
+	case GetPeersOp:
+		return "get_peers"
+	case PeersOp:
+		return "peers"
 	// State sync
 	case GetStateSummaryFrontierOp:
 		return "get_state_summary_frontier"
@@ -285,10 +285,10 @@ func Unwrap(m *p2p.Message) (fmt.Stringer, error) {
 		return msg.Pong, nil
 	case *p2p.Message_Handshake:
 		return msg.Handshake, nil
-	case *p2p.Message_GetPeerList:
-		return msg.GetPeerList, nil
-	case *p2p.Message_PeerList_:
-		return msg.PeerList_, nil
+	case *p2p.Message_GetPeers:
+		return msg.GetPeers, nil
+	case *p2p.Message_Peers_:
+		return msg.Peers_, nil
 	// State sync:
 	case *p2p.Message_GetStateSummaryFrontier:
 		return msg.GetStateSummaryFrontier, nil
@@ -344,10 +344,10 @@ func ToOp(m *p2p.Message) (Op, error) {
 		return PongOp, nil
 	case *p2p.Message_Handshake:
 		return HandshakeOp, nil
-	case *p2p.Message_GetPeerList:
-		return GetPeerListOp, nil
-	case *p2p.Message_PeerList_:
-		return PeerListOp, nil
+	case *p2p.Message_GetPeers:
+		return GetPeersOp, nil
+	case *p2p.Message_Peers_:
+		return PeersOp, nil
 	case *p2p.Message_GetStateSummaryFrontier:
 		return GetStateSummaryFrontierOp, nil
 	case *p2p.Message_StateSummaryFrontier_:

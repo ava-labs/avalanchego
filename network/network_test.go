@@ -49,10 +49,10 @@ var (
 		MaxSendFailRate:              .1,
 		SendFailRateHalflife:         time.Second,
 	}
-	defaultPeerListGossipConfig = PeerListGossipConfig{
-		PeerListNumValidatorIPs: 100,
-		PeerListPullGossipFreq:  time.Second,
-		PeerListBloomResetFreq:  constants.DefaultNetworkPeerListBloomResetFreq,
+	defaultPeerGossipConfig = PeerGossipConfig{
+		PeersNumValidatorIPs: 100,
+		PeersPullGossipFreq:  time.Second,
+		PeersBloomResetFreq:  constants.DefaultNetworkPeersBloomResetFreq,
 	}
 	defaultTimeoutConfig = TimeoutConfig{
 		PingPongTimeout:      30 * time.Second,
@@ -98,11 +98,11 @@ var (
 	}
 
 	defaultConfig = Config{
-		HealthConfig:         defaultHealthConfig,
-		PeerListGossipConfig: defaultPeerListGossipConfig,
-		TimeoutConfig:        defaultTimeoutConfig,
-		DelayConfig:          defaultDelayConfig,
-		ThrottlerConfig:      defaultThrottlerConfig,
+		HealthConfig:     defaultHealthConfig,
+		PeerGossipConfig: defaultPeerGossipConfig,
+		TimeoutConfig:    defaultTimeoutConfig,
+		DelayConfig:      defaultDelayConfig,
+		ThrottlerConfig:  defaultThrottlerConfig,
 
 		DialerConfig: defaultDialerConfig,
 

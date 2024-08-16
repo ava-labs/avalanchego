@@ -21,13 +21,13 @@ const (
 
 	MaxContainersLen = int(4 * DefaultMaxMessageSize / 5)
 
-	DefaultNetworkPeerListNumValidatorIPs        = 15
-	DefaultNetworkPeerListValidatorGossipSize    = 20
-	DefaultNetworkPeerListNonValidatorGossipSize = 0
-	DefaultNetworkPeerListPeersGossipSize        = 10
-	DefaultNetworkPeerListGossipFreq             = time.Minute
-	DefaultNetworkPeerListPullGossipFreq         = 2 * time.Second
-	DefaultNetworkPeerListBloomResetFreq         = time.Minute
+	DefaultNetworkPeersNumValidatorIPs        = 15
+	DefaultNetworkPeersValidatorGossipSize    = 20
+	DefaultNetworkPeersNonValidatorGossipSize = 0
+	DefaultNetworkPeersPeersGossipSize        = 10
+	DefaultNetworkPeersGossipFreq             = time.Minute
+	DefaultNetworkPeersPullGossipFreq         = 2 * time.Second
+	DefaultNetworkPeersBloomResetFreq         = time.Minute
 
 	// Inbound Connection Throttling
 	DefaultInboundConnUpgradeThrottlerCooldown = 10 * time.Second
