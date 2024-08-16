@@ -21,4 +21,5 @@ const (
 	Latest = Etna
 )
 
+// Fork is an enum of all the major network upgrades.
 type Fork int
