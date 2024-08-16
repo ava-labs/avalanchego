@@ -16,22 +16,15 @@ func GetConfig(fork Fork) upgrade.Config {
 
 func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 	c := upgrade.Config{
-		ApricotPhase1Time:            upgrade.UnscheduledActivationTime,
-		ApricotPhase2Time:            upgrade.UnscheduledActivationTime,
-		ApricotPhase3Time:            upgrade.UnscheduledActivationTime,
-		ApricotPhase4Time:            upgrade.UnscheduledActivationTime,
 		ApricotPhase4MinPChainHeight: 0,
-		ApricotPhase5Time:            upgrade.UnscheduledActivationTime,
-		ApricotPhasePre6Time:         upgrade.UnscheduledActivationTime,
-		ApricotPhase6Time:            upgrade.UnscheduledActivationTime,
-		ApricotPhasePost6Time:        upgrade.UnscheduledActivationTime,
-		BanffTime:                    upgrade.UnscheduledActivationTime,
-		CortinaTime:                  upgrade.UnscheduledActivationTime,
 		CortinaXChainStopVertexID:    ids.Empty,
-		DurangoTime:                  upgrade.UnscheduledActivationTime,
-		EtnaTime:                     upgrade.UnscheduledActivationTime,
 	}
+	SetConfigTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
+	SetConfigTimesTo(&c, fork, upgradeTime)
+	return c
+}
 
+func SetConfigTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
 	case Etna:
 		c.EtnaTime = upgradeTime
@@ -69,5 +62,4 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 	case ApricotPhase1:
 		c.ApricotPhase1Time = upgradeTime
 	}
-	return c
 }
