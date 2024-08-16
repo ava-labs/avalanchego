@@ -61,8 +61,26 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
 		}
 
+		// Save the plugin dir for use with compose configuration and remove it from flags so pluginDir can
+		// be used for the db-initialization bootstrap.
+		//
+		// TODO(marun) Separate bootstrap configuration from runtime configuration to avoid having to do this
+		pluginDirForCompose, err := network.GetPluginDir()
+		if err != nil {
+			return fmt.Errorf("failed to get plugin dir: %w", err)
+		}
+		delete(network.DefaultFlags, config.PluginDirKey)
+
 		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
 			return fmt.Errorf("failed to initialize db volumes: %w", err)
+		}
+
+		if len(pluginDirForCompose) > 0 {
+			// Restore the plugin dir
+			network.DefaultFlags[config.PluginDirKey] = pluginDirForCompose
+		} else {
+			// Ensure the plugin dir is not provided so that the default is used
+			delete(network.DefaultFlags, config.PluginDirKey)
 		}
 	}
 
@@ -158,6 +176,15 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
+		}
+
+		// Set a non-default plugin dir if provided
+		pluginDir, err := network.GetPluginDir()
+		if err != nil {
+			return nil, err
+		}
+		if len(pluginDir) > 0 {
+			env[config.PluginDirKey] = pluginDir
 		}
 
 		// Apply configuration appropriate to a test network
