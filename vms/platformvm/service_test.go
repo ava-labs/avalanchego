@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -1106,4 +1107,69 @@ func TestServiceGetSubnets(t *testing.T) {
 			Threshold:   0,
 		},
 	}, response.Subnets)
+}
+
+func TestGetFeeConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		etnaTime time.Time
+		expected fee.Config
+	}{
+		{
+			name:     "pre-etna",
+			etnaTime: time.Now().Add(time.Hour),
+			expected: fee.Config{},
+		},
+		{
+			name:     "post-etna",
+			etnaTime: time.Now().Add(-time.Hour),
+			expected: defaultDynamicFeeConfig,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			service, _, _ := defaultService(t)
+			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
+
+			var reply fee.Config
+			require.NoError(service.GetFeeConfig(nil, nil, &reply))
+			require.Equal(test.expected, reply)
+		})
+	}
+}
+
+func FuzzGetFeeState(f *testing.F) {
+	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
+		require := require.New(t)
+
+		service, _, _ := defaultService(t)
+
+		var (
+			expectedState = fee.State{
+				Capacity: fee.Gas(capacity),
+				Excess:   fee.Gas(excess),
+			}
+			expectedTime  = time.Now()
+			expectedReply = GetFeeStateReply{
+				State: expectedState,
+				Price: fee.CalculateGasPrice(
+					defaultDynamicFeeConfig.MinGasPrice,
+					expectedState.Excess,
+					defaultDynamicFeeConfig.ExcessConversionConstant,
+				),
+				Time: expectedTime,
+			}
+		)
+
+		service.vm.ctx.Lock.Lock()
+		service.vm.state.SetFeeState(expectedState)
+		service.vm.state.SetTimestamp(expectedTime)
+		service.vm.ctx.Lock.Unlock()
+
+		var reply GetFeeStateReply
+		require.NoError(service.GetFeeState(nil, nil, &reply))
+		require.Equal(expectedReply, reply)
+	})
 }

@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"gopkg.in/yaml.v3"
@@ -129,7 +128,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	baseNetworkAddress := "10.0.20"
 
 	services := make(types.Services, len(network.Nodes)+1)
-	uris := make([]string, len(network.Nodes))
+	uris := make(CSV, len(network.Nodes))
 	var (
 		bootstrapIP  string
 		bootstrapIDs string
@@ -230,16 +229,16 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	}
 
 	workloadEnv := types.Mapping{
-		envVarName(URIsKey): strings.Join(uris, " "),
+		envVarName(EnvPrefix, URIsKey): uris.String(),
 	}
-	chainIDs := []string{}
+	chainIDs := CSV{}
 	for _, subnet := range network.Subnets {
 		for _, chain := range subnet.Chains {
 			chainIDs = append(chainIDs, chain.ChainID.String())
 		}
 	}
 	if len(chainIDs) > 0 {
-		workloadEnv[envVarName(ChainIDsKey)] = strings.Join(chainIDs, " ")
+		workloadEnv[envVarName(EnvPrefix, ChainIDsKey)] = chainIDs.String()
 	}
 
 	workloadName := "workload"
@@ -277,8 +276,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 	envVarMap := make(types.Mapping, len(keyMap))
 	for key, val := range keyMap {
-		// e.g. network-id -> AVAGO_NETWORK_ID
-		envVar := strings.ToUpper(config.EnvPrefix + "_" + config.DashesToUnderscores.Replace(key))
+		envVar := envVarName(config.EnvPrefix, key)
 		envVarMap[envVar] = val
 	}
 	return envVarMap
