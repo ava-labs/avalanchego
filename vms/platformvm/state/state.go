@@ -458,38 +458,6 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 ) (State, error) {
-	s, err := newState(
-		db,
-		metrics,
-		cfg,
-		execCfg,
-		ctx,
-		metricsReg,
-		rewards,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.sync(genesisBytes); err != nil {
-		// Drop any errors on close to return the first error
-		_ = s.Close()
-
-		return nil, err
-	}
-
-	return s, nil
-}
-
-func newState(
-	db database.Database,
-	metrics metrics.Metrics,
-	cfg *config.Config,
-	execCfg *config.ExecutionConfig,
-	ctx *snow.Context,
-	metricsReg prometheus.Registerer,
-	rewards reward.Calculator,
-) (*state, error) {
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
 		metricsReg,
@@ -614,7 +582,7 @@ func newState(
 		return nil, err
 	}
 
-	return &state{
+	s := &state{
 		validatorState: newValidatorState(),
 
 		validators: cfg.Validators,
@@ -694,7 +662,16 @@ func newState(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(SingletonPrefix, baseDB),
-	}, nil
+	}
+
+	if err := s.sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = s.Close()
+
+		return nil, err
+	}
+
+	return s, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {

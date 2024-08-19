@@ -37,7 +37,7 @@ func TestDiffMissingState(t *testing.T) {
 func TestNewDiffOn(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -48,7 +48,7 @@ func TestNewDiffOn(t *testing.T) {
 func TestDiffFeeState(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -69,7 +69,7 @@ func TestDiffFeeState(t *testing.T) {
 func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -257,7 +257,7 @@ func TestDiffSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	// Initialize parent with one subnet
 	parentStateCreateSubnetTx := &txs.Tx{
@@ -306,7 +306,7 @@ func TestDiffSubnet(t *testing.T) {
 func TestDiffChain(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 	subnetID := ids.GenerateTestID()
 
 	// Initialize parent with one chain
@@ -403,7 +403,7 @@ func TestDiffTx(t *testing.T) {
 func TestDiffRewardUTXO(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	// Initialize parent with one reward UTXO
 	var (
@@ -532,7 +532,7 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	var (
 		owner1 = fx.NewMockOwner(ctrl)
@@ -590,7 +590,7 @@ func TestDiffSubnetManager(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
@@ -639,7 +639,7 @@ func TestDiffStacking(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedStateFromDB(t, memdb.New())
+	state := newTestState(t, memdb.New())
 
 	var (
 		owner1 = fx.NewMockOwner(ctrl)
