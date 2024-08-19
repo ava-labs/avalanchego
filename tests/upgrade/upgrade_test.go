@@ -60,9 +60,11 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		// Previous version does not have unactivated upgrades.
 		// The default upgrade config usually sets the latest upgrade to be activated
 		// Use unscheduled
+
 		upgradeJSON, err := json.Marshal(upgrade.LatestUnscheduled)
 		require.NoError(err)
 		upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
+		network.DefaultFlags = tmpnet.FlagsMap{}
 		network.DefaultFlags[config.UpgradeFileContentKey] = upgradeBase64
 
 		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
