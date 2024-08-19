@@ -288,5 +288,5 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, ErrIsImmutable)
+	require.ErrorIs(err, errIsImmutable)
 }
