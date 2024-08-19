@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 
@@ -64,8 +65,6 @@ func TestPickFeeCalculator(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.fork.String(), func(t *testing.T) {
-			require := require.New(t)
-
 			var (
 				config = &config.Config{
 					CreateAssetTxFee: createAssetTxFee,
@@ -73,10 +72,10 @@ func TestPickFeeCalculator(t *testing.T) {
 					DynamicFeeConfig: dynamicFeeConfig,
 					UpgradeConfig:    upgradetest.GetConfig(test.fork),
 				}
-				s = newInitializedState(require)
+				s = newTestState(t, memdb.New())
 			)
 			actual := PickFeeCalculator(config, s)
-			require.Equal(test.expected, actual)
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
