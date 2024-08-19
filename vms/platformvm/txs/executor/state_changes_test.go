@@ -26,56 +26,45 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 	durationToAdvance := nextStakerChangeTime.Sub(currentTime)
 	secondsToAdvance := uint64(durationToAdvance / time.Second)
 
+	feeConfig := fee.Config{
+		MaxGasCapacity:     1000,
+		MaxGasPerSecond:    100,
+		TargetGasPerSecond: 50,
+	}
+
 	tests := []struct {
 		name          string
 		fork          upgradetest.Fork
-		config        fee.Config
 		initialState  fee.State
 		expectedState fee.State
 	}{
 		{
-			name: "Pre-Etna",
-			fork: upgradetest.Durango,
-			config: fee.Config{
-				MaxGasCapacity:     1000,
-				MaxGasPerSecond:    100,
-				TargetGasPerSecond: 50,
-			},
+			name:          "Pre-Etna",
+			fork:          upgradetest.Durango,
 			initialState:  fee.State{},
-			expectedState: fee.State{},
+			expectedState: fee.State{}, // Pre-Etna, fee state should not change
 		},
 		{
 			name: "Etna with no usage",
-			fork: upgradetest.Etna,
-			config: fee.Config{
-				MaxGasCapacity:     1000,
-				MaxGasPerSecond:    100,
-				TargetGasPerSecond: 50,
-			},
 			initialState: fee.State{
-				Capacity: 1000,
+				Capacity: feeConfig.MaxGasCapacity,
 				Excess:   0,
 			},
 			expectedState: fee.State{
-				Capacity: 1000,
+				Capacity: feeConfig.MaxGasCapacity,
 				Excess:   0,
 			},
 		},
 		{
 			name: "Etna with usage",
 			fork: upgradetest.Etna,
-			config: fee.Config{
-				MaxGasCapacity:     1000,
-				MaxGasPerSecond:    100,
-				TargetGasPerSecond: 50,
-			},
 			initialState: fee.State{
 				Capacity: 600,
 				Excess:   400,
 			},
 			expectedState: fee.State{
-				Capacity: min(fee.Gas(600).AddPerSecond(100, secondsToAdvance), 1000),
-				Excess:   fee.Gas(400).SubPerSecond(50, secondsToAdvance),
+				Capacity: min(fee.Gas(600).AddPerSecond(feeConfig.MaxGasPerSecond, secondsToAdvance), feeConfig.MaxGasCapacity),
+				Excess:   fee.Gas(400).SubPerSecond(feeConfig.TargetGasPerSecond, secondsToAdvance),
 			},
 		},
 	}
@@ -91,7 +80,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
 					Config: &config.Config{
-						DynamicFeeConfig: test.config,
+						DynamicFeeConfig: feeConfig,
 						UpgradeConfig:    upgradetest.GetConfig(test.fork),
 					},
 				},
