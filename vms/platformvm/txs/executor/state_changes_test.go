@@ -22,15 +22,17 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 	nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
 	require.NoError(t, err)
 
-	currentTime := s.GetTimestamp()
-	durationToAdvance := nextStakerChangeTime.Sub(currentTime)
-	secondsToAdvance := uint64(durationToAdvance / time.Second)
+	var (
+		currentTime       = s.GetTimestamp()
+		durationToAdvance = nextStakerChangeTime.Sub(currentTime)
+		secondsToAdvance  = uint64(durationToAdvance / time.Second)
 
-	feeConfig := fee.Config{
-		MaxGasCapacity:     1000,
-		MaxGasPerSecond:    100,
-		TargetGasPerSecond: 50,
-	}
+		feeConfig = fee.Config{
+			MaxGasCapacity:     1000,
+			MaxGasPerSecond:    100,
+			TargetGasPerSecond: 50,
+		}
+	)
 
 	tests := []struct {
 		name          string
