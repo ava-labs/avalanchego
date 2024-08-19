@@ -29,11 +29,11 @@ var (
 	errPluginDirEnvVarNotSet  = errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
 )
 
-// Creates docker compose configuration for an antithesis test
-// setup. Configuration is via env vars to simplify usage by main entrypoints. If
-// the provided network includes a subnet, the initial DB state for the subnet
-// will be created and written to the target path.
-func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
+// Creates docker compose configuration for an antithesis test setup. Configuration is via env vars to
+// simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
+// the subnet will be created and written to the target path. The runtimePluginDir should be set if the node
+// image used for the test setup uses a path other than the default (~/.avalanchego/plugins).
+func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtimePluginDir string) error {
 	targetPath := os.Getenv("TARGET_PATH")
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
@@ -51,6 +51,7 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 			return errAvalancheGoEvVarNotSet
 		}
 
+		// Plugin dir configured here is only used for initializing the bootstrap db.
 		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
 		if len(pluginDir) == 0 {
 			return errPluginDirEnvVarNotSet
@@ -61,33 +62,15 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
 		}
 
-		// Save the plugin dir for use with compose configuration and remove it from flags so pluginDir can
-		// be used for the db-initialization bootstrap.
-		//
-		// TODO(marun) Separate bootstrap configuration from runtime configuration to avoid having to do this
-		pluginDirForCompose, err := network.GetPluginDir()
-		if err != nil {
-			return fmt.Errorf("failed to get plugin dir: %w", err)
-		}
-		delete(network.DefaultFlags, config.PluginDirKey)
-
 		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
 			return fmt.Errorf("failed to initialize db volumes: %w", err)
-		}
-
-		if len(pluginDirForCompose) > 0 {
-			// Restore the plugin dir
-			network.DefaultFlags[config.PluginDirKey] = pluginDirForCompose
-		} else {
-			// Ensure the plugin dir is not provided so that the default is used
-			delete(network.DefaultFlags, config.PluginDirKey)
 		}
 	}
 
 	nodeImageName := fmt.Sprintf("%s-node:%s", baseImageName, imageTag)
 	workloadImageName := fmt.Sprintf("%s-workload:%s", baseImageName, imageTag)
 
-	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath); err != nil {
+	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath, runtimePluginDir); err != nil {
 		return fmt.Errorf("failed to generate compose config: %w", err)
 	}
 
@@ -101,9 +84,10 @@ func initComposeConfig(
 	nodeImageName string,
 	workloadImageName string,
 	targetPath string,
+	pluginDir string,
 ) error {
 	// Generate a compose project for the specified network
-	project, err := newComposeProject(network, nodeImageName, workloadImageName)
+	project, err := newComposeProject(network, nodeImageName, workloadImageName, pluginDir)
 	if err != nil {
 		return fmt.Errorf("failed to create compose project: %w", err)
 	}
@@ -141,7 +125,7 @@ func initComposeConfig(
 
 // Create a new docker compose project for an antithesis test setup
 // for the provided network configuration.
-func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string) (*types.Project, error) {
+func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string, pluginDir string) (*types.Project, error) {
 	networkName := "avalanche-testnet"
 	baseNetworkAddress := "10.0.20"
 
@@ -179,10 +163,6 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 
 		// Set a non-default plugin dir if provided
-		pluginDir, err := network.GetPluginDir()
-		if err != nil {
-			return nil, err
-		}
 		if len(pluginDir) > 0 {
 			env[config.PluginDirKey] = pluginDir
 		}

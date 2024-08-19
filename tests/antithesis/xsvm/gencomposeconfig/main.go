@@ -20,7 +20,7 @@ func main() {
 	network.Subnets = []*tmpnet.Subnet{
 		subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, network.Nodes...),
 	}
-	if err := antithesis.GenerateComposeConfig(network, baseImageName); err != nil {
+	if err := antithesis.GenerateComposeConfig(network, baseImageName, "" /* runtimePluginDir */); err != nil {
 		log.Fatalf("failed to generate compose config: %v", err)
 	}
 }
