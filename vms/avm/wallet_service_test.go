@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
@@ -20,7 +21,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			env := setup(t, &envConfig{
-				fork:             latest,
+				fork:             upgradetest.Latest,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,

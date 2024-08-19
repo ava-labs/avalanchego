@@ -22,13 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -49,7 +48,7 @@ func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -72,7 +71,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -104,7 +103,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 
@@ -258,7 +257,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 
@@ -299,7 +298,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 
@@ -495,7 +494,7 @@ func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -520,7 +519,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -608,7 +607,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -698,7 +697,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -891,7 +890,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1033,7 +1032,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1214,7 +1213,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1357,7 +1356,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: upgradetest.Durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1544,7 +1543,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1679,7 +1678,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -2010,7 +2009,7 @@ func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2024,7 +2023,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2036,7 +2035,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2288,7 +2287,7 @@ func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2308,7 +2307,7 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2332,6 +2331,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2378,6 +2378,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2466,6 +2467,7 @@ func TestNFTWorkflow(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2584,6 +2586,7 @@ func TestImportExportKey(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username: username,
 			password: password,
@@ -2623,6 +2626,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username: username,
 			password: password,
@@ -2668,6 +2672,7 @@ func TestSend(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username:    username,
 			password:    password,
@@ -2721,9 +2726,7 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					Upgrades: upgrade.Config{
-						EtnaTime: mockable.MaxTime,
-					},
+					Upgrades: upgradetest.GetConfig(upgradetest.Durango),
 				},
 			})
 			service := &Service{vm: env.vm}
@@ -2773,6 +2776,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username: username,
 			password: password,
@@ -2807,6 +2811,7 @@ func TestImport(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,

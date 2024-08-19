@@ -64,7 +64,7 @@ message Message {
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // Uptime percentage on subnets
+  // Deprecated
   repeated SubnetUptime subnet_uptimes = 2;
 }
 
@@ -112,6 +112,9 @@ message Handshake {
   // Signature of the peer IP port pair at a provided timestamp with the BLS
   // key.
   bytes ip_bls_sig = 13;
+  // To avoid sending IPs that the client isn't interested in tracking, the
+  // server expects the client to confirm that it is tracking all subnets.
+  bool all_subnets = 14;
 }
 
 // Metadata about a peer's P2P client used to determine compatibility
@@ -154,6 +157,7 @@ message ClaimedIpPort {
 // filter.
 message GetPeerList {
   BloomFilter known_peers = 1;
+  bool all_subnets = 2;
 }
 
 // PeerList contains network-level metadata for a set of validators.
@@ -193,7 +197,7 @@ message StateSummaryFrontier {
 // GetAcceptedStateSummary requests a set of state summaries at a set of
 // block heights
 message GetAcceptedStateSummary {
-  // Chain bein requested from
+  // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
   uint32 request_id = 2;
