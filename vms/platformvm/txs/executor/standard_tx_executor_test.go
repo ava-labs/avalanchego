@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -2400,7 +2401,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 // Returns a ConvertSubnetTx that passes syntactic verification.
 // Memo field is empty as required post Durango activation
-func newConvertSubnetTx(t *testing.T) (*txs.ConvertSubnetTx, *txs.Tx) {
+func newConvertSubnetTx(t *testing.T, addressSize uint64) (*txs.ConvertSubnetTx, *txs.Tx) {
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -2414,6 +2415,8 @@ func newConvertSubnetTx(t *testing.T) (*txs.ConvertSubnetTx, *txs.Tx) {
 	unsignedTx := &txs.ConvertSubnetTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
+				NetworkID:    constants.UnitTestID,
+				BlockchainID: constants.PlatformChainID,
 				Ins: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
 						TxID: ids.GenerateTestID(),
@@ -2446,7 +2449,7 @@ func newConvertSubnetTx(t *testing.T) (*txs.ConvertSubnetTx, *txs.Tx) {
 		},
 		Subnet:  ids.GenerateTestID(),
 		ChainID: ids.GenerateTestID(),
-		Address: make([]byte, 24),
+		Address: make([]byte, addressSize),
 		SubnetAuth: &secp256k1fx.Credential{
 			Sigs: make([][65]byte, 1),
 		},
@@ -2479,7 +2482,7 @@ func newValidConvertSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) con
 	now := time.Now()
 	mockFx := fx.NewMockFx(ctrl)
 	mockFlowChecker := utxo.NewMockVerifier(ctrl)
-	unsignedTx, tx := newConvertSubnetTx(t)
+	unsignedTx, tx := newConvertSubnetTx(t, 24)
 	mockState := state.NewMockDiff(ctrl)
 	return convertSubnetTxVerifyEnv{
 		latestForkTime: now,
@@ -2496,6 +2499,8 @@ func newValidConvertSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) con
 }
 
 func TestStandardExecutorConvertSubnetTx(t *testing.T) {
+	ctx := snowtest.Context(t, constants.PlatformChainID)
+
 	type test struct {
 		name        string
 		newExecutor func(*gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor)
@@ -2519,7 +2524,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2548,7 +2553,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2577,7 +2582,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2613,7 +2618,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2644,7 +2649,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2676,7 +2681,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2714,7 +2719,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Bootstrapped: &utils.Atomic[bool]{},
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+						Ctx:          ctx,
 					},
 					FeeCalculator: feeCalculator,
 					Tx:            env.tx,
@@ -2736,4 +2741,16 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			require.ErrorIs(t, err, tt.err)
 		})
 	}
+}
+
+func TestConvertSubnetTxLargeAddress(t *testing.T) {
+	require := require.New(t)
+	ctx := snowtest.Context(t, constants.PlatformChainID)
+
+	convertSubnetTx, _ := newConvertSubnetTx(t, 4096)
+	require.NoError(convertSubnetTx.SyntacticVerify(ctx))
+
+	convertSubnetTx, _ = newConvertSubnetTx(t, 4097)
+	err := convertSubnetTx.SyntacticVerify(ctx)
+	require.ErrorIs(err, txs.ErrAddressTooLong)
 }
