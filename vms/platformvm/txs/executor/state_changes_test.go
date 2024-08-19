@@ -18,14 +18,13 @@ import (
 )
 
 func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
-	s := statetest.New(t, memdb.New())
-
 	const (
 		secondsToAdvance  = 3
 		durationToAdvance = secondsToAdvance * time.Second
 	)
 
 	var (
+		s           = statetest.New(t, memdb.New())
 		currentTime = s.GetTimestamp()
 		nextTime    = currentTime.Add(durationToAdvance)
 		feeConfig   = fee.Config{
