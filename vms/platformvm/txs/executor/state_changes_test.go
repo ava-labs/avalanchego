@@ -98,9 +98,8 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 			)
 			require.NoError(err)
 			require.False(validatorsModified)
-
-			feeState := modifiedState.GetFeeState()
-			require.Equal(test.expectedState, feeState)
+			require.Equal(test.expectedState, modifiedState.GetFeeState())
+			require.Equal(nextTime, modifiedState.GetTimestamp())
 		})
 	}
 }
