@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -45,23 +45,16 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	initialTxID             = ids.GenerateTestID()
-	initialNodeID           = ids.GenerateTestNodeID()
-	initialTime             = time.Now().Round(time.Second)
-	initialValidatorEndTime = initialTime.Add(28 * 24 * time.Hour)
-)
-
 func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
-	state := newInitializedState(require)
+	state := newInitializedStateFromDB(t, memdb.New())
 
-	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)
+	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.NoError(err)
 	require.NotNil(staker)
-	require.Equal(initialNodeID, staker.NodeID)
+	require.Equal(genesistest.ValidatorNodeID, staker.NodeID)
 
-	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
+	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
@@ -69,10 +62,10 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.NoError(err)
 	assertIteratorsEqual(t, NewSliceIterator(staker), stakerIterator)
 
-	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, initialNodeID)
+	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
+	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
@@ -657,7 +650,8 @@ func TestPersistStakers(t *testing.T) {
 			t.Run(fmt.Sprintf("%s - subnetID %s", name, subnetID), func(t *testing.T) {
 				require := require.New(t)
 
-				state, db := newUninitializedState(require)
+				db := memdb.New()
+				state := newStateFromDB(t, db)
 
 				// create and store the staker
 				staker := test.storeStaker(require, subnetID, state)
@@ -669,7 +663,7 @@ func TestPersistStakers(t *testing.T) {
 				test.checkDiffs(require, state, staker, 0 /*height*/)
 
 				// rebuild the state
-				rebuiltState := newStateFromDB(require, db)
+				rebuiltState := newStateFromDB(t, db)
 
 				// load relevant quantities
 				require.NoError(rebuiltState.loadCurrentValidators())
@@ -686,89 +680,29 @@ func TestPersistStakers(t *testing.T) {
 	}
 }
 
-func newInitializedState(require *require.Assertions) State {
-	s, _ := newUninitializedState(require)
-	initializeState(require, s)
+func newInitializedStateFromDB(t testing.TB, db database.Database) *state {
+	s := newStateFromDB(t, db)
+	initializeState(t, s)
 	return s
 }
 
-func newUninitializedState(require *require.Assertions) (*state, database.Database) {
-	db := memdb.New()
-	return newStateFromDB(require, db), db
-}
-
-func initializeState(require *require.Assertions, s *state) {
-	initialValidator := &txs.AddValidatorTx{
-		Validator: txs.Validator{
-			NodeID: initialNodeID,
-			Start:  uint64(initialTime.Unix()),
-			End:    uint64(initialValidatorEndTime.Unix()),
-			Wght:   units.Avax,
-		},
-		StakeOuts: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{ID: initialTxID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: units.Avax,
-				},
-			},
-		},
-		RewardsOwner:     &secp256k1fx.OutputOwners{},
-		DelegationShares: reward.PercentDenominator,
-	}
-	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
-	require.NoError(initialValidatorTx.Initialize(txs.Codec))
-
-	initialChain := &txs.CreateChainTx{
-		SubnetID:   constants.PrimaryNetworkID,
-		ChainName:  "x",
-		VMID:       constants.AVMID,
-		SubnetAuth: &secp256k1fx.Input{},
-	}
-	initialChainTx := &txs.Tx{Unsigned: initialChain}
-	require.NoError(initialChainTx.Initialize(txs.Codec))
-
+func initializeState(t testing.TB, s *state) {
 	genesisBlkID := ids.GenerateTestID()
-	genesisState := &genesis.Genesis{
-		UTXOs: []*genesis.UTXO{
-			{
-				UTXO: avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        initialTxID,
-						OutputIndex: 0,
-					},
-					Asset: avax.Asset{ID: initialTxID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: units.Schmeckle,
-					},
-				},
-				Message: nil,
-			},
-		},
-		Validators: []*txs.Tx{
-			initialValidatorTx,
-		},
-		Chains: []*txs.Tx{
-			initialChainTx,
-		},
-		Timestamp:     uint64(initialTime.Unix()),
-		InitialSupply: units.Schmeckle + units.Avax,
-	}
-
 	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
-	require.NoError(err)
-	require.NoError(s.syncGenesis(genesisBlk, genesisState))
+	require.NoError(t, err)
+
+	genesis := genesistest.New(t)
+	require.NoError(t, s.syncGenesis(genesisBlk, genesis))
 }
 
-func newStateFromDB(require *require.Assertions, db database.Database) *state {
-	execCfg, _ := config.GetExecutionConfig(nil)
+func newStateFromDB(t testing.TB, db database.Database) *state {
 	state, err := newState(
 		db,
 		metrics.Noop,
 		&config.Config{
 			Validators: validators.NewManager(),
 		},
-		execCfg,
+		&config.DefaultExecutionConfig,
 		&snow.Context{},
 		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
@@ -778,8 +712,8 @@ func newStateFromDB(require *require.Assertions, db database.Database) *state {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 	)
-	require.NoError(err)
-	require.NotNil(state)
+	require.NoError(t, err)
+	require.NotNil(t, state)
 	return state
 }
 
@@ -1058,7 +992,7 @@ func TestValidatorWeightDiff(t *testing.T) {
 func TestStateAddRemoveValidator(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newInitializedStateFromDB(t, memdb.New())
 
 	var (
 		numNodes  = 3
@@ -1313,7 +1247,7 @@ func TestParsedStateBlock(t *testing.T) {
 func TestReindexBlocks(t *testing.T) {
 	var (
 		require = require.New(t)
-		s       = newInitializedState(require).(*state)
+		s       = newInitializedStateFromDB(t, memdb.New())
 		blks    = makeBlocks(require)
 	)
 
@@ -1354,7 +1288,7 @@ func TestReindexBlocks(t *testing.T) {
 func TestStateSubnetOwner(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newInitializedStateFromDB(t, memdb.New())
 	ctrl := gomock.NewController(t)
 
 	var (
@@ -1417,7 +1351,7 @@ func TestStateSubnetManager(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			initializedState := newInitializedState(require)
+			initializedState := newInitializedStateFromDB(t, memdb.New())
 
 			subnetID := ids.GenerateTestID()
 			chainID, addr, err := initializedState.GetSubnetManager(subnetID)
@@ -1531,8 +1465,8 @@ func makeBlocks(require *require.Assertions) []block.Block {
 func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	require := require.New(t)
 
-	s, db := newUninitializedState(require)
-	initializeState(require, s)
+	db := memdb.New()
+	s := newInitializedStateFromDB(t, db)
 
 	expectedFeeState := fee.State{
 		Capacity: 1,
@@ -1541,7 +1475,7 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	s.SetFeeState(expectedFeeState)
 	require.NoError(s.Commit())
 
-	s = newStateFromDB(require, db)
+	s = newStateFromDB(t, db)
 	require.NoError(s.load())
 	require.Equal(expectedFeeState, s.GetFeeState())
 }
