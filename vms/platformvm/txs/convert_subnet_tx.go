@@ -16,6 +16,7 @@ var (
 	_ UnsignedTx = (*TransferSubnetOwnershipTx)(nil)
 
 	ErrConvertPermissionlessSubnet = errors.New("cannot convert a permissionless subnet")
+	ErrAddressTooLong              = errors.New("address is too long")
 )
 
 type ConvertSubnetTx struct {
@@ -47,6 +48,8 @@ func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.Subnet == constants.PrimaryNetworkID:
 		return ErrConvertPermissionlessSubnet
+	case len(tx.Address) > 4096:
+		return ErrAddressTooLong
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
