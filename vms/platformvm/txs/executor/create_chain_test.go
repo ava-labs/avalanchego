@@ -256,7 +256,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, etna)
+	env := newEnvironment(t, upgradetest.Etna)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
