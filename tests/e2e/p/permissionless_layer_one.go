@@ -11,9 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -22,27 +24,38 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("e2e flow", func() {
-		env := e2e.GetEnv(tc)
-
-		nodeURI := env.GetRandomNodeURI()
-
+	var (
+		env     *e2e.TestEnvironment
+		nodeURI tmpnet.NodeURI
+	)
+	ginkgo.It("skips test if Etna is not activated", func() {
+		env = e2e.GetEnv(tc)
+		nodeURI = env.GetRandomNodeURI()
 		infoClient := info.NewClient(nodeURI.URI)
 
-		tc.By("get upgrade config")
+		tc.By("fetching upgrade config")
 		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
 		require.NoError(err)
 
+		tc.By("verifying Etna is activated")
 		now := time.Now()
 		if !upgrades.IsEtnaActivated(now) {
 			ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
 		}
+	})
 
-		keychain := env.NewKeychain(1)
+	var (
+		subnetID ids.ID
+		pWallet  p.Wallet
+		pClient  platformvm.Client
+		keychain *secp256k1fx.Keychain
+	)
+	ginkgo.It("creates a Permissioned Subnet", func() {
+		keychain = env.NewKeychain(1)
 		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 
-		pWallet := baseWallet.P()
-		pClient := platformvm.NewClient(nodeURI.URI)
+		pWallet = baseWallet.P()
+		pClient = platformvm.NewClient(nodeURI.URI)
 
 		owner := &secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -51,54 +64,54 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			},
 		}
 
-		var subnetID ids.ID
-		tc.By("create a permissioned subnet", func() {
-			subnetTx, err := pWallet.IssueCreateSubnetTx(
-				owner,
-				tc.WithDefaultContext(),
-			)
+		tc.By("issuing a CreateSubnetTx")
+		subnetTx, err := pWallet.IssueCreateSubnetTx(
+			owner,
+			tc.WithDefaultContext(),
+		)
+		require.NoError(err)
 
-			subnetID = subnetTx.ID()
-			require.NoError(err)
-			require.NotEqual(subnetID, constants.PrimaryNetworkID)
+		tc.By("verifying the Subnet was successfully created")
+		subnetID = subnetTx.ID()
+		require.NotEqual(subnetID, constants.PrimaryNetworkID)
 
-			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
+		res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+		require.NoError(err)
 
-			require.Equal(platformvm.GetSubnetClientResponse{
-				IsPermissioned: true,
-				ControlKeys: []ids.ShortID{
-					keychain.Keys[0].Address(),
-				},
-				Threshold: 1,
-			}, res)
-		})
+		require.Equal(platformvm.GetSubnetClientResponse{
+			IsPermissioned: true,
+			ControlKeys: []ids.ShortID{
+				keychain.Keys[0].Address(),
+			},
+			Threshold: 1,
+		}, res)
+	})
 
+	ginkgo.It("converts the Permissioned Subnet to a Permissionless L1", func() {
 		chainID := ids.GenerateTestID()
 		address := []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
-		tc.By("convert subnet to permissionless L1", func() {
-			convertSubnetTx, err := pWallet.IssueConvertSubnetTx(
-				subnetID,
-				chainID,
-				address,
-				tc.WithDefaultContext(),
-			)
-			require.NoError(err)
 
-			require.NoError(platformvm.AwaitTxAccepted(pClient, tc.DefaultContext(), convertSubnetTx.ID(), 100*time.Millisecond))
+		tc.By("issuing a ConvertSubnetTx")
+		_, err := pWallet.IssueConvertSubnetTx(
+			subnetID,
+			chainID,
+			address,
+			tc.WithDefaultContext(),
+		)
+		require.NoError(err)
 
-			res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
+		tc.By("verifying the Subnet is now a Permissionless L1")
+		res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+		require.NoError(err)
 
-			require.Equal(platformvm.GetSubnetClientResponse{
-				IsPermissioned: false,
-				ControlKeys: []ids.ShortID{
-					keychain.Keys[0].Address(),
-				},
-				Threshold:      1,
-				ManagerChainID: chainID,
-				ManagerAddress: address,
-			}, res)
-		})
+		require.Equal(platformvm.GetSubnetClientResponse{
+			IsPermissioned: false,
+			ControlKeys: []ids.ShortID{
+				keychain.Keys[0].Address(),
+			},
+			Threshold:      1,
+			ManagerChainID: chainID,
+			ManagerAddress: address,
+		}, res)
 	})
 })
