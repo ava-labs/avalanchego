@@ -671,10 +671,10 @@ func TestPersistStakers(t *testing.T) {
 				require.NoError(rebuiltState.initValidatorSets())
 
 				// check again that all relevant data are still available in rebuilt state
-				test.checkStakerInState(require, state, staker)
-				test.checkValidatorsSet(require, state, staker)
-				test.checkValidatorUptimes(require, state, staker)
-				test.checkDiffs(require, state, staker, 0 /*height*/)
+				test.checkStakerInState(require, rebuiltState, staker)
+				test.checkValidatorsSet(require, rebuiltState, staker)
+				test.checkValidatorUptimes(require, rebuiltState, staker)
+				test.checkDiffs(require, rebuiltState, staker, 0 /*height*/)
 			})
 		}
 	}
