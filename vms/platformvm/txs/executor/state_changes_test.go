@@ -19,20 +19,27 @@ import (
 
 func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 	s := statetest.New(t, memdb.New())
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
-	require.NoError(t, err)
+
+	const (
+		secondsToAdvance  = 3
+		durationToAdvance = secondsToAdvance * time.Second
+	)
 
 	var (
-		currentTime       = s.GetTimestamp()
-		durationToAdvance = nextStakerChangeTime.Sub(currentTime)
-		secondsToAdvance  = uint64(durationToAdvance / time.Second)
-
-		feeConfig = fee.Config{
+		currentTime = s.GetTimestamp()
+		nextTime    = currentTime.Add(durationToAdvance)
+		feeConfig   = fee.Config{
 			MaxGasCapacity:     1000,
 			MaxGasPerSecond:    100,
 			TargetGasPerSecond: 50,
 		}
 	)
+
+	// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
+	// AdvanceTimeTo is maintained.
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
+	require.NoError(t, err)
+	require.False(t, nextTime.After(nextStakerChangeTime))
 
 	tests := []struct {
 		name          string
@@ -61,12 +68,12 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 			name: "Etna with usage",
 			fork: upgradetest.Etna,
 			initialState: fee.State{
-				Capacity: 600,
-				Excess:   400,
+				Capacity: 1,
+				Excess:   10_000,
 			},
 			expectedState: fee.State{
-				Capacity: min(fee.Gas(600).AddPerSecond(feeConfig.MaxGasPerSecond, secondsToAdvance), feeConfig.MaxGasCapacity),
-				Excess:   fee.Gas(400).SubPerSecond(feeConfig.TargetGasPerSecond, secondsToAdvance),
+				Capacity: min(fee.Gas(1).AddPerSecond(feeConfig.MaxGasPerSecond, secondsToAdvance), feeConfig.MaxGasCapacity),
+				Excess:   fee.Gas(10_000).SubPerSecond(feeConfig.TargetGasPerSecond, secondsToAdvance),
 			},
 		},
 	}
@@ -87,7 +94,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 					},
 				},
 				modifiedState,
-				nextStakerChangeTime,
+				nextTime,
 			)
 			require.NoError(err)
 			require.False(validatorsModified)
