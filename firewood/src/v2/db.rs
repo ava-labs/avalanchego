@@ -19,7 +19,6 @@ impl From<DbError> for api::Error {
         match value {
             DbError::InvalidParams => api::Error::InternalError(Box::new(value)),
             DbError::Merkle(e) => api::Error::InternalError(Box::new(e)),
-            DbError::System(e) => api::Error::IO(e.into()),
             DbError::CreateError => api::Error::InternalError(Box::new(value)),
             DbError::IO(e) => api::Error::IO(e),
             DbError::InvalidProposal => api::Error::InvalidProposal,

@@ -27,7 +27,6 @@ const _VERSION_STR: &[u8; 16] = b"firewood v0.1\0\0\0";
 pub enum DbError {
     InvalidParams,
     Merkle(MerkleError),
-    System(nix::Error),
     CreateError,
     IO(std::io::Error),
     InvalidProposal,
@@ -38,7 +37,6 @@ impl fmt::Display for DbError {
         match self {
             DbError::InvalidParams => write!(f, "invalid parameters provided"),
             DbError::Merkle(e) => write!(f, "merkle error: {e:?}"),
-            DbError::System(e) => write!(f, "system error: {e:?}"),
             DbError::CreateError => write!(f, "database create error"),
             DbError::IO(e) => write!(f, "I/O error: {e:?}"),
             DbError::InvalidProposal => write!(f, "invalid proposal"),
