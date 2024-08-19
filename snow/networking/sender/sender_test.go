@@ -845,7 +845,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				router.EXPECT().RegisterRequest(
 					gomock.Any(),          // Context
 					nodeID,                // Node ID
-					ctx.ChainID,           // Source Chain
 					ctx.ChainID,           // Destination Chain
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
@@ -1228,7 +1227,6 @@ func TestSender_Single_Request(t *testing.T) {
 				router.EXPECT().RegisterRequest(
 					gomock.Any(),          // Context
 					ctx.NodeID,            // Node ID
-					ctx.ChainID,           // Source Chain
 					ctx.ChainID,           // Destination Chain
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
@@ -1268,7 +1266,6 @@ func TestSender_Single_Request(t *testing.T) {
 				router.EXPECT().RegisterRequest(
 					gomock.Any(),          // Context
 					destinationNodeID,     // Node ID
-					ctx.ChainID,           // Source Chain
 					ctx.ChainID,           // Destination Chain
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation
@@ -1304,7 +1301,6 @@ func TestSender_Single_Request(t *testing.T) {
 				router.EXPECT().RegisterRequest(
 					gomock.Any(),          // Context
 					destinationNodeID,     // Node ID
-					ctx.ChainID,           // Source Chain
 					ctx.ChainID,           // Destination Chain
 					requestID,             // Request ID
 					tt.expectedResponseOp, // Operation

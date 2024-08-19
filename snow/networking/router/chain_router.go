@@ -136,7 +136,7 @@ func (cr *ChainRouter) Initialize(
 }
 
 // RegisterRequest marks that we should expect to receive a reply for a request
-// issued by [requestingChainID] from the given node's [respondingChainID] and
+// from the given node's [respondingChainID] and
 // the reply should have the given requestID.
 //
 // The type of message we expect is [op].
@@ -148,7 +148,6 @@ func (cr *ChainRouter) Initialize(
 func (cr *ChainRouter) RegisterRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
-	requestingChainID ids.ID,
 	respondingChainID ids.ID,
 	requestID uint32,
 	op message.Op,
@@ -159,7 +158,6 @@ func (cr *ChainRouter) RegisterRequest(
 	if cr.closing {
 		cr.log.Debug("dropping request",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("requestingChainID", requestingChainID),
 			zap.Stringer("respondingChainID", respondingChainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("messageOp", op),
@@ -171,16 +169,10 @@ func (cr *ChainRouter) RegisterRequest(
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	//
-	// For cross-chain messages, the responding chain is the source of the
-	// response which is sent to the requester which is the destination,
-	// which is why we flip the two in request id generation.
 	uniqueRequestID := ids.RequestID{
-		NodeID:             nodeID,
-		SourceChainID:      respondingChainID,
-		DestinationChainID: requestingChainID,
-		RequestID:          requestID,
-		Op:                 byte(op),
+		NodeID:    nodeID,
+		RequestID: requestID,
+		Op:        byte(op),
 	}
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
@@ -223,19 +215,6 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
 			zap.String("field", "ChainID"),
-			zap.Error(err),
-		)
-
-		msg.OnFinishedHandling()
-		return
-	}
-
-	sourceChainID, err := message.GetSourceChainID(m)
-	if err != nil {
-		cr.log.Debug("dropping message with invalid field",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("messageOp", op),
-			zap.String("field", "SourceChainID"),
 			zap.Error(err),
 		)
 
@@ -321,7 +300,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, destinationChainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
@@ -352,7 +331,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, destinationChainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
@@ -736,14 +715,12 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
 	nodeID ids.NodeID,
-	sourceChainID ids.ID,
 	destinationChainID ids.ID,
 	requestID uint32,
 ) (ids.RequestID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
 	uniqueRequestID := ids.RequestID{
 		NodeID:             nodeID,
-		SourceChainID:      sourceChainID,
 		DestinationChainID: destinationChainID,
 		RequestID:          requestID,
 		Op:                 byte(op),

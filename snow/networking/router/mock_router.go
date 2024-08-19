@@ -139,15 +139,15 @@ func (mr *MockRouterMockRecorder) Initialize(nodeID, log, timeouts, shutdownTime
 }
 
 // RegisterRequest mocks base method.
-func (m *MockRouter) RegisterRequest(ctx context.Context, nodeID ids.NodeID, sourceChainID, destinationChainID ids.ID, requestID uint32, op message.Op, failedMsg message.InboundMessage, engineType p2p.EngineType) {
+func (m *MockRouter) RegisterRequest(ctx context.Context, nodeID ids.NodeID, destinationChainID ids.ID, requestID uint32, op message.Op, failedMsg message.InboundMessage, engineType p2p.EngineType) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterRequest", ctx, nodeID, sourceChainID, destinationChainID, requestID, op, failedMsg, engineType)
+	m.ctrl.Call(m, "RegisterRequest", ctx, nodeID, destinationChainID, requestID, op, failedMsg, engineType)
 }
 
 // RegisterRequest indicates an expected call of RegisterRequest.
-func (mr *MockRouterMockRecorder) RegisterRequest(ctx, nodeID, sourceChainID, destinationChainID, requestID, op, failedMsg, engineType any) *gomock.Call {
+func (mr *MockRouterMockRecorder) RegisterRequest(ctx, nodeID, destinationChainID, requestID, op, failedMsg, engineType any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRequest", reflect.TypeOf((*MockRouter)(nil).RegisterRequest), ctx, nodeID, sourceChainID, destinationChainID, requestID, op, failedMsg, engineType)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterRequest", reflect.TypeOf((*MockRouter)(nil).RegisterRequest), ctx, nodeID, destinationChainID, requestID, op, failedMsg, engineType)
 }
 
 // Shutdown mocks base method.
