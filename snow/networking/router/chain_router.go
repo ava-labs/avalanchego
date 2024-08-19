@@ -136,7 +136,7 @@ func (cr *ChainRouter) Initialize(
 }
 
 // RegisterRequest marks that we should expect to receive a reply for a request
-// from the given node's [respondingChainID] and
+// from the given node's [chainID] and
 // the reply should have the given requestID.
 //
 // The type of message we expect is [op].
@@ -148,7 +148,7 @@ func (cr *ChainRouter) Initialize(
 func (cr *ChainRouter) RegisterRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
-	respondingChainID ids.ID,
+	chainID ids.ID,
 	requestID uint32,
 	op message.Op,
 	timeoutMsg message.InboundMessage,
@@ -158,7 +158,7 @@ func (cr *ChainRouter) RegisterRequest(
 	if cr.closing {
 		cr.log.Debug("dropping request",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("respondingChainID", respondingChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("messageOp", op),
 			zap.Error(errClosing),
@@ -171,6 +171,7 @@ func (cr *ChainRouter) RegisterRequest(
 	// Give this request a unique ID so we can do that validation.
 	uniqueRequestID := ids.RequestID{
 		NodeID:    nodeID,
+		ChainID:   chainID,
 		RequestID: requestID,
 		Op:        byte(op),
 	}
@@ -195,7 +196,7 @@ func (cr *ChainRouter) RegisterRequest(
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(
 		nodeID,
-		respondingChainID,
+		chainID,
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
