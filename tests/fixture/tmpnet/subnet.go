@@ -36,6 +36,12 @@ type Chain struct {
 	VMID    ids.ID
 	Config  string
 	Genesis []byte
+	// VersionArgs are the argument(s) to pass to the VM binary to receive
+	// version details in json format (e.g. `--version-json`). This
+	// supports checking that the rpcchainvm version of the VM binary
+	// matches the version used by the configured avalanchego binary. If
+	// empty, the version check will be skipped.
+	VersionArgs []string
 
 	// Set at runtime
 	ChainID      ids.ID

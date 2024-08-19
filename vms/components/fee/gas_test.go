@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var gasPriceMulExpTests = []struct {
+var calculateGasPriceTests = []struct {
 	minPrice                 GasPrice
 	excess                   Gas
 	excessConversionConstant Gas
@@ -172,20 +172,20 @@ func Test_Gas_SubPerSecond(t *testing.T) {
 	}
 }
 
-func Test_GasPrice_MulExp(t *testing.T) {
-	for _, test := range gasPriceMulExpTests {
+func Test_CalculateGasPrice(t *testing.T) {
+	for _, test := range calculateGasPriceTests {
 		t.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(t *testing.T) {
-			actual := test.minPrice.MulExp(test.excess, test.excessConversionConstant)
+			actual := CalculateGasPrice(test.minPrice, test.excess, test.excessConversionConstant)
 			require.Equal(t, test.expected, actual)
 		})
 	}
 }
 
-func Benchmark_GasPrice_MulExp(b *testing.B) {
-	for _, test := range gasPriceMulExpTests {
+func Benchmark_CalculateGasPrice(b *testing.B) {
+	for _, test := range calculateGasPriceTests {
 		b.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				test.minPrice.MulExp(test.excess, test.excessConversionConstant)
+				CalculateGasPrice(test.minPrice, test.excess, test.excessConversionConstant)
 			}
 		})
 	}
