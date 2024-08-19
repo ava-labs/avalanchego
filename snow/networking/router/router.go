@@ -50,7 +50,7 @@ type InternalHandler interface {
 	RegisterRequest(
 		ctx context.Context,
 		nodeID ids.NodeID,
-		destinationChainID ids.ID,
+		chainID ids.ID,
 		requestID uint32,
 		op message.Op,
 		failedMsg message.InboundMessage,

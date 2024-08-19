@@ -209,7 +209,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	op := msg.Op()
 
 	m := msg.Message()
-	destinationChainID, err := message.GetChainID(m)
+	chainID, err := message.GetChainID(m)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
@@ -241,7 +241,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Error(errClosing),
 		)
 		msg.OnFinishedHandling()
@@ -249,12 +249,12 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	// Get the chain, if it exists
-	chain, exists := cr.chainHandlers[destinationChainID]
+	chain, exists := cr.chainHandlers[chainID]
 	if !exists {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Error(errUnknownChain),
 		)
 		msg.OnFinishedHandling()
@@ -265,7 +265,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Error(errUnallowedNode),
 		)
 		msg.OnFinishedHandling()
@@ -300,7 +300,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, destinationChainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
@@ -331,7 +331,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, destinationChainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
@@ -342,7 +342,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	latency := cr.clock.Time().Sub(req.time)
 
 	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
+	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
 	chain.Push(
@@ -715,15 +715,15 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
 	nodeID ids.NodeID,
-	destinationChainID ids.ID,
+	chainID ids.ID,
 	requestID uint32,
 ) (ids.RequestID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
 	uniqueRequestID := ids.RequestID{
-		NodeID:             nodeID,
-		DestinationChainID: destinationChainID,
-		RequestID:          requestID,
-		Op:                 byte(op),
+		NodeID:    nodeID,
+		ChainID:   chainID,
+		RequestID: requestID,
+		Op:        byte(op),
 	}
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.timedRequests.Get(uniqueRequestID)

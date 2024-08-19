@@ -85,7 +85,7 @@ func (r *tracedRouter) RegisterRequest(
 
 func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMessage) {
 	m := msg.Message()
-	destinationChainID, err := message.GetChainID(m)
+	chainID, err := message.GetChainID(m)
 	if err != nil {
 		r.router.HandleInbound(ctx, msg)
 		return
@@ -94,7 +94,7 @@ func (r *tracedRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", msg.NodeID()),
 		attribute.Stringer("messageOp", msg.Op()),
-		attribute.Stringer("chainID", destinationChainID),
+		attribute.Stringer("chainID", chainID),
 	))
 	defer span.End()
 
