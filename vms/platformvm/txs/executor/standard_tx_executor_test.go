@@ -2507,13 +2507,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "invalid prior to E-Upgrade",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-
-				// Set dependency expectations.
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
@@ -2537,7 +2534,6 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "tx fails syntactic verification",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-				// Setting the tx to nil makes the tx fail syntactic verification
 				env.tx.Unsigned = (*txs.ConvertSubnetTx)(nil)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
@@ -2567,16 +2563,13 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "fail subnet authorization",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
-
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
 					Backend: &Backend{
@@ -2603,7 +2596,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
-				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(2)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
@@ -2611,8 +2604,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				).Return(ErrFlowCheckFailed)
 
 				cfg := &config.Config{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
@@ -2636,8 +2628,6 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "invalid if subnet is transformed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-
-				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
@@ -2645,8 +2635,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
 				cfg := &config.Config{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
@@ -2670,8 +2659,6 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "invalid if subnet is converted",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-
-				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
@@ -2680,8 +2667,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
 				cfg := &config.Config{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
@@ -2705,12 +2691,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "valid tx",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-
-				// Set dependency expectations.
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(2)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
@@ -2721,8 +2705,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
 				cfg := &config.Config{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &StandardTxExecutor{
