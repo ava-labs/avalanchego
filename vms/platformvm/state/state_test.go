@@ -687,12 +687,8 @@ func newInitializedStateFromDB(t testing.TB, db database.Database) *state {
 }
 
 func initializeState(t testing.TB, s *state) {
-	genesisBlkID := ids.GenerateTestID()
-	genesisBlk, err := block.NewApricotCommitBlock(genesisBlkID, 0)
-	require.NoError(t, err)
-
-	genesis := genesistest.New(t)
-	require.NoError(t, s.syncGenesis(genesisBlk, genesis))
+	genesis := genesistest.NewBytes(t)
+	require.NoError(t, s.sync(genesis))
 }
 
 func newStateFromDB(t testing.TB, db database.Database) *state {
