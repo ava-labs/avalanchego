@@ -28,7 +28,6 @@ func init() {
 		lc.RegisterType(&SetSubnetValidatorWeight{}),
 		lc.RegisterType(&SubnetValidatorRegistration{}),
 		lc.RegisterType(&SubnetValidatorWeightUpdate{}),
-		lc.RegisterType(&ValidatorUptime{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
