@@ -394,6 +394,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     }
 
     /// Map `key` to `value` in the trie.
+    /// Each element of key is 2 nibbles.
     pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
@@ -416,6 +417,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     }
 
     /// Map `key` to `value` into the subtrie rooted at `node`.
+    /// Each element of `key` is 1 nibble.
     /// Returns the new root of the subtrie.
     pub fn insert_helper(
         &mut self,
@@ -550,6 +552,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Removes the value associated with the given `key`.
     /// Returns the value that was removed, if any.
     /// Otherwise returns `None`.
+    /// Each element of `key` is 2 nibbles.
     pub fn remove(&mut self, key: &[u8]) -> Result<Option<Box<[u8]>>, MerkleError> {
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
@@ -566,6 +569,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     /// Removes the value associated with the given `key` from the subtrie rooted at `node`.
     /// Returns the new root of the subtrie and the value that was removed, if any.
+    /// Each element of `key` is 1 nibble.
     #[allow(clippy::type_complexity)]
     fn remove_helper(
         &mut self,
