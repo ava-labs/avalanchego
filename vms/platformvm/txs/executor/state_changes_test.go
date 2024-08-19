@@ -23,22 +23,11 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 		durationToAdvance = secondsToAdvance * time.Second
 	)
 
-	var (
-		s           = statetest.New(t, memdb.New())
-		currentTime = s.GetTimestamp()
-		nextTime    = currentTime.Add(durationToAdvance)
-		feeConfig   = fee.Config{
-			MaxGasCapacity:     1000,
-			MaxGasPerSecond:    100,
-			TargetGasPerSecond: 50,
-		}
-	)
-
-	// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
-	// AdvanceTimeTo is maintained.
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
-	require.NoError(t, err)
-	require.False(t, nextTime.After(nextStakerChangeTime))
+	feeConfig := fee.Config{
+		MaxGasCapacity:     1000,
+		MaxGasPerSecond:    100,
+		TargetGasPerSecond: 50,
+	}
 
 	tests := []struct {
 		name          string
@@ -78,12 +67,20 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+			var (
+				require = require.New(t)
 
-			modifiedState, err := state.NewDiffOn(s)
+				s        = statetest.New(t, memdb.New())
+				nextTime = s.GetTimestamp().Add(durationToAdvance)
+			)
+
+			// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
+			// AdvanceTimeTo is maintained.
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
 			require.NoError(err)
+			require.False(nextTime.After(nextStakerChangeTime))
 
-			modifiedState.SetFeeState(test.initialState)
+			s.SetFeeState(test.initialState)
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
@@ -92,13 +89,13 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 						UpgradeConfig:    upgradetest.GetConfig(test.fork),
 					},
 				},
-				modifiedState,
+				s,
 				nextTime,
 			)
 			require.NoError(err)
 			require.False(validatorsModified)
-			require.Equal(test.expectedState, modifiedState.GetFeeState())
-			require.Equal(nextTime, modifiedState.GetTimestamp())
+			require.Equal(test.expectedState, s.GetFeeState())
+			require.Equal(nextTime, s.GetTimestamp())
 		})
 	}
 }
