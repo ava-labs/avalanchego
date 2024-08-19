@@ -160,7 +160,8 @@ func TestPersistStakers(t *testing.T) {
 						PublicKey: staker.PublicKey,
 						Weight:    staker.Weight,
 					},
-					valsMap[staker.NodeID])
+					valsMap[staker.NodeID],
+				)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
 				upDuration, lastUpdated, err := s.GetUptime(staker.NodeID, staker.SubnetID)
