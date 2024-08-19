@@ -753,15 +753,6 @@ func (s *state) GetPendingStakerIterator() (StakerIterator, error) {
 	return s.pendingStakers.GetStakerIterator(), nil
 }
 
-func (s *state) shouldInit() (bool, error) {
-	has, err := s.singletonDB.Has(InitializedKey)
-	return !has, err
-}
-
-func (s *state) doneInit() error {
-	return s.singletonDB.Put(InitializedKey, nil)
-}
-
 func (s *state) GetSubnetIDs() ([]ids.ID, error) {
 	if s.cachedSubnetIDs != nil {
 		return s.cachedSubnetIDs, nil
@@ -1751,7 +1742,7 @@ func (s *state) Close() error {
 }
 
 func (s *state) sync(genesis []byte) error {
-	shouldInit, err := s.shouldInit()
+	isInitialized, err := isInitialized(s.singletonDB)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to check if the database is initialized: %w",
@@ -1761,7 +1752,7 @@ func (s *state) sync(genesis []byte) error {
 
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
-	if shouldInit {
+	if !isInitialized {
 		if err := s.init(genesis); err != nil {
 			return fmt.Errorf(
 				"failed to initialize the database: %w",
@@ -1797,7 +1788,7 @@ func (s *state) init(genesisBytes []byte) error {
 		return err
 	}
 
-	if err := s.doneInit(); err != nil {
+	if err := markInitialized(s.singletonDB); err != nil {
 		return err
 	}
 
@@ -2546,6 +2537,14 @@ func (s *state) ReindexBlocks(lock sync.Locker, log logging.Logger) error {
 	)
 
 	return s.Commit()
+}
+
+func markInitialized(db database.KeyValueWriter) error {
+	return db.Put(InitializedKey, nil)
+}
+
+func isInitialized(db database.KeyValueReader) (bool, error) {
+	return db.Has(InitializedKey)
 }
 
 func putFeeState(db database.KeyValueWriter, feeState fee.State) error {

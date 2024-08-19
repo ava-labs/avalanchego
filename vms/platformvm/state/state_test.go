@@ -52,24 +52,6 @@ var (
 	initialValidatorEndTime = initialTime.Add(28 * 24 * time.Hour)
 )
 
-func TestStateInitialization(t *testing.T) {
-	require := require.New(t)
-	s, db := newUninitializedState(require)
-
-	shouldInit, err := s.shouldInit()
-	require.NoError(err)
-	require.True(shouldInit)
-
-	require.NoError(s.doneInit())
-	require.NoError(s.Commit())
-
-	s = newStateFromDB(require, db)
-
-	shouldInit, err = s.shouldInit()
-	require.NoError(err)
-	require.False(shouldInit)
-}
-
 func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
 	state := newInitializedState(require)
@@ -1562,6 +1544,21 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	s = newStateFromDB(require, db)
 	require.NoError(s.load())
 	require.Equal(expectedFeeState, s.GetFeeState())
+}
+
+func TestMarkAndIsInitialized(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	defaultIsInitialized, err := isInitialized(db)
+	require.NoError(err)
+	require.False(defaultIsInitialized)
+
+	require.NoError(markInitialized(db))
+
+	isInitializedAfterMarking, err := isInitialized(db)
+	require.NoError(err)
+	require.True(isInitializedAfterMarking)
 }
 
 // Verify that reading from the database returns the same value that was written
