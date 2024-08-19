@@ -55,7 +55,12 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 	return Gas(totalGas)
 }
 
-// MulExp returns an approximation of g * e^(excess / excessConversionConstant)
+// CalculateGasPrice returns the gas price given the minimum gas price, the
+// excess gas, and the excess conversion constant.
+//
+// It is defined as an approximation of:
+//
+//	minPrice * e^(excess / excessConversionConstant)
 //
 // This implements the EIP-4844 fake exponential formula:
 //
@@ -77,7 +82,8 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 // This function does not perform any memory allocations.
 //
 //nolint:dupword // The python is copied from the EIP-4844 specification
-func (g GasPrice) MulExp(
+func CalculateGasPrice(
+	minPrice GasPrice,
 	excess Gas,
 	excessConversionConstant Gas,
 ) GasPrice {
@@ -95,7 +101,7 @@ func (g GasPrice) MulExp(
 	denominator.SetUint64(uint64(excessConversionConstant)) // range is [0, MaxUint64]
 
 	i.SetOne()
-	numeratorAccum.SetUint64(uint64(g))               // range is [0, MaxUint64]
+	numeratorAccum.SetUint64(uint64(minPrice))        // range is [0, MaxUint64]
 	numeratorAccum.Mul(&numeratorAccum, &denominator) // range is [0, MaxUint128]
 
 	maxOutput.Mul(&denominator, maxUint64) // range is [0, MaxUint128]

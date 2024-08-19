@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -123,6 +124,10 @@ type Client interface {
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
+	// GetFeeConfig returns the dynamic fee config of the chain.
+	GetFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error)
+	// GetFeeState returns the current fee state of the chain.
+	GetFeeState(ctx context.Context, options ...rpc.Option) (fee.State, fee.GasPrice, time.Time, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -515,6 +520,18 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetFeeConfig(ctx context.Context, options ...rpc.Option) (*fee.Config, error) {
+	res := &fee.Config{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeConfig", struct{}{}, res, options...)
+	return res, err
+}
+
+func (c *client) GetFeeState(ctx context.Context, options ...rpc.Option) (fee.State, fee.GasPrice, time.Time, error) {
+	res := &GetFeeStateReply{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeState", struct{}{}, res, options...)
+	return res.State, res.Price, res.Time, err
 }
 
 func AwaitTxAccepted(
