@@ -22,7 +22,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("skips test if Etna is not activated", func() {
+	ginkgo.It("creates a Permissionless L1", func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
 		infoClient := info.NewClient(nodeURI.URI)
@@ -36,11 +36,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		if !upgrades.IsEtnaActivated(now) {
 			ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
 		}
-	})
-
-	ginkgo.It("creates a Permissionless L1", func() {
-		env := e2e.GetEnv(tc)
-		nodeURI := env.GetRandomNodeURI()
 
 		keychain := env.NewKeychain(1)
 		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
