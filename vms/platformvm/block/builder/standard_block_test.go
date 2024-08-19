@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -23,7 +24,7 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

@@ -64,7 +64,7 @@ message Message {
 message Ping {
   // Uptime percentage on the primary network [0, 100]
   uint32 uptime = 1;
-  // Uptime percentage on subnets
+  // Deprecated
   repeated SubnetUptime subnet_uptimes = 2;
 }
 
@@ -197,7 +197,7 @@ message StateSummaryFrontier {
 // GetAcceptedStateSummary requests a set of state summaries at a set of
 // block heights
 message GetAcceptedStateSummary {
-  // Chain bein requested from
+  // Chain being requested from
   bytes chain_id = 1;
   // Unique identifier for this request
   uint32 request_id = 2;
