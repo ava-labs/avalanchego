@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package backend
 
 import (
 	"context"
@@ -38,7 +38,7 @@ type backend struct {
 	subnetOwner     map[ids.ID]fx.Owner // subnetID -> owner
 }
 
-func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetOwner map[ids.ID]fx.Owner) Backend {
+func New(context *builder.Context, utxos common.ChainUTXOs, subnetOwner map[ids.ID]fx.Owner) Backend {
 	return &backend{
 		ChainUTXOs:  utxos,
 		context:     context,
@@ -48,7 +48,7 @@ func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetOwner m
 
 func (b *backend) AcceptTx(ctx context.Context, tx *txs.Tx) error {
 	txID := tx.ID()
-	err := tx.Unsigned.Visit(&backendVisitor{
+	err := tx.Unsigned.Visit(&visitor{
 		b:    b,
 		ctx:  ctx,
 		txID: txID,

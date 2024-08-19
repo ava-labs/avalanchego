@@ -253,3 +253,40 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		})
 	}
 }
+
+func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, upgradetest.Etna)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		constants.AVMID,
+		nil,
+		"chain name",
+	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	require.NoError(err)
+
+	stateDiff, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	builderDiff, err := state.NewDiffOn(stateDiff)
+	require.NoError(err)
+
+	stateDiff.SetSubnetManager(testSubnet1.ID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'})
+
+	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
+	executor := StandardTxExecutor{
+		Backend:       &env.backend,
+		FeeCalculator: feeCalculator,
+		State:         stateDiff,
+		Tx:            tx,
+	}
+	err = tx.Unsigned.Visit(&executor)
+	require.ErrorIs(err, errIsImmutable)
+}

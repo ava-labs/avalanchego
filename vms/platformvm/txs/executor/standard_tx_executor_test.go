@@ -891,6 +891,44 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 }
 
+func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, upgradetest.Etna)
+	env.ctx.Lock.Lock()
+	defer env.ctx.Lock.Unlock()
+
+	nodeID := genesisNodeIDs[0]
+
+	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
+	utx, err := builder.NewAddSubnetValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(defaultValidateStartTime.Unix() + 1),
+				End:    uint64(defaultValidateEndTime.Unix()),
+				Wght:   defaultWeight,
+			},
+			Subnet: testSubnet1.ID(),
+		},
+	)
+	require.NoError(err)
+	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
+	require.NoError(err)
+
+	onAcceptState, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	onAcceptState.SetSubnetManager(testSubnet1.ID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'})
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      tx,
+	}
+	err = tx.Unsigned.Visit(&executor)
+	require.ErrorIs(err, errIsImmutable)
+}
+
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.Banff)
@@ -1984,6 +2022,32 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			},
 			expectedErr: ErrFlowCheckFailed,
 		},
+		{
+			name: "attempted to remove subnet validator after subnet manager is set",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}, nil).AnyTimes()
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+
+				cfg := &config.Config{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
+				}
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config:       cfg,
+						Bootstrapped: &utils.Atomic[bool]{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					Tx:    env.tx,
+					State: env.state,
+				}
+				e.Bootstrapped.Set(true)
+				return env.unsignedTx, e
+			},
+			expectedErr: ErrRemoveValidatorManagedSubnet,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2213,6 +2277,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
@@ -2243,6 +2308,41 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			err: ErrFlowCheckFailed,
 		},
 		{
+			name: "invalid if subnet manager is set",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
+
+				// Set dependency expectations.
+				subnetOwner := fx.NewMockOwner(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), make([]byte, 20), nil)
+				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
+				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
+
+				cfg := &config.Config{
+					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					MaxStakeDuration: math.MaxInt64,
+				}
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
+				e := &StandardTxExecutor{
+					Backend: &Backend{
+						Config:       cfg,
+						Bootstrapped: &utils.Atomic[bool]{},
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					FeeCalculator: feeCalculator,
+					Tx:            env.tx,
+					State:         env.state,
+				}
+				e.Bootstrapped.Set(true)
+				return env.unsignedTx, e
+			},
+			err: errIsImmutable,
+		},
+		{
 			name: "valid tx",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
@@ -2251,6 +2351,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fx.NewMockOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
+				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
