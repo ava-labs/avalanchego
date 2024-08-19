@@ -289,7 +289,7 @@ func (n *Network) Create(rootDir string) error {
 	n.Dir = canonicalDir
 
 	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.GetPluginDir()
+	pluginDir, err := n.getPluginDir()
 	if err != nil {
 		return err
 	}
@@ -463,7 +463,7 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
 	// This check is duplicative for a network that is starting, but ensures
 	// that individual node start/restart won't fail due to missing binaries.
-	pluginDir, err := n.GetPluginDir()
+	pluginDir, err := n.getPluginDir()
 	if err != nil {
 		return err
 	}
@@ -877,7 +877,7 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
-func (n *Network) GetPluginDir() (string, error) {
+func (n *Network) getPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
 }
 
