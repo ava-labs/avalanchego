@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	pbackend "github.com/ava-labs/avalanchego/wallet/chain/p/backend"
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	psigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
@@ -105,7 +106,7 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		return nil, err
 	}
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pBackend := pbackend.New(avaxState.PCTX, pUTXOs, subnetOwners)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)
 

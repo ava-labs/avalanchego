@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/backend"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -258,7 +259,7 @@ func NewWallet(
 	builder builder.Builder,
 	signer walletsigner.Signer,
 	client platformvm.Client,
-	backend Backend,
+	backend backend.Backend,
 ) Wallet {
 	return &wallet{
 		Backend: backend,
@@ -269,7 +270,7 @@ func NewWallet(
 }
 
 type wallet struct {
-	Backend
+	backend.Backend
 	builder builder.Builder
 	signer  walletsigner.Signer
 	client  platformvm.Client
