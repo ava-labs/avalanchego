@@ -76,7 +76,6 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 					owner,
 					tc.WithDefaultContext(),
 				)
-
 				require.NoError(err)
 				subnetID = subnetTx.ID()
 				require.NotEqual(subnetID, constants.PrimaryNetworkID)
@@ -106,7 +105,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				subnetAssetID = subnetAssetTx.ID()
 			})
 
-			tc.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
+			tc.By(fmt.Sprintf("Send %d Avax of asset %s to the P-chain", maxSupply, subnetAssetID), func() {
 				_, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
@@ -125,7 +124,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				require.NoError(err)
 			})
 
-			tc.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetID), func() {
+			tc.By(fmt.Sprintf("Import the %d Avax of asset %s from the X-chain into the P-chain", maxSupply, subnetAssetID), func() {
 				_, err := pWallet.IssueImportTx(
 					xChainID,
 					owner,

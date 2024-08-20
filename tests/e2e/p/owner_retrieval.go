@@ -41,8 +41,8 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 			owner,
 			tc.WithDefaultContext(),
 		)
-		subnetID := subnetTx.ID()
 		require.NoError(err)
+		subnetID := subnetTx.ID()
 		require.NotEqual(subnetID, constants.PrimaryNetworkID)
 
 		tc.By("verifying owner", func() {

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -45,15 +44,14 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 		env := e2e.GetEnv(tc)
 
-		nodeURI := env.GetRandomNodeURI()
 		// Use a pre-funded key for the P-Chain
 		keychain := env.NewKeychain()
 		// Use a new key for the X-Chain
-		xChainKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-		keychain.Add(xChainKey)
+		keychain.Add(e2e.NewPrivateKey(tc))
 
 		var (
+			nodeURI = env.GetRandomNodeURI()
+
 			rewardAddr  = keychain.Keys[0].Address()
 			rewardOwner = &secp256k1fx.OutputOwners{
 				Threshold: 1,
