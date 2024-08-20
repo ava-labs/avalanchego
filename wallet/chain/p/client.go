@@ -6,29 +6,28 @@ package p
 import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backend"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ wallet.Client = (*client)(nil)
+var _ wallet.Client = (*Client)(nil)
 
 func NewClient(
 	c platformvm.Client,
-	b backend.Backend,
-) wallet.Client {
-	return &client{
+	b wallet.Backend,
+) *Client {
+	return &Client{
 		client:  c,
 		backend: b,
 	}
 }
 
-type client struct {
+type Client struct {
 	client  platformvm.Client
-	backend backend.Backend
+	backend wallet.Backend
 }
 
-func (c *client) IssueTx(
+func (c *Client) IssueTx(
 	tx *txs.Tx,
 	options ...common.Option,
 ) error {

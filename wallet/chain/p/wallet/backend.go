@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package backend
+package wallet
 
 import (
 	"context"
@@ -38,7 +38,7 @@ type backend struct {
 	subnetOwner     map[ids.ID]fx.Owner // subnetID -> owner
 }
 
-func New(context *builder.Context, utxos common.ChainUTXOs, subnetOwner map[ids.ID]fx.Owner) Backend {
+func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetOwner map[ids.ID]fx.Owner) Backend {
 	return &backend{
 		ChainUTXOs:  utxos,
 		context:     context,
