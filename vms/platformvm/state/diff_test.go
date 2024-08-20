@@ -588,11 +588,10 @@ func TestDiffSubnetOwner(t *testing.T) {
 
 func TestDiffSubnetManager(t *testing.T) {
 	var (
-		require        = require.New(t)
-		state          = newTestState(t, memdb.New())
-		lastAcceptedID = ids.GenerateTestID()
-		newManager     = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
-		subnetID       = ids.GenerateTestID()
+		require    = require.New(t)
+		state      = newTestState(t, memdb.New())
+		newManager = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
+		subnetID   = ids.GenerateTestID()
 	)
 
 	chainID, addr, err := state.GetSubnetManager(subnetID)
@@ -600,7 +599,7 @@ func TestDiffSubnetManager(t *testing.T) {
 	require.Equal(ids.Empty, chainID)
 	require.Nil(addr)
 
-	d, err := NewDiff(lastAcceptedID, stateGetter{state: state})
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	chainID, addr, err = d.GetSubnetManager(subnetID)
