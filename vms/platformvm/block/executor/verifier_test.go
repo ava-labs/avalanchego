@@ -39,8 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -108,36 +106,6 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 		},
 		pChainHeight: 0,
 	}
-}
-
-func newTestWallet(
-	t testing.TB,
-	v *verifier,
-) wallet.Wallet {
-	ctx := &builder.Context{
-		NetworkID:   v.ctx.NetworkID,
-		AVAXAssetID: v.ctx.AVAXAssetID,
-	}
-	if !v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(v.state.GetTimestamp()) {
-		ctx.StaticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
-	} else {
-		ctx.ComplexityWeights = v.txExecutorBackend.Config.DynamicFeeConfig.Weights
-		ctx.GasPrice = 10 * feecomponent.CalculateGasPrice(
-			v.txExecutorBackend.Config.DynamicFeeConfig.MinGasPrice,
-			v.state.GetFeeState().Excess,
-			v.txExecutorBackend.Config.DynamicFeeConfig.ExcessConversionConstant,
-		)
-	}
-
-	return txstest.NewWallet(
-		t,
-		v.state,
-		v.ctx.SharedMemory,
-		ctx,
-		secp256k1fx.NewKeychain(genesis.EWOQKey),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
 }
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
@@ -1154,7 +1122,15 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 func TestBlockExecutionWithComplexity(t *testing.T) {
 	s := statetest.New(t, memdb.New())
 	verifier := newTestVerifier(t, s)
-	wallet := newTestWallet(t, verifier)
+	wallet := txstest.NewWallet(
+		t,
+		verifier.ctx,
+		verifier.txExecutorBackend.Config,
+		s,
+		secp256k1fx.NewKeychain(genesis.EWOQKey),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
 
 	baseTx0, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
 	require.NoError(t, err)

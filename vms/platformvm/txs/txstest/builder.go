@@ -15,20 +15,20 @@ import (
 
 func NewWalletFactory(
 	ctx *snow.Context,
-	cfg *config.Config,
+	config *config.Config,
 	state state.State,
 ) *WalletFactory {
 	return &WalletFactory{
-		ctx:   ctx,
-		cfg:   cfg,
-		state: state,
+		ctx:    ctx,
+		config: config,
+		state:  state,
 	}
 }
 
 type WalletFactory struct {
-	ctx   *snow.Context
-	cfg   *config.Config
-	state state.State
+	ctx    *snow.Context
+	config *config.Config
+	state  state.State
 }
 
 func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builder, signer.Signer) {
@@ -36,7 +36,7 @@ func (w *WalletFactory) NewWallet(keys ...*secp256k1.PrivateKey) (builder.Builde
 		kc      = secp256k1fx.NewKeychain(keys...)
 		addrs   = kc.Addresses()
 		backend = newBackend(addrs, w.state, w.ctx.SharedMemory)
-		context = newContext(w.ctx, w.cfg, w.state.GetTimestamp())
+		context = newContext(w.ctx, w.config, w.state)
 	)
 
 	return builder.New(addrs, context, backend), signer.New(kc, backend)

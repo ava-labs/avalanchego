@@ -10,10 +10,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -27,9 +28,9 @@ import (
 
 func NewWallet(
 	t testing.TB,
+	ctx *snow.Context,
+	config *config.Config,
 	state state.State,
-	sharedMemory atomic.SharedMemory,
-	ctx *builder.Context,
 	kc *secp256k1fx.Keychain,
 	subnetIDs []ids.ID,
 	chainIDs []ids.ID,
@@ -54,7 +55,7 @@ func NewWallet(
 
 	for _, chainID := range chainIDs {
 		remoteChainUTXOs, _, _, err := avax.GetAtomicUTXOs(
-			sharedMemory,
+			ctx.SharedMemory,
 			txs.Codec,
 			chainID,
 			addrs,
@@ -81,8 +82,9 @@ func NewWallet(
 		owners[subnetID] = owner
 	}
 
+	builderContext := newContext(ctx, config, state)
 	backend := backend.New(
-		ctx,
+		builderContext,
 		common.NewChainUTXOs(constants.PlatformChainID, utxos),
 		owners,
 	)
@@ -92,7 +94,7 @@ func NewWallet(
 		},
 		builder.New(
 			addrs,
-			ctx,
+			builderContext,
 			backend,
 		),
 		signer.New(
