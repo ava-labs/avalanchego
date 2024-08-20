@@ -494,7 +494,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: subnetValidatorNodeID,
+				NodeID: subnetValidatorNodeID.NodeID(),
 				Start:  uint64(subnetVdr1StartTime.Unix()),
 				End:    uint64(subnetVdr1EndTime.Unix()),
 				Wght:   1,
@@ -527,7 +527,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	utx, err = builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: subnetVdr2NodeID,
+				NodeID: subnetVdr2NodeID.NodeID(),
 				Start:  uint64(subnetVdr1EndTime.Add(time.Second).Unix()),
 				End:    uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()),
 				Wght:   1,
@@ -573,7 +573,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	}
 	require.NoError(tx.Unsigned.Visit(&executor))
 
-	_, err = executor.OnCommitState.GetCurrentValidator(subnetID, subnetValidatorNodeID)
+	_, err = executor.OnCommitState.GetCurrentValidator(subnetID, subnetValidatorNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
@@ -581,9 +581,9 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
-	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
+	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID.NodeID())
 	require.False(ok)
-	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID.NodeID())
 	require.False(ok)
 }
 
@@ -610,7 +610,7 @@ func TestTrackedSubnet(t *testing.T) {
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: subnetValidatorNodeID,
+						NodeID: subnetValidatorNodeID.NodeID(),
 						Start:  uint64(subnetVdr1StartTime.Unix()),
 						End:    uint64(subnetVdr1EndTime.Unix()),
 						Wght:   1,
@@ -658,7 +658,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
-			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID.NodeID())
 			require.True(ok)
 		})
 	}

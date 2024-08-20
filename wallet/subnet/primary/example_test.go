@@ -146,7 +146,7 @@ func ExampleWallet() {
 	addSubnetValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
+				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
 				Wght:   25 * units.MegaAvax,
@@ -170,7 +170,7 @@ func ExampleWallet() {
 	addSubnetDelegatorTx, err := pWallet.IssueAddPermissionlessDelegatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
+				NodeID: genesis.LocalConfig.InitialStakers[0].NodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
 				Wght:   25 * units.MegaAvax,

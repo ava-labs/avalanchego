@@ -131,7 +131,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			stakeAmount: env.config.MinDelegatorStake,
 			startTime:   uint64(defaultValidateStartTime.Unix()) + 1,
 			endTime:     uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID:      nodeID,
+			nodeID:      nodeID.NodeID(),
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       nil,
 			AP3Time:     defaultGenesisTime,
@@ -186,7 +186,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			stakeAmount: env.config.MinDelegatorStake,
 			startTime:   uint64(currentTimestamp.Unix()),
 			endTime:     uint64(defaultValidateEndTime.Unix()),
-			nodeID:      nodeID,
+			nodeID:      nodeID.NodeID(),
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       nil,
 			AP3Time:     defaultGenesisTime,
@@ -197,7 +197,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			stakeAmount: env.config.MinDelegatorStake,
 			startTime:   uint64(defaultValidateStartTime.Unix()) + 1,
 			endTime:     uint64(defaultValidateEndTime.Unix()),
-			nodeID:      nodeID,
+			nodeID:      nodeID.NodeID(),
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[1]},
 			setup: func(env *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := env.state.UTXOIDs(
@@ -301,7 +301,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 					End:    uint64(defaultValidateEndTime.Unix()) + 1,
 					Wght:   defaultWeight,
@@ -340,7 +340,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 					End:    uint64(defaultValidateEndTime.Unix()),
 					Wght:   defaultWeight,
@@ -566,7 +566,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(newTimestamp.Unix()),
 					End:    uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()),
 					Wght:   defaultWeight,
@@ -605,7 +605,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	uSubnetTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: nodeID.NodeID(),
 				Start:  uint64(defaultValidateStartTime.Unix()),
 				End:    uint64(defaultValidateEndTime.Unix()),
 				Wght:   defaultWeight,
@@ -637,7 +637,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 					End:    uint64(defaultValidateEndTime.Unix()),
 					Wght:   defaultWeight,
@@ -677,7 +677,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 					End:    uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   defaultWeight,
@@ -720,7 +720,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 					End:    uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   defaultWeight,
@@ -762,7 +762,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: nodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 					End:    uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   defaultWeight,
@@ -861,7 +861,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		builder, signer := env.factory.NewWallet(preFundedKeys[0])
 		utx, err := builder.NewAddValidatorTx(
 			&txs.Validator{
-				NodeID: nodeID,
+				NodeID: nodeID.NodeID(),
 				Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 				End:    uint64(defaultValidateEndTime.Unix()),
 				Wght:   env.config.MinValidatorStake,

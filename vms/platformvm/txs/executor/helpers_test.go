@@ -73,13 +73,13 @@ var (
 	testSubnet1ControlKeys = preFundedKeys[0:3]
 
 	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs []ids.NodeID
+	genesisNodeIDs []ids.ShortNodeID
 )
 
 func init() {
-	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	genesisNodeIDs = make([]ids.ShortNodeID, len(preFundedKeys))
 	for i := range preFundedKeys {
-		genesisNodeIDs[i] = ids.GenerateTestNodeID()
+		genesisNodeIDs[i] = ids.GenerateTestShortNodeID()
 	}
 }
 

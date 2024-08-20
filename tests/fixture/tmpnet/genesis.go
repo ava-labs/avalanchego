@@ -177,12 +177,17 @@ func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker,
 	// Configure provided nodes as initial stakers
 	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
 	for i, node := range nodes {
+		nodeID := node.NodeID
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(node.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert nodeID %v to shortNodeID: %w", nodeID, err)
+		}
 		pop, err := node.GetProofOfPossession()
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive proof of possession for node %s: %w", node.NodeID, err)
 		}
 		initialStakers[i] = genesis.UnparsedStaker{
-			NodeID:        node.NodeID,
+			NodeID:        shortNodeID,
 			RewardAddress: rewardAddr,
 			DelegationFee: .01 * reward.PercentDenominator,
 			Signer:        pop,

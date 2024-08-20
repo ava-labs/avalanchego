@@ -723,7 +723,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: subnetValidatorNodeID,
+				NodeID: subnetValidatorNodeID.NodeID(),
 				Start:  uint64(subnetVdr1StartTime.Unix()),
 				End:    uint64(subnetVdr1EndTime.Unix()),
 				Wght:   1,
@@ -755,7 +755,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	utx, err = builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: subnetVdr2NodeID,
+				NodeID: subnetVdr2NodeID.NodeID(),
 				Start:  uint64(subnetVdr1EndTime.Add(time.Second).Unix()),
 				End:    uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()),
 				Wght:   1,
@@ -851,15 +851,15 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	blkStateMap := env.blkManager.(*manager).blkIDToState
 	updatedState := blkStateMap[commitBlk.ID()].onAcceptState
-	_, err = updatedState.GetCurrentValidator(subnetID, subnetValidatorNodeID)
+	_, err = updatedState.GetCurrentValidator(subnetID, subnetValidatorNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Check VM Validators are removed successfully
 	require.NoError(propBlk.Accept(context.Background()))
 	require.NoError(commitBlk.Accept(context.Background()))
-	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
+	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID.NodeID())
 	require.False(ok)
-	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID.NodeID())
 	require.False(ok)
 }
 
@@ -883,7 +883,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: subnetValidatorNodeID,
+						NodeID: subnetValidatorNodeID.NodeID(),
 						Start:  uint64(subnetVdr1StartTime.Unix()),
 						End:    uint64(subnetVdr1EndTime.Unix()),
 						Wght:   1,
@@ -973,7 +973,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			require.NoError(propBlk.Accept(context.Background()))
 			require.NoError(commitBlk.Accept(context.Background()))
-			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+			_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID.NodeID())
 			require.True(ok)
 		})
 	}

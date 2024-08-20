@@ -482,7 +482,7 @@ func TestGetStake(t *testing.T) {
 	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
-			NodeID: delegatorNodeID,
+			NodeID: delegatorNodeID.NodeID(),
 			Start:  uint64(delegatorStartTime.Unix()),
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
@@ -611,7 +611,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators) && !found; i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-			if gotVdr.NodeID != vdr.NodeID {
+			if gotVdr.NodeID.Compare(vdr.NodeID.NodeID()) != 0 {
 				continue
 			}
 
@@ -633,7 +633,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
-			NodeID: validatorNodeID,
+			NodeID: validatorNodeID.NodeID(),
 			Start:  uint64(delegatorStartTime.Unix()),
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
@@ -675,7 +675,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
 		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != validatorNodeID {
+		if vdr.NodeID.Compare(validatorNodeID.NodeID()) != 0 {
 			continue
 		}
 		found = true
@@ -722,7 +722,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	for _, vdr := range response.Validators {
 		castVdr := vdr.(pchainapi.PermissionlessValidator)
-		if castVdr.NodeID != validatorNodeID {
+		if castVdr.NodeID.Compare(validatorNodeID.NodeID()) != 0 {
 			continue
 		}
 		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))

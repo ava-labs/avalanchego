@@ -21,7 +21,12 @@ func GenerateTestShortID() ShortID {
 
 // GenerateTestNodeID returns a new ID that should only be used for testing
 func GenerateTestNodeID() NodeID {
-	return NodeID(GenerateTestShortID())
+	return NodeID{ShortNodeID: ShortNodeID(GenerateTestShortID())}
+}
+
+// GenerateTestShortNodeID returns a new ID that should only be used for testing
+func GenerateTestShortNodeID() ShortNodeID {
+	return ShortNodeID(GenerateTestShortID())
 }
 
 // BuildTestNodeID is an utility to build NodeID from bytes in UTs
@@ -29,6 +34,14 @@ func GenerateTestNodeID() NodeID {
 // use ToNodeID, which performs proper length checking.
 func BuildTestNodeID(src []byte) NodeID {
 	res := NodeID{}
+	copy(res.ShortNodeID[:], src)
+	return res
+}
+
+// BuildTestNodeID is an utility to build ShortNodeID from bytes in UTs
+// It must not be used in production code.
+func BuildTestShortNodeID(src []byte) ShortNodeID {
+	res := ShortNodeID{}
 	copy(res[:], src)
 	return res
 }

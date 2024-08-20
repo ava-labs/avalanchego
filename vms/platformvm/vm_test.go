@@ -106,7 +106,7 @@ var (
 	keys = secp256k1.TestKeys()
 
 	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs           []ids.NodeID
+	genesisNodeIDs           []ids.ShortNodeID
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
@@ -144,7 +144,7 @@ func init() {
 		// TODO: use ids.GenerateTestNodeID() instead of ids.BuildTestNodeID
 		// Can be done when TestGetState is refactored
 		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
+		nodeID := ids.BuildTestShortNodeID(nodeBytes[:])
 
 		genesisNodeIDs = append(genesisNodeIDs, nodeID)
 	}
@@ -372,7 +372,7 @@ func TestGenesis(t *testing.T) {
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
 	for _, nodeID := range genesisNodeIDs {
-		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
+		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID.NodeID())
 		require.True(ok)
 	}
 
@@ -574,7 +574,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: repeatNodeID,
+				NodeID: repeatNodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   vm.MinValidatorStake,
@@ -624,7 +624,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: nodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
@@ -652,7 +652,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in current validator set
-	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID.NodeID())
 	require.NoError(err)
 }
 
@@ -676,7 +676,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: nodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
@@ -703,7 +703,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in validator set
-	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -960,7 +960,7 @@ func TestCreateSubnet(t *testing.T) {
 	uAddValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: nodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
@@ -988,10 +988,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID.NodeID())
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1001,10 +1001,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1782,7 +1782,7 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
+			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID.NodeID())
 			require.NoError(err)
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)

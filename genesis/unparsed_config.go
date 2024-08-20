@@ -55,7 +55,7 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 }
 
 type UnparsedStaker struct {
-	NodeID        ids.NodeID                `json:"nodeID"`
+	NodeID        ids.ShortNodeID           `json:"nodeID"`
 	RewardAddress string                    `json:"rewardAddress"`
 	DelegationFee uint32                    `json:"delegationFee"`
 	Signer        *signer.ProofOfPossession `json:"signer,omitempty"`

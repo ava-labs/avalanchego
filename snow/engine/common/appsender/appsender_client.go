@@ -57,7 +57,7 @@ func (c *Client) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 func (c *Client) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
 	_, err := c.client.SendAppError(ctx,
 		&appsenderpb.SendAppErrorMsg{
-			NodeId:       nodeID[:],
+			NodeId:       nodeID.Bytes(),
 			RequestId:    requestID,
 			ErrorCode:    errorCode,
 			ErrorMessage: errorMessage,
