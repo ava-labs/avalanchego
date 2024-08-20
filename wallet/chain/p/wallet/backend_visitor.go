@@ -19,7 +19,7 @@ var (
 	ErrUnsupportedTxType = errors.New("unsupported tx type")
 )
 
-// backendVisitor handles accepting transactions for the backend
+// backendVisitor handles accepting of transactions for the backend
 type backendVisitor struct {
 	b    *backend
 	ctx  context.Context
