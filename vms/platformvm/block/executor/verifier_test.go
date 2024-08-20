@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -112,7 +113,7 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 func newTestWallet(
 	t testing.TB,
 	v *verifier,
-) *txstest.Wallet {
+) wallet.Wallet {
 	ctx := &builder.Context{
 		NetworkID:   v.ctx.NetworkID,
 		AVAXAssetID: v.ctx.AVAXAssetID,
