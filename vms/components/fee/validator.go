@@ -14,7 +14,7 @@ type ValidatorState struct {
 
 func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
 	if v.Current == v.Target {
-		return uint64(v.MinFee.MulExp(v.Excess, v.ExcessConversionConstant)) * seconds
+		return uint64(CalculateGasPrice(v.MinFee, v.Excess, v.ExcessConversionConstant))
 	}
 
 	var totalFee uint64
@@ -35,7 +35,7 @@ func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
 			x = x.AddPerSecond(v.Current-v.Target, 1)
 		}
 
-		totalFee += uint64(v.MinFee.MulExp(x, v.ExcessConversionConstant))
+		totalFee += uint64(CalculateGasPrice(v.MinFee, x, v.ExcessConversionConstant))
 	}
 
 	return totalFee
@@ -58,7 +58,7 @@ func (v ValidatorState) CalculateTimeTillContinuousFee(balance uint64) uint64 {
 			x = x.AddPerSecond(v.Current-v.Target, 1)
 		}
 
-		totalFee += uint64(v.MinFee.MulExp(x, v.ExcessConversionConstant))
+		totalFee += uint64(CalculateGasPrice(v.MinFee, x, v.ExcessConversionConstant))
 		if totalFee >= balance {
 			return i
 		}
