@@ -22,15 +22,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+type nilStateGetter struct{}
+
+func (nilStateGetter) GetState(ids.ID) (Chain, bool) {
+	return nil, false
+}
+
 func TestDiffMissingState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-
-	versions := NewMockVersions(ctrl)
-
 	parentID := ids.GenerateTestID()
-	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
-
-	_, err := NewDiff(parentID, versions)
+	_, err := NewDiff(parentID, nilStateGetter{})
 	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
@@ -588,13 +588,10 @@ func TestDiffSubnetOwner(t *testing.T) {
 
 func TestDiffSubnetManager(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
 	state := newTestState(t, memdb.New())
 
-	states := NewMockVersions(ctrl)
 	lastAcceptedID := ids.GenerateTestID()
-	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
 
 	var (
 		newManager = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
@@ -606,7 +603,9 @@ func TestDiffSubnetManager(t *testing.T) {
 	require.Equal(ids.Empty, chainID)
 	require.Nil(addr)
 
-	d, err := NewDiff(lastAcceptedID, states)
+	d, err := NewDiff(lastAcceptedID, stateGetter{
+		state: state,
+	})
 	require.NoError(err)
 
 	chainID, addr, err = d.GetSubnetManager(subnetID)
