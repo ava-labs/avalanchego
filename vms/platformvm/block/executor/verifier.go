@@ -467,18 +467,10 @@ func (v *verifier) processStandardTxs(
 	func(),
 	error,
 ) {
-	timestamp := state.GetTimestamp()
-	isEtnaActivated := v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp)
-
-	var (
-		blockComplexity feecomponent.Dimensions
-		onAcceptFunc    func()
-		inputs          set.Set[ids.ID]
-		funcs           = make([]func(), 0, len(txs))
-		atomicRequests  = make(map[ids.ID]*atomic.Requests)
-	)
-	for _, tx := range txs {
-		if isEtnaActivated {
+	// Complexity is limited first to avoid processing too large of a block.
+	if timestamp := state.GetTimestamp(); v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		var blockComplexity feecomponent.Dimensions
+		for _, tx := range txs {
 			txComplexity, err := txfee.TxComplexity(tx.Unsigned)
 			if err != nil {
 				txID := tx.ID()
@@ -492,6 +484,27 @@ func (v *verifier) processStandardTxs(
 			}
 		}
 
+		blockGas, err := blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		feeState := state.GetFeeState()
+		feeState, err = feeState.ConsumeGas(blockGas)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		state.SetFeeState(feeState)
+	}
+
+	var (
+		onAcceptFunc   func()
+		inputs         set.Set[ids.ID]
+		funcs          = make([]func(), 0, len(txs))
+		atomicRequests = make(map[ids.ID]*atomic.Requests)
+	)
+	for _, tx := range txs {
 		txExecutor := executor.StandardTxExecutor{
 			Backend:       v.txExecutorBackend,
 			State:         state,
@@ -526,21 +539,6 @@ func (v *verifier) processStandardTxs(
 			chainRequests.PutRequests = append(chainRequests.PutRequests, txRequests.PutRequests...)
 			chainRequests.RemoveRequests = append(chainRequests.RemoveRequests, txRequests.RemoveRequests...)
 		}
-	}
-
-	if isEtnaActivated {
-		blockGas, err := blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		feeState := state.GetFeeState()
-		feeState, err = feeState.ConsumeGas(blockGas)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		state.SetFeeState(feeState)
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
