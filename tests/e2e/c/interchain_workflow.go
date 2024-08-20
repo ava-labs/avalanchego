@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -39,11 +38,12 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		ethClient := e2e.NewEthClient(tc, nodeURI)
 
 		tc.By("allocating a pre-funded key to send from and a recipient key to deliver to")
-		senderKey := env.AllocatePreFundedKey()
-		senderEthAddress := evm.GetEthAddress(senderKey)
-		recipientKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
-		recipientEthAddress := evm.GetEthAddress(recipientKey)
+		var (
+			senderKey           = env.AllocatePreFundedKey()
+			senderEthAddress    = evm.GetEthAddress(senderKey)
+			recipientKey        = e2e.NewPrivateKey(tc)
+			recipientEthAddress = evm.GetEthAddress(recipientKey)
+		)
 
 		tc.By("sending funds from one address to another on the C-Chain", func() {
 			// Create transaction
@@ -150,7 +150,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		})
 
 		tc.By("importing AVAX from the C-Chain to the P-Chain", func() {
-			_, err = pWallet.IssueImportTx(
+			_, err := pWallet.IssueImportTx(
 				cContext.BlockchainID,
 				&recipientOwner,
 				tc.WithDefaultContext(),

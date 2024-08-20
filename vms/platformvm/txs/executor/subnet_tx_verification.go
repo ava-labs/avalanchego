@@ -16,9 +16,8 @@ import (
 
 var (
 	errWrongNumberOfCredentials       = errors.New("should have the same number of credentials as inputs")
+	errIsImmutable                    = errors.New("is immutable")
 	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
-
-	ErrIsImmutable = errors.New("is immutable")
 )
 
 // verifyPoASubnetAuthorization carries out the validation for modifying a PoA
@@ -38,7 +37,7 @@ func verifyPoASubnetAuthorization(
 
 	_, err = chainState.GetSubnetTransformation(subnetID)
 	if err == nil {
-		return nil, fmt.Errorf("%q %w", subnetID, ErrIsImmutable)
+		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
 	}
 	if err != database.ErrNotFound {
 		return nil, err
@@ -46,7 +45,7 @@ func verifyPoASubnetAuthorization(
 
 	_, _, err = chainState.GetSubnetManager(subnetID)
 	if err == nil {
-		return nil, fmt.Errorf("%q %w", subnetID, ErrIsImmutable)
+		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
 	}
 	if err != database.ErrNotFound {
 		return nil, err
