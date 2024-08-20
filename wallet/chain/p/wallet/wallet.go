@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p
+package wallet
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -25,7 +24,17 @@ var (
 	_ Wallet = (*wallet)(nil)
 )
 
+type Client interface {
+	// IssueTx issues the signed tx.
+	IssueTx(
+		tx *txs.Tx,
+		options ...common.Option,
+	) error
+}
+
 type Wallet interface {
+	Client
+
 	// Builder returns the builder that will be used to create the transactions.
 	Builder() builder.Builder
 
@@ -246,33 +255,24 @@ type Wallet interface {
 		utx txs.UnsignedTx,
 		options ...common.Option,
 	) (*txs.Tx, error)
-
-	// IssueTx issues the signed tx.
-	IssueTx(
-		tx *txs.Tx,
-		options ...common.Option,
-	) error
 }
 
-func NewWallet(
+func New(
+	client Client,
 	builder builder.Builder,
 	signer walletsigner.Signer,
-	client platformvm.Client,
-	backend Backend,
 ) Wallet {
 	return &wallet{
-		Backend: backend,
+		Client:  client,
 		builder: builder,
 		signer:  signer,
-		client:  client,
 	}
 }
 
 type wallet struct {
-	Backend
+	Client
 	builder builder.Builder
 	signer  walletsigner.Signer
-	client  platformvm.Client
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -498,30 +498,4 @@ func (w *wallet) IssueUnsignedTx(
 	}
 
 	return tx, w.IssueTx(tx, options...)
-}
-
-func (w *wallet) IssueTx(
-	tx *txs.Tx,
-	options ...common.Option,
-) error {
-	ops := common.NewOptions(options)
-	ctx := ops.Context()
-	txID, err := w.client.IssueTx(ctx, tx.Bytes())
-	if err != nil {
-		return err
-	}
-
-	if f := ops.PostIssuanceFunc(); f != nil {
-		f(txID)
-	}
-
-	if ops.AssumeDecided() {
-		return w.Backend.AcceptTx(ctx, tx)
-	}
-
-	if err := platformvm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
-		return err
-	}
-
-	return w.Backend.AcceptTx(ctx, tx)
 }
