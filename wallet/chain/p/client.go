@@ -4,19 +4,13 @@
 package p
 
 import (
-	"errors"
-
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var (
-	ErrNotCommitted = errors.New("not committed")
-
-	_ wallet.Client = (*Client)(nil)
-)
+var _ wallet.Client = (*Client)(nil)
 
 func NewClient(
 	c platformvm.Client,

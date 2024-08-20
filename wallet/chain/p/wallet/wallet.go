@@ -4,7 +4,6 @@
 package wallet
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,11 +17,7 @@ import (
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
-var (
-	ErrNotCommitted = errors.New("not committed")
-
-	_ Wallet = (*wallet)(nil)
-)
+var _ Wallet = (*wallet)(nil)
 
 type Client interface {
 	// IssueTx issues the signed tx.
