@@ -171,20 +171,7 @@ func GetChainConfig(agoUpgrade upgrade.Config, chainID *big.Int) *ChainConfig {
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
-		NetworkUpgrades: NetworkUpgrades{
-			ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase1Time),
-			ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase2Time),
-			ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase3Time),
-			ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase4Time),
-			ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase5Time),
-			ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(agoUpgrade.ApricotPhasePre6Time),
-			ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase6Time),
-			ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(agoUpgrade.ApricotPhasePost6Time),
-			BanffBlockTimestamp:             utils.TimeToNewUint64(agoUpgrade.BanffTime),
-			CortinaBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.CortinaTime),
-			DurangoBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.DurangoTime),
-			EtnaTimestamp:                   utils.TimeToNewUint64(agoUpgrade.EtnaTime),
-		},
+		NetworkUpgrades:     getNetworkUpgrades(agoUpgrade),
 	}
 }
 

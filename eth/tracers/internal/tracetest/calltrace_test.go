@@ -34,6 +34,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
@@ -275,6 +277,7 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 
 func TestInternals(t *testing.T) {
 	var (
+		config    = params.GetChainConfig(upgrade.GetConfig(constants.MainnetID), params.AvalancheMainnetChainID)
 		to        = common.HexToAddress("0x00000000000000000000000000000000deadbeef")
 		origin    = common.HexToAddress("0x00000000000000000000000000000000feed")
 		txContext = vm.TxContext{
@@ -388,7 +391,7 @@ func TestInternals(t *testing.T) {
 				}, false, rawdb.HashScheme)
 			defer triedb.Close()
 
-			evm := vm.NewEVM(context, txContext, statedb, params.AvalancheMainnetChainConfig, vm.Config{Tracer: tc.tracer})
+			evm := vm.NewEVM(context, txContext, statedb, config, vm.Config{Tracer: tc.tracer})
 			msg := &core.Message{
 				To:                &to,
 				From:              origin,
