@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/google/btree"
 )
 
 var (
@@ -94,7 +94,8 @@ type subnetOnlyValidators struct {
 	aggregatedBalance uint64
 	calculator        *fee.ValidatorState
 
-	validators heap.Map[ids.ID, *subnetOnlyValidator] // validationID -> *subnetOnlyValidator
+	validators    *btree.BTreeG[*subnetOnlyValidator]
+	validatorsMap map[ids.ID]*subnetOnlyValidator
 
 	// validationID -> added for that validator since the last db write
 	validatorDiffs   map[ids.ID]*subnetOnlyValidatorDiff
@@ -111,7 +112,7 @@ func newSubnetOnlyValidators(
 		aggregatedBalance: 0,
 		calculator:        calculator,
 
-		validators:       heap.NewMap[ids.ID, *subnetOnlyValidator]((*subnetOnlyValidator).Less),
+		validators:       btree.NewG(defaultTreeDegree, (*subnetOnlyValidator).Less),
 		validatorDiffs:   make(map[ids.ID]*subnetOnlyValidatorDiff),
 		validatorDB:      validatorDB,
 		validatorManager: validatorManager,
@@ -127,11 +128,11 @@ func (s *subnetOnlyValidators) AddValidator(
 	endTime uint64,
 	pk *bls.PublicKey,
 ) error {
-	if s.validators.Contains(validationID) {
+	if _, ok := s.validatorsMap[validationID]; ok {
 		return ErrAlreadyValidator
 	}
 
-	s.validators.Push(validationID, &subnetOnlyValidator{
+	sov := &subnetOnlyValidator{
 		ValidationID: validationID,
 		SubnetID:     subnetID,
 		NodeID:       nodeID,
@@ -141,8 +142,9 @@ func (s *subnetOnlyValidators) AddValidator(
 		PublicKey:    pk,
 
 		EndTime: endTime,
-	})
-
+	}
+	s.validatorsMap[validationID] = sov
+	s.validators.ReplaceOrInsert(sov)
 	s.validatorDiffs[validationID] = &subnetOnlyValidatorDiff{
 		weightDiff: &ValidatorWeightDiff{
 			Decrease: false,
@@ -155,21 +157,23 @@ func (s *subnetOnlyValidators) AddValidator(
 }
 
 func (s *subnetOnlyValidators) ExitValidator(validationID ids.ID) (uint64, error) {
-	vdr, ok := s.validators.Remove(validationID)
+	sov, ok := s.validatorsMap[validationID]
 	if !ok {
 		return 0, ErrValidatorNotFound
 	}
+	delete(s.validatorsMap, validationID)
+	s.validators.Delete(sov)
 
 	// Note: s.validatorDiffs is not updated here as the validator is only
 	// purged when its weight is set to 0 via SetValidatorWeight()
 	s.calculator.Current -= 1
 
-	toRefund := vdr.Balance - s.aggregatedBalance
+	toRefund := sov.Balance - s.aggregatedBalance
 	return toRefund, nil
 }
 
 func (s *subnetOnlyValidators) SetValidatorWeight(validationID ids.ID, newWeight uint64, newNonce uint64) (uint64, error) {
-	vdr, ok := s.validators.Get(validationID)
+	vdr, ok := s.validatorsMap[validationID]
 	if !ok {
 		return 0, ErrValidatorNotFound
 	}
@@ -179,14 +183,14 @@ func (s *subnetOnlyValidators) SetValidatorWeight(validationID ids.ID, newWeight
 		return 0, nil
 	}
 
-	if vdr.MinNonce == math.MaxUint64 && newWeight != 0 {
+	if newNonce == math.MaxUint64 && newWeight != 0 {
 		return 0, ErrNonZeroWeight
 	}
 
 	currentWeight := s.validatorManager.GetWeight(vdr.SubnetID, vdr.NodeID)
 
 	if newWeight == 0 {
-		s.validators.Remove(validationID)
+		s.validators.Delete(vdr)
 
 		s.validatorDiffs[validationID] = &subnetOnlyValidatorDiff{
 			weightDiff: &ValidatorWeightDiff{
@@ -226,10 +230,11 @@ func (s *subnetOnlyValidators) SetValidatorWeight(validationID ids.ID, newWeight
 }
 
 func (s *subnetOnlyValidators) IncreaseValidatorBalance(validationID ids.ID, toAdd uint64) error {
-	vdr, ok := s.validators.Get(validationID)
+	vdr, ok := s.validatorsMap[validationID]
 	if ok {
+		s.validators.Delete(vdr)
 		vdr.Balance += toAdd
-		s.validators.Fix(validationID)
+		s.validators.ReplaceOrInsert(vdr)
 
 		return nil
 	}
@@ -240,7 +245,7 @@ func (s *subnetOnlyValidators) IncreaseValidatorBalance(validationID ids.ID, toA
 	}
 
 	vdr.Balance = s.aggregatedBalance + toAdd
-	s.validators.Push(validationID, vdr)
+	s.validators.ReplaceOrInsert(vdr)
 
 	s.calculator.Current += 1
 	return nil
