@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/chain/p/backend"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
@@ -83,7 +82,7 @@ func NewWallet(
 	}
 
 	builderContext := newContext(ctx, config, state)
-	backend := backend.New(
+	backend := wallet.NewBackend(
 		builderContext,
 		common.NewChainUTXOs(constants.PlatformChainID, utxos),
 		owners,
@@ -101,12 +100,11 @@ func NewWallet(
 			kc,
 			backend,
 		),
-		backend,
 	)
 }
 
 type client struct {
-	backend backend.Backend
+	backend wallet.Backend
 }
 
 func (c *client) IssueTx(
