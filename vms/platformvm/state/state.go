@@ -645,12 +645,12 @@ func newState(
 		pendingStakers: newBaseStakers(),
 		subnetOnlyValidators: newSubnetOnlyValidators(
 			&fee.ValidatorState{
-				Current:  0,
-				Target:   10_000,
-				Capacity: 20_000,
-				Excess:   0,
-				MinFee:   2048,
-				K:        60_480_000_000,
+				Current:                  0,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   0,
+				MinFee:                   2048,
+				ExcessConversionConstant: 60_480_000_000,
 			},
 			linkeddb.NewDefault(currentSubnetOnlyValidatorBaseDB),
 			cfg.Validators,
