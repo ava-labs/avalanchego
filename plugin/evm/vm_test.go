@@ -83,7 +83,7 @@ var (
 		g := new(core.Genesis)
 		g.Difficulty = big.NewInt(0)
 		g.GasLimit = 8000000
-		g.Timestamp = 1607144400 // Sat Dec 05 2020 05:00:00 GMT+0000
+		g.Timestamp = uint64(upgrade.InitiallyActiveTime.Unix())
 
 		// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 		// config overridden in vm.Initialize.
@@ -145,6 +145,7 @@ func NewContext() *snow.Context {
 	ctx.ChainID = testCChainID
 	ctx.AVAXAssetID = testAvaxAssetID
 	ctx.XChainID = testXChainID
+	ctx.NetworkUpgrades = upgrade.GetConfig(testNetworkID)
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	_ = aliaser.Alias(testCChainID, "C")
 	_ = aliaser.Alias(testCChainID, testCChainID.String())
