@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/upgrade"
 	avalanchegoConstants "github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -448,20 +449,27 @@ func (vm *VM) Initialize(
 	}
 
 	var extDataHashes map[common.Hash]common.Hash
+	var chainID *big.Int
 	// Set the chain config for mainnet/fuji chain IDs
 	switch chainCtx.NetworkID {
 	case avalanchegoConstants.MainnetID:
-		config := *params.AvalancheMainnetChainConfig
-		g.Config = &config
+		chainID = params.AvalancheMainnetChainID
 		extDataHashes = mainnetExtDataHashes
 	case avalanchegoConstants.FujiID:
-		config := *params.AvalancheFujiChainConfig
-		g.Config = &config
+		chainID = params.AvalancheFujiChainID
 		extDataHashes = fujiExtDataHashes
 	case avalanchegoConstants.LocalID:
-		config := *params.AvalancheLocalChainConfig
-		g.Config = &config
+		chainID = params.AvalancheLocalChainID
+	default:
+		chainID = g.Config.ChainID
 	}
+
+	// if the chainCtx.NetworkUpgrades is not empty, set the chain config
+	// normally it should not be empty, but some tests may not set it
+	if chainCtx.NetworkUpgrades != (upgrade.Config{}) {
+		g.Config = params.GetChainConfig(chainCtx.NetworkUpgrades, new(big.Int).Set(chainID))
+	}
+
 	// If the Durango is activated, activate the Warp Precompile at the same time
 	if g.Config.DurangoBlockTimestamp != nil {
 		g.Config.PrecompileUpgrades = append(g.Config.PrecompileUpgrades, params.PrecompileUpgrade{
