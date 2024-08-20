@@ -8,27 +8,136 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
+
+	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
+
+func newTestVerifier(t testing.TB, s state.State) *verifier {
+	require := require.New(t)
+
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	pk := bls.PublicFromSecretKey(sk)
+
+	var (
+		upgrades = upgradetest.GetConfig(upgradetest.Latest)
+		ctx      = &snow.Context{
+			NetworkID:       constants.UnitTestID,
+			SubnetID:        constants.PrimaryNetworkID,
+			ChainID:         constants.PlatformChainID,
+			NodeID:          ids.GenerateTestNodeID(),
+			PublicKey:       pk,
+			NetworkUpgrades: upgrades,
+
+			XChainID:    ids.GenerateTestID(),
+			CChainID:    ids.GenerateTestID(),
+			AVAXAssetID: genesistest.AVAXAssetID,
+
+			Log: logging.NoLog{},
+		}
+		clock = &mockable.Clock{}
+		fx    = &secp256k1fx.Fx{}
+	)
+	require.NoError(fx.InitializeVM(&secp256k1fx.TestVM{
+		Clk: *clock,
+		Log: logging.NoLog{},
+	}))
+
+	return &verifier{
+		backend: &backend{
+			Mempool:      mempool,
+			lastAccepted: s.GetLastAccepted(),
+			blkIDToState: make(map[ids.ID]*blockState),
+			state:        s,
+			ctx:          ctx,
+		},
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
+				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
+				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
+				SybilProtectionEnabled: true,
+				UpgradeConfig:          upgrades,
+			},
+			Ctx: ctx,
+			Clk: clock,
+			Fx:  fx,
+			FlowChecker: utxo.NewVerifier(
+				ctx,
+				clock,
+				fx,
+			),
+			Bootstrapped: utils.NewAtomic(true),
+		},
+		pChainHeight: 0,
+	}
+}
+
+func newTestWallet(
+	t testing.TB,
+	v *verifier,
+) *txstest.Wallet {
+	ctx := &builder.Context{
+		NetworkID:   v.ctx.NetworkID,
+		AVAXAssetID: v.ctx.AVAXAssetID,
+	}
+	if !v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(v.state.GetTimestamp()) {
+		ctx.StaticFeeConfig = v.txExecutorBackend.Config.StaticFeeConfig
+	} else {
+		ctx.ComplexityWeights = v.txExecutorBackend.Config.DynamicFeeConfig.Weights
+		ctx.GasPrice = 10 * feecomponent.CalculateGasPrice(
+			v.txExecutorBackend.Config.DynamicFeeConfig.MinGasPrice,
+			v.state.GetFeeState().Excess,
+			v.txExecutorBackend.Config.DynamicFeeConfig.ExcessConversionConstant,
+		)
+	}
+
+	return txstest.NewWallet(
+		t,
+		v.state,
+		v.ctx.SharedMemory,
+		ctx,
+		secp256k1fx.NewKeychain(genesis.EWOQKey),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+}
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
 	require := require.New(t)
@@ -42,7 +151,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetFeeState().Return(fee.State{}).Times(2)
+	parentOnAcceptState.EXPECT().GetFeeState().Return(feecomponent.State{}).Times(2)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -273,7 +382,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	parentState.EXPECT().GetFeeState().Return(feecomponent.State{}).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -534,7 +643,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
+			s.EXPECT().GetFeeState().Return(feecomponent.State{}).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -631,7 +740,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			parentTime := defaultGenesisTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
+			s.EXPECT().GetFeeState().Return(feecomponent.State{}).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -746,7 +855,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	parentState.EXPECT().GetFeeState().Return(feecomponent.State{}).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
@@ -1039,4 +1148,80 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	// Verify the block.
 	err = verifier.BanffAbortBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestBlockExecutionWithComplexity(t *testing.T) {
+	s := statetest.New(t, memdb.New())
+	verifier := newTestVerifier(t, s)
+	wallet := newTestWallet(t, verifier)
+
+	baseTx0, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+	require.NoError(t, err)
+	baseTx1, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+	require.NoError(t, err)
+
+	blockComplexity, err := txfee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
+	require.NoError(t, err)
+	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name             string
+		timestamp        time.Time
+		expectedErr      error
+		expectedFeeState feecomponent.State
+	}{
+		{
+			name:        "no capacity",
+			timestamp:   genesistest.Time,
+			expectedErr: feecomponent.ErrInsufficientCapacity,
+		},
+		{
+			name:      "updates fee state",
+			timestamp: genesistest.Time.Add(10 * time.Second),
+			expectedFeeState: feecomponent.State{
+				Capacity: feecomponent.Gas(0).AddPerSecond(verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxGasPerSecond, 10) - blockGas,
+				Excess:   blockGas,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Clear the state to prevent prior tests from impacting this test.
+			clear(verifier.blkIDToState)
+
+			verifier.txExecutorBackend.Clk.Set(test.timestamp)
+			timestamp, _, err := state.NextBlockTime(s, verifier.txExecutorBackend.Clk)
+			require.NoError(err)
+
+			lastAcceptedID := s.GetLastAccepted()
+			lastAccepted, err := s.GetStatelessBlock(lastAcceptedID)
+			require.NoError(err)
+
+			blk, err := block.NewBanffStandardBlock(
+				timestamp,
+				lastAcceptedID,
+				lastAccepted.Height()+1,
+				[]*txs.Tx{
+					baseTx0,
+					baseTx1,
+				},
+			)
+			require.NoError(err)
+
+			blkID := blk.ID()
+			err = blk.Visit(verifier)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				require.NotContains(verifier.blkIDToState, blkID)
+				return
+			}
+
+			require.Contains(verifier.blkIDToState, blkID)
+			onAcceptState := verifier.blkIDToState[blkID].onAcceptState
+			require.Equal(test.expectedFeeState, onAcceptState.GetFeeState())
+		})
+	}
 }

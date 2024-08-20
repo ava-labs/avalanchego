@@ -183,7 +183,23 @@ var (
 	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
-func TxComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
+func TxComplexity(txs ...txs.UnsignedTx) (fee.Dimensions, error) {
+	var complexity fee.Dimensions
+	for _, tx := range txs {
+		txComplexity, err := txComplexity(tx)
+		if err != nil {
+			return fee.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&txComplexity)
+		if err != nil {
+			return fee.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func txComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
 	c := complexityVisitor{}
 	err := tx.Visit(&c)
 	return c.output, err
