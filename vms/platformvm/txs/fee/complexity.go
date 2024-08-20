@@ -181,7 +181,6 @@ var (
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
 			wrappers.IntLen + // subnetAuth typeID
-			wrappers.IntLen + // owner typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
 		fee.DBRead:  1,
 		fee.DBWrite: 1,
@@ -601,22 +600,14 @@ func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	if err != nil {
 		return err
 	}
-	output, err := IntrinsicConvertSubnetTxComplexities.Add(
+	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
 		&baseTxComplexity,
 		&authComplexity,
+		&fee.Dimensions{
+			fee.Bandwidth: uint64(len(tx.Address)),
+		},
 	)
-	if err != nil {
-		return err
-	}
-	output[fee.Bandwidth], err = math.Add(
-		output[fee.Bandwidth],
-		uint64(len(tx.Memo)),
-	)
-	if err != nil {
-		return err
-	}
-	c.output = output
-	return nil
+	return err
 }
 
 func baseTxComplexity(tx *txs.BaseTx) (fee.Dimensions, error) {
