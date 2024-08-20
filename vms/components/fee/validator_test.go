@@ -119,6 +119,8 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual := test.initial.CalculateContinuousFee(test.seconds)
 			require.Equal(t, test.expected, actual)
+			seconds := test.initial.CalculateTimeTillContinuousFee(test.expected)
+			require.Equal(t, test.seconds, seconds)
 		})
 	}
 }

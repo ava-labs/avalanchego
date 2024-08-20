@@ -3,10 +3,6 @@
 
 package fee
 
-import (
-	"fmt"
-)
-
 type ValidatorState struct {
 	Current                  Gas
 	Target                   Gas
@@ -14,10 +10,6 @@ type ValidatorState struct {
 	Excess                   Gas
 	MinFee                   GasPrice
 	ExcessConversionConstant Gas
-}
-
-func (v ValidatorState) CurrentFeeRate() GasPrice {
-	return v.MinFee.MulExp(v.Excess, v.ExcessConversionConstant)
 }
 
 func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
@@ -50,35 +42,25 @@ func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
 }
 
 // Returns the first number n where CalculateContinuousFee(n) >= balance
-func (v ValidatorState) CalculateTimeTillContinuousFee(balance uint64) (uint64, uint64) {
-	// Lower bound can be derived from [MinFee].
-	n := balance / uint64(v.MinFee)
-	interval := n
+func (v ValidatorState) CalculateTimeTillContinuousFee(balance uint64) uint64 {
+	var (
+		totalFee uint64
+		i        uint64
 
-	numIters := 0
+		x = v.Excess
+	)
 	for {
-		fmt.Printf("n=%d", n)
-		feeAtN := v.CalculateContinuousFee(n)
-		feeBeforeN := v.CalculateContinuousFee(n - 1)
-		if feeAtN == balance {
-			return n, uint64(numIters)
+		i += 1
+
+		if v.Current < v.Target {
+			x = x.SubPerSecond(v.Target-v.Current, 1)
+		} else {
+			x = x.AddPerSecond(v.Current-v.Target, 1)
 		}
 
-		if feeAtN > balance && feeBeforeN < balance {
-			return n, uint64(numIters)
+		totalFee += uint64(v.MinFee.MulExp(x, v.ExcessConversionConstant))
+		if totalFee >= balance {
+			return i
 		}
-
-		if feeAtN > balance {
-			if interval > 1 {
-				interval /= 2
-			}
-			n -= interval
-		}
-
-		if feeAtN < balance {
-			n += interval
-		}
-
-		numIters++
 	}
 }
