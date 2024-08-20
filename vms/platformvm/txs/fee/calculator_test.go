@@ -229,7 +229,7 @@ var (
 				fee.DBWrite:   IntrinsicConvertSubnetTxComplexities[fee.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
 				fee.Compute:   0, // TODO: implement
 			},
-			expectedDynamicFee: 175_600,
+			expectedDynamicFee: 175_900,
 		},
 	}
 )
