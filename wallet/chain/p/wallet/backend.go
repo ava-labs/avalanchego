@@ -48,7 +48,7 @@ func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetOwner m
 
 func (b *backend) AcceptTx(ctx context.Context, tx *txs.Tx) error {
 	txID := tx.ID()
-	err := tx.Unsigned.Visit(&visitor{
+	err := tx.Unsigned.Visit(&backendVisitor{
 		b:    b,
 		ctx:  ctx,
 		txID: txID,
