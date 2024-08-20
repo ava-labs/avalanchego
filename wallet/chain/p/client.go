@@ -15,25 +15,25 @@ import (
 var (
 	ErrNotCommitted = errors.New("not committed")
 
-	_ wallet.Client = (*client)(nil)
+	_ wallet.Client = (*Client)(nil)
 )
 
 func NewClient(
 	c platformvm.Client,
 	b wallet.Backend,
-) wallet.Client {
-	return &client{
+) *Client {
+	return &Client{
 		client:  c,
 		backend: b,
 	}
 }
 
-type client struct {
+type Client struct {
 	client  platformvm.Client
 	backend wallet.Backend
 }
 
-func (c *client) IssueTx(
+func (c *Client) IssueTx(
 	tx *txs.Tx,
 	options ...common.Option,
 ) error {
