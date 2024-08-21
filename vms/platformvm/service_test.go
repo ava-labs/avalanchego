@@ -77,8 +77,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
-	vm, factory, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
+func defaultService(t *testing.T, fork upgradetest.Fork) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
+	vm, factory, _, mutableSharedMemory := defaultVM(t, fork)
 
 	return &Service{
 		vm:          vm,
@@ -92,7 +92,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.Wall
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, upgradetest.Latest)
 	service.vm.ctx.Lock.Lock()
 
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -122,7 +122,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory, factory := defaultService(t)
+	service, mutableSharedMemory, factory := defaultService(t, upgradetest.Latest)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -311,7 +311,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _, txBuilder := defaultService(t)
+				service, _, txBuilder := defaultService(t, upgradetest.Latest)
 				service.vm.ctx.Lock.Lock()
 
 				tx, err := test.createTx(service, txBuilder)
@@ -375,10 +375,10 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, upgradetest.Durango)
 
 	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
-	createSubnetFee, err := feeCalculator.CalculateFee(&txs.CreateSubnetTx{})
+	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
 	require.NoError(err)
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -407,7 +407,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t)
+	service, _, factory := defaultService(t, upgradetest.Latest)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
@@ -596,7 +596,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t)
+	service, _, factory := defaultService(t, upgradetest.Latest)
 
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 
@@ -731,7 +731,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, upgradetest.Latest)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -767,7 +767,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _, factory := defaultService(t)
+			service, _, factory := defaultService(t, upgradetest.Latest)
 			service.vm.ctx.Lock.Lock()
 
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
@@ -1059,7 +1059,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetSubnets(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _, _ := defaultService(t, upgradetest.Latest)
 
 	testSubnet1ID := testSubnet1.ID()
 
@@ -1131,7 +1131,7 @@ func TestGetFeeConfig(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			service, _, _ := defaultService(t)
+			service, _, _ := defaultService(t, upgradetest.Latest)
 			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
 
 			var reply fee.Config
@@ -1145,7 +1145,7 @@ func FuzzGetFeeState(f *testing.F) {
 	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
 		require := require.New(t)
 
-		service, _, _ := defaultService(t)
+		service, _, _ := defaultService(t, upgradetest.Latest)
 
 		var (
 			expectedState = fee.State{
