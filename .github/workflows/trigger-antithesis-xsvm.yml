@@ -2,7 +2,7 @@ name: Trigger Antithesis XSVM Setup
 
 on:
   schedule:
-    - cron: '0 10 * * *' # Every day at 10AM UTC
+    - cron: '0 6 * * *' # Every day at 6AM UTC
   workflow_dispatch:
     inputs:
       duration:
@@ -37,5 +37,5 @@ jobs:
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           # Duration is in hours
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '11.25' }}
+            custom.duration=${{ github.event.inputs.duration || '7.5' }}
             custom.workload=xsvm

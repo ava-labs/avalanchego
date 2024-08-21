@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -1120,7 +1119,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 }
 
 func TestBlockExecutionWithComplexity(t *testing.T) {
-	s := statetest.New(t, memdb.New())
+	s := statetest.New(t, statetest.Config{})
 	verifier := newTestVerifier(t, s)
 	wallet := txstest.NewWallet(
 		t,
