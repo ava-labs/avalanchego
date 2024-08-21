@@ -100,7 +100,7 @@ func (s signatureRequestHandler) AppRequest(
 
 	// Per ACP-118, the responseBytes are the serialized form of
 	// sdk.SignatureResponse.
-	resp := &sdk.SignatureResponse{Signature: sig[:]}
+	resp := &sdk.SignatureResponse{Signature: sig}
 	respBytes, err := proto.Marshal(resp)
 	if err != nil {
 		return nil, &common.AppError{

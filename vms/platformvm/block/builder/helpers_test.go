@@ -127,7 +127,8 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	atomicDB := prefixdb.New([]byte{1}, res.baseDB)
 	m := atomic.NewMemory(atomicDB)
 
-	res.ctx = snowtest.Context(t, snowtest.PChainID)
+	snowCtx := snowtest.Context(t, snowtest.PChainID)
+	res.ctx = snowCtx
 	res.msm = &mutableSharedMemory{
 		SharedMemory: m.NewSharedMemory(res.ctx.ChainID),
 	}
@@ -179,7 +180,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
 	res.network, err = network.New(
-		nil,
+		snowCtx,
 		res.backend.Ctx.Log,
 		res.backend.Ctx.NodeID,
 		res.backend.Ctx.SubnetID,
