@@ -489,6 +489,8 @@ func (v *verifier) processStandardTxs(
 			return nil, nil, nil, err
 		}
 
+		// If this block exceeds the available capacity, ConsumeGas will return
+		// an error.
 		feeState := state.GetFeeState()
 		feeState, err = feeState.ConsumeGas(blockGas)
 		if err != nil {
