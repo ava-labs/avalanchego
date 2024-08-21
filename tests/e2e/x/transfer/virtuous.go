@@ -87,6 +87,32 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 			require.NoError(err)
 			testKeys = append(testKeys, newKeys...)
 
+			const transferPerRound = units.MilliAvax
+
+			tc.By("Funding new keys")
+			fundingWallet := e2e.NewWallet(tc, env.NewKeychain(), env.GetRandomNodeURI())
+			for _, key := range newKeys {
+				_, err := fundingWallet.X().IssueBaseTx(
+					[]*avax.TransferableOutput{{
+						Asset: avax.Asset{
+							ID: fundingWallet.X().Builder().Context().AVAXAssetID,
+						},
+						Out: &secp256k1fx.TransferOutput{
+							// Enough for 1 transfer per round
+							Amt: totalRounds * transferPerRound,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs: []ids.ShortID{
+									key.Address(),
+								},
+							},
+						},
+					}},
+					tc.WithDefaultContext(),
+				)
+				require.NoError(err)
+			}
+
 			runFunc := func(round int) {
 				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
 
@@ -167,15 +193,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				senderOrigBal := testBalances[fromIdx]
 				receiverOrigBal := testBalances[toIdx]
-
-				amountToTransfer := senderOrigBal / 10
-
-				// Special-case the transfer amount from the funded key to ensure
-				// that new keys have enough funds to perform their own transfers.
-				if shortAddrs[fromIdx] == env.PreFundedKey.Address() {
-					amountToTransfer = 10 * units.Avax
-				}
-
+				amountToTransfer := transferPerRound
 				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
