@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -101,8 +101,8 @@ type Chain interface {
 	GetTimestamp() time.Time
 	SetTimestamp(tm time.Time)
 
-	GetFeeState() fee.State
-	SetFeeState(f fee.State)
+	GetFeeState() gas.State
+	SetFeeState(f gas.State)
 
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
@@ -367,7 +367,7 @@ type state struct {
 
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
-	feeState, persistedFeeState           fee.State
+	feeState, persistedFeeState           gas.State
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -1038,11 +1038,11 @@ func (s *state) SetTimestamp(tm time.Time) {
 	s.timestamp = tm
 }
 
-func (s *state) GetFeeState() fee.State {
+func (s *state) GetFeeState() gas.State {
 	return s.feeState
 }
 
-func (s *state) SetFeeState(feeState fee.State) {
+func (s *state) SetFeeState(feeState gas.State) {
 	s.feeState = feeState
 }
 
@@ -2524,7 +2524,7 @@ func isInitialized(db database.KeyValueReader) (bool, error) {
 	return db.Has(InitializedKey)
 }
 
-func putFeeState(db database.KeyValueWriter, feeState fee.State) error {
+func putFeeState(db database.KeyValueWriter, feeState gas.State) error {
 	feeStateBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, feeState)
 	if err != nil {
 		return err
@@ -2532,18 +2532,18 @@ func putFeeState(db database.KeyValueWriter, feeState fee.State) error {
 	return db.Put(FeeStateKey, feeStateBytes)
 }
 
-func getFeeState(db database.KeyValueReader) (fee.State, error) {
+func getFeeState(db database.KeyValueReader) (gas.State, error) {
 	feeStateBytes, err := db.Get(FeeStateKey)
 	if err == database.ErrNotFound {
-		return fee.State{}, nil
+		return gas.State{}, nil
 	}
 	if err != nil {
-		return fee.State{}, err
+		return gas.State{}, err
 	}
 
-	var feeState fee.State
+	var feeState gas.State
 	if _, err := block.GenesisCodec.Unmarshal(feeStateBytes, &feeState); err != nil {
-		return fee.State{}, err
+		return gas.State{}, err
 	}
 	return feeState, nil
 }

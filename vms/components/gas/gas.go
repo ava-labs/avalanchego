@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fee
+package gas
 
 import (
 	"math"
@@ -14,14 +14,14 @@ import (
 var maxUint64 = new(uint256.Int).SetUint64(math.MaxUint64)
 
 type (
-	Gas      uint64
-	GasPrice uint64
+	Gas   uint64
+	Price uint64
 )
 
 // Cost converts the gas to nAVAX based on the price.
 //
 // If overflow would occur, an error is returned.
-func (g Gas) Cost(price GasPrice) (uint64, error) {
+func (g Gas) Cost(price Price) (uint64, error) {
 	return safemath.Mul(uint64(g), uint64(price))
 }
 
@@ -55,7 +55,7 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 	return Gas(totalGas)
 }
 
-// CalculateGasPrice returns the gas price given the minimum gas price, the
+// CalculatePrice returns the gas price given the minimum gas price, the
 // excess gas, and the excess conversion constant.
 //
 // It is defined as an approximation of:
@@ -82,11 +82,11 @@ func (g Gas) SubPerSecond(gasPerSecond Gas, seconds uint64) Gas {
 // This function does not perform any memory allocations.
 //
 //nolint:dupword // The python is copied from the EIP-4844 specification
-func CalculateGasPrice(
-	minPrice GasPrice,
+func CalculatePrice(
+	minPrice Price,
 	excess Gas,
 	excessConversionConstant Gas,
-) GasPrice {
+) Price {
 	var (
 		numerator   uint256.Int
 		denominator uint256.Int
@@ -117,5 +117,5 @@ func CalculateGasPrice(
 
 		i.AddUint64(&i, 1)
 	}
-	return GasPrice(output.Div(&output, &denominator).Uint64())
+	return Price(output.Div(&output, &denominator).Uint64())
 }

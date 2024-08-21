@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -54,7 +54,7 @@ func TestDiffFeeState(t *testing.T) {
 	require.NoError(err)
 
 	initialFeeState := state.GetFeeState()
-	newFeeState := fee.State{
+	newFeeState := gas.State{
 		Capacity: initialFeeState.Capacity + 1,
 		Excess:   initialFeeState.Excess + 1,
 	}
@@ -100,7 +100,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -134,7 +134,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -174,7 +174,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -220,7 +220,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -360,7 +360,7 @@ func TestDiffTx(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -457,7 +457,7 @@ func TestDiffUTXO(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)

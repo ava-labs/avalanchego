@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 const (
@@ -106,10 +106,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// AVAX fees:
 	// Dynamic fees:
-	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
-	fs.Uint64(DynamicFeesDBReadWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.DBRead], "Complexity multiplier used to convert DB Reads into Gas")
-	fs.Uint64(DynamicFeesDBWriteWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.DBWrite], "Complexity multiplier used to convert DB Writes into Gas")
-	fs.Uint64(DynamicFeesComputeWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.Compute], "Complexity multiplier used to convert Compute into Gas")
+	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
+	fs.Uint64(DynamicFeesDBReadWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.DBRead], "Complexity multiplier used to convert DB Reads into Gas")
+	fs.Uint64(DynamicFeesDBWriteWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.DBWrite], "Complexity multiplier used to convert DB Writes into Gas")
+	fs.Uint64(DynamicFeesComputeWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Compute], "Complexity multiplier used to convert Compute into Gas")
 	fs.Uint64(DynamicFeesMaxGasCapacityKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxGasCapacity), "Maximum amount of Gas the chain is allowed to store for future use")
 	fs.Uint64(DynamicFeesMaxGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxGasPerSecond), "Rate at which Gas is stored for future use")
 	fs.Uint64(DynamicFeesTargetGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.TargetGasPerSecond), "Target rate of Gas usage")

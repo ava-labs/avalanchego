@@ -17,20 +17,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common/utxotest"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -93,7 +92,7 @@ var (
 	testContextPreEtna = &builder.Context{
 		NetworkID:   constants.UnitTestID,
 		AVAXAssetID: avaxAssetID,
-		StaticFeeConfig: txfee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                         units.MicroAvax,
 			CreateSubnetTxFee:             19 * units.MicroAvax,
 			TransformSubnetTxFee:          789 * units.MicroAvax,
@@ -104,7 +103,7 @@ var (
 			AddSubnetDelegatorFee:         9 * units.Avax,
 		},
 	}
-	staticFeeCalculator = txfee.NewStaticCalculator(
+	staticFeeCalculator = fee.NewStaticCalculator(
 		testContextPreEtna.StaticFeeConfig,
 	)
 
@@ -112,15 +111,15 @@ var (
 		NetworkID:   constants.UnitTestID,
 		AVAXAssetID: avaxAssetID,
 
-		ComplexityWeights: feecomponent.Dimensions{
-			feecomponent.Bandwidth: 1,
-			feecomponent.DBRead:    10,
-			feecomponent.DBWrite:   100,
-			feecomponent.Compute:   1000,
+		ComplexityWeights: gas.Dimensions{
+			gas.Bandwidth: 1,
+			gas.DBRead:    10,
+			gas.DBWrite:   100,
+			gas.Compute:   1000,
 		},
 		GasPrice: 1,
 	}
-	dynamicFeeCalculator = txfee.NewDynamicCalculator(
+	dynamicFeeCalculator = fee.NewDynamicCalculator(
 		testContextPostEtna.ComplexityWeights,
 		testContextPostEtna.GasPrice,
 	)
@@ -160,7 +159,7 @@ var (
 type environment struct {
 	name          string
 	context       *builder.Context
-	feeCalculator txfee.Calculator
+	feeCalculator fee.Calculator
 	memo          []byte
 }
 
@@ -761,7 +760,7 @@ func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 // and verifies that the burned amount is exactly the required fee.
 func requireFeeIsCorrect(
 	require *require.Assertions,
-	feeCalculator txfee.Calculator,
+	feeCalculator fee.Calculator,
 	utx txs.UnsignedTx,
 	baseTx *avax.BaseTx,
 	additionalIns []*avax.TransferableInput,
