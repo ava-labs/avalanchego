@@ -45,6 +45,10 @@ func New(t testing.TB) *platformvmgenesis.Genesis {
 	require := require.New(t)
 
 	genesisValidator := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: constants.PlatformChainID,
+		}},
 		Validator: txs.Validator{
 			NodeID: ValidatorNodeID,
 			Start:  TimeUnix,
@@ -66,6 +70,10 @@ func New(t testing.TB) *platformvmgenesis.Genesis {
 	require.NoError(genesisValidatorTx.Initialize(txs.Codec))
 
 	genesisChain := &txs.CreateChainTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: constants.PlatformChainID,
+		}},
 		SubnetID:   constants.PrimaryNetworkID,
 		ChainName:  XChainName,
 		VMID:       constants.AVMID,
