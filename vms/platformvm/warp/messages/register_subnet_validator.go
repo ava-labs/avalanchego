@@ -14,7 +14,7 @@ import (
 // the given weight to the subnet.
 type RegisterSubnetValidator struct {
 	SubnetID  ids.ID                 `serialize:"true"`
-	NodeID    ids.NodeID             `serialize:"true"`
+	NodeID    ids.ID                 `serialize:"true"`
 	Weight    uint64                 `serialize:"true"`
 	BlsPubKey [bls.PublicKeyLen]byte `serialize:"true"`
 	Expiry    uint64                 `serialize:"true"`
@@ -25,7 +25,7 @@ type RegisterSubnetValidator struct {
 // NewRegisterSubnetValidator creates a new *RegisterSubnetValidator and initializes it.
 func NewRegisterSubnetValidator(
 	subnetID ids.ID,
-	nodeID ids.NodeID,
+	nodeID ids.ID,
 	weight uint64,
 	blsPubKey [bls.PublicKeyLen]byte,
 	expiry uint64,
