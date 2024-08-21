@@ -1864,7 +1864,7 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 
 	reply.State = s.vm.state.GetFeeState()
 	reply.Price = gas.CalculatePrice(
-		s.vm.DynamicFeeConfig.MinGasPrice,
+		s.vm.DynamicFeeConfig.MinPrice,
 		reply.State.Excess,
 		s.vm.DynamicFeeConfig.ExcessConversionConstant,
 	)

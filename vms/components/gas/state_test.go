@@ -12,13 +12,13 @@ import (
 
 func Test_State_AdvanceTime(t *testing.T) {
 	tests := []struct {
-		name               string
-		initial            State
-		maxGasCapacity     Gas
-		maxGasPerSecond    Gas
-		targetGasPerSecond Gas
-		duration           uint64
-		expected           State
+		name            string
+		initial         State
+		maxCapacity     Gas
+		maxPerSecond    Gas
+		targetPerSecond Gas
+		duration        uint64
+		expected        State
 	}{
 		{
 			name: "cap capacity",
@@ -26,10 +26,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   0,
 			},
-			maxGasCapacity:     20,
-			maxGasPerSecond:    10,
-			targetGasPerSecond: 0,
-			duration:           2,
+			maxCapacity:     20,
+			maxPerSecond:    10,
+			targetPerSecond: 0,
+			duration:        2,
 			expected: State{
 				Capacity: 20,
 				Excess:   0,
@@ -41,10 +41,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   0,
 			},
-			maxGasCapacity:     30,
-			maxGasPerSecond:    10,
-			targetGasPerSecond: 0,
-			duration:           1,
+			maxCapacity:     30,
+			maxPerSecond:    10,
+			targetPerSecond: 0,
+			duration:        1,
 			expected: State{
 				Capacity: 20,
 				Excess:   0,
@@ -56,10 +56,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   10,
 			},
-			maxGasCapacity:     20,
-			maxGasPerSecond:    10,
-			targetGasPerSecond: 10,
-			duration:           2,
+			maxCapacity:     20,
+			maxPerSecond:    10,
+			targetPerSecond: 10,
+			duration:        2,
 			expected: State{
 				Capacity: 20,
 				Excess:   0,
@@ -71,10 +71,10 @@ func Test_State_AdvanceTime(t *testing.T) {
 				Capacity: 10,
 				Excess:   10,
 			},
-			maxGasCapacity:     20,
-			maxGasPerSecond:    10,
-			targetGasPerSecond: 5,
-			duration:           1,
+			maxCapacity:     20,
+			maxPerSecond:    10,
+			targetPerSecond: 5,
+			duration:        1,
 			expected: State{
 				Capacity: 20,
 				Excess:   5,
@@ -83,7 +83,7 @@ func Test_State_AdvanceTime(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := test.initial.AdvanceTime(test.maxGasCapacity, test.maxGasPerSecond, test.targetGasPerSecond, test.duration)
+			actual := test.initial.AdvanceTime(test.maxCapacity, test.maxPerSecond, test.targetPerSecond, test.duration)
 			require.Equal(t, test.expected, actual)
 		})
 	}
