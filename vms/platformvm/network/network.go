@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -157,11 +158,16 @@ func New(
 	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
 		return nil, err
 	}
-	signatureRequestHandler := signatureRequestHandler{
-		signer: ctx.WarpSigner,
-	}
-	if err := p2pNetwork.AddHandler(p2p.SignatureRequestHandlerID, signatureRequestHandler); err != nil {
-		return nil, err
+
+	// Only register the signature request handler if this is a local network.
+	// TODO: Replace this with Etna-timestamp based gating.
+	if ctx.NetworkID != constants.FujiID && ctx.NetworkID != constants.MainnetID {
+		signatureRequestHandler := signatureRequestHandler{
+			signer: ctx.WarpSigner,
+		}
+		if err := p2pNetwork.AddHandler(p2p.SignatureRequestHandlerID, signatureRequestHandler); err != nil {
+			return nil, err
+		}
 	}
 
 	return &Network{

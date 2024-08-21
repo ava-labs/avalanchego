@@ -35,7 +35,9 @@ type signatureRequestHandler struct {
 	signer warp.Signer
 }
 
-// TODO: This should be allowed only for local networks
+// ACP-118 compliant handler for signing Warp messages.
+// This handler signs any Warp message that is a message type registered with the Warp messages codec.
+// TODO: Replace this with handlers that sign messages according to the VM rules.
 func (s signatureRequestHandler) AppRequest(
 	_ context.Context,
 	_ ids.NodeID,
