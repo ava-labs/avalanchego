@@ -11,6 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
+// gasPriceMultiplier increases the gas price to support multiple transactions
+// to be issued.
+const gasPriceMultiplier = 2
+
 func newContext(
 	ctx *snow.Context,
 	config *config.Config,
@@ -26,7 +30,7 @@ func newContext(
 	switch {
 	case config.UpgradeConfig.IsEtnaActivated(timestamp):
 		builderContext.ComplexityWeights = config.DynamicFeeConfig.Weights
-		builderContext.GasPrice = 10 * fee.CalculateGasPrice(
+		builderContext.GasPrice = gasPriceMultiplier * fee.CalculateGasPrice(
 			config.DynamicFeeConfig.MinGasPrice,
 			state.GetFeeState().Excess,
 			config.DynamicFeeConfig.ExcessConversionConstant,
