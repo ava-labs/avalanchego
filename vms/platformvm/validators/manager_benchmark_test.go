@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -110,9 +111,8 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
-		&config.Config{
-			Validators: vdrs,
-		},
+		vdrs,
+		upgradetest.GetConfig(upgradetest.Latest),
 		execConfig,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
