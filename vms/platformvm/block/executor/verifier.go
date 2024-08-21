@@ -495,6 +495,8 @@ func (v *verifier) processStandardTxs(
 			return nil, nil, nil, err
 		}
 
+		// Updating the fee state prior to executing the transactions is fine
+		// because the fee calculator was already created.
 		state.SetFeeState(feeState)
 	}
 
