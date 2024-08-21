@@ -148,7 +148,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	parentHeight := uint64(2022)
 
 	banffParentBlk, err := block.NewApricotStandardBlock(
-		genesisBlkID, // does not matter
+		ids.GenerateTestID(), // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
 	)
