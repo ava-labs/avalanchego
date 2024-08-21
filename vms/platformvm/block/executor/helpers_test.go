@@ -163,7 +163,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 			res.state,
 		)
 	} else {
-		genesisBlkID := ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
@@ -174,7 +173,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 		)
 
 		// setup expectations strictly needed for environment creation
-		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
+		res.mockedState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).Times(1)
 	}
 
 	res.backend = &executor.Backend{
