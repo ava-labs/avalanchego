@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -1451,7 +1451,7 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	db := memdb.New()
 	s := newTestState(t, db)
 
-	expectedFeeState := fee.State{
+	expectedFeeState := gas.State{
 		Capacity: 1,
 		Excess:   2,
 	}
@@ -1485,12 +1485,12 @@ func TestPutAndGetFeeState(t *testing.T) {
 	db := memdb.New()
 	defaultFeeState, err := getFeeState(db)
 	require.NoError(err)
-	require.Equal(fee.State{}, defaultFeeState)
+	require.Equal(gas.State{}, defaultFeeState)
 
 	//nolint:gosec // This does not require a secure random number generator
-	expectedFeeState := fee.State{
-		Capacity: fee.Gas(rand.Uint64()),
-		Excess:   fee.Gas(rand.Uint64()),
+	expectedFeeState := gas.State{
+		Capacity: gas.Gas(rand.Uint64()),
+		Excess:   gas.Gas(rand.Uint64()),
 	}
 	require.NoError(putFeeState(db, expectedFeeState))
 
@@ -1543,7 +1543,7 @@ func TestGetFeeStateErrors(t *testing.T) {
 			require.NoError(db.Put(FeeStateKey, test.value))
 
 			actualState, err := getFeeState(db)
-			require.Equal(fee.State{}, actualState)
+			require.Equal(gas.State{}, actualState)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}

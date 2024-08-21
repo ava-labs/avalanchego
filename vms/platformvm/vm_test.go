@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -58,6 +59,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -66,11 +68,9 @@ import (
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	snowgetter "github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	timetracker "github.com/ava-labs/avalanchego/snow/networking/tracker"
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	walletbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -112,18 +112,18 @@ var (
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
 	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
 
-	defaultStaticFeeConfig = txfee.StaticConfig{
+	defaultStaticFeeConfig = fee.StaticConfig{
 		TxFee:                 defaultTxFee,
 		CreateSubnetTxFee:     100 * defaultTxFee,
 		TransformSubnetTxFee:  100 * defaultTxFee,
 		CreateBlockchainTxFee: 100 * defaultTxFee,
 	}
-	defaultDynamicFeeConfig = feecomponent.Config{
-		Weights: feecomponent.Dimensions{
-			feecomponent.Bandwidth: 1,
-			feecomponent.DBRead:    1,
-			feecomponent.DBWrite:   1,
-			feecomponent.Compute:   1,
+	defaultDynamicFeeConfig = gas.Config{
+		Weights: gas.Dimensions{
+			gas.Bandwidth: 1,
+			gas.DBRead:    1,
+			gas.DBWrite:   1,
+			gas.Compute:   1,
 		},
 		MaxGasCapacity:           10_000,
 		MaxGasPerSecond:          1_000,

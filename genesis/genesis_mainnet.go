@@ -9,10 +9,9 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -23,7 +22,7 @@ var (
 	MainnetParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: 10 * units.MilliAvax,
-			StaticFeeConfig: txfee.StaticConfig{
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             1 * units.Avax,
 				TransformSubnetTxFee:          10 * units.Avax,
@@ -34,12 +33,12 @@ var (
 				AddSubnetDelegatorFee:         units.MilliAvax,
 			},
 			// TODO: Set these values to something more reasonable
-			DynamicFeeConfig: feecomponent.Config{
-				Weights: feecomponent.Dimensions{
-					feecomponent.Bandwidth: 1,
-					feecomponent.DBRead:    1,
-					feecomponent.DBWrite:   1,
-					feecomponent.Compute:   1,
+			DynamicFeeConfig: gas.Config{
+				Weights: gas.Dimensions{
+					gas.Bandwidth: 1,
+					gas.DBRead:    1,
+					gas.DBWrite:   1,
+					gas.Compute:   1,
 				},
 				MaxGasCapacity:           1_000_000,
 				MaxGasPerSecond:          1_000,
