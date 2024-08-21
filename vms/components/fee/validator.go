@@ -12,9 +12,26 @@ type ValidatorState struct {
 	ExcessConversionConstant Gas
 }
 
+func (v ValidatorState) AdvanceTime(seconds uint64) ValidatorState {
+	excess := v.Excess
+	if v.Current < v.Target {
+		excess = excess.SubPerSecond(v.Target-v.Current, seconds)
+	} else {
+		excess = excess.AddPerSecond(v.Current-v.Target, seconds)
+	}
+	return ValidatorState{
+		Current:                  v.Current,
+		Target:                   v.Target,
+		Capacity:                 v.Capacity,
+		Excess:                   excess,
+		MinFee:                   v.MinFee,
+		ExcessConversionConstant: v.ExcessConversionConstant,
+	}
+}
+
 func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
 	if v.Current == v.Target {
-		return uint64(CalculateGasPrice(v.MinFee, v.Excess, v.ExcessConversionConstant))
+		return seconds * uint64(CalculateGasPrice(v.MinFee, v.Excess, v.ExcessConversionConstant))
 	}
 
 	var totalFee uint64

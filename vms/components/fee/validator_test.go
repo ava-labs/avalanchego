@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_ValidatorState_CalculateFee(t *testing.T) {
+func Test_ValidatorState(t *testing.T) {
 	var (
 		minute uint64 = 60
 		hour          = 60 * minute
@@ -18,10 +18,11 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 	)
 
 	tests := []struct {
-		name     string
-		initial  ValidatorState
-		seconds  uint64
-		expected uint64
+		name          string
+		initial       ValidatorState
+		seconds       uint64
+		expectedFee   uint64
+		expectedState ValidatorState
 	}{
 		{
 			name: "excess=0, current<target, minute",
@@ -33,8 +34,16 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  minute,
-			expected: 122_880,
+			seconds:     minute,
+			expectedFee: 122_880,
+			expectedState: ValidatorState{
+				Current:                  10,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   0,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 		{
 			name: "excess=0, current>target, minute",
@@ -46,8 +55,16 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  minute,
-			expected: 122_880,
+			seconds:     minute,
+			expectedFee: 122_880,
+			expectedState: ValidatorState{
+				Current:                  15_000,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   300_000,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 		{
 			name: "excess=K, current=target, minute",
@@ -59,8 +76,16 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  minute,
-			expected: 334_020,
+			seconds:     minute,
+			expectedFee: 334_020,
+			expectedState: ValidatorState{
+				Current:                  10_000,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   60_480_000_000,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 		{
 			name: "excess=0, current>target, day",
@@ -69,11 +94,19 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				Target:                   10_000,
 				Capacity:                 20_000,
 				Excess:                   0,
-				MinFee:                   2048,
+				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  day,
-			expected: 177_538_111,
+			seconds:     day,
+			expectedFee: 177_538_111,
+			expectedState: ValidatorState{
+				Current:                  15_000,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   432_000_000,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 		{
 			name: "excess=K, current=target, day",
@@ -85,8 +118,16 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  day,
-			expected: 480_988_800,
+			seconds:     day,
+			expectedFee: 480_988_800,
+			expectedState: ValidatorState{
+				Current:                  10_000,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   60_480_000_000,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 		{
 			name: "excess hits 0 during, current<target, day",
@@ -95,11 +136,19 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				Target:                   10_000,
 				Capacity:                 20_000,
 				Excess:                   Gas(6 * hour * 1_000),
-				MinFee:                   2048,
+				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  day,
-			expected: 176_947_200,
+			seconds:     day,
+			expectedFee: 176_947_200,
+			expectedState: ValidatorState{
+				Current:                  9_000,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   0,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 		{
 			name: "excess=0, current>target, week",
@@ -108,19 +157,29 @@ func Test_ValidatorState_CalculateFee(t *testing.T) {
 				Target:                   10_000,
 				Capacity:                 20_000,
 				Excess:                   0,
-				MinFee:                   2048,
+				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
-			seconds:  week,
-			expected: 1_269_816_464,
+			seconds:     week,
+			expectedFee: 1_269_816_464,
+			expectedState: ValidatorState{
+				Current:                  15_000,
+				Target:                   10_000,
+				Capacity:                 20_000,
+				Excess:                   3_024_000_000,
+				MinFee:                   2_048,
+				ExcessConversionConstant: 60_480_000_000,
+			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := test.initial.CalculateContinuousFee(test.seconds)
-			require.Equal(t, test.expected, actual)
-			seconds := test.initial.CalculateTimeTillContinuousFee(test.expected)
+			actualFee := test.initial.CalculateContinuousFee(test.seconds)
+			require.Equal(t, test.expectedFee, actualFee)
+			seconds := test.initial.CalculateTimeTillContinuousFee(test.expectedFee)
 			require.Equal(t, test.seconds, seconds)
+			actualState := test.initial.AdvanceTime(seconds)
+			require.Equal(t, test.expectedState, actualState)
 		})
 	}
 }
