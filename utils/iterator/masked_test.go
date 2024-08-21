@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package iterator_test
 
 import (
 	"testing"
@@ -10,11 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func TestMaskedIterator(t *testing.T) {
+func TestMasked(t *testing.T) {
 	require := require.New(t)
-	stakers := []*Staker{
+	stakers := []*state.Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			NextTime: time.Unix(0, 0),
@@ -32,14 +34,14 @@ func TestMaskedIterator(t *testing.T) {
 			NextTime: time.Unix(3, 0),
 		},
 	}
-	maskedStakers := map[ids.ID]*Staker{
+	maskedStakers := map[ids.ID]*state.Staker{
 		stakers[0].TxID: stakers[0],
 		stakers[2].TxID: stakers[2],
 		stakers[3].TxID: stakers[3],
 	}
 
-	it := NewMaskedIterator(
-		NewSliceIterator(stakers[:3]...),
+	it := iterator.NewMasked(
+		iterator.NewSlice(stakers[:3]...),
 		maskedStakers,
 	)
 

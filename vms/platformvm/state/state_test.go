@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -81,18 +82,18 @@ func TestStateSyncGenesis(t *testing.T) {
 
 	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
+	assertIteratorsEqual(t, iterator.Empty[*Staker](), delegatorIterator)
 
 	stakerIterator, err := state.GetCurrentStakerIterator()
 	require.NoError(err)
-	assertIteratorsEqual(t, NewSliceIterator(staker), stakerIterator)
+	assertIteratorsEqual(t, iterator.NewSlice(staker), stakerIterator)
 
 	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
+	assertIteratorsEqual(t, iterator.Empty[*Staker](), delegatorIterator)
 }
 
 // Whenever we store a staker, a whole bunch a data structures are updated
