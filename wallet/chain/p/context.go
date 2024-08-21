@@ -13,6 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
+// gasPriceMultiplier increases the gas price to support multiple transactions
+// to be issued.
+//
+// TODO: Handle this better. Either here or in the mempool.
+const gasPriceMultiplier = 2
+
 func NewContextFromURI(ctx context.Context, uri string) (*builder.Context, error) {
 	infoClient := info.NewClient(uri)
 	xChainClient := avm.NewClient(uri, "X")
@@ -52,11 +58,7 @@ func NewContextFromClients(
 			NetworkID:         networkID,
 			AVAXAssetID:       asset.AssetID,
 			ComplexityWeights: dynamicFeeConfig.Weights,
-			// The gas price is doubled to attempt to handle concurrent tx
-			// issuance.
-			//
-			// TODO: Handle this better. Either here or in the mempool.
-			GasPrice: 2 * gasPrice,
+			GasPrice:          gasPriceMultiplier * gasPrice,
 		}, nil
 	}
 
