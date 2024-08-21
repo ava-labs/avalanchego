@@ -21,7 +21,7 @@ var (
 )
 
 type NodeID struct {
-	ShortNodeID
+	ShortNodeID `serialize:"true"`
 }
 
 // ToNodeID attempt to convert a byte slice into a node id
