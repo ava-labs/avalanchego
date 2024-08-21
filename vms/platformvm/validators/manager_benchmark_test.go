@@ -14,9 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -31,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -100,34 +99,11 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
-
-	execConfig, err := config.GetExecutionConfig(nil)
-	require.NoError(err)
-
-	metrics, err := metrics.New(prometheus.NewRegistry())
-	require.NoError(err)
-
-	s, err := state.New(
-		db,
-		genesisBytes,
-		prometheus.NewRegistry(),
-		vdrs,
-		upgradetest.GetConfig(upgradetest.Latest),
-		execConfig,
-		&snow.Context{
-			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
-			Log:       logging.NoLog{},
-		},
-		metrics,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
-	)
-	require.NoError(err)
+	s := statetest.New(b, statetest.Config{
+		DB:         db,
+		Genesis:    genesisBytes,
+		Validators: vdrs,
+	})
 
 	m := NewManager(
 		logging.NoLog{},
@@ -135,7 +111,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 			Validators: vdrs,
 		},
 		s,
-		metrics,
+		metrics.Noop,
 		new(mockable.Clock),
 	)
 
