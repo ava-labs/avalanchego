@@ -72,6 +72,14 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				},
 			},
 		}
+		// Ensure the change is returned to the pre-funded key
+		// TODO(marun) Remove when the wallet does this automatically
+		changeOwner := common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				keychain.Keys[0].Address(),
+			},
+		})
 
 		tc.By("sending funds from one address to another on the X-Chain", func() {
 			_, err := xWallet.IssueBaseTx(
@@ -85,6 +93,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					},
 				}},
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -102,6 +111,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				cContext.BlockchainID,
 				exportOutputs,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -115,6 +125,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				recipientEthAddress,
 				tc.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(tc, ethClient),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -131,6 +142,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				constants.PlatformChainID,
 				exportOutputs,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -140,6 +152,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				xContext.BlockchainID,
 				&recipientOwner,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
