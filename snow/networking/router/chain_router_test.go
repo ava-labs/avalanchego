@@ -634,7 +634,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.StateSummaryFrontierOp,
 			message.InternalGetStateSummaryFrontierFailed(
@@ -652,7 +651,6 @@ func TestRouterTimeout(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AcceptedStateSummaryOp,
@@ -672,7 +670,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.AcceptedFrontierOp,
 			message.InternalGetAcceptedFrontierFailed(
@@ -691,7 +688,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.AcceptedOp,
 			message.InternalGetAcceptedFailed(
@@ -709,7 +705,6 @@ func TestRouterTimeout(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AncestorsOp,
@@ -730,7 +725,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.PutOp,
 			message.InternalGetFailed(
@@ -749,7 +743,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.ChitsOp,
 			message.InternalQueryFailed(
@@ -767,7 +760,6 @@ func TestRouterTimeout(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
@@ -856,7 +848,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.StateSummaryFrontierOp,
 			message.InternalGetStateSummaryFrontierFailed(
@@ -884,7 +875,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AcceptedStateSummaryOp,
@@ -992,7 +982,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 			chainRouter.RegisterRequest(
 				context.Background(),
 				ids.EmptyNodeID,
-				ids.Empty,
 				ids.Empty,
 				requestID,
 				tt.responseOp,
@@ -1537,7 +1526,7 @@ func TestAppRequest(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
+			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
 			chainRouter.lock.Lock()
 			require.Equal(1, chainRouter.timedRequests.Len())
 			chainRouter.lock.Unlock()
