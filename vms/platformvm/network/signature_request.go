@@ -7,6 +7,8 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -15,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/messages"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
