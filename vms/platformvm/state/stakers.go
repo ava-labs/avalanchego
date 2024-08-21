@@ -340,7 +340,10 @@ func (s *diffStakers) GetDelegatorIterator(
 			parentIterator,
 			addedDelegatorIterator,
 		),
-		deletedDelegators,
+		func(staker *Staker) bool {
+			_, ok := deletedDelegators[staker.TxID]
+			return ok
+		},
 	)
 }
 
@@ -377,7 +380,10 @@ func (s *diffStakers) GetStakerIterator(parentIterator iterator.Iterator[*Staker
 			parentIterator,
 			iterator.NewTree(s.addedStakers),
 		),
-		s.deletedStakers,
+		func(staker *Staker) bool {
+			_, ok := s.deletedStakers[staker.TxID]
+			return ok
+		},
 	)
 }
 

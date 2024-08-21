@@ -3,28 +3,26 @@
 
 package iterator
 
-import "github.com/ava-labs/avalanchego/ids"
+var _ Iterator[any] = (*masked[any])(nil)
 
-var _ Iterator[Identifiable] = (*masked[Identifiable])(nil)
-
-type masked[T Identifiable] struct {
+type masked[T any] struct {
 	parentIterator Iterator[T]
-	maskedElements map[ids.ID]T
+	filter         func(T) bool
 }
 
 // NewMasked returns a new iterator that skips the elements in [parentIterator]
-// that are present in [maskedElements].
-func NewMasked[T Identifiable](parentIterator Iterator[T], maskedElements map[ids.ID]T) Iterator[T] {
+// that if the element is in [filter].
+func NewMasked[T any](parentIterator Iterator[T], filter func(T) bool) Iterator[T] {
 	return &masked[T]{
 		parentIterator: parentIterator,
-		maskedElements: maskedElements,
+		filter:         filter,
 	}
 }
 
 func (i *masked[T]) Next() bool {
 	for i.parentIterator.Next() {
 		element := i.parentIterator.Value()
-		if _, ok := i.maskedElements[element.ID()]; !ok {
+		if !i.filter(element) {
 			return true
 		}
 	}

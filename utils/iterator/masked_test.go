@@ -42,7 +42,10 @@ func TestMasked(t *testing.T) {
 
 	it := iterator.NewMasked(
 		iterator.NewSlice(stakers[:3]...),
-		maskedStakers,
+		func(staker *state.Staker) bool {
+			_, ok := maskedStakers[staker.TxID]
+			return ok
+		},
 	)
 
 	require.True(it.Next())

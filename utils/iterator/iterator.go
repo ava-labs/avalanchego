@@ -3,8 +3,6 @@
 
 package iterator
 
-import "github.com/ava-labs/avalanchego/ids"
-
 // Iterator defines an interface for iterating over a set.
 type Iterator[T any] interface {
 	// Next attempts to move the iterator to the next element in the set. It
@@ -18,10 +16,4 @@ type Iterator[T any] interface {
 	// Release any resources associated with the iterator. This must be called
 	// after the iterator is no longer needed.
 	Release()
-}
-
-// Identifiable defines an interface for elements that have unique identifiers.
-type Identifiable interface {
-	// ID must return a unique identifier for the element in the set.
-	ID() ids.ID
 }

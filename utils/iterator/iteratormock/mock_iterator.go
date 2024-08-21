@@ -12,7 +12,6 @@ package iteratormock
 import (
 	reflect "reflect"
 
-	ids "github.com/ava-labs/avalanchego/ids"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -77,41 +76,4 @@ func (m *MockIterator[T]) Value() T {
 func (mr *MockIteratorMockRecorder[T]) Value() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Value", reflect.TypeOf((*MockIterator[T])(nil).Value))
-}
-
-// MockIdentifiable is a mock of Identifiable interface.
-type MockIdentifiable struct {
-	ctrl     *gomock.Controller
-	recorder *MockIdentifiableMockRecorder
-}
-
-// MockIdentifiableMockRecorder is the mock recorder for MockIdentifiable.
-type MockIdentifiableMockRecorder struct {
-	mock *MockIdentifiable
-}
-
-// NewMockIdentifiable creates a new mock instance.
-func NewMockIdentifiable(ctrl *gomock.Controller) *MockIdentifiable {
-	mock := &MockIdentifiable{ctrl: ctrl}
-	mock.recorder = &MockIdentifiableMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIdentifiable) EXPECT() *MockIdentifiableMockRecorder {
-	return m.recorder
-}
-
-// ID mocks base method.
-func (m *MockIdentifiable) ID() ids.ID {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ID")
-	ret0, _ := ret[0].(ids.ID)
-	return ret0
-}
-
-// ID indicates an expected call of ID.
-func (mr *MockIdentifiableMockRecorder) ID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockIdentifiable)(nil).ID))
 }

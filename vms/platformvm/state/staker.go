@@ -11,14 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var (
-	_ btree.LessFunc[*Staker] = (*Staker).Less
-	_ iterator.Identifiable   = (*Staker)(nil)
-)
+var _ btree.LessFunc[*Staker] = (*Staker).Less
 
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
@@ -45,10 +41,6 @@ type Staker struct {
 	// [priorities.go] and depends on if the stakers are in the pending or
 	// current validator set.
 	Priority txs.Priority
-}
-
-func (s *Staker) ID() ids.ID {
-	return s.TxID
 }
 
 // A *Staker is considered to be less than another *Staker when:
