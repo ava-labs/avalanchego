@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -32,7 +34,9 @@ func New(t testing.TB, db database.Database) state.State {
 		upgradetest.GetConfig(upgradetest.Latest),
 		&config.DefaultExecutionConfig,
 		&snow.Context{
-			Log: logging.NoLog{},
+			NetworkID: constants.UnitTestID,
+			NodeID:    ids.GenerateTestNodeID(),
+			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
 		reward.NewCalculator(reward.Config{
