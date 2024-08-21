@@ -61,11 +61,11 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 			require.Equal(owner.Addrs, subnetOwner.Addrs)
 		})
 
-		newKeychain := env.NewKeychain()
+		newOwnerKey := e2e.NewPrivateKey(tc)
 		newOwner := &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				newKeychain.Keys[0].Address(),
+				newOwnerKey.Address(),
 			},
 		}
 

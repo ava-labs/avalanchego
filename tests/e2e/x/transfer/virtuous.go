@@ -91,27 +91,30 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 			tc.By("Funding new keys")
 			fundingWallet := e2e.NewWallet(tc, env.NewKeychain(), env.GetRandomNodeURI())
-			for _, key := range newKeys {
-				_, err := fundingWallet.X().IssueBaseTx(
-					[]*avax.TransferableOutput{{
-						Asset: avax.Asset{
-							ID: fundingWallet.X().Builder().Context().AVAXAssetID,
-						},
-						Out: &secp256k1fx.TransferOutput{
-							// Enough for 1 transfer per round
-							Amt: totalRounds * transferPerRound,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs: []ids.ShortID{
-									key.Address(),
-								},
+			fundingOutputs := make([]*avax.TransferableOutput, len(newKeys))
+			fundingAssetID := fundingWallet.X().Builder().Context().AVAXAssetID
+			for i, key := range newKeys {
+				fundingOutputs[i] = &avax.TransferableOutput{
+					Asset: avax.Asset{
+						ID: fundingAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						// Enough for 1 transfer per round
+						Amt: totalRounds * transferPerRound,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								key.Address(),
 							},
 						},
-					}},
-					tc.WithDefaultContext(),
-				)
-				require.NoError(err)
+					},
+				}
 			}
+			_, err = fundingWallet.X().IssueBaseTx(
+				fundingOutputs,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
 
 			runFunc := func(round int) {
 				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
