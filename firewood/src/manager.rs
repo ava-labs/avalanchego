@@ -3,30 +3,42 @@
 
 #![allow(dead_code)]
 
-use std::io::Error;
+use std::collections::HashMap;
+use std::num::NonZero;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::{collections::VecDeque, io::Error};
 
 use typed_builder::TypedBuilder;
 
 use crate::v2::api::HashKey;
 
-use storage::FileBacked;
+use storage::{Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, TrieHash};
 
 #[derive(Clone, Debug, TypedBuilder)]
 pub struct RevisionManagerConfig {
     /// The number of historical revisions to keep in memory.
     #[builder(default = 64)]
     max_revisions: usize,
+
+    #[builder(default_code = "NonZero::new(1024).expect(\"non-zero\")")]
+    node_cache_size: NonZero<usize>,
 }
 
 #[derive(Debug)]
 pub(crate) struct RevisionManager {
+    /// Maximum number of revisions to keep on disk
     max_revisions: usize,
-    filebacked: FileBacked,
-    // historical: VecDeque<Arc<Historical>>,
-    // proposals: Vec<Arc<ProposedImmutable>>, // TODO: Should be Vec<Weak<ProposedImmutable>>
+
+    /// The underlying file storage
+    filebacked: Arc<FileBacked>,
+
+    /// The list of revisions that are on disk; these point to the different roots
+    /// stored in the filebacked storage.
+    historical: VecDeque<Arc<NodeStore<Committed, FileBacked>>>,
+    proposals: Vec<Arc<NodeStore<ImmutableProposal, FileBacked>>>,
     // committing_proposals: VecDeque<Arc<ProposedImmutable>>,
-    // TODO: by_hash: HashMap<TrieHash, LinearStore>
+    by_hash: HashMap<TrieHash, Arc<NodeStore<Committed, FileBacked>>>,
     // TODO: maintain root hash of the most recent commit
 }
 
@@ -36,13 +48,21 @@ impl RevisionManager {
         truncate: bool,
         config: RevisionManagerConfig,
     ) -> Result<Self, Error> {
-        Ok(Self {
+        let storage = Arc::new(FileBacked::new(filename, config.node_cache_size, truncate)?);
+        let nodestore = Arc::new(NodeStore::new_empty_committed(storage.clone())?);
+        let manager = Self {
             max_revisions: config.max_revisions,
-            filebacked: FileBacked::new(filename, truncate)?,
-            // historical: Default::default(),
-            // proposals: Default::default(),
+            filebacked: storage,
+            historical: VecDeque::from([nodestore]),
+            by_hash: Default::default(),
+            proposals: Default::default(),
             // committing_proposals: Default::default(),
-        })
+        };
+        Ok(manager)
+    }
+
+    pub fn latest_revision(&self) -> Option<Arc<NodeStore<Committed, FileBacked>>> {
+        self.historical.back().cloned()
     }
 }
 
@@ -59,129 +79,117 @@ pub(crate) enum RevisionManagerError {
 }
 
 impl RevisionManager {
-    // TODO fix this or remove it. It should take in a proposal.
-    fn commit(&mut self, _proposal: ()) -> Result<(), RevisionManagerError> {
-        todo!()
-        // // detach FileBacked from all revisions to make writes safe
-        // let new_historical = self.prepare_for_writes(&proposal)?;
+    /// Commit a proposal
+    /// To commit a proposal involves a few steps:
+    /// 1. Commit check.
+    ///    The proposal’s parent must be the last committed revision, otherwise the commit fails.
+    /// 2. Persist delete list.
+    ///    The list of all nodes that were to be deleted for this proposal must be fully flushed to disk.
+    ///    The address of the root node and the root hash is also persisted.
+    ///    Note that this is *not* a write ahead log.
+    ///    It only contains the address of the nodes that are deleted, which should be very small.
+    /// 3. Set last committed revision.
+    ///    Set last committed revision in memory.
+    ///    Another commit can start after this but before the node flush is completed.
+    /// 4. Free list flush.
+    ///    Persist/write the free list header.
+    ///    The free list is flushed first to prevent future allocations from using the space allocated to this proposal.
+    ///    This should be done in a single write since the free list headers are small, and must be persisted to disk before starting the next step.
+    /// 5. Node flush.
+    ///    Persist/write all the nodes to disk.
+    ///    Note that since these are all freshly allocated nodes, they will never be referred to by any prior commit.
+    ///    After flushing all nodes, the file should be flushed to disk (fsync) before performing the next step.
+    /// 6. Root move.
+    ///    The root address on disk must be updated.
+    ///    This write can be delayed, but would mean that recovery will not roll forward to this revision.
+    /// 7. Proposal Cleanup.
+    ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
+    /// 8. Revision reaping.
+    ///    If more than the configurable number of revisions is available, the oldest revision can be forgotten.
+    pub fn commit(
+        &mut self,
+        proposal: Arc<NodeStore<ImmutableProposal, FileBacked>>,
+    ) -> Result<(), RevisionManagerError> {
+        // 1. Commit check
+        let current_revision = self.current_revision();
+        if !proposal
+            .kind
+            .parent_is(&current_revision.kind.as_nodestore_parent())
+        {
+            return Err(RevisionManagerError::NotLatest);
+        }
+        // 2. Persist delete list
+        // TODO
 
-        // // append this historical to the list of known historicals
-        // self.historical.push_back(new_historical);
+        // 3. Set last committed revision
+        let committed: Arc<NodeStore<Committed, FileBacked>> = proposal.as_committed().into();
+        self.historical.push_back(committed.clone());
+        if let Some(hash) = committed.kind.root_hash() {
+            self.by_hash.insert(hash, committed.clone());
+        }
+        // TODO: We could allow other commits to start here using the pending list
 
-        // // forget about older revisions
-        // while self.historical.len() > self.max_revisions {
-        //     self.historical.pop_front();
-        // }
+        // 4. Free list flush
+        proposal.flush_freelist()?;
 
-        // // If we do copy on writes for underneath files, since we keep all changes
-        // // after bootstrapping, we should be able to read from the changes and the
-        // // read only file map to the state at bootstrapping.
-        // // We actually doesn't care whether the writes are successful or not
-        // // (crash recovery may need to be handled above)
-        // for write in proposal.new.iter() {
-        //     self.filebacked.write(*write.0, write.1)?;
-        // }
+        // 5. Node flush
+        proposal.flush_nodes()?;
 
-        // self.writes_completed(proposal)
-    }
+        // 6. Root move
+        proposal.flush_header()?;
 
-    // TODO fix or remove this. It should take in a proposal.
-    fn prepare_for_writes(&mut self, _proposal: ()) -> Result<(), RevisionManagerError> {
-        todo!()
-        // // check to see if we can commit this proposal
-        // let parent = proposal.parent();
-        // match parent {
-        //     LinearStoreParent::FileBacked(_) => {
-        //         if !self.committing_proposals.is_empty() {
-        //             return Err(RevisionManagerError::NotLatest);
-        //         }
-        //     }
-        //     LinearStoreParent::Proposed(ref parent_proposal) => {
-        //         let Some(last_commiting_proposal) = self.committing_proposals.back() else {
-        //             return Err(RevisionManagerError::NotLatest);
-        //         };
-        //         if !Arc::ptr_eq(parent_proposal, last_commiting_proposal) {
-        //             return Err(RevisionManagerError::NotLatest);
-        //         }
-        //     }
-        //     _ => return Err(RevisionManagerError::SiblingCommitted),
-        // }
-        // // checks complete: safe to commit
+        // 7. Proposal Cleanup
+        self.proposals.retain(|p| {
+            // TODO: reparent proposals; this needs a lock on the parent element of immutable proposals
+            // if p
+            //     .kind
+            //     .parent_is(&proposal.kind.as_nodestore_parent())
+            // {
+            //     p.kind.reparent_to(&committed.kind.as_nodestore_parent());
+            // }
+            !Arc::ptr_eq(&proposal, p)
+        });
 
-        // let new_historical = Arc::new(Historical::new(
-        //     std::mem::take(&mut proposal.old.clone()), // TODO: remove clone
-        //     parent.clone(),
-        //     proposal.size()?,
-        // ));
-
-        // // reparent the oldest historical to point to the new proposal
-        // if let Some(historical) = self.historical.back() {
-        //     historical.reparent(new_historical.clone().into());
-        // }
-
-        // // for each outstanding proposal, see if their parent is the last committed linear store
-        // for candidate in self
-        //     .proposals
-        //     .iter()
-        //     .filter(|&candidate| candidate.has_parent(&parent) && !Arc::ptr_eq(candidate, proposal))
-        // {
-        //     candidate.reparent(LinearStoreParent::Historical(new_historical.clone()));
-        // }
-
-        // // mark this proposal as committing
-        // self.committing_proposals.push_back(proposal.clone());
-
-        // Ok(new_historical)
-    }
-
-    // TODO fix or remove this. It should take in a proposal.
-    fn writes_completed(&mut self, _proposal: ()) -> Result<(), RevisionManagerError> {
-        todo!()
-        // // now that the committed proposal is on disk, reparent anything that pointed to our proposal,
-        // // which is now fully flushed to our parent, as our parent
-        // // TODO: This needs work when we support multiple simultaneous commit writes; we should
-        // // only do this work when the entire stack below us has been flushed
-        // let parent = proposal.parent();
-        // let proposal = LinearStoreParent::Proposed(proposal);
-        // for candidate in self
-        //     .proposals
-        //     .iter()
-        //     .filter(|&candidate| candidate.has_parent(&proposal))
-        // {
-        //     candidate.reparent(parent.clone());
-        // }
-
-        // // TODO: As of now, this is always what we just pushed, no support for multiple simultaneous
-        // // commits yet; the assert verifies this and should be removed when we add support for this
-        // let should_be_us = self
-        //     .committing_proposals
-        //     .pop_front()
-        //     .expect("can't be empty");
-        // assert!(
-        //     matches!(proposal, LinearStoreParent::Proposed(us) if Arc::ptr_eq(&us, &should_be_us))
-        // );
-
-        // // TODO: we should reparent fileback as the parent of this committed proposal??
-
-        // Ok(())
+        Ok(())
     }
 }
 
 pub type NewProposalError = (); // TODO implement
 
 impl RevisionManager {
-    // TODO fix this or remove it. It should take in a proposal.
-    pub fn add_proposal(&mut self, _proposal: ()) {
-        todo!()
-        // self.proposals.push(proposal);
+    pub fn add_proposal(&mut self, proposal: Arc<NodeStore<ImmutableProposal, FileBacked>>) {
+        self.proposals.push(proposal);
     }
 
-    pub fn revision(&self, _root_hash: HashKey) -> Result<(), RevisionManagerError> {
-        todo!()
+    pub fn revision(
+        &self,
+        root_hash: HashKey,
+    ) -> Result<Arc<NodeStore<Committed, FileBacked>>, RevisionManagerError> {
+        self.by_hash
+            .get(&root_hash)
+            .cloned()
+            .ok_or(RevisionManagerError::IO(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Revision not found",
+            )))
     }
 
-    pub fn root_hash(&self) -> Result<HashKey, RevisionManagerError> {
-        todo!()
+    pub fn root_hash(&self) -> Result<Option<HashKey>, RevisionManagerError> {
+        self.current_revision()
+            .kind
+            .root_hash()
+            .map(Option::Some)
+            .ok_or(RevisionManagerError::IO(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Root hash not found",
+            )))
+    }
+
+    fn current_revision(&self) -> Arc<NodeStore<Committed, FileBacked>> {
+        self.historical
+            .back()
+            .expect("there is always one revision")
+            .clone()
     }
 }
 

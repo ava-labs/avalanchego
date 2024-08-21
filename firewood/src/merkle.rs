@@ -127,11 +127,17 @@ fn get_helper<T: TrieReader>(
 }
 
 #[derive(Debug)]
-pub struct Merkle<T: TrieReader> {
+pub struct Merkle<T> {
     nodestore: T,
 }
 
-impl<T: TrieReader> From<T> for Merkle<T> {
+impl<T> Merkle<T> {
+    pub fn into_inner(self) -> T {
+        self.nodestore
+    }
+}
+
+impl<T> From<T> for Merkle<T> {
     fn from(nodestore: T) -> Self {
         Merkle { nodestore }
     }

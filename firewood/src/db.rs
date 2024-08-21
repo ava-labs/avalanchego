@@ -1,11 +1,11 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::MerkleError;
+use crate::merkle::{Merkle, MerkleError};
 use crate::proof::{Proof, ProofNode};
 use crate::range_proof::RangeProof;
 use crate::stream::MerkleKeyValueStream;
-use crate::v2::api::{self, KeyType};
+use crate::v2::api::{self, KeyType, ValueType};
 pub use crate::v2::api::{Batch, BatchOp};
 
 use crate::manager::{RevisionManager, RevisionManagerConfig};
@@ -15,8 +15,8 @@ use std::error::Error;
 use std::fmt;
 use std::io::Write;
 use std::path::Path;
-use std::sync::Arc;
-use storage::{Committed, FileBacked, HashedNodeReader, NodeStore};
+use std::sync::{Arc, RwLock};
+use storage::{Committed, FileBacked, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash};
 use typed_builder::TypedBuilder;
 
 // TODO use or remove
@@ -62,8 +62,9 @@ impl api::DbView for HistoricalRev {
         HashedNodeReader::root_hash(self).map_err(api::Error::IO)
     }
 
-    async fn val<K: api::KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, api::Error> {
-        todo!()
+    async fn val<K: api::KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, api::Error> {
+        let merkle = Merkle::from(self);
+        Ok(merkle.get_value(key.as_ref())?)
     }
 
     async fn single_key_proof<K: api::KeyType>(
@@ -209,36 +210,72 @@ pub struct DbConfig {
 #[derive(Debug)]
 pub struct Db {
     metrics: Arc<DbMetrics>,
-    _manager: RevisionManager,
+    // TODO: consider using https://docs.rs/lock_api/latest/lock_api/struct.RwLock.html#method.upgradable_read
+    // TODO: This should probably use an async RwLock
+    manager: RwLock<RevisionManager>,
 }
 
-// #[async_trait]
-// impl api::Db for Db {
-//     type Historical = HistoricalRev<HistoricalStore>;
+#[async_trait]
+impl api::Db for Db
+where
+    for<'p> Proposal<'p>: api::Proposal,
+{
+    type Historical = NodeStore<Committed, FileBacked>;
 
-//     type Proposal = Proposal<ProposedMutable>;
+    type Proposal<'p> = Proposal<'p> where Self: 'p;
 
-//     async fn revision(
-//         &self,
-//         _root_hash: HashKey,
-//     ) -> Result<Arc<HistoricalRev<HistoricalStore>>, api::Error> {
-//         let store = self.manager.revision(_root_hash)?;
-//         Ok(Arc::new(HistoricalRev::<HistoricalStore> {
-//             _historical: store,
-//         }))
-//     }
+    async fn revision(&self, root_hash: TrieHash) -> Result<Arc<Self::Historical>, api::Error> {
+        let nodestore = self
+            .manager
+            .read()
+            .expect("poisoned lock")
+            .revision(root_hash)?;
+        Ok(nodestore)
+    }
 
-//     async fn root_hash(&self) -> Result<HashKey, api::Error> {
-//         Ok(self.manager.root_hash()?)
-//     }
+    async fn root_hash(&self) -> Result<Option<TrieHash>, api::Error> {
+        Ok(self.manager.read().expect("poisoned lock").root_hash()?)
+    }
 
-//     async fn propose<K: KeyType, V: ValueType>(
-//         &self,
-//         _batch: api::Batch<K, V>,
-//     ) -> Result<Arc<Self::Proposal>, api::Error> {
-//         todo!()
-//     }
-// }
+    async fn propose<'p, K: KeyType, V: ValueType>(
+        &'p mut self,
+        batch: api::Batch<K, V>,
+    ) -> Result<Arc<Self::Proposal<'p>>, api::Error>
+    where
+        Self: 'p,
+    {
+        let parent = self
+            .manager
+            .read()
+            .expect("poisoned lock")
+            .latest_revision()
+            .expect("no latest revision");
+        let proposal = NodeStore::new(parent)?;
+        let mut merkle = Merkle::from(proposal);
+        for op in batch {
+            match op {
+                BatchOp::Put { key, value } => {
+                    merkle.insert(key.as_ref(), value.as_ref().into())?;
+                }
+                BatchOp::Delete { key } => {
+                    merkle.remove(key.as_ref())?;
+                }
+            }
+        }
+        let nodestore = merkle.into_inner();
+        let immutable: Arc<NodeStore<ImmutableProposal, FileBacked>> = Arc::new(nodestore.into());
+        self.manager
+            .write()
+            .expect("poisoned lock")
+            .add_proposal(immutable.clone());
+
+        Ok(Self::Proposal {
+            nodestore: immutable,
+            db: self,
+        }
+        .into())
+    }
+}
 
 #[metered(registry = DbMetrics, visibility = pub)]
 impl Db {
@@ -251,7 +288,7 @@ impl Db {
         )?;
         let db = Self {
             metrics,
-            _manager: manager,
+            manager: manager.into(),
         };
         Ok(db)
     }
@@ -271,5 +308,70 @@ impl Db {
 
     pub fn metrics(&self) -> Arc<DbMetrics> {
         self.metrics.clone()
+    }
+}
+
+#[derive(Debug)]
+pub struct Proposal<'p> {
+    nodestore: Arc<NodeStore<ImmutableProposal, FileBacked>>,
+    db: &'p Db,
+}
+
+#[async_trait]
+impl<'a> api::DbView for Proposal<'a> {
+    type Stream<'b> = MerkleKeyValueStream<'b, NodeStore<ImmutableProposal, FileBacked>> where Self: 'b;
+
+    async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
+        todo!()
+    }
+
+    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Box<[u8]>>, api::Error> {
+        todo!()
+    }
+
+    async fn single_key_proof<K: KeyType>(
+        &self,
+        _key: K,
+    ) -> Result<Option<Proof<ProofNode>>, api::Error> {
+        todo!()
+    }
+
+    async fn range_proof<K: KeyType, V>(
+        &self,
+        _first_key: Option<K>,
+        _last_key: Option<K>,
+        _limit: Option<usize>,
+    ) -> Result<Option<api::RangeProof<Box<[u8]>, Box<[u8]>, ProofNode>>, api::Error> {
+        todo!()
+    }
+
+    fn iter_option<K: KeyType>(
+        &self,
+        _first_key: Option<K>,
+    ) -> Result<Self::Stream<'_>, api::Error> {
+        todo!()
+    }
+}
+
+#[async_trait]
+impl<'a> api::Proposal for Proposal<'a> {
+    type Proposal = Proposal<'a>;
+
+    async fn propose<K: KeyType, V: ValueType>(
+        self: Arc<Self>,
+        _data: api::Batch<K, V>,
+    ) -> Result<Arc<Self::Proposal>, api::Error> {
+        todo!()
+    }
+
+    // When committing a proposal, refuse to commit if there are any cloned proposals.
+    async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
+        match Arc::into_inner(self) {
+            Some(proposal) => {
+                let mut manager = proposal.db.manager.write().expect("poisoned lock");
+                Ok(manager.commit(proposal.nodestore.clone())?)
+            }
+            None => Err(api::Error::CannotCommitClonedProposal),
+        }
     }
 }

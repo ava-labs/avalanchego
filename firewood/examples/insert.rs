@@ -5,13 +5,15 @@
 // insert some random keys using the front-end API.
 
 use clap::Parser;
-use std::{collections::HashMap, error::Error, ops::RangeInclusive};
+use std::{
+    borrow::BorrowMut as _, collections::HashMap, error::Error, ops::RangeInclusive, time::Instant,
+};
 
 use firewood::{
-    db::{Batch, BatchOp},
-    v2::api::DbView,
+    db::{Batch, BatchOp, Db, DbConfig},
+    v2::api::{Db as _, DbView, Proposal as _},
 };
-use rand::Rng;
+use rand::{distributions::Alphanumeric, Rng, SeedableRng as _};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -43,63 +45,60 @@ fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error +
 /// cargo run --release --example insert
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let cfg = DbConfig::builder().truncate(true).build();
+
+    let args = Args::parse();
+
+    let mut db = Db::new("rev_db", cfg)
+        .await
+        .expect("db initiation should succeed");
+
+    let keys = args.batch_size;
+    let start = Instant::now();
+
+    let mut rng = if let Some(seed) = args.seed {
+        rand::rngs::StdRng::seed_from_u64(seed)
+    } else {
+        rand::rngs::StdRng::from_entropy()
+    };
+
+    for _ in 0..args.number_of_batches {
+        let keylen = rng.gen_range(args.keylen.clone());
+        let valuelen = rng.gen_range(args.valuelen.clone());
+        let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
+            .map(|_| {
+                (
+                    rng.borrow_mut()
+                        .sample_iter(&Alphanumeric)
+                        .take(keylen)
+                        .collect::<Vec<u8>>(),
+                    rng.borrow_mut()
+                        .sample_iter(&Alphanumeric)
+                        .take(valuelen)
+                        .collect::<Vec<u8>>(),
+                )
+            })
+            .map(|(key, value)| BatchOp::Put { key, value })
+            .collect();
+
+        let verify = get_keys_to_verify(&batch, args.read_verify_percent);
+
+        #[allow(clippy::unwrap_used)]
+        let proposal = db.propose(batch).await.unwrap();
+        proposal.commit().await?;
+        verify_keys(&db, verify).await?;
+    }
+
+    let duration = start.elapsed();
+    println!(
+        "Generated and inserted {} batches of size {keys} in {duration:?}",
+        args.number_of_batches
+    );
+
     Ok(())
-
-    // TODO replace
-    // let cfg = DbConfig::builder().truncate(true).build();
-
-    // let args = Args::parse();
-
-    // let db = Db::new("rev_db", cfg)
-    //     .await
-    //     .expect("db initiation should succeed");
-
-    // let keys = args.batch_size;
-    // let start = Instant::now();
-
-    // let mut rng = if let Some(seed) = args.seed {
-    //     rand::rngs::StdRng::seed_from_u64(seed)
-    // } else {
-    //     rand::rngs::StdRng::from_entropy()
-    // };
-
-    // for _ in 0..args.number_of_batches {
-    //     let keylen = rng.gen_range(args.keylen.clone());
-    //     let valuelen = rng.gen_range(args.valuelen.clone());
-    //     let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
-    //         .map(|_| {
-    //             (
-    //                 rng.borrow_mut()
-    //                     .sample_iter(&Alphanumeric)
-    //                     .take(keylen)
-    //                     .collect::<Vec<u8>>(),
-    //                 rng.borrow_mut()
-    //                     .sample_iter(&Alphanumeric)
-    //                     .take(valuelen)
-    //                     .collect::<Vec<u8>>(),
-    //             )
-    //         })
-    //         .map(|(key, value)| BatchOp::Put { key, value })
-    //         .collect();
-
-    //     let verify = get_keys_to_verify(&batch, args.read_verify_percent);
-
-    //     #[allow(clippy::unwrap_used)]
-    //     let proposal = db.propose(batch).await.unwrap();
-    //     proposal.commit().await?;
-    //     verify_keys(&db, verify).await?;
-    // }
-
-    // let duration = start.elapsed();
-    // println!(
-    //     "Generated and inserted {} batches of size {keys} in {duration:?}",
-    //     args.number_of_batches
-    // );
-
-    // Ok(())
 }
 
-fn _get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<u8>, Vec<u8>> {
+fn get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<u8>, Box<[u8]>> {
     if pct == 0 {
         HashMap::new()
     } else {
@@ -108,7 +107,7 @@ fn _get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec
             .filter(|_last_key| rand::thread_rng().gen_range(0..=(100 - pct)) == 0)
             .map(|op| {
                 if let BatchOp::Put { key, value } = op {
-                    (key.clone(), value.clone())
+                    (key.clone(), value.clone().into_boxed_slice())
                 } else {
                     unreachable!()
                 }
@@ -117,9 +116,9 @@ fn _get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec
     }
 }
 
-async fn _verify_keys(
+async fn verify_keys(
     db: &impl firewood::v2::api::Db,
-    verify: HashMap<Vec<u8>, Vec<u8>>,
+    verify: HashMap<Vec<u8>, Box<[u8]>>,
 ) -> Result<(), firewood::v2::api::Error> {
     if !verify.is_empty() {
         let hash = db.root_hash().await?.expect("root hash should exist");
