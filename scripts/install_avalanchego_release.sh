@@ -92,7 +92,7 @@ else
 
       if [[ $CHECKOUT_STATUS -ne 0 ]]; then
         echo
-        echo "'${VERSION}' is not a valid release tag, commit hash, or branch name"
+        echo "'${AVALANCHE_VERSION}' is not a valid release tag, commit hash, or branch name"
         exit 1
       fi
     fi

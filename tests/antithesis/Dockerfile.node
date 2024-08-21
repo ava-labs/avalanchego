@@ -1,0 +1,32 @@
+# BUILDER_IMAGE_TAG should identify the builder image
+ARG BUILDER_IMAGE_TAG
+
+# AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
+ARG AVALANCHEGO_NODE_IMAGE
+
+# ============= Compilation Stage ================
+FROM antithesis-subnet-evm-builder:$BUILDER_IMAGE_TAG AS builder
+
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
+
+WORKDIR $BUILDER_WORKDIR
+
+# Build the VM
+RUN ./scripts/build.sh /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+
+# ============= Cleanup Stage ================
+FROM $AVALANCHEGO_NODE_IMAGE AS execution
+
+# Copy identifying information into the container. This will replace
+# the avalanchego commit hash in the base image.
+COPY --from=builder /build/commit_hash.txt /avalanchego/build/commit_hash.txt
+
+# Copy the antithesis dependencies into the container
+COPY --from=builder /instrumented/symbols /symbols
+
+# Copy the executable into the container
+COPY --from=builder /build/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy\
+ /avalanchego/build/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+
+# The node image's entrypoint will be reused.

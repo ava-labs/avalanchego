@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:experimental
 
 # ============= Setting up base Stage ================
-# Set required AVALANCHE_VERSION parameter in build image script
-ARG AVALANCHE_VERSION
+# AVALANCHEGO_NODE_IMAGE needs to identify an existing node image and should include the tag
+ARG AVALANCHEGO_NODE_IMAGE
 
 # ============= Compilation Stage ================
 FROM golang:1.21.12-bullseye AS builder
@@ -29,8 +29,8 @@ ARG CURRENT_BRANCH
 RUN export SUBNET_EVM_COMMIT=$SUBNET_EVM_COMMIT && export CURRENT_BRANCH=$CURRENT_BRANCH && ./scripts/build.sh build/subnet-evm
 
 # ============= Cleanup Stage ================
-FROM avaplatform/avalanchego:$AVALANCHE_VERSION AS builtImage
+FROM $AVALANCHEGO_NODE_IMAGE AS builtImage
 
 # Copy the evm binary into the correct location in the container
-ARG VM_ID
+ARG VM_ID=srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
 COPY --from=builder /build/build/subnet-evm /avalanchego/build/plugins/$VM_ID
