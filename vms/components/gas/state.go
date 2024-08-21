@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fee
+package gas
 
 import (
 	"errors"
@@ -17,23 +17,23 @@ type State struct {
 	Excess   Gas `serialize:"true" json:"excess"`
 }
 
-// AdvanceTime adds maxGasPerSecond to capacity and subtracts targetGasPerSecond
+// AdvanceTime adds maxPerSecond to capacity and subtracts targetPerSecond
 // from excess over the provided duration.
 //
-// Capacity is capped at maxGasCapacity.
+// Capacity is capped at maxCapacity.
 // Excess to be removed is capped at excess.
 func (s State) AdvanceTime(
-	maxGasCapacity Gas,
-	maxGasPerSecond Gas,
-	targetGasPerSecond Gas,
+	maxCapacity Gas,
+	maxPerSecond Gas,
+	targetPerSecond Gas,
 	duration uint64,
 ) State {
 	return State{
 		Capacity: min(
-			s.Capacity.AddPerSecond(maxGasPerSecond, duration),
-			maxGasCapacity,
+			s.Capacity.AddPerSecond(maxPerSecond, duration),
+			maxCapacity,
 		),
-		Excess: s.Excess.SubPerSecond(targetGasPerSecond, duration),
+		Excess: s.Excess.SubPerSecond(targetPerSecond, duration),
 	}
 }
 
