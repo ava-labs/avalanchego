@@ -1,0 +1,20 @@
+name: "Sync Subnet EVM Branch" 
+on:
+  workflow_dispatch:
+      inputs:
+        remoteBranch:
+            description: "Subnet EVM Branch"
+            required: true
+            default: "master"
+
+jobs:
+  sync_branch:
+    name: Sync Subnet EVM Branch
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "~1.21.12"
+          check-latest: true
