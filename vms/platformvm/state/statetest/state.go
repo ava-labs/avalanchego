@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,26 +27,63 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func New(t testing.TB, db database.Database) state.State {
-	s, err := state.New(
-		db,
-		genesistest.NewBytes(t),
-		prometheus.NewRegistry(),
-		validators.NewManager(),
-		upgradetest.GetConfig(upgradetest.Latest),
-		&config.DefaultExecutionConfig,
-		&snow.Context{
+type Config struct {
+	DB              database.Database
+	Genesis         []byte
+	Registerer      prometheus.Registerer
+	Validators      validators.Manager
+	Upgrades        upgrade.Config
+	ExecutionConfig config.ExecutionConfig
+	Context         *snow.Context
+	Metrics         metrics.Metrics
+	Rewards         reward.Calculator
+}
+
+func New(t testing.TB, c Config) state.State {
+	if c.DB == nil {
+		c.DB = memdb.New()
+	}
+	if len(c.Genesis) == 0 {
+		c.Genesis = genesistest.NewBytes(t)
+	}
+	if c.Registerer == nil {
+		c.Registerer = prometheus.NewRegistry()
+	}
+	if c.Upgrades == (upgrade.Config{}) {
+		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
+	}
+	if c.ExecutionConfig == (config.ExecutionConfig{}) {
+		c.ExecutionConfig = config.DefaultExecutionConfig
+	}
+	if c.Context == nil {
+		c.Context = &snow.Context{
 			NetworkID: constants.UnitTestID,
 			NodeID:    ids.GenerateTestNodeID(),
 			Log:       logging.NoLog{},
-		},
-		metrics.Noop,
-		reward.NewCalculator(reward.Config{
+		}
+	}
+	if c.Metrics == nil {
+		c.Metrics = metrics.Noop
+	}
+	if c.Rewards == nil {
+		c.Rewards = reward.NewCalculator(reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .1 * reward.PercentDenominator,
 			MintingPeriod:      365 * 24 * time.Hour,
 			SupplyCap:          720 * units.MegaAvax,
-		}),
+		})
+	}
+
+	s, err := state.New(
+		c.DB,
+		c.Genesis,
+		c.Registerer,
+		c.Validators,
+		c.Upgrades,
+		&c.ExecutionConfig,
+		c.Context,
+		c.Metrics,
+		c.Rewards,
 	)
 	require.NoError(t, err)
 	return s
