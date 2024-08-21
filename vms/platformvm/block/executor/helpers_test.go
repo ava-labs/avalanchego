@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -43,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -77,8 +77,7 @@ var (
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 
-	genesisBlkID ids.ID
-	testSubnet1  *txs.Tx
+	testSubnet1 *txs.Tx
 
 	// Node IDs of genesis validators. Initialized in init function
 	genesisNodeIDs []ids.NodeID
@@ -148,7 +147,14 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 
 	if ctrl == nil {
-		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+		res.state = statetest.New(t, statetest.Config{
+			DB:         res.baseDB,
+			Genesis:    buildGenesisTest(res.ctx),
+			Validators: res.config.Validators,
+			Context:    res.ctx,
+			Rewards:    rewardsCalc,
+		})
+
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 		res.factory = txstest.NewWalletFactory(
@@ -157,7 +163,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 			res.state,
 		)
 	} else {
-		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
@@ -168,7 +173,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 		)
 
 		// setup expectations strictly needed for environment creation
-		res.mockedState.EXPECT().GetLastAccepted().Return(genesisBlkID).Times(1)
+		res.mockedState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).Times(1)
 	}
 
 	res.backend = &executor.Backend{
@@ -290,37 +295,6 @@ func addSubnet(env *environment) {
 	if err := env.state.Commit(); err != nil {
 		panic(err)
 	}
-}
-
-func defaultState(
-	cfg *config.Config,
-	ctx *snow.Context,
-	db database.Database,
-	rewards reward.Calculator,
-) state.State {
-	genesisBytes := buildGenesisTest(ctx)
-	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
-	state, err := state.New(
-		db,
-		genesisBytes,
-		prometheus.NewRegistry(),
-		cfg,
-		execCfg,
-		ctx,
-		metrics.Noop,
-		rewards,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	// persist and reload to init a bunch of in-memory stuff
-	state.SetHeight(0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-	genesisBlkID = state.GetLastAccepted()
-	return state
 }
 
 func defaultConfig(f upgradetest.Fork) *config.Config {
