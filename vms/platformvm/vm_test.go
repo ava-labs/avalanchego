@@ -140,13 +140,9 @@ var (
 )
 
 func init() {
-	for _, key := range keys {
-		// TODO: use ids.GenerateTestNodeID() instead of ids.BuildTestNodeID
-		// Can be done when TestGetState is refactored
-		nodeBytes := key.PublicKey().Address()
-		nodeID := ids.BuildTestNodeID(nodeBytes[:])
-
-		genesisNodeIDs = append(genesisNodeIDs, nodeID)
+	genesisNodeIDs = make([]ids.NodeID, len(keys))
+	for i := range keys {
+		genesisNodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
 
@@ -173,7 +169,8 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
 	for i, nodeID := range genesisNodeIDs {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+		addr := keys[i].Address()
+		addrStr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
 			GenesisValidator: api.GenesisValidator{
@@ -183,11 +180,11 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,
-				Addresses: []string{addr},
+				Addresses: []string{addrStr},
 			},
 			Staked: []api.UTXO{{
 				Amount:  json.Uint64(defaultWeight),
-				Address: addr,
+				Address: addrStr,
 			}},
 			DelegationFee: reward.PercentDenominator,
 		}

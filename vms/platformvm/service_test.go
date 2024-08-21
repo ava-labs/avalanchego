@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
@@ -412,13 +413,13 @@ func TestGetStake(t *testing.T) {
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
 	addrsStrs := []string{}
-	for i, validator := range genesis.Validators {
-		addr := "P-" + validator.RewardOwner.Addresses[0]
-		addrsStrs = append(addrsStrs, addr)
+	for _, validator := range genesis.Validators {
+		addrStr := "P-" + validator.RewardOwner.Addresses[0]
+		addrsStrs = append(addrsStrs, addrStr)
 
 		args := GetStakeArgs{
 			JSONAddresses: api.JSONAddresses{
-				Addresses: []string{addr},
+				Addresses: []string{addrStr},
 			},
 			Encoding: formatting.Hex,
 		}
@@ -435,12 +436,25 @@ func TestGetStake(t *testing.T) {
 		_, err = txs.Codec.Unmarshal(outputBytes, &output)
 		require.NoError(err)
 
-		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(defaultWeight, out.Amount())
-		require.Equal(uint32(1), out.Threshold)
-		require.Len(out.Addrs, 1)
-		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
-		require.Zero(out.Locktime)
+		addr, err := address.ParseToID(addrStr)
+		require.NoError(err)
+		require.Equal(
+			avax.TransferableOutput{
+				Asset: avax.Asset{
+					ID: service.vm.ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: defaultWeight,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							addr,
+						},
+					},
+				},
+			},
+			output,
+		)
 	}
 
 	// Make sure this works for multiple addresses
@@ -464,7 +478,7 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.Equal(defaultWeight, out.Amount())
+		require.Equal(defaultWeight, out.Amt)
 		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
