@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
+	platformvmgenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
 var (
@@ -29,17 +31,17 @@ var (
 	ValidatorDuration                = 28 * 24 * time.Hour
 	ValidatorEndTime                 = Time.Add(ValidatorDuration)
 	ValidatorEndTimeUnix             = uint64(ValidatorEndTime.Unix())
-	ValidatorWeight                  = units.Avax
+	ValidatorWeight                  = units.MegaAvax
 	ValidatorRewardsOwner            = &secp256k1fx.OutputOwners{}
 	ValidatorDelegationShares uint32 = reward.PercentDenominator
 
 	XChainName = "x"
 
-	InitialBalance = units.Schmeckle
+	InitialBalance = 30 * units.MegaAvax
 	InitialSupply  = ValidatorWeight + InitialBalance
 )
 
-func New(t testing.TB) *genesis.Genesis {
+func New(t testing.TB) *platformvmgenesis.Genesis {
 	require := require.New(t)
 
 	genesisValidator := &txs.AddValidatorTx{
@@ -72,8 +74,8 @@ func New(t testing.TB) *genesis.Genesis {
 	genesisChainTx := &txs.Tx{Unsigned: genesisChain}
 	require.NoError(genesisChainTx.Initialize(txs.Codec))
 
-	return &genesis.Genesis{
-		UTXOs: []*genesis.UTXO{
+	return &platformvmgenesis.Genesis{
+		UTXOs: []*platformvmgenesis.UTXO{
 			{
 				UTXO: avax.UTXO{
 					UTXOID: avax.UTXOID{
@@ -83,6 +85,12 @@ func New(t testing.TB) *genesis.Genesis {
 					Asset: AVAXAsset,
 					Out: &secp256k1fx.TransferOutput{
 						Amt: InitialBalance,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								avalanchegenesis.EWOQKey.Address(),
+							},
+						},
 					},
 				},
 				Message: nil,
@@ -101,7 +109,7 @@ func New(t testing.TB) *genesis.Genesis {
 
 func NewBytes(t testing.TB) []byte {
 	g := New(t)
-	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, g)
+	genesisBytes, err := platformvmgenesis.Codec.Marshal(platformvmgenesis.CodecVersion, g)
 	require.NoError(t, err)
 	return genesisBytes
 }
