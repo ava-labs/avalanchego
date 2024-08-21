@@ -1,7 +1,13 @@
 name: Trigger Antithesis
 
 on:
-  # TODO(marun) Add a schedule
+  schedule:
+    # When adjusting the schedule and duration of execution, make sure
+    # to check the schedule of antithesis jobs scheduled by other
+    # repos (avalanchego and hypersdk). Ideally the schedules for
+    # different test setups should not overlap to avoid unintended
+    # resource contention.
+    - cron: '0 14 * * *' # Every day at 2PM UTC
   workflow_dispatch:
     inputs:
       duration:
@@ -36,5 +42,5 @@ jobs:
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           # Duration is in hours
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '11.25' }}
+            custom.duration=${{ github.event.inputs.duration || '7.5' }}
             custom.workload=subnet-evm
