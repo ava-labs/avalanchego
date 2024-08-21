@@ -48,7 +48,7 @@ type Staker struct {
 }
 
 func (s *Staker) ID() ids.ID {
-	return s.ID()
+	return s.TxID
 }
 
 // A *Staker is considered to be less than another *Staker when:
