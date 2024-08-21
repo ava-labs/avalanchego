@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	iterator "github.com/ava-labs/avalanchego/utils/iterator/mocks"
 )
 
 type nilStateGetter struct{}
@@ -184,7 +186,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 	// Assert that we get the current delegator back
 	// Mock iterator for [state] returns no delegators.
-	stateCurrentDelegatorIter := NewMockStakerIterator(ctrl)
+	stateCurrentDelegatorIter := iterator.NewMockIterator[*Staker](ctrl)
 	stateCurrentDelegatorIter.EXPECT().Next().Return(false).Times(2)
 	stateCurrentDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetCurrentDelegatorIterator(
@@ -230,7 +232,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 
 	// Assert that we get the pending delegator back
 	// Mock iterator for [state] returns no delegators.
-	statePendingDelegatorIter := NewMockStakerIterator(ctrl)
+	statePendingDelegatorIter := iterator.NewMockIterator[*Staker](ctrl)
 	statePendingDelegatorIter.EXPECT().Next().Return(false).Times(2)
 	statePendingDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetPendingDelegatorIterator(

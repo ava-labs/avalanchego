@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	iterator "github.com/ava-labs/avalanchego/utils/iterator/mocks"
 	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -90,7 +91,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 
-	currentStakersIt := state.NewMockStakerIterator(ctrl)
+	currentStakersIt := iterator.NewMockIterator[*state.Staker](ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:      addValTx.ID(),
@@ -201,7 +202,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTxID := nextStakerTx.ID()
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
-	currentStakersIt := state.NewMockStakerIterator(ctrl)
+	currentStakersIt := iterator.NewMockIterator[*state.Staker](ctrl)
 	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:     nextStakerTxID,
@@ -214,7 +215,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
-	pendingStakersIt := state.NewMockStakerIterator(ctrl)
+	pendingStakersIt := iterator.NewMockIterator[*state.Staker](ctrl)
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
 	pendingStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()

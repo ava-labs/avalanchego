@@ -4,8 +4,9 @@
 package iterator
 
 import (
-	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/google/btree"
+
+	"github.com/ava-labs/avalanchego/utils/heap"
 )
 
 var _ Iterator[any] = (*merged[any])(nil)
