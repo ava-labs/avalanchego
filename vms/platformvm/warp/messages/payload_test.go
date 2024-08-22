@@ -8,14 +8,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 func TestInvalidPayload(t *testing.T) {
-	invalidMessage := []byte{1, 2, 3, 4}
+	invalidMessage := []byte{255, 255, 255, 255}
 	_, err := Parse(invalidMessage)
-	require.Error(t, err)
+	require.ErrorIs(t, err, codec.ErrUnknownVersion)
 }
 
 func TestRegisterSubnetValidator(t *testing.T) {
