@@ -13,8 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 )
@@ -36,11 +37,11 @@ func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) blo
 
 	// create mock
 	ctrl := gomock.NewController(t)
-	vm := block.NewMockChainVM(ctrl)
+	vm := blockmock.NewChainVM(ctrl)
 
 	if loadExpectations {
-		blk1 := snowmantest.NewMockBlock(ctrl)
-		blk2 := snowmantest.NewMockBlock(ctrl)
+		blk1 := snowmanmock.NewBlock(ctrl)
+		blk2 := snowmanmock.NewBlock(ctrl)
 		gomock.InOrder(
 			// Initialize
 			vm.EXPECT().Initialize(

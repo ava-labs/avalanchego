@@ -28,8 +28,8 @@ AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-if [[ $image_tag == *"-race" ]]; then
-  echo "Branch name must not end in '-race'"
+if [[ $image_tag == *"-r" ]]; then
+  echo "Branch name must not end in '-r'"
   exit 1
 fi
 
@@ -84,8 +84,8 @@ echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAG
 ${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
-echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-race , $DOCKER_IMAGE:$image_tag-race"
-${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-race" -t "$DOCKER_IMAGE:$image_tag-race" \
+echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
+${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
 # Only tag the latest image for the master branch when images are pushed to a registry
