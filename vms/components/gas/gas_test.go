@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fee
+package gas
 
 import (
 	"fmt"
@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var calculateGasPriceTests = []struct {
-	minPrice                 GasPrice
+var calculatePriceTests = []struct {
+	minPrice                 Price
 	excess                   Gas
 	excessConversionConstant Gas
-	expected                 GasPrice
+	expected                 Price
 }{
 	{
 		minPrice:                 1,
@@ -83,9 +83,9 @@ func Test_Gas_Cost(t *testing.T) {
 	require := require.New(t)
 
 	const (
-		gas      Gas      = 40
-		price    GasPrice = 100
-		expected uint64   = 4000
+		gas      Gas    = 40
+		price    Price  = 100
+		expected uint64 = 4000
 	)
 	actual, err := gas.Cost(price)
 	require.NoError(err)
@@ -172,20 +172,20 @@ func Test_Gas_SubPerSecond(t *testing.T) {
 	}
 }
 
-func Test_CalculateGasPrice(t *testing.T) {
-	for _, test := range calculateGasPriceTests {
+func Test_CalculatePrice(t *testing.T) {
+	for _, test := range calculatePriceTests {
 		t.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(t *testing.T) {
-			actual := CalculateGasPrice(test.minPrice, test.excess, test.excessConversionConstant)
+			actual := CalculatePrice(test.minPrice, test.excess, test.excessConversionConstant)
 			require.Equal(t, test.expected, actual)
 		})
 	}
 }
 
-func Benchmark_CalculateGasPrice(b *testing.B) {
-	for _, test := range calculateGasPriceTests {
+func Benchmark_CalculatePrice(b *testing.B) {
+	for _, test := range calculatePriceTests {
 		b.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				CalculateGasPrice(test.minPrice, test.excess, test.excessConversionConstant)
+				CalculatePrice(test.minPrice, test.excess, test.excessConversionConstant)
 			}
 		})
 	}

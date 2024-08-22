@@ -30,7 +30,7 @@ if pgrep --pidfile="${PIDFILE}" &> /dev/null; then
   exit 0
 fi
 
-LOKI_URL="${LOKI_URL:-https://loki-experimental.avax-dev.network}"
+LOKI_URL="${LOKI_URL:-https://loki-poc.avax-dev.network}"
 if [[ -z "${LOKI_URL}" ]]; then
   echo "Please provide a value for LOKI_URL"
   exit 1

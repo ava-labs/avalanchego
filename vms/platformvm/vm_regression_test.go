@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -36,10 +35,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
@@ -764,18 +762,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	execCfg, _ := config.GetExecutionConfig(nil)
-	newState, err := state.New(
-		vm.db,
-		nil,
-		prometheus.NewRegistry(),
-		&vm.Config,
-		execCfg,
-		vm.ctx,
-		metrics.Noop,
-		reward.NewCalculator(vm.Config.RewardConfig),
-	)
-	require.NoError(err)
+	newState := statetest.New(t, statetest.Config{
+		DB:         vm.db,
+		Validators: vm.Config.Validators,
+		Upgrades:   vm.Config.UpgradeConfig,
+		Context:    vm.ctx,
+		Rewards:    reward.NewCalculator(vm.Config.RewardConfig),
+	})
 
 	// Verify that new validator is now in the current validator set.
 	{
@@ -1067,18 +1060,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	execCfg, _ := config.GetExecutionConfig(nil)
-	newState, err := state.New(
-		vm.db,
-		nil,
-		prometheus.NewRegistry(),
-		&vm.Config,
-		execCfg,
-		vm.ctx,
-		metrics.Noop,
-		reward.NewCalculator(vm.Config.RewardConfig),
-	)
-	require.NoError(err)
+	newState := statetest.New(t, statetest.Config{
+		DB:         vm.db,
+		Validators: vm.Config.Validators,
+		Upgrades:   vm.Config.UpgradeConfig,
+		Context:    vm.ctx,
+		Rewards:    reward.NewCalculator(vm.Config.RewardConfig),
+	})
 
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.

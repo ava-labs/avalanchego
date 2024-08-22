@@ -20,7 +20,7 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	fee "github.com/ava-labs/avalanchego/vms/components/fee"
+	gas "github.com/ava-labs/avalanchego/vms/components/gas"
 	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -259,10 +259,10 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 }
 
 // GetFeeState mocks base method.
-func (m *MockChain) GetFeeState() fee.State {
+func (m *MockChain) GetFeeState() gas.State {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeState")
-	ret0, _ := ret[0].(fee.State)
+	ret0, _ := ret[0].(gas.State)
 	return ret0
 }
 
@@ -483,7 +483,7 @@ func (mr *MockChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 }
 
 // SetFeeState mocks base method.
-func (m *MockChain) SetFeeState(arg0 fee.State) {
+func (m *MockChain) SetFeeState(arg0 gas.State) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetFeeState", arg0)
 }
@@ -775,10 +775,10 @@ func (mr *MockDiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call 
 }
 
 // GetFeeState mocks base method.
-func (m *MockDiff) GetFeeState() fee.State {
+func (m *MockDiff) GetFeeState() gas.State {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeState")
-	ret0, _ := ret[0].(fee.State)
+	ret0, _ := ret[0].(gas.State)
 	return ret0
 }
 
@@ -999,7 +999,7 @@ func (mr *MockDiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock
 }
 
 // SetFeeState mocks base method.
-func (m *MockDiff) SetFeeState(arg0 fee.State) {
+func (m *MockDiff) SetFeeState(arg0 gas.State) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetFeeState", arg0)
 }
@@ -1416,10 +1416,10 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call
 }
 
 // GetFeeState mocks base method.
-func (m *MockState) GetFeeState() fee.State {
+func (m *MockState) GetFeeState() gas.State {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeState")
-	ret0, _ := ret[0].(fee.State)
+	ret0, _ := ret[0].(gas.State)
 	return ret0
 }
 
@@ -1744,7 +1744,7 @@ func (mr *MockStateMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomoc
 }
 
 // SetFeeState mocks base method.
-func (m *MockState) SetFeeState(arg0 fee.State) {
+func (m *MockState) SetFeeState(arg0 gas.State) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetFeeState", arg0)
 }
