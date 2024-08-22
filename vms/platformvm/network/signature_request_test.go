@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package network
 
 import (
@@ -68,7 +71,7 @@ func requestSignature(t *testing.T, msg []byte, valid bool) {
 	require.NoError(t, err)
 	unsignedMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())
 	require.NoError(t, err)
-	unsignedMessage.Initialize()
+	require.NoError(t, unsignedMessage.Initialize())
 
 	reqBytes, err := proto.Marshal(
 		&sdk.SignatureRequest{
@@ -80,14 +83,13 @@ func requestSignature(t *testing.T, msg []byte, valid bool) {
 	resp, appErr := signatureRequestHandler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Now(), reqBytes)
 	if !valid {
 		require.NotNil(t, appErr)
-		require.Equal(t, int(appErr.Code), ErrUnsupportedWarpMessageType)
+		require.Equal(t, ErrUnsupportedWarpMessageType, int(appErr.Code))
 		return
 	}
 
 	require.Nil(t, appErr)
 	sigResponse := sdk.SignatureResponse{}
-	err = proto.Unmarshal(resp, &sigResponse)
-	require.NoError(t, err)
+	require.NoError(t, proto.Unmarshal(resp, &sigResponse))
 
 	sig, err := bls.SignatureFromBytes(sigResponse.Signature)
 	require.NoError(t, err)
