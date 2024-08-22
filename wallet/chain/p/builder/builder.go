@@ -796,14 +796,14 @@ func (b *builder) NewConvertSubnetTx(
 	}
 
 	memo := ops.Memo()
-	bytesComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)) + uint64(len(address)),
+	bytesComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)) + uint64(len(address)),
 	}
-	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicConvertSubnetTxComplexities.Add(
+	complexity, err := fee.IntrinsicConvertSubnetTxComplexities.Add(
 		&bytesComplexity,
 		&authComplexity,
 	)
