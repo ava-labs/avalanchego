@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -48,7 +49,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
-	onParentAccept := state.NewMockDiff(ctrl)
+	onParentAccept := statemock.NewDiff(ctrl)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
 		onAcceptState:  onParentAccept,
@@ -104,7 +105,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	parentID := banffParentBlk.ID()
 
 	// store parent block, with relevant quantities
-	onParentAccept := state.NewMockDiff(ctrl)
+	onParentAccept := statemock.NewDiff(ctrl)
 	chainTime := env.clk.Time().Truncate(time.Second)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,

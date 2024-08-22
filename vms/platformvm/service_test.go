@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
@@ -47,6 +48,7 @@ import (
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/blockmock"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -883,10 +885,10 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "block height not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
-				manager := blockexecutor.NewMockManager(ctrl)
+				manager := blockexecutormock.NewMockManager(ctrl)
 				return &Service{
 					vm: &VM{
 						state:   state,
@@ -903,10 +905,10 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "block not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
-				manager := blockexecutor.NewMockManager(ctrl)
+				manager := blockexecutormock.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
@@ -924,13 +926,13 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "JSON format",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := block.NewMockBlock(ctrl)
+				block := blockmock.NewBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
-				manager := blockexecutor.NewMockManager(ctrl)
+				manager := blockexecutormock.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -948,17 +950,17 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hex format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := block.NewMockBlock(ctrl)
+				block := blockmock.NewBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
 				require.NoError(t, err)
 
-				manager := blockexecutor.NewMockManager(ctrl)
+				manager := blockexecutormock.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -976,17 +978,17 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hexc format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := block.NewMockBlock(ctrl)
+				block := blockmock.NewBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
 				require.NoError(t, err)
 
-				manager := blockexecutor.NewMockManager(ctrl)
+				manager := blockexecutormock.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -1004,17 +1006,17 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hexnc format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := block.NewMockBlock(ctrl)
+				block := blockmock.NewBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
 				require.NoError(t, err)
 
-				manager := blockexecutor.NewMockManager(ctrl)
+				manager := blockexecutormock.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{

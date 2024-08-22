@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -91,7 +91,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier := executormock.NewMockManager(ctrl)
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(errTest)
 				return txVerifier
 			},
@@ -108,7 +108,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier := executormock.NewMockManager(ctrl)
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
 				return txVerifier
 			},
@@ -127,7 +127,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return mempool
 			},
 			txVerifierFunc: func(ctrl *gomock.Controller) TxVerifier {
-				txVerifier := executor.NewMockManager(ctrl)
+				txVerifier := executormock.NewMockManager(ctrl)
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
 				return txVerifier
 			},
@@ -162,7 +162,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			}
 
 			txVerifierFunc := func(ctrl *gomock.Controller) TxVerifier {
-				return executor.NewMockManager(ctrl)
+				return executormock.NewMockManager(ctrl)
 			}
 			if tt.txVerifierFunc != nil {
 				txVerifierFunc = tt.txVerifierFunc
@@ -282,7 +282,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 					},
 				},
 				parser,
-				executor.NewMockManager(ctrl), // Should never verify a tx
+				executormock.NewMockManager(ctrl), // Should never verify a tx
 				mempoolFunc(ctrl),
 				appSenderFunc(ctrl),
 				prometheus.NewRegistry(),

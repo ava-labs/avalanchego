@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/avax/avaxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -1612,7 +1613,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner := fx.NewMockOwner(ctrl)
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
 
-				stakeOut := avax.NewMockTransferableOut(ctrl)
+				stakeOut := avaxmock.NewTransferableOut(ctrl)
 				stakeOut.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,

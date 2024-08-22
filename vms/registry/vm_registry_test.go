@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/vmsmock"
 )
 
 var (
@@ -120,7 +121,7 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 type registryTestResources struct {
 	ctrl          *gomock.Controller
 	mockVMGetter  *MockVMGetter
-	mockVMManager *vms.MockManager
+	mockVMManager *vmsmock.Manager
 	vmRegistry    VMRegistry
 }
 
@@ -128,7 +129,7 @@ func initVMRegistryTest(t *testing.T) *registryTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockVMGetter := NewMockVMGetter(ctrl)
-	mockVMManager := vms.NewMockManager(ctrl)
+	mockVMManager := vmsmock.NewManager(ctrl)
 
 	vmRegistry := NewVMRegistry(
 		VMRegistryConfig{

@@ -190,6 +190,8 @@ func TestNewPendingStaker(t *testing.T) {
 	endTime := time.Now()
 	pendingPriority := txs.SubnetPermissionedValidatorPendingPriority
 
+	txs.ScheduledStaker
+
 	stakerTx := txs.NewMockScheduledStaker(ctrl)
 	stakerTx.EXPECT().NodeID().Return(nodeID)
 	stakerTx.EXPECT().PublicKey().Return(publicKey, true, nil)
@@ -199,7 +201,15 @@ func TestNewPendingStaker(t *testing.T) {
 	stakerTx.EXPECT().EndTime().Return(endTime)
 	stakerTx.EXPECT().PendingPriority().Return(pendingPriority)
 
-	staker, err := NewPendingStaker(txID, stakerTx)
+	staker, err := NewPendingStaker(txID, &txs.AddSubnetValidatorTx{
+		SubnetValidator: txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(startTime.Unix()),
+				End:    uint64(endTime.Unix()),
+			},
+		},
+	})
 	require.NotNil(staker)
 	require.NoError(err)
 	require.Equal(txID, staker.TxID)

@@ -13,6 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/chains/atomic/atomicmock"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -20,10 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/block/blockmock"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
-	"github.com/ava-labs/avalanchego/vms/avm/state"
+	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -40,7 +41,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block already verified",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				b := &Block{
 					Block: mockBlock,
@@ -59,7 +60,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block timestamp too far in the future",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.GenerateTestID()).AnyTimes()
 				return &Block{
@@ -74,7 +75,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block timestamp too far in the future",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				now := time.Now()
@@ -95,7 +96,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block contains no transactions",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
@@ -114,7 +115,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block transaction fails verification",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
@@ -143,7 +144,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "parent doesn't exist",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
@@ -158,7 +159,7 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := state.NewMockState(ctrl)
+				mockState := statemock.NewState(ctrl)
 				mockState.EXPECT().GetBlock(parentID).Return(nil, errTest)
 				return &Block{
 					Block: mockBlock,
@@ -175,7 +176,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block height isn't parent height + 1",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
@@ -192,8 +193,8 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockState := state.NewMockState(ctrl)
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockState := statemock.NewState(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight) // Should be blockHeight - 1
 				mockState.EXPECT().GetBlock(parentID).Return(mockParentBlock, nil)
 
@@ -212,7 +213,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "block timestamp before parent timestamp",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
@@ -230,10 +231,10 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := state.NewMockDiff(ctrl)
+				mockParentState := statemock.NewDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp.Add(1))
 
@@ -257,7 +258,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "tx fails semantic verification",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
@@ -276,10 +277,10 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := state.NewMockDiff(ctrl)
+				mockParentState := statemock.NewDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -307,7 +308,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "tx fails execution",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
@@ -327,10 +328,10 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := state.NewMockDiff(ctrl)
+				mockParentState := statemock.NewDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -358,7 +359,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "tx imported inputs overlap",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
@@ -405,10 +406,10 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := state.NewMockDiff(ctrl)
+				mockParentState := statemock.NewDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -436,7 +437,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "tx input overlaps with other tx",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
@@ -467,10 +468,10 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := state.NewMockDiff(ctrl)
+				mockParentState := statemock.NewDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -495,7 +496,7 @@ func TestBlockVerify(t *testing.T) {
 		{
 			name: "happy path",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				blockTimestamp := time.Now()
@@ -515,10 +516,10 @@ func TestBlockVerify(t *testing.T) {
 				parentID := ids.GenerateTestID()
 				mockBlock.EXPECT().Parent().Return(parentID).AnyTimes()
 
-				mockParentBlock := block.NewMockBlock(ctrl)
+				mockParentBlock := blockmock.NewBlock(ctrl)
 				mockParentBlock.EXPECT().Height().Return(blockHeight - 1)
 
-				mockParentState := state.NewMockDiff(ctrl)
+				mockParentState := statemock.NewDiff(ctrl)
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
@@ -591,7 +592,7 @@ func TestBlockAccept(t *testing.T) {
 		{
 			name: "block not found",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
@@ -614,18 +615,18 @@ func TestBlockAccept(t *testing.T) {
 			name: "can't get commit batch",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := state.NewMockState(ctrl)
+				mockManagerState := statemock.NewState(ctrl)
 				mockManagerState.EXPECT().CommitBatch().Return(nil, errTest)
 				mockManagerState.EXPECT().Abort()
 
-				mockOnAcceptState := state.NewMockDiff(ctrl)
+				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				return &Block{
@@ -648,23 +649,23 @@ func TestBlockAccept(t *testing.T) {
 			name: "can't apply shared memory",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := state.NewMockState(ctrl)
+				mockManagerState := statemock.NewState(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
 
-				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
+				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(errTest)
 
-				mockOnAcceptState := state.NewMockDiff(ctrl)
+				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				return &Block{
@@ -687,23 +688,23 @@ func TestBlockAccept(t *testing.T) {
 			name: "failed to apply metrics",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := state.NewMockState(ctrl)
+				mockManagerState := statemock.NewState(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
 
-				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
+				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
 
-				mockOnAcceptState := state.NewMockDiff(ctrl)
+				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				metrics := metrics.NewMockMetrics(ctrl)
@@ -730,7 +731,7 @@ func TestBlockAccept(t *testing.T) {
 			name: "no error",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
@@ -739,17 +740,17 @@ func TestBlockAccept(t *testing.T) {
 				mempool := mempool.NewMockMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
-				mockManagerState := state.NewMockState(ctrl)
+				mockManagerState := statemock.NewState(ctrl)
 				// Note the returned batch is nil but not used
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
 				mockManagerState.EXPECT().Checksums().Return(ids.Empty, ids.Empty)
 
-				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
+				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
 
-				mockOnAcceptState := state.NewMockDiff(ctrl)
+				mockOnAcceptState := statemock.NewDiff(ctrl)
 				mockOnAcceptState.EXPECT().Apply(mockManagerState)
 
 				metrics := metrics.NewMockMetrics(ctrl)
@@ -800,7 +801,7 @@ func TestBlockReject(t *testing.T) {
 			name: "one tx passes verification; one fails syntactic verification; one fails semantic verification; one fails execution",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
@@ -846,7 +847,7 @@ func TestBlockReject(t *testing.T) {
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
-				mockState := state.NewMockState(ctrl)
+				mockState := statemock.NewState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 
@@ -869,7 +870,7 @@ func TestBlockReject(t *testing.T) {
 			name: "all txs valid",
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				blockID := ids.GenerateTestID()
-				mockBlock := block.NewMockBlock(ctrl)
+				mockBlock := blockmock.NewBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
@@ -899,7 +900,7 @@ func TestBlockReject(t *testing.T) {
 				mempool.EXPECT().RequestBuildBlock()
 
 				lastAcceptedID := ids.GenerateTestID()
-				mockState := state.NewMockState(ctrl)
+				mockState := statemock.NewState(ctrl)
 				mockState.EXPECT().GetLastAccepted().Return(lastAcceptedID).AnyTimes()
 				mockState.EXPECT().GetTimestamp().Return(time.Now()).AnyTimes()
 

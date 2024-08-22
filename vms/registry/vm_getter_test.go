@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/vmsmock"
 )
 
 var (
@@ -131,7 +132,7 @@ func TestGet_Success(t *testing.T) {
 type vmGetterTestResources struct {
 	ctrl        *gomock.Controller
 	mockReader  *filesystem.MockReader
-	mockManager *vms.MockManager
+	mockManager *vmsmock.Manager
 	getter      VMGetter
 }
 
@@ -139,7 +140,7 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 	ctrl := gomock.NewController(t)
 
 	mockReader := filesystem.NewMockReader(ctrl)
-	mockManager := vms.NewMockManager(ctrl)
+	mockManager := vmsmock.NewManager(ctrl)
 	mockRegistry := prometheus.NewRegistry()
 	mockCPUTracker, err := resource.NewManager(
 		logging.NoLog{},
