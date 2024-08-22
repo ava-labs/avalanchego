@@ -66,17 +66,7 @@ var (
 	defaultTxFee              = uint64(100)
 
 	testSubnet1 *txs.Tx
-
-	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs []ids.NodeID
 )
-
-func init() {
-	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
-	for i := range preFundedKeys {
-		genesisNodeIDs[i] = ids.GenerateTestNodeID()
-	}
-}
 
 type stakerStatus uint
 

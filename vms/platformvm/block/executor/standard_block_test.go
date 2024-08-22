@@ -603,7 +603,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	env.config.TrackedSubnets.Add(subnetID)
 
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := genesisNodeIDs[0]
+	subnetValidatorNodeID := genesistest.NodeIDs[0]
 	subnetVdr1EndTime := genesistest.Time.Add(defaultMinStakingDuration)
 	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
@@ -637,7 +637,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := genesisNodeIDs[1]
+	subnetVdr2NodeID := genesistest.NodeIDs[1]
 	utx, err = builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -708,7 +708,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			}
 
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := genesisNodeIDs[0]
+			subnetValidatorNodeID := genesistest.NodeIDs[0]
 			subnetVdr1StartTime := genesistest.Time.Add(1 * time.Minute)
 			subnetVdr1EndTime := genesistest.Time.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 			builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
