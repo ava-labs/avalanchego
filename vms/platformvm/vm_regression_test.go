@@ -1101,29 +1101,29 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.NoError(err)
 	require.Equal(uint64(1), currentHeight)
 
-	expectedValidators1 := map[ids.NodeID]uint64{
-		genesisNodeIDs[0].NodeID(): defaultWeight,
-		genesisNodeIDs[1].NodeID(): defaultWeight,
-		genesisNodeIDs[2].NodeID(): defaultWeight,
-		genesisNodeIDs[3].NodeID(): defaultWeight,
-		genesisNodeIDs[4].NodeID(): defaultWeight,
+	expectedValidators1 := map[ids.ShortNodeID]uint64{
+		genesisNodeIDs[0]: defaultWeight,
+		genesisNodeIDs[1]: defaultWeight,
+		genesisNodeIDs[2]: defaultWeight,
+		genesisNodeIDs[3]: defaultWeight,
+		genesisNodeIDs[4]: defaultWeight,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
-	for nodeID, weight := range expectedValidators1 {
-		require.Equal(weight, validators[nodeID].Weight)
+	for shortNodeID, weight := range expectedValidators1 {
+		require.Equal(weight, validators[shortNodeID.NodeID()].Weight)
 	}
 
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
-	extraNodeID := ids.GenerateTestNodeID()
+	extraShortNodeID := ids.GenerateTestShortNodeID()
 
 	// Create the tx to add the first new validator
 	builder, txSigner := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
-			NodeID: extraNodeID,
+			NodeID: extraShortNodeID.NodeID(),
 			Start:  uint64(newValidatorStartTime0.Unix()),
 			End:    uint64(newValidatorEndTime0.Unix()),
 			Wght:   vm.MaxValidatorStake,
@@ -1164,8 +1164,8 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	for i := uint64(1); i <= 2; i++ {
 		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
-		for nodeID, weight := range expectedValidators1 {
-			require.Equal(weight, validators[nodeID].Weight)
+		for shortNodeID, weight := range expectedValidators1 {
+			require.Equal(weight, validators[shortNodeID.NodeID()].Weight)
 		}
 	}
 
@@ -1200,23 +1200,23 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	for i := uint64(1); i <= 2; i++ {
 		validators, err = vm.GetValidatorSet(context.Background(), i, constants.PrimaryNetworkID)
 		require.NoError(err)
-		for nodeID, weight := range expectedValidators1 {
-			require.Equal(weight, validators[nodeID].Weight)
+		for shortNodeID, weight := range expectedValidators1 {
+			require.Equal(weight, validators[shortNodeID.NodeID()].Weight)
 		}
 	}
 
-	expectedValidators2 := map[ids.NodeID]uint64{
-		genesisNodeIDs[0].NodeID(): defaultWeight,
-		genesisNodeIDs[1].NodeID(): defaultWeight,
-		genesisNodeIDs[2].NodeID(): defaultWeight,
-		genesisNodeIDs[3].NodeID(): defaultWeight,
-		genesisNodeIDs[4].NodeID(): defaultWeight,
-		extraNodeID:                vm.MaxValidatorStake,
+	expectedValidators2 := map[ids.ShortNodeID]uint64{
+		genesisNodeIDs[0]: defaultWeight,
+		genesisNodeIDs[1]: defaultWeight,
+		genesisNodeIDs[2]: defaultWeight,
+		genesisNodeIDs[3]: defaultWeight,
+		genesisNodeIDs[4]: defaultWeight,
+		extraShortNodeID:  vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)
 	require.NoError(err)
-	for nodeID, weight := range expectedValidators2 {
-		require.Equal(weight, validators[nodeID].Weight)
+	for shortNodeID, weight := range expectedValidators2 {
+		require.Equal(weight, validators[shortNodeID.NodeID()].Weight)
 	}
 }
 

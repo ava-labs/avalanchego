@@ -371,8 +371,8 @@ func TestGenesis(t *testing.T) {
 	// Ensure current validator set of primary network is correct
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
-	for _, nodeID := range genesisNodeIDs {
-		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID.NodeID())
+	for _, shortNodeID := range genesisNodeIDs {
+		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, shortNodeID.NodeID())
 		require.True(ok)
 	}
 

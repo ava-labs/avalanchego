@@ -34,7 +34,7 @@ func GenerateTestShortNodeID() ShortNodeID {
 // use ToNodeID, which performs proper length checking.
 func BuildTestNodeID(src []byte) NodeID {
 	res := NodeID{}
-	copy(res.ShortNodeID[:], src)
+	copy(res.ShortNodeID.Bytes(), src)
 	return res
 }
 
