@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	defaultMinValidatorStake = 5 * units.MilliAvax
-
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
+
+	defaultMinValidatorStake = 5 * units.MilliAvax
 )
 
 var defaultConfig = Config{
