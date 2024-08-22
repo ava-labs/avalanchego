@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
@@ -90,9 +91,10 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		CChainID:    CChainID,
 		AVAXAssetID: AVAXAssetID,
 
-		Log:      logging.NoLog{},
-		BCLookup: aliaser,
-		Metrics:  metrics.NewPrefixGatherer(),
+		Log:        logging.NoLog{},
+		BCLookup:   aliaser,
+		Metrics:    metrics.NewPrefixGatherer(),
+		WarpSigner: warp.NewSigner(secretKey, constants.UnitTestID, constants.PrimaryNetworkID),
 
 		ValidatorState: validatorState,
 		ChainDataDir:   "",
