@@ -35,7 +35,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,

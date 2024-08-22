@@ -107,7 +107,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	uDelTx1, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -270,7 +270,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			changeAddr := genesistest.DefaultFundedKeys[0].Address()
 
 			// create valid tx
-			builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+			builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 			utx, err := builder.NewAddValidatorTx(
 				&txs.Validator{
 					NodeID: nodeID,
@@ -1246,7 +1246,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	changeAddr := genesistest.DefaultFundedKeys[0].Address()
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1359,7 +1359,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	nodeID := ids.GenerateTestNodeID()
 	changeAddr := genesistest.DefaultFundedKeys[0].Address()
 
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1508,7 +1508,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	nodeID := ids.GenerateTestNodeID()
 	changeAddr := genesistest.DefaultFundedKeys[0].Address()
 
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -1708,7 +1708,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2115,7 +2115,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2329,7 +2329,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{

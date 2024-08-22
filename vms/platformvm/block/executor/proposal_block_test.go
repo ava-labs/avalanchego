@@ -554,7 +554,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, subStaker := range test.subnetStakers {
-				builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+				builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -591,7 +591,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// add Staker0 (with the right end time) to state
 				// so to allow proposalBlk issuance
 				staker0.endTime = newTime
-				builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+				builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 				utx, err := builder.NewAddValidatorTx(
 					&txs.Validator{
 						NodeID: staker0.nodeID,
@@ -700,7 +700,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
 	subnetVdr1EndTime := genesistest.DefaultTime.Add(defaultMinStakingDuration)
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -859,7 +859,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			subnetVdr1StartTime := genesistest.DefaultTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := genesistest.DefaultTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 
-			builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+			builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
@@ -983,7 +983,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// just to allow proposalBlk issuance (with a reward Tx)
 	staker0StartTime := genesistest.DefaultTime
 	staker0EndTime := pendingValidatorStartTime
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
@@ -1085,7 +1085,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
-	builder, signer = env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, signer = env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err = builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
@@ -1180,7 +1180,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0StartTime := genesistest.DefaultTime
 	staker0EndTime := pendingValidatorStartTime
-	builder, txSigner := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
@@ -1281,7 +1281,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
-	builder, txSigner = env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner = env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err = builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),

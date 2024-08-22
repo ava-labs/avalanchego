@@ -389,7 +389,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+				builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 				utx, err := builder.NewAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -490,7 +490,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
 	subnetVdr1EndTime := genesistest.DefaultTime.Add(defaultMinStakingDuration)
 
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -606,7 +606,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 			subnetVdr1StartTime := genesistest.DefaultTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := genesistest.DefaultTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+			builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 			utx, err := builder.NewAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{

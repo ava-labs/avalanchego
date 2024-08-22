@@ -256,7 +256,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
 	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -291,7 +291,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 	}
 
 	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
+	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
