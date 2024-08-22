@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package iterator_test
 
 import (
 	"testing"
@@ -10,52 +10,54 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func TestMergedIterator(t *testing.T) {
+func TestMerge(t *testing.T) {
 	type test struct {
 		name      string
-		iterators []StakerIterator
-		expected  []*Staker
+		iterators []iterator.Iterator[*state.Staker]
+		expected  []*state.Staker
 	}
 
 	txID := ids.GenerateTestID()
 	tests := []test{
 		{
 			name:      "no iterators",
-			iterators: []StakerIterator{},
-			expected:  []*Staker{},
+			iterators: []iterator.Iterator[*state.Staker]{},
+			expected:  []*state.Staker{},
 		},
 		{
 			name:      "one empty iterator",
-			iterators: []StakerIterator{EmptyIterator},
-			expected:  []*Staker{},
+			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]{}},
+			expected:  []*state.Staker{},
 		},
 		{
 			name:      "multiple empty iterator",
-			iterators: []StakerIterator{EmptyIterator, EmptyIterator, EmptyIterator},
-			expected:  []*Staker{},
+			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]{}, iterator.Empty[*state.Staker]{}, iterator.Empty[*state.Staker]{}},
+			expected:  []*state.Staker{},
 		},
 		{
 			name:      "mixed empty iterators",
-			iterators: []StakerIterator{EmptyIterator, NewSliceIterator()},
-			expected:  []*Staker{},
+			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]{}, iterator.FromSlice[*state.Staker]()},
+			expected:  []*state.Staker{},
 		},
 		{
 			name: "single iterator",
-			iterators: []StakerIterator{
-				NewSliceIterator(
-					&Staker{
+			iterators: []iterator.Iterator[*state.Staker]{
+				iterator.FromSlice[*state.Staker](
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(0, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(1, 0),
 					},
 				),
 			},
-			expected: []*Staker{
+			expected: []*state.Staker{
 				{
 					TxID:     txID,
 					NextTime: time.Unix(0, 0),
@@ -68,29 +70,29 @@ func TestMergedIterator(t *testing.T) {
 		},
 		{
 			name: "multiple iterators",
-			iterators: []StakerIterator{
-				NewSliceIterator(
-					&Staker{
+			iterators: []iterator.Iterator[*state.Staker]{
+				iterator.FromSlice[*state.Staker](
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(0, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(2, 0),
 					},
 				),
-				NewSliceIterator(
-					&Staker{
+				iterator.FromSlice[*state.Staker](
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(1, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(3, 0),
 					},
 				),
 			},
-			expected: []*Staker{
+			expected: []*state.Staker{
 				{
 					TxID:     txID,
 					NextTime: time.Unix(0, 0),
@@ -111,37 +113,37 @@ func TestMergedIterator(t *testing.T) {
 		},
 		{
 			name: "multiple iterators different lengths",
-			iterators: []StakerIterator{
-				NewSliceIterator(
-					&Staker{
+			iterators: []iterator.Iterator[*state.Staker]{
+				iterator.FromSlice[*state.Staker](
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(0, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(2, 0),
 					},
 				),
-				NewSliceIterator(
-					&Staker{
+				iterator.FromSlice[*state.Staker](
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(1, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(3, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(4, 0),
 					},
-					&Staker{
+					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(5, 0),
 					},
 				),
 			},
-			expected: []*Staker{
+			expected: []*state.Staker{
 				{
 					TxID:     txID,
 					NextTime: time.Unix(0, 0),
@@ -173,7 +175,7 @@ func TestMergedIterator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			it := NewMergedIterator(tt.iterators...)
+			it := iterator.Merge[*state.Staker]((*state.Staker).Less, tt.iterators...)
 			for _, expected := range tt.expected {
 				require.True(it.Next())
 				require.Equal(expected, it.Value())
@@ -185,9 +187,9 @@ func TestMergedIterator(t *testing.T) {
 	}
 }
 
-func TestMergedIteratorEarlyRelease(t *testing.T) {
+func TestMergedEarlyRelease(t *testing.T) {
 	require := require.New(t)
-	stakers0 := []*Staker{
+	stakers0 := []*state.Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			NextTime: time.Unix(0, 0),
@@ -198,7 +200,7 @@ func TestMergedIteratorEarlyRelease(t *testing.T) {
 		},
 	}
 
-	stakers1 := []*Staker{
+	stakers1 := []*state.Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			NextTime: time.Unix(1, 0),
@@ -209,12 +211,13 @@ func TestMergedIteratorEarlyRelease(t *testing.T) {
 		},
 	}
 
-	it := NewMergedIterator(
-		EmptyIterator,
-		NewSliceIterator(stakers0...),
-		EmptyIterator,
-		NewSliceIterator(stakers1...),
-		EmptyIterator,
+	it := iterator.Merge(
+		(*state.Staker).Less,
+		iterator.Empty[*state.Staker]{},
+		iterator.FromSlice(stakers0...),
+		iterator.Empty[*state.Staker]{},
+		iterator.FromSlice(stakers1...),
+		iterator.Empty[*state.Staker]{},
 	)
 	require.True(it.Next())
 	it.Release()

@@ -18,6 +18,7 @@ import (
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
+	iterator "github.com/ava-labs/avalanchego/utils/iterator"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	gas "github.com/ava-labs/avalanchego/vms/components/gas"
@@ -323,10 +324,10 @@ func (mr *MockStateMockRecorder) GetChains(subnetID any) *gomock.Call {
 }
 
 // GetCurrentDelegatorIterator mocks base method.
-func (m *MockState) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (m *MockState) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentDelegatorIterator", subnetID, nodeID)
-	ret0, _ := ret[0].(StakerIterator)
+	ret0, _ := ret[0].(iterator.Iterator[*Staker])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -338,10 +339,10 @@ func (mr *MockStateMockRecorder) GetCurrentDelegatorIterator(subnetID, nodeID an
 }
 
 // GetCurrentStakerIterator mocks base method.
-func (m *MockState) GetCurrentStakerIterator() (StakerIterator, error) {
+func (m *MockState) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentStakerIterator")
-	ret0, _ := ret[0].(StakerIterator)
+	ret0, _ := ret[0].(iterator.Iterator[*Staker])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -426,10 +427,10 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 }
 
 // GetPendingDelegatorIterator mocks base method.
-func (m *MockState) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (m *MockState) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingDelegatorIterator", subnetID, nodeID)
-	ret0, _ := ret[0].(StakerIterator)
+	ret0, _ := ret[0].(iterator.Iterator[*Staker])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -441,10 +442,10 @@ func (mr *MockStateMockRecorder) GetPendingDelegatorIterator(subnetID, nodeID an
 }
 
 // GetPendingStakerIterator mocks base method.
-func (m *MockState) GetPendingStakerIterator() (StakerIterator, error) {
+func (m *MockState) GetPendingStakerIterator() (iterator.Iterator[*Staker], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingStakerIterator")
-	ret0, _ := ret[0].(StakerIterator)
+	ret0, _ := ret[0].(iterator.Iterator[*Staker])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

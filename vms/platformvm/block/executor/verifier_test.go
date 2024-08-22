@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -40,7 +39,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnAcceptState := statemock.NewDiff(ctrl)
+	parentOnAcceptState := state.NewMockDiff(ctrl)
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
@@ -125,7 +124,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	grandparentID := ids.GenerateTestID()
-	parentState := statemock.NewDiff(ctrl)
+	parentState := state.NewMockDiff(ctrl)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -150,7 +149,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 		backend: backend,
 	}
 
-	onAccept := statemock.NewDiff(ctrl)
+	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txsmock.NewUnsignedTx(ctrl)
 	inputs := set.Of(ids.GenerateTestID())
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
@@ -207,7 +206,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentState := statemock.NewDiff(ctrl)
+	parentState := state.NewMockDiff(ctrl)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -302,9 +301,9 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnDecisionState := statemock.NewDiff(ctrl)
-	parentOnCommitState := statemock.NewDiff(ctrl)
-	parentOnAbortState := statemock.NewDiff(ctrl)
+	parentOnDecisionState := state.NewMockDiff(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -369,9 +368,9 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnDecisionState := statemock.NewDiff(ctrl)
-	parentOnCommitState := statemock.NewDiff(ctrl)
-	parentOnAbortState := statemock.NewDiff(ctrl)
+	parentOnDecisionState := state.NewMockDiff(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -670,10 +669,10 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 
 	grandParentID := ids.GenerateTestID()
 	grandParentStatelessBlk := block.NewMockBlock(ctrl)
-	grandParentState := statemock.NewDiff(ctrl)
+	grandParentState := state.NewMockDiff(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentState := statemock.NewDiff(ctrl)
+	parentState := state.NewMockDiff(ctrl)
 	atomicInputs := set.Of(ids.GenerateTestID())
 
 	backend := &backend{
@@ -764,8 +763,8 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnCommitState := statemock.NewDiff(ctrl)
-	parentOnAbortState := statemock.NewDiff(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -821,8 +820,8 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentTime := time.Now()
-	parentOnCommitState := statemock.NewDiff(ctrl)
-	parentOnAbortState := statemock.NewDiff(ctrl)
+	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAbortState := state.NewMockDiff(ctrl)
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
