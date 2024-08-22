@@ -765,7 +765,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 			return nil, err
 		}
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
+			Amount:  json.Uint64(genesistest.InitialBalance2),
 			Address: addr,
 		}
 	}
@@ -793,7 +793,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 			Addresses: []string{addr},
 		},
 		Staked: []api.UTXO{{
-			Amount:  json.Uint64(defaultWeight),
+			Amount:  json.Uint64(genesistest.ValidatorWeight2),
 			Address: addr,
 		}},
 		DelegationFee: reward.PercentDenominator,

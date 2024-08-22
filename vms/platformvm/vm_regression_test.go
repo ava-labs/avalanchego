@@ -1101,11 +1101,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require.Equal(uint64(1), currentHeight)
 
 	expectedValidators1 := map[ids.NodeID]uint64{
-		genesistest.NodeIDs[0]: defaultWeight,
-		genesistest.NodeIDs[1]: defaultWeight,
-		genesistest.NodeIDs[2]: defaultWeight,
-		genesistest.NodeIDs[3]: defaultWeight,
-		genesistest.NodeIDs[4]: defaultWeight,
+		genesistest.NodeIDs[0]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[1]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[2]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[3]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[4]: genesistest.ValidatorWeight2,
 	}
 	validators, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -1205,11 +1205,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	}
 
 	expectedValidators2 := map[ids.NodeID]uint64{
-		genesistest.NodeIDs[0]: defaultWeight,
-		genesistest.NodeIDs[1]: defaultWeight,
-		genesistest.NodeIDs[2]: defaultWeight,
-		genesistest.NodeIDs[3]: defaultWeight,
-		genesistest.NodeIDs[4]: defaultWeight,
+		genesistest.NodeIDs[0]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[1]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[2]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[3]: genesistest.ValidatorWeight2,
+		genesistest.NodeIDs[4]: genesistest.ValidatorWeight2,
 		extraNodeID:            vm.MaxValidatorStake,
 	}
 	validators, err = vm.GetValidatorSet(context.Background(), 3, constants.PrimaryNetworkID)

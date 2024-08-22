@@ -75,13 +75,10 @@ import (
 )
 
 const (
-	defaultWeight = 5 * units.MilliAvax
-
 	// Node IDs of genesis validators. Initialized in init function
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
-	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
 )
 
 var (
@@ -542,7 +539,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
-				Wght:   defaultWeight,
+				Wght:   genesistest.ValidatorWeight2,
 			},
 			Subnet: testSubnet1.ID(),
 		},
@@ -594,7 +591,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
-				Wght:   defaultWeight,
+				Wght:   genesistest.ValidatorWeight2,
 			},
 			Subnet: testSubnet1.ID(),
 		},
@@ -878,7 +875,7 @@ func TestCreateSubnet(t *testing.T) {
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
-				Wght:   defaultWeight,
+				Wght:   genesistest.ValidatorWeight2,
 			},
 			Subnet: subnetID,
 		},
@@ -1698,7 +1695,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
 			require.NoError(err)
-			require.Equal(defaultWeight, amount)
+			require.Equal(genesistest.ValidatorWeight2, amount)
 		})
 	}
 }

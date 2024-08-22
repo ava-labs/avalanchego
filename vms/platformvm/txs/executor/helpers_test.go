@@ -46,10 +46,8 @@ import (
 )
 
 const (
-	defaultWeight             = 5 * units.MilliAvax
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
 )
 
 const (

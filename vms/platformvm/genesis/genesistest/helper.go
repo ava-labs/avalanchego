@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	defaultWeight  = 5 * units.MilliAvax
-	defaultBalance = 1 * units.Avax
+	ValidatorWeight2 = 5 * units.MilliAvax
+	InitialBalance2  = 1 * units.Avax
 )
 
 var (
@@ -49,7 +49,7 @@ func Build(t *testing.T) *api.BuildGenesisArgs {
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
+			Amount:  json.Uint64(InitialBalance2),
 			Address: addr,
 		}
 	}
@@ -70,7 +70,7 @@ func Build(t *testing.T) *api.BuildGenesisArgs {
 				Addresses: []string{addrStr},
 			},
 			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
+				Amount:  json.Uint64(ValidatorWeight2),
 				Address: addrStr,
 			}},
 			DelegationFee: reward.PercentDenominator,

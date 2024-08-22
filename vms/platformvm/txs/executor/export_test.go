@@ -61,7 +61,7 @@ func TestNewExportTx(t *testing.T) {
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: defaultBalance - defaultTxFee,
+						Amt: genesistest.InitialBalance2 - defaultTxFee,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Locktime:  0,
 							Threshold: 1,
