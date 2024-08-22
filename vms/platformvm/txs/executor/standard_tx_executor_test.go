@@ -2466,8 +2466,8 @@ func newConvertSubnetTx(t *testing.T, addressSize uint64) (*txs.ConvertSubnetTx,
 // for verifying ConvertSubnetTx.
 type convertSubnetTxVerifyEnv struct {
 	latestForkTime time.Time
-	fx             *fx.MockFx
-	flowChecker    *utxo.MockVerifier
+	fx             *fxmock.Fx
+	flowChecker    *utxomock.Verifier
 	unsignedTx     *txs.ConvertSubnetTx
 	tx             *txs.Tx
 	state          *state.MockDiff
@@ -2480,8 +2480,8 @@ func newValidConvertSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) con
 	t.Helper()
 
 	now := time.Now()
-	mockFx := fx.NewMockFx(ctrl)
-	mockFlowChecker := utxo.NewMockVerifier(ctrl)
+	mockFx := fxmock.NewFx(ctrl)
+	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newConvertSubnetTx(t, 24)
 	mockState := state.NewMockDiff(ctrl)
 	return convertSubnetTxVerifyEnv{
@@ -2598,7 +2598,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
-				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(1)
@@ -2633,7 +2633,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "invalid if subnet is transformed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(&txs.Tx{Unsigned: &txs.TransformSubnetTx{}}, nil).Times(1)
@@ -2664,7 +2664,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "invalid if subnet is converted",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), make([]byte, 24), nil)
@@ -2696,7 +2696,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			name: "valid tx",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
 				env := newValidConvertSubnetTxVerifyEnv(t, ctrl)
-				subnetOwner := fx.NewMockOwner(ctrl)
+				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
 				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(1)
