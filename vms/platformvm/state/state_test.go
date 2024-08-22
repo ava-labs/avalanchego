@@ -23,13 +23,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -50,9 +51,8 @@ func newTestState(t testing.TB, db database.Database) *state {
 		db,
 		genesistest.NewBytes(t),
 		prometheus.NewRegistry(),
-		&config.Config{
-			Validators: validators.NewManager(),
-		},
+		validators.NewManager(),
+		upgradetest.GetConfig(upgradetest.Latest),
 		&config.DefaultExecutionConfig,
 		&snow.Context{
 			Log: logging.NoLog{},
@@ -152,7 +152,7 @@ func TestPersistStakers(t *testing.T) {
 				r.Equal(staker, retrievedStaker)
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.Contains(valsMap, staker.NodeID)
 				r.Equal(
 					&validators.GetValidatorOutput{
@@ -258,7 +258,7 @@ func TestPersistStakers(t *testing.T) {
 				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.Contains(valsMap, staker.NodeID)
 				valOut := valsMap[staker.NodeID]
 				r.Equal(valOut.NodeID, staker.NodeID)
@@ -313,7 +313,7 @@ func TestPersistStakers(t *testing.T) {
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				// pending validators are not showed in validators set
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.NotContains(valsMap, staker.NodeID)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
@@ -388,7 +388,7 @@ func TestPersistStakers(t *testing.T) {
 				r.Equal(staker, retrievedDelegator)
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.NotContains(valsMap, staker.NodeID)
 			},
 			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
@@ -435,7 +435,7 @@ func TestPersistStakers(t *testing.T) {
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
 				// deleted validators are not showed in the validators set anymore
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.NotContains(valsMap, staker.NodeID)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
@@ -532,7 +532,7 @@ func TestPersistStakers(t *testing.T) {
 				val, err := s.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 				r.NoError(err)
 
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.Contains(valsMap, staker.NodeID)
 				valOut := valsMap[staker.NodeID]
 				r.Equal(valOut.NodeID, staker.NodeID)
@@ -589,7 +589,7 @@ func TestPersistStakers(t *testing.T) {
 				r.ErrorIs(err, database.ErrNotFound)
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.NotContains(valsMap, staker.NodeID)
 			},
 			checkValidatorUptimes: func(r *require.Assertions, s *state, staker *Staker) {
@@ -660,7 +660,7 @@ func TestPersistStakers(t *testing.T) {
 				delIt.Release()
 			},
 			checkValidatorsSet: func(r *require.Assertions, s *state, staker *Staker) {
-				valsMap := s.cfg.Validators.GetMap(staker.SubnetID)
+				valsMap := s.validators.GetMap(staker.SubnetID)
 				r.NotContains(valsMap, staker.NodeID)
 			},
 			checkValidatorUptimes: func(*require.Assertions, *state, *Staker) {},
@@ -1450,7 +1450,7 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	db := memdb.New()
 	s := newTestState(t, db)
 
-	expectedFeeState := fee.State{
+	expectedFeeState := gas.State{
 		Capacity: 1,
 		Excess:   2,
 	}
@@ -1484,12 +1484,12 @@ func TestPutAndGetFeeState(t *testing.T) {
 	db := memdb.New()
 	defaultFeeState, err := getFeeState(db)
 	require.NoError(err)
-	require.Equal(fee.State{}, defaultFeeState)
+	require.Equal(gas.State{}, defaultFeeState)
 
 	//nolint:gosec // This does not require a secure random number generator
-	expectedFeeState := fee.State{
-		Capacity: fee.Gas(rand.Uint64()),
-		Excess:   fee.Gas(rand.Uint64()),
+	expectedFeeState := gas.State{
+		Capacity: gas.Gas(rand.Uint64()),
+		Excess:   gas.Gas(rand.Uint64()),
 	}
 	require.NoError(putFeeState(db, expectedFeeState))
 
@@ -1542,7 +1542,7 @@ func TestGetFeeStateErrors(t *testing.T) {
 			require.NoError(db.Put(FeeStateKey, test.value))
 
 			actualState, err := getFeeState(db)
-			require.Equal(fee.State{}, actualState)
+			require.Equal(gas.State{}, actualState)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}
