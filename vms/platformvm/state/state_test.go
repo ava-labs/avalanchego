@@ -55,7 +55,9 @@ func newTestState(t testing.TB, db database.Database) *state {
 		upgradetest.GetConfig(upgradetest.Latest),
 		&config.DefaultExecutionConfig,
 		&snow.Context{
-			Log: logging.NoLog{},
+			NetworkID: constants.UnitTestID,
+			NodeID:    ids.GenerateTestNodeID(),
+			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
 		reward.NewCalculator(reward.Config{
