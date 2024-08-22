@@ -71,20 +71,14 @@ func (s signatureRequestHandler) AppRequest(
 		}
 	}
 	// Check that the addressed call payload is a registered Warp message type
-	var dst messages.Payload
-	ver, err := messages.Codec.Unmarshal(msg.Payload, &dst)
+	_, err = messages.Parse(msg.Payload)
 	if err != nil {
 		return nil, &common.AppError{
 			Code:    ErrUnsupportedWarpMessageType,
 			Message: "unsupported warp message type",
 		}
 	}
-	if ver != uint16(messages.CodecVersion) {
-		return nil, &common.AppError{
-			Code:    ErrInvalidCodecVersion,
-			Message: "invalid codec version",
-		}
-	}
+
 	sig, err := s.signer.Sign(unsignedMessage)
 	if err != nil {
 		return nil, &common.AppError{
