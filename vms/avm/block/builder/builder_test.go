@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
+	"github.com/ava-labs/avalanchego/vms/avm/block/blockmock"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
@@ -88,7 +89,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -119,7 +120,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -163,7 +164,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -208,7 +209,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -254,7 +255,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -347,7 +348,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -421,7 +422,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// preferred block's timestamp is after the time reported by clock
 				now := time.Now()
 				preferredTimestamp := now.Add(-2 * time.Second)
-				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock := blockmock.NewBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 

@@ -22,6 +22,7 @@ github.com/ava-labs/avalanchego/utils/crypto/keychain=Ledger=utils/crypto/keycha
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/filesystemmock/reader.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/hashingmock/hasher.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/resourcemock/user.go
+github.com/ava-labs/avalanchego/vms/avm/block=Block=vms/avm/block/blockmock/block.go
 github.com/ava-labs/avalanchego/vms/avm/metrics=Metrics=vms/avm/metrics/metricsmock/metrics.go
 github.com/ava-labs/avalanchego/vms/avm/state=Chain=vms/avm/state/statemock/chain.go
 github.com/ava-labs/avalanchego/vms/avm/state=Diff=vms/avm/state/statemock/diff.go
@@ -29,6 +30,7 @@ github.com/ava-labs/avalanchego/vms/avm/state=State=vms/avm/state/statemock/stat
 github.com/ava-labs/avalanchego/vms/avm/txs/mempool=Mempool=vms/avm/txs/mempool/mempoolmock/mempool.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/avaxmock/transferable_in.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/verifymock/verifiable.go
+github.com/ava-labs/avalanchego/vms/platformvm/block=Block=vms/platformvm/block/blockmock/block.go
 github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx=vms/platformvm/fx/fxmock/fx.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Chain=vms/platformvm/state/statemock/chain.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Diff=vms/platformvm/state/statemock/diff.go
