@@ -75,24 +75,23 @@ import (
 )
 
 const (
-	// Node IDs of genesis validators. Initialized in init function
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
 	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
-)
 
-var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 
+	defaultTxFee = 100 * units.NanoAvax
+)
+
+var (
 	defaultRewardConfig = reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,
 		MinConsumptionRate: .10 * reward.PercentDenominator,
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
 	}
-
-	defaultTxFee = uint64(100)
 
 	latestForkTime = genesistest.Time.Add(time.Second)
 

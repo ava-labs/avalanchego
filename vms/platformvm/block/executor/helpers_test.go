@@ -57,15 +57,14 @@ import (
 const (
 	pending stakerStatus = iota
 	current
-)
 
-var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultTxFee              = uint64(100)
 
-	testSubnet1 *txs.Tx
+	defaultTxFee = 100 * units.NanoAvax
 )
+
+var testSubnet1 *txs.Tx
 
 type stakerStatus uint
 

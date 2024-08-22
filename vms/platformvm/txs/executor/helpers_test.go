@@ -46,14 +46,12 @@ import (
 )
 
 const (
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-)
+	defaultMinValidatorStake = 5 * units.MilliAvax
 
-const (
+	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	trackChecksum             = false
-	defaultTxFee              = 100
+
+	defaultTxFee = 100 * units.NanoAvax
 )
 
 var (

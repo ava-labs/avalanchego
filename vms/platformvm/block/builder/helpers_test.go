@@ -54,11 +54,14 @@ import (
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var (
+const (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultTxFee              = uint64(100)
 
+	defaultTxFee = 100 * units.NanoAvax
+)
+
+var (
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = genesistest.FundedKeys[0:3]
 )
