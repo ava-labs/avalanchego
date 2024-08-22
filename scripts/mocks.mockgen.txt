@@ -22,7 +22,6 @@ github.com/ava-labs/avalanchego/utils/crypto/keychain=Ledger=utils/crypto/keycha
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/filesystemmock/reader.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/hashingmock/hasher.go
 github.com/ava-labs/avalanchego/utils/resource=User=utils/resource/resourcemock/user.go
-github.com/ava-labs/avalanchego/vms/avm/block=Block=vms/avm/block/blockmock/block.go
 github.com/ava-labs/avalanchego/vms/avm/metrics=Metrics=vms/avm/metrics/metricsmock/metrics.go
 github.com/ava-labs/avalanchego/vms/avm/state=Chain=vms/avm/state/statemock/chain.go
 github.com/ava-labs/avalanchego/vms/avm/state=Diff=vms/avm/state/statemock/diff.go
