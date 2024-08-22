@@ -3,9 +3,7 @@
 
 package ids
 
-import (
-	"github.com/ava-labs/avalanchego/utils"
-)
+import "github.com/ava-labs/avalanchego/utils"
 
 const (
 	NodeIDPrefix = "NodeID-"
