@@ -15,9 +15,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/filesystem/filesystemmock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/vmsmock"
 )
 
 var (
@@ -108,7 +110,7 @@ func TestGet_Success(t *testing.T) {
 	registeredVMId := ids.GenerateTestID()
 	unregisteredVMId := ids.GenerateTestID()
 
-	registeredVMFactory := vms.NewMockFactory(resources.ctrl)
+	registeredVMFactory := vmsmock.NewFactory(resources.ctrl)
 
 	resources.mockReader.EXPECT().ReadDir(pluginDir).Times(1).Return(twoValidVMs, nil)
 	resources.mockManager.EXPECT().Lookup(registeredVMName).Times(1).Return(registeredVMId, nil)
@@ -130,16 +132,16 @@ func TestGet_Success(t *testing.T) {
 
 type vmGetterTestResources struct {
 	ctrl        *gomock.Controller
-	mockReader  *filesystem.MockReader
-	mockManager *vms.MockManager
+	mockReader  *filesystemmock.Reader
+	mockManager *vmsmock.Manager
 	getter      VMGetter
 }
 
 func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 	ctrl := gomock.NewController(t)
 
-	mockReader := filesystem.NewMockReader(ctrl)
-	mockManager := vms.NewMockManager(ctrl)
+	mockReader := filesystemmock.NewReader(ctrl)
+	mockManager := vmsmock.NewManager(ctrl)
 	mockRegistry := prometheus.NewRegistry()
 	mockCPUTracker, err := resource.NewManager(
 		logging.NoLog{},

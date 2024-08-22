@@ -46,7 +46,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				ginkgo.Skip("Etna is activated. Elastic Subnets are disabled post-Etna, skipping test.")
 			}
 
-			keychain := env.NewKeychain(1)
+			keychain := env.NewKeychain()
 			baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 
 			pWallet := baseWallet.P()
@@ -76,11 +76,14 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 					owner,
 					tc.WithDefaultContext(),
 				)
-
-				subnetID = subnetTx.ID()
 				require.NoError(err)
+				subnetID = subnetTx.ID()
 				require.NotEqual(subnetID, constants.PrimaryNetworkID)
 			})
+
+			validatorWeight := units.Avax
+			initialSupply := 2 * validatorWeight
+			maxSupply := 2 * initialSupply
 
 			var subnetAssetID ids.ID
 			tc.By("create a custom asset for the permissionless subnet", func() {
@@ -91,7 +94,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 					map[uint32][]verify.State{
 						0: {
 							&secp256k1fx.TransferOutput{
-								Amt:          100 * units.MegaAvax,
+								Amt:          maxSupply,
 								OutputOwners: *owner,
 							},
 						},
@@ -102,7 +105,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				subnetAssetID = subnetAssetTx.ID()
 			})
 
-			tc.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
+			tc.By(fmt.Sprintf("Send %d of asset %s to the P-chain", maxSupply, subnetAssetID), func() {
 				_, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
@@ -111,7 +114,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 								ID: subnetAssetID,
 							},
 							Out: &secp256k1fx.TransferOutput{
-								Amt:          100 * units.MegaAvax,
+								Amt:          maxSupply,
 								OutputOwners: *owner,
 							},
 						},
@@ -121,7 +124,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				require.NoError(err)
 			})
 
-			tc.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetID), func() {
+			tc.By(fmt.Sprintf("Import the %d of asset %s from the X-chain into the P-chain", maxSupply, subnetAssetID), func() {
 				_, err := pWallet.IssueImportTx(
 					xChainID,
 					owner,
@@ -134,12 +137,12 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				_, err := pWallet.IssueTransformSubnetTx(
 					subnetID,
 					subnetAssetID,
-					50*units.MegaAvax,
-					100*units.MegaAvax,
+					initialSupply,
+					maxSupply,
 					reward.PercentDenominator,
 					reward.PercentDenominator,
 					1,
-					100*units.MegaAvax,
+					maxSupply,
 					time.Second,
 					365*24*time.Hour,
 					0,
@@ -158,7 +161,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 						Validator: txs.Validator{
 							NodeID: validatorID,
 							End:    uint64(endTime.Unix()),
-							Wght:   25 * units.MegaAvax,
+							Wght:   validatorWeight,
 						},
 						Subnet: subnetID,
 					},
@@ -178,7 +181,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 						Validator: txs.Validator{
 							NodeID: validatorID,
 							End:    uint64(endTime.Unix()),
-							Wght:   25 * units.MegaAvax,
+							Wght:   validatorWeight,
 						},
 						Subnet: subnetID,
 					},

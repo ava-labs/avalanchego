@@ -18,8 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -59,7 +60,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	chainTime := env.clk.Time().Truncate(time.Second)
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(fee.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -118,7 +119,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 
 	// store just once current staker to mark next staker time.
-	currentStakerIt := state.NewMockStakerIterator(ctrl)
+	currentStakerIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
 	currentStakerIt.EXPECT().Value().Return(
 		&state.Staker{
@@ -130,13 +131,13 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
 
 	// no pending stakers
-	pendingIt := state.NewMockStakerIterator(ctrl)
+	pendingIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	pendingIt.EXPECT().Next().Return(false).AnyTimes()
 	pendingIt.EXPECT().Release().Return().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(fee.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 
 	txID := ids.GenerateTestID()
 	utxo := &avax.UTXO{
