@@ -18,9 +18,9 @@ type merged[T any] struct {
 	heap heap.Queue[Iterator[T]]
 }
 
-// NewMerged returns an iterator that returns all of the elements of [iterators]
-// in order.
-func NewMerged[T any](less btree.LessFunc[T], iterators ...Iterator[T]) Iterator[T] {
+// Merge returns an iterator that returns all of the elements of [iterators] in
+// order.
+func Merge[T any](less btree.LessFunc[T], iterators ...Iterator[T]) Iterator[T] {
 	// Filter out iterators that are already exhausted.
 	i := 0
 	for i < len(iterators) {

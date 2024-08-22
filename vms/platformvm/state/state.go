@@ -1651,7 +1651,7 @@ func (s *state) initValidatorSets() error {
 				return err
 			}
 
-			delegatorIterator := iterator.NewTree(validator.delegators)
+			delegatorIterator := iterator.FromTree(validator.delegators)
 			for delegatorIterator.Next() {
 				delegatorStaker := delegatorIterator.Value()
 				if err := s.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
@@ -2073,7 +2073,7 @@ func writeCurrentDelegatorDiff(
 	validatorDiff *diffValidator,
 	codecVersion uint16,
 ) error {
-	addedDelegatorIterator := iterator.NewTree(validatorDiff.addedDelegators)
+	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
 	for addedDelegatorIterator.Next() {
 		staker := addedDelegatorIterator.Value()
@@ -2147,7 +2147,7 @@ func writePendingDiff(
 		}
 	}
 
-	addedDelegatorIterator := iterator.NewTree(validatorDiff.addedDelegators)
+	addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 	defer addedDelegatorIterator.Release()
 	for addedDelegatorIterator.Next() {
 		staker := addedDelegatorIterator.Value()

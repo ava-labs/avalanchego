@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func TestMasked(t *testing.T) {
+func TestFilter(t *testing.T) {
 	require := require.New(t)
 	stakers := []*state.Staker{
 		{
@@ -40,8 +40,8 @@ func TestMasked(t *testing.T) {
 		stakers[3].TxID: stakers[3],
 	}
 
-	it := iterator.NewMasked(
-		iterator.NewSlice(stakers[:3]...),
+	it := iterator.Filter(
+		iterator.FromSlice(stakers[:3]...),
 		func(staker *state.Staker) bool {
 			_, ok := maskedStakers[staker.TxID]
 			return ok

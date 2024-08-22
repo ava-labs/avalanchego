@@ -98,8 +98,8 @@ func TestStakerDiffIterator(t *testing.T) {
 	}
 
 	it := NewStakerDiffIterator(
-		iterator.NewSlice(currentStakers...),
-		iterator.NewSlice(pendingStakers...),
+		iterator.FromSlice(currentStakers...),
+		iterator.FromSlice(pendingStakers...),
 	)
 	for _, expectedStaker := range stakerDiffs {
 		require.True(it.Next())
@@ -135,7 +135,7 @@ func TestMutableStakerIterator(t *testing.T) {
 		},
 	}
 
-	it := newMutableStakerIterator(iterator.NewSlice(initialStakers...))
+	it := newMutableStakerIterator(iterator.FromSlice(initialStakers...))
 
 	addedStakers := []*Staker{
 		{

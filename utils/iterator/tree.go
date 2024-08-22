@@ -19,11 +19,11 @@ type tree[T any] struct {
 	wg          sync.WaitGroup
 }
 
-// NewTree returns a new iterator of the stakers in [tree] in ascending order.
+// FromTree returns a new iterator of the stakers in [tree] in ascending order.
 // Note that it isn't safe to modify [tree] while iterating over it.
-func NewTree[T any](btree *btree.BTreeG[T]) Iterator[T] {
+func FromTree[T any](btree *btree.BTreeG[T]) Iterator[T] {
 	if btree == nil {
-		return Empty[T]()
+		return Empty[T]{}
 	}
 	it := &tree[T]{
 		next:    make(chan T),

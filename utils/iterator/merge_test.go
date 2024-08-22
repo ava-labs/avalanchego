@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func TestMerged(t *testing.T) {
+func TestMerge(t *testing.T) {
 	type test struct {
 		name      string
 		iterators []iterator.Iterator[*state.Staker]
@@ -30,23 +30,23 @@ func TestMerged(t *testing.T) {
 		},
 		{
 			name:      "one empty iterator",
-			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]()},
+			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]{}},
 			expected:  []*state.Staker{},
 		},
 		{
 			name:      "multiple empty iterator",
-			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker](), iterator.Empty[*state.Staker](), iterator.Empty[*state.Staker]()},
+			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]{}, iterator.Empty[*state.Staker]{}, iterator.Empty[*state.Staker]{}},
 			expected:  []*state.Staker{},
 		},
 		{
 			name:      "mixed empty iterators",
-			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker](), iterator.NewSlice[*state.Staker]()},
+			iterators: []iterator.Iterator[*state.Staker]{iterator.Empty[*state.Staker]{}, iterator.FromSlice[*state.Staker]()},
 			expected:  []*state.Staker{},
 		},
 		{
 			name: "single iterator",
 			iterators: []iterator.Iterator[*state.Staker]{
-				iterator.NewSlice[*state.Staker](
+				iterator.FromSlice[*state.Staker](
 					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(0, 0),
@@ -71,7 +71,7 @@ func TestMerged(t *testing.T) {
 		{
 			name: "multiple iterators",
 			iterators: []iterator.Iterator[*state.Staker]{
-				iterator.NewSlice[*state.Staker](
+				iterator.FromSlice[*state.Staker](
 					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(0, 0),
@@ -81,7 +81,7 @@ func TestMerged(t *testing.T) {
 						NextTime: time.Unix(2, 0),
 					},
 				),
-				iterator.NewSlice[*state.Staker](
+				iterator.FromSlice[*state.Staker](
 					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(1, 0),
@@ -114,7 +114,7 @@ func TestMerged(t *testing.T) {
 		{
 			name: "multiple iterators different lengths",
 			iterators: []iterator.Iterator[*state.Staker]{
-				iterator.NewSlice[*state.Staker](
+				iterator.FromSlice[*state.Staker](
 					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(0, 0),
@@ -124,7 +124,7 @@ func TestMerged(t *testing.T) {
 						NextTime: time.Unix(2, 0),
 					},
 				),
-				iterator.NewSlice[*state.Staker](
+				iterator.FromSlice[*state.Staker](
 					&state.Staker{
 						TxID:     txID,
 						NextTime: time.Unix(1, 0),
@@ -175,7 +175,7 @@ func TestMerged(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			it := iterator.NewMerged[*state.Staker]((*state.Staker).Less, tt.iterators...)
+			it := iterator.Merge[*state.Staker]((*state.Staker).Less, tt.iterators...)
 			for _, expected := range tt.expected {
 				require.True(it.Next())
 				require.Equal(expected, it.Value())
@@ -211,13 +211,13 @@ func TestMergedEarlyRelease(t *testing.T) {
 		},
 	}
 
-	it := iterator.NewMerged(
+	it := iterator.Merge(
 		(*state.Staker).Less,
-		iterator.Empty[*state.Staker](),
-		iterator.NewSlice(stakers0...),
-		iterator.Empty[*state.Staker](),
-		iterator.NewSlice(stakers1...),
-		iterator.Empty[*state.Staker](),
+		iterator.Empty[*state.Staker]{},
+		iterator.FromSlice(stakers0...),
+		iterator.Empty[*state.Staker]{},
+		iterator.FromSlice(stakers1...),
+		iterator.Empty[*state.Staker]{},
 	)
 	require.True(it.Next())
 	it.Release()

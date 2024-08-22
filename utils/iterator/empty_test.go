@@ -12,7 +12,7 @@ import (
 func TestEmpty(t *testing.T) {
 	var (
 		require = require.New(t)
-		empty   = Empty[*int]()
+		empty   = Empty[int]{}
 	)
 
 	require.False(empty.Next())

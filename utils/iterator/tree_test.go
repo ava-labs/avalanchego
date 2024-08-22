@@ -39,7 +39,7 @@ func TestTree(t *testing.T) {
 		require.Nil(tree.ReplaceOrInsert(staker))
 	}
 
-	it := iterator.NewTree(tree)
+	it := iterator.FromTree(tree)
 	for _, staker := range stakers {
 		require.True(it.Next())
 		require.Equal(staker, it.Value())
@@ -49,7 +49,7 @@ func TestTree(t *testing.T) {
 }
 
 func TestTreeNil(t *testing.T) {
-	it := iterator.NewTree[*state.Staker](nil)
+	it := iterator.FromTree[*state.Staker](nil)
 	require.False(t, it.Next())
 	it.Release()
 }
@@ -76,7 +76,7 @@ func TestTreeEarlyRelease(t *testing.T) {
 		require.Nil(tree.ReplaceOrInsert(staker))
 	}
 
-	it := iterator.NewTree(tree)
+	it := iterator.FromTree(tree)
 	require.True(it.Next())
 	it.Release()
 	require.False(it.Next())

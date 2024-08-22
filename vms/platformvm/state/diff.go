@@ -449,7 +449,7 @@ func (d *diff) Apply(baseState Chain) error {
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
 
-			addedDelegatorIterator := iterator.NewTree(validatorDiff.addedDelegators)
+			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 			for addedDelegatorIterator.Next() {
 				baseState.PutCurrentDelegator(addedDelegatorIterator.Value())
 			}
@@ -476,7 +476,7 @@ func (d *diff) Apply(baseState Chain) error {
 				baseState.DeletePendingValidator(validatorDiff.validator)
 			}
 
-			addedDelegatorIterator := iterator.NewTree(validatorDiff.addedDelegators)
+			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 			for addedDelegatorIterator.Next() {
 				baseState.PutPendingDelegator(addedDelegatorIterator.Value())
 			}

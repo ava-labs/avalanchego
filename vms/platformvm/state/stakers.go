@@ -158,13 +158,13 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) iterator.Iterator[*Staker] {
 	subnetValidators, ok := v.validators[subnetID]
 	if !ok {
-		return iterator.Empty[*Staker]()
+		return iterator.Empty[*Staker]{}
 	}
 	validator, ok := subnetValidators[nodeID]
 	if !ok {
-		return iterator.Empty[*Staker]()
+		return iterator.Empty[*Staker]{}
 	}
-	return iterator.NewTree(validator.delegators)
+	return iterator.FromTree(validator.delegators)
 }
 
 func (v *baseStakers) PutDelegator(staker *Staker) {
@@ -200,7 +200,7 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 }
 
 func (v *baseStakers) GetStakerIterator() iterator.Iterator[*Staker] {
-	return iterator.NewTree(v.stakers)
+	return iterator.FromTree(v.stakers)
 }
 
 func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseStaker {
@@ -324,18 +324,18 @@ func (s *diffStakers) GetDelegatorIterator(
 	nodeID ids.NodeID,
 ) iterator.Iterator[*Staker] {
 	var (
-		addedDelegatorIterator = iterator.Empty[*Staker]()
+		addedDelegatorIterator iterator.Iterator[*Staker] = iterator.Empty[*Staker]{}
 		deletedDelegators      map[ids.ID]*Staker
 	)
 	if subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]; ok {
 		if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
-			addedDelegatorIterator = iterator.NewTree(validatorDiff.addedDelegators)
+			addedDelegatorIterator = iterator.FromTree(validatorDiff.addedDelegators)
 			deletedDelegators = validatorDiff.deletedDelegators
 		}
 	}
 
-	return iterator.NewMasked(
-		iterator.NewMerged(
+	return iterator.Filter(
+		iterator.Merge(
 			(*Staker).Less,
 			parentIterator,
 			addedDelegatorIterator,
@@ -374,11 +374,11 @@ func (s *diffStakers) DeleteDelegator(staker *Staker) {
 }
 
 func (s *diffStakers) GetStakerIterator(parentIterator iterator.Iterator[*Staker]) iterator.Iterator[*Staker] {
-	return iterator.NewMasked(
-		iterator.NewMerged(
+	return iterator.Filter(
+		iterator.Merge(
 			(*Staker).Less,
 			parentIterator,
-			iterator.NewTree(s.addedStakers),
+			iterator.FromTree(s.addedStakers),
 		),
 		func(staker *Staker) bool {
 			_, ok := s.deletedStakers[staker.TxID]

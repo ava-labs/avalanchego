@@ -10,9 +10,9 @@ type slice[T any] struct {
 	elements []T
 }
 
-// NewSlice returns an iterator that contains [elements] in order. Doesn't sort
+// FromSlice returns an iterator that contains [elements] in order. Doesn't sort
 // by anything.
-func NewSlice[T any](elements ...T) Iterator[T] {
+func FromSlice[T any](elements ...T) Iterator[T] {
 	return &slice[T]{
 		index:    -1,
 		elements: elements,
