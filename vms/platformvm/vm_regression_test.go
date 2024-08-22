@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
@@ -247,7 +248,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		},
 		{
 			name:    "post-upgrade calculate max stake correctly",
-			ap3Time: defaultGenesisTime,
+			ap3Time: genesistest.Time,
 		},
 	}
 
@@ -1637,7 +1638,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	subnetID := testSubnet1.TxID
 
 	// setup time
-	currentTime := defaultGenesisTime
+	currentTime := genesistest.Time
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -1900,7 +1901,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	// setup time
-	currentTime := defaultGenesisTime
+	currentTime := genesistest.Time
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -2058,7 +2059,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	subnetID := testSubnet1.TxID
 
 	// setup time
-	currentTime := defaultGenesisTime
+	currentTime := genesistest.Time
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -2277,7 +2278,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	subnetID := testSubnet1.TxID
 
 	// setup time
-	currentTime := defaultGenesisTime
+	currentTime := genesistest.Time
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -26,7 +27,7 @@ var (
 	AVAXAsset   = avax.Asset{ID: AVAXAssetID}
 
 	ValidatorNodeID                  = ids.GenerateTestNodeID()
-	Time                             = time.Now().Round(time.Second)
+	Time                             = upgrade.InitiallyActiveTime
 	TimeUnix                         = uint64(Time.Unix())
 	ValidatorDuration                = 28 * 24 * time.Hour
 	ValidatorEndTime                 = Time.Add(ValidatorDuration)

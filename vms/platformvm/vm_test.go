@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -91,16 +92,13 @@ var (
 
 	defaultTxFee = uint64(100)
 
-	// chain timestamp at genesis
-	defaultGenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-
 	// time that genesis validators start validating
-	defaultValidateStartTime = defaultGenesisTime
+	defaultValidateStartTime = genesistest.Time
 
 	// time that genesis validators stop validating
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
-	latestForkTime = defaultGenesisTime.Add(time.Second)
+	latestForkTime = genesistest.Time.Add(time.Second)
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys = secp256k1.TestKeys()
@@ -197,7 +195,7 @@ func defaultGenesis(t *testing.T, avaxAssetID ids.ID) (*api.BuildGenesisArgs, []
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(genesistest.Time.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 
@@ -216,7 +214,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, d
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
-	latestForkTime = defaultGenesisTime.Add(time.Second)
+	latestForkTime = genesistest.Time.Add(time.Second)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -451,7 +449,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
-	startTime := defaultGenesisTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
+	startTime := genesistest.Time.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create invalid tx

@@ -29,8 +29,7 @@ const (
 )
 
 var (
-	defaultGenesisTime       = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime = defaultGenesisTime
+	defaultValidateStartTime = Time
 	defaultValidateEndTime   = defaultValidateStartTime.Add(defaultValidateDuration)
 	preFundedKeys            = secp256k1.TestKeys()
 
@@ -88,7 +87,7 @@ func BuildGenesisTest(t *testing.T, avaxAssetID ids.ID) []byte {
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(TimeUnix),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 		Encoding:      formatting.Hex,
 	}

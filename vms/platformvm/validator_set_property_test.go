@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -89,7 +90,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}()
 			nodeID := ids.GenerateTestNodeID()
 
-			currentTime := defaultGenesisTime
+			currentTime := genesistest.Time
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
@@ -662,9 +663,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, defaultGenesisTime),
+		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.Time),
 	}}
-	vm.clock.Set(defaultGenesisTime.Add(time.Second))
+	vm.clock.Set(genesistest.Time.Add(time.Second))
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)
@@ -805,7 +806,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		Time:          json.Uint64(genesistest.Time.Unix()),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 

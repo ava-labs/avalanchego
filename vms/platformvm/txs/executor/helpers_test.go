@@ -55,7 +55,7 @@ const (
 )
 
 var (
-	defaultGenesisTime       = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	defaultGenesisTime       = genesistest.Time
 	defaultValidateStartTime = defaultGenesisTime
 	defaultValidateEndTime   = defaultValidateStartTime.Add(defaultValidateDuration)
 	preFundedKeys            = secp256k1.TestKeys()

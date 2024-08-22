@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -492,7 +493,7 @@ func TestGetStake(t *testing.T) {
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesisNodeIDs[0]
 	delegatorStartTime := defaultValidateStartTime
-	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
+	delegatorEndTime := genesistest.Time.Add(defaultMinStakingDuration)
 	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
@@ -556,11 +557,11 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
+	pendingStakerEndTime := uint64(genesistest.Time.Add(defaultMinStakingDuration).Unix())
 	utx2, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: pendingStakerNodeID,
-			Start:  uint64(defaultGenesisTime.Unix()),
+			Start:  uint64(genesistest.Time.Unix()),
 			End:    pendingStakerEndTime,
 			Wght:   stakeAmount,
 		},
