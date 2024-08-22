@@ -15,7 +15,6 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -33,12 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -91,7 +85,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}()
 			nodeID := ids.GenerateTestNodeID()
 
-			currentTime := genesistest.Time
+			currentTime := genesistest.DefaultTime
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
@@ -262,7 +256,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 
 func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
 	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(genesistest.FundedKeys[0], genesistest.FundedKeys[1])
+	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -275,7 +269,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	if err != nil {
@@ -289,7 +283,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 }
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := genesistest.FundedKeys[0].Address()
+	addr := genesistest.DefaultFundedKeys[0].Address()
 
 	sk, err := bls.NewSecretKey()
 	if err != nil {
@@ -297,7 +291,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 	}
 
 	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0], genesistest.FundedKeys[1])
+	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1])
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -664,9 +658,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.Time),
+		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.DefaultTime),
 	}}
-	vm.clock.Set(genesistest.Time.Add(time.Second))
+	vm.clock.Set(genesistest.DefaultTime.Add(time.Second))
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)
@@ -690,7 +684,12 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		context.Background(),
 		ctx,
 		chainDB,
-		buildCustomGenesis(t),
+		genesistest.NewBytes(t, genesistest.Config{
+			NodeIDs: []ids.NodeID{
+				genesistest.DefaultNodeIDs[len(genesistest.DefaultNodeIDs)-1],
+			},
+			ValidatorEndTime: mockable.MaxTime,
+		}),
 		nil,
 		nil,
 		msgChan,
@@ -710,15 +709,15 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
 	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(genesistest.FundedKeys[len(genesistest.FundedKeys)-1])
+	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[len(genesistest.DefaultFundedKeys)-1])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	if err != nil {
@@ -750,65 +749,4 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	}
 
 	return vm, testSubnet1.ID(), nil
-}
-
-func buildCustomGenesis(t testing.TB) []byte {
-	require := require.New(t)
-
-	genesisUTXOs := make([]api.UTXO, len(genesistest.FundedKeys))
-	for i, key := range genesistest.FundedKeys {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, key.Address().Bytes())
-		require.NoError(err)
-		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(genesistest.InitialBalance2),
-			Address: addr,
-		}
-	}
-
-	// we need at least a validator, otherwise BuildBlock would fail, since it
-	// won't find next staker to promote/evict from stakers set. Contrary to
-	// what happens with production code we push such validator at the end of
-	// times, so to avoid interference with our tests
-	nodeID := genesistest.NodeIDs[len(genesistest.NodeIDs)-1]
-	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-	require.NoError(err)
-
-	starTime := mockable.MaxTime.Add(-1 * defaultMinStakingDuration)
-	endTime := mockable.MaxTime
-	genesisValidator := api.GenesisPermissionlessValidator{
-		GenesisValidator: api.GenesisValidator{
-			StartTime: json.Uint64(starTime.Unix()),
-			EndTime:   json.Uint64(endTime.Unix()),
-			NodeID:    nodeID,
-		},
-		RewardOwner: &api.Owner{
-			Threshold: 1,
-			Addresses: []string{addr},
-		},
-		Staked: []api.UTXO{{
-			Amount:  json.Uint64(genesistest.ValidatorWeight2),
-			Address: addr,
-		}},
-		DelegationFee: reward.PercentDenominator,
-	}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		Encoding:      formatting.Hex,
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   snowtest.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
-		Chains:        nil,
-		Time:          json.Uint64(genesistest.Time.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	require.NoError(err)
-
-	return genesisBytes
 }

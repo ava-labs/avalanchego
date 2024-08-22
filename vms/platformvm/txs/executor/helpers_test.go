@@ -58,7 +58,7 @@ var (
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = genesistest.FundedKeys[0:3]
+	testSubnet1ControlKeys = genesistest.DefaultFundedKeys[0:3]
 )
 
 type mutableSharedMemory struct {
@@ -113,7 +113,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := statetest.New(t, statetest.Config{
 		DB:         baseDB,
-		Genesis:    genesistest.BuildBytes(t),
+		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
 		Validators: config.Validators,
 		Upgrades:   config.UpgradeConfig,
 		Context:    ctx,
@@ -185,19 +185,19 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(genesistest.FundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				genesistest.FundedKeys[0].Address(),
-				genesistest.FundedKeys[1].Address(),
-				genesistest.FundedKeys[2].Address(),
+				genesistest.DefaultFundedKeys[0].Address(),
+				genesistest.DefaultFundedKeys[1].Address(),
+				genesistest.DefaultFundedKeys[2].Address(),
 			},
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -224,12 +224,12 @@ func addSubnet(t *testing.T, env *environment) {
 func defaultConfig(f upgradetest.Fork) *config.Config {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(
 		f,
-		genesistest.Time.Add(-2*time.Second),
+		genesistest.DefaultTime.Add(-2*time.Second),
 	)
 	upgradetest.SetTimesTo(
 		&upgrades,
 		min(f, upgradetest.ApricotPhase5),
-		genesistest.ValidatorEndTime,
+		genesistest.DefaultValidatorEndTime,
 	)
 
 	return &config.Config{
@@ -257,10 +257,10 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 }
 
 func defaultClock(f upgradetest.Fork) *mockable.Clock {
-	now := genesistest.Time
+	now := genesistest.DefaultTime
 	if f >= upgradetest.Banff {
 		// 1 second after active fork
-		now = genesistest.ValidatorEndTime.Add(-2 * time.Second)
+		now = genesistest.DefaultValidatorEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
 	clk.Set(now)

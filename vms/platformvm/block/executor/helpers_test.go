@@ -124,7 +124,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	if ctrl == nil {
 		res.state = statetest.New(t, statetest.Config{
 			DB:         res.baseDB,
-			Genesis:    genesistest.BuildBytes(t),
+			Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
 			Validators: res.config.Validators,
 			Context:    res.ctx,
 			Rewards:    rewardsCalc,
@@ -223,19 +223,19 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 }
 
 func addSubnet(env *environment) {
-	builder, signer := env.factory.NewWallet(genesistest.FundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				genesistest.FundedKeys[0].Address(),
-				genesistest.FundedKeys[1].Address(),
-				genesistest.FundedKeys[2].Address(),
+				genesistest.DefaultFundedKeys[0].Address(),
+				genesistest.DefaultFundedKeys[1].Address(),
+				genesistest.DefaultFundedKeys[2].Address(),
 			},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	if err != nil {
@@ -278,7 +278,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 	upgradetest.SetTimesTo(
 		&upgrades,
 		min(f, upgradetest.ApricotPhase5),
-		genesistest.ValidatorEndTime,
+		genesistest.DefaultValidatorEndTime,
 	)
 
 	return &config.Config{
@@ -307,7 +307,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 
 func defaultClock() *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(genesistest.Time)
+	clk.Set(genesistest.DefaultTime)
 	return clk
 }
 

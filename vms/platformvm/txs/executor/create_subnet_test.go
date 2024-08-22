@@ -24,7 +24,7 @@ import (
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := genesistest.Time.Add(time.Hour)
+	ap3Time := genesistest.DefaultTime.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -33,7 +33,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        genesistest.Time,
+			time:        genesistest.DefaultTime,
 			fee:         0,
 			expectedErr: nil,
 		},
@@ -61,15 +61,15 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			env.state.SetTimestamp(test.time) // to duly set fee
 
-			addrs := set.NewSet[ids.ShortID](len(genesistest.FundedKeys))
-			for _, key := range genesistest.FundedKeys {
+			addrs := set.NewSet[ids.ShortID](len(genesistest.DefaultFundedKeys))
+			for _, key := range genesistest.DefaultFundedKeys {
 				addrs.Add(key.Address())
 			}
 
 			cfg := *env.config
 			cfg.StaticFeeConfig.CreateSubnetTxFee = test.fee
 			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(genesistest.FundedKeys...)
+			builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys...)
 			utx, err := builder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
 			)

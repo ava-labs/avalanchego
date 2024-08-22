@@ -33,14 +33,14 @@ func TestNewExportTx(t *testing.T) {
 		timestamp          time.Time
 	}
 
-	sourceKey := genesistest.FundedKeys[0]
+	sourceKey := genesistest.DefaultFundedKeys[0]
 
 	tests := []test{
 		{
 			description:        "P->X export",
 			destinationChainID: env.ctx.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          genesistest.Time,
+			timestamp:          genesistest.DefaultTime,
 		},
 		{
 			description:        "P->C export",
@@ -61,7 +61,7 @@ func TestNewExportTx(t *testing.T) {
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: genesistest.InitialBalance2 - defaultTxFee,
+						Amt: genesistest.DefaultInitialBalance - defaultTxFee,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Locktime:  0,
 							Threshold: 1,

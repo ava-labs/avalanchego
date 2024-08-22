@@ -113,7 +113,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.NoError(err)
 
 	// Create a valid [AddPermissionlessValidatorTx]
-	builder, txSigner := env.factory.NewWallet(genesistest.FundedKeys[0])
+	builder, txSigner := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -128,16 +128,16 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -322,7 +322,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder1, signer1 := env.factory.NewWallet(genesistest.FundedKeys[0])
+	builder1, signer1 := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx1, err := builder1.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -337,16 +337,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -363,7 +363,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err = bls.NewSecretKey()
 	require.NoError(err)
 
-	builder2, signer2 := env.factory.NewWallet(genesistest.FundedKeys[2])
+	builder2, signer2 := env.factory.NewWallet(genesistest.DefaultFundedKeys[2])
 	utx2, err := builder2.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -378,16 +378,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
 		}),
 	)
 	require.NoError(err)

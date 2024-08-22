@@ -34,7 +34,7 @@ func TestAtomicTxImports(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(70000)
-	recipientKey := genesistest.FundedKeys[1]
+	recipientKey := genesistest.DefaultFundedKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 

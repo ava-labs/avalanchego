@@ -469,7 +469,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := genesistest.Time.Add(time.Hour)
+	now := genesistest.DefaultTime.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -532,7 +532,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := genesistest.Time
+			parentTime := genesistest.DefaultTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
@@ -566,7 +566,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := genesistest.Time.Add(time.Hour)
+	now := genesistest.DefaultTime.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -629,7 +629,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := genesistest.Time
+			parentTime := genesistest.DefaultTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
