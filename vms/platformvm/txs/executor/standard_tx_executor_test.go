@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -218,7 +219,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               nodeID,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                nil,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: ErrPeriodMismatch,
 		},
 		{
@@ -229,7 +230,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               newValidatorID,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                nil,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: database.ErrNotFound,
 		},
 		{
@@ -240,7 +241,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               newValidatorID,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                addMinStakeValidator,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: ErrPeriodMismatch,
 		},
 		{
@@ -251,7 +252,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               newValidatorID,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                addMinStakeValidator,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: ErrPeriodMismatch,
 		},
 		{
@@ -262,7 +263,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               newValidatorID,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                addMinStakeValidator,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: nil,
 		},
 		{
@@ -273,7 +274,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               nodeID,                                    // node ID
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]}, // tx fee payer
 			setup:                nil,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: ErrTimestampNotBeforeStartTime,
 		},
 		{
@@ -296,7 +297,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				env.state.SetHeight(dummyHeight)
 				require.NoError(t, env.state.Commit())
 			},
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: ErrFlowCheckFailed,
 		},
 		{
@@ -318,7 +319,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			nodeID:               newValidatorID,
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                addMaxStakeValidator,
-			AP3Time:              defaultGenesisTime,
+			AP3Time:              genesistest.Time,
 			expectedExecutionErr: ErrOverDelegated,
 		},
 	}
@@ -448,7 +449,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	// Add a validator to pending validator set of primary network
 	// Starts validating primary network 10 seconds after genesis
 	pendingDSValidatorID := ids.GenerateTestNodeID()
-	dsStartTime := defaultGenesisTime.Add(10 * time.Second)
+	dsStartTime := genesistest.Time.Add(10 * time.Second)
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
 	builder, signer := env.factory.NewWallet(preFundedKeys[0])
@@ -618,7 +619,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 	// Case: Proposed validator start validating at/before current timestamp
 	// First, advance the timestamp
-	newTimestamp := defaultGenesisTime.Add(2 * time.Second)
+	newTimestamp := genesistest.Time.Add(2 * time.Second)
 	env.state.SetTimestamp(newTimestamp)
 
 	{
@@ -653,7 +654,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	}
 
 	// reset the timestamp
-	env.state.SetTimestamp(defaultGenesisTime)
+	env.state.SetTimestamp(genesistest.Time)
 
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet

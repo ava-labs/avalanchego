@@ -58,8 +58,7 @@ import (
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = genesistest.Time
-	defaultValidateStartTime  = defaultGenesisTime
+	defaultValidateStartTime  = genesistest.Time
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	preFundedKeys             = secp256k1.TestKeys()
 	defaultTxFee              = uint64(100)
@@ -295,7 +294,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
 	clk := &mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(genesistest.Time)
 	return clk
 }
 

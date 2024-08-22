@@ -62,8 +62,7 @@ const (
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = genesistest.Time
-	defaultValidateStartTime  = defaultGenesisTime
+	defaultValidateStartTime  = genesistest.Time
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	preFundedKeys             = secp256k1.TestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
@@ -324,7 +323,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 
 func defaultClock() *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(genesistest.Time)
 	return clk
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -882,7 +883,7 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Durango)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
-	env.clk.Set(defaultGenesisTime) // VM's clock reads the genesis time
+	env.clk.Set(genesistest.Time) // VM's clock reads the genesis time
 	upgradeTime := env.clk.Time().Add(SyncBound)
 	env.config.UpgradeConfig.BanffTime = upgradeTime
 	env.config.UpgradeConfig.CortinaTime = upgradeTime

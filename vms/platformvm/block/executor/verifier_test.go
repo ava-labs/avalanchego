@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -468,7 +469,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := defaultGenesisTime.Add(time.Hour)
+	now := genesistest.Time.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -531,7 +532,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := defaultGenesisTime
+			parentTime := genesistest.Time
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
@@ -565,7 +566,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := defaultGenesisTime.Add(time.Hour)
+	now := genesistest.Time.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -628,7 +629,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := defaultGenesisTime
+			parentTime := genesistest.Time
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)

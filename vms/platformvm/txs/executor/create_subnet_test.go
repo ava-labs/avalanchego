@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -23,7 +24,7 @@ import (
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := defaultGenesisTime.Add(time.Hour)
+	ap3Time := genesistest.Time.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -32,7 +33,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        defaultGenesisTime,
+			time:        genesistest.Time,
 			fee:         0,
 			expectedErr: nil,
 		},

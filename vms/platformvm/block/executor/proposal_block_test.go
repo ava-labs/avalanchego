@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -144,7 +145,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env := newEnvironment(t, ctrl, upgradetest.Banff)
 
 	// create parentBlock. It's a standard one for simplicity
-	parentTime := defaultGenesisTime
+	parentTime := genesistest.Time
 	parentHeight := uint64(2022)
 
 	banffParentBlk, err := block.NewApricotStandardBlock(
@@ -374,15 +375,15 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 	staker0 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf0}),
 		rewardAddress: ids.ShortID{0xf0},
-		startTime:     defaultGenesisTime,
+		startTime:     genesistest.Time,
 		endTime:       time.Time{}, // actual endTime depends on specific test
 	}
 
 	staker1 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf1}),
 		rewardAddress: ids.ShortID{0xf1},
-		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		startTime:     genesistest.Time.Add(1 * time.Minute),
+		endTime:       genesistest.Time.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf2}),
@@ -876,8 +877,8 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			// Add a subnet validator to the staker set
 			subnetValidatorNodeID := genesisNodeIDs[0]
-			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
+			subnetVdr1StartTime := genesistest.Time.Add(1 * time.Minute)
+			subnetVdr1EndTime := genesistest.Time.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 
 			builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
 			utx, err := builder.NewAddSubnetValidatorTx(
@@ -910,7 +911,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			// add Staker0 (with the right end time) to state
 			// so to allow proposalBlk issuance
-			staker0StartTime := defaultGenesisTime
+			staker0StartTime := genesistest.Time
 			staker0EndTime := subnetVdr1StartTime
 
 			uVdrTx, err := builder.NewAddValidatorTx(
@@ -985,7 +986,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorStartTime := genesistest.Time.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
@@ -1001,7 +1002,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	// add Staker0 (with the right end time) to state
 	// just to allow proposalBlk issuance (with a reward Tx)
-	staker0StartTime := defaultGenesisTime
+	staker0StartTime := genesistest.Time
 	staker0EndTime := pendingValidatorStartTime
 	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewAddValidatorTx(
@@ -1180,7 +1181,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorStartTime := genesistest.Time.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeIDKey, _ := secp256k1.NewPrivateKey()
 	rewardAddress := nodeIDKey.PublicKey().Address()
@@ -1198,7 +1199,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
-	staker0StartTime := defaultGenesisTime
+	staker0StartTime := genesistest.Time
 	staker0EndTime := pendingValidatorStartTime
 	builder, txSigner := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewAddValidatorTx(

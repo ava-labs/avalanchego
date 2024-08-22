@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -134,7 +135,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      nodeID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       nil,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: ErrPeriodMismatch,
 		},
 		{
@@ -145,7 +146,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      newValidatorID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       nil,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: database.ErrNotFound,
 		},
 		{
@@ -156,7 +157,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      newValidatorID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       addMinStakeValidator,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: ErrPeriodMismatch,
 		},
 		{
@@ -167,7 +168,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      newValidatorID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       addMinStakeValidator,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: ErrPeriodMismatch,
 		},
 		{
@@ -178,7 +179,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      newValidatorID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       addMinStakeValidator,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: nil,
 		},
 		{
@@ -189,7 +190,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      nodeID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       nil,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: ErrTimestampNotBeforeStartTime,
 		},
 		{
@@ -212,7 +213,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				env.state.SetHeight(dummyHeight)
 				require.NoError(t, env.state.Commit())
 			},
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: ErrFlowCheckFailed,
 		},
 		{
@@ -234,7 +235,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			nodeID:      newValidatorID,
 			feeKeys:     []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:       addMaxStakeValidator,
-			AP3Time:     defaultGenesisTime,
+			AP3Time:     genesistest.Time,
 			expectedErr: ErrOverDelegated,
 		},
 	}

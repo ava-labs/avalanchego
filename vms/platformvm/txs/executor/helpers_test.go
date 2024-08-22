@@ -55,8 +55,7 @@ const (
 )
 
 var (
-	defaultGenesisTime       = genesistest.Time
-	defaultValidateStartTime = defaultGenesisTime
+	defaultValidateStartTime = genesistest.Time
 	defaultValidateEndTime   = defaultValidateStartTime.Add(defaultValidateDuration)
 	preFundedKeys            = secp256k1.TestKeys()
 
@@ -273,7 +272,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 }
 
 func defaultClock(f upgradetest.Fork) *mockable.Clock {
-	now := defaultGenesisTime
+	now := genesistest.Time
 	if f >= upgradetest.Banff {
 		// 1 second after active fork
 		now = defaultValidateEndTime.Add(-2 * time.Second)

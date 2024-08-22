@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
@@ -180,7 +181,7 @@ func TestCreateChainTxValid(t *testing.T) {
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
-	ap3Time := defaultGenesisTime.Add(time.Hour)
+	ap3Time := genesistest.Time.Add(time.Hour)
 	tests := []struct {
 		name          string
 		time          time.Time
@@ -189,7 +190,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:          "pre-fork - correctly priced",
-			time:          defaultGenesisTime,
+			time:          genesistest.Time,
 			fee:           0,
 			expectedError: nil,
 		},
