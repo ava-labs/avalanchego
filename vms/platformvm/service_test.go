@@ -491,7 +491,7 @@ func TestGetStake(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	delegatorNodeID := genesisNodeIDs[0]
+	delegatorNodeID := genesistest.NodeIDs[0]
 	delegatorEndTime := genesistest.Time.Add(defaultMinStakingDuration)
 	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
@@ -638,7 +638,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
-	validatorNodeID := genesisNodeIDs[1]
+	validatorNodeID := genesistest.NodeIDs[1]
 	delegatorEndTime := genesistest.Time.Add(defaultMinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()

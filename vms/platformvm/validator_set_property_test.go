@@ -774,7 +774,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	// won't find next staker to promote/evict from stakers set. Contrary to
 	// what happens with production code we push such validator at the end of
 	// times, so to avoid interference with our tests
-	nodeID := genesisNodeIDs[len(genesisNodeIDs)-1]
+	nodeID := genesistest.NodeIDs[len(genesistest.NodeIDs)-1]
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 	if err != nil {
 		return nil, err
