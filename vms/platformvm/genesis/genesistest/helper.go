@@ -5,7 +5,6 @@ package genesistest
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,10 +21,8 @@ import (
 )
 
 const (
-	defaultWeight             = 5 * units.MilliAvax
-	defaultMinStakingDuration = 24 * time.Hour
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
+	defaultWeight  = 5 * units.MilliAvax
+	defaultBalance = 500 * units.MilliAvax
 )
 
 var (

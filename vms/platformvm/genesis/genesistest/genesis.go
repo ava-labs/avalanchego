@@ -23,23 +23,26 @@ import (
 	platformvmgenesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 )
 
-var (
-	AVAXAsset = avax.Asset{ID: snowtest.AVAXAssetID}
-
-	ValidatorNodeID                  = ids.GenerateTestNodeID()
-	Time                             = upgrade.InitiallyActiveTime
-	TimeUnix                         = uint64(Time.Unix())
-	ValidatorDuration                = 28 * 24 * time.Hour
-	ValidatorEndTime                 = Time.Add(ValidatorDuration)
-	ValidatorEndTimeUnix             = uint64(ValidatorEndTime.Unix())
-	ValidatorWeight                  = units.MegaAvax
-	ValidatorRewardsOwner            = &secp256k1fx.OutputOwners{}
-	ValidatorDelegationShares uint32 = reward.PercentDenominator
+const (
+	ValidatorDuration         = 28 * 24 * time.Hour
+	ValidatorWeight           = units.MegaAvax
+	ValidatorDelegationShares = reward.PercentDenominator
 
 	XChainName = "x"
 
-	InitialBalance = 30 * units.MegaAvax
+	InitialBalance = 10 * units.MegaAvax
 	InitialSupply  = ValidatorWeight + InitialBalance
+)
+
+var (
+	AVAXAsset = avax.Asset{ID: snowtest.AVAXAssetID}
+
+	ValidatorNodeID       = ids.GenerateTestNodeID()
+	Time                  = upgrade.InitiallyActiveTime
+	TimeUnix              = uint64(Time.Unix())
+	ValidatorEndTime      = Time.Add(ValidatorDuration)
+	ValidatorEndTimeUnix  = uint64(ValidatorEndTime.Unix())
+	ValidatorRewardsOwner = &secp256k1fx.OutputOwners{}
 )
 
 func New(t testing.TB) *platformvmgenesis.Genesis {
