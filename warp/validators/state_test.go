@@ -26,7 +26,7 @@ func TestGetValidatorSetPrimaryNetwork(t *testing.T) {
 	snowCtx := utils.TestSnowContext()
 	snowCtx.SubnetID = mySubnetID
 	snowCtx.ValidatorState = mockState
-	state := NewState(snowCtx)
+	state := NewState(snowCtx.ValidatorState, snowCtx.SubnetID, snowCtx.ChainID, false)
 	// Expect that requesting my validator set returns my validator set
 	mockState.EXPECT().GetValidatorSet(gomock.Any(), gomock.Any(), mySubnetID).Return(make(map[ids.NodeID]*validators.GetValidatorOutput), nil)
 	output, err := state.GetValidatorSet(context.Background(), 10, mySubnetID)

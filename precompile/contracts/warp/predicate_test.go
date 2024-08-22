@@ -228,6 +228,12 @@ func createValidPredicateTest(snowCtx *snow.Context, numKeys uint64, predicateBy
 }
 
 func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
+	for _, requirePrimaryNetworkSigners := range []bool{true, false} {
+		testWarpMessageFromPrimaryNetwork(t, requirePrimaryNetworkSigners)
+	}
+}
+
+func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigners bool) {
 	require := require.New(t)
 	numKeys := 10
 	cChainID := ids.GenerateTestID()
@@ -273,13 +279,17 @@ func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
 			return constants.PrimaryNetworkID, nil // Return Primary Network SubnetID
 		},
 		GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			require.Equal(snowCtx.SubnetID, subnetID)
+			expectedSubnetID := snowCtx.SubnetID
+			if requirePrimaryNetworkSigners {
+				expectedSubnetID = constants.PrimaryNetworkID
+			}
+			require.Equal(expectedSubnetID, subnetID)
 			return getValidatorsOutput, nil
 		},
 	}
 
 	test := testutils.PredicateTest{
-		Config: NewDefaultConfig(utils.NewUint64(0)),
+		Config: NewConfig(utils.NewUint64(0), 0, requirePrimaryNetworkSigners),
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -576,7 +586,7 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 
 		name := fmt.Sprintf("non-default quorum %d signature(s)", numSigners)
 		tests[name] = testutils.PredicateTest{
-			Config: NewConfig(utils.NewUint64(0), uint64(nonDefaultQuorumNumerator)),
+			Config: NewConfig(utils.NewUint64(0), uint64(nonDefaultQuorumNumerator), false),
 			PredicateContext: &precompileconfig.PredicateContext{
 				SnowCtx: snowCtx,
 				ProposerVMBlockCtx: &block.Context{
