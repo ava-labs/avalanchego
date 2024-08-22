@@ -22,7 +22,7 @@ import (
 
 const (
 	defaultWeight  = 5 * units.MilliAvax
-	defaultBalance = 500 * units.MilliAvax
+	defaultBalance = 1 * units.Avax
 )
 
 var (

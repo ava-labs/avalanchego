@@ -77,7 +77,15 @@ import (
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-const defaultWeight uint64 = 10000
+const (
+	defaultWeight = 5 * units.MilliAvax
+
+	// Node IDs of genesis validators. Initialized in init function
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
+	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -93,12 +101,6 @@ var (
 	defaultTxFee = uint64(100)
 
 	latestForkTime = genesistest.Time.Add(time.Second)
-
-	// Node IDs of genesis validators. Initialized in init function
-	defaultMinDelegatorStake = 1 * units.MilliAvax
-	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
-	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
-	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
 
 	defaultStaticFeeConfig = txfee.StaticConfig{
 		TxFee:                 defaultTxFee,
@@ -178,7 +180,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
-		Time:          json.Uint64(genesistest.Time.Unix()),
+		Time:          json.Uint64(genesistest.TimeUnix),
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 	}
 
