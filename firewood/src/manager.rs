@@ -26,7 +26,7 @@ pub struct RevisionManagerConfig {
 }
 
 type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
-type ProposedRevision = Arc<NodeStore<ImmutableProposal, FileBacked>>;
+type ProposedRevision = Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>;
 
 #[derive(Debug)]
 pub(crate) struct RevisionManager {
@@ -108,7 +108,7 @@ impl RevisionManager {
         let current_revision = self.current_revision();
         if !proposal
             .kind
-            .parent_is(&current_revision.kind.as_nodestore_parent())
+            .parent_hash_is(current_revision.kind.root_hash())
         {
             return Err(RevisionManagerError::NotLatest);
         }
@@ -133,16 +133,16 @@ impl RevisionManager {
         proposal.flush_header()?;
 
         // 7. Proposal Cleanup
-        self.proposals.retain(|p| {
-            // TODO: reparent proposals; this needs a lock on the parent element of immutable proposals
-            // if p
-            //     .kind
-            //     .parent_is(&proposal.kind.as_nodestore_parent())
-            // {
-            //     p.kind.reparent_to(&committed.kind.as_nodestore_parent());
-            // }
-            !Arc::ptr_eq(&proposal, p)
-        });
+        // first remove the committing proposal from the list of outstanding proposals
+        self.proposals.retain(|p| !Arc::ptr_eq(&proposal, p));
+
+        // then reparent any proposals that have this proposal as a parent
+        for p in self.proposals.iter() {
+            proposal.commit_reparent(p);
+        }
+
+        // 8. Revision reaping
+        // TODO
 
         Ok(())
     }

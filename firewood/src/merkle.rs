@@ -385,7 +385,7 @@ impl<T: HashedNodeReader> Merkle<T> {
 }
 
 impl<S: ReadableStorage> From<Merkle<NodeStore<MutableProposal, S>>>
-    for Merkle<NodeStore<ImmutableProposal, S>>
+    for Merkle<NodeStore<Arc<ImmutableProposal>, S>>
 {
     fn from(m: Merkle<NodeStore<MutableProposal, S>>) -> Self {
         Merkle {
@@ -395,7 +395,7 @@ impl<S: ReadableStorage> From<Merkle<NodeStore<MutableProposal, S>>>
 }
 
 impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
-    pub fn hash(self) -> Merkle<NodeStore<ImmutableProposal, S>> {
+    pub fn hash(self) -> Merkle<NodeStore<Arc<ImmutableProposal>, S>> {
         self.into()
     }
 

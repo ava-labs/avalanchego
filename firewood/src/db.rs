@@ -262,7 +262,8 @@ where
             }
         }
         let nodestore = merkle.into_inner();
-        let immutable: Arc<NodeStore<ImmutableProposal, FileBacked>> = Arc::new(nodestore.into());
+        let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
+            Arc::new(nodestore.into());
         self.manager
             .write()
             .expect("poisoned lock")
@@ -312,13 +313,13 @@ impl Db {
 
 #[derive(Debug)]
 pub struct Proposal<'p> {
-    nodestore: Arc<NodeStore<ImmutableProposal, FileBacked>>,
+    nodestore: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>,
     db: &'p Db,
 }
 
 #[async_trait]
 impl<'a> api::DbView for Proposal<'a> {
-    type Stream<'b> = MerkleKeyValueStream<'b, NodeStore<ImmutableProposal, FileBacked>> where Self: 'b;
+    type Stream<'b> = MerkleKeyValueStream<'b, NodeStore<Arc<ImmutableProposal>, FileBacked>> where Self: 'b;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
         todo!()
@@ -363,7 +364,6 @@ impl<'a> api::Proposal for Proposal<'a> {
         todo!()
     }
 
-    // When committing a proposal, refuse to commit if there are any cloned proposals.
     async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
         match Arc::into_inner(self) {
             Some(proposal) => {
