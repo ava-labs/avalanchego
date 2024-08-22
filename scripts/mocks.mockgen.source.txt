@@ -7,7 +7,7 @@ vms/avm/block/executor/manager.go==Manager=vms/avm/block/executor/executormock/m
 vms/avm/txs/tx.go==UnsignedTx=vms/avm/txs/txsmock/tx.go
 vms/platformvm/block/block.go=BanffBlock=MockBlock=vms/platformvm/block/mock_block.go
 vms/platformvm/block/executor/manager.go==Manager=vms/platformvm/block/executor/executormock/manager.go
-vms/platformvm/signer/signer.go==Signer=vms/platformvm/signer/signermock/mock_signer.go
+vms/platformvm/signer/signer.go==Signer=vms/platformvm/signer/signermock/signer.go
 vms/platformvm/state/diff.go==MockDiff=vms/platformvm/state/mock_diff.go
 vms/platformvm/state/state.go=Chain=MockState=vms/platformvm/state/mock_state.go
 vms/platformvm/state/state.go=State=MockChain=vms/platformvm/state/mock_chain.go
