@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/google/btree"
 )
@@ -92,7 +91,7 @@ type subnetOnlyValidatorDiff struct {
 
 type subnetOnlyValidators struct {
 	aggregatedBalance uint64
-	calculator        *fee.ValidatorState
+	calculator        *ValidatorState
 
 	validators    *btree.BTreeG[*subnetOnlyValidator]
 	validatorsMap map[ids.ID]*subnetOnlyValidator
@@ -104,7 +103,7 @@ type subnetOnlyValidators struct {
 }
 
 func newSubnetOnlyValidators(
-	calculator *fee.ValidatorState,
+	calculator *ValidatorState,
 	validatorDB linkeddb.LinkedDB,
 	validatorManager validators.Manager,
 ) *subnetOnlyValidators {

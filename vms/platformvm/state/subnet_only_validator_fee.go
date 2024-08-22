@@ -1,15 +1,17 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fee
+package state
+
+import "github.com/ava-labs/avalanchego/vms/components/gas"
 
 type ValidatorState struct {
-	Current                  Gas
-	Target                   Gas
-	Capacity                 Gas
-	Excess                   Gas
-	MinFee                   GasPrice
-	ExcessConversionConstant Gas
+	Current                  gas.Gas
+	Target                   gas.Gas
+	Capacity                 gas.Gas
+	Excess                   gas.Gas
+	MinFee                   gas.Price
+	ExcessConversionConstant gas.Gas
 }
 
 func (v ValidatorState) AdvanceTime(seconds uint64) ValidatorState {
@@ -31,7 +33,7 @@ func (v ValidatorState) AdvanceTime(seconds uint64) ValidatorState {
 
 func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
 	if v.Current == v.Target {
-		return seconds * uint64(CalculateGasPrice(v.MinFee, v.Excess, v.ExcessConversionConstant))
+		return seconds * uint64(gas.CalculatePrice(v.MinFee, v.Excess, v.ExcessConversionConstant))
 	}
 
 	var totalFee uint64
@@ -52,7 +54,7 @@ func (v ValidatorState) CalculateContinuousFee(seconds uint64) uint64 {
 			x = x.AddPerSecond(v.Current-v.Target, 1)
 		}
 
-		totalFee += uint64(CalculateGasPrice(v.MinFee, x, v.ExcessConversionConstant))
+		totalFee += uint64(gas.CalculatePrice(v.MinFee, x, v.ExcessConversionConstant))
 	}
 
 	return totalFee
@@ -75,7 +77,7 @@ func (v ValidatorState) CalculateTimeTillContinuousFee(balance uint64) uint64 {
 			x = x.AddPerSecond(v.Current-v.Target, 1)
 		}
 
-		totalFee += uint64(CalculateGasPrice(v.MinFee, x, v.ExcessConversionConstant))
+		totalFee += uint64(gas.CalculatePrice(v.MinFee, x, v.ExcessConversionConstant))
 		if totalFee >= balance {
 			return i
 		}

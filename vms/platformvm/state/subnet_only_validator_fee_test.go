@@ -1,12 +1,14 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package fee
+package state
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 func Test_ValidatorState(t *testing.T) {
@@ -135,7 +137,7 @@ func Test_ValidatorState(t *testing.T) {
 				Current:                  9_000,
 				Target:                   10_000,
 				Capacity:                 20_000,
-				Excess:                   Gas(6 * hour * 1_000),
+				Excess:                   gas.Gas(6 * hour * 1_000),
 				MinFee:                   2_048,
 				ExcessConversionConstant: 60_480_000_000,
 			},
