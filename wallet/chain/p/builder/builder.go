@@ -15,16 +15,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -341,14 +340,14 @@ func (b *builder) NewBaseTx(
 
 	ops := common.NewOptions(options)
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	outputComplexity, err := txfee.OutputComplexity(outputs...)
+	outputComplexity, err := fee.OutputComplexity(outputs...)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicBaseTxComplexities.Add(
+	complexity, err := fee.IntrinsicBaseTxComplexities.Add(
 		&memoComplexity,
 		&outputComplexity,
 	)
@@ -398,7 +397,7 @@ func (b *builder) NewAddValidatorTx(
 		toBurn,
 		toStake,
 		0,
-		feecomponent.Dimensions{},
+		gas.Dimensions{},
 		nil,
 		ops,
 	)
@@ -439,14 +438,14 @@ func (b *builder) NewAddSubnetValidatorTx(
 	}
 
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicAddSubnetValidatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicAddSubnetValidatorTxComplexities.Add(
 		&memoComplexity,
 		&authComplexity,
 	)
@@ -497,14 +496,14 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	}
 
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicRemoveSubnetValidatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicRemoveSubnetValidatorTxComplexities.Add(
 		&memoComplexity,
 		&authComplexity,
 	)
@@ -556,7 +555,7 @@ func (b *builder) NewAddDelegatorTx(
 		toBurn,
 		toStake,
 		0,
-		feecomponent.Dimensions{},
+		gas.Dimensions{},
 		nil,
 		ops,
 	)
@@ -616,14 +615,14 @@ func (b *builder) NewCreateChainTx(
 	if err != nil {
 		return nil, err
 	}
-	dynamicComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: bandwidth,
+	dynamicComplexity := gas.Dimensions{
+		gas.Bandwidth: bandwidth,
 	}
-	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicCreateChainTxComplexities.Add(
+	complexity, err := fee.IntrinsicCreateChainTxComplexities.Add(
 		&dynamicComplexity,
 		&authComplexity,
 	)
@@ -673,14 +672,14 @@ func (b *builder) NewCreateSubnetTx(
 
 	ops := common.NewOptions(options)
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	ownerComplexity, err := txfee.OwnerComplexity(owner)
+	ownerComplexity, err := fee.OwnerComplexity(owner)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicCreateSubnetTxComplexities.Add(
+	complexity, err := fee.IntrinsicCreateSubnetTxComplexities.Add(
 		&memoComplexity,
 		&ownerComplexity,
 	)
@@ -731,18 +730,18 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	}
 
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	authComplexity, err := txfee.AuthComplexity(subnetAuth)
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {
 		return nil, err
 	}
-	ownerComplexity, err := txfee.OwnerComplexity(owner)
+	ownerComplexity, err := fee.OwnerComplexity(owner)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicTransferSubnetOwnershipTxComplexities.Add(
+	complexity, err := fee.IntrinsicTransferSubnetOwnershipTxComplexities.Add(
 		&memoComplexity,
 		&authComplexity,
 		&ownerComplexity,
@@ -916,18 +915,18 @@ func (b *builder) NewImportTx(
 	}
 
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	inputComplexity, err := txfee.InputComplexity(importedInputs...)
+	inputComplexity, err := fee.InputComplexity(importedInputs...)
 	if err != nil {
 		return nil, err
 	}
-	outputComplexity, err := txfee.OutputComplexity(outputs...)
+	outputComplexity, err := fee.OutputComplexity(outputs...)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicImportTxComplexities.Add(
+	complexity, err := fee.IntrinsicImportTxComplexities.Add(
 		&memoComplexity,
 		&inputComplexity,
 		&outputComplexity,
@@ -995,14 +994,14 @@ func (b *builder) NewExportTx(
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	outputComplexity, err := txfee.OutputComplexity(outputs...)
+	outputComplexity, err := fee.OutputComplexity(outputs...)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicExportTxComplexities.Add(
+	complexity, err := fee.IntrinsicExportTxComplexities.Add(
 		&memoComplexity,
 		&outputComplexity,
 	)
@@ -1070,7 +1069,7 @@ func (b *builder) NewTransformSubnetTx(
 		toBurn,
 		toStake,
 		0,
-		feecomponent.Dimensions{},
+		gas.Dimensions{},
 		nil,
 		ops,
 	)
@@ -1127,22 +1126,22 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 
 	ops := common.NewOptions(options)
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	signerComplexity, err := txfee.SignerComplexity(signer)
+	signerComplexity, err := fee.SignerComplexity(signer)
 	if err != nil {
 		return nil, err
 	}
-	validatorOwnerComplexity, err := txfee.OwnerComplexity(validationRewardsOwner)
+	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
 	if err != nil {
 		return nil, err
 	}
-	delegatorOwnerComplexity, err := txfee.OwnerComplexity(delegationRewardsOwner)
+	delegatorOwnerComplexity, err := fee.OwnerComplexity(delegationRewardsOwner)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
 		&memoComplexity,
 		&signerComplexity,
 		&validatorOwnerComplexity,
@@ -1204,14 +1203,14 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 
 	ops := common.NewOptions(options)
 	memo := ops.Memo()
-	memoComplexity := feecomponent.Dimensions{
-		feecomponent.Bandwidth: uint64(len(memo)),
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
 	}
-	ownerComplexity, err := txfee.OwnerComplexity(rewardsOwner)
+	ownerComplexity, err := fee.OwnerComplexity(rewardsOwner)
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := txfee.IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
 		&memoComplexity,
 		&ownerComplexity,
 	)
@@ -1318,7 +1317,7 @@ func (b *builder) spend(
 	toBurn map[ids.ID]uint64,
 	toStake map[ids.ID]uint64,
 	excessAVAX uint64,
-	complexity feecomponent.Dimensions,
+	complexity gas.Dimensions,
 	ownerOverride *secp256k1fx.OutputOwners,
 	options *common.Options,
 ) (
@@ -1637,12 +1636,12 @@ func (b *builder) initCtx(tx txs.UnsignedTx) error {
 }
 
 type spendHelper struct {
-	weights  feecomponent.Dimensions
-	gasPrice feecomponent.GasPrice
+	weights  gas.Dimensions
+	gasPrice gas.Price
 
 	toBurn     map[ids.ID]uint64
 	toStake    map[ids.ID]uint64
-	complexity feecomponent.Dimensions
+	complexity gas.Dimensions
 
 	inputs        []*avax.TransferableInput
 	changeOutputs []*avax.TransferableOutput
@@ -1650,7 +1649,7 @@ type spendHelper struct {
 }
 
 func (s *spendHelper) addInput(input *avax.TransferableInput) error {
-	newInputComplexity, err := txfee.InputComplexity(input)
+	newInputComplexity, err := fee.InputComplexity(input)
 	if err != nil {
 		return err
 	}
@@ -1674,7 +1673,7 @@ func (s *spendHelper) addStakedOutput(output *avax.TransferableOutput) error {
 }
 
 func (s *spendHelper) addOutputComplexity(output *avax.TransferableOutput) error {
-	newOutputComplexity, err := txfee.OutputComplexity(output)
+	newOutputComplexity, err := fee.OutputComplexity(output)
 	if err != nil {
 		return err
 	}

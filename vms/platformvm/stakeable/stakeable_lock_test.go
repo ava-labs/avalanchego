@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/avax/avaxmock"
 )
 
 var errTest = errors.New("hi mom")
@@ -26,7 +27,7 @@ func TestLockOutVerify(t *testing.T) {
 			name:     "happy path",
 			locktime: 1,
 			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
-				o := avax.NewMockTransferableOut(ctrl)
+				o := avaxmock.NewTransferableOut(ctrl)
 				o.EXPECT().Verify().Return(nil)
 				return o
 			},
@@ -52,7 +53,7 @@ func TestLockOutVerify(t *testing.T) {
 			name:     "inner output fails verification",
 			locktime: 1,
 			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
-				o := avax.NewMockTransferableOut(ctrl)
+				o := avaxmock.NewTransferableOut(ctrl)
 				o.EXPECT().Verify().Return(errTest)
 				return o
 			},
@@ -84,7 +85,7 @@ func TestLockInVerify(t *testing.T) {
 			name:     "happy path",
 			locktime: 1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				o := avax.NewMockTransferableIn(ctrl)
+				o := avaxmock.NewTransferableIn(ctrl)
 				o.EXPECT().Verify().Return(nil)
 				return o
 			},
@@ -110,7 +111,7 @@ func TestLockInVerify(t *testing.T) {
 			name:     "inner input fails verification",
 			locktime: 1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				o := avax.NewMockTransferableIn(ctrl)
+				o := avaxmock.NewTransferableIn(ctrl)
 				o.EXPECT().Verify().Return(errTest)
 				return o
 			},
