@@ -140,7 +140,7 @@ jobs:
         shell: bash
         run: ./scripts/build.sh
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@v1-actions
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@v1.11.11-monitoring-url
         with:
           run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/run_ginkgo_warp.sh
           prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
@@ -172,7 +172,7 @@ jobs:
         shell: bash
         run: ./scripts/build.sh
       - name: Run E2E Load Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@v1-actions
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@v1.11.11-monitoring-url
         with:
           run: AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/run_ginkgo_load.sh
           prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
