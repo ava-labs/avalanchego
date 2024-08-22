@@ -49,7 +49,7 @@ func Merge[T any](less btree.LessFunc[T], iterators ...Iterator[T]) Iterator[T] 
 	return it
 }
 
-func (it *merged[T]) Next() bool {
+func (it *merged[_]) Next() bool {
 	if it.heap.Len() == 0 {
 		return false
 	}
@@ -81,13 +81,9 @@ func (it *merged[T]) Value() T {
 	return peek.Value()
 }
 
-func (it *merged[T]) Release() {
+func (it *merged[_]) Release() {
 	for it.heap.Len() > 0 {
 		removed, _ := it.heap.Pop()
 		removed.Release()
 	}
-}
-
-func (it *merged[T]) Len() int {
-	return it.heap.Len()
 }

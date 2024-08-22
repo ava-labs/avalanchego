@@ -19,7 +19,7 @@ func Filter[T any](it Iterator[T], filter func(T) bool) Iterator[T] {
 	}
 }
 
-func (i *filtered[T]) Next() bool {
+func (i *filtered[_]) Next() bool {
 	for i.it.Next() {
 		element := i.it.Value()
 		if !i.filter(element) {
@@ -33,6 +33,6 @@ func (i *filtered[T]) Value() T {
 	return i.it.Value()
 }
 
-func (i *filtered[T]) Release() {
+func (i *filtered[_]) Release() {
 	i.it.Release()
 }

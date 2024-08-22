@@ -19,7 +19,7 @@ func FromSlice[T any](elements ...T) Iterator[T] {
 	}
 }
 
-func (i *slice[T]) Next() bool {
+func (i *slice[_]) Next() bool {
 	i.index++
 	return i.index < len(i.elements)
 }
@@ -28,4 +28,4 @@ func (i *slice[T]) Value() T {
 	return i.elements[i.index]
 }
 
-func (*slice[T]) Release() {}
+func (*slice[_]) Release() {}

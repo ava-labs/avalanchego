@@ -5,10 +5,12 @@ package iterator
 
 import "github.com/ava-labs/avalanchego/utils"
 
+var _ Iterator[any] = Empty[any]{}
+
 // Empty is an iterator with no elements.
 type Empty[T any] struct{}
 
-func (Empty[T]) Next() bool {
+func (Empty[_]) Next() bool {
 	return false
 }
 
@@ -16,4 +18,4 @@ func (Empty[T]) Value() T {
 	return utils.Zero[T]()
 }
 
-func (Empty[T]) Release() {}
+func (Empty[_]) Release() {}

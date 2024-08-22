@@ -45,7 +45,7 @@ func FromTree[T any](btree *btree.BTreeG[T]) Iterator[T] {
 	return it
 }
 
-func (i *tree[T]) Next() bool {
+func (i *tree[_]) Next() bool {
 	next, ok := <-i.next
 	i.current = next
 	return ok
@@ -55,7 +55,7 @@ func (i *tree[T]) Value() T {
 	return i.current
 }
 
-func (i *tree[T]) Release() {
+func (i *tree[_]) Release() {
 	i.releaseOnce.Do(func() {
 		close(i.release)
 	})
