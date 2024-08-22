@@ -40,7 +40,7 @@ func init() {
 	}
 }
 
-func BuildGenesisTest(t *testing.T) []byte {
+func Build(t *testing.T) *api.BuildGenesisArgs {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(FundedKeys))
@@ -77,7 +77,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 		}
 	}
 
-	buildGenesisArgs := api.BuildGenesisArgs{
+	return &api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   snowtest.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
@@ -87,10 +87,15 @@ func BuildGenesisTest(t *testing.T) []byte {
 		InitialSupply: json.Uint64(360 * units.MegaAvax),
 		Encoding:      formatting.Hex,
 	}
+}
 
+func BuildBytes(t *testing.T) []byte {
+	require := require.New(t)
+
+	buildGenesisArgs := Build(t)
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
+	require.NoError(platformvmSS.BuildGenesis(nil, buildGenesisArgs, &buildGenesisResponse))
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	require.NoError(err)

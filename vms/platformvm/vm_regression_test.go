@@ -464,7 +464,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	_, genesisBytes := defaultGenesis(t, ctx.AVAXAssetID)
+	_, genesisBytes := defaultGenesis(t)
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(

@@ -384,7 +384,7 @@ func TestGetBalance(t *testing.T) {
 	require.NoError(err)
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := defaultGenesis(t)
 	for idx, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -412,7 +412,7 @@ func TestGetStake(t *testing.T) {
 	service, _, factory := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := defaultGenesis(t)
 	addrsStrs := []string{}
 	for _, validator := range genesis.Validators {
 		addrStr := "P-" + validator.RewardOwner.Addresses[0]
@@ -612,7 +612,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
 	service, _, factory := defaultService(t)
 
-	genesis, _ := defaultGenesis(t, service.vm.ctx.AVAXAssetID)
+	genesis, _ := defaultGenesis(t)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}

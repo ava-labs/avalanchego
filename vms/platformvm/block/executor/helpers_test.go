@@ -125,7 +125,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	if ctrl == nil {
 		res.state = statetest.New(t, statetest.Config{
 			DB:         res.baseDB,
-			Genesis:    genesistest.BuildGenesisTest(t),
+			Genesis:    genesistest.BuildBytes(t),
 			Validators: res.config.Validators,
 			Context:    res.ctx,
 			Rewards:    rewardsCalc,

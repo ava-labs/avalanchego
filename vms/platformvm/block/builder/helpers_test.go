@@ -116,7 +116,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = statetest.New(t, statetest.Config{
 		DB:         res.baseDB,
-		Genesis:    genesistest.BuildGenesisTest(t),
+		Genesis:    genesistest.BuildBytes(t),
 		Validators: res.config.Validators,
 		Context:    res.ctx,
 		Rewards:    rewardsCalc,
