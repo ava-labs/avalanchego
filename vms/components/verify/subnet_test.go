@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 )
 
 var errMissing = errors.New("missing")
@@ -33,7 +33,7 @@ func TestSameSubnet(t *testing.T) {
 		{
 			name: "same chain",
 			ctxF: func(ctrl *gomock.Controller) *snow.Context {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				return &snow.Context{
 					SubnetID:       subnetID0,
 					ChainID:        chainID0,
@@ -46,7 +46,7 @@ func TestSameSubnet(t *testing.T) {
 		{
 			name: "unknown chain",
 			ctxF: func(ctrl *gomock.Controller) *snow.Context {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), chainID1).Return(subnetID1, errMissing)
 				return &snow.Context{
 					SubnetID:       subnetID0,
@@ -60,7 +60,7 @@ func TestSameSubnet(t *testing.T) {
 		{
 			name: "wrong subnet",
 			ctxF: func(ctrl *gomock.Controller) *snow.Context {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), chainID1).Return(subnetID1, nil)
 				return &snow.Context{
 					SubnetID:       subnetID0,
@@ -74,7 +74,7 @@ func TestSameSubnet(t *testing.T) {
 		{
 			name: "same subnet",
 			ctxF: func(ctrl *gomock.Controller) *snow.Context {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), chainID1).Return(subnetID0, nil)
 				return &snow.Context{
 					SubnetID:       subnetID0,

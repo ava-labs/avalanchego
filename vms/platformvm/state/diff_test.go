@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -94,7 +94,6 @@ func TestDiffCurrentSupply(t *testing.T) {
 
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
 
 	state := NewMockState(ctrl)
@@ -262,7 +261,7 @@ func TestDiffSubnet(t *testing.T) {
 	// Initialize parent with one subnet
 	parentStateCreateSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
+			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
 	state.AddSubnet(parentStateCreateSubnetTx.ID())
@@ -283,7 +282,7 @@ func TestDiffSubnet(t *testing.T) {
 	// Put a subnet
 	createSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
+			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
 	diff.AddSubnet(createSubnetTx.ID())
@@ -535,8 +534,8 @@ func TestDiffSubnetOwner(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{
@@ -635,9 +634,9 @@ func TestDiffStacking(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
-		owner3 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
+		owner3 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{
