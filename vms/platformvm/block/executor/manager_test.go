@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 func TestGetBlock(t *testing.T) {
@@ -21,7 +21,7 @@ func TestGetBlock(t *testing.T) {
 
 	statelessBlk, err := block.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
 	require.NoError(err)
-	state := statemock.NewState(ctrl)
+	state := state.NewMockState(ctrl)
 	manager := &manager{
 		backend: &backend{
 			state:        state,

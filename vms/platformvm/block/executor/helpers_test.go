@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -120,7 +119,7 @@ type environment struct {
 	ctx            *snow.Context
 	fx             fx.Fx
 	state          state.State
-	mockedState    *statemock.State
+	mockedState    *state.MockState
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	factory        *txstest.WalletFactory
@@ -164,7 +163,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 			res.state,
 		)
 	} else {
-		res.mockedState = statemock.NewState(ctrl)
+		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
 		res.factory = txstest.NewWalletFactory(

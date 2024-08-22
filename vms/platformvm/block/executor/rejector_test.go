@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -120,7 +120,7 @@ func TestRejectBlock(t *testing.T) {
 			require.NoError(err)
 
 			mempool := mempoolmock.NewMempool(ctrl)
-			state := statemock.NewState(ctrl)
+			state := state.NewMockState(ctrl)
 			blkIDToState := map[ids.ID]*blockState{
 				blk.Parent(): nil,
 				blk.ID():     nil,

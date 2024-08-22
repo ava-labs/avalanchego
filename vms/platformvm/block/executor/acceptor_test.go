@@ -49,7 +49,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	blkID := blk.ID()
 
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
 
 	acceptor := &acceptor{
@@ -83,7 +83,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -162,7 +162,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -252,7 +252,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -362,7 +362,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()

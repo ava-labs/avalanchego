@@ -29,11 +29,9 @@ github.com/ava-labs/avalanchego/vms/avm/state=State=vms/avm/state/statemock/stat
 github.com/ava-labs/avalanchego/vms/avm/txs/mempool=Mempool=vms/avm/txs/mempool/mempoolmock/mempool.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/avaxmock/transferable_in.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/verifymock/verifiable.go
-github.com/ava-labs/avalanchego/vms/platformvm/block=Block=vms/platformvm/block/blockmock/block.go
 github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx=vms/platformvm/fx/fxmock/fx.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Chain=vms/platformvm/state/statemock/chain.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Diff=vms/platformvm/state/statemock/diff.go
-github.com/ava-labs/avalanchego/vms/platformvm/state=State=vms/platformvm/state/statemock/state.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mempoolmock/mempool.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/utxomock/verifier.go
 github.com/ava-labs/avalanchego/vms/proposervm/proposer=Windower=vms/proposervm/proposer/proposermock/windower.go
