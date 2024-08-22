@@ -616,7 +616,7 @@ func New(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 		subnetOnlyValidators: newSubnetOnlyValidators(
-			&fee.ValidatorState{
+			&ValidatorState{
 				Current:                  0,
 				Target:                   10_000,
 				Capacity:                 20_000,

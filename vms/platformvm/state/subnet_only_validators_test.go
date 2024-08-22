@@ -13,10 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
-var calculator = &fee.ValidatorState{
+var calculator = &ValidatorState{
 	Current:                  0,
 	Target:                   10_000,
 	Capacity:                 20_000,
@@ -61,7 +61,7 @@ func TestAddValidator(t *testing.T) {
 		},
 		status: added,
 	}, subnetOnlyValidators.validatorDiffs[validationID])
-	require.Equal(fee.Gas(1), subnetOnlyValidators.calculator.Current)
+	require.Equal(gas.Gas(1), subnetOnlyValidators.calculator.Current)
 
 	require.NoError(subnetOnlyValidators.Write(
 		height,
