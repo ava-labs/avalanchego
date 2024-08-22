@@ -7,10 +7,8 @@ package ids
 type RequestID struct {
 	// The node this request came from
 	NodeID NodeID
-	// The chain this request came from
-	SourceChainID ID
 	// The chain the expected response should come from
-	DestinationChainID ID
+	ChainID ID
 	// The unique identifier for this request
 	RequestID uint32
 	// The message opcode

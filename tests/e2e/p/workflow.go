@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
@@ -42,11 +43,15 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			delegationFeeShares uint32 = 20000 // TODO: retrieve programmatically
 		)
 
-		var (
-			env = e2e.GetEnv(tc)
+		env := e2e.GetEnv(tc)
 
-			nodeURI  = env.GetRandomNodeURI()
-			keychain = env.NewKeychain(2)
+		// Use a pre-funded key for the P-Chain
+		keychain := env.NewKeychain()
+		// Use a new key for the X-Chain
+		keychain.Add(e2e.NewPrivateKey(tc))
+
+		var (
+			nodeURI = env.GetRandomNodeURI()
 
 			rewardAddr  = keychain.Keys[0].Address()
 			rewardOwner = &secp256k1fx.OutputOwners{
@@ -59,6 +64,15 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{transferAddr},
 			}
+
+			// Ensure the change is returned to the pre-funded key
+			// TODO(marun) Remove when the wallet does this automatically
+			changeOwner = common.WithChangeOwner(&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					keychain.Keys[0].Address(),
+				},
+			})
 
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 
@@ -111,6 +125,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				rewardOwner,
 				delegationFeeShares,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -121,6 +136,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				avaxAssetID,
 				rewardOwner,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -146,6 +162,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 					},
 				},
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 
@@ -172,6 +189,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				constants.PlatformChainID,
 				&transferOwner,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 

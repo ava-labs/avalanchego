@@ -5,12 +5,13 @@ package state
 
 import (
 	"github.com/ava-labs/avalanchego/utils/heap"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
-	_ StakerDiffIterator = (*stakerDiffIterator)(nil)
-	_ StakerIterator     = (*mutableStakerIterator)(nil)
+	_ StakerDiffIterator         = (*stakerDiffIterator)(nil)
+	_ iterator.Iterator[*Staker] = (*mutableStakerIterator)(nil)
 )
 
 // StakerDiffIterator is an iterator that iterates over the events that will be
@@ -40,13 +41,13 @@ type stakerDiffIterator struct {
 	currentIterator          *mutableStakerIterator
 
 	pendingIteratorExhausted bool
-	pendingIterator          StakerIterator
+	pendingIterator          iterator.Iterator[*Staker]
 
 	modifiedStaker *Staker
 	isAdded        bool
 }
 
-func NewStakerDiffIterator(currentIterator, pendingIterator StakerIterator) StakerDiffIterator {
+func NewStakerDiffIterator(currentIterator, pendingIterator iterator.Iterator[*Staker]) StakerDiffIterator {
 	mutableCurrentIterator := newMutableStakerIterator(currentIterator)
 	return &stakerDiffIterator{
 		currentIteratorExhausted: !mutableCurrentIterator.Next(),
@@ -111,11 +112,11 @@ func (it *stakerDiffIterator) advancePending() {
 
 type mutableStakerIterator struct {
 	iteratorExhausted bool
-	iterator          StakerIterator
+	iterator          iterator.Iterator[*Staker]
 	heap              heap.Queue[*Staker]
 }
 
-func newMutableStakerIterator(iterator StakerIterator) *mutableStakerIterator {
+func newMutableStakerIterator(iterator iterator.Iterator[*Staker]) *mutableStakerIterator {
 	return &mutableStakerIterator{
 		iteratorExhausted: !iterator.Next(),
 		iterator:          iterator,
