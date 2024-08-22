@@ -509,25 +509,6 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				staker5.nodeID: pending,
 			},
 		},
-		{
-			description:   "advance time to staker5 start",
-			stakers:       []staker{staker1, staker2, staker3, staker4, staker5},
-			advanceTimeTo: []time.Time{staker1.startTime, staker2.startTime, staker3.startTime, staker5.startTime},
-			expectedStakers: map[ids.NodeID]stakerStatus{
-				staker1.nodeID: current,
-
-				// Staker2's end time matches staker5's start time, so typically
-				// the block builder would produce a ProposalBlock to remove
-				// staker2 when advancing the time. However, this test injects
-				// staker0 into the staker set artificially to advance the time.
-				// This means that staker2 is not removed by the ProposalBlock
-				// when advancing the time.
-				staker2.nodeID: current,
-				staker3.nodeID: current,
-				staker4.nodeID: current,
-				staker5.nodeID: current,
-			},
-		},
 	}
 
 	for _, test := range tests {

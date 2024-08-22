@@ -53,12 +53,7 @@ const (
 	defaultBalance            = 100 * defaultMinValidatorStake
 )
 
-var (
-	preFundedKeys = secp256k1.TestKeys()
-
-	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs = genesistest.GenesisNodeIDs
-)
+var preFundedKeys = secp256k1.TestKeys()
 
 const (
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
@@ -125,7 +120,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := statetest.New(t, statetest.Config{
 		DB:         baseDB,
-		Genesis:    genesistest.BuildGenesisTest(t, ctx.AVAXAssetID),
+		Genesis:    genesistest.BuildGenesisTest(t),
 		Validators: config.Validators,
 		Upgrades:   config.UpgradeConfig,
 		Context:    ctx,

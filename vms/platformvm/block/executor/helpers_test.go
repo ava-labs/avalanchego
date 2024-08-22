@@ -63,7 +63,6 @@ var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 
 	testSubnet1 *txs.Tx
@@ -128,7 +127,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	m := atomic.NewMemory(atomicDB)
 
 	res.ctx = snowtest.Context(t, snowtest.PChainID)
-	res.ctx.AVAXAssetID = avaxAssetID
 	res.ctx.SharedMemory = m.NewSharedMemory(res.ctx.ChainID)
 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
@@ -138,7 +136,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	if ctrl == nil {
 		res.state = statetest.New(t, statetest.Config{
 			DB:         res.baseDB,
-			Genesis:    genesistest.BuildGenesisTest(t, res.ctx.AVAXAssetID),
+			Genesis:    genesistest.BuildGenesisTest(t),
 			Validators: res.config.Validators,
 			Context:    res.ctx,
 			Rewards:    rewardsCalc,

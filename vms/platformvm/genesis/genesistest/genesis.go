@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -23,8 +24,7 @@ import (
 )
 
 var (
-	AVAXAssetID = ids.GenerateTestID()
-	AVAXAsset   = avax.Asset{ID: AVAXAssetID}
+	AVAXAsset = avax.Asset{ID: snowtest.AVAXAssetID}
 
 	ValidatorNodeID                  = ids.GenerateTestNodeID()
 	Time                             = upgrade.InitiallyActiveTime
@@ -88,7 +88,7 @@ func New(t testing.TB) *platformvmgenesis.Genesis {
 			{
 				UTXO: avax.UTXO{
 					UTXOID: avax.UTXOID{
-						TxID:        AVAXAssetID,
+						TxID:        snowtest.AVAXAssetID,
 						OutputIndex: 0,
 					},
 					Asset: AVAXAsset,

@@ -29,7 +29,7 @@ import (
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
 	rewardAddress := preFundedKeys[0].PublicKey().Address()
-	nodeID := genesisNodeIDs[0]
+	nodeID := genesistest.NodeIDs[0]
 
 	newValidatorID := ids.GenerateTestNodeID()
 	newValidatorStartTime := uint64(genesistest.Time.Add(5 * time.Second).Unix())
@@ -293,7 +293,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	nodeID := genesisNodeIDs[0]
+	nodeID := genesistest.NodeIDs[0]
 	{
 		// Case: Proposed validator currently validating primary network
 		// but stops validating subnet after stops validating primary network
@@ -856,7 +856,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}
 
 	{
-		nodeID := genesisNodeIDs[0]
+		nodeID := genesistest.NodeIDs[0]
 
 		// Case: Validator already validating primary network
 		builder, signer := env.factory.NewWallet(preFundedKeys[0])

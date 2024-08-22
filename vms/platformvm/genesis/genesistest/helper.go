@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -31,17 +32,17 @@ var (
 	preFundedKeys = secp256k1.TestKeys()
 
 	// Node IDs of genesis validators. Initialized in init function
-	GenesisNodeIDs []ids.NodeID
+	NodeIDs []ids.NodeID
 )
 
 func init() {
-	GenesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
+	NodeIDs = make([]ids.NodeID, len(preFundedKeys))
 	for i := range preFundedKeys {
-		GenesisNodeIDs[i] = ids.GenerateTestNodeID()
+		NodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
 
-func BuildGenesisTest(t *testing.T, avaxAssetID ids.ID) []byte {
+func BuildGenesisTest(t *testing.T) []byte {
 	require := require.New(t)
 
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
@@ -55,8 +56,8 @@ func BuildGenesisTest(t *testing.T, avaxAssetID ids.ID) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(GenesisNodeIDs))
-	for i, nodeID := range GenesisNodeIDs {
+	genesisValidators := make([]api.GenesisPermissionlessValidator, len(NodeIDs))
+	for i, nodeID := range NodeIDs {
 		addr := preFundedKeys[i].Address()
 		addrStr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 		require.NoError(err)
@@ -80,7 +81,7 @@ func BuildGenesisTest(t *testing.T, avaxAssetID ids.ID) []byte {
 
 	buildGenesisArgs := api.BuildGenesisArgs{
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
+		AvaxAssetID:   snowtest.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
 		Chains:        nil,
