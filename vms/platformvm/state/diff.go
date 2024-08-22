@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -187,7 +188,7 @@ func (d *diff) DeleteCurrentValidator(staker *Staker) {
 	d.currentStakerDiffs.DeleteValidator(staker)
 }
 
-func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (d *diff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -209,7 +210,7 @@ func (d *diff) DeleteCurrentDelegator(staker *Staker) {
 	d.currentStakerDiffs.DeleteDelegator(staker)
 }
 
-func (d *diff) GetCurrentStakerIterator() (StakerIterator, error) {
+func (d *diff) GetCurrentStakerIterator() (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -250,7 +251,7 @@ func (d *diff) DeletePendingValidator(staker *Staker) {
 	d.pendingStakerDiffs.DeleteValidator(staker)
 }
 
-func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error) {
+func (d *diff) GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -272,7 +273,7 @@ func (d *diff) DeletePendingDelegator(staker *Staker) {
 	d.pendingStakerDiffs.DeleteDelegator(staker)
 }
 
-func (d *diff) GetPendingStakerIterator() (StakerIterator, error) {
+func (d *diff) GetPendingStakerIterator() (iterator.Iterator[*Staker], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
@@ -448,7 +449,7 @@ func (d *diff) Apply(baseState Chain) error {
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 			for addedDelegatorIterator.Next() {
 				baseState.PutCurrentDelegator(addedDelegatorIterator.Value())
 			}
@@ -475,7 +476,7 @@ func (d *diff) Apply(baseState Chain) error {
 				baseState.DeletePendingValidator(validatorDiff.validator)
 			}
 
-			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
 			for addedDelegatorIterator.Next() {
 				baseState.PutPendingDelegator(addedDelegatorIterator.Value())
 			}

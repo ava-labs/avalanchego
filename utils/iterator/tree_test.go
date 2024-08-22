@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package iterator_test
 
 import (
 	"testing"
@@ -11,11 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func TestTreeIterator(t *testing.T) {
+var defaultTreeDegree = 2
+
+func TestTree(t *testing.T) {
 	require := require.New(t)
-	stakers := []*Staker{
+	stakers := []*state.Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			NextTime: time.Unix(0, 0),
@@ -30,12 +34,12 @@ func TestTreeIterator(t *testing.T) {
 		},
 	}
 
-	tree := btree.NewG(defaultTreeDegree, (*Staker).Less)
+	tree := btree.NewG(defaultTreeDegree, (*state.Staker).Less)
 	for _, staker := range stakers {
 		require.Nil(tree.ReplaceOrInsert(staker))
 	}
 
-	it := NewTreeIterator(tree)
+	it := iterator.FromTree(tree)
 	for _, staker := range stakers {
 		require.True(it.Next())
 		require.Equal(staker, it.Value())
@@ -44,15 +48,15 @@ func TestTreeIterator(t *testing.T) {
 	it.Release()
 }
 
-func TestTreeIteratorNil(t *testing.T) {
-	it := NewTreeIterator(nil)
+func TestTreeNil(t *testing.T) {
+	it := iterator.FromTree[*state.Staker](nil)
 	require.False(t, it.Next())
 	it.Release()
 }
 
-func TestTreeIteratorEarlyRelease(t *testing.T) {
+func TestTreeEarlyRelease(t *testing.T) {
 	require := require.New(t)
-	stakers := []*Staker{
+	stakers := []*state.Staker{
 		{
 			TxID:     ids.GenerateTestID(),
 			NextTime: time.Unix(0, 0),
@@ -67,12 +71,12 @@ func TestTreeIteratorEarlyRelease(t *testing.T) {
 		},
 	}
 
-	tree := btree.NewG(defaultTreeDegree, (*Staker).Less)
+	tree := btree.NewG(defaultTreeDegree, (*state.Staker).Less)
 	for _, staker := range stakers {
 		require.Nil(tree.ReplaceOrInsert(staker))
 	}
 
-	it := NewTreeIterator(tree)
+	it := iterator.FromTree(tree)
 	require.True(it.Next())
 	it.Release()
 	require.False(it.Next())

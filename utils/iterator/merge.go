@@ -1,50 +1,55 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package iterator
 
-import "github.com/ava-labs/avalanchego/utils/heap"
+import (
+	"github.com/google/btree"
 
-var _ StakerIterator = (*mergedIterator)(nil)
+	"github.com/ava-labs/avalanchego/utils/heap"
+)
 
-type mergedIterator struct {
+var _ Iterator[any] = (*merged[any])(nil)
+
+type merged[T any] struct {
 	initialized bool
 	// heap only contains iterators that have been initialized and are not
 	// exhausted.
-	heap heap.Queue[StakerIterator]
+	heap heap.Queue[Iterator[T]]
 }
 
-// Returns an iterator that returns all of the elements of [stakers] in order.
-func NewMergedIterator(stakers ...StakerIterator) StakerIterator {
+// Merge returns an iterator that returns all of the elements of [iterators] in
+// order.
+func Merge[T any](less btree.LessFunc[T], iterators ...Iterator[T]) Iterator[T] {
 	// Filter out iterators that are already exhausted.
 	i := 0
-	for i < len(stakers) {
-		staker := stakers[i]
-		if staker.Next() {
+	for i < len(iterators) {
+		it := iterators[i]
+		if it.Next() {
 			i++
 			continue
 		}
-		staker.Release()
+		it.Release()
 
-		newLength := len(stakers) - 1
-		stakers[i] = stakers[newLength]
-		stakers[newLength] = nil
-		stakers = stakers[:newLength]
+		newLength := len(iterators) - 1
+		iterators[i] = iterators[newLength]
+		iterators[newLength] = nil
+		iterators = iterators[:newLength]
 	}
 
-	it := &mergedIterator{
+	it := &merged[T]{
 		heap: heap.QueueOf(
-			func(a, b StakerIterator) bool {
-				return a.Value().Less(b.Value())
+			func(a, b Iterator[T]) bool {
+				return less(a.Value(), b.Value())
 			},
-			stakers...,
+			iterators...,
 		),
 	}
 
 	return it
 }
 
-func (it *mergedIterator) Next() bool {
+func (it *merged[_]) Next() bool {
 	if it.heap.Len() == 0 {
 		return false
 	}
@@ -52,7 +57,7 @@ func (it *mergedIterator) Next() bool {
 	if !it.initialized {
 		// Note that on the first call to Next() (i.e. here) we don't call
 		// Next() on the current iterator. This is because we already called
-		// Next() on each iterator in NewMergedIterator.
+		// Next() on each iterator in Merge.
 		it.initialized = true
 		return true
 	}
@@ -71,18 +76,14 @@ func (it *mergedIterator) Next() bool {
 	return it.heap.Len() > 0
 }
 
-func (it *mergedIterator) Value() *Staker {
+func (it *merged[T]) Value() T {
 	peek, _ := it.heap.Peek()
 	return peek.Value()
 }
 
-func (it *mergedIterator) Release() {
+func (it *merged[_]) Release() {
 	for it.heap.Len() > 0 {
 		removed, _ := it.heap.Pop()
 		removed.Release()
 	}
-}
-
-func (it *mergedIterator) Len() int {
-	return it.heap.Len()
 }

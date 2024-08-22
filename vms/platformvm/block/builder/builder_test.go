@@ -17,13 +17,13 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -496,7 +496,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "end of time",
 			timestamp: mockable.MaxTime,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				return statemock.NewChain(ctrl)
+				return state.NewMockChain(ctrl)
 			},
 			expectedErr: ErrEndOfTime,
 		},
@@ -504,11 +504,11 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "no stakers",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 				currentStakerIter.EXPECT().Next().Return(false)
 				currentStakerIter.EXPECT().Release()
 
-				s := statemock.NewChain(ctrl)
+				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -518,7 +518,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired subnet validator/delegator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -533,7 +533,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := statemock.NewChain(ctrl)
+				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -545,7 +545,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network validator after subnet expired subnet validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -560,7 +560,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := statemock.NewChain(ctrl)
+				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -572,7 +572,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network delegator after subnet expired subnet validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -587,7 +587,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := statemock.NewChain(ctrl)
+				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -599,7 +599,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network delegator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -609,7 +609,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := statemock.NewChain(ctrl)
+				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -621,7 +621,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -631,7 +631,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := statemock.NewChain(ctrl)
+				s := state.NewMockChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
