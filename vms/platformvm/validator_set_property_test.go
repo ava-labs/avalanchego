@@ -274,7 +274,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	if err != nil {
@@ -288,7 +288,7 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 }
 
 func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := genesistest.FundedKeys[0].PublicKey().Address()
+	addr := genesistest.FundedKeys[0].Address()
 
 	sk, err := bls.NewSecretKey()
 	if err != nil {
@@ -718,11 +718,11 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	if err != nil {
@@ -759,7 +759,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(genesistest.FundedKeys))
 	for i, key := range genesistest.FundedKeys {
-		id := key.PublicKey().Address()
+		id := key.Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		if err != nil {
 			return nil, err

@@ -128,16 +128,16 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -337,16 +337,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -378,16 +378,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
 		}),
 	)
 	require.NoError(err)

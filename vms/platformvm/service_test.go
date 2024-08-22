@@ -147,7 +147,7 @@ func TestGetTxStatus(t *testing.T) {
 			Amt: 1234567,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Locktime:  0,
-				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				Addrs:     []ids.ShortID{recipientKey.Address()},
 				Threshold: 1,
 			},
 		},
@@ -163,7 +163,7 @@ func TestGetTxStatus(t *testing.T) {
 					Key:   inputID[:],
 					Value: utxoBytes,
 					Traits: [][]byte{
-						recipientKey.PublicKey().Address().Bytes(),
+						recipientKey.Address().Bytes(),
 					},
 				},
 			},
@@ -234,7 +234,7 @@ func TestGetTx(t *testing.T) {
 					"chain name",
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 					}),
 				)
 				require.NoError(t, err)
@@ -270,7 +270,7 @@ func TestGetTx(t *testing.T) {
 					0,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 					}),
 				)
 				require.NoError(t, err)
@@ -296,7 +296,7 @@ func TestGetTx(t *testing.T) {
 					}},
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 					}),
 				)
 				require.NoError(t, err)
@@ -507,7 +507,7 @@ func TestGetStake(t *testing.T) {
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -530,7 +530,7 @@ func TestGetStake(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.addrManager.FormatLocalAddress(genesistest.FundedKeys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(genesistest.FundedKeys[0].Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
@@ -571,7 +571,7 @@ func TestGetStake(t *testing.T) {
 		0,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -657,7 +657,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -794,7 +794,7 @@ func TestGetBlock(t *testing.T) {
 				"chain name",
 				common.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 				}),
 			)
 			require.NoError(err)

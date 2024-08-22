@@ -47,7 +47,7 @@ func TestAtomicTxImports(t *testing.T) {
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				Addrs:     []ids.ShortID{recipientKey.Address()},
 			},
 		},
 	}
@@ -60,7 +60,7 @@ func TestAtomicTxImports(t *testing.T) {
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
-				recipientKey.PublicKey().Address().Bytes(),
+				recipientKey.Address().Bytes(),
 			},
 		}}},
 	}))
@@ -70,7 +70,7 @@ func TestAtomicTxImports(t *testing.T) {
 		env.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+			Addrs:     []ids.ShortID{recipientKey.Address()},
 		},
 	)
 	require.NoError(err)

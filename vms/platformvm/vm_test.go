@@ -205,14 +205,14 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, d
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				genesistest.FundedKeys[0].PublicKey().Address(),
-				genesistest.FundedKeys[1].PublicKey().Address(),
-				genesistest.FundedKeys[2].PublicKey().Address(),
+				genesistest.FundedKeys[0].Address(),
+				genesistest.FundedKeys[1].Address(),
+				genesistest.FundedKeys[2].Address(),
 			},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -270,7 +270,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := genesistest.FundedKeys[0].PublicKey().Address()
+			id := genesistest.FundedKeys[0].Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
@@ -829,13 +829,13 @@ func TestCreateSubnet(t *testing.T) {
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				genesistest.FundedKeys[0].PublicKey().Address(),
-				genesistest.FundedKeys[1].PublicKey().Address(),
+				genesistest.FundedKeys[0].Address(),
+				genesistest.FundedKeys[1].Address(),
 			},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -943,7 +943,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+			Addrs:     []ids.ShortID{recipientKey.Address()},
 		},
 	)
 	require.ErrorIs(err, walletbuilder.ErrInsufficientFunds)
@@ -957,7 +957,7 @@ func TestAtomicImport(t *testing.T) {
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				Addrs:     []ids.ShortID{recipientKey.Address()},
 			},
 		},
 	}
@@ -972,7 +972,7 @@ func TestAtomicImport(t *testing.T) {
 					Key:   inputID[:],
 					Value: utxoBytes,
 					Traits: [][]byte{
-						recipientKey.PublicKey().Address().Bytes(),
+						recipientKey.Address().Bytes(),
 					},
 				},
 			},
@@ -984,7 +984,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+			Addrs:     []ids.ShortID{recipientKey.Address()},
 		},
 	)
 	require.NoError(err)
@@ -1956,7 +1956,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	key, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
 
-	id := key.PublicKey().Address()
+	id := key.Address()
 	nodeID := ids.GenerateTestNodeID()
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
@@ -1985,7 +1985,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		reward.PercentDenominator,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2010,7 +2010,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2041,7 +2041,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[1].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[1].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2054,7 +2054,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		createSubnetTx.ID(),
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2093,11 +2093,11 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2126,7 +2126,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			genesistest.FundedKeys[0].PublicKey().Address(),
+			genesistest.FundedKeys[0].Address(),
 		},
 	}
 	ctx, err := walletbuilder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
@@ -2138,7 +2138,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		subnetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[1].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[1].Address()},
 		},
 	)
 	require.NoError(err)
@@ -2165,7 +2165,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			genesistest.FundedKeys[1].PublicKey().Address(),
+			genesistest.FundedKeys[1].Address(),
 		},
 	}
 	expectedOwner.InitCtx(ctx)

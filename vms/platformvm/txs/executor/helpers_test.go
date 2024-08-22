@@ -190,14 +190,14 @@ func addSubnet(t *testing.T, env *environment) {
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				genesistest.FundedKeys[0].PublicKey().Address(),
-				genesistest.FundedKeys[1].PublicKey().Address(),
-				genesistest.FundedKeys[2].PublicKey().Address(),
+				genesistest.FundedKeys[0].Address(),
+				genesistest.FundedKeys[1].Address(),
+				genesistest.FundedKeys[2].Address(),
 			},
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)

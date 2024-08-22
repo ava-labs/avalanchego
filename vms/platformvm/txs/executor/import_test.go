@@ -200,7 +200,7 @@ func fundedSharedMemory(
 				Amt: amt,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
-					Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+					Addrs:     []ids.ShortID{sourceKey.Address()},
 					Threshold: 1,
 				},
 			},
@@ -216,7 +216,7 @@ func fundedSharedMemory(
 						Key:   inputID[:],
 						Value: utxoBytes,
 						Traits: [][]byte{
-							sourceKey.PublicKey().Address().Bytes(),
+							sourceKey.Address().Bytes(),
 						},
 					},
 				},

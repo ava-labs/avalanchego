@@ -1064,7 +1064,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 	)
 	require.NoError(err)
@@ -1163,7 +1163,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	pendingValidatorStartTime := genesistest.Time.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeIDKey, _ := secp256k1.NewPrivateKey()
-	rewardAddress := nodeIDKey.PublicKey().Address()
+	rewardAddress := nodeIDKey.Address()
 	nodeID := ids.BuildTestNodeID(rewardAddress[:])
 
 	_, err := addPendingValidator(
@@ -1260,7 +1260,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 	)
 	require.NoError(err)
@@ -1380,11 +1380,11 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		10000,
 	)
@@ -1464,11 +1464,11 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].Address()},
 		},
 		10000,
 	)

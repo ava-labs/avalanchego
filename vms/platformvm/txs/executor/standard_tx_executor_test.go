@@ -112,7 +112,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 
 func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	dummyHeight := uint64(1)
-	rewardAddress := genesistest.FundedKeys[0].PublicKey().Address()
+	rewardAddress := genesistest.FundedKeys[0].Address()
 	nodeID := genesistest.NodeIDs[0]
 
 	newValidatorID := ids.GenerateTestNodeID()
@@ -286,7 +286,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:     []*secp256k1.PrivateKey{genesistest.FundedKeys[1]}, // tx fee payer
 			setup: func(env *environment) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := env.state.UTXOIDs(
-					genesistest.FundedKeys[1].PublicKey().Address().Bytes(),
+					genesistest.FundedKeys[1].Address().Bytes(),
 					ids.Empty,
 					math.MaxInt32)
 				require.NoError(t, err)
@@ -517,7 +517,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	// Node with ID key.PublicKey().Address() now a pending validator for primary network
+	// Node with ID key.Address() now a pending validator for primary network
 
 	{
 		// Case: Proposed validator is pending validator of primary network
@@ -689,7 +689,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	{
-		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
+		// Node with ID nodeIDKey.Address() now validating subnet with ID testSubnet1.ID
 		startTime := genesistest.Time.Add(time.Second)
 		builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 		utx, err := builder.NewAddSubnetValidatorTx(
@@ -1085,7 +1085,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		// Remove all UTXOs owned by preFundedKeys[0]
-		utxoIDs, err := env.state.UTXOIDs(genesistest.FundedKeys[0].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
+		utxoIDs, err := env.state.UTXOIDs(genesistest.FundedKeys[0].Address().Bytes(), ids.Empty, math.MaxInt32)
 		require.NoError(err)
 
 		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
@@ -1330,7 +1330,7 @@ func TestDurangoMemoField(t *testing.T) {
 					&secp256k1fx.OutputOwners{
 						Locktime:  0,
 						Threshold: 1,
-						Addrs:     []ids.ShortID{sourceKey.PublicKey().Address()},
+						Addrs:     []ids.ShortID{sourceKey.Address()},
 					},
 					common.WithMemo(memoField),
 				)
