@@ -26,8 +26,8 @@ import (
 
 func newCallthroughSyncClient(ctrl *gomock.Controller, db merkledb.MerkleDB) *MockClient {
 	syncClient := NewMockClient(ctrl)
-	syncClient.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
+	syncClient.EXPECT().GetRangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, request *pb.SyncGetRangeProofRequest, _ DB) (*merkledb.RangeProof, error) {
 			return db.GetRangeProof(
 				context.Background(),
 				maybeBytesToMaybe(request.StartKey),
@@ -938,8 +938,8 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	require.NoError(err)
 
 	client := NewMockClient(ctrl)
-	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(context.Context, *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
+	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(context.Context, *pb.SyncGetRangeProofRequest, DB) (*merkledb.RangeProof, error) {
 			return nil, errInvalidRangeProof
 		},
 	).AnyTimes()
@@ -1031,8 +1031,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	updatedRootChan <- struct{}{}
 
 	client := NewMockClient(ctrl)
-	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
+	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any(), gomock.All()).DoAndReturn(
+		func(ctx context.Context, request *pb.SyncGetRangeProofRequest, _ DB) (*merkledb.RangeProof, error) {
 			<-updatedRootChan
 			root, err := ids.ToID(request.RootHash)
 			require.NoError(err)

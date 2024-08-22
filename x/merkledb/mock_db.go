@@ -417,6 +417,20 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(ctx, proof, start, end, ex
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyChangeProof", reflect.TypeOf((*MockMerkleDB)(nil).VerifyChangeProof), ctx, proof, start, end, expectedEndRootID)
 }
 
+// VerifyRangeProof mocks base method.
+func (m *MockMerkleDB) VerifyRangeProof(ctx context.Context, proof *RangeProof, start, end maybe.Maybe[[]byte], expectedRootID ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyRangeProof", ctx, proof, start, end, expectedRootID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyRangeProof indicates an expected call of VerifyRangeProof.
+func (mr *MockMerkleDBMockRecorder) VerifyRangeProof(ctx, proof, start, end, expectedRootID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyRangeProof", reflect.TypeOf((*MockMerkleDB)(nil).VerifyRangeProof), ctx, proof, start, end, expectedRootID)
+}
+
 // getEditableNode mocks base method.
 func (m *MockMerkleDB) getEditableNode(key Key, hasValue bool) (*node, error) {
 	m.ctrl.T.Helper()

@@ -368,6 +368,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
+		m.config.DB,
 	)
 	if err != nil {
 		m.setError(err)
