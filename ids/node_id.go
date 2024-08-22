@@ -4,9 +4,7 @@
 package ids
 
 import (
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const (
@@ -26,12 +24,6 @@ type NodeID struct {
 
 func (id NodeID) Compare(other NodeID) int {
 	return id.ShortNodeID.Compare(other.ShortNodeID)
-}
-
-func NodeIDFromCert(cert *staking.Certificate) NodeID {
-	return NodeID{
-		ShortNodeID: ShortNodeID(hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw))),
-	}
 }
 
 // NodeIDFromString is the inverse of NodeID.String()

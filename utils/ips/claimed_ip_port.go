@@ -50,7 +50,7 @@ func NewClaimedIPPort(
 		AddrPort:  ipPort,
 		Timestamp: timestamp,
 		Signature: signature,
-		NodeID:    ids.NodeIDFromCert(cert),
+		NodeID:    ids.ShortNodeIDFromCert(cert).NodeID(),
 	}
 
 	packer := wrappers.Packer{

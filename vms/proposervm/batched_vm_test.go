@@ -1017,7 +1017,7 @@ func initTestRemoteProposerVM(
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = valState
 
 	require.NoError(proVM.Initialize(

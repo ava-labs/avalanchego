@@ -359,7 +359,7 @@ func (n *Node) EnsureNodeID() error {
 	if err != nil {
 		return fmt.Errorf("failed to ensure node ID: failed to parse staking cert: %w", err)
 	}
-	n.NodeID = ids.NodeIDFromCert(stakingCert)
+	n.NodeID = ids.ShortNodeIDFromCert(stakingCert).NodeID()
 
 	return nil
 }

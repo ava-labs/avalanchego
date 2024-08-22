@@ -133,7 +133,7 @@ func New(
 		LogFactory:       logFactory,
 		StakingTLSSigner: config.StakingTLSCert.PrivateKey.(crypto.Signer),
 		StakingTLSCert:   stakingCert,
-		ID:               ids.NodeIDFromCert(stakingCert),
+		ID:               ids.ShortNodeIDFromCert(stakingCert).NodeID(),
 		Config:           config,
 	}
 

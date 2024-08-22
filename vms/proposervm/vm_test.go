@@ -180,7 +180,7 @@ func initTestProposerVM(
 	}
 
 	ctx := snowtest.Context(t, ids.ID{1})
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = valState
 
 	db := prefixdb.New([]byte{0}, memdb.New())
@@ -838,7 +838,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = valState
 
 	toEngine := make(chan common.Message, 1)
@@ -1117,7 +1117,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = valState
 
 	db := memdb.New()
@@ -1635,7 +1635,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = valState
 
 	require.NoError(proVM.Initialize(
@@ -1804,7 +1804,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = valState
 
 	require.NoError(proVM.Initialize(
@@ -1921,7 +1921,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2032,7 +2032,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	}
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
+	snowCtx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 
 	require.NoError(vm.Initialize(
 		context.Background(),
@@ -2179,7 +2179,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	}
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.NodeID = ids.ShortNodeIDFromCert(pTestCert).NodeID()
 	ctx.ValidatorState = &validatorstest.State{
 		T: t,
 		GetMinimumHeightF: func(context.Context) (uint64, error) {

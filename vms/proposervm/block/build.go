@@ -58,7 +58,7 @@ func Build(
 		},
 		timestamp: timestamp,
 		cert:      cert,
-		proposer:  ids.NodeIDFromCert(cert),
+		proposer:  ids.ShortNodeIDFromCert(cert).NodeID(),
 	}
 	var blockIntf SignedBlock = block
 
