@@ -37,7 +37,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
 		}
 
-		keychain := env.NewKeychain(1)
+		keychain := env.NewKeychain()
 		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 
 		pWallet := baseWallet.P()
