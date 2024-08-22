@@ -52,13 +52,13 @@ func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
 	}
 	var (
-		subnetID ids.ID
-		nodeID   ids.NodeID
+		subnetID    ids.ID
+		shortNodeID ids.ShortNodeID
 	)
 	copy(subnetID[:], key)
 	height := unpackIterableHeight(key[ids.IDLen:])
-	copy(nodeID.ShortNodeID.Bytes(), key[diffKeyNodeIDOffset:])
-	return subnetID, height, nodeID, nil
+	copy(shortNodeID[:], key[diffKeyNodeIDOffset:])
+	return subnetID, height, shortNodeID.NodeID(), nil
 }
 
 func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {

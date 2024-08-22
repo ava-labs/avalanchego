@@ -612,9 +612,9 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	var (
-		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime   = startTime.Add(defaultMinStakingDuration)
-		nodeID    = genesisNodeIDs[0]
+		startTime   = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime     = startTime.Add(defaultMinStakingDuration)
+		shortNodeID = genesisNodeIDs[0]
 	)
 
 	// create valid tx
@@ -624,7 +624,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID.NodeID(),
+				NodeID: shortNodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
@@ -652,7 +652,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in current validator set
-	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID.NodeID())
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), shortNodeID.NodeID())
 	require.NoError(err)
 }
 
@@ -664,9 +664,9 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	var (
-		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime   = startTime.Add(defaultMinStakingDuration)
-		nodeID    = genesisNodeIDs[0]
+		startTime   = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime     = startTime.Add(defaultMinStakingDuration)
+		shortNodeID = genesisNodeIDs[0]
 	)
 
 	// create valid tx
@@ -676,7 +676,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID.NodeID(),
+				NodeID: shortNodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
@@ -703,7 +703,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in validator set
-	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID.NodeID())
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -953,14 +953,14 @@ func TestCreateSubnet(t *testing.T) {
 	require.Contains(subnetIDs, subnetID)
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	nodeID := genesisNodeIDs[0]
+	shortNodeID := genesisNodeIDs[0]
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	uAddValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID.NodeID(),
+				NodeID: shortNodeID.NodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultWeight,
@@ -988,10 +988,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID.NodeID())
+	_, err = vm.state.GetPendingValidator(subnetID, shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID.NodeID())
+	_, err = vm.state.GetCurrentValidator(subnetID, shortNodeID.NodeID())
 	require.NoError(err)
 
 	// fast forward clock to time validator should stop validating
@@ -1001,10 +1001,10 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background())) // remove validator from current validator set
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID.NodeID())
+	_, err = vm.state.GetPendingValidator(subnetID, shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID.NodeID())
+	_, err = vm.state.GetCurrentValidator(subnetID, shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 

@@ -374,7 +374,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	nodeID := genesisNodeIDs[0]
+	shortNodeID := genesisNodeIDs[0]
 
 	{
 		// Case: Proposed validator currently validating primary network
@@ -385,7 +385,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(startTime.Unix()),
 					End:    uint64(defaultValidateEndTime.Unix()) + 1,
 					Wght:   defaultWeight,
@@ -420,7 +420,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(defaultValidateStartTime.Unix() + 1),
 					End:    uint64(defaultValidateEndTime.Unix()),
 					Wght:   defaultWeight,
@@ -626,7 +626,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(newTimestamp.Unix()),
 					End:    uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()),
 					Wght:   defaultWeight,
@@ -661,7 +661,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	uSubnetTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID.NodeID(),
+				NodeID: shortNodeID.NodeID(),
 				Start:  uint64(defaultValidateStartTime.Unix()),
 				End:    uint64(defaultValidateEndTime.Unix()),
 				Wght:   defaultWeight,
@@ -694,7 +694,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(startTime.Unix()),
 					End:    uint64(defaultValidateEndTime.Unix()),
 					Wght:   defaultWeight,
@@ -731,7 +731,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(startTime.Unix()),
 					End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   defaultWeight,
@@ -771,7 +771,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(startTime.Unix()),
 					End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()),
 					Wght:   defaultWeight,
@@ -811,7 +811,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(startTime.Unix()),
 					End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()),
 					Wght:   defaultWeight,
@@ -850,7 +850,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		utx, err := builder.NewAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID.NodeID(),
+					NodeID: shortNodeID.NodeID(),
 					Start:  uint64(startTime.Unix()) + 1,
 					End:    uint64(startTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   defaultWeight,
@@ -897,13 +897,13 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	nodeID := genesisNodeIDs[0]
+	shortNodeID := genesisNodeIDs[0]
 
 	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID.NodeID(),
+				NodeID: shortNodeID.NodeID(),
 				Start:  uint64(defaultValidateStartTime.Unix() + 1),
 				End:    uint64(defaultValidateEndTime.Unix()),
 				Wght:   defaultWeight,
