@@ -94,9 +94,6 @@ var (
 
 	latestForkTime = genesistest.Time.Add(time.Second)
 
-	// each key controls an address that has [defaultBalance] AVAX at genesis
-	keys = secp256k1.TestKeys()
-
 	// Node IDs of genesis validators. Initialized in init function
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
@@ -127,7 +124,7 @@ var (
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	// Its threshold is 2
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = keys[0:3]
+	testSubnet1ControlKeys = genesistest.FundedKeys[0:3]
 )
 
 type mutableSharedMemory struct {
@@ -140,8 +137,8 @@ type mutableSharedMemory struct {
 func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 	require := require.New(t)
 
-	genesisUTXOs := make([]api.UTXO, len(keys))
-	for i, key := range keys {
+	genesisUTXOs := make([]api.UTXO, len(genesistest.FundedKeys))
+	for i, key := range genesistest.FundedKeys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
@@ -153,7 +150,7 @@ func defaultGenesis(t *testing.T) (*api.BuildGenesisArgs, []byte) {
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesistest.NodeIDs))
 	for i, nodeID := range genesistest.NodeIDs {
-		addr := keys[i].Address()
+		addr := genesistest.FundedKeys[i].Address()
 		addrStr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
@@ -270,19 +267,19 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, d
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	builder, signer := factory.NewWallet(keys[0])
+	builder, signer := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				keys[0].PublicKey().Address(),
-				keys[1].PublicKey().Address(),
-				keys[2].PublicKey().Address(),
+				genesistest.FundedKeys[0].PublicKey().Address(),
+				genesistest.FundedKeys[1].PublicKey().Address(),
+				genesistest.FundedKeys[2].PublicKey().Address(),
 			},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -340,7 +337,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := keys[0].PublicKey().Address()
+			id := genesistest.FundedKeys[0].PublicKey().Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
@@ -380,7 +377,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -439,7 +436,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create invalid tx
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -498,7 +495,7 @@ func TestAddValidatorReject(t *testing.T) {
 	)
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
@@ -551,7 +548,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require.NoError(err)
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -894,18 +891,18 @@ func TestCreateSubnet(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				keys[0].PublicKey().Address(),
-				keys[1].PublicKey().Address(),
+				genesistest.FundedKeys[0].PublicKey().Address(),
+				genesistest.FundedKeys[1].PublicKey().Address(),
 			},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -1001,14 +998,14 @@ func TestAtomicImport(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(50000)
-	recipientKey := keys[1]
+	recipientKey := genesistest.FundedKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, baseDB))
 
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	builder, _ := factory.NewWallet(keys[0])
+	builder, _ := factory.NewWallet(genesistest.FundedKeys[0])
 	_, err := builder.NewImportTx(
 		vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
@@ -2037,7 +2034,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	uAddValTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2061,7 +2058,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		reward.PercentDenominator,
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2086,7 +2083,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2104,7 +2101,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(createSubnetBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	builder, txSigner = factory.NewWallet(key, keys[1])
+	builder, txSigner = factory.NewWallet(key, genesistest.FundedKeys[1])
 	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2117,20 +2114,20 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[1].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
 	addSubnetValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(key, keys[2])
+	builder, txSigner = factory.NewWallet(key, genesistest.FundedKeys[2])
 	uRemoveSubnetValTx, err := builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		createSubnetTx.ID(),
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2165,15 +2162,15 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		},
 		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -2202,7 +2199,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			keys[0].PublicKey().Address(),
+			genesistest.FundedKeys[0].PublicKey().Address(),
 		},
 	}
 	ctx, err := walletbuilder.NewSnowContext(vm.ctx.NetworkID, vm.ctx.AVAXAssetID)
@@ -2214,7 +2211,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		subnetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[1].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[1].PublicKey().Address()},
 		},
 	)
 	require.NoError(err)
@@ -2241,7 +2238,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 		Locktime:  0,
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			keys[1].PublicKey().Address(),
+			genesistest.FundedKeys[1].PublicKey().Address(),
 		},
 	}
 	expectedOwner.InitCtx(ctx)
@@ -2257,7 +2254,7 @@ func TestBaseTx(t *testing.T) {
 	sendAmt := uint64(100000)
 	changeAddr := ids.ShortEmpty
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewBaseTx(
 		[]*avax.TransferableOutput{
 			{
@@ -2267,7 +2264,7 @@ func TestBaseTx(t *testing.T) {
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs: []ids.ShortID{
-							keys[1].Address(),
+							genesistest.FundedKeys[1].Address(),
 						},
 					},
 				},
@@ -2289,7 +2286,7 @@ func TestBaseTx(t *testing.T) {
 		require.NoError(err)
 		require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
 		castOut := utxo.Out.(*secp256k1fx.TransferOutput)
-		if castOut.AddressesSet().Equals(set.Of(keys[0].Address())) {
+		if castOut.AddressesSet().Equals(set.Of(genesistest.FundedKeys[0].Address())) {
 			key0InputAmt += castOut.Amt
 		}
 		totalInputAmt += castOut.Amt
@@ -2303,10 +2300,10 @@ func TestBaseTx(t *testing.T) {
 	for _, output := range baseTx.Unsigned.Outputs() {
 		require.IsType(&secp256k1fx.TransferOutput{}, output.Out)
 		castOut := output.Out.(*secp256k1fx.TransferOutput)
-		if castOut.AddressesSet().Equals(set.Of(keys[0].Address())) {
+		if castOut.AddressesSet().Equals(set.Of(genesistest.FundedKeys[0].Address())) {
 			key0OutputAmt += castOut.Amt
 		}
-		if castOut.AddressesSet().Equals(set.Of(keys[1].Address())) {
+		if castOut.AddressesSet().Equals(set.Of(genesistest.FundedKeys[1].Address())) {
 			key1OutputAmt += castOut.Amt
 		}
 		if castOut.AddressesSet().Equals(set.Of(changeAddr)) {
@@ -2344,7 +2341,7 @@ func TestPruneMempool(t *testing.T) {
 	sendAmt := uint64(100000)
 	changeAddr := ids.ShortEmpty
 
-	builder, txSigner := factory.NewWallet(keys[0])
+	builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewBaseTx(
 		[]*avax.TransferableOutput{
 			{
@@ -2354,7 +2351,7 @@ func TestPruneMempool(t *testing.T) {
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs: []ids.ShortID{
-							keys[1].Address(),
+							genesistest.FundedKeys[1].Address(),
 						},
 					},
 				},
@@ -2387,7 +2384,7 @@ func TestPruneMempool(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(keys[1])
+	builder, txSigner = factory.NewWallet(genesistest.FundedKeys[1])
 	uAddValTx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -2402,11 +2399,11 @@ func TestPruneMempool(t *testing.T) {
 		vm.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[2].Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[2].Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[2].Address()},
 		},
 		20000,
 	)

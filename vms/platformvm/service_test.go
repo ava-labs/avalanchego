@@ -107,7 +107,7 @@ func TestExportKey(t *testing.T) {
 	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
 	require.NoError(err)
 
-	require.NoError(user.PutKeys(pk, keys[0]))
+	require.NoError(user.PutKeys(pk, genesistest.FundedKeys[0]))
 
 	service.vm.ctx.Lock.Unlock()
 
@@ -234,7 +234,7 @@ func TestGetTx(t *testing.T) {
 					"chain name",
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 					}),
 				)
 				require.NoError(t, err)
@@ -252,7 +252,7 @@ func TestGetTx(t *testing.T) {
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 				}
 
-				builder, txSigner := factory.NewWallet(keys[0])
+				builder, txSigner := factory.NewWallet(genesistest.FundedKeys[0])
 				utx, err := builder.NewAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -270,7 +270,7 @@ func TestGetTx(t *testing.T) {
 					0,
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 					}),
 				)
 				require.NoError(t, err)
@@ -280,7 +280,7 @@ func TestGetTx(t *testing.T) {
 		{
 			"atomic block",
 			func(service *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer := factory.NewWallet(keys[0])
+				builder, signer := factory.NewWallet(genesistest.FundedKeys[0])
 				utx, err := builder.NewExportTx(
 					service.vm.ctx.XChainID,
 					[]*avax.TransferableOutput{{
@@ -296,7 +296,7 @@ func TestGetTx(t *testing.T) {
 					}},
 					common.WithChangeOwner(&secp256k1fx.OutputOwners{
 						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+						Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 					}),
 				)
 				require.NoError(t, err)
@@ -493,7 +493,7 @@ func TestGetStake(t *testing.T) {
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesistest.NodeIDs[0]
 	delegatorEndTime := genesistest.Time.Add(defaultMinStakingDuration)
-	builder, signer := factory.NewWallet(keys[0])
+	builder, signer := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
@@ -507,7 +507,7 @@ func TestGetStake(t *testing.T) {
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -530,7 +530,7 @@ func TestGetStake(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmount)
-	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
+	addr, _ := service.addrManager.FormatLocalAddress(genesistest.FundedKeys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
 	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
@@ -571,7 +571,7 @@ func TestGetStake(t *testing.T) {
 		0,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -643,7 +643,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	builder, signer := factory.NewWallet(keys[0])
+	builder, signer := factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: validatorNodeID,
@@ -657,7 +657,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)
@@ -794,7 +794,7 @@ func TestGetBlock(t *testing.T) {
 				"chain name",
 				common.WithChangeOwner(&secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 				}),
 			)
 			require.NoError(err)
