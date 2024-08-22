@@ -33,9 +33,9 @@ func GenerateTestShortNodeID() ShortNodeID {
 // It must not be used in production code. In production code we should
 // use ToNodeID, which performs proper length checking.
 func BuildTestNodeID(src []byte) NodeID {
-	res := NodeID{}
-	copy(res.ShortNodeID.Bytes(), src)
-	return res
+	res := ShortNodeID{}
+	copy(res[:], src)
+	return res.NodeID()
 }
 
 // BuildTestNodeID is an utility to build ShortNodeID from bytes in UTs
