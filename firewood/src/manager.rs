@@ -25,6 +25,9 @@ pub struct RevisionManagerConfig {
     node_cache_size: NonZero<usize>,
 }
 
+type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
+type ProposedRevision = Arc<NodeStore<ImmutableProposal, FileBacked>>;
+
 #[derive(Debug)]
 pub(crate) struct RevisionManager {
     /// Maximum number of revisions to keep on disk
@@ -35,11 +38,23 @@ pub(crate) struct RevisionManager {
 
     /// The list of revisions that are on disk; these point to the different roots
     /// stored in the filebacked storage.
-    historical: VecDeque<Arc<NodeStore<Committed, FileBacked>>>,
-    proposals: Vec<Arc<NodeStore<ImmutableProposal, FileBacked>>>,
+    historical: VecDeque<CommittedRevision>,
+    proposals: Vec<ProposedRevision>,
     // committing_proposals: VecDeque<Arc<ProposedImmutable>>,
-    by_hash: HashMap<TrieHash, Arc<NodeStore<Committed, FileBacked>>>,
+    by_hash: HashMap<TrieHash, CommittedRevision>,
     // TODO: maintain root hash of the most recent commit
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum RevisionManagerError {
+    #[error("The proposal cannot be committed since a sibling was committed")]
+    SiblingCommitted,
+    #[error(
+        "The proposal cannot be committed since it is not a direct child of the most recent commit"
+    )]
+    NotLatest,
+    #[error("An IO error occurred during the commit")]
+    IO(#[from] std::io::Error),
 }
 
 impl RevisionManager {
@@ -61,24 +76,6 @@ impl RevisionManager {
         Ok(manager)
     }
 
-    pub fn latest_revision(&self) -> Option<Arc<NodeStore<Committed, FileBacked>>> {
-        self.historical.back().cloned()
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum RevisionManagerError {
-    #[error("The proposal cannot be committed since a sibling was committed")]
-    SiblingCommitted,
-    #[error(
-        "The proposal cannot be committed since it is not a direct child of the most recent commit"
-    )]
-    NotLatest,
-    #[error("An IO error occurred during the commit")]
-    IO(#[from] std::io::Error),
-}
-
-impl RevisionManager {
     /// Commit a proposal
     /// To commit a proposal involves a few steps:
     /// 1. Commit check.
@@ -106,10 +103,7 @@ impl RevisionManager {
     ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
     /// 8. Revision reaping.
     ///    If more than the configurable number of revisions is available, the oldest revision can be forgotten.
-    pub fn commit(
-        &mut self,
-        proposal: Arc<NodeStore<ImmutableProposal, FileBacked>>,
-    ) -> Result<(), RevisionManagerError> {
+    pub fn commit(&mut self, proposal: ProposedRevision) -> Result<(), RevisionManagerError> {
         // 1. Commit check
         let current_revision = self.current_revision();
         if !proposal
@@ -122,7 +116,7 @@ impl RevisionManager {
         // TODO
 
         // 3. Set last committed revision
-        let committed: Arc<NodeStore<Committed, FileBacked>> = proposal.as_committed().into();
+        let committed: CommittedRevision = proposal.as_committed().into();
         self.historical.push_back(committed.clone());
         if let Some(hash) = committed.kind.root_hash() {
             self.by_hash.insert(hash, committed.clone());
@@ -157,14 +151,11 @@ impl RevisionManager {
 pub type NewProposalError = (); // TODO implement
 
 impl RevisionManager {
-    pub fn add_proposal(&mut self, proposal: Arc<NodeStore<ImmutableProposal, FileBacked>>) {
+    pub fn add_proposal(&mut self, proposal: ProposedRevision) {
         self.proposals.push(proposal);
     }
 
-    pub fn revision(
-        &self,
-        root_hash: HashKey,
-    ) -> Result<Arc<NodeStore<Committed, FileBacked>>, RevisionManagerError> {
+    pub fn revision(&self, root_hash: HashKey) -> Result<CommittedRevision, RevisionManagerError> {
         self.by_hash
             .get(&root_hash)
             .cloned()
@@ -185,7 +176,7 @@ impl RevisionManager {
             )))
     }
 
-    fn current_revision(&self) -> Arc<NodeStore<Committed, FileBacked>> {
+    pub fn current_revision(&self) -> CommittedRevision {
         self.historical
             .back()
             .expect("there is always one revision")

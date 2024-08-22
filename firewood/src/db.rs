@@ -248,8 +248,7 @@ where
             .manager
             .read()
             .expect("poisoned lock")
-            .latest_revision()
-            .expect("no latest revision");
+            .current_revision();
         let proposal = NodeStore::new(parent)?;
         let mut merkle = Merkle::from(proposal);
         for op in batch {
@@ -372,6 +371,73 @@ impl<'a> api::Proposal for Proposal<'a> {
                 Ok(manager.commit(proposal.nodestore.clone())?)
             }
             None => Err(api::Error::CannotCommitClonedProposal),
+        }
+    }
+}
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod test {
+    use std::{
+        ops::{Deref, DerefMut},
+        path::PathBuf,
+    };
+
+    use crate::{
+        db::Db,
+        v2::api::{Db as _, Error, Proposal},
+    };
+
+    use super::DbConfig;
+
+    #[tokio::test]
+    async fn test_cloned_proposal_error() {
+        let mut db = testdb().await;
+        let proposal = db
+            .propose::<Vec<u8>, Vec<u8>>(Default::default())
+            .await
+            .unwrap();
+        let cloned = proposal.clone();
+
+        // attempt to commit the clone; this should fail
+        let result = cloned.commit().await;
+        assert!(
+            matches!(result, Err(Error::CannotCommitClonedProposal)),
+            "{result:?}"
+        );
+
+        // the prior attempt consumed the Arc though, so cloned is no longer valid
+        // that means the actual proposal can be committed
+        let result = proposal.commit().await;
+        assert!(matches!(result, Ok(())), "{result:?}");
+    }
+
+    // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
+    struct TestDb {
+        db: Db,
+        _tmpdir: tempfile::TempDir,
+    }
+    impl Deref for TestDb {
+        type Target = Db;
+        fn deref(&self) -> &Self::Target {
+            &self.db
+        }
+    }
+    impl DerefMut for TestDb {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.db
+        }
+    }
+
+    async fn testdb() -> TestDb {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+            .iter()
+            .collect();
+        let dbconfig = DbConfig::builder().truncate(true).build();
+        let db = Db::new(dbpath, dbconfig).await.unwrap();
+        TestDb {
+            db,
+            _tmpdir: tmpdir,
         }
     }
 }
