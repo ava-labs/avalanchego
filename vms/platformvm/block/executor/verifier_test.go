@@ -36,7 +36,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -120,7 +120,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -203,7 +203,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -298,7 +298,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -365,7 +365,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -433,7 +433,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 
@@ -503,7 +503,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
-			s := statemock.NewState(ctrl)
+			s := state.NewMockState(ctrl)
 			mempool := mempoolmock.NewMempool(ctrl)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -600,7 +600,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require := require.New(t)
 
 			// Create mocked dependencies.
-			s := statemock.NewState(ctrl)
+			s := state.NewMockState(ctrl)
 			mempool := mempoolmock.NewMempool(ctrl)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -665,7 +665,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 
 	grandParentID := ids.GenerateTestID()
@@ -760,7 +760,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -816,7 +816,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
@@ -874,7 +874,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
@@ -916,7 +916,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	timestamp := time.Unix(12345, 0)
@@ -961,7 +961,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
@@ -1003,7 +1003,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create mocked dependencies.
-	s := statemock.NewState(ctrl)
+	s := state.NewMockState(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	timestamp := time.Unix(12345, 0)
