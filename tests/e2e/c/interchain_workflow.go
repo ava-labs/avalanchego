@@ -39,7 +39,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 
 		tc.By("allocating a pre-funded key to send from and a recipient key to deliver to")
 		var (
-			senderKey           = env.AllocatePreFundedKey()
+			senderKey           = env.PreFundedKey
 			senderEthAddress    = evm.GetEthAddress(senderKey)
 			recipientKey        = e2e.NewPrivateKey(tc)
 			recipientEthAddress = evm.GetEthAddress(recipientKey)
