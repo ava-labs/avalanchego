@@ -34,8 +34,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/blockmock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
@@ -48,7 +50,6 @@ import (
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/blockmock"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -888,7 +889,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
-				manager := blockexecutormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				return &Service{
 					vm: &VM{
 						state:   state,
@@ -908,7 +909,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
-				manager := blockexecutormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
@@ -932,7 +933,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
-				manager := blockexecutormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -960,7 +961,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
 				require.NoError(t, err)
 
-				manager := blockexecutormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -988,7 +989,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
 				require.NoError(t, err)
 
-				manager := blockexecutormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -1016,7 +1017,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
 				require.NoError(t, err)
 
-				manager := blockexecutormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -1116,12 +1117,12 @@ func TestGetFeeConfig(t *testing.T) {
 	tests := []struct {
 		name     string
 		etnaTime time.Time
-		expected fee.Config
+		expected gas.Config
 	}{
 		{
 			name:     "pre-etna",
 			etnaTime: time.Now().Add(time.Hour),
-			expected: fee.Config{},
+			expected: gas.Config{},
 		},
 		{
 			name:     "post-etna",
@@ -1136,7 +1137,7 @@ func TestGetFeeConfig(t *testing.T) {
 			service, _, _ := defaultService(t)
 			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
 
-			var reply fee.Config
+			var reply gas.Config
 			require.NoError(service.GetFeeConfig(nil, nil, &reply))
 			require.Equal(test.expected, reply)
 		})
@@ -1150,15 +1151,15 @@ func FuzzGetFeeState(f *testing.F) {
 		service, _, _ := defaultService(t)
 
 		var (
-			expectedState = fee.State{
-				Capacity: fee.Gas(capacity),
-				Excess:   fee.Gas(excess),
+			expectedState = gas.State{
+				Capacity: gas.Gas(capacity),
+				Excess:   gas.Gas(excess),
 			}
 			expectedTime  = time.Now()
 			expectedReply = GetFeeStateReply{
 				State: expectedState,
-				Price: fee.CalculateGasPrice(
-					defaultDynamicFeeConfig.MinGasPrice,
+				Price: gas.CalculatePrice(
+					defaultDynamicFeeConfig.MinPrice,
 					expectedState.Excess,
 					defaultDynamicFeeConfig.ExcessConversionConstant,
 				),

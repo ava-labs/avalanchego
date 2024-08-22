@@ -15,7 +15,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	fee "github.com/ava-labs/avalanchego/vms/components/fee"
+	gas "github.com/ava-labs/avalanchego/vms/components/gas"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -268,10 +268,10 @@ func (mr *DiffMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call {
 }
 
 // GetFeeState mocks base method.
-func (m *Diff) GetFeeState() fee.State {
+func (m *Diff) GetFeeState() gas.State {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeState")
-	ret0, _ := ret[0].(fee.State)
+	ret0, _ := ret[0].(gas.State)
 	return ret0
 }
 
@@ -492,7 +492,7 @@ func (mr *DiffMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Cal
 }
 
 // SetFeeState mocks base method.
-func (m *Diff) SetFeeState(arg0 fee.State) {
+func (m *Diff) SetFeeState(arg0 gas.State) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetFeeState", arg0)
 }

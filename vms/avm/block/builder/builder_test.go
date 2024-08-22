@@ -63,7 +63,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 			name: "can't get stateless block",
 			builderFunc: func(ctrl *gomock.Controller) Builder {
 				preferredID := ids.GenerateTestID()
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(nil, errTest)
 
@@ -93,7 +93,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(nil, false)
@@ -128,12 +128,12 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
 
-				unsignedTx := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail semantic verification
 				tx := &txs.Tx{Unsigned: unsignedTx}
 
@@ -172,12 +172,12 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
 
-				unsignedTx := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fail execution
 				tx := &txs.Tx{Unsigned: unsignedTx}
@@ -217,13 +217,13 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(errTest)
 
-				unsignedTx := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil) // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil) // Pass execution
 				tx := &txs.Tx{Unsigned: unsignedTx}
@@ -266,7 +266,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// tx1 and tx2 both consume [inputID].
 				// tx1 is added to the block first, so tx2 should be dropped.
 				inputID := ids.GenerateTestID()
-				unsignedTx1 := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx1 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -283,7 +283,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				tx1Bytes := []byte{1, 2, 3}
 				tx1.SetBytes(nil, tx1Bytes)
 
-				unsignedTx2 := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx2 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -295,7 +295,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 				tx2 := &txs.Tx{Unsigned: unsignedTx2}
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
@@ -361,7 +361,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
@@ -375,7 +375,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 
 				inputID := ids.GenerateTestID()
-				unsignedTx := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
@@ -435,7 +435,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
 				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
 
-				manager := executormock.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
@@ -449,7 +449,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				)
 
 				inputID := ids.GenerateTestID()
-				unsignedTx := txsmock.NewMockUnsignedTx(ctrl)
+				unsignedTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {

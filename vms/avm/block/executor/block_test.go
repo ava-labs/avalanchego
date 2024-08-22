@@ -27,7 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool/mempoolmock"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txsmock"
 )
 
 func TestBlockVerify(t *testing.T) {
@@ -119,14 +120,14 @@ func TestBlockVerify(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest)
 				errTx := &txs.Tx{
 					Unsigned: mockUnsignedTx,
 				}
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{errTx}).AnyTimes()
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().MarkDropped(errTx.ID(), errTest).Times(1)
 				return &Block{
 					Block: mockBlock,
@@ -149,7 +150,7 @@ func TestBlockVerify(t *testing.T) {
 				mockBlock.EXPECT().MerkleRoot().Return(ids.Empty).AnyTimes()
 				mockBlock.EXPECT().Timestamp().Return(time.Now()).AnyTimes()
 
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)
 				tx := &txs.Tx{
 					Unsigned: mockUnsignedTx,
@@ -183,7 +184,7 @@ func TestBlockVerify(t *testing.T) {
 				blockHeight := uint64(1337)
 				mockBlock.EXPECT().Height().Return(blockHeight).AnyTimes()
 
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)
 				tx := &txs.Tx{
 					Unsigned: mockUnsignedTx,
@@ -221,7 +222,7 @@ func TestBlockVerify(t *testing.T) {
 				blockHeight := uint64(1337)
 				mockBlock.EXPECT().Height().Return(blockHeight).AnyTimes()
 
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)
 				tx := &txs.Tx{
 					Unsigned: mockUnsignedTx,
@@ -266,7 +267,7 @@ func TestBlockVerify(t *testing.T) {
 				blockHeight := uint64(1337)
 				mockBlock.EXPECT().Height().Return(blockHeight).AnyTimes()
 
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1)     // Syntactic verification passes
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest).Times(1) // Semantic verification fails
 				tx := &txs.Tx{
@@ -284,7 +285,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
 				return &Block{
 					Block: mockBlock,
@@ -316,7 +317,7 @@ func TestBlockVerify(t *testing.T) {
 				blockHeight := uint64(1337)
 				mockBlock.EXPECT().Height().Return(blockHeight).AnyTimes()
 
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1)     // Syntactic verification passes
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1)     // Semantic verification fails
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(errTest).Times(1) // Execution fails
@@ -335,7 +336,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx.ID(), errTest).Times(1)
 				return &Block{
 					Block: mockBlock,
@@ -369,7 +370,7 @@ func TestBlockVerify(t *testing.T) {
 
 				// tx1 and tx2 both consume imported input [inputID]
 				inputID := ids.GenerateTestID()
-				mockUnsignedTx1 := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx1 := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Syntactic verification passes
 				mockUnsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Semantic verification fails
 				mockUnsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn(
@@ -382,7 +383,7 @@ func TestBlockVerify(t *testing.T) {
 						return nil
 					},
 				).Times(1)
-				mockUnsignedTx2 := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx2 := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Syntactic verification passes
 				mockUnsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Semantic verification fails
 				mockUnsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn(
@@ -413,7 +414,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().MarkDropped(tx2.ID(), ErrConflictingBlockTxs).Times(1)
 				return &Block{
 					Block: mockBlock,
@@ -447,7 +448,7 @@ func TestBlockVerify(t *testing.T) {
 
 				// tx1 and parent block both consume [inputID]
 				inputID := ids.GenerateTestID()
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Syntactic verification passes
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Semantic verification fails
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn(
@@ -504,7 +505,7 @@ func TestBlockVerify(t *testing.T) {
 				blockHeight := uint64(1337)
 				mockBlock.EXPECT().Height().Return(blockHeight).AnyTimes()
 
-				mockUnsignedTx := txs.NewMockUnsignedTx(ctrl)
+				mockUnsignedTx := txsmock.NewUnsignedTx(ctrl)
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Syntactic verification passes
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Semantic verification fails
 				mockUnsignedTx.EXPECT().Visit(gomock.Any()).Return(nil).Times(1) // Execution passes
@@ -523,7 +524,7 @@ func TestBlockVerify(t *testing.T) {
 				mockParentState.EXPECT().GetLastAccepted().Return(parentID)
 				mockParentState.EXPECT().GetTimestamp().Return(blockTimestamp)
 
-				mockMempool := mempool.NewMockMempool(ctrl)
+				mockMempool := mempoolmock.NewMempool(ctrl)
 				mockMempool.EXPECT().Remove([]*txs.Tx{tx})
 				return &Block{
 					Block: mockBlock,
@@ -596,7 +597,7 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
 				return &Block{
@@ -619,7 +620,7 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
 				mockManagerState := statemock.NewState(ctrl)
@@ -653,7 +654,7 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
 				mockManagerState := statemock.NewState(ctrl)
@@ -692,7 +693,7 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
 				mockManagerState := statemock.NewState(ctrl)
@@ -737,7 +738,7 @@ func TestBlockAccept(t *testing.T) {
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Remove(gomock.Any()).AnyTimes()
 
 				mockManagerState := statemock.NewState(ctrl)
@@ -806,20 +807,20 @@ func TestBlockReject(t *testing.T) {
 				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 
-				unsignedValidTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedValidTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedValidTx.EXPECT().SetBytes(gomock.Any())
 				unsignedValidTx.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
 
-				unsignedSyntacticallyInvalidTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedSyntacticallyInvalidTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedSyntacticallyInvalidTx.EXPECT().SetBytes(gomock.Any())
 				unsignedSyntacticallyInvalidTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fails syntactic verification
 
-				unsignedSemanticallyInvalidTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedSemanticallyInvalidTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedSemanticallyInvalidTx.EXPECT().SetBytes(gomock.Any())
 				unsignedSemanticallyInvalidTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Passes syntactic verification
 				unsignedSemanticallyInvalidTx.EXPECT().Visit(gomock.Any()).Return(errTest) // Fails semantic verification
 
-				unsignedExecutionFailsTx := txs.NewMockUnsignedTx(ctrl)
+				unsignedExecutionFailsTx := txsmock.NewUnsignedTx(ctrl)
 				unsignedExecutionFailsTx.EXPECT().SetBytes(gomock.Any())
 				unsignedExecutionFailsTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Passes syntactic verification
 				unsignedExecutionFailsTx.EXPECT().Visit(gomock.Any()).Return(nil)     // Passes semantic verification
@@ -842,7 +843,7 @@ func TestBlockReject(t *testing.T) {
 					executionFailsTx,
 				})
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Add(validTx).Return(nil) // Only add the one that passes verification
 				mempool.EXPECT().RequestBuildBlock()
 
@@ -875,11 +876,11 @@ func TestBlockReject(t *testing.T) {
 				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
 				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 
-				unsignedTx1 := txs.NewMockUnsignedTx(ctrl)
+				unsignedTx1 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx1.EXPECT().SetBytes(gomock.Any())
 				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
 
-				unsignedTx2 := txs.NewMockUnsignedTx(ctrl)
+				unsignedTx2 := txsmock.NewUnsignedTx(ctrl)
 				unsignedTx2.EXPECT().SetBytes(gomock.Any())
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil).AnyTimes() // Passes verification and execution
 
@@ -894,7 +895,7 @@ func TestBlockReject(t *testing.T) {
 					tx2,
 				})
 
-				mempool := mempool.NewMockMempool(ctrl)
+				mempool := mempoolmock.NewMempool(ctrl)
 				mempool.EXPECT().Add(tx1).Return(nil)
 				mempool.EXPECT().Add(tx2).Return(nil)
 				mempool.EXPECT().RequestBuildBlock()

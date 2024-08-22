@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -35,7 +35,7 @@ type diff struct {
 	stateVersions Versions
 
 	timestamp time.Time
-	feeState  fee.State
+	feeState  gas.State
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -103,11 +103,11 @@ func (d *diff) SetTimestamp(timestamp time.Time) {
 	d.timestamp = timestamp
 }
 
-func (d *diff) GetFeeState() fee.State {
+func (d *diff) GetFeeState() gas.State {
 	return d.feeState
 }
 
-func (d *diff) SetFeeState(feeState fee.State) {
+func (d *diff) SetFeeState(feeState gas.State) {
 	d.feeState = feeState
 }
 

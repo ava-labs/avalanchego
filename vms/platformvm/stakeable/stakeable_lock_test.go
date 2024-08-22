@@ -85,7 +85,7 @@ func TestLockInVerify(t *testing.T) {
 			name:     "happy path",
 			locktime: 1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				o := avax.NewMockTransferableIn(ctrl)
+				o := avaxmock.NewTransferableIn(ctrl)
 				o.EXPECT().Verify().Return(nil)
 				return o
 			},
@@ -111,7 +111,7 @@ func TestLockInVerify(t *testing.T) {
 			name:     "inner input fails verification",
 			locktime: 1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				o := avax.NewMockTransferableIn(ctrl)
+				o := avaxmock.NewTransferableIn(ctrl)
 				o.EXPECT().Verify().Return(errTest)
 				return o
 			},

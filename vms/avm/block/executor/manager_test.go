@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/block/blockmock"
 	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/txsmock"
 )
 
 var (
@@ -130,7 +131,7 @@ func TestManagerVerifyTx(t *testing.T) {
 		{
 			name: "fails syntactic verification",
 			txF: func(ctrl *gomock.Controller) *txs.Tx {
-				unsigned := txs.NewMockUnsignedTx(ctrl)
+				unsigned := txsmock.NewUnsignedTx(ctrl)
 				unsigned.EXPECT().Visit(gomock.Any()).Return(errTestSyntacticVerifyFail)
 				return &txs.Tx{
 					Unsigned: unsigned,
@@ -146,7 +147,7 @@ func TestManagerVerifyTx(t *testing.T) {
 		{
 			name: "fails semantic verification",
 			txF: func(ctrl *gomock.Controller) *txs.Tx {
-				unsigned := txs.NewMockUnsignedTx(ctrl)
+				unsigned := txsmock.NewUnsignedTx(ctrl)
 				// Syntactic verification passes
 				unsigned.EXPECT().Visit(gomock.Any()).Return(nil)
 				// Semantic verification fails
@@ -174,7 +175,7 @@ func TestManagerVerifyTx(t *testing.T) {
 		{
 			name: "fails execution",
 			txF: func(ctrl *gomock.Controller) *txs.Tx {
-				unsigned := txs.NewMockUnsignedTx(ctrl)
+				unsigned := txsmock.NewUnsignedTx(ctrl)
 				// Syntactic verification passes
 				unsigned.EXPECT().Visit(gomock.Any()).Return(nil)
 				// Semantic verification passes
@@ -204,7 +205,7 @@ func TestManagerVerifyTx(t *testing.T) {
 		{
 			name: "happy path",
 			txF: func(ctrl *gomock.Controller) *txs.Tx {
-				unsigned := txs.NewMockUnsignedTx(ctrl)
+				unsigned := txsmock.NewUnsignedTx(ctrl)
 				// Syntactic verification passes
 				unsigned.EXPECT().Visit(gomock.Any()).Return(nil)
 				// Semantic verification passes

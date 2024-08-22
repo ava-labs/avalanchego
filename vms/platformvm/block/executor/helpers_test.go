@@ -120,7 +120,7 @@ type environment struct {
 	ctx            *snow.Context
 	fx             fx.Fx
 	state          state.State
-	mockedState    *state.MockState
+	mockedState    *statemock.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
 	factory        *txstest.WalletFactory

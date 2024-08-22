@@ -15,7 +15,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	fee "github.com/ava-labs/avalanchego/vms/components/fee"
+	gas "github.com/ava-labs/avalanchego/vms/components/gas"
 	fx "github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -254,10 +254,10 @@ func (mr *ChainMockRecorder) GetDelegateeReward(arg0, arg1 any) *gomock.Call {
 }
 
 // GetFeeState mocks base method.
-func (m *Chain) GetFeeState() fee.State {
+func (m *Chain) GetFeeState() gas.State {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFeeState")
-	ret0, _ := ret[0].(fee.State)
+	ret0, _ := ret[0].(gas.State)
 	return ret0
 }
 
@@ -478,7 +478,7 @@ func (mr *ChainMockRecorder) SetDelegateeReward(arg0, arg1, arg2 any) *gomock.Ca
 }
 
 // SetFeeState mocks base method.
-func (m *Chain) SetFeeState(arg0 fee.State) {
+func (m *Chain) SetFeeState(arg0 gas.State) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetFeeState", arg0)
 }
