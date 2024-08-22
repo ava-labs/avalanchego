@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -48,7 +49,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 
 	blkID := blk.ID()
 
-	s := state.NewMockState(ctrl)
+	s := statemock.NewState(ctrl)
 	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
 
 	acceptor := &acceptor{
@@ -82,7 +83,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := state.NewMockState(ctrl)
+	s := statemock.NewState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -123,7 +124,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require.ErrorIs(err, errMissingBlockState)
 
 	// Set [blk]'s state in the map as though it had been verified.
-	onAcceptState := state.NewMockDiff(ctrl)
+	onAcceptState := statemock.NewDiff(ctrl)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
@@ -131,9 +132,9 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 		atomicRequests: atomicRequests,
 	}
 	// Give [blk] a child.
-	childOnAcceptState := state.NewMockDiff(ctrl)
-	childOnAbortState := state.NewMockDiff(ctrl)
-	childOnCommitState := state.NewMockDiff(ctrl)
+	childOnAcceptState := statemock.NewDiff(ctrl)
+	childOnAbortState := statemock.NewDiff(ctrl)
+	childOnCommitState := statemock.NewDiff(ctrl)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
 		proposalBlockState: proposalBlockState{
@@ -161,7 +162,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := state.NewMockState(ctrl)
+	s := statemock.NewState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -206,7 +207,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require.ErrorIs(err, errMissingBlockState)
 
 	// Set [blk]'s state in the map as though it had been verified.
-	onAcceptState := state.NewMockDiff(ctrl)
+	onAcceptState := statemock.NewDiff(ctrl)
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	calledOnAcceptFunc := false
@@ -219,9 +220,9 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 		atomicRequests: atomicRequests,
 	}
 	// Give [blk] a child.
-	childOnAcceptState := state.NewMockDiff(ctrl)
-	childOnAbortState := state.NewMockDiff(ctrl)
-	childOnCommitState := state.NewMockDiff(ctrl)
+	childOnAcceptState := statemock.NewDiff(ctrl)
+	childOnAbortState := statemock.NewDiff(ctrl)
+	childOnCommitState := statemock.NewDiff(ctrl)
 	childState := &blockState{
 		onAcceptState: childOnAcceptState,
 		proposalBlockState: proposalBlockState{
@@ -251,7 +252,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := state.NewMockState(ctrl)
+	s := statemock.NewState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -277,9 +278,9 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 
 	// Set [blk]'s parent in the state map.
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAcceptState := statemock.NewDiff(ctrl)
+	parentOnAbortState := statemock.NewDiff(ctrl)
+	parentOnCommitState := statemock.NewDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
@@ -361,7 +362,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	s := state.NewMockState(ctrl)
+	s := statemock.NewState(ctrl)
 	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
@@ -387,9 +388,9 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require.ErrorIs(err, state.ErrMissingParentState)
 
 	// Set [blk]'s parent in the state map.
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	parentOnAbortState := state.NewMockDiff(ctrl)
-	parentOnCommitState := state.NewMockDiff(ctrl)
+	parentOnAcceptState := statemock.NewDiff(ctrl)
+	parentOnAbortState := statemock.NewDiff(ctrl)
+	parentOnCommitState := statemock.NewDiff(ctrl)
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	calledOnAcceptFunc := false
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
