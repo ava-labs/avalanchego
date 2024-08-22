@@ -9,14 +9,14 @@ type Config struct {
 	// Weights to merge fee dimensions into a single gas value.
 	Weights Dimensions `json:"weights"`
 	// Maximum amount of gas the chain is allowed to store for future use.
-	MaxGasCapacity Gas `json:"maxGasCapacity"`
+	MaxCapacity Gas `json:"maxCapacity"`
 	// Maximum amount of gas the chain is allowed to consume per second.
-	MaxGasPerSecond Gas `json:"maxGasPerSecond"`
+	MaxPerSecond Gas `json:"maxPerSecond"`
 	// Target amount of gas the chain should consume per second to keep the fees
 	// stable.
-	TargetGasPerSecond Gas `json:"targetGasPerSecond"`
+	TargetPerSecond Gas `json:"targetPerSecond"`
 	// Minimum price per unit of gas.
-	MinGasPrice Price `json:"minGasPrice"`
+	MinPrice Price `json:"minPrice"`
 	// Constant used to convert excess gas to a gas price.
 	ExcessConversionConstant Gas `json:"excessConversionConstant"`
 }

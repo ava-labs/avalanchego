@@ -34,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -1275,8 +1275,8 @@ func TestStateSubnetOwner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{

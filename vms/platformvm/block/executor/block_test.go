@@ -14,12 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -36,9 +37,9 @@ func TestBlockOptions(t *testing.T) {
 		{
 			name: "apricot proposal block; commit preferred",
 			blkF: func(ctrl *gomock.Controller) *Block {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -63,9 +64,9 @@ func TestBlockOptions(t *testing.T) {
 		{
 			name: "banff proposal block; invalid proposal tx",
 			blkF: func(ctrl *gomock.Controller) *Block {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -98,10 +99,10 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				stakerTxID := ids.GenerateTestID()
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(nil, status.Unknown, database.ErrNotFound)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -136,10 +137,10 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				stakerTxID := ids.GenerateTestID()
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(nil, status.Unknown, database.ErrClosed)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -177,10 +178,10 @@ func TestBlockOptions(t *testing.T) {
 					Unsigned: &txs.CreateChainTx{},
 				}
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -227,11 +228,11 @@ func TestBlockOptions(t *testing.T) {
 					}
 				)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(nil, database.ErrNotFound)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -282,11 +283,11 @@ func TestBlockOptions(t *testing.T) {
 					}
 				)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
 
 				manager := &manager{
@@ -338,12 +339,12 @@ func TestBlockOptions(t *testing.T) {
 					}
 				)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, database.ErrNotFound)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -399,12 +400,12 @@ func TestBlockOptions(t *testing.T) {
 					}
 				)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(transformSubnetTx, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(.5, nil)
 
 				manager := &manager{
@@ -461,12 +462,12 @@ func TestBlockOptions(t *testing.T) {
 					}
 				)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(transformSubnetTx, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(.5, nil)
 
 				manager := &manager{

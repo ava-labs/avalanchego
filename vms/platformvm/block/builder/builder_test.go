@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -496,7 +497,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "end of time",
 			timestamp: mockable.MaxTime,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				return state.NewMockChain(ctrl)
+				return statemock.NewChain(ctrl)
 			},
 			expectedErr: ErrEndOfTime,
 		},
@@ -508,7 +509,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				currentStakerIter.EXPECT().Next().Return(false)
 				currentStakerIter.EXPECT().Release()
 
-				s := state.NewMockChain(ctrl)
+				s := statemock.NewChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -533,7 +534,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := state.NewMockChain(ctrl)
+				s := statemock.NewChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -560,7 +561,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := state.NewMockChain(ctrl)
+				s := statemock.NewChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -587,7 +588,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := state.NewMockChain(ctrl)
+				s := statemock.NewChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -609,7 +610,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := state.NewMockChain(ctrl)
+				s := statemock.NewChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s
@@ -631,7 +632,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 				})
 				currentStakerIter.EXPECT().Release()
 
-				s := state.NewMockChain(ctrl)
+				s := statemock.NewChain(ctrl)
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
 
 				return s

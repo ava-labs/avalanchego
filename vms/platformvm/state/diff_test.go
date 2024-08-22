@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -96,12 +96,7 @@ func TestDiffCurrentSupply(t *testing.T) {
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
 
-	ctrl := gomock.NewController(t)
-
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -123,19 +118,14 @@ func TestDiffCurrentValidator(t *testing.T) {
 	d.DeleteCurrentValidator(currentValidator)
 
 	// Make sure the deletion worked
-	state.EXPECT().GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)
 	_, err = d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestDiffPendingValidator(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -157,7 +147,6 @@ func TestDiffPendingValidator(t *testing.T) {
 	d.DeletePendingValidator(pendingValidator)
 
 	// Make sure the deletion worked
-	state.EXPECT().GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID).Return(nil, database.ErrNotFound).Times(1)
 	_, err = d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -263,7 +252,7 @@ func TestDiffSubnet(t *testing.T) {
 	// Initialize parent with one subnet
 	parentStateCreateSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
+			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
 	state.AddSubnet(parentStateCreateSubnetTx.ID())
@@ -284,7 +273,7 @@ func TestDiffSubnet(t *testing.T) {
 	// Put a subnet
 	createSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
+			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
 	diff.AddSubnet(createSubnetTx.ID())
@@ -453,12 +442,8 @@ func TestDiffRewardUTXO(t *testing.T) {
 
 func TestDiffUTXO(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	state := NewMockState(ctrl)
-	// Called in NewDiffOn
-	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -482,7 +467,7 @@ func TestDiffUTXO(t *testing.T) {
 		parentUTXO := &avax.UTXO{
 			UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
 		}
-		state.EXPECT().GetUTXO(parentUTXO.InputID()).Return(parentUTXO, nil).Times(1)
+		state.AddUTXO(parentUTXO)
 		gotParentUTXO, err := d.GetUTXO(parentUTXO.InputID())
 		require.NoError(err)
 		require.Equal(parentUTXO, gotParentUTXO)
@@ -536,8 +521,8 @@ func TestDiffSubnetOwner(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{
@@ -636,9 +621,9 @@ func TestDiffStacking(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
-		owner3 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
+		owner3 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
+	"github.com/ava-labs/avalanchego/snow/networking/handler/handlermock"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -827,7 +828,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	))
 	defer chainRouter.Shutdown(context.Background())
 
-	h := handler.NewMockHandler(ctrl)
+	h := handlermock.NewHandler(ctrl)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
@@ -1223,7 +1224,7 @@ func TestConnectedSubnet(t *testing.T) {
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 
-	platformHandler := handler.NewMockHandler(ctrl)
+	platformHandler := handlermock.NewHandler(ctrl)
 	platformHandler.EXPECT().Context().Return(ctx).AnyTimes()
 	platformHandler.EXPECT().SetOnStopped(gomock.Any()).AnyTimes()
 	platformHandler.EXPECT().Push(gomock.Any(), myConnectedMsg).Times(1)

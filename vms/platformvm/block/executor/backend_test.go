@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 )
 
 func TestGetState(t *testing.T) {
@@ -21,8 +21,8 @@ func TestGetState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var (
-		mockState     = state.NewMockState(ctrl)
-		onAcceptState = state.NewMockDiff(ctrl)
+		mockState     = statemock.NewState(ctrl)
+		onAcceptState = statemock.NewDiff(ctrl)
 		blkID1        = ids.GenerateTestID()
 		blkID2        = ids.GenerateTestID()
 		b             = &backend{
@@ -73,7 +73,7 @@ func TestBackendGetBlock(t *testing.T) {
 	var (
 		blkID1       = ids.GenerateTestID()
 		statelessBlk = block.NewMockBlock(ctrl)
-		state        = state.NewMockState(ctrl)
+		state        = statemock.NewState(ctrl)
 		b            = &backend{
 			state: state,
 			blkIDToState: map[ids.ID]*blockState{
@@ -134,7 +134,7 @@ func TestGetTimestamp(t *testing.T) {
 		{
 			name: "block isn't map",
 			backendF: func(ctrl *gomock.Controller) *backend {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetTimestamp().Return(time.Unix(1337, 0))
 				return &backend{
 					state: state,
