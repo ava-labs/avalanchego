@@ -51,13 +51,10 @@ const (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	defaultValidateDuration   = 20 * defaultMinStakingDuration
 )
 
 var (
-	defaultValidateStartTime = genesistest.Time
-	defaultValidateEndTime   = defaultValidateStartTime.Add(defaultValidateDuration)
-	preFundedKeys            = secp256k1.TestKeys()
+	preFundedKeys = secp256k1.TestKeys()
 
 	// Node IDs of genesis validators. Initialized in init function
 	genesisNodeIDs = genesistest.GenesisNodeIDs
@@ -239,12 +236,12 @@ func addSubnet(t *testing.T, env *environment) {
 func defaultConfig(f upgradetest.Fork) *config.Config {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(
 		f,
-		defaultValidateStartTime.Add(-2*time.Second),
+		genesistest.Time.Add(-2*time.Second),
 	)
 	upgradetest.SetTimesTo(
 		&upgrades,
 		min(f, upgradetest.ApricotPhase5),
-		defaultValidateEndTime,
+		genesistest.ValidatorEndTime,
 	)
 
 	return &config.Config{
@@ -275,7 +272,7 @@ func defaultClock(f upgradetest.Fork) *mockable.Clock {
 	now := genesistest.Time
 	if f >= upgradetest.Banff {
 		// 1 second after active fork
-		now = defaultValidateEndTime.Add(-2 * time.Second)
+		now = genesistest.ValidatorEndTime.Add(-2 * time.Second)
 	}
 	clk := &mockable.Clock{}
 	clk.Set(now)

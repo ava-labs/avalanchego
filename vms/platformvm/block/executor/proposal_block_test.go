@@ -718,14 +718,13 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	// Add a subnet validator to the staker set
 	subnetValidatorNodeID := genesisNodeIDs[0]
-	subnetVdr1StartTime := defaultValidateStartTime
-	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
+	subnetVdr1EndTime := genesistest.Time.Add(defaultMinStakingDuration)
 	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: subnetValidatorNodeID,
-				Start:  uint64(subnetVdr1StartTime.Unix()),
+				Start:  genesistest.TimeUnix,
 				End:    uint64(subnetVdr1EndTime.Unix()),
 				Wght:   1,
 			},
@@ -785,12 +784,11 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
-	staker0StartTime := defaultValidateStartTime
 	staker0EndTime := subnetVdr1EndTime
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
-			Start:  uint64(staker0StartTime.Unix()),
+			Start:  genesistest.TimeUnix,
 			End:    uint64(staker0EndTime.Unix()),
 			Wght:   10,
 		},

@@ -25,13 +25,10 @@ const (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	defaultValidateDuration   = 20 * defaultMinStakingDuration
 )
 
 var (
-	defaultValidateStartTime = Time
-	defaultValidateEndTime   = defaultValidateStartTime.Add(defaultValidateDuration)
-	preFundedKeys            = secp256k1.TestKeys()
+	preFundedKeys = secp256k1.TestKeys()
 
 	// Node IDs of genesis validators. Initialized in init function
 	GenesisNodeIDs []ids.NodeID
@@ -65,8 +62,8 @@ func BuildGenesisTest(t *testing.T, avaxAssetID ids.ID) []byte {
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
 			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+				StartTime: json.Uint64(TimeUnix),
+				EndTime:   json.Uint64(ValidatorEndTimeUnix),
 				NodeID:    nodeID,
 			},
 			RewardOwner: &api.Owner{

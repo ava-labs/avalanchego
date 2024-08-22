@@ -492,13 +492,12 @@ func TestGetStake(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesisNodeIDs[0]
-	delegatorStartTime := defaultValidateStartTime
 	delegatorEndTime := genesistest.Time.Add(defaultMinStakingDuration)
 	builder, signer := factory.NewWallet(keys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
-			Start:  uint64(delegatorStartTime.Unix()),
+			Start:  genesistest.TimeUnix,
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
 		},
@@ -519,7 +518,7 @@ func TestGetStake(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
-		delegatorStartTime,
+		genesistest.Time,
 		0,
 	)
 	require.NoError(err)
@@ -640,8 +639,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := genesisNodeIDs[1]
-	delegatorStartTime := defaultValidateStartTime
-	delegatorEndTime := delegatorStartTime.Add(defaultMinStakingDuration)
+	delegatorEndTime := genesistest.Time.Add(defaultMinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 
@@ -649,7 +647,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: validatorNodeID,
-			Start:  uint64(delegatorStartTime.Unix()),
+			Start:  genesistest.TimeUnix,
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
 		},
@@ -670,7 +668,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		delegatorStartTime,
+		genesistest.Time,
 		0,
 	)
 	require.NoError(err)
@@ -712,7 +710,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
-		require.Equal(int64(delegator.StartTime), delegatorStartTime.Unix())
+		require.Equal(uint64(delegator.StartTime), genesistest.TimeUnix)
 		require.Equal(int64(delegator.EndTime), delegatorEndTime.Unix())
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
