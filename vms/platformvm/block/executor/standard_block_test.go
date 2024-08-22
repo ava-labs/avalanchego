@@ -117,7 +117,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 
 	// store just once current staker to mark next staker time.
-	currentStakerIt := statemock.NewStakerIterator(ctrl)
+	currentStakerIt := state.NewMockStakerIterator(ctrl)
 	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
 	currentStakerIt.EXPECT().Value().Return(
 		&state.Staker{
@@ -129,7 +129,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
 
 	// no pending stakers
-	pendingIt := statemock.NewStakerIterator(ctrl)
+	pendingIt := state.NewMockStakerIterator(ctrl)
 	pendingIt.EXPECT().Next().Return(false).AnyTimes()
 	pendingIt.EXPECT().Release().Return().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()

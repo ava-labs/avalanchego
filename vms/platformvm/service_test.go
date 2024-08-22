@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/blockmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -927,7 +926,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "JSON format",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blockmock.NewBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 
 				state := statemock.NewState(ctrl)
@@ -951,7 +950,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hex format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blockmock.NewBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
@@ -979,7 +978,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hexc format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blockmock.NewBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
@@ -1007,7 +1006,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "hexnc format",
 			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blockmock.NewBlock(ctrl)
+				block := block.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 

@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm/block/blockmock"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/txsmock"
@@ -38,7 +38,7 @@ func TestManagerGetStatelessBlock(t *testing.T) {
 
 	// Case: block is in memory
 	{
-		statelessBlk := blockmock.NewBlock(ctrl)
+		statelessBlk := block.NewMockBlock(ctrl)
 		blkID := ids.GenerateTestID()
 		blk := &blockState{
 			statelessBlock: statelessBlk,
@@ -52,7 +52,7 @@ func TestManagerGetStatelessBlock(t *testing.T) {
 	// Case: block isn't in memory
 	{
 		blkID := ids.GenerateTestID()
-		blk := blockmock.NewBlock(ctrl)
+		blk := block.NewMockBlock(ctrl)
 		state.EXPECT().GetBlock(blkID).Return(blk, nil)
 		gotBlk, err := m.GetStatelessBlock(blkID)
 		require.NoError(err)
@@ -259,7 +259,7 @@ func TestVerifyUniqueInputs(t *testing.T) {
 
 	// blk0 is blk1's parent
 	blk0ID, blk1ID := ids.GenerateTestID(), ids.GenerateTestID()
-	blk0, blk1 := blockmock.NewBlock(ctrl), blockmock.NewBlock(ctrl)
+	blk0, blk1 := block.NewMockBlock(ctrl), block.NewMockBlock(ctrl)
 	blk1.EXPECT().Parent().Return(blk0ID).AnyTimes()
 	blk0.EXPECT().Parent().Return(ids.Empty).AnyTimes() // blk0's parent is accepted
 

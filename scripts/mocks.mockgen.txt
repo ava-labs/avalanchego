@@ -32,7 +32,6 @@ github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/
 github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx=vms/platformvm/fx/fxmock/fx.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Chain=vms/platformvm/state/statemock/chain.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Diff=vms/platformvm/state/statemock/diff.go
-github.com/ava-labs/avalanchego/vms/platformvm/state=StakerIterator=vms/platformvm/state/statemock/staker_iterator.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=State=vms/platformvm/state/statemock/state.go
 github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool=Mempool=vms/platformvm/txs/mempool/mempoolmock/mempool.go
 github.com/ava-labs/avalanchego/vms/platformvm/utxo=Verifier=vms/platformvm/utxo/utxomock/verifier.go

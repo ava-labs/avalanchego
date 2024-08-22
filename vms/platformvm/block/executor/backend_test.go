@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block/blockmock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 )
 
@@ -72,7 +72,7 @@ func TestBackendGetBlock(t *testing.T) {
 
 	var (
 		blkID1       = ids.GenerateTestID()
-		statelessBlk = blockmock.NewBlock(ctrl)
+		statelessBlk = block.NewMockBlock(ctrl)
 		state        = statemock.NewState(ctrl)
 		b            = &backend{
 			state: state,
