@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -53,8 +52,6 @@ const (
 	defaultBalance            = 100 * defaultMinValidatorStake
 )
 
-var preFundedKeys = secp256k1.TestKeys()
-
 const (
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	trackChecksum             = false
@@ -65,7 +62,7 @@ var (
 	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = preFundedKeys[0:3]
+	testSubnet1ControlKeys = genesistest.FundedKeys[0:3]
 )
 
 type mutableSharedMemory struct {
@@ -192,19 +189,19 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.FundedKeys[0])
 	utx, err := builder.NewCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				preFundedKeys[0].PublicKey().Address(),
-				preFundedKeys[1].PublicKey().Address(),
-				preFundedKeys[2].PublicKey().Address(),
+				genesistest.FundedKeys[0].PublicKey().Address(),
+				genesistest.FundedKeys[1].PublicKey().Address(),
+				genesistest.FundedKeys[2].PublicKey().Address(),
 			},
 		},
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.FundedKeys[0].PublicKey().Address()},
 		}),
 	)
 	require.NoError(err)

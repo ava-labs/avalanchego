@@ -61,15 +61,15 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 
 			env.state.SetTimestamp(test.time) // to duly set fee
 
-			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
-			for _, key := range preFundedKeys {
+			addrs := set.NewSet[ids.ShortID](len(genesistest.FundedKeys))
+			for _, key := range genesistest.FundedKeys {
 				addrs.Add(key.Address())
 			}
 
 			cfg := *env.config
 			cfg.StaticFeeConfig.CreateSubnetTxFee = test.fee
 			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(preFundedKeys...)
+			builder, signer := factory.NewWallet(genesistest.FundedKeys...)
 			utx, err := builder.NewCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
 			)

@@ -33,7 +33,7 @@ func TestNewExportTx(t *testing.T) {
 		timestamp          time.Time
 	}
 
-	sourceKey := preFundedKeys[0]
+	sourceKey := genesistest.FundedKeys[0]
 
 	tests := []test{
 		{

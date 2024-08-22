@@ -35,7 +35,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
+	builder, signer := env.factory.NewWallet(genesistest.FundedKeys[0], genesistest.FundedKeys[1])
 	utx, err := builder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -214,8 +214,8 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env := newEnvironment(t, upgradetest.Banff)
 			env.config.UpgradeConfig.ApricotPhase3Time = ap3Time
 
-			addrs := set.NewSet[ids.ShortID](len(preFundedKeys))
-			for _, key := range preFundedKeys {
+			addrs := set.NewSet[ids.ShortID](len(genesistest.FundedKeys))
+			for _, key := range genesistest.FundedKeys {
 				addrs.Add(key.Address())
 			}
 
@@ -225,7 +225,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(preFundedKeys...)
+			builder, signer := factory.NewWallet(genesistest.FundedKeys...)
 			utx, err := builder.NewCreateChainTx(
 				testSubnet1.ID(),
 				nil,

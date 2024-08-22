@@ -29,15 +29,16 @@ const (
 )
 
 var (
-	preFundedKeys = secp256k1.TestKeys()
+	// Keys that are funded in the genesis
+	FundedKeys = secp256k1.TestKeys()
 
-	// Node IDs of genesis validators. Initialized in init function
+	// Node IDs of genesis validators
 	NodeIDs []ids.NodeID
 )
 
 func init() {
-	NodeIDs = make([]ids.NodeID, len(preFundedKeys))
-	for i := range preFundedKeys {
+	NodeIDs = make([]ids.NodeID, len(FundedKeys))
+	for i := range FundedKeys {
 		NodeIDs[i] = ids.GenerateTestNodeID()
 	}
 }
@@ -45,8 +46,8 @@ func init() {
 func BuildGenesisTest(t *testing.T) []byte {
 	require := require.New(t)
 
-	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	for i, key := range preFundedKeys {
+	genesisUTXOs := make([]api.UTXO, len(FundedKeys))
+	for i, key := range FundedKeys {
 		id := key.PublicKey().Address()
 		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		require.NoError(err)
@@ -58,7 +59,7 @@ func BuildGenesisTest(t *testing.T) []byte {
 
 	genesisValidators := make([]api.GenesisPermissionlessValidator, len(NodeIDs))
 	for i, nodeID := range NodeIDs {
-		addr := preFundedKeys[i].Address()
+		addr := FundedKeys[i].Address()
 		addrStr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 		require.NoError(err)
 		genesisValidators[i] = api.GenesisPermissionlessValidator{
