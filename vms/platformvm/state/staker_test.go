@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer/signermock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -159,7 +160,7 @@ func TestNewCurrentStaker(t *testing.T) {
 	}, staker)
 
 	ctrl := gomock.NewController(t)
-	signer := signer.NewMockSigner(ctrl)
+	signer := signermock.NewSigner(ctrl)
 	signer.EXPECT().Verify().Return(errCustom)
 	stakerTx.Signer = signer
 
@@ -191,7 +192,7 @@ func TestNewPendingStaker(t *testing.T) {
 	}, staker)
 
 	ctrl := gomock.NewController(t)
-	signer := signer.NewMockSigner(ctrl)
+	signer := signermock.NewSigner(ctrl)
 	signer.EXPECT().Verify().Return(errCustom)
 	stakerTx.Signer = signer
 

@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/registry/registrymock"
+	"github.com/ava-labs/avalanchego/vms/vmsmock"
 )
 
 var (
@@ -27,10 +29,10 @@ func TestReload_Success(t *testing.T) {
 
 	resources := initVMRegistryTest(t)
 
-	factory1 := vms.NewMockFactory(resources.ctrl)
-	factory2 := vms.NewMockFactory(resources.ctrl)
-	factory3 := vms.NewMockFactory(resources.ctrl)
-	factory4 := vms.NewMockFactory(resources.ctrl)
+	factory1 := vmsmock.NewFactory(resources.ctrl)
+	factory2 := vmsmock.NewFactory(resources.ctrl)
+	factory3 := vmsmock.NewFactory(resources.ctrl)
+	factory4 := vmsmock.NewFactory(resources.ctrl)
 
 	registeredVms := map[ids.ID]vms.Factory{
 		id1: factory1,
@@ -81,10 +83,10 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 
 	resources := initVMRegistryTest(t)
 
-	factory1 := vms.NewMockFactory(resources.ctrl)
-	factory2 := vms.NewMockFactory(resources.ctrl)
-	factory3 := vms.NewMockFactory(resources.ctrl)
-	factory4 := vms.NewMockFactory(resources.ctrl)
+	factory1 := vmsmock.NewFactory(resources.ctrl)
+	factory2 := vmsmock.NewFactory(resources.ctrl)
+	factory3 := vmsmock.NewFactory(resources.ctrl)
+	factory4 := vmsmock.NewFactory(resources.ctrl)
 
 	registeredVms := map[ids.ID]vms.Factory{
 		id1: factory1,
@@ -119,16 +121,16 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 
 type registryTestResources struct {
 	ctrl          *gomock.Controller
-	mockVMGetter  *MockVMGetter
-	mockVMManager *vms.MockManager
+	mockVMGetter  *registrymock.VMGetter
+	mockVMManager *vmsmock.Manager
 	vmRegistry    VMRegistry
 }
 
 func initVMRegistryTest(t *testing.T) *registryTestResources {
 	ctrl := gomock.NewController(t)
 
-	mockVMGetter := NewMockVMGetter(ctrl)
-	mockVMManager := vms.NewMockManager(ctrl)
+	mockVMGetter := registrymock.NewVMGetter(ctrl)
+	mockVMManager := vmsmock.NewManager(ctrl)
 
 	vmRegistry := NewVMRegistry(
 		VMRegistryConfig{

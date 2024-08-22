@@ -19,15 +19,19 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler/schedulermock"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -47,25 +51,25 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		blkID                  = ids.GenerateTestID()
 	)
 
-	innerBlk := snowmantest.NewMockBlock(ctrl)
+	innerBlk := snowmanmock.NewBlock(ctrl)
 	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
 	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
 
-	builtBlk := snowmantest.NewMockBlock(ctrl)
+	builtBlk := snowmanmock.NewBlock(ctrl)
 	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
 	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
 
-	innerVM := block.NewMockChainVM(ctrl)
-	innerBlockBuilderVM := block.NewMockBuildBlockWithContextChainVM(ctrl)
+	innerVM := blockmock.NewChainVM(ctrl)
+	innerBlockBuilderVM := blockmock.NewBuildBlockWithContextChainVM(ctrl)
 	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &block.Context{
 		PChainHeight: pChainHeight - 1,
 	}).Return(builtBlk, nil).AnyTimes()
 
-	vdrState := validators.NewMockState(ctrl)
+	vdrState := validatorsmock.NewState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
 
-	windower := proposer.NewMockWindower(ctrl)
+	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -368,17 +372,17 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		parentHeight     uint64 = 1234
 	)
 
-	innerBlk := snowmantest.NewMockBlock(ctrl)
+	innerBlk := snowmanmock.NewBlock(ctrl)
 	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
 
-	vdrState := validators.NewMockState(ctrl)
+	vdrState := validatorsmock.NewState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
 
-	windower := proposer.NewMockWindower(ctrl)
+	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(selectedProposer, nil).AnyTimes() // return a proposer different from thisNode, to check whether scheduler is reset
 
-	scheduler := scheduler.NewMockScheduler(ctrl)
+	scheduler := schedulermock.NewScheduler(ctrl)
 
 	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(err)
@@ -389,7 +393,7 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 			StakingLeafSigner: pk,
 			Registerer:        prometheus.NewRegistry(),
 		},
-		ChainVM: block.NewMockChainVM(ctrl),
+		ChainVM: blockmock.NewChainVM(ctrl),
 		ctx: &snow.Context{
 			NodeID:         thisNodeID,
 			ValidatorState: vdrState,
