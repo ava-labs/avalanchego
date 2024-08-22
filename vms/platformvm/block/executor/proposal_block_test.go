@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -55,7 +54,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	parentID := apricotParentBlk.ID()
 
 	// store parent block, with relevant quantities
-	onParentAccept := statemock.NewDiff(ctrl)
+	onParentAccept := state.NewMockDiff(ctrl)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
 		onAcceptState:  onParentAccept,
@@ -159,7 +158,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 	chainTime := parentTime
-	onParentAccept := statemock.NewDiff(ctrl)
+	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()

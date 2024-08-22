@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 )
 
 func TestGetState(t *testing.T) {
@@ -23,7 +22,7 @@ func TestGetState(t *testing.T) {
 
 	var (
 		mockState     = state.NewMockState(ctrl)
-		onAcceptState = statemock.NewDiff(ctrl)
+		onAcceptState = state.NewMockDiff(ctrl)
 		blkID1        = ids.GenerateTestID()
 		blkID2        = ids.GenerateTestID()
 		b             = &backend{

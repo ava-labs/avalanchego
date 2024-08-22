@@ -57,7 +57,7 @@ func (it *merged[T]) Next() bool {
 	if !it.initialized {
 		// Note that on the first call to Next() (i.e. here) we don't call
 		// Next() on the current iterator. This is because we already called
-		// Next() on each iterator in NewMerged.
+		// Next() on each iterator in Merge.
 		it.initialized = true
 		return true
 	}

@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
@@ -1726,7 +1725,7 @@ type removeSubnetValidatorTxVerifyEnv struct {
 	flowChecker    *utxomock.Verifier
 	unsignedTx     *txs.RemoveSubnetValidatorTx
 	tx             *txs.Tx
-	state          *statemock.Diff
+	state          *state.MockDiff
 	staker         *state.Staker
 }
 
@@ -1739,7 +1738,7 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 	mockFx := fxmock.NewFx(ctrl)
 	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
-	mockState := statemock.NewDiff(ctrl)
+	mockState := state.NewMockDiff(ctrl)
 	return removeSubnetValidatorTxVerifyEnv{
 		latestForkTime: now,
 		fx:             mockFx,
@@ -1808,7 +1807,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
@@ -1836,7 +1835,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "node isn't a validator of the subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
@@ -1901,7 +1900,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 
@@ -1930,7 +1929,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "can't find subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
@@ -1960,7 +1959,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "no permission to remove validator",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fxmock.NewOwner(ctrl)
@@ -1992,7 +1991,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fxmock.NewOwner(ctrl)
@@ -2143,7 +2142,7 @@ type transformSubnetTxVerifyEnv struct {
 	flowChecker    *utxomock.Verifier
 	unsignedTx     *txs.TransformSubnetTx
 	tx             *txs.Tx
-	state          *statemock.Diff
+	state          *state.MockDiff
 	staker         *state.Staker
 }
 
@@ -2156,7 +2155,7 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	mockFx := fxmock.NewFx(ctrl)
 	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newTransformSubnetTx(t)
-	mockState := statemock.NewDiff(ctrl)
+	mockState := state.NewMockDiff(ctrl)
 	return transformSubnetTxVerifyEnv{
 		latestForkTime: now,
 		fx:             mockFx,
@@ -2185,7 +2184,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				// Setting the tx to nil makes the tx fail syntactic verification
 				env.tx.Unsigned = (*txs.TransformSubnetTx)(nil)
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
@@ -2214,7 +2213,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
@@ -2244,7 +2243,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
@@ -2274,7 +2273,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			name: "flow checker failed",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				env.state = statemock.NewDiff(ctrl)
+				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
