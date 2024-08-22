@@ -52,8 +52,6 @@ outputted_files+=('vms/components/avax/avaxmock/transferable_out.go') # Embedded
 outputted_files+=('vms/platformvm/fx/fxmock/owner.go') # Embedded verify.IsNotState
 outputted_files+=('vms/proposervm/mock_post_fork_block.go') # Causes an import cycle if put in sub-dir proposervmmock
 outputted_files+=('x/sync/mock_client.go') # Causes an import cycle if put in sub-dir syncmock
-outputted_files+=('vms/platformvm/state/mock_staker_iterator.go') # Causes an import cycle if put in sub-dir statemock
-outputted_files+=('vms/platformvm/state/mock_state.go') # Causes an import cycle if put in sub-dir statemock
 outputted_files+=('vms/avm/block/mock_block.go') # Does not generate with the right interface compliance
 outputted_files+=('vms/platformvm/block/mock_block.go') # Does not generate with the right interface compliance
 

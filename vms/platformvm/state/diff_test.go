@@ -184,7 +184,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 	// Assert that we get the current delegator back
 	// Mock iterator for [state] returns no delegators.
-	stateCurrentDelegatorIter := iteratormock.NewMockIterator[*Staker](ctrl)
+	stateCurrentDelegatorIter := iteratormock.NewIterator[*Staker](ctrl)
 	stateCurrentDelegatorIter.EXPECT().Next().Return(false).Times(2)
 	stateCurrentDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetCurrentDelegatorIterator(
@@ -230,7 +230,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 
 	// Assert that we get the pending delegator back
 	// Mock iterator for [state] returns no delegators.
-	statePendingDelegatorIter := iteratormock.NewMockIterator[*Staker](ctrl)
+	statePendingDelegatorIter := iteratormock.NewIterator[*Staker](ctrl)
 	statePendingDelegatorIter.EXPECT().Next().Return(false).Times(2)
 	statePendingDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetPendingDelegatorIterator(

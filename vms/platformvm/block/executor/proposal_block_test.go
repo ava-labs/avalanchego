@@ -92,7 +92,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 
-	currentStakersIt := iteratormock.NewMockIterator[*state.Staker](ctrl)
+	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	currentStakersIt.EXPECT().Next().Return(true)
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:      addValTx.ID(),
@@ -203,7 +203,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTxID := nextStakerTx.ID()
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
-	currentStakersIt := iteratormock.NewMockIterator[*state.Staker](ctrl)
+	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
 	currentStakersIt.EXPECT().Value().Return(&state.Staker{
 		TxID:     nextStakerTxID,
@@ -216,7 +216,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
-	pendingStakersIt := iteratormock.NewMockIterator[*state.Staker](ctrl)
+	pendingStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
 	pendingStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()

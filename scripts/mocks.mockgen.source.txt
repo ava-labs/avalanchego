@@ -1,3 +1,7 @@
+vms/platformvm/state/state.go=State=Chain=vms/platformvm/state/statemock/chain.go
+vms/platformvm/state/state.go=Chain=State=vms/platformvm/state/statemock/state.go
+vms/platformvm/state/diff.go==Diff=vms/platformvm/state/statemock/diff.go
+utils/iterator/iterator.go==Iterator=utils/iterator/iteratormock/iterator.go
 snow/engine/common/sender.go=StateSummarySender,AcceptedStateSummarySender,FrontierSender,AcceptedSender,FetchSender,AppSender,QuerySender,Gossiper=Sender=snow/engine/common/commonmock/sender.go
 snow/networking/router/router.go=InternalHandler=Router=snow/networking/router/routermock/router.go
 snow/networking/sender/external_sender.go==ExternalSender=snow/networking/sender/sendermock/external_sender.go
@@ -7,3 +11,5 @@ vms/platformvm/block/executor/manager.go==Manager=vms/platformvm/block/executor/
 vms/platformvm/txs/unsigned_tx.go==UnsignedTx=vms/platformvm/txs/txsmock/unsigned_tx.go
 vms/platformvm/signer/signer.go==Signer=vms/platformvm/signer/signermock/mock_signer.go
 x/merkledb/db.go=ChangeProofer,RangeProofer,Clearer,Prefetcher=MockMerkleDB=x/merkledb/mock_db.go
+vms/platformvm/state/state.go=Chain=MockState=vms/platformvm/state/mock_state.go
+vms/platformvm/state/diff.go==MockDiff=vms/platformvm/state/mock_diff.go
