@@ -24,12 +24,6 @@ type NodeID struct {
 	ShortNodeID `serialize:"true"`
 }
 
-// ToNodeID attempt to convert a byte slice into a node id
-func ToNodeID(bytes []byte) (NodeID, error) {
-	nodeID, err := ToShortID(bytes)
-	return NodeID{ShortNodeID: ShortNodeID(nodeID)}, err
-}
-
 func (id NodeID) Compare(other NodeID) int {
 	return id.ShortNodeID.Compare(other.ShortNodeID)
 }
