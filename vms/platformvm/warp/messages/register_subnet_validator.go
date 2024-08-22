@@ -54,7 +54,8 @@ func ParseRegisterSubnetValidator(b []byte) (*RegisterSubnetValidator, error) {
 }
 
 // Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewRegisterSubnetValidator or Parse.
+// payload is initialized from either NewRegisterSubnetValidator or Parse,
+// otherwise it will return nil.
 func (b *RegisterSubnetValidator) Bytes() []byte {
 	return b.bytes
 }
