@@ -15,6 +15,7 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -685,16 +686,11 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil
 	}
 
-	genesisBytes, err := buildCustomGenesis(ctx.AVAXAssetID)
-	if err != nil {
-		return nil, ids.Empty, err
-	}
-
-	err = vm.Initialize(
+	err := vm.Initialize(
 		context.Background(),
 		ctx,
 		chainDB,
-		genesisBytes,
+		buildCustomGenesis(t),
 		nil,
 		nil,
 		msgChan,
@@ -756,14 +752,13 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	return vm, testSubnet1.ID(), nil
 }
 
-func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
+func buildCustomGenesis(t testing.TB) []byte {
+	require := require.New(t)
+
 	genesisUTXOs := make([]api.UTXO, len(genesistest.FundedKeys))
 	for i, key := range genesistest.FundedKeys {
-		id := key.Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
-		if err != nil {
-			return nil, err
-		}
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.Address().Bytes())
+		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(genesistest.InitialBalance2),
 			Address: addr,
@@ -776,9 +771,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	// times, so to avoid interference with our tests
 	nodeID := genesistest.NodeIDs[len(genesistest.NodeIDs)-1]
 	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(err)
 
 	starTime := mockable.MaxTime.Add(-1 * defaultMinStakingDuration)
 	endTime := mockable.MaxTime
@@ -802,7 +795,7 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
 		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
+		AvaxAssetID:   snowtest.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.GenesisPermissionlessValidator{genesisValidator},
 		Chains:        nil,
@@ -812,14 +805,10 @@ func buildCustomGenesis(avaxAssetID ids.ID) ([]byte, error) {
 
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		return nil, err
-	}
+	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(err)
 
-	return genesisBytes, nil
+	return genesisBytes
 }
