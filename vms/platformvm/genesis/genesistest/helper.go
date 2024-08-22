@@ -23,6 +23,7 @@ import (
 const (
 	ValidatorWeight2 = 5 * units.MilliAvax
 	InitialBalance2  = 1 * units.Avax
+	InitialSupply2   = 360 * units.MegaAvax
 )
 
 var (
@@ -43,23 +44,21 @@ func init() {
 func Build(t *testing.T) *api.BuildGenesisArgs {
 	require := require.New(t)
 
-	genesisUTXOs := make([]api.UTXO, len(FundedKeys))
+	var (
+		utxos      = make([]api.UTXO, len(FundedKeys))
+		validators = make([]api.GenesisPermissionlessValidator, len(FundedKeys))
+	)
 	for i, key := range FundedKeys {
-		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, key.Address().Bytes())
 		require.NoError(err)
-		genesisUTXOs[i] = api.UTXO{
+
+		utxos[i] = api.UTXO{
 			Amount:  json.Uint64(InitialBalance2),
 			Address: addr,
 		}
-	}
 
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(NodeIDs))
-	for i, nodeID := range NodeIDs {
-		addr := FundedKeys[i].Address()
-		addrStr, err := address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
-		require.NoError(err)
-		genesisValidators[i] = api.GenesisPermissionlessValidator{
+		nodeID := NodeIDs[i]
+		validators[i] = api.GenesisPermissionlessValidator{
 			GenesisValidator: api.GenesisValidator{
 				StartTime: json.Uint64(TimeUnix),
 				EndTime:   json.Uint64(ValidatorEndTimeUnix),
@@ -67,24 +66,23 @@ func Build(t *testing.T) *api.BuildGenesisArgs {
 			},
 			RewardOwner: &api.Owner{
 				Threshold: 1,
-				Addresses: []string{addrStr},
+				Addresses: []string{addr},
 			},
 			Staked: []api.UTXO{{
 				Amount:  json.Uint64(ValidatorWeight2),
-				Address: addrStr,
+				Address: addr,
 			}},
 			DelegationFee: reward.PercentDenominator,
 		}
 	}
 
 	return &api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   snowtest.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
+		NetworkID:     json.Uint32(constants.UnitTestID),
+		UTXOs:         utxos,
+		Validators:    validators,
 		Time:          json.Uint64(TimeUnix),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
+		InitialSupply: json.Uint64(InitialSupply2),
 		Encoding:      formatting.Hex,
 	}
 }
