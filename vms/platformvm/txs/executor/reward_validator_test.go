@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -137,7 +138,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToRemove.Weight+27697, onCommitBalance)
+	require.Equal(oldBalance+stakerToRemove.Weight+38944, onCommitBalance)
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
@@ -246,11 +247,11 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -380,11 +381,11 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -610,11 +611,11 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
@@ -786,11 +787,11 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
+	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
