@@ -87,7 +87,6 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 			),
 			Bootstrapped: utils.NewAtomic(true),
 		},
-		pChainHeight: 0,
 	}
 }
 
