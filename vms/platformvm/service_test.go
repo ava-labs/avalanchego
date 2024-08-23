@@ -53,7 +53,6 @@ import (
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 var (
@@ -80,22 +79,21 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory, *txstest.WalletFactory) {
-	vm, factory, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
-
+func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
+	vm, _, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
 		stakerAttributesCache: &cache.LRU[ids.ID, *stakerAttributes]{
 			Size: stakerAttributesCacheSize,
 		},
-	}, mutableSharedMemory, factory
+	}, mutableSharedMemory
 }
 
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 
-	service, _, _ := defaultService(t)
+	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -125,7 +123,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory, _ := defaultService(t)
+	service, mutableSharedMemory := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -347,7 +345,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _, _ := defaultService(t)
+				service, _ := defaultService(t)
 
 				service.vm.ctx.Lock.Lock()
 				tx := test.createTx(t, service)
@@ -409,7 +407,7 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _ := defaultService(t)
 
 	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
 	createSubnetFee, err := feeCalculator.CalculateFee(&txs.CreateSubnetTx{})
@@ -448,7 +446,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t)
+	service, _ := defaultService(t)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis := genesistest.New(t, genesistest.Config{})
@@ -534,12 +532,21 @@ func TestGetStake(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
+	wallet := txstest.NewWallet(
+		t,
+		service.vm.ctx,
+		&service.vm.Config,
+		service.vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesistest.DefaultNodeIDs[0]
 	delegatorEndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
-	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewAddDelegatorTx(
+	tx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
 			Start:  genesistest.DefaultValidatorStartTimeUnix,
@@ -555,8 +562,6 @@ func TestGetStake(t *testing.T) {
 			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
-	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	addDelTx := tx.Unsigned.(*txs.AddDelegatorTx)
@@ -602,7 +607,7 @@ func TestGetStake(t *testing.T) {
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix())
-	utx2, err := builder.NewAddValidatorTx(
+	tx, err = wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: pendingStakerNodeID,
 			Start:  uint64(genesistest.DefaultValidatorStartTime.Unix()),
@@ -619,8 +624,6 @@ func TestGetStake(t *testing.T) {
 			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
-	require.NoError(err)
-	tx, err = walletsigner.SignUnsigned(context.Background(), signer, utx2)
 	require.NoError(err)
 
 	staker, err = state.NewPendingStaker(
@@ -655,7 +658,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _, factory := defaultService(t)
+	service, _ := defaultService(t)
 
 	genesis := genesistest.New(t, genesistest.Config{})
 
@@ -692,8 +695,16 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewAddDelegatorTx(
+	wallet := txstest.NewWallet(
+		t,
+		service.vm.ctx,
+		&service.vm.Config,
+		service.vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: validatorNodeID,
 			Start:  genesistest.DefaultValidatorStartTimeUnix,
@@ -709,8 +720,6 @@ func TestGetCurrentValidators(t *testing.T) {
 			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
-	require.NoError(err)
-	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
@@ -793,7 +802,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _ := defaultService(t)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -829,14 +838,23 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _, factory := defaultService(t)
+			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
-			builder, signer := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
-			utx, err := builder.NewCreateChainTx(
-				testSubnet1.ID(),
+			subnetID := testSubnet1.ID()
+			wallet := txstest.NewWallet(
+				t,
+				service.vm.ctx,
+				&service.vm.Config,
+				service.vm.state,
+				secp256k1fx.NewKeychain(testSubnet1ControlKeys[:2]...),
+				[]ids.ID{subnetID},
+				nil, // chainIDs
+			)
+			tx, err := wallet.IssueCreateChainTx(
+				subnetID,
 				[]byte{},
 				constants.AVMID,
 				[]ids.ID{},
@@ -846,8 +864,6 @@ func TestGetBlock(t *testing.T) {
 					Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 				}),
 			)
-			require.NoError(err)
-			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			preferredID := service.vm.manager.Preferred()
@@ -1121,7 +1137,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetSubnets(t *testing.T) {
 	require := require.New(t)
-	service, _, _ := defaultService(t)
+	service, _ := defaultService(t)
 
 	testSubnet1ID := testSubnet1.ID()
 
@@ -1193,7 +1209,7 @@ func TestGetFeeConfig(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			service, _, _ := defaultService(t)
+			service, _ := defaultService(t)
 			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
 
 			var reply gas.Config
@@ -1207,7 +1223,7 @@ func FuzzGetFeeState(f *testing.F) {
 	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
 		require := require.New(t)
 
-		service, _, _ := defaultService(t)
+		service, _ := defaultService(t)
 
 		var (
 			expectedState = gas.State{
