@@ -1365,19 +1365,22 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, factory, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _, _ := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	key, err := secp256k1.NewPrivateKey()
-	require.NoError(err)
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
 
-	id := key.Address()
 	nodeID := ids.GenerateTestNodeID()
-	changeAddr := genesistest.DefaultFundedKeys[0].Address()
-
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
-	utx, err := builder.NewAddValidatorTx(
+	addValidatorTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(validatorStartTime.Unix()),
@@ -1386,55 +1389,36 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{id},
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
 	)
-	require.NoError(err)
-	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
-	// trigger block creation for the validator tx
-	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(addValidatorBlock.Verify(context.Background()))
-	require.NoError(addValidatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept addValidatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	uCreateSubnetTx, err := builder.NewCreateSubnetTx(
+	createSubnetTx, err := wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
 	)
-	require.NoError(err)
-	createSubnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uCreateSubnetTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(createSubnetTx))
 	vm.ctx.Lock.Lock()
 
-	// trigger block creation for the subnet tx
-	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(createSubnetBlock.Verify(context.Background()))
-	require.NoError(createSubnetBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept createSubnetTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
+	subnetID := createSubnetTx.ID()
+	addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1442,38 +1426,22 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 				End:    uint64(validatorEndTime.Unix()),
 				Wght:   defaultMaxValidatorStake,
 			},
-			Subnet: createSubnetTx.ID(),
+			Subnet: subnetID,
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
 	)
-	require.NoError(err)
-	addSubnetValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(addSubnetValidatorTx))
 	vm.ctx.Lock.Lock()
 
-	// trigger block creation for the validator tx
-	addSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(addSubnetValidatorBlock.Verify(context.Background()))
-	require.NoError(addSubnetValidatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept addSubnetValidatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	uRemoveSubnetValTx, err := builder.NewRemoveSubnetValidatorTx(
+	removeSubnetValidatorTx, err := wallet.IssueRemoveSubnetValidatorTx(
 		nodeID,
-		createSubnetTx.ID(),
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
+		subnetID,
 	)
-	require.NoError(err)
-	removeSubnetValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uRemoveSubnetValTx)
 	require.NoError(err)
 
 	// Set the clock so that the validator will be moved from the pending
@@ -1484,12 +1452,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.issueTxFromRPC(removeSubnetValidatorTx))
 	vm.ctx.Lock.Lock()
 
-	// trigger block creation for the validator tx
-	removeSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(removeSubnetValidatorBlock.Verify(context.Background()))
-	require.NoError(removeSubnetValidatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept removeSubnetValidatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 }
 
 // GetValidatorSet must return the BLS keys for a given validator correctly when
