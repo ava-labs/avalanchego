@@ -525,7 +525,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
-	// validates primary network ([genesistest.Time, genesistest.ValidatorEndTime])
+	// validates primary network ([genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime])
 	builder, txSigner := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
@@ -577,7 +577,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 	// create valid tx
 	// note that [startTime, endTime] is a subset of time that keys[0]
-	// validates primary network ([genesistest.Time, genesistest.ValidatorEndTime])
+	// validates primary network ([genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime])
 	builder, txSigner := factory.NewWallet(testSubnet1ControlKeys[1], testSubnet1ControlKeys[2])
 	utx, err := builder.NewAddSubnetValidatorTx(
 		&txs.SubnetValidator{
