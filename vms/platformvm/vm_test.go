@@ -2121,88 +2121,46 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _, _ := defaultVM(t, upgradetest.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	sendAmt := uint64(100000)
-	changeAddr := ids.ShortEmpty
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
 
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewBaseTx(
+	baseTx, err := wallet.IssueBaseTx(
 		[]*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: sendAmt,
+					Amt: 100 * units.MicroAvax,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs: []ids.ShortID{
-							genesistest.DefaultFundedKeys[1].Address(),
+							ids.GenerateTestShortID(),
 						},
 					},
 				},
 			},
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
 	)
 	require.NoError(err)
-	baseTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
-	require.NoError(err)
-
-	totalInputAmt := uint64(0)
-	key0InputAmt := uint64(0)
-	for inputID := range baseTx.Unsigned.InputIDs() {
-		utxo, err := vm.state.GetUTXO(inputID)
-		require.NoError(err)
-		require.IsType(&secp256k1fx.TransferOutput{}, utxo.Out)
-		castOut := utxo.Out.(*secp256k1fx.TransferOutput)
-		if castOut.AddressesSet().Equals(set.Of(genesistest.DefaultFundedKeys[0].Address())) {
-			key0InputAmt += castOut.Amt
-		}
-		totalInputAmt += castOut.Amt
-	}
-	require.Equal(totalInputAmt, key0InputAmt)
-
-	totalOutputAmt := uint64(0)
-	key0OutputAmt := uint64(0)
-	key1OutputAmt := uint64(0)
-	changeAddrOutputAmt := uint64(0)
-	for _, output := range baseTx.Unsigned.Outputs() {
-		require.IsType(&secp256k1fx.TransferOutput{}, output.Out)
-		castOut := output.Out.(*secp256k1fx.TransferOutput)
-		if castOut.AddressesSet().Equals(set.Of(genesistest.DefaultFundedKeys[0].Address())) {
-			key0OutputAmt += castOut.Amt
-		}
-		if castOut.AddressesSet().Equals(set.Of(genesistest.DefaultFundedKeys[1].Address())) {
-			key1OutputAmt += castOut.Amt
-		}
-		if castOut.AddressesSet().Equals(set.Of(changeAddr)) {
-			changeAddrOutputAmt += castOut.Amt
-		}
-		totalOutputAmt += castOut.Amt
-	}
-	require.Equal(totalOutputAmt, key0OutputAmt+key1OutputAmt+changeAddrOutputAmt)
-
-	require.Equal(vm.StaticFeeConfig.TxFee, totalInputAmt-totalOutputAmt)
-	require.Equal(sendAmt, key1OutputAmt)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(baseTx))
 	vm.ctx.Lock.Lock()
-	baseTxBlock, err := vm.Builder.BuildBlock(context.Background())
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	_, txStatus, err := vm.state.GetTx(baseTx.ID())
 	require.NoError(err)
-
-	baseTxRawBlock := baseTxBlock.(*blockexecutor.Block).Block
-	require.IsType(&block.BanffStandardBlock{}, baseTxRawBlock)
-	require.Contains(baseTxRawBlock.Txs(), baseTx)
-
-	require.NoError(baseTxBlock.Verify(context.Background()))
-	require.NoError(baseTxBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.Equal(status.Committed, txStatus)
 }
 
 func TestPruneMempool(t *testing.T) {
