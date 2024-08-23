@@ -187,7 +187,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, d
 
 	// align chain time and local clock
 	vm.state.SetTimestamp(vm.clock.Time())
-	vm.state.SetFeeState(feecomponent.State{
+	vm.state.SetFeeState(gas.State{
 		Capacity: defaultDynamicFeeConfig.MaxGasCapacity,
 	})
 

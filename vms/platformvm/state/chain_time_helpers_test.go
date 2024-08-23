@@ -10,16 +10,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func TestPickFeeCalculator(t *testing.T) {
 	var (
 		createAssetTxFee uint64 = 9
-		staticFeeConfig         = txfee.StaticConfig{
+		staticFeeConfig         = fee.StaticConfig{
 			TxFee:                         1,
 			CreateSubnetTxFee:             2,
 			TransformSubnetTxFee:          3,
@@ -29,12 +28,12 @@ func TestPickFeeCalculator(t *testing.T) {
 			AddSubnetValidatorFee:         7,
 			AddSubnetDelegatorFee:         8,
 		}
-		dynamicFeeConfig = feecomponent.Config{
-			Weights:                  feecomponent.Dimensions{1},
-			MaxGasCapacity:           2,
-			MaxGasPerSecond:          3,
-			TargetGasPerSecond:       4,
-			MinGasPrice:              5,
+		dynamicFeeConfig = gas.Config{
+			Weights:                  gas.Dimensions{1},
+			MaxCapacity:              2,
+			MaxPerSecond:             3,
+			TargetPerSecond:          4,
+			MinPrice:                 5,
 			ExcessConversionConstant: 6,
 		}
 	)
@@ -45,21 +44,21 @@ func TestPickFeeCalculator(t *testing.T) {
 
 	tests := []struct {
 		fork     upgradetest.Fork
-		expected txfee.Calculator
+		expected fee.Calculator
 	}{
 		{
 			fork:     upgradetest.ApricotPhase2,
-			expected: txfee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
+			expected: fee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
 		},
 		{
 			fork:     upgradetest.ApricotPhase3,
-			expected: txfee.NewStaticCalculator(staticFeeConfig),
+			expected: fee.NewStaticCalculator(staticFeeConfig),
 		},
 		{
 			fork: upgradetest.Etna,
-			expected: txfee.NewDynamicCalculator(
+			expected: fee.NewDynamicCalculator(
 				dynamicFeeConfig.Weights,
-				dynamicFeeConfig.MinGasPrice,
+				dynamicFeeConfig.MinPrice,
 			),
 		},
 	}
