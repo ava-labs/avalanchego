@@ -475,9 +475,19 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _, _ := defaultVM(t, upgradetest.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
 
 	// Use nodeID that is already in the genesis
 	repeatNodeID := genesistest.DefaultNodeIDs[0]
@@ -488,9 +498,13 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
 	// create valid tx
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewAddPermissionlessValidatorTx(
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: repeatNodeID,
@@ -502,18 +516,10 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		vm.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
-	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
