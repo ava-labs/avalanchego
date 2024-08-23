@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -41,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -366,71 +366,46 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	vm.clock.Set(latestForkTime.Add(time.Second))
 	vm.state.SetTimestamp(latestForkTime.Add(time.Second))
 
-	key0 := genesistest.DefaultFundedKeys[0]
-	key1 := genesistest.DefaultFundedKeys[1]
-	addr0 := key0.Address()
-	addr1 := key1.Address()
+	var (
+		key0    = genesistest.DefaultFundedKeys[0]
+		addr0   = key0.Address()
+		owners0 = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr0},
+		}
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(key0),
-		nil, // subnetIDs
-		nil, // chainIDs
+		key1    = genesistest.DefaultFundedKeys[1]
+		addr1   = key1.Address()
+		owners1 = &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr1},
+		}
 	)
+
+	wallet := newWallet(t, vm, walletConfig{})
 	addSubnetTx0, err := wallet.IssueCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr0},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr0},
-		}),
+		owners0,
+		walletcommon.WithCustomAddresses(set.Of(
+			addr0,
+		)),
 	)
 	require.NoError(err)
 
-	wallet = txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(key1),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
 	addSubnetTx1, err := wallet.IssueCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr1},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr1},
-		}),
+		owners1,
+		walletcommon.WithCustomAddresses(set.Of(
+			addr1,
+		)),
 	)
 	require.NoError(err)
 
-	wallet = txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(key1),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	// Wallet needs to be re-created to generate a conflicting transaction
+	wallet = newWallet(t, vm, walletConfig{})
 	addSubnetTx2, err := wallet.IssueCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr1},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr0},
-		}),
+		owners1,
+		walletcommon.WithCustomAddresses(set.Of(
+			addr0,
+		)),
 	)
 	require.NoError(err)
 
@@ -490,15 +465,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
 	newValidatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
@@ -693,15 +660,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID0 := ids.GenerateTestNodeID()
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
@@ -1017,15 +976,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 		require.Equal(weight, validators[nodeID].Weight)
 	}
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
@@ -1149,15 +1100,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1236,15 +1179,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
@@ -1352,15 +1287,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
@@ -1449,15 +1376,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		[]ids.ID{subnetID},
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
 
 	// A subnet validator stakes and then stops; also its primary network counterpart stops staking
 	var (
@@ -1677,15 +1598,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	// A primary network validator stake twice
 	var (
@@ -1811,15 +1724,9 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		[]ids.ID{subnetID},
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
 
 	// A primary network validator stake twice
 	var (
@@ -1995,15 +1902,9 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		[]ids.ID{subnetID},
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
 
 	// A primary network validator stake twice
 	var (
