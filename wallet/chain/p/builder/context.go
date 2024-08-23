@@ -12,9 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const Alias = "P"
@@ -22,9 +21,9 @@ const Alias = "P"
 type Context struct {
 	NetworkID         uint32
 	AVAXAssetID       ids.ID
-	StaticFeeConfig   txfee.StaticConfig
-	ComplexityWeights feecomponent.Dimensions
-	GasPrice          feecomponent.GasPrice
+	StaticFeeConfig   fee.StaticConfig
+	ComplexityWeights gas.Dimensions
+	GasPrice          gas.Price
 }
 
 func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
@@ -56,7 +55,7 @@ func NewContextFromClients(
 	return &Context{
 		NetworkID:   networkID,
 		AVAXAssetID: asset.AssetID,
-		StaticFeeConfig: txfee.StaticConfig{
+		StaticFeeConfig: fee.StaticConfig{
 			TxFee:                         uint64(txFees.TxFee),
 			CreateSubnetTxFee:             uint64(txFees.CreateSubnetTxFee),
 			TransformSubnetTxFee:          uint64(txFees.TransformSubnetTxFee),
@@ -68,7 +67,7 @@ func NewContextFromClients(
 		},
 
 		// TODO: Populate these fields once they are exposed by the API
-		ComplexityWeights: feecomponent.Dimensions{},
+		ComplexityWeights: gas.Dimensions{},
 		GasPrice:          0,
 	}, nil
 }

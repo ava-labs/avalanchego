@@ -12,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -35,7 +36,7 @@ func TestLockedCalculator(t *testing.T) {
 	require.ErrorIs(err, errStillBootstrapping)
 
 	var isBootstrapped utils.Atomic[bool]
-	mockCalc := NewMockCalculator(ctrl)
+	mockCalc := uptimemock.NewCalculator(ctrl)
 
 	// Should still error because ctx is not bootstrapped
 	lc.SetCalculator(&isBootstrapped, &sync.Mutex{}, mockCalc)

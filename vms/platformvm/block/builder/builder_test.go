@@ -14,11 +14,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -34,7 +37,7 @@ import (
 func TestBuildBlockBasic(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -77,7 +80,7 @@ func TestBuildBlockBasic(t *testing.T) {
 func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -94,7 +97,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 func TestBuildBlockShouldReward(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -111,7 +114,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.NoError(err)
 
 	// Create a valid [AddPermissionlessValidatorTx]
-	builder, txSigner := env.factory.NewWallet(preFundedKeys[0])
+	builder, txSigner := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx, err := builder.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -126,16 +129,16 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -213,7 +216,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 func TestBuildBlockAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -246,7 +249,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -301,7 +304,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -320,7 +323,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder1, signer1 := env.factory.NewWallet(preFundedKeys[0])
+	builder1, signer1 := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx1, err := builder1.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -335,16 +338,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -361,7 +364,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err = bls.NewSecretKey()
 	require.NoError(err)
 
-	builder2, signer2 := env.factory.NewWallet(preFundedKeys[2])
+	builder2, signer2 := env.factory.NewWallet(genesistest.DefaultFundedKeys[2])
 	utx2, err := builder2.NewAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -376,16 +379,16 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		env.ctx.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
 		},
 		reward.PercentDenominator,
 		common.WithChangeOwner(&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[2].PublicKey().Address()},
+			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
 		}),
 	)
 	require.NoError(err)
@@ -421,7 +424,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -465,7 +468,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -502,7 +505,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "no stakers",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 				currentStakerIter.EXPECT().Next().Return(false)
 				currentStakerIter.EXPECT().Release()
 
@@ -516,7 +519,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired subnet validator/delegator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -543,7 +546,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network validator after subnet expired subnet validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -570,7 +573,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network delegator after subnet expired subnet validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -597,7 +600,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network delegator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{
@@ -619,7 +622,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
 
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(&state.Staker{

@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -20,7 +22,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, upgradetest.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -31,14 +33,14 @@ func TestNewExportTx(t *testing.T) {
 		timestamp          time.Time
 	}
 
-	sourceKey := preFundedKeys[0]
+	sourceKey := genesistest.DefaultFundedKeys[0]
 
 	tests := []test{
 		{
 			description:        "P->X export",
 			destinationChainID: env.ctx.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          defaultValidateStartTime,
+			timestamp:          genesistest.DefaultValidatorStartTime,
 		},
 		{
 			description:        "P->C export",
@@ -59,7 +61,7 @@ func TestNewExportTx(t *testing.T) {
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: defaultBalance - defaultTxFee,
+						Amt: genesistest.DefaultInitialBalance - defaultTxFee,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Locktime:  0,
 							Threshold: 1,

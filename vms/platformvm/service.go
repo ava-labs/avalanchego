@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -1830,7 +1830,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 }
 
 // GetFeeConfig returns the dynamic fee config of the chain.
-func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *fee.Config) error {
+func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *gas.Config) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getFeeConfig"),
@@ -1847,9 +1847,9 @@ func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *fee.Config) 
 }
 
 type GetFeeStateReply struct {
-	fee.State
-	Price fee.GasPrice `json:"price"`
-	Time  time.Time    `json:"timestamp"`
+	gas.State
+	Price gas.Price `json:"price"`
+	Time  time.Time `json:"timestamp"`
 }
 
 // GetFeeState returns the current fee state of the chain.
@@ -1863,7 +1863,8 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 	defer s.vm.ctx.Lock.Unlock()
 
 	reply.State = s.vm.state.GetFeeState()
-	reply.Price = s.vm.DynamicFeeConfig.MinGasPrice.MulExp(
+	reply.Price = gas.CalculatePrice(
+		s.vm.DynamicFeeConfig.MinPrice,
 		reply.State.Excess,
 		s.vm.DynamicFeeConfig.ExcessConversionConstant,
 	)

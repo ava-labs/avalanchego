@@ -282,7 +282,7 @@ configured to scrape metrics from configured nodes and forward the
 metrics to a persistent prometheus instance. The script requires that
 the `PROMETHEUS_ID` and `PROMETHEUS_PASSWORD` env vars be set. By
 default the prometheus instance at
-https://prometheus-experimental.avax-dev.network will be targeted and
+https://prometheus-poc.avax-dev.network will be targeted and
 this can be overridden via the `PROMETHEUS_URL` env var.
 
 ### Log collection
@@ -300,7 +300,7 @@ The `scripts/run_promtail.sh` script starts promtail configured to
 collect logs from configured nodes and forward the results to loki. The
 script requires that the `LOKI_ID` and `LOKI_PASSWORD` env vars be
 set. By default the loki instance at
-https://loki-experimental.avax-dev.network will be targeted and this
+https://loki-poc.avax-dev.network will be targeted and this
 can be overridden via the `LOKI_URL` env var.
 
 ### Labels
@@ -336,7 +336,7 @@ https://docs.github.com/en/actions/learn-github-actions/contexts#github-context.
 #### Local networks
 
 When a network is started with tmpnet, a link to the [default grafana
-instance](https://grafana-experimental.avax-dev.network) will be
+instance](https://grafana-poc.avax-dev.network) will be
 emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.

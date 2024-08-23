@@ -15,19 +15,21 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txsmock"
 )
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
@@ -35,14 +37,14 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnAcceptState := state.NewMockDiff(ctrl)
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetFeeState().Return(fee.State{}).Times(2)
+	parentOnAcceptState.EXPECT().GetFeeState().Return(gas.State{}).Times(2)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -61,16 +63,14 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
 	}
 
-	blkTx := txs.NewMockUnsignedTx(ctrl)
+	blkTx := txsmock.NewUnsignedTx(ctrl)
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
@@ -121,7 +121,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	grandparentID := ids.GenerateTestID()
@@ -143,10 +143,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					ApricotPhase5Time: time.Now().Add(time.Hour),
-					BanffTime:         mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -154,7 +151,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	}
 
 	onAccept := state.NewMockDiff(ctrl)
-	blkTx := txs.NewMockUnsignedTx(ctrl)
+	blkTx := txsmock.NewUnsignedTx(ctrl)
 	inputs := set.Of(ids.GenerateTestID())
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
@@ -207,7 +204,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
@@ -228,17 +225,14 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					ApricotPhase5Time: time.Now().Add(time.Hour),
-					BanffTime:         mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
 	}
 
-	blkTx := txs.NewMockUnsignedTx(ctrl)
+	blkTx := txsmock.NewUnsignedTx(ctrl)
 	atomicRequests := map[ids.ID]*atomic.Requests{
 		ids.GenerateTestID(): {
 			RemoveRequests: [][]byte{{1}, {2}},
@@ -281,7 +275,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	// Set expectations for dependencies.
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -305,7 +299,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnDecisionState := state.NewMockDiff(ctrl)
@@ -332,9 +326,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -374,7 +366,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnDecisionState := state.NewMockDiff(ctrl)
@@ -401,9 +393,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -444,7 +434,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 
 	backend := &backend{
@@ -458,9 +448,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -482,7 +470,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := defaultGenesisTime.Add(time.Hour)
+	now := genesistest.DefaultValidatorStartTime.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -516,7 +504,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
-			mempool := mempool.NewMockMempool(ctrl)
+			mempool := mempoolmock.NewMempool(ctrl)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
@@ -532,9 +520,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Config{
-						UpgradeConfig: upgrade.Config{
-							BanffTime: time.Time{}, // banff is activated
-						},
+						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 					},
 					Clk: &mockable.Clock{},
 				},
@@ -547,10 +533,10 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := defaultGenesisTime
+			parentTime := genesistest.DefaultValidatorStartTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
+			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -581,7 +567,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
-	now := defaultGenesisTime.Add(time.Hour)
+	now := genesistest.DefaultValidatorStartTime.Add(time.Hour)
 
 	tests := []struct {
 		description string
@@ -615,7 +601,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// Create mocked dependencies.
 			s := state.NewMockState(ctrl)
-			mempool := mempool.NewMockMempool(ctrl)
+			mempool := mempoolmock.NewMempool(ctrl)
 			parentID := ids.GenerateTestID()
 			parentStatelessBlk := block.NewMockBlock(ctrl)
 			parentHeight := uint64(1)
@@ -631,9 +617,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
 					Config: &config.Config{
-						UpgradeConfig: upgrade.Config{
-							BanffTime: time.Time{}, // banff is activated
-						},
+						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 					},
 					Clk: &mockable.Clock{},
 				},
@@ -646,10 +630,10 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require.NoError(err)
 
 			// setup parent state
-			parentTime := defaultGenesisTime
+			parentTime := genesistest.DefaultValidatorStartTime
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
-			s.EXPECT().GetFeeState().Return(fee.State{}).Times(3)
+			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -682,7 +666,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 
 	grandParentID := ids.GenerateTestID()
 	grandParentStatelessBlk := block.NewMockBlock(ctrl)
@@ -713,17 +697,14 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					ApricotPhase5Time: time.Now().Add(time.Hour),
-					BanffTime:         mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
 		backend: backend,
 	}
 
-	blkTx := txs.NewMockUnsignedTx(ctrl)
+	blkTx := txsmock.NewUnsignedTx(ctrl)
 	atomicRequests := map[ids.ID]*atomic.Requests{
 		ids.GenerateTestID(): {
 			RemoveRequests: [][]byte{{1}, {2}},
@@ -767,7 +748,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
@@ -780,7 +761,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentOnCommitState := state.NewMockDiff(ctrl)
@@ -805,9 +786,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -838,7 +817,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 
 	// Create mocked dependencies.
 	s := state.NewMockState(ctrl)
-	mempool := mempool.NewMockMempool(ctrl)
+	mempool := mempoolmock.NewMempool(ctrl)
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	parentTime := time.Now()
@@ -864,9 +843,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: time.Time{}, // banff is activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -903,9 +880,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -948,9 +923,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: time.Time{}, // banff is activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -994,9 +967,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: mockable.MaxTime, // banff is not activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
 		},
@@ -1039,9 +1010,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				UpgradeConfig: upgrade.Config{
-					BanffTime: time.Time{}, // banff is activated
-				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
 		},

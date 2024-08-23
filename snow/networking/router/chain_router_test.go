@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
+	"github.com/ava-labs/avalanchego/snow/networking/handler/handlermock"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -634,7 +635,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.StateSummaryFrontierOp,
 			message.InternalGetStateSummaryFrontierFailed(
@@ -652,7 +652,6 @@ func TestRouterTimeout(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AcceptedStateSummaryOp,
@@ -672,7 +671,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.AcceptedFrontierOp,
 			message.InternalGetAcceptedFrontierFailed(
@@ -691,7 +689,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.AcceptedOp,
 			message.InternalGetAcceptedFailed(
@@ -709,7 +706,6 @@ func TestRouterTimeout(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AncestorsOp,
@@ -730,7 +726,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.PutOp,
 			message.InternalGetFailed(
@@ -749,7 +744,6 @@ func TestRouterTimeout(t *testing.T) {
 			context.Background(),
 			nodeID,
 			ctx.ChainID,
-			ctx.ChainID,
 			requestID,
 			message.ChitsOp,
 			message.InternalQueryFailed(
@@ -767,7 +761,6 @@ func TestRouterTimeout(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AppResponseOp,
@@ -835,7 +828,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	))
 	defer chainRouter.Shutdown(context.Background())
 
-	h := handler.NewMockHandler(ctrl)
+	h := handlermock.NewHandler(ctrl)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
@@ -855,7 +848,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.StateSummaryFrontierOp,
@@ -884,7 +876,6 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		chainRouter.RegisterRequest(
 			context.Background(),
 			nodeID,
-			ctx.ChainID,
 			ctx.ChainID,
 			requestID,
 			message.AcceptedStateSummaryOp,
@@ -992,7 +983,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 			chainRouter.RegisterRequest(
 				context.Background(),
 				ids.EmptyNodeID,
-				ids.Empty,
 				ids.Empty,
 				requestID,
 				tt.responseOp,
@@ -1234,7 +1224,7 @@ func TestConnectedSubnet(t *testing.T) {
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
 
-	platformHandler := handler.NewMockHandler(ctrl)
+	platformHandler := handlermock.NewHandler(ctrl)
 	platformHandler.EXPECT().Context().Return(ctx).AnyTimes()
 	platformHandler.EXPECT().SetOnStopped(gomock.Any()).AnyTimes()
 	platformHandler.EXPECT().Push(gomock.Any(), myConnectedMsg).Times(1)
@@ -1537,7 +1527,7 @@ func TestAppRequest(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
+			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
 			chainRouter.lock.Lock()
 			require.Equal(1, chainRouter.timedRequests.Len())
 			chainRouter.lock.Unlock()
