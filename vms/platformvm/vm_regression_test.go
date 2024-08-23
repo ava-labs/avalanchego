@@ -62,7 +62,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
-		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
 	// create valid tx
@@ -214,7 +214,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			rewardsOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			}
 
 			// create valid tx

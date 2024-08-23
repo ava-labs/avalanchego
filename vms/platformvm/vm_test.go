@@ -2016,7 +2016,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 	expectedSubnetOwner = &secp256k1fx.OutputOwners{
 		Threshold: 1,
-		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[1].Address()},
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 	transferSubnetOwnershipTx, err := wallet.IssueTransferSubnetOwnershipTx(
 		subnetID,

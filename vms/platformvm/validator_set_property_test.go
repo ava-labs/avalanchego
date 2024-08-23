@@ -688,15 +688,13 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
 	wallet := newWallet(t, vm, walletConfig{})
+	owner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+	}
 	testSubnet1, err = wallet.IssueCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
+		owner,
+		walletcommon.WithChangeOwner(owner),
 	)
 	if err != nil {
 		return nil, ids.Empty, err
