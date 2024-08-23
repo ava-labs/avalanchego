@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -50,28 +50,11 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 	require.NoError(err)
 
-	sk, err := bls.NewSecretKey()
-	require.NoError(err)
-	pk := bls.PublicFromSecretKey(sk)
-
 	var (
 		upgrades = upgradetest.GetConfig(upgradetest.Latest)
-		ctx      = &snow.Context{
-			NetworkID:       constants.UnitTestID,
-			SubnetID:        constants.PrimaryNetworkID,
-			ChainID:         constants.PlatformChainID,
-			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       pk,
-			NetworkUpgrades: upgrades,
-
-			XChainID:    ids.GenerateTestID(),
-			CChainID:    ids.GenerateTestID(),
-			AVAXAssetID: genesistest.AVAXAssetID,
-
-			Log: logging.NoLog{},
-		}
-		clock = &mockable.Clock{}
-		fx    = &secp256k1fx.Fx{}
+		ctx      = snowtest.Context(t, constants.PlatformChainID)
+		clock    = &mockable.Clock{}
+		fx       = &secp256k1fx.Fx{}
 	)
 	require.NoError(fx.InitializeVM(&secp256k1fx.TestVM{
 		Clk: *clock,
