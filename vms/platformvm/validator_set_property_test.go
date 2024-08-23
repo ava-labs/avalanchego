@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -251,15 +250,9 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID ids.ID) *state.Staker {
 	require := require.New(t)
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[:2]...),
-		[]ids.ID{subnetID},
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
 	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -270,10 +263,6 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 			},
 			Subnet: subnetID,
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
 	require.NoError(err)
 
@@ -285,20 +274,16 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputData) *state.Staker {
 	require := require.New(t)
 
-	addr := genesistest.DefaultFundedKeys[0].Address()
+	wallet := newWallet(t, vm, walletConfig{})
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[:2]...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -311,19 +296,9 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 		},
 		signer.NewProofOfPossession(sk),
 		vm.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}),
 	)
 	require.NoError(err)
 
@@ -712,15 +687,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[len(genesistest.DefaultFundedKeys)-1]),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 	testSubnet1, err = wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,

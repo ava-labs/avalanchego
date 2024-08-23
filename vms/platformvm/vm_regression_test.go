@@ -54,15 +54,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	wallet := txstest.NewWallet(
-		t,
-		vm.ctx,
-		&vm.Config,
-		vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, vm, walletConfig{})
 
 	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
@@ -217,15 +209,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
 
-			wallet := txstest.NewWallet(
-				t,
-				vm.ctx,
-				&vm.Config,
-				vm.state,
-				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-				nil, // subnetIDs
-				nil, // chainIDs
-			)
+			wallet := newWallet(t, vm, walletConfig{})
 
 			nodeID := ids.GenerateTestNodeID()
 			rewardsOwner := &secp256k1fx.OutputOwners{
