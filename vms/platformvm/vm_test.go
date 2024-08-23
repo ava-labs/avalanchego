@@ -795,39 +795,41 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _, _ := defaultVM(t, upgradetest.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	builder, txSigner := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
-	utx, err := builder.NewCreateChainTx(
-		testSubnet1.ID(),
+	subnetID := testSubnet1.ID()
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		[]ids.ID{subnetID},
+		nil, // chainIDs
+	)
+
+	tx, err := wallet.IssueCreateChainTx(
+		subnetID,
 		nil,
 		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
 		nil,
 		"name",
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
-	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
 	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
-
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err) // should contain proposal to create chain
-
-	require.NoError(blk.Verify(context.Background()))
-
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
 	// Verify chain was created
-	chains, err := vm.state.GetChains(testSubnet1.ID())
+	chains, err := vm.state.GetChains(subnetID)
 	require.NoError(err)
 
 	foundNewChain := false
