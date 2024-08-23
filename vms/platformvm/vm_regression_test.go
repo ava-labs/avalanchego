@@ -223,7 +223,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 				vm.ctx,
 				&vm.Config,
 				vm.state,
-				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[:2]...),
+				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 				nil, // subnetIDs
 				nil, // chainIDs
 			)
