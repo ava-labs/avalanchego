@@ -686,7 +686,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		chainDB,
 		genesistest.NewBytes(t, genesistest.Config{
 			NodeIDs: []ids.NodeID{
-				genesistest.DefaultNodeIDs[len(genesistest.DefaultNodeIDs)-1],
+				genesistest.DefaultNodeIDs[len(genesistest.DefaultNodeIDs)-1].NodeID(),
 			},
 			ValidatorEndTime: mockable.MaxTime,
 		}),

@@ -642,7 +642,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators); i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-			if gotVdr.NodeID.Compare(vdr.NodeID.NodeID()) != 0 {
+			if gotVdr.NodeID.Compare(nodeID) != 0 {
 				continue
 			}
 
