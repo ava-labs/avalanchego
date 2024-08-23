@@ -125,7 +125,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory, factory := defaultService(t)
+	service, mutableSharedMemory, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -173,16 +173,22 @@ func TestGetTxStatus(t *testing.T) {
 
 	mutableSharedMemory.SharedMemory = sm
 
-	builder, signer := factory.NewWallet(recipientKey)
-	utx, err := builder.NewImportTx(
+	wallet := txstest.NewWallet(
+		t,
+		service.vm.ctx,
+		&service.vm.Config,
+		service.vm.state,
+		secp256k1fx.NewKeychain(recipientKey),
+		nil, // subnetIDs
+		[]ids.ID{service.vm.ctx.XChainID},
+	)
+	tx, err := wallet.IssueImportTx(
 		service.vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.ShortEmpty},
 		},
 	)
-	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	service.vm.ctx.Lock.Unlock()
@@ -219,16 +225,26 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	type test struct {
 		description string
-		createTx    func(service *Service, factory *txstest.WalletFactory) (*txs.Tx, error)
+		createTx    func(t testing.TB, s *Service) *txs.Tx
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func(_ *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer := factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
-				utx, err := builder.NewCreateChainTx(
-					testSubnet1.ID(),
+			func(t testing.TB, s *Service) *txs.Tx {
+				subnetID := testSubnet1.ID()
+				wallet := txstest.NewWallet(
+					t,
+					s.vm.ctx,
+					&s.vm.Config,
+					s.vm.state,
+					secp256k1fx.NewKeychain(testSubnet1ControlKeys[:2]...),
+					[]ids.ID{subnetID},
+					nil, // chainIDs
+				)
+
+				tx, err := wallet.IssueCreateChainTx(
+					subnetID,
 					[]byte{},
 					constants.AVMID,
 					[]ids.ID{},
@@ -239,12 +255,22 @@ func TestGetTx(t *testing.T) {
 					}),
 				)
 				require.NoError(t, err)
-				return walletsigner.SignUnsigned(context.Background(), signer, utx)
+				return tx
 			},
 		},
 		{
 			"proposal block",
-			func(service *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
+			func(t testing.TB, s *Service) *txs.Tx {
+				wallet := txstest.NewWallet(
+					t,
+					s.vm.ctx,
+					&s.vm.Config,
+					s.vm.state,
+					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
+					nil, // subnetIDs
+					nil, // chainIDs
+				)
+
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
 
@@ -252,20 +278,18 @@ func TestGetTx(t *testing.T) {
 					Threshold: 1,
 					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 				}
-
-				builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-				utx, err := builder.NewAddPermissionlessValidatorTx(
+				tx, err := wallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: ids.GenerateTestNodeID(),
-							Start:  uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-							End:    uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
-							Wght:   service.vm.MinValidatorStake,
+							Start:  uint64(s.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+							End:    uint64(s.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+							Wght:   s.vm.MinValidatorStake,
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
 					signer.NewProofOfPossession(sk),
-					service.vm.ctx.AVAXAssetID,
+					s.vm.ctx.AVAXAssetID,
 					rewardsOwner,
 					rewardsOwner,
 					0,
@@ -275,17 +299,26 @@ func TestGetTx(t *testing.T) {
 					}),
 				)
 				require.NoError(t, err)
-				return walletsigner.SignUnsigned(context.Background(), txSigner, utx)
+				return tx
 			},
 		},
 		{
 			"atomic block",
-			func(service *Service, factory *txstest.WalletFactory) (*txs.Tx, error) {
-				builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-				utx, err := builder.NewExportTx(
-					service.vm.ctx.XChainID,
+			func(t testing.TB, s *Service) *txs.Tx {
+				wallet := txstest.NewWallet(
+					t,
+					s.vm.ctx,
+					&s.vm.Config,
+					s.vm.state,
+					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
+					nil, // subnetIDs
+					nil, // chainIDs
+				)
+
+				tx, err := wallet.IssueExportTx(
+					s.vm.ctx.XChainID,
 					[]*avax.TransferableOutput{{
-						Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+						Asset: avax.Asset{ID: s.vm.ctx.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: 100,
 							OutputOwners: secp256k1fx.OutputOwners{
@@ -301,7 +334,7 @@ func TestGetTx(t *testing.T) {
 					}),
 				)
 				require.NoError(t, err)
-				return walletsigner.SignUnsigned(context.Background(), signer, utx)
+				return tx
 			},
 		},
 	}
@@ -314,12 +347,10 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _, txBuilder := defaultService(t)
+				service, _, _ := defaultService(t)
+
 				service.vm.ctx.Lock.Lock()
-
-				tx, err := test.createTx(service, txBuilder)
-				require.NoError(err)
-
+				tx := test.createTx(t, service)
 				service.vm.ctx.Lock.Unlock()
 
 				arg := &api.GetTxArgs{
@@ -327,7 +358,7 @@ func TestGetTx(t *testing.T) {
 					Encoding: encoding,
 				}
 				var response api.GetTxReply
-				err = service.GetTx(nil, arg, &response)
+				err := service.GetTx(nil, arg, &response)
 				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
 				require.NoError(service.vm.Network.IssueTxFromRPC(tx))

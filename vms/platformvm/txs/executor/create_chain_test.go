@@ -221,20 +221,25 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 
 			env.state.SetTimestamp(test.time) // to duly set fee
 
-			cfg := *env.config
+			config := *env.config
+			config.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 
-			cfg.StaticFeeConfig.CreateBlockchainTxFee = test.fee
-			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys...)
-			utx, err := builder.NewCreateChainTx(
+			wallet := txstest.NewWallet(
+				t,
+				env.ctx,
+				&config,
+				env.state,
+				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+				[]ids.ID{testSubnet1.ID()},
+				nil, // chainIDs
+			)
+			tx, err := wallet.IssueCreateChainTx(
 				testSubnet1.ID(),
 				nil,
 				ids.GenerateTestID(),
 				nil,
 				"",
 			)
-			require.NoError(err)
-			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)

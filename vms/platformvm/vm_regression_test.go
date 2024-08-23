@@ -489,14 +489,16 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	addr0 := key0.Address()
 	addr1 := key1.Address()
 
-	factory := txstest.NewWalletFactory(
+	wallet := txstest.NewWallet(
+		t,
 		vm.ctx,
 		&vm.Config,
 		vm.state,
+		secp256k1fx.NewKeychain(key0),
+		nil, // subnetIDs
+		nil, // chainIDs
 	)
-
-	builder, txSigner := factory.NewWallet(key0)
-	utx0, err := builder.NewCreateSubnetTx(
+	addSubnetTx0, err := wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr0},
@@ -507,11 +509,17 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	addSubnetTx0, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx0)
-	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(key1)
-	utx1, err := builder.NewCreateSubnetTx(
+	wallet = txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(key1),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+	addSubnetTx1, err := wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr1},
@@ -522,10 +530,17 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	addSubnetTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx1)
-	require.NoError(err)
 
-	utx2, err := builder.NewCreateSubnetTx(
+	wallet = txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(key1),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+	addSubnetTx2, err := wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{addr1},
@@ -535,8 +550,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 			Addrs:     []ids.ShortID{addr0},
 		}),
 	)
-	require.NoError(err)
-	addSubnetTx2, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx2)
 	require.NoError(err)
 
 	preferredID := vm.manager.Preferred()
