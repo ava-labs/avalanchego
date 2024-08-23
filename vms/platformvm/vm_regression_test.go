@@ -704,34 +704,42 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, factory, baseDB, mutableSharedMemory := defaultVM(t, upgradetest.Cortina)
+	vm, _, baseDB, mutableSharedMemory := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
 	vm.state.SetCurrentSupply(constants.PrimaryNetworkID, defaultRewardConfig.SupplyCap/2)
 
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+
+	nodeID0 := ids.GenerateTestNodeID()
 	newValidatorStartTime0 := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	newValidatorEndTime0 := newValidatorStartTime0.Add(defaultMaxStakingDuration)
 
-	nodeID0 := ids.GenerateTestNodeID()
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
 
 	// Create the tx to add the first new validator
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewAddValidatorTx(
+	addValidatorTx0, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID0,
 			Start:  uint64(newValidatorStartTime0.Unix()),
 			End:    uint64(newValidatorEndTime0.Unix()),
 			Wght:   vm.MaxValidatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
-	require.NoError(err)
-	addValidatorTx0, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// Create the standard block to add the first new validator
@@ -885,22 +893,16 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	nodeID1 := ids.GenerateTestNodeID()
 
 	// Create the tx to add the second new validator
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[1])
-	utx1, err := builder.NewAddValidatorTx(
+	addValidatorTx1, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID1,
 			Start:  uint64(newValidatorStartTime1.Unix()),
 			End:    uint64(newValidatorEndTime1.Unix()),
 			Wght:   vm.MaxValidatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
-	require.NoError(err)
-	addValidatorTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx1)
 	require.NoError(err)
 
 	// Create the standard block to add the second new validator
