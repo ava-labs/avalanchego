@@ -171,9 +171,9 @@ func AdvanceTimeTo(
 
 		feeState := changes.GetFeeState()
 		feeState = feeState.AdvanceTime(
-			backend.Config.DynamicFeeConfig.MaxGasCapacity,
-			backend.Config.DynamicFeeConfig.MaxGasPerSecond,
-			backend.Config.DynamicFeeConfig.TargetGasPerSecond,
+			backend.Config.DynamicFeeConfig.MaxCapacity,
+			backend.Config.DynamicFeeConfig.MaxPerSecond,
+			backend.Config.DynamicFeeConfig.TargetPerSecond,
 			duration,
 		)
 		changes.SetFeeState(feeState)

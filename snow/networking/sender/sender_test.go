@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/message/messagemock"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -23,8 +24,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/router/routermock"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendertest"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/snow/networking/timeout/timeoutmock"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -634,8 +638,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		failedMsgF              func(nodeID ids.NodeID) message.InboundMessage
 		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
 		expectedResponseOp      message.Op
-		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
-		setExternalSenderExpect func(externalSender *MockExternalSender)
+		setMsgCreatorExpect     func(msgCreator *messagemock.OutboundMsgBuilder)
+		setExternalSenderExpect func(externalSender *sendermock.ExternalSender)
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID])
 	}
 
@@ -657,14 +661,14 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 			},
 			expectedResponseOp: message.StateSummaryFrontierOp,
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetStateSummaryFrontier(
 					ctx.ChainID,
 					requestID,
 					deadline,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -701,7 +705,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(heights, innerMsg.Heights)
 			},
 			expectedResponseOp: message.AcceptedStateSummaryOp,
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAcceptedStateSummary(
 					ctx.ChainID,
 					requestID,
@@ -709,7 +713,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					heights,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -741,14 +745,14 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 			},
 			expectedResponseOp: message.AcceptedFrontierOp,
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAcceptedFrontier(
 					ctx.ChainID,
 					requestID,
 					deadline,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -780,7 +784,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 			},
 			expectedResponseOp: message.AcceptedOp,
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAccepted(
 					ctx.ChainID,
 					requestID,
@@ -788,7 +792,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 					containerIDs,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -811,10 +815,10 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
-				externalSender = NewMockExternalSender(ctrl)
-				timeoutManager = timeout.NewMockManager(ctrl)
-				router         = router.NewMockRouter(ctrl)
+				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
+				externalSender = sendermock.NewExternalSender(ctrl)
+				timeoutManager = timeoutmock.NewManager(ctrl)
+				router         = routermock.NewRouter(ctrl)
 				nodeIDs        = set.Of(successNodeID, failedNodeID, ctx.NodeID)
 				nodeIDsCopy    set.Set[ids.NodeID]
 			)
@@ -894,15 +898,15 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 	type test struct {
 		name                    string
 		assertMsgToMyself       func(require *require.Assertions, msg message.InboundMessage)
-		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
-		setExternalSenderExpect func(externalSender *MockExternalSender)
+		setMsgCreatorExpect     func(msgCreator *messagemock.OutboundMsgBuilder)
+		setExternalSenderExpect func(externalSender *sendermock.ExternalSender)
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.NodeID)
 	}
 
 	tests := []test{
 		{
 			name: "StateSummaryFrontier",
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().StateSummaryFrontier(
 					ctx.ChainID,
 					requestID,
@@ -916,7 +920,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(summary, innerMsg.Summary)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -932,7 +936,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		},
 		{
 			name: "AcceptedStateSummary",
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().AcceptedStateSummary(
 					ctx.ChainID,
 					requestID,
@@ -948,7 +952,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					require.Equal(summaryID[:], innerMsg.SummaryIds[i])
 				}
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -964,7 +968,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		},
 		{
 			name: "AcceptedFrontier",
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().AcceptedFrontier(
 					ctx.ChainID,
 					requestID,
@@ -978,7 +982,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(summaryIDs[0][:], innerMsg.ContainerId)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -994,7 +998,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		},
 		{
 			name: "Accepted",
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().Accepted(
 					ctx.ChainID,
 					requestID,
@@ -1010,7 +1014,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
 				}
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -1032,10 +1036,10 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
-				externalSender = NewMockExternalSender(ctrl)
-				timeoutManager = timeout.NewMockManager(ctrl)
-				router         = router.NewMockRouter(ctrl)
+				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
+				externalSender = sendermock.NewExternalSender(ctrl)
+				timeoutManager = timeoutmock.NewManager(ctrl)
+				router         = routermock.NewRouter(ctrl)
 			)
 
 			sender, err := New(
@@ -1098,8 +1102,8 @@ func TestSender_Single_Request(t *testing.T) {
 		shouldFailMessageToSelf bool
 		assertMsg               func(require *require.Assertions, msg message.InboundMessage)
 		expectedResponseOp      message.Op
-		setMsgCreatorExpect     func(msgCreator *message.MockOutboundMsgBuilder)
-		setExternalSenderExpect func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID])
+		setMsgCreatorExpect     func(msgCreator *messagemock.OutboundMsgBuilder)
+		setExternalSenderExpect func(externalSender *sendermock.ExternalSender, sentTo set.Set[ids.NodeID])
 		sendF                   func(require *require.Assertions, sender common.Sender, nodeID ids.NodeID)
 		expectedEngineType      p2ppb.EngineType
 	}
@@ -1124,7 +1128,7 @@ func TestSender_Single_Request(t *testing.T) {
 				require.Equal(engineType, innerMsg.EngineType)
 			},
 			expectedResponseOp: message.AncestorsOp,
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAncestors(
 					ctx.ChainID,
 					requestID,
@@ -1133,7 +1137,7 @@ func TestSender_Single_Request(t *testing.T) {
 					engineType,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -1165,7 +1169,7 @@ func TestSender_Single_Request(t *testing.T) {
 				require.Equal(requestID, innerMsg.RequestID)
 			},
 			expectedResponseOp: message.PutOp,
-			setMsgCreatorExpect: func(msgCreator *message.MockOutboundMsgBuilder) {
+			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().Get(
 					ctx.ChainID,
 					requestID,
@@ -1173,7 +1177,7 @@ func TestSender_Single_Request(t *testing.T) {
 					containerID,
 				).Return(nil, nil)
 			},
-			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
+			setExternalSenderExpect: func(externalSender *sendermock.ExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
 					common.SendConfig{
@@ -1195,10 +1199,10 @@ func TestSender_Single_Request(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
-				externalSender = NewMockExternalSender(ctrl)
-				timeoutManager = timeout.NewMockManager(ctrl)
-				router         = router.NewMockRouter(ctrl)
+				msgCreator     = messagemock.NewOutboundMsgBuilder(ctrl)
+				externalSender = sendermock.NewExternalSender(ctrl)
+				timeoutManager = timeoutmock.NewManager(ctrl)
+				router         = routermock.NewRouter(ctrl)
 			)
 
 			// Instantiate new registerers to avoid duplicate metrics

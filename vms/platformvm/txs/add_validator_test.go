@@ -40,7 +40,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
-	rewardAddress := preFundedKeys[0].PublicKey().Address()
+	rewardAddress := preFundedKeys[0].Address()
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
@@ -58,7 +58,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 			},
 		},
 	}}
@@ -70,7 +70,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},
@@ -156,7 +156,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 
 	assetID := ids.GenerateTestID()
 	validatorWeight := uint64(2022)
-	rewardAddress := preFundedKeys[0].PublicKey().Address()
+	rewardAddress := preFundedKeys[0].Address()
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
@@ -174,7 +174,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 			},
 		},
 	}}
@@ -186,7 +186,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},

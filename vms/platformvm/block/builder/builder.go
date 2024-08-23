@@ -19,16 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 // targetBlockSize is maximum number of transaction bytes to place into a
@@ -440,12 +440,12 @@ func packEtnaBlockTxsOn(
 	mempool mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
-	capacity feecomponent.Gas,
+	capacity gas.Gas,
 ) ([]*txs.Tx, error) {
 	var (
 		blockTxs        []*txs.Tx
 		inputs          set.Set[ids.ID]
-		blockComplexity feecomponent.Dimensions
+		blockComplexity gas.Dimensions
 		feeCalculator   = state.PickFeeCalculator(backend.Config, stateDiff)
 	)
 	for {
@@ -454,7 +454,7 @@ func packEtnaBlockTxsOn(
 			break
 		}
 
-		txComplexity, err := txfee.TxComplexity(tx.Unsigned)
+		txComplexity, err := fee.TxComplexity(tx.Unsigned)
 		if err != nil {
 			return nil, err
 		}
@@ -501,7 +501,7 @@ func executeTx(
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	inputs *set.Set[ids.ID],
-	feeCalculator txfee.Calculator,
+	feeCalculator fee.Calculator,
 	tx *txs.Tx,
 ) (bool, error) {
 	mempool.Remove(tx)

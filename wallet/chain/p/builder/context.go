@@ -8,9 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const Alias = "P"
@@ -18,9 +17,9 @@ const Alias = "P"
 type Context struct {
 	NetworkID         uint32
 	AVAXAssetID       ids.ID
-	StaticFeeConfig   txfee.StaticConfig
-	ComplexityWeights feecomponent.Dimensions
-	GasPrice          feecomponent.GasPrice
+	StaticFeeConfig   fee.StaticConfig
+	ComplexityWeights gas.Dimensions
+	GasPrice          gas.Price
 }
 
 func NewSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {

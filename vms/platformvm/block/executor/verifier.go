@@ -10,14 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var (
@@ -381,7 +380,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	feeCalculator txfee.Calculator,
+	feeCalculator fee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -431,7 +430,7 @@ func (v *verifier) proposalBlock(
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
 	b *block.ApricotStandardBlock,
-	feeCalculator txfee.Calculator,
+	feeCalculator fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
@@ -458,7 +457,7 @@ func (v *verifier) standardBlock(
 
 func (v *verifier) processStandardTxs(
 	txs []*txs.Tx,
-	feeCalculator txfee.Calculator,
+	feeCalculator fee.Calculator,
 	state state.Diff,
 	parentID ids.ID,
 ) (
@@ -469,9 +468,9 @@ func (v *verifier) processStandardTxs(
 ) {
 	// Complexity is limited first to avoid processing too large of a block.
 	if timestamp := state.GetTimestamp(); v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
-		var blockComplexity feecomponent.Dimensions
+		var blockComplexity gas.Dimensions
 		for _, tx := range txs {
-			txComplexity, err := txfee.TxComplexity(tx.Unsigned)
+			txComplexity, err := fee.TxComplexity(tx.Unsigned)
 			if err != nil {
 				txID := tx.ID()
 				v.MarkDropped(txID, err) // cache tx as dropped

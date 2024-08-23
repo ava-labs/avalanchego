@@ -48,7 +48,7 @@ func NewContextFromClients(
 	}
 
 	// TODO: After Etna is activated, assume the gas price is always non-zero.
-	if dynamicFeeConfig.MinGasPrice != 0 {
+	if dynamicFeeConfig.MinPrice != 0 {
 		_, gasPrice, _, err := pChainClient.GetFeeState(ctx)
 		if err != nil {
 			return nil, err

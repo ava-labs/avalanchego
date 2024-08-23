@@ -35,7 +35,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 
 		tc.By("creating wallet with a funded key to source delegated funds from")
 		var (
-			keychain    = env.NewKeychain(1)
+			keychain    = env.NewKeychain()
 			nodeURI     = env.GetRandomNodeURI()
 			baseWallet  = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet     = baseWallet.P()

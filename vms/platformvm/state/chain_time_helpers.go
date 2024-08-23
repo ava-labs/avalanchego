@@ -9,10 +9,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
@@ -77,19 +76,19 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
-func PickFeeCalculator(cfg *config.Config, state Chain) txfee.Calculator {
+func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
 	timestamp := state.GetTimestamp()
 	if !cfg.UpgradeConfig.IsEtnaActivated(timestamp) {
 		return NewStaticFeeCalculator(cfg, timestamp)
 	}
 
 	feeState := state.GetFeeState()
-	gasPrice := feecomponent.CalculateGasPrice(
-		cfg.DynamicFeeConfig.MinGasPrice,
+	gasPrice := gas.CalculatePrice(
+		cfg.DynamicFeeConfig.MinPrice,
 		feeState.Excess,
 		cfg.DynamicFeeConfig.ExcessConversionConstant,
 	)
-	return txfee.NewDynamicCalculator(
+	return fee.NewDynamicCalculator(
 		cfg.DynamicFeeConfig.Weights,
 		gasPrice,
 	)
@@ -97,11 +96,11 @@ func PickFeeCalculator(cfg *config.Config, state Chain) txfee.Calculator {
 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set
 // to either the pre-AP3 or post-AP3 config.
-func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) txfee.Calculator {
+func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) fee.Calculator {
 	config := cfg.StaticFeeConfig
 	if !cfg.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
 		config.CreateSubnetTxFee = cfg.CreateAssetTxFee
 		config.CreateBlockchainTxFee = cfg.CreateAssetTxFee
 	}
-	return txfee.NewStaticCalculator(config)
+	return fee.NewStaticCalculator(config)
 }
