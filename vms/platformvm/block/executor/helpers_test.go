@@ -307,7 +307,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 
 func defaultClock() *mockable.Clock {
 	clk := &mockable.Clock{}
-	clk.Set(genesistest.DefaultTime)
+	clk.Set(genesistest.DefaultValidatorStartTime)
 	return clk
 }
 

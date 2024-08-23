@@ -224,7 +224,7 @@ func addSubnet(t *testing.T, env *environment) {
 func defaultConfig(f upgradetest.Fork) *config.Config {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(
 		f,
-		genesistest.DefaultTime.Add(-2*time.Second),
+		genesistest.DefaultValidatorStartTime.Add(-2*time.Second),
 	)
 	upgradetest.SetTimesTo(
 		&upgrades,
@@ -257,7 +257,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 }
 
 func defaultClock(f upgradetest.Fork) *mockable.Clock {
-	now := genesistest.DefaultTime
+	now := genesistest.DefaultValidatorStartTime
 	if f >= upgradetest.Banff {
 		// 1 second after active fork
 		now = genesistest.DefaultValidatorEndTime.Add(-2 * time.Second)

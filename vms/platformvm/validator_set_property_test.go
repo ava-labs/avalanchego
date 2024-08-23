@@ -85,7 +85,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}()
 			nodeID := ids.GenerateTestNodeID()
 
-			currentTime := genesistest.DefaultTime
+			currentTime := genesistest.DefaultValidatorStartTime
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
@@ -658,9 +658,9 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
 		RewardConfig:      defaultRewardConfig,
-		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.DefaultTime),
+		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.DefaultValidatorStartTime),
 	}}
-	vm.clock.Set(genesistest.DefaultTime.Add(time.Second))
+	vm.clock.Set(genesistest.DefaultValidatorStartTime.Add(time.Second))
 
 	baseDB := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, baseDB)

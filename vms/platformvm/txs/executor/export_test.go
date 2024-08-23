@@ -40,7 +40,7 @@ func TestNewExportTx(t *testing.T) {
 			description:        "P->X export",
 			destinationChainID: env.ctx.XChainID,
 			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          genesistest.DefaultTime,
+			timestamp:          genesistest.DefaultValidatorStartTime,
 		},
 		{
 			description:        "P->C export",

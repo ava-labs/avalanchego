@@ -36,10 +36,10 @@ const (
 var (
 	AVAXAsset = avax.Asset{ID: snowtest.AVAXAssetID}
 
-	DefaultTime                 = upgrade.InitiallyActiveTime
-	DefaultTimeUnix             = uint64(DefaultTime.Unix())
-	DefaultValidatorEndTime     = DefaultTime.Add(DefaultValidatorDuration)
-	DefaultValidatorEndTimeUnix = uint64(DefaultValidatorEndTime.Unix())
+	DefaultValidatorStartTime     = upgrade.InitiallyActiveTime
+	DefaultValidatorStartTimeUnix = uint64(DefaultValidatorStartTime.Unix())
+	DefaultValidatorEndTime       = DefaultValidatorStartTime.Add(DefaultValidatorDuration)
+	DefaultValidatorEndTimeUnix   = uint64(DefaultValidatorEndTime.Unix())
 )
 
 var (
@@ -58,10 +58,10 @@ func init() {
 }
 
 type Config struct {
-	NodeIDs          []ids.NodeID
-	ValidatorWeight  uint64
-	Time             time.Time
-	ValidatorEndTime time.Time
+	NodeIDs            []ids.NodeID
+	ValidatorWeight    uint64
+	ValidatorStartTime time.Time
+	ValidatorEndTime   time.Time
 
 	FundedKeys     []*secp256k1.PrivateKey
 	InitialBalance uint64
@@ -74,8 +74,8 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 	if c.ValidatorWeight == 0 {
 		c.ValidatorWeight = DefaultValidatorWeight
 	}
-	if c.Time.IsZero() {
-		c.Time = DefaultTime
+	if c.ValidatorStartTime.IsZero() {
+		c.ValidatorStartTime = DefaultValidatorStartTime
 	}
 	if c.ValidatorEndTime.IsZero() {
 		c.ValidatorEndTime = DefaultValidatorEndTime
@@ -92,7 +92,7 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 	genesis := &platformvmgenesis.Genesis{
 		UTXOs:         make([]*platformvmgenesis.UTXO, len(c.FundedKeys)),
 		Validators:    make([]*txs.Tx, len(c.NodeIDs)),
-		Timestamp:     uint64(c.Time.Unix()),
+		Timestamp:     uint64(c.ValidatorStartTime.Unix()),
 		InitialSupply: InitialSupply,
 	}
 	for i, key := range c.FundedKeys {
@@ -128,7 +128,7 @@ func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 			}},
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  uint64(c.Time.Unix()),
+				Start:  uint64(c.ValidatorStartTime.Unix()),
 				End:    uint64(c.ValidatorEndTime.Unix()),
 				Wght:   c.ValidatorWeight,
 			},

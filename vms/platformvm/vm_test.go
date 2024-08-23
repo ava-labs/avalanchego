@@ -92,7 +92,7 @@ var (
 		SupplyCap:          720 * units.MegaAvax,
 	}
 
-	latestForkTime = genesistest.DefaultTime.Add(time.Second)
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
 
 	defaultStaticFeeConfig = fee.StaticConfig{
 		TxFee:                 defaultTxFee,
@@ -130,7 +130,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, *txstest.WalletFactory, d
 
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
-	latestForkTime = genesistest.DefaultTime.Add(time.Second)
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -360,7 +360,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
-	startTime := genesistest.DefaultTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
+	startTime := genesistest.DefaultValidatorStartTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
 	// create invalid tx
@@ -1661,22 +1661,22 @@ func TestMaxStakeAmount(t *testing.T) {
 	}{
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   genesistest.DefaultTime,
+			startTime:   genesistest.DefaultValidatorStartTime,
 			endTime:     genesistest.DefaultValidatorEndTime,
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] == [validator.EndTime]",
-			startTime:   genesistest.DefaultTime.Add(time.Minute),
+			startTime:   genesistest.DefaultValidatorStartTime.Add(time.Minute),
 			endTime:     genesistest.DefaultValidatorEndTime,
 		},
 		{
 			description: "[validator.StartTime] == [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   genesistest.DefaultTime,
+			startTime:   genesistest.DefaultValidatorStartTime,
 			endTime:     genesistest.DefaultValidatorEndTime.Add(-time.Minute),
 		},
 		{
 			description: "[validator.StartTime] < [startTime] < [endTime] < [validator.EndTime]",
-			startTime:   genesistest.DefaultTime.Add(time.Minute),
+			startTime:   genesistest.DefaultValidatorStartTime.Add(time.Minute),
 			endTime:     genesistest.DefaultValidatorEndTime.Add(-time.Minute),
 		},
 	}
@@ -1696,7 +1696,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
-	latestForkTime = genesistest.DefaultTime.Add(defaultMinStakingDuration)
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
@@ -1736,8 +1736,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
-	durationForReward := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultTime) * firstUptimePercentage / 100
-	vmStopTime := genesistest.DefaultTime.Add(durationForReward)
+	durationForReward := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime) * firstUptimePercentage / 100
+	vmStopTime := genesistest.DefaultValidatorStartTime.Add(durationForReward)
 	firstVM.clock.Set(vmStopTime)
 
 	// Shutdown VM to stop all genesis validator uptime.
@@ -1840,7 +1840,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
-	latestForkTime = genesistest.DefaultTime.Add(defaultMinStakingDuration)
+	latestForkTime = genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 
 	db := memdb.New()
 

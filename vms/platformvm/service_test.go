@@ -506,12 +506,12 @@ func TestGetStake(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesistest.DefaultNodeIDs[0]
-	delegatorEndTime := genesistest.DefaultTime.Add(defaultMinStakingDuration)
+	delegatorEndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
-			Start:  genesistest.DefaultTimeUnix,
+			Start:  genesistest.DefaultValidatorStartTimeUnix,
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
 		},
@@ -532,7 +532,7 @@ func TestGetStake(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addDelTx,
-		genesistest.DefaultTime,
+		genesistest.DefaultValidatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -570,11 +570,11 @@ func TestGetStake(t *testing.T) {
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestNodeID()
-	pendingStakerEndTime := uint64(genesistest.DefaultTime.Add(defaultMinStakingDuration).Unix())
+	pendingStakerEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix())
 	utx2, err := builder.NewAddValidatorTx(
 		&txs.Validator{
 			NodeID: pendingStakerNodeID,
-			Start:  uint64(genesistest.DefaultTime.Unix()),
+			Start:  uint64(genesistest.DefaultValidatorStartTime.Unix()),
 			End:    pendingStakerEndTime,
 			Wght:   stakeAmount,
 		},
@@ -657,7 +657,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := genesistest.DefaultNodeIDs[1]
-	delegatorEndTime := genesistest.DefaultTime.Add(defaultMinStakingDuration)
+	delegatorEndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 
 	service.vm.ctx.Lock.Lock()
 
@@ -665,7 +665,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	utx, err := builder.NewAddDelegatorTx(
 		&txs.Validator{
 			NodeID: validatorNodeID,
-			Start:  genesistest.DefaultTimeUnix,
+			Start:  genesistest.DefaultValidatorStartTimeUnix,
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
 		},
@@ -686,7 +686,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	staker, err := state.NewCurrentStaker(
 		delTx.ID(),
 		addDelTx,
-		genesistest.DefaultTime,
+		genesistest.DefaultValidatorStartTime,
 		0,
 	)
 	require.NoError(err)
@@ -728,7 +728,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
-		require.Equal(uint64(delegator.StartTime), genesistest.DefaultTimeUnix)
+		require.Equal(uint64(delegator.StartTime), genesistest.DefaultValidatorStartTimeUnix)
 		require.Equal(int64(delegator.EndTime), delegatorEndTime.Unix())
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}

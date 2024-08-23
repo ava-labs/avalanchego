@@ -24,7 +24,7 @@ import (
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	ap3Time := genesistest.DefaultTime.Add(time.Hour)
+	ap3Time := genesistest.DefaultValidatorStartTime.Add(time.Hour)
 	tests := []struct {
 		name        string
 		time        time.Time
@@ -33,7 +33,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:        "pre-fork - correctly priced",
-			time:        genesistest.DefaultTime,
+			time:        genesistest.DefaultValidatorStartTime,
 			fee:         0,
 			expectedErr: nil,
 		},

@@ -248,7 +248,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		},
 		{
 			name:    "post-upgrade calculate max stake correctly",
-			ap3Time: genesistest.DefaultTime,
+			ap3Time: genesistest.DefaultValidatorStartTime,
 		},
 	}
 
@@ -1636,7 +1636,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	subnetID := testSubnet1.TxID
 
 	// setup time
-	currentTime := genesistest.DefaultTime
+	currentTime := genesistest.DefaultValidatorStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -1899,7 +1899,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	// setup time
-	currentTime := genesistest.DefaultTime
+	currentTime := genesistest.DefaultValidatorStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -2057,7 +2057,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	subnetID := testSubnet1.TxID
 
 	// setup time
-	currentTime := genesistest.DefaultTime
+	currentTime := genesistest.DefaultValidatorStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -2276,7 +2276,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	subnetID := testSubnet1.TxID
 
 	// setup time
-	currentTime := genesistest.DefaultTime
+	currentTime := genesistest.DefaultValidatorStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 

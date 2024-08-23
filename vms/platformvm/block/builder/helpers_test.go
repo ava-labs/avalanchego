@@ -283,7 +283,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
 	clk := &mockable.Clock{}
-	clk.Set(genesistest.DefaultTime)
+	clk.Set(genesistest.DefaultValidatorStartTime)
 	return clk
 }
 
