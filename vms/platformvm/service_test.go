@@ -80,7 +80,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
+	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
