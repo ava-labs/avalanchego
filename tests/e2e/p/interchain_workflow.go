@@ -52,7 +52,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 
 		tc.By("creating wallet with a funded key to send from and recipient key to deliver to")
 		recipientKey := e2e.NewPrivateKey(tc)
-		keychain := env.NewKeychain(1)
+		keychain := env.NewKeychain()
 		keychain.Add(recipientKey)
 
 		var (
@@ -100,6 +100,14 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				},
 			},
 		}
+		// Ensure the change is returned to the pre-funded key
+		// TODO(marun) Remove when the wallet does this automatically
+		changeOwner := common.WithChangeOwner(&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				keychain.Keys[0].Address(),
+			},
+		})
 
 		tc.By("adding new node and waiting for it to report healthy")
 		node := e2e.AddEphemeralNode(tc, network, tmpnet.FlagsMap{})
@@ -144,6 +152,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				},
 				delegationShare,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -170,6 +179,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 					Addrs:     []ids.ShortID{rewardAddr},
 				},
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -179,6 +189,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				xContext.BlockchainID,
 				exportOutputs,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -188,6 +199,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				constants.PlatformChainID,
 				&recipientOwner,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -205,6 +217,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				cContext.BlockchainID,
 				exportOutputs,
 				tc.WithDefaultContext(),
+				changeOwner,
 			)
 			require.NoError(err)
 		})
@@ -218,6 +231,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 				recipientEthAddress,
 				tc.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(tc, ethClient),
+				changeOwner,
 			)
 			require.NoError(err)
 		})

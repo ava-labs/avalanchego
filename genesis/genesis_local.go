@@ -12,10 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -41,7 +40,7 @@ var (
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: units.MilliAvax,
-			StaticFeeConfig: txfee.StaticConfig{
+			StaticFeeConfig: fee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             100 * units.MilliAvax,
 				TransformSubnetTxFee:          100 * units.MilliAvax,
@@ -52,17 +51,17 @@ var (
 				AddSubnetDelegatorFee:         units.MilliAvax,
 			},
 			// TODO: Set these values to something more reasonable
-			DynamicFeeConfig: feecomponent.Config{
-				Weights: feecomponent.Dimensions{
-					feecomponent.Bandwidth: 1,
-					feecomponent.DBRead:    1,
-					feecomponent.DBWrite:   1,
-					feecomponent.Compute:   1,
+			DynamicFeeConfig: gas.Config{
+				Weights: gas.Dimensions{
+					gas.Bandwidth: 1,
+					gas.DBRead:    1,
+					gas.DBWrite:   1,
+					gas.Compute:   1,
 				},
-				MaxGasCapacity:           1_000_000,
-				MaxGasPerSecond:          1_000,
-				TargetGasPerSecond:       500,
-				MinGasPrice:              1,
+				MaxCapacity:              1_000_000,
+				MaxPerSecond:             1_000,
+				TargetPerSecond:          500,
+				MinPrice:                 1,
 				ExcessConversionConstant: 5_000,
 			},
 		},

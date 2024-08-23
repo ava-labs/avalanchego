@@ -42,7 +42,8 @@ func ParseSubnetValidatorWeightUpdate(b []byte) (*SubnetValidatorWeightUpdate, e
 }
 
 // Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewSubnetValidatorWeightUpdate or Parse.
+// payload is initialized from either NewSubnetValidatorWeightUpdate or Parse,
+// otherwise it will return nil.
 func (b *SubnetValidatorWeightUpdate) Bytes() []byte {
 	return b.bytes
 }

@@ -25,7 +25,7 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 		nodeURI := env.GetRandomNodeURI()
 		pChainClient := platformvm.NewClient(nodeURI.URI)
 
-		keychain := env.NewKeychain(1)
+		keychain := env.NewKeychain()
 		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 		pWallet := baseWallet.P()
 
@@ -41,8 +41,8 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 			owner,
 			tc.WithDefaultContext(),
 		)
-		subnetID := subnetTx.ID()
 		require.NoError(err)
+		subnetID := subnetTx.ID()
 		require.NotEqual(subnetID, constants.PrimaryNetworkID)
 
 		tc.By("verifying owner", func() {
@@ -61,11 +61,11 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 			require.Equal(owner.Addrs, subnetOwner.Addrs)
 		})
 
-		newKeychain := env.NewKeychain(1)
+		newOwnerKey := e2e.NewPrivateKey(tc)
 		newOwner := &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				newKeychain.Keys[0].Address(),
+				newOwnerKey.Address(),
 			},
 		}
 

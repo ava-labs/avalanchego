@@ -42,7 +42,8 @@ func ParseSetSubnetValidatorWeight(b []byte) (*SetSubnetValidatorWeight, error) 
 }
 
 // Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewSetSubnetValidatorWeight or Parse.
+// payload is initialized from either NewSetSubnetValidatorWeight or Parse,
+// otherwise it will return nil.
 func (b *SetSubnetValidatorWeight) Bytes() []byte {
 	return b.bytes
 }
