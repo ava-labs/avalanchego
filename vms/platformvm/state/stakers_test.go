@@ -221,7 +221,7 @@ func TestDiffStakersDelegator(t *testing.T) {
 
 func newTestStaker() *Staker {
 	startTime := time.Now().Round(time.Second)
-	endTime := startTime.Add(genesistest.ValidatorDuration)
+	endTime := startTime.Add(genesistest.DefaultValidatorDuration)
 	return &Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          ids.GenerateTestNodeID(),

@@ -47,16 +47,22 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var defaultValidatorNodeID = ids.GenerateTestNodeID()
+
 func newTestState(t testing.TB, db database.Database) *state {
 	s, err := New(
 		db,
-		genesistest.NewBytes(t),
+		genesistest.NewBytes(t, genesistest.Config{
+			NodeIDs: []ids.NodeID{defaultValidatorNodeID},
+		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
 		upgradetest.GetConfig(upgradetest.Latest),
 		&config.DefaultExecutionConfig,
 		&snow.Context{
-			Log: logging.NoLog{},
+			NetworkID: constants.UnitTestID,
+			NodeID:    ids.GenerateTestNodeID(),
+			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
 		reward.NewCalculator(reward.Config{
@@ -75,12 +81,12 @@ func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
 	state := newTestState(t, memdb.New())
 
-	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
 	require.NotNil(staker)
-	require.Equal(genesistest.ValidatorNodeID, staker.NodeID)
+	require.Equal(defaultValidatorNodeID, staker.NodeID)
 
-	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
 
@@ -88,10 +94,10 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.FromSlice(staker), stakerIterator)
 
-	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
 }
