@@ -51,37 +51,41 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _, _ := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
+
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
 
 	validatorStartTime := vm.clock.Time().Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	nodeID := ids.GenerateTestNodeID()
 	changeAddr := genesistest.DefaultFundedKeys[0].Address()
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{changeAddr},
+	}
 
 	// create valid tx
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewAddValidatorTx(
+	addValidatorTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(validatorStartTime.Unix()),
 			End:    uint64(validatorEndTime.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
 	)
-	require.NoError(err)
-	addValidatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
 	require.NoError(err)
 
 	// trigger block creation
@@ -89,43 +93,26 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(addValidatorTx))
 	vm.ctx.Lock.Lock()
 
-	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(addValidatorBlock.Verify(context.Background()))
-	require.NoError(addValidatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept addValidatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
+	// Advance the time
 	vm.clock.Set(validatorStartTime)
-
-	firstAdvanceTimeBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(firstAdvanceTimeBlock.Verify(context.Background()))
-	require.NoError(firstAdvanceTimeBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	firstDelegatorStartTime := validatorStartTime.Add(executor.SyncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
 
 	// create valid tx
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
-	uDelTx1, err := builder.NewAddDelegatorTx(
+	addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(firstDelegatorStartTime.Unix()),
 			End:    uint64(firstDelegatorEndTime.Unix()),
 			Wght:   4 * vm.MinValidatorStake, // maximum amount of stake this delegator can provide
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
+		rewardsOwner,
 	)
-	require.NoError(err)
-	addFirstDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uDelTx1)
 	require.NoError(err)
 
 	// trigger block creation
@@ -133,19 +120,12 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(addFirstDelegatorTx))
 	vm.ctx.Lock.Lock()
 
-	addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(addFirstDelegatorBlock.Verify(context.Background()))
-	require.NoError(addFirstDelegatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept addFirstDelegatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
+	// Advance the time
 	vm.clock.Set(firstDelegatorStartTime)
-
-	secondAdvanceTimeBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(secondAdvanceTimeBlock.Verify(context.Background()))
-	require.NoError(secondAdvanceTimeBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -153,25 +133,15 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	vm.clock.Set(secondDelegatorStartTime.Add(-10 * executor.SyncBound))
 
 	// create valid tx
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1], genesistest.DefaultFundedKeys[3])
-	uDelTx2, err := builder.NewAddDelegatorTx(
+	addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(secondDelegatorStartTime.Unix()),
 			End:    uint64(secondDelegatorEndTime.Unix()),
 			Wght:   vm.MinDelegatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
+		rewardsOwner,
 	)
-	require.NoError(err)
-	addSecondDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uDelTx2)
 	require.NoError(err)
 
 	// trigger block creation
@@ -179,35 +149,22 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(addSecondDelegatorTx))
 	vm.ctx.Lock.Lock()
 
-	addSecondDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(addSecondDelegatorBlock.Verify(context.Background()))
-	require.NoError(addSecondDelegatorBlock.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	// Accept addSecondDelegatorTx
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
 
-	// create valid tx
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[0], genesistest.DefaultFundedKeys[1], genesistest.DefaultFundedKeys[4])
-	uDelTx3, err := builder.NewAddDelegatorTx(
+	// create invalid tx
+	addThirdDelegatorTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(thirdDelegatorStartTime.Unix()),
 			End:    uint64(thirdDelegatorEndTime.Unix()),
 			Wght:   vm.MinDelegatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{changeAddr},
-		}),
+		rewardsOwner,
 	)
-	require.NoError(err)
-	addThirdDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uDelTx3)
 	require.NoError(err)
 
 	// trigger block creation
