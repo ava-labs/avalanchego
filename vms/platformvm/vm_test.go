@@ -115,10 +115,7 @@ var (
 	}
 
 	// subnet that exists at genesis in defaultVM
-	// Its controlKeys are keys[0], keys[1], keys[2]
-	// Its threshold is 2
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = genesistest.DefaultFundedKeys[0:3]
+	testSubnet1 *txs.Tx
 )
 
 type mutableSharedMemory struct {
@@ -2091,7 +2088,7 @@ func TestPruneMempool(t *testing.T) {
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs: []ids.ShortID{
-							genesistest.DefaultFundedKeys[1].Address(),
+							genesistest.DefaultFundedKeys[0].Address(),
 						},
 					},
 				},

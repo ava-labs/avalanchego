@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -171,15 +170,9 @@ func TestGetTxStatus(t *testing.T) {
 
 	mutableSharedMemory.SharedMemory = sm
 
-	wallet := txstest.NewWallet(
-		t,
-		service.vm.ctx,
-		&service.vm.Config,
-		service.vm.state,
-		secp256k1fx.NewKeychain(recipientKey),
-		nil, // subnetIDs
-		[]ids.ID{service.vm.ctx.XChainID},
-	)
+	wallet := newWallet(t, service.vm, walletConfig{
+		keys: []*secp256k1.PrivateKey{recipientKey},
+	})
 	tx, err := wallet.IssueImportTx(
 		service.vm.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
@@ -231,15 +224,9 @@ func TestGetTx(t *testing.T) {
 			"standard block",
 			func(t testing.TB, s *Service) *txs.Tx {
 				subnetID := testSubnet1.ID()
-				wallet := txstest.NewWallet(
-					t,
-					s.vm.ctx,
-					&s.vm.Config,
-					s.vm.state,
-					secp256k1fx.NewKeychain(testSubnet1ControlKeys[:2]...),
-					[]ids.ID{subnetID},
-					nil, // chainIDs
-				)
+				wallet := newWallet(t, s.vm, walletConfig{
+					subnetIDs: []ids.ID{subnetID},
+				})
 
 				tx, err := wallet.IssueCreateChainTx(
 					subnetID,
@@ -247,10 +234,6 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					[]ids.ID{},
 					"chain name",
-					common.WithChangeOwner(&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-					}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -259,15 +242,7 @@ func TestGetTx(t *testing.T) {
 		{
 			"proposal block",
 			func(t testing.TB, s *Service) *txs.Tx {
-				wallet := txstest.NewWallet(
-					t,
-					s.vm.ctx,
-					&s.vm.Config,
-					s.vm.state,
-					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
-					nil, // subnetIDs
-					nil, // chainIDs
-				)
+				wallet := newWallet(t, s.vm, walletConfig{})
 
 				sk, err := bls.NewSecretKey()
 				require.NoError(t, err)
@@ -291,10 +266,6 @@ func TestGetTx(t *testing.T) {
 					rewardsOwner,
 					rewardsOwner,
 					0,
-					common.WithChangeOwner(&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-					}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -303,15 +274,7 @@ func TestGetTx(t *testing.T) {
 		{
 			"atomic block",
 			func(t testing.TB, s *Service) *txs.Tx {
-				wallet := txstest.NewWallet(
-					t,
-					s.vm.ctx,
-					&s.vm.Config,
-					s.vm.state,
-					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
-					nil, // subnetIDs
-					nil, // chainIDs
-				)
+				wallet := newWallet(t, s.vm, walletConfig{})
 
 				tx, err := wallet.IssueExportTx(
 					s.vm.ctx.XChainID,
@@ -326,10 +289,6 @@ func TestGetTx(t *testing.T) {
 							},
 						},
 					}},
-					common.WithChangeOwner(&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-					}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -532,20 +491,20 @@ func TestGetStake(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	wallet := txstest.NewWallet(
-		t,
-		service.vm.ctx,
-		&service.vm.Config,
-		service.vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, service.vm, walletConfig{})
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
 	delegatorNodeID := genesistest.DefaultNodeIDs[0]
 	delegatorEndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	changeOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+	}
 	tx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
@@ -553,14 +512,8 @@ func TestGetStake(t *testing.T) {
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
+		rewardsOwner,
+		common.WithChangeOwner(changeOwner),
 	)
 	require.NoError(err)
 
@@ -614,15 +567,9 @@ func TestGetStake(t *testing.T) {
 			End:    pendingStakerEndTime,
 			Wght:   stakeAmount,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		0,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
+		common.WithChangeOwner(changeOwner),
 	)
 	require.NoError(err)
 
@@ -695,15 +642,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.ctx.Lock.Lock()
 
-	wallet := txstest.NewWallet(
-		t,
-		service.vm.ctx,
-		&service.vm.Config,
-		service.vm.state,
-		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys[0]),
-		nil, // subnetIDs
-		nil, // chainIDs
-	)
+	wallet := newWallet(t, service.vm, walletConfig{})
 	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: validatorNodeID,
@@ -844,25 +783,15 @@ func TestGetBlock(t *testing.T) {
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
 
 			subnetID := testSubnet1.ID()
-			wallet := txstest.NewWallet(
-				t,
-				service.vm.ctx,
-				&service.vm.Config,
-				service.vm.state,
-				secp256k1fx.NewKeychain(testSubnet1ControlKeys[:2]...),
-				[]ids.ID{subnetID},
-				nil, // chainIDs
-			)
+			wallet := newWallet(t, service.vm, walletConfig{
+				subnetIDs: []ids.ID{subnetID},
+			})
 			tx, err := wallet.IssueCreateChainTx(
 				subnetID,
 				[]byte{},
 				constants.AVMID,
 				[]ids.ID{},
 				"chain name",
-				common.WithChangeOwner(&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-				}),
 			)
 			require.NoError(err)
 
