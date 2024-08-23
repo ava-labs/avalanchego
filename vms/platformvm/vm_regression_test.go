@@ -1823,20 +1823,24 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, factory, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _, _ := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
 	subnetID := testSubnet1.TxID
-
-	// setup time
-	currentTime := genesistest.DefaultValidatorStartTime
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
+	wallet := txstest.NewWallet(
+		t,
+		vm.ctx,
+		&vm.Config,
+		vm.state,
+		secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+		[]ids.ID{subnetID},
+		nil, // chainIDs
+	)
 
 	// A primary network validator stake twice
 	var (
-		primaryStartTime1 = currentTime.Add(executor.SyncBound)
+		primaryStartTime1 = genesistest.DefaultValidatorStartTime.Add(executor.SyncBound)
 		subnetStartTime   = primaryStartTime1.Add(executor.SyncBound)
 		subnetEndTime     = subnetStartTime.Add(defaultMinStakingDuration)
 		primaryEndTime1   = subnetEndTime.Add(time.Second)
@@ -1846,28 +1850,21 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// Add a primary network validator with no BLS key
 	nodeID := ids.GenerateTestNodeID()
-	addr := genesistest.DefaultFundedKeys[0].Address()
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
 
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	uPrimaryTx1, err := builder.NewAddValidatorTx(
+	primaryTx1, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
 			End:    uint64(primaryEndTime1.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}),
 	)
-	require.NoError(err)
-	primaryTx1, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryTx1)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -1876,9 +1873,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
-	currentTime = primaryStartTime1
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
+	vm.clock.Set(primaryStartTime1)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -1888,8 +1883,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// insert the subnet validator
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
-	uAddSubnetValTx, err := builder.NewAddSubnetValidatorTx(
+	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1899,13 +1893,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			},
 			Subnet: subnetID,
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}),
 	)
-	require.NoError(err)
-	subnetTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uAddSubnetValTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -1914,9 +1902,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current
-	currentTime = subnetStartTime
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
+	vm.clock.Set(subnetStartTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
@@ -1926,9 +1912,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// move time ahead, terminating the subnet validator
-	currentTime = subnetEndTime
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
+	vm.clock.Set(subnetEndTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
@@ -1938,10 +1922,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// move time ahead, terminating primary network validator
-	currentTime = primaryEndTime1
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
+	vm.clock.Set(primaryEndTime1)
 	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
@@ -1968,8 +1949,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	sk2, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder, txSigner = factory.NewWallet(genesistest.DefaultFundedKeys...)
-	uPrimaryRestartTx, err := builder.NewAddPermissionlessValidatorTx(
+	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -1981,22 +1961,10 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk2),
 		vm.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}),
 	)
-	require.NoError(err)
-	primaryRestartTx, err := walletsigner.SignUnsigned(context.Background(), txSigner, uPrimaryRestartTx)
 	require.NoError(err)
 
 	vm.ctx.Lock.Unlock()
@@ -2005,22 +1973,19 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
-	currentTime = primaryStartTime2
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
+	vm.clock.Set(primaryStartTime2)
 	require.NoError(buildAndAcceptStandardBlock(vm))
+
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
-	emptySigner := &signer.Empty{}
 	for height := primaryStartHeight; height < primaryEndHeight; height++ {
 		require.NoError(checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			emptySigner.Key(),
+			nil,
 		))
 	}
 	for height := subnetStartHeight; height < subnetEndHeight; height++ {
@@ -2029,7 +1994,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			subnetID,
 			height,
-			emptySigner.Key(),
+			nil,
 		))
 	}
 }
