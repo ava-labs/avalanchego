@@ -302,8 +302,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	wallet := newWallet(t, vm, walletConfig{})
 
 	var (
-		startTime    = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime      = startTime.Add(defaultMinStakingDuration)
+		endTime      = vm.clock.Time().Add(defaultMinStakingDuration)
 		nodeID       = ids.GenerateTestNodeID()
 		rewardsOwner = &secp256k1fx.OutputOwners{
 			Threshold: 1,
@@ -319,7 +318,6 @@ func TestAddValidatorCommit(t *testing.T) {
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
-				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   vm.MinValidatorStake,
 			},
