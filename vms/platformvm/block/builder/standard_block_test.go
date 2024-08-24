@@ -13,13 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestAtomicTxImports(t *testing.T) {
@@ -29,11 +28,6 @@ func TestAtomicTxImports(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	utxoID := avax.UTXOID{
-		TxID:        ids.Empty.Prefix(1),
-		OutputIndex: 1,
-	}
-	amount := uint64(70000)
 	recipientKey := genesistest.DefaultFundedKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
@@ -41,10 +35,13 @@ func TestAtomicTxImports(t *testing.T) {
 	env.msm.SharedMemory = m.NewSharedMemory(env.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
 	utxo := &avax.UTXO{
-		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 1,
+		},
+		Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: amount,
+			Amt: 70 * units.MicroAvax,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{recipientKey.Address()},
@@ -65,16 +62,15 @@ func TestAtomicTxImports(t *testing.T) {
 		}}},
 	}))
 
-	builder, signer := env.factory.NewWallet(recipientKey)
-	utx, err := builder.NewImportTx(
+	wallet := newWallet(t, env, walletConfig{})
+
+	tx, err := wallet.IssueImportTx(
 		env.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{recipientKey.Address()},
 		},
 	)
-	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	require.NoError(env.Builder.Add(tx))
