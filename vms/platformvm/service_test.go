@@ -501,10 +501,10 @@ func TestGetStake(t *testing.T) {
 		Threshold: 1,
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
-	changeOwner := &secp256k1fx.OutputOwners{
+	withChangeOwner := common.WithChangeOwner(&secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-	}
+	})
 	tx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: delegatorNodeID,
@@ -513,7 +513,7 @@ func TestGetStake(t *testing.T) {
 			Wght:   stakeAmount,
 		},
 		rewardsOwner,
-		common.WithChangeOwner(changeOwner),
+		withChangeOwner,
 	)
 	require.NoError(err)
 
@@ -569,7 +569,7 @@ func TestGetStake(t *testing.T) {
 		},
 		rewardsOwner,
 		0,
-		common.WithChangeOwner(changeOwner),
+		withChangeOwner,
 	)
 	require.NoError(err)
 
