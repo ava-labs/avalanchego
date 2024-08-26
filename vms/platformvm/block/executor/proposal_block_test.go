@@ -520,9 +520,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.TrackedSubnets.Add(subnetID)
 
 			for _, staker := range test.stakers {
-				wallet := newWallet(t, env, walletConfig{
-					keys: genesistest.DefaultFundedKeys[:1],
-				})
+				wallet := newWallet(t, env, walletConfig{})
 
 				tx, err := wallet.IssueAddValidatorTx(
 					&txs.Validator{
@@ -552,7 +550,6 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 			for _, subStaker := range test.subnetStakers {
 				wallet := newWallet(t, env, walletConfig{
-					keys:      genesistest.DefaultFundedKeys[:2],
 					subnetIDs: []ids.ID{subnetID},
 				})
 
@@ -587,9 +584,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// so to allow proposalBlk issuance
 				staker0.endTime = newTime
 
-				wallet := newWallet(t, env, walletConfig{
-					keys: genesistest.DefaultFundedKeys[:2],
-				})
+				wallet := newWallet(t, env, walletConfig{})
 
 				addStaker0, err := wallet.IssueAddValidatorTx(
 					&txs.Validator{
@@ -689,7 +684,6 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	subnetID := testSubnet1.ID()
 	wallet := newWallet(t, env, walletConfig{
-		keys:      genesistest.DefaultFundedKeys[:2],
 		subnetIDs: []ids.ID{subnetID},
 	})
 
@@ -846,7 +840,6 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			}
 
 			wallet := newWallet(t, env, walletConfig{
-				keys:      genesistest.DefaultFundedKeys[:2],
 				subnetIDs: []ids.ID{subnetID},
 			})
 
