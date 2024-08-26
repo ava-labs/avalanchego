@@ -1045,10 +1045,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			End:    uint64(pendingDelegatorEndTime.Unix()),
 			Wght:   env.config.MinDelegatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
+		rewardsOwner,
 	)
 	require.NoError(err)
 
@@ -1233,10 +1230,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			End:    uint64(pendingDelegatorEndTime.Unix()),
 			Wght:   env.config.MinDelegatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
+		rewardsOwner,
 	)
 	require.NoError(err)
 
@@ -1336,7 +1330,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
-		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(

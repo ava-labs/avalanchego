@@ -817,7 +817,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 	)
 	require.NoError(err)
