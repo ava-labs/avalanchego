@@ -84,7 +84,6 @@ type environment struct {
 	state          state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	factory        *txstest.WalletFactory
 	backend        txexecutor.Backend
 }
 
@@ -124,7 +123,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{

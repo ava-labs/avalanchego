@@ -96,7 +96,6 @@ type environment struct {
 	mockedState    *state.MockState
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	factory        *txstest.WalletFactory
 	backend        *executor.Backend
 }
 
@@ -130,20 +129,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.factory = txstest.NewWalletFactory(
-			res.ctx,
-			res.config,
-			res.state,
-		)
 	} else {
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.factory = txstest.NewWalletFactory(
-			res.ctx,
-			res.config,
-			res.mockedState,
-		)
 
 		// setup expectations strictly needed for environment creation
 		res.mockedState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).Times(1)
