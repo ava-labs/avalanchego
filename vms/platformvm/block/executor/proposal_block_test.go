@@ -1334,6 +1334,11 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+	}
+
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
@@ -1346,14 +1351,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		10000,
 	)
 	require.NoError(err)
@@ -1428,14 +1427,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		10000,
 	)
 	require.NoError(err)
