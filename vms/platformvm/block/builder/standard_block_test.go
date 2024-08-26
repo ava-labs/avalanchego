@@ -28,7 +28,11 @@ func TestAtomicTxImports(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	recipientKey := genesistest.DefaultFundedKeys[1]
+	addr := genesistest.DefaultFundedKeys[0].Address()
+	owner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
+	}
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
@@ -41,11 +45,8 @@ func TestAtomicTxImports(t *testing.T) {
 		},
 		Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: 70 * units.MicroAvax,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientKey.Address()},
-			},
+			Amt:          70 * units.MicroAvax,
+			OutputOwners: *owner,
 		},
 	}
 	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
@@ -57,7 +58,7 @@ func TestAtomicTxImports(t *testing.T) {
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
-				recipientKey.Address().Bytes(),
+				addr.Bytes(),
 			},
 		}}},
 	}))
@@ -66,10 +67,7 @@ func TestAtomicTxImports(t *testing.T) {
 
 	tx, err := wallet.IssueImportTx(
 		env.ctx.XChainID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{recipientKey.Address()},
-		},
+		owner,
 	)
 	require.NoError(err)
 
