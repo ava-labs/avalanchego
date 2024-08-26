@@ -18,17 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
@@ -345,9 +342,6 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		rewardsOwner,
 		rewardsOwner,
 		reward.PercentDenominator,
-		common.WithCustomAddresses(set.Of(
-			genesistest.DefaultFundedKeys[0].Address(),
-		)),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
@@ -377,9 +371,6 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		rewardsOwner,
 		rewardsOwner,
 		reward.PercentDenominator,
-		common.WithCustomAddresses(set.Of(
-			genesistest.DefaultFundedKeys[2].Address(),
-		)),
 	)
 	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
