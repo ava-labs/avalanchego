@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	codecpkg "github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // A NamedTest couples a test in the suite with a human-readable name.
@@ -75,6 +76,7 @@ var (
 		{"Slice Length Overflow", TestSliceLengthOverflow},
 		{"Map", TestMap},
 		{"Can Marshal Large Slices", TestCanMarshalLargeSlices},
+		{"Implements UnmarshalFrom", TestImplementsUnmarshalFrom},
 	}
 
 	MultipleTagsTests = []NamedTest{
@@ -1152,4 +1154,27 @@ func FuzzStructUnmarshal(codec codecpkg.GeneralCodec, f *testing.F) {
 		require.NoError(err)
 		require.Len(bytes, size)
 	})
+}
+func TestImplementsUnmarshalFrom(t testing.TB, codec codecpkg.GeneralCodec) {
+	require := require.New(t)
+
+	p := wrappers.Packer{MaxSize: 1024}
+	p.PackFixedBytes([]byte{0, 1, 2}) // pack 3 extra bytes prefix
+
+	mySlice := []bool{true, false, true, true}
+
+	require.NoError(codec.MarshalInto(mySlice, &p))
+
+	p.PackFixedBytes([]byte{7, 7, 7}) // pack 3 extra bytes suffix
+
+	bytesLen, err := codec.Size(mySlice)
+	require.NoError(err)
+	require.Equal(3+bytesLen+3, p.Offset)
+
+	p = wrappers.Packer{Bytes: p.Bytes[:], MaxSize: p.MaxSize, Offset: 3}
+
+	var sliceUnmarshaled []bool
+	err = codec.UnmarshalFrom(&p, &sliceUnmarshaled)
+	require.NoError(err)
+	require.Equal(mySlice, sliceUnmarshaled)
 }
