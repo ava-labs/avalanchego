@@ -9,9 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
@@ -23,45 +22,45 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 		durationToAdvance = secondsToAdvance * time.Second
 	)
 
-	feeConfig := fee.Config{
-		MaxGasCapacity:     1000,
-		MaxGasPerSecond:    100,
-		TargetGasPerSecond: 50,
+	feeConfig := gas.Config{
+		MaxCapacity:     1000,
+		MaxPerSecond:    100,
+		TargetPerSecond: 50,
 	}
 
 	tests := []struct {
 		name          string
 		fork          upgradetest.Fork
-		initialState  fee.State
-		expectedState fee.State
+		initialState  gas.State
+		expectedState gas.State
 	}{
 		{
 			name:          "Pre-Etna",
 			fork:          upgradetest.Durango,
-			initialState:  fee.State{},
-			expectedState: fee.State{}, // Pre-Etna, fee state should not change
+			initialState:  gas.State{},
+			expectedState: gas.State{}, // Pre-Etna, fee state should not change
 		},
 		{
 			name: "Etna with no usage",
-			initialState: fee.State{
-				Capacity: feeConfig.MaxGasCapacity,
+			initialState: gas.State{
+				Capacity: feeConfig.MaxCapacity,
 				Excess:   0,
 			},
-			expectedState: fee.State{
-				Capacity: feeConfig.MaxGasCapacity,
+			expectedState: gas.State{
+				Capacity: feeConfig.MaxCapacity,
 				Excess:   0,
 			},
 		},
 		{
 			name: "Etna with usage",
 			fork: upgradetest.Etna,
-			initialState: fee.State{
+			initialState: gas.State{
 				Capacity: 1,
 				Excess:   10_000,
 			},
-			expectedState: fee.State{
-				Capacity: min(fee.Gas(1).AddPerSecond(feeConfig.MaxGasPerSecond, secondsToAdvance), feeConfig.MaxGasCapacity),
-				Excess:   fee.Gas(10_000).SubPerSecond(feeConfig.TargetGasPerSecond, secondsToAdvance),
+			expectedState: gas.State{
+				Capacity: min(gas.Gas(1).AddPerSecond(feeConfig.MaxPerSecond, secondsToAdvance), feeConfig.MaxCapacity),
+				Excess:   gas.Gas(10_000).SubPerSecond(feeConfig.TargetPerSecond, secondsToAdvance),
 			},
 		},
 	}
@@ -70,7 +69,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 			var (
 				require = require.New(t)
 
-				s        = statetest.New(t, memdb.New())
+				s        = statetest.New(t, statetest.Config{})
 				nextTime = s.GetTimestamp().Add(durationToAdvance)
 			)
 
