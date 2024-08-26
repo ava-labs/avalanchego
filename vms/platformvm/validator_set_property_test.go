@@ -15,6 +15,7 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -41,12 +42,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -122,10 +121,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 
 				switch ev.eventType {
 				case startSubnetValidator:
-					currentSubnetValidator, err = addSubnetValidator(vm, ev, subnetID)
-					if err != nil {
-						return "could not add subnet validator: " + err.Error()
-					}
+					currentSubnetValidator = addSubnetValidator(t, vm, ev, subnetID)
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 						return failedValidatorSnapshotString + err.Error()
 					}
@@ -145,10 +141,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 							return failedValidatorSnapshotString + err.Error()
 						}
 					}
-					currentPrimaryValidator, err = addPrimaryValidatorWithBLSKey(vm, ev)
-					if err != nil {
-						return "could not add primary validator with BLS key: " + err.Error()
-					}
+					currentPrimaryValidator = addPrimaryValidatorWithBLSKey(t, vm, ev)
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorSetByHeightAndSubnet); err != nil {
 						return failedValidatorSnapshotString + err.Error()
 					}
@@ -254,10 +247,13 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 	return nil
 }
 
-func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
-	utx, err := builder.NewAddSubnetValidatorTx(
+func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID ids.ID) *state.Staker {
+	require := require.New(t)
+
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: data.nodeID,
@@ -267,32 +263,28 @@ func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*sta
 			},
 			Subnet: subnetID,
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("could not build AddSubnetValidatorTx: %w", err)
-	}
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign AddSubnetValidatorTx: %w", err)
-	}
-	return internalAddValidator(vm, tx)
+	require.NoError(err)
+
+	staker, err := internalAddValidator(vm, tx)
+	require.NoError(err)
+	return staker
 }
 
-func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
-	addr := genesistest.DefaultFundedKeys[0].Address()
+func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputData) *state.Staker {
+	require := require.New(t)
+
+	wallet := newWallet(t, vm, walletConfig{})
 
 	sk, err := bls.NewSecretKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate BLS key: %w", err)
+	require.NoError(err)
+
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, txSigner := factory.NewWallet(genesistest.DefaultFundedKeys[:2]...)
-	utx, err := builder.NewAddPermissionlessValidatorTx(
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: data.nodeID,
@@ -304,28 +296,15 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 		},
 		signer.NewProofOfPossession(sk),
 		vm.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		}),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("could not build AddPermissionlessValidatorTx: %w", err)
-	}
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign AddPermissionlessValidatorTx: %w", err)
-	}
-	return internalAddValidator(vm, tx)
+	require.NoError(err)
+
+	staker, err := internalAddValidator(vm, tx)
+	require.NoError(err)
+	return staker
 }
 
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
@@ -708,25 +687,19 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	factory := txstest.NewWalletFactory(vm.ctx, &vm.Config, vm.state)
-	builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys[len(genesistest.DefaultFundedKeys)-1])
-	utx, err := builder.NewCreateSubnetTx(
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
+	wallet := newWallet(t, vm, walletConfig{})
+	owner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+	}
+	testSubnet1, err = wallet.IssueCreateSubnetTx(
+		owner,
+		walletcommon.WithChangeOwner(owner),
 	)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
-	if err != nil {
-		return nil, ids.Empty, err
-	}
+
 	vm.ctx.Lock.Unlock()
 	err = vm.issueTxFromRPC(testSubnet1)
 	vm.ctx.Lock.Lock()
