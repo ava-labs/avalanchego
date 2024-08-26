@@ -243,7 +243,7 @@ func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
 func addSubnet(t testing.TB, env *environment) {
 	require := require.New(t)
 
-	wallet := newWallet(nil, env, walletConfig{
+	wallet := newWallet(t, env, walletConfig{
 		keys: genesistest.DefaultFundedKeys[:1],
 	})
 
@@ -364,7 +364,7 @@ func addPendingValidator(
 ) *txs.Tx {
 	require := require.New(t)
 
-	wallet := newWallet(nil, env, walletConfig{
+	wallet := newWallet(t, env, walletConfig{
 		keys: keys,
 	})
 
