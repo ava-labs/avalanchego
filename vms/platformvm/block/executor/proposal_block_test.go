@@ -965,6 +965,11 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	wallet := newWallet(t, env, walletConfig{})
 
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
 	// add Staker0 (with the right end time) to state
 	// just to allow proposalBlk issuance (with a reward Tx)
 	staker0StartTime := genesistest.DefaultValidatorStartTime
@@ -976,10 +981,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			End:    uint64(staker0EndTime.Unix()),
 			Wght:   10,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -1071,10 +1073,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 			End:    uint64(staker0EndTime.Unix()),
 			Wght:   10,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -1154,6 +1153,11 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	wallet := newWallet(t, env, walletConfig{})
 
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
 	// add Staker0 (with the right end time) to state
 	// so to allow proposalBlk issuance
 	staker0StartTime := genesistest.DefaultValidatorStartTime
@@ -1165,10 +1169,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			End:    uint64(staker0EndTime.Unix()),
 			Wght:   10,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -1260,10 +1261,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 			End:    uint64(staker0EndTime.Unix()),
 			Wght:   10,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		rewardsOwner,
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
