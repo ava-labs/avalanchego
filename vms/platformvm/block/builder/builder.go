@@ -262,22 +262,13 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 			math.MaxInt,
 		)
 	}
-
-	stateDiff, err := state.NewDiffOn(preferredState)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := txexecutor.AdvanceTimeTo(b.txExecutorBackend, stateDiff, timestamp); err != nil {
-		return nil, err
-	}
-
-	return packEtnaBlockTxsOn(
+	return packEtnaBlockTxs(
 		preferredID,
-		stateDiff,
+		preferredState,
 		b.Mempool,
 		b.txExecutorBackend,
 		b.blkManager,
+		timestamp,
 		math.MaxUint64,
 	)
 }
@@ -303,6 +294,7 @@ func buildBlock(
 			builder.txExecutorBackend,
 			builder.blkManager,
 			timestamp,
+			0, // minCapacity is 0 as we want to honor the capacity in state.
 		)
 	} else {
 		blockTxs, err = packDurangoBlockTxs(
@@ -420,6 +412,7 @@ func packEtnaBlockTxs(
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
+	minCapacity gas.Gas,
 ) ([]*txs.Tx, error) {
 	stateDiff, err := state.NewDiffOn(parentState)
 	if err != nil {
@@ -431,17 +424,8 @@ func packEtnaBlockTxs(
 	}
 
 	feeState := stateDiff.GetFeeState()
-	return packEtnaBlockTxsOn(parentID, stateDiff, mempool, backend, manager, feeState.Capacity)
-}
+	capacity := max(feeState.Capacity, minCapacity)
 
-func packEtnaBlockTxsOn(
-	parentID ids.ID,
-	stateDiff state.Diff,
-	mempool mempool.Mempool,
-	backend *txexecutor.Backend,
-	manager blockexecutor.Manager,
-	capacity gas.Gas,
-) ([]*txs.Tx, error) {
 	var (
 		blockTxs        []*txs.Tx
 		inputs          set.Set[ids.ID]
