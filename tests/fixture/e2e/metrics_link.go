@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
@@ -44,7 +45,7 @@ var _ = ginkgo.AfterEach(func() {
 	// Extend the end time by the shutdown delay (a proxy for the metrics
 	// scrape interval) to maximize the chances of the specified duration
 	// including all metrics relevant to the current spec.
-	endTime := specReport.StartTime.Add(networkShutdownDelay).UnixMilli()
+	endTime := time.Now().Add(networkShutdownDelay).UnixMilli()
 	metricsLink := tmpnet.MetricsLinkForNetwork(
 		env.GetNetwork().UUID,
 		strconv.FormatInt(startTime, 10),
