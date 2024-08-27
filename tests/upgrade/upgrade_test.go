@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -57,7 +57,8 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 			network.Genesis = genesis
 		}
 
-		upgradeJSON, err := json.Marshal(upgrade.LatestUnscheduled)
+		latestUnscheduled := upgradetest.GetConfig(upgradetest.Latest - 1)
+		upgradeJSON, err := json.Marshal(latestUnscheduled)
 		require.NoError(err)
 		upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
 		if network.DefaultFlags == nil {

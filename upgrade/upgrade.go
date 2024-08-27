@@ -73,26 +73,6 @@ var (
 		EtnaTime:                     InitiallyActiveTime,
 	}
 
-	// LatestUnscheduled is the configuration that deactivates the latest
-	// non-scheduled upgrade. This configuration is safe for networks that requires
-	// backwards compatibility with the latest upgrade.
-	LatestUnscheduled = Config{
-		ApricotPhase1Time:            InitiallyActiveTime,
-		ApricotPhase2Time:            InitiallyActiveTime,
-		ApricotPhase3Time:            InitiallyActiveTime,
-		ApricotPhase4Time:            InitiallyActiveTime,
-		ApricotPhase4MinPChainHeight: 0,
-		ApricotPhase5Time:            InitiallyActiveTime,
-		ApricotPhasePre6Time:         InitiallyActiveTime,
-		ApricotPhase6Time:            InitiallyActiveTime,
-		ApricotPhasePost6Time:        InitiallyActiveTime,
-		BanffTime:                    InitiallyActiveTime,
-		CortinaTime:                  InitiallyActiveTime,
-		CortinaXChainStopVertexID:    ids.Empty,
-		DurangoTime:                  InitiallyActiveTime,
-		EtnaTime:                     UnscheduledActivationTime,
-	}
-
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
 )
 
