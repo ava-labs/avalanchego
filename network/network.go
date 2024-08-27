@@ -202,6 +202,10 @@ func NewNetwork(
 		}
 	}
 
+	if config.TrackedSubnets.Contains(constants.PrimaryNetworkID) {
+		return nil, fmt.Errorf("tracked subnets must not contain the primary network ID")
+	}
+
 	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
 		log,
 		metricsRegisterer,
