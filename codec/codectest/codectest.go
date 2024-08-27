@@ -10,8 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	codecpkg "github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+
+	codecpkg "github.com/ava-labs/avalanchego/codec"
 )
 
 // A NamedTest couples a test in the suite with a human-readable name.
@@ -1155,6 +1156,7 @@ func FuzzStructUnmarshal(codec codecpkg.GeneralCodec, f *testing.F) {
 		require.Len(bytes, size)
 	})
 }
+
 func TestImplementsUnmarshalFrom(t testing.TB, codec codecpkg.GeneralCodec) {
 	require := require.New(t)
 
@@ -1171,10 +1173,9 @@ func TestImplementsUnmarshalFrom(t testing.TB, codec codecpkg.GeneralCodec) {
 	require.NoError(err)
 	require.Equal(3+bytesLen+3, p.Offset)
 
-	p = wrappers.Packer{Bytes: p.Bytes[:], MaxSize: p.MaxSize, Offset: 3}
+	p = wrappers.Packer{Bytes: p.Bytes, MaxSize: p.MaxSize, Offset: 3}
 
 	var sliceUnmarshaled []bool
-	err = codec.UnmarshalFrom(&p, &sliceUnmarshaled)
-	require.NoError(err)
+	require.NoError(codec.UnmarshalFrom(&p, &sliceUnmarshaled))
 	require.Equal(mySlice, sliceUnmarshaled)
 }
