@@ -16,7 +16,6 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.11.0 activates Durango.
 # v1.11.3 fixes a regression in Coreth genesis for custom networks.
 DEFAULT_VERSION="1.11.3"
 
