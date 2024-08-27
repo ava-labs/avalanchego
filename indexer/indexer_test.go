@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex/vertexmock"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -162,7 +162,7 @@ func TestIndexer(t *testing.T) {
 	require.False(previouslyIndexed)
 
 	// Register this chain, creating a new index
-	chainVM := block.NewMockChainVM(ctrl)
+	chainVM := blockmock.NewChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -265,7 +265,7 @@ func TestIndexer(t *testing.T) {
 	previouslyIndexed, err = idxr.previouslyIndexed(chain2Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	dagVM := vertex.NewMockLinearizableVM(ctrl)
+	dagVM := vertexmock.NewLinearizableVM(ctrl)
 	idxr.RegisterChain("chain2", chain2Ctx, dagVM)
 	require.NoError(err)
 	require.Equal(4, server.timesCalled) // block index for chain, block index for dag, vtx index, tx index
@@ -425,7 +425,7 @@ func TestIncompleteIndex(t *testing.T) {
 	previouslyIndexed, err := idxr.previouslyIndexed(chain1Ctx.ChainID)
 	require.NoError(err)
 	require.False(previouslyIndexed)
-	chainVM := block.NewMockChainVM(ctrl)
+	chainVM := blockmock.NewChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	isIncomplete, err = idxr.isIncomplete(chain1Ctx.ChainID)
 	require.NoError(err)
@@ -506,7 +506,7 @@ func TestIgnoreNonDefaultChains(t *testing.T) {
 	})
 
 	// RegisterChain should return without adding an index for this chain
-	chainVM := block.NewMockChainVM(ctrl)
+	chainVM := blockmock.NewChainVM(ctrl)
 	idxr.RegisterChain("chain1", chain1Ctx, chainVM)
 	require.Empty(idxr.blockIndices)
 }

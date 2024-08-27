@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -440,7 +441,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	)
 	require.NoError(err)
 	ctrl := gomock.NewController(t)
-	connector := validators.NewMockSubnetConnector(ctrl)
+	connector := validatorsmock.NewSubnetConnector(ctrl)
 
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
