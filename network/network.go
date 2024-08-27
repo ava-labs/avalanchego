@@ -51,10 +51,11 @@ const (
 var (
 	_ Network = (*network)(nil)
 
-	errNotValidator        = errors.New("node is not a validator")
-	errNotTracked          = errors.New("subnet is not tracked")
-	errExpectedProxy       = errors.New("expected proxy")
-	errExpectedTCPProtocol = errors.New("expected TCP protocol")
+	errNotValidator           = errors.New("node is not a validator")
+	errNotTracked             = errors.New("subnet is not tracked")
+	errExpectedProxy          = errors.New("expected proxy")
+	errExpectedTCPProtocol    = errors.New("expected TCP protocol")
+	errTrackingPrimaryNetwork = errors.New("cannot track primary network")
 )
 
 // Network defines the functionality of the networking library.
@@ -203,7 +204,7 @@ func NewNetwork(
 	}
 
 	if config.TrackedSubnets.Contains(constants.PrimaryNetworkID) {
-		return nil, fmt.Errorf("tracked subnets must not contain the primary network ID")
+		return nil, errTrackingPrimaryNetwork
 	}
 
 	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
