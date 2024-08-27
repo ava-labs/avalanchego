@@ -58,7 +58,7 @@ func init() {
 }
 
 type Config struct {
-	NodeIDs            []ids.NodeID
+	NodeIDs            []ids.ShortNodeID
 	ValidatorWeight    uint64
 	ValidatorStartTime time.Time
 	ValidatorEndTime   time.Time
@@ -69,9 +69,7 @@ type Config struct {
 
 func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 	if len(c.NodeIDs) == 0 {
-		for _, shortNodeID := range DefaultNodeIDs {
-			c.NodeIDs = append(c.NodeIDs, shortNodeID.NodeID())
-		}
+		c.NodeIDs = append(c.NodeIDs, DefaultNodeIDs...)
 	}
 	if c.ValidatorWeight == 0 {
 		c.ValidatorWeight = DefaultValidatorWeight

@@ -82,7 +82,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				_ = vm.Shutdown(context.Background())
 				vm.ctx.Lock.Unlock()
 			}()
-			nodeID := ids.GenerateTestNodeID()
+			nodeID := ids.GenerateTestShortNodeID()
 
 			currentTime := genesistest.DefaultValidatorStartTime
 			vm.clock.Set(currentTime)
@@ -402,13 +402,13 @@ type validatorInputData struct {
 	eventType uint8
 	startTime time.Time
 	endTime   time.Time
-	nodeID    ids.NodeID
+	nodeID    ids.ShortNodeID
 	publicKey *bls.PublicKey
 }
 
 // buildTimestampsList creates validators start and end time, given the event list.
 // output is returned as a list of validatorInputData
-func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeID) ([]*validatorInputData, error) {
+func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.ShortNodeID) ([]*validatorInputData, error) {
 	res := make([]*validatorInputData, 0, len(events))
 
 	currentTime = currentTime.Add(txexecutor.SyncBound)
@@ -478,7 +478,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties.Property("primary validators are returned in sequence", prop.ForAll(
 		func(events []uint8) string {
 			currentTime := time.Now()
-			nodeID := ids.GenerateTestNodeID()
+			nodeID := ids.GenerateTestShortNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return failedBuildingEventSeqString + err.Error()
@@ -529,7 +529,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties.Property("subnet validators are returned in sequence", prop.ForAll(
 		func(events []uint8) string {
 			currentTime := time.Now()
-			nodeID := ids.GenerateTestNodeID()
+			nodeID := ids.GenerateTestShortNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return failedBuildingEventSeqString + err.Error()
@@ -580,7 +580,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties.Property("subnet validators' times are bound by a primary validator's times", prop.ForAll(
 		func(events []uint8) string {
 			currentTime := time.Now()
-			nodeID := ids.GenerateTestNodeID()
+			nodeID := ids.GenerateTestShortNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return failedBuildingEventSeqString + err.Error()
@@ -664,8 +664,8 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		ctx,
 		chainDB,
 		genesistest.NewBytes(t, genesistest.Config{
-			NodeIDs: []ids.NodeID{
-				genesistest.DefaultNodeIDs[len(genesistest.DefaultNodeIDs)-1].NodeID(),
+			NodeIDs: []ids.ShortNodeID{
+				genesistest.DefaultNodeIDs[len(genesistest.DefaultNodeIDs)-1],
 			},
 			ValidatorEndTime: mockable.MaxTime,
 		}),

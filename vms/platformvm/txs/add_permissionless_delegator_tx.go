@@ -53,7 +53,7 @@ func (tx *AddPermissionlessDelegatorTx) SubnetID() ids.ID {
 }
 
 func (tx *AddPermissionlessDelegatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+	return tx.Validator.NodeID.NodeID()
 }
 
 func (*AddPermissionlessDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {

@@ -47,13 +47,13 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var defaultValidatorNodeID = ids.GenerateTestNodeID()
+var defaultValidatorShortNodeID = ids.GenerateTestShortNodeID()
 
 func newTestState(t testing.TB, db database.Database) *state {
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
-			NodeIDs: []ids.NodeID{defaultValidatorNodeID},
+			NodeIDs: []ids.ShortNodeID{defaultValidatorShortNodeID},
 		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
@@ -81,12 +81,12 @@ func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
 	state := newTestState(t, memdb.New())
 
-	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorShortNodeID.NodeID())
 	require.NoError(err)
 	require.NotNil(staker)
-	require.Equal(defaultValidatorNodeID, staker.NodeID)
+	require.Equal(defaultValidatorShortNodeID.NodeID(), staker.NodeID)
 
-	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorShortNodeID.NodeID())
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
 
@@ -94,10 +94,10 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.FromSlice(staker), stakerIterator)
 
-	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorShortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorShortNodeID.NodeID())
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
 }
@@ -129,7 +129,7 @@ func TestPersistStakers(t *testing.T) {
 					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						End:    uint64(endTime),
 						Wght:   1234,
 					}
@@ -205,7 +205,7 @@ func TestPersistStakers(t *testing.T) {
 					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						End:    uint64(valEndTime),
 						Wght:   1234,
 					}
@@ -291,7 +291,7 @@ func TestPersistStakers(t *testing.T) {
 					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Start:  uint64(startTime),
 						End:    uint64(endTime),
 						Wght:   1234,
@@ -347,7 +347,7 @@ func TestPersistStakers(t *testing.T) {
 					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Start:  uint64(valStartTime),
 						End:    uint64(valEndTime),
 						Wght:   1234,
@@ -409,7 +409,7 @@ func TestPersistStakers(t *testing.T) {
 					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						End:    uint64(endTime),
 						Wght:   1234,
 					}
@@ -479,7 +479,7 @@ func TestPersistStakers(t *testing.T) {
 					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						End:    uint64(valEndTime),
 						Wght:   1234,
 					}
@@ -565,7 +565,7 @@ func TestPersistStakers(t *testing.T) {
 					endTime   = time.Now().Add(14 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Start:  uint64(startTime),
 						End:    uint64(endTime),
 						Wght:   1234,
@@ -621,7 +621,7 @@ func TestPersistStakers(t *testing.T) {
 					valEndTime   = time.Unix(valStartTime, 0).Add(365 * 24 * time.Hour).Unix()
 
 					validatorsData = txs.Validator{
-						NodeID: ids.GenerateTestNodeID(),
+						NodeID: ids.GenerateTestShortNodeID(),
 						Start:  uint64(valStartTime),
 						End:    uint64(valEndTime),
 						Wght:   1234,

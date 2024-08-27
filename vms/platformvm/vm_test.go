@@ -303,7 +303,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	var (
 		endTime      = vm.clock.Time().Add(defaultMinStakingDuration)
-		nodeID       = ids.GenerateTestNodeID()
+		nodeID       = ids.GenerateTestShortNodeID()
 		rewardsOwner = &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -342,7 +342,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in current validator set
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID.NodeID())
 	require.NoError(err)
 }
 
@@ -355,7 +355,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 	startTime := genesistest.DefaultValidatorStartTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
@@ -413,7 +413,7 @@ func TestAddValidatorReject(t *testing.T) {
 	var (
 		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 		endTime       = startTime.Add(defaultMinStakingDuration)
-		nodeID        = ids.GenerateTestNodeID()
+		nodeID        = ids.GenerateTestShortNodeID()
 		rewardAddress = ids.GenerateTestShortID()
 	)
 
@@ -447,7 +447,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -478,7 +478,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: repeatNodeID.NodeID(),
+				NodeID: repeatNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   vm.MinValidatorStake,
@@ -524,7 +524,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: shortNodeID.NodeID(),
+				NodeID: shortNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -573,7 +573,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: shortNodeID.NodeID(),
+				NodeID: shortNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -839,7 +839,7 @@ func TestCreateSubnet(t *testing.T) {
 	addValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: shortNodeID.NodeID(),
+				NodeID: shortNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -1897,7 +1897,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1982,7 +1982,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -2124,7 +2124,7 @@ func TestPruneMempool(t *testing.T) {
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultMinValidatorStake,

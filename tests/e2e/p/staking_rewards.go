@@ -70,10 +70,14 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		alphaInfoClient := info.NewClient(alphaNode.URI)
 		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
+		alphaShortNodeID, err := ids.ShortNodeIDFromNodeID(alphaNodeID)
+		require.NoError(err)
 
 		tc.By("retrieving beta node id and pop")
 		betaInfoClient := info.NewClient(betaNode.URI)
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(tc.DefaultContext())
+		require.NoError(err)
+		betaShortNodeID, err := ids.ShortNodeIDFromNodeID(betaNodeID)
 		require.NoError(err)
 
 		tc.By("creating keychain and P-Chain wallet")
@@ -118,7 +122,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: alphaNodeID,
+						NodeID: alphaShortNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
@@ -147,7 +151,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: betaNodeID,
+						NodeID: betaShortNodeID,
 						End:    uint64(betaValidatorEndTime.Unix()),
 						Wght:   weight,
 					},
@@ -180,7 +184,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: alphaNodeID,
+						NodeID: alphaShortNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},
@@ -203,7 +207,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
-						NodeID: betaNodeID,
+						NodeID: betaShortNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
 					},

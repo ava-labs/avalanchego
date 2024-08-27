@@ -254,7 +254,7 @@ func TestGetTx(t *testing.T) {
 				tx, err := wallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
-							NodeID: ids.GenerateTestNodeID(),
+							NodeID: ids.GenerateTestShortNodeID(),
 							Start:  uint64(s.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 							End:    uint64(s.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 							Wght:   s.vm.MinValidatorStake,
@@ -507,7 +507,7 @@ func TestGetStake(t *testing.T) {
 	})
 	tx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
-			NodeID: delegatorNodeID.NodeID(),
+			NodeID: delegatorNodeID,
 			Start:  genesistest.DefaultValidatorStartTimeUnix,
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,
@@ -558,7 +558,7 @@ func TestGetStake(t *testing.T) {
 	// Make sure this works for pending stakers
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
-	pendingStakerNodeID := ids.GenerateTestNodeID()
+	pendingStakerNodeID := ids.GenerateTestShortNodeID()
 	pendingStakerEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = wallet.IssueAddValidatorTx(
 		&txs.Validator{
@@ -645,7 +645,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	wallet := newWallet(t, service.vm, walletConfig{})
 	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
-			NodeID: validatorNodeID.NodeID(),
+			NodeID: validatorNodeID,
 			Start:  genesistest.DefaultValidatorStartTimeUnix,
 			End:    uint64(delegatorEndTime.Unix()),
 			Wght:   stakeAmount,

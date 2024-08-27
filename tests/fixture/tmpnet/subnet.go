@@ -189,11 +189,15 @@ func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, apiURI string, 
 		if !ok {
 			return fmt.Errorf("failed to find end time for %s", node.NodeID)
 		}
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(node.NodeID)
+		if err != nil {
+			return err
+		}
 
-		_, err := pWallet.IssueAddSubnetValidatorTx(
+		_, err = pWallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: node.NodeID,
+					NodeID: shortNodeID,
 					Start:  uint64(startTime.Unix()),
 					End:    endTime,
 					Wght:   units.Schmeckle,

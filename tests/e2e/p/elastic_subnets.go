@@ -55,12 +55,13 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 			xContext := xBuilder.Context()
 			xChainID := xContext.BlockchainID
 
-			var validatorID ids.NodeID
+			var validatorID ids.ShortNodeID
 			tc.By("retrieving the node ID of a primary network validator", func() {
 				pChainClient := platformvm.NewClient(nodeURI.URI)
 				validatorIDs, err := pChainClient.SampleValidators(tc.DefaultContext(), constants.PrimaryNetworkID, 1)
 				require.NoError(err)
-				validatorID = validatorIDs[0]
+				validatorID, err = ids.ShortNodeIDFromNodeID(validatorIDs[0])
+				require.NoError(err)
 			})
 
 			owner := &secp256k1fx.OutputOwners{

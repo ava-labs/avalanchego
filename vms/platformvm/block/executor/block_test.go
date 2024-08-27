@@ -215,7 +215,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
-					nodeID     = ids.GenerateTestNodeID()
+					nodeID     = ids.GenerateTestShortNodeID()
 					subnetID   = ids.GenerateTestID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{
@@ -266,7 +266,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
-					nodeID     = ids.GenerateTestNodeID()
+					nodeID     = ids.GenerateTestShortNodeID()
 					subnetID   = constants.PrimaryNetworkID
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{
@@ -322,7 +322,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
-					nodeID     = ids.GenerateTestNodeID()
+					nodeID     = ids.GenerateTestShortNodeID()
 					subnetID   = ids.GenerateTestID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{
@@ -378,7 +378,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
-					nodeID     = ids.GenerateTestNodeID()
+					nodeID     = ids.GenerateTestShortNodeID()
 					subnetID   = ids.GenerateTestID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{
@@ -440,7 +440,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				var (
 					stakerTxID = ids.GenerateTestID()
-					nodeID     = ids.GenerateTestNodeID()
+					nodeID     = ids.GenerateTestShortNodeID()
 					subnetID   = ids.GenerateTestID()
 					stakerTx   = &txs.Tx{
 						Unsigned: &txs.AddPermissionlessValidatorTx{

@@ -330,7 +330,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				BlockchainID: ids.Empty,
 			}}
 			validator = txs.Validator{
-				NodeID: vdr.NodeID.NodeID(),
+				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
 				Wght:   weight,

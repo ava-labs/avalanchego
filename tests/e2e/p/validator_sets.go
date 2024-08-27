@@ -44,6 +44,9 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			avaxAssetID = pContext.AVAXAssetID
 		)
 
+		shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeURI.NodeID)
+		require.NoError(err)
+
 		const delegatorCount = 15
 		tc.By(fmt.Sprintf("adding %d delegators", delegatorCount), func() {
 			var (
@@ -57,7 +60,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
-							NodeID: nodeURI.NodeID,
+							NodeID: shortNodeID,
 							End:    uint64(endTime.Unix()),
 							Wght:   weight,
 						},

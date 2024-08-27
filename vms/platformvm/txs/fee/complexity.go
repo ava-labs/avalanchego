@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	intrinsicValidatorBandwidth = ids.NodeIDLen + // nodeID
+	intrinsicValidatorBandwidth = ids.ShortNodeIDLen + // nodeID
 		wrappers.LongLen + // start
 		wrappers.LongLen + // end
 		wrappers.LongLen // weight
@@ -157,7 +157,7 @@ var (
 	}
 	IntrinsicRemoveSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
-			ids.NodeIDLen + // nodeID
+			ids.ShortNodeIDLen + // nodeID
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID

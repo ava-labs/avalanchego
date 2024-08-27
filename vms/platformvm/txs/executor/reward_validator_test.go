@@ -249,7 +249,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
 	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
@@ -315,7 +315,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// test validator stake
-	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
+	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID.NodeID())
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := newRewardValidatorTx(t, delTx.ID())
@@ -369,7 +369,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.Less(vdrReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
 	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
-	stake = env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
+	stake = env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID.NodeID())
 	require.Equal(env.config.MinValidatorStake, stake)
 }
 
@@ -383,7 +383,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
 	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
@@ -459,7 +459,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	// test validator stake
-	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID)
+	stake := env.config.Validators.GetWeight(constants.PrimaryNetworkID, vdrNodeID.NodeID())
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
 	tx, err := newRewardValidatorTx(t, delTx.ID())
@@ -613,7 +613,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
 	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(
@@ -789,7 +789,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
 	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
-	vdrNodeID := ids.GenerateTestNodeID()
+	vdrNodeID := ids.GenerateTestShortNodeID()
 
 	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
 	uVdrTx, err := builder.NewAddValidatorTx(

@@ -80,7 +80,7 @@ func (w *withOptions) IssueAddSubnetValidatorTx(
 }
 
 func (w *withOptions) IssueRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {

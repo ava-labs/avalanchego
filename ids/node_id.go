@@ -7,7 +7,6 @@ import "github.com/ava-labs/avalanchego/utils"
 
 const (
 	NodeIDPrefix = "NodeID-"
-	NodeIDLen    = ShortIDLen
 )
 
 var (
