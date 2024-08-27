@@ -63,15 +63,24 @@ impl RevisionManager {
         config: RevisionManagerConfig,
     ) -> Result<Self, Error> {
         let storage = Arc::new(FileBacked::new(filename, config.node_cache_size, truncate)?);
-        let nodestore = Arc::new(NodeStore::new_empty_committed(storage.clone())?);
-        let manager = Self {
+        let nodestore = match truncate {
+            true => Arc::new(NodeStore::new_empty_committed(storage.clone())?),
+            false => Arc::new(NodeStore::open(storage.clone())?),
+        };
+        let mut manager = Self {
             max_revisions: config.max_revisions,
             filebacked: storage,
-            historical: VecDeque::from([nodestore]),
+            historical: VecDeque::from([nodestore.clone()]),
             by_hash: Default::default(),
             proposals: Default::default(),
             // committing_proposals: Default::default(),
         };
+        if nodestore.kind.root_hash().is_some() {
+            manager.by_hash.insert(
+                nodestore.kind.root_hash().expect("root hash is present"),
+                nodestore.clone(),
+            );
+        }
         Ok(manager)
     }
 

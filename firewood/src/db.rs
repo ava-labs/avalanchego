@@ -303,10 +303,10 @@ mod test {
 
     use crate::{
         db::Db,
-        v2::api::{Db as _, Error, Proposal},
+        v2::api::{Db as _, DbView as _, Error, Proposal as _},
     };
 
-    use super::DbConfig;
+    use super::{BatchOp, DbConfig};
 
     #[tokio::test]
     async fn test_cloned_proposal_error() {
@@ -330,10 +330,53 @@ mod test {
         assert!(matches!(result, Ok(())), "{result:?}");
     }
 
+    #[tokio::test]
+    async fn test_proposal_reads() {
+        let db = testdb().await;
+        let batch = vec![BatchOp::Put {
+            key: b"k",
+            value: b"v",
+        }];
+        let proposal = db.propose(batch).await.unwrap();
+        assert_eq!(&*proposal.val(b"k").await.unwrap().unwrap(), b"v");
+
+        assert_eq!(proposal.val(b"notfound").await.unwrap(), None);
+        proposal.commit().await.unwrap();
+
+        let batch = vec![BatchOp::Put {
+            key: b"k",
+            value: b"v2",
+        }];
+        let proposal = db.propose(batch).await.unwrap();
+        assert_eq!(&*proposal.val(b"k").await.unwrap().unwrap(), b"v2");
+
+        let committed = db.root_hash().await.unwrap().unwrap();
+        let historical = db.revision(committed).await.unwrap();
+        assert_eq!(&*historical.val(b"k").await.unwrap().unwrap(), b"v");
+    }
+
+    #[tokio::test]
+    async fn reopen_test() {
+        let db = testdb().await;
+        let batch = vec![BatchOp::Put {
+            key: b"k",
+            value: b"v",
+        }];
+        let proposal = db.propose(batch).await.unwrap();
+        proposal.commit().await.unwrap();
+        println!("{:?}", db.root_hash().await.unwrap().unwrap());
+
+        let db = db.reopen().await;
+        println!("{:?}", db.root_hash().await.unwrap().unwrap());
+        let committed = db.root_hash().await.unwrap().unwrap();
+        let historical = db.revision(committed).await.unwrap();
+        assert_eq!(&*historical.val(b"k").await.unwrap().unwrap(), b"v");
+    }
+
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
     struct TestDb {
         db: Db,
-        _tmpdir: tempfile::TempDir,
+        tmpdir: tempfile::TempDir,
     }
     impl Deref for TestDb {
         type Target = Db;
@@ -354,9 +397,25 @@ mod test {
             .collect();
         let dbconfig = DbConfig::builder().truncate(true).build();
         let db = Db::new(dbpath, dbconfig).await.unwrap();
-        TestDb {
-            db,
-            _tmpdir: tmpdir,
+        TestDb { db, tmpdir }
+    }
+
+    impl TestDb {
+        fn path(&self) -> PathBuf {
+            [self.tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+                .iter()
+                .collect()
+        }
+        async fn reopen(self) -> Self {
+            let path = self.path();
+            drop(self.db);
+            let dbconfig = DbConfig::builder().truncate(false).build();
+
+            let db = Db::new(path, dbconfig).await.unwrap();
+            TestDb {
+                db,
+                tmpdir: self.tmpdir,
+            }
         }
     }
 }

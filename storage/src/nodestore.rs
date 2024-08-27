@@ -196,14 +196,22 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
         drop(stream);
 
-        Ok(Self {
+        let mut nodestore = Self {
             header,
             kind: Committed {
                 deleted: Default::default(),
-                root_hash: None, // TODO: get the root hash
+                root_hash: None,
             },
             storage,
-        })
+        };
+
+        if let Some(root_address) = nodestore.header.root_address {
+            let node = nodestore.read_node_from_disk(root_address);
+            let root_hash = node.map(|n| hash_node(&n, &Path(Default::default())))?;
+            nodestore.kind.root_hash = Some(root_hash);
+        }
+
+        Ok(nodestore)
     }
 
     /// Create a new, empty, Committed [NodeStore] and clobber
@@ -1047,9 +1055,10 @@ impl Hashed for Arc<ImmutableProposal> {}
 
 impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> RootReader for NodeStore<T, S> {
     fn root_node(&self) -> Option<Arc<Node>> {
+        // TODO: If the read_node fails, we just say there is no root; this is incorrect
         self.header
             .root_address
-            .and_then(|addr| self.kind.read_in_memory_node(addr))
+            .and_then(|addr| self.read_node(addr).ok())
     }
 }
 
