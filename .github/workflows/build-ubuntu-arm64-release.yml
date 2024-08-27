@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -74,7 +74,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-focal-deps
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Build the avalanchego binaries
