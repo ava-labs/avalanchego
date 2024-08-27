@@ -30,43 +30,43 @@ func NewServer(appSender common.AppSender) *Server {
 func (s *Server) SendAppRequest(ctx context.Context, req *appsenderpb.SendAppRequestMsg) (*emptypb.Empty, error) {
 	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
-		shortNodeID, err := ids.ToShortNodeID(nodeIDBytes)
+		nodeID, err := ids.ToNodeID(nodeIDBytes)
 		if err != nil {
 			return nil, err
 		}
-		nodeIDs.Add(shortNodeID.NodeID())
+		nodeIDs.Add(nodeID)
 	}
 	err := s.appSender.SendAppRequest(ctx, nodeIDs, req.RequestId, req.Request)
 	return &emptypb.Empty{}, err
 }
 
 func (s *Server) SendAppResponse(ctx context.Context, req *appsenderpb.SendAppResponseMsg) (*emptypb.Empty, error) {
-	shortNodeID, err := ids.ToShortNodeID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	err = s.appSender.SendAppResponse(ctx, shortNodeID.NodeID(), req.RequestId, req.Response)
+	err = s.appSender.SendAppResponse(ctx, nodeID, req.RequestId, req.Response)
 	return &emptypb.Empty{}, err
 }
 
 func (s *Server) SendAppError(ctx context.Context, req *appsenderpb.SendAppErrorMsg) (*emptypb.Empty, error) {
-	shortNodeID, err := ids.ToShortNodeID(req.NodeId)
+	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.appSender.SendAppError(ctx, shortNodeID.NodeID(), req.RequestId, req.ErrorCode, req.ErrorMessage)
+	err = s.appSender.SendAppError(ctx, nodeID, req.RequestId, req.ErrorCode, req.ErrorMessage)
 	return &emptypb.Empty{}, err
 }
 
 func (s *Server) SendAppGossip(ctx context.Context, req *appsenderpb.SendAppGossipMsg) (*emptypb.Empty, error) {
 	nodeIDs := set.NewSet[ids.NodeID](len(req.NodeIds))
 	for _, nodeIDBytes := range req.NodeIds {
-		shortNodeID, err := ids.ToShortNodeID(nodeIDBytes)
+		nodeID, err := ids.ToNodeID(nodeIDBytes)
 		if err != nil {
 			return nil, err
 		}
-		nodeIDs.Add(shortNodeID.NodeID())
+		nodeIDs.Add(nodeID)
 	}
 	err := s.appSender.SendAppGossip(
 		ctx,

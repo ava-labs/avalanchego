@@ -31,3 +31,8 @@ func NodeIDFromString(nodeIDStr string) (NodeID, error) {
 	}
 	return NodeID{ShortNodeID: ShortNodeID(asShort)}, nil
 }
+
+func ToNodeID(bytes []byte) (NodeID, error) {
+	nodeID, err := ToShortID(bytes)
+	return NodeID{ShortNodeID: ShortNodeID(nodeID)}, err
+}
