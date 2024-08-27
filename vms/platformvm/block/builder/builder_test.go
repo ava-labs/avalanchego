@@ -21,17 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestBuildBlockBasic(t *testing.T) {
@@ -41,24 +38,27 @@ func TestBuildBlockBasic(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
+	subnetID := testSubnet1.ID()
+	wallet := newWallet(t, env, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
 	// Create a valid transaction
-	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
-	utx, err := builder.NewCreateChainTx(
-		testSubnet1.ID(),
+	tx, err := wallet.IssueCreateChainTx(
+		subnetID,
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-	require.NoError(err)
-	txID := tx.ID()
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTxFromRPC(tx))
 	env.ctx.Lock.Lock()
+
+	txID := tx.ID()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
@@ -101,6 +101,8 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	var (
 		now    = env.backend.Clk.Time()
 		nodeID = ids.GenerateTestShortNodeID()
@@ -113,9 +115,13 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
+	rewardOwners := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
 	// Create a valid [AddPermissionlessValidatorTx]
-	builder, txSigner := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewAddPermissionlessValidatorTx(
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: nodeID,
@@ -127,29 +133,18 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
+		rewardOwners,
+		rewardOwners,
 		reward.PercentDenominator,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), txSigner, utx)
-	require.NoError(err)
-	txID := tx.ID()
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTxFromRPC(tx))
 	env.ctx.Lock.Lock()
+
+	txID := tx.ID()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
@@ -253,24 +248,27 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
+	subnetID := testSubnet1.ID()
+	wallet := newWallet(t, env, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
 	// Create a valid transaction
-	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
-	utx, err := builder.NewCreateChainTx(
-		testSubnet1.ID(),
+	tx, err := wallet.IssueCreateChainTx(
+		subnetID,
 		nil,
 		constants.AVMID,
 		nil,
 		"chain name",
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-	require.NoError(err)
-	txID := tx.ID()
 
 	// Issue the transaction
 	env.ctx.Lock.Unlock()
 	require.NoError(env.network.IssueTxFromRPC(tx))
 	env.ctx.Lock.Lock()
+
+	txID := tx.ID()
 	_, ok := env.mempool.Get(txID)
 	require.True(ok)
 
@@ -312,6 +310,8 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	// based on the current chain timestamp and must be validated.
 	env.config.UpgradeConfig.DurangoTime = time.Time{}
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	var (
 		now                   = env.backend.Clk.Time()
 		defaultValidatorStake = 100 * units.MilliAvax
@@ -323,8 +323,11 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
-	builder1, signer1 := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx1, err := builder1.NewAddPermissionlessValidatorTx(
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	tx1, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestShortNodeID(),
@@ -336,24 +339,13 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
 	require.NoError(err)
-	tx1, err := walletsigner.SignUnsigned(context.Background(), signer1, utx1)
-	require.NoError(err)
 	require.NoError(env.mempool.Add(tx1))
+
 	tx1ID := tx1.ID()
 	_, ok := env.mempool.Get(tx1ID)
 	require.True(ok)
@@ -364,8 +356,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	sk, err = bls.NewSecretKey()
 	require.NoError(err)
 
-	builder2, signer2 := env.factory.NewWallet(genesistest.DefaultFundedKeys[2])
-	utx2, err := builder2.NewAddPermissionlessValidatorTx(
+	tx2, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestShortNodeID(),
@@ -377,24 +368,13 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		},
 		signer.NewProofOfPossession(sk),
 		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
-		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
-		},
+		rewardsOwner,
+		rewardsOwner,
 		reward.PercentDenominator,
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[2].Address()},
-		}),
 	)
 	require.NoError(err)
-	tx2, err := walletsigner.SignUnsigned(context.Background(), signer2, utx2)
-	require.NoError(err)
 	require.NoError(env.mempool.Add(tx2))
+
 	tx2ID := tx2.ID()
 	_, ok = env.mempool.Get(tx2ID)
 	require.True(ok)
@@ -428,9 +408,13 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
+	subnetID := testSubnet1.ID()
+	wallet := newWallet(t, env, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
 	// Create a valid transaction
-	builder, signer := env.factory.NewWallet(testSubnet1ControlKeys[0], testSubnet1ControlKeys[1])
-	utx, err := builder.NewCreateChainTx(
+	tx, err := wallet.IssueCreateChainTx(
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -438,12 +422,10 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 		"chain name",
 	)
 	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-	require.NoError(err)
-	txID := tx.ID()
 
 	// Transaction should not be marked as dropped before being added to the
 	// mempool
+	txID := tx.ID()
 	require.NoError(env.mempool.GetDropReason(txID))
 
 	// Mark the transaction as dropped
