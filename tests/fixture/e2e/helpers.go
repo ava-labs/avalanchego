@@ -204,16 +204,22 @@ func StartNetwork(
 ) {
 	require := require.New(tc)
 
-	require.NoError(
-		tmpnet.BootstrapNewNetwork(
-			tc.DefaultContext(),
-			tc.GetWriter(),
-			network,
-			DefaultNetworkDir,
-			avalancheGoExecPath,
-			pluginDir,
-		),
+	err := tmpnet.BootstrapNewNetwork(
+		tc.DefaultContext(),
+		tc.GetWriter(),
+		network,
+		DefaultNetworkDir,
+		avalancheGoExecPath,
+		pluginDir,
 	)
+	if err != nil {
+		// Ensure nodes are stopped if bootstrap fails. The network configuration
+		// will remain on disk to enable troubleshooting.
+		if stopErr := network.Stop(tc.DefaultContext()); stopErr != nil {
+			tc.Outf("failed to stop network after bootstrap failure: %v", stopErr)
+		}
+		require.FailNow("failed to bootstrap network: %s", err)
+	}
 
 	tc.Outf("{{green}}Successfully started network{{/}}\n")
 

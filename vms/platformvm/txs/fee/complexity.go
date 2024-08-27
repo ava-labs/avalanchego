@@ -183,10 +183,24 @@ var (
 	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
-func TxComplexity(tx txs.UnsignedTx) (gas.Dimensions, error) {
-	c := complexityVisitor{}
-	err := tx.Visit(&c)
-	return c.output, err
+func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
+	var (
+		c          complexityVisitor
+		complexity gas.Dimensions
+	)
+	for _, tx := range txs {
+		c = complexityVisitor{}
+		err := tx.Visit(&c)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&c.output)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
 }
 
 // OutputComplexity returns the complexity outputs add to a transaction.

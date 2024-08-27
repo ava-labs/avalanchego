@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestTxComplexity(t *testing.T) {
+func TestTxComplexity_Individual(t *testing.T) {
 	for _, test := range txTests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
@@ -52,7 +52,37 @@ func TestTxComplexity(t *testing.T) {
 	}
 }
 
-func BenchmarkTxComplexity(b *testing.B) {
+func TestTxComplexity_Batch(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		unsignedTxs        = make([]txs.UnsignedTx, 0, len(txTests))
+		expectedComplexity gas.Dimensions
+	)
+	for _, test := range txTests {
+		if test.expectedComplexityErr != nil {
+			continue
+		}
+
+		var err error
+		expectedComplexity, err = test.expectedComplexity.Add(&expectedComplexity)
+		require.NoError(err)
+
+		txBytes, err := hex.DecodeString(test.tx)
+		require.NoError(err)
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		require.NoError(err)
+
+		unsignedTxs = append(unsignedTxs, tx.Unsigned)
+	}
+
+	complexity, err := TxComplexity(unsignedTxs...)
+	require.NoError(err)
+	require.Equal(expectedComplexity, complexity)
+}
+
+func BenchmarkTxComplexity_Individual(b *testing.B) {
 	for _, test := range txTests {
 		b.Run(test.name, func(b *testing.B) {
 			require := require.New(b)
@@ -68,6 +98,30 @@ func BenchmarkTxComplexity(b *testing.B) {
 				_, _ = TxComplexity(tx.Unsigned)
 			}
 		})
+	}
+}
+
+func BenchmarkTxComplexity_Batch(b *testing.B) {
+	require := require.New(b)
+
+	unsignedTxs := make([]txs.UnsignedTx, 0, len(txTests))
+	for _, test := range txTests {
+		if test.expectedComplexityErr != nil {
+			continue
+		}
+
+		txBytes, err := hex.DecodeString(test.tx)
+		require.NoError(err)
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		require.NoError(err)
+
+		unsignedTxs = append(unsignedTxs, tx.Unsigned)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = TxComplexity(unsignedTxs...)
 	}
 }
 
