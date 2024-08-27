@@ -126,10 +126,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         }
     }
 
-    async fn single_key_proof<K: KeyType>(
-        &self,
-        _key: K,
-    ) -> Result<Option<Proof<ProofNode>>, api::Error> {
+    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<Proof<ProofNode>, api::Error> {
         todo!();
     }
 

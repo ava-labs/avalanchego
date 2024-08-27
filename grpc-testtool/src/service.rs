@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use firewood::db::{Db, DbConfig};
+use firewood::v2::api::Db as _;
 use firewood::v2::api::Error;
 
 use std::path::Path;
@@ -20,11 +21,11 @@ pub mod database;
 pub mod db;
 pub mod process;
 
-trait _IntoStatusResultExt<T> {
+trait IntoStatusResultExt<T> {
     fn into_status_result(self) -> Result<T, Status>;
 }
 
-impl<T> _IntoStatusResultExt<T> for Result<T, Error> {
+impl<T> IntoStatusResultExt<T> for Result<T, Error> {
     // We map errors from bad arguments into Status::invalid_argument; all other errors are Status::internal errors
     fn into_status_result(self) -> Result<T, Status> {
         self.map_err(|err| match err {
@@ -70,12 +71,12 @@ impl Deref for Database {
     }
 }
 
-// impl Database {
-//     async fn latest(&self) -> Result<Arc<<Db as firewood::v2::api::Db>::Historical>, Error> {
-//         let root_hash = self.root_hash().await?;
-//         self.revision(root_hash).await
-//     }
-// }
+impl Database {
+    async fn latest(&self) -> Result<Arc<<Db as firewood::v2::api::Db>::Historical>, Error> {
+        let root_hash = self.root_hash().await?.ok_or(Error::LatestIsEmpty)?;
+        self.revision(root_hash).await
+    }
+}
 
 // TODO: implement Iterator
 #[derive(Debug)]

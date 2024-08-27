@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let args = Args::parse();
 
-    let mut db = Db::new("rev_db", cfg)
+    let db = Db::new("rev_db", cfg)
         .await
         .expect("db initiation should succeed");
 

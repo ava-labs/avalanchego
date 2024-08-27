@@ -40,7 +40,7 @@ impl Db for EmptyDb {
     }
 
     async fn propose<'p, K, V>(
-        &'p mut self,
+        &'p self,
         data: Batch<K, V>,
     ) -> Result<Arc<Self::Proposal<'p>>, Error>
     where
@@ -66,11 +66,8 @@ impl DbView for HistoricalImpl {
         Ok(None)
     }
 
-    async fn single_key_proof<K: KeyType>(
-        &self,
-        _key: K,
-    ) -> Result<Option<Proof<ProofNode>>, Error> {
-        Ok(None)
+    async fn single_key_proof<K: KeyType>(&self, _key: K) -> Result<Proof<ProofNode>, Error> {
+        Err(Error::RangeProofOnEmptyTrie)
     }
 
     async fn range_proof<K: KeyType, V>(
@@ -108,7 +105,7 @@ mod tests {
 
     #[tokio::test]
     async fn basic_proposal() -> Result<(), Error> {
-        let mut db = EmptyDb;
+        let db = EmptyDb;
 
         let batch = vec![
             BatchOp::Put {
@@ -132,7 +129,7 @@ mod tests {
 
     #[tokio::test]
     async fn nested_proposal() -> Result<(), Error> {
-        let mut db = EmptyDb;
+        let db = EmptyDb;
         // create proposal1 which adds key "k" with value "v" and deletes "z"
         let batch = vec![
             BatchOp::Put {
@@ -164,10 +161,12 @@ mod tests {
         );
 
         // create a proposal3 by adding the two proposals together, keeping the originals
-        // TODO: consider making this possible again
-        // let proposal3 = proposal1.as_ref() + proposal2.as_ref();
-        // assert_eq!(proposal3.val(b"k").await.unwrap().unwrap(), b"v");
-        // assert_eq!(proposal3.val(b"z").await.unwrap().unwrap(), b"undo");
+        let proposal3 = proposal1.as_ref() + proposal2.as_ref();
+        assert_eq!(proposal3.val(b"k").await.unwrap().unwrap().to_vec(), b"v");
+        assert_eq!(
+            proposal3.val(b"z").await.unwrap().unwrap().to_vec(),
+            b"undo"
+        );
 
         // now consume proposal1 and proposal2
         proposal2.commit().await?;

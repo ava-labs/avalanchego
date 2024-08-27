@@ -20,7 +20,7 @@ const TESTDIR: &str = "/tmp/benchdb";
 /// The port to use for testing
 const TESTPORT: u16 = 5000;
 /// The URI to connect to; this better match the TESTPORT
-const TESTURI: &str = "http://localhost:5000";
+const TESTURI: &str = "http://127.0.0.1:5000";
 /// Retry timeouts (in seconds); we want this long for processes
 /// to start and exit
 const RETRY_TIMEOUT_SEC: u32 = 5;

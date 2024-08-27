@@ -42,7 +42,6 @@ pub(crate) struct RevisionManager {
     proposals: Vec<ProposedRevision>,
     // committing_proposals: VecDeque<Arc<ProposedImmutable>>,
     by_hash: HashMap<TrieHash, CommittedRevision>,
-    // TODO: maintain root hash of the most recent commit
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -147,8 +146,6 @@ impl RevisionManager {
         Ok(())
     }
 }
-
-pub type NewProposalError = (); // TODO implement
 
 impl RevisionManager {
     pub fn add_proposal(&mut self, proposal: ProposedRevision) {

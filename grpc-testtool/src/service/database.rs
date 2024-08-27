@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::{Database as DatabaseService, Iter};
+use super::{Database as DatabaseService, IntoStatusResultExt as _, Iter};
 use crate::rpcdb::{
     database_server::Database, CloseRequest, CloseResponse, CompactRequest, CompactResponse,
     DeleteRequest, DeleteResponse, GetRequest, GetResponse, HasRequest, HasResponse,
@@ -10,71 +10,67 @@ use crate::rpcdb::{
     NewIteratorWithStartAndPrefixRequest, NewIteratorWithStartAndPrefixResponse, PutRequest,
     PutResponse, WriteBatchRequest, WriteBatchResponse,
 };
-use firewood::v2::api::BatchOp;
+use firewood::v2::api::{BatchOp, Db as _, DbView as _, Proposal as _};
 
 use tonic::{async_trait, Request, Response, Status};
 
 #[async_trait]
 impl Database for DatabaseService {
-    async fn has(&self, _request: Request<HasRequest>) -> Result<Response<HasResponse>, Status> {
-        todo!()
-        // let key = request.into_inner().key;
-        // let revision = self.latest().await.into_status_result()?;
+    async fn has(&self, request: Request<HasRequest>) -> Result<Response<HasResponse>, Status> {
+        let key = request.into_inner().key;
+        let revision = self.latest().await.into_status_result()?;
 
-        // let val = revision.val(key).await.into_status_result()?;
+        let val = revision.val(key).await.into_status_result()?;
 
-        // let response = HasResponse {
-        //     has: val.is_some(),
-        //     ..Default::default()
-        // };
+        let response = HasResponse {
+            has: val.is_some(),
+            ..Default::default()
+        };
 
-        // Ok(Response::new(response))
+        Ok(Response::new(response))
     }
 
-    async fn get(&self, _request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
-        todo!()
-        // let key = request.into_inner().key;
-        // let revision = self.latest().await.into_status_result()?;
+    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
+        let key = request.into_inner().key;
+        let revision = self.latest().await.into_status_result()?;
 
-        // let value = revision
-        //     .val(key)
-        //     .await
-        //     .into_status_result()?
-        //     .map(|v| v.to_vec());
+        let value = revision
+            .val(key)
+            .await
+            .into_status_result()?
+            .map(|v| v.to_vec());
 
-        // let Some(value) = value else {
-        //     return Err(Status::not_found("key not found"));
-        // };
+        let Some(value) = value else {
+            return Err(Status::not_found("key not found"));
+        };
 
-        // let response = GetResponse {
-        //     value,
-        //     ..Default::default()
-        // };
+        let response = GetResponse {
+            value,
+            ..Default::default()
+        };
 
-        // Ok(Response::new(response))
+        Ok(Response::new(response))
     }
 
-    async fn put(&self, _request: Request<PutRequest>) -> Result<Response<PutResponse>, Status> {
-        todo!()
-        // let PutRequest { key, value } = request.into_inner();
-        // let batch = BatchOp::Put { key, value };
-        // let proposal = self.db.propose(vec![batch]).await.into_status_result()?;
-        // let _ = proposal.commit().await.into_status_result()?;
+    async fn put(&self, request: Request<PutRequest>) -> Result<Response<PutResponse>, Status> {
+        let PutRequest { key, value } = request.into_inner();
+        let batch = BatchOp::Put { key, value };
+        let proposal = self.db.propose(vec![batch]).await.into_status_result()?;
+        let _ = proposal.commit().await.into_status_result()?;
 
-        // Ok(Response::new(PutResponse::default()))
+        Ok(Response::new(PutResponse::default()))
     }
 
     async fn delete(
         &self,
-        _request: Request<DeleteRequest>,
+        request: Request<DeleteRequest>,
     ) -> Result<Response<DeleteResponse>, Status> {
-        todo!()
-        // let DeleteRequest { key } = request.into_inner();
-        // let batch = BatchOp::<_, Vec<u8>>::Delete { key };
-        // let proposal = self.db.propose(vec![batch]).await.into_status_result()?;
-        // let _ = proposal.commit().await.into_status_result()?;
+        let DeleteRequest { key } = request.into_inner();
+        let batch = BatchOp::<_, Vec<u8>>::Delete { key };
+        let proposal = self.db.propose(vec![batch]).await.into_status_result()?;
+        let _ = proposal.commit().await.into_status_result()?;
 
-        // Ok(Response::new(DeleteResponse::default()))
+        Ok(Response::new(DeleteResponse::default()))
     }
 
     async fn compact(
@@ -101,19 +97,18 @@ impl Database for DatabaseService {
 
     async fn write_batch(
         &self,
-        _request: Request<WriteBatchRequest>,
+        request: Request<WriteBatchRequest>,
     ) -> Result<Response<WriteBatchResponse>, Status> {
-        todo!()
-        // let WriteBatchRequest { puts, deletes } = request.into_inner();
-        // let batch = puts
-        //     .into_iter()
-        //     .map(from_put_request)
-        //     .chain(deletes.into_iter().map(from_delete_request))
-        //     .collect();
-        // let proposal = self.db.propose(batch).await.into_status_result()?;
-        // let _ = proposal.commit().await.into_status_result()?;
+        let WriteBatchRequest { puts, deletes } = request.into_inner();
+        let batch = puts
+            .into_iter()
+            .map(from_put_request)
+            .chain(deletes.into_iter().map(from_delete_request))
+            .collect();
+        let proposal = self.db.propose(batch).await.into_status_result()?;
+        let _ = proposal.commit().await.into_status_result()?;
 
-        // Ok(Response::new(WriteBatchResponse::default()))
+        Ok(Response::new(WriteBatchResponse::default()))
     }
 
     async fn new_iterator_with_start_and_prefix(
@@ -163,13 +158,13 @@ impl Database for DatabaseService {
     }
 }
 
-fn _from_put_request(request: PutRequest) -> BatchOp<Vec<u8>, Vec<u8>> {
+fn from_put_request(request: PutRequest) -> BatchOp<Vec<u8>, Vec<u8>> {
     BatchOp::Put {
         key: request.key,
         value: request.value,
     }
 }
 
-fn _from_delete_request(request: DeleteRequest) -> BatchOp<Vec<u8>, Vec<u8>> {
+fn from_delete_request(request: DeleteRequest) -> BatchOp<Vec<u8>, Vec<u8>> {
     BatchOp::Delete { key: request.key }
 }

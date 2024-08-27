@@ -50,6 +50,7 @@ use std::io::{Error, ErrorKind, Write};
 use std::iter::once;
 use std::mem::offset_of;
 use std::num::NonZeroU64;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::hashednode::hash_node;
@@ -244,7 +245,7 @@ pub trait Parentable {
 
 impl Parentable for Arc<ImmutableProposal> {
     fn as_nodestore_parent(&self) -> NodeStoreParent {
-        NodeStoreParent::Proposed(self.clone())
+        NodeStoreParent::Proposed(Arc::clone(self))
     }
     fn root_hash(&self) -> Option<TrieHash> {
         self.root_hash.clone()
@@ -587,27 +588,44 @@ pub trait HashedNodeReader: TrieReader {
     }
 }
 
+impl<T> HashedNodeReader for T
+where
+    T: Deref,
+    T::Target: HashedNodeReader,
+{
+    fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
+        self.deref().root_address_and_hash()
+    }
+}
+
 /// Reads nodes and the root address from a merkle trie.
 pub trait TrieReader: NodeReader + RootReader {}
-
-impl TrieReader for &NodeStore<Committed, FileBacked> {}
-impl NodeReader for &NodeStore<Committed, FileBacked> {
-    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, Error> {
-        self.read_node_from_disk(addr)
-    }
-}
-impl RootReader for &NodeStore<Committed, FileBacked> {
-    fn root_node(&self) -> Option<Arc<Node>> {
-        self.header
-            .root_address
-            .map(|addr| self.read_node_from_disk(addr).unwrap())
-    }
-}
+impl<T> TrieReader for T where T: NodeReader + RootReader {}
 
 /// Reads nodes from a merkle trie.
 pub trait NodeReader {
     /// Returns the node at `addr`.
     fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, Error>;
+}
+
+impl<T> NodeReader for T
+where
+    T: Deref,
+    T::Target: NodeReader,
+{
+    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, Error> {
+        self.deref().read_node(addr)
+    }
+}
+
+impl<T> RootReader for T
+where
+    T: Deref,
+    T::Target: RootReader,
+{
+    fn root_node(&self) -> Option<Arc<Node>> {
+        self.deref().root_node()
+    }
 }
 
 /// Reads the root of a merkle trie.
@@ -676,7 +694,7 @@ impl ImmutableProposal {
     }
 }
 
-impl ReadInMemoryNode for Arc<ImmutableProposal> {
+impl ReadInMemoryNode for ImmutableProposal {
     fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
         // Check if the node being requested was created in this proposal.
         if let Some((_, node)) = self.new.get(&addr) {
@@ -701,6 +719,16 @@ pub trait ReadInMemoryNode {
     /// Returns the node at `addr` if it is in memory.
     /// Returns None if it isn't.
     fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>>;
+}
+
+impl<T> ReadInMemoryNode for T
+where
+    T: Deref,
+    T::Target: ReadInMemoryNode,
+{
+    fn read_in_memory_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
+        self.deref().read_in_memory_node(addr)
+    }
 }
 
 /// Contains the state of a revision of a merkle trie.
@@ -1023,11 +1051,6 @@ impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> RootReader for NodeStore<
             .root_address
             .and_then(|addr| self.kind.read_in_memory_node(addr))
     }
-}
-
-impl<T: ReadInMemoryNode, S: ReadableStorage> TrieReader for NodeStore<T, S> where
-    NodeStore<T, S>: RootReader
-{
 }
 
 impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> HashedNodeReader for NodeStore<T, S>

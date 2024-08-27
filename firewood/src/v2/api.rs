@@ -96,19 +96,27 @@ pub enum Error {
 
     #[error("request RangeProof for empty trie")]
     RangeProofOnEmptyTrie,
-}
 
-impl From<MerkleError> for Error {
-    fn from(err: MerkleError) -> Self {
-        // TODO: do a better job
-        Error::InternalError(Box::new(err))
-    }
+    #[error("the latest revision is empty and has no root hash")]
+    LatestIsEmpty,
+
+    #[error("commit the parents of this proposal first")]
+    NotLatest,
+
+    #[error("sibling already committed")]
+    SiblingCommitted,
+
+    #[error("merkle error: {0}")]
+    Merkle(#[from] MerkleError),
 }
 
 impl From<RevisionManagerError> for Error {
     fn from(err: RevisionManagerError) -> Self {
-        // TODO: do a better job
-        Error::InternalError(Box::new(err))
+        match err {
+            RevisionManagerError::IO(io_err) => Error::IO(io_err),
+            RevisionManagerError::NotLatest => Error::NotLatest,
+            RevisionManagerError::SiblingCommitted => Error::SiblingCommitted,
+        }
     }
 }
 
@@ -144,7 +152,7 @@ pub trait Db {
     ///            [BatchOp::Delete] operations to apply
     ///
     async fn propose<'p, K: KeyType, V: ValueType>(
-        &'p mut self,
+        &'p self,
         data: Batch<K, V>,
     ) -> Result<Arc<Self::Proposal<'p>>, Error>
     where
@@ -173,8 +181,7 @@ pub trait DbView {
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Box<[u8]>>, Error>;
 
     /// Obtain a proof for a single key
-    async fn single_key_proof<K: KeyType>(&self, key: K)
-        -> Result<Option<Proof<ProofNode>>, Error>;
+    async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<Proof<ProofNode>, Error>;
 
     /// Obtain a range proof over a set of keys
     ///
