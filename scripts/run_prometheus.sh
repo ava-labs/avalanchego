@@ -31,7 +31,7 @@ if pgrep --pidfile="${PIDFILE}" -f 'prometheus.*enable-feature=agent' &> /dev/nu
   exit 0
 fi
 
-PROMETHEUS_URL="${PROMETHEUS_URL:-https://prometheus-experimental.avax-dev.network}"
+PROMETHEUS_URL="${PROMETHEUS_URL:-https://prometheus-poc.avax-dev.network}"
 if [[ -z "${PROMETHEUS_URL}" ]]; then
   echo "Please provide a value for PROMETHEUS_URL"
   exit 1

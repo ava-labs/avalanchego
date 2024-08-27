@@ -12,7 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -23,7 +25,7 @@ import (
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -32,7 +34,7 @@ func TestAtomicTxImports(t *testing.T) {
 		OutputIndex: 1,
 	}
 	amount := uint64(70000)
-	recipientKey := preFundedKeys[1]
+	recipientKey := genesistest.DefaultFundedKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
@@ -45,7 +47,7 @@ func TestAtomicTxImports(t *testing.T) {
 			Amt: amount,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				Addrs:     []ids.ShortID{recipientKey.Address()},
 			},
 		},
 	}
@@ -58,7 +60,7 @@ func TestAtomicTxImports(t *testing.T) {
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
-				recipientKey.PublicKey().Address().Bytes(),
+				recipientKey.Address().Bytes(),
 			},
 		}}},
 	}))
@@ -68,7 +70,7 @@ func TestAtomicTxImports(t *testing.T) {
 		env.ctx.XChainID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+			Addrs:     []ids.ShortID{recipientKey.Address()},
 		},
 	)
 	require.NoError(err)

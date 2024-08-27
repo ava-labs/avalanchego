@@ -35,11 +35,13 @@ type OutboundMsgBuilder interface {
 		objectedACPs []uint32,
 		knownPeersFilter []byte,
 		knownPeersSalt []byte,
+		requestAllSubnetIPs bool,
 	) (OutboundMessage, error)
 
 	GetPeerList(
 		knownPeersFilter []byte,
 		knownPeersSalt []byte,
+		requestAllSubnetIPs bool,
 	) (OutboundMessage, error)
 
 	PeerList(
@@ -242,6 +244,7 @@ func (b *outMsgBuilder) Handshake(
 	objectedACPs []uint32,
 	knownPeersFilter []byte,
 	knownPeersSalt []byte,
+	requestAllSubnetIPs bool,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
@@ -270,7 +273,8 @@ func (b *outMsgBuilder) Handshake(
 						Filter: knownPeersFilter,
 						Salt:   knownPeersSalt,
 					},
-					IpBlsSig: ipBLSSig,
+					IpBlsSig:   ipBLSSig,
+					AllSubnets: requestAllSubnetIPs,
 				},
 			},
 		},
@@ -282,6 +286,7 @@ func (b *outMsgBuilder) Handshake(
 func (b *outMsgBuilder) GetPeerList(
 	knownPeersFilter []byte,
 	knownPeersSalt []byte,
+	requestAllSubnetIPs bool,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -291,6 +296,7 @@ func (b *outMsgBuilder) GetPeerList(
 						Filter: knownPeersFilter,
 						Salt:   knownPeersSalt,
 					},
+					AllSubnets: requestAllSubnetIPs,
 				},
 			},
 		},
