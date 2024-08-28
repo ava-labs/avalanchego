@@ -26,8 +26,14 @@ function build_antithesis_builder_image {
     builder_dockerfile="${base_dockerfile}.builder-uninstrumented"
   fi
 
-  docker buildx build --build-arg GO_VERSION="${go_version}" --build-arg=MODULE_PATH="${module_path}" \
-         -t "${image_name}" -f "${builder_dockerfile}" "${target_path}"
+  BUILD_ARGS="--build-arg GO_VERSION=${go_version}"
+  if [[ -n "${module_path}" ]]; then
+    # Only set the module path if it is provided
+    BUILD_ARGS="${BUILD_ARGS} --build-arg MODULE_PATH=${module_path}"
+  fi
+
+  # shellcheck disable=SC2086
+  docker buildx build ${BUILD_ARGS} -t "${image_name}" -f "${builder_dockerfile}" "${target_path}"
 }
 
 # Build the antithesis node, workload, and config images.
