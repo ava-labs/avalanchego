@@ -455,12 +455,7 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(
-	txs []*txs.Tx,
-	feeCalculator fee.Calculator,
-	state state.Diff,
-	parentID ids.ID,
-) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculator, state state.Diff, parentID ids.ID) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
