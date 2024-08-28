@@ -5,13 +5,20 @@ ARG GO_VERSION
 FROM golang:$GO_VERSION-bullseye
 
 WORKDIR /build
-# Copy and download dependencies using go mod
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
 
 # Copy the code into the container
 COPY . .
+
+# Download dependencies of the main go module
+RUN go mod download
+
+# Providing a non-empty MODULE_PATH supports the case where the target module is
+# not at the root of the repo but its go.mod references other modules in the repo
+# (including the root).
+ARG MODULE_PATH
+
+# Download dependencies for the specified go module if a path was provided
+RUN [ -n $MODULE_PATH ] && (cd $MODULE_PATH && go mod download) || true
 
 # Ensure pre-existing builds are not available for inclusion in the final image
 RUN [ -d ./build ] && rm -rf ./build/* || true
