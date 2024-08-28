@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var ErrNotConnectedEnoughStake = errors.New("not connected to enough stake")
@@ -39,7 +42,7 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 
 func (h *handler) networkHealthCheck() (interface{}, error) {
 	percentConnected := h.peerTracker.ConnectedPercent()
-	details := map[string]float64{
+	details := map[string]interface{}{
 		"percentConnected": percentConnected,
 	}
 
@@ -54,5 +57,24 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 		)
 	}
 
+	details["disconnectedValidators"] = h.getDisconnectedValidators()
+
 	return details, err
+}
+
+func (h *handler) getDisconnectedValidators() set.Set[ids.NodeID] {
+	allVdrs := h.peerTracker.GetValidators()
+	if allVdrs.Len() == 0 {
+		return set.NewSet[ids.NodeID](0)
+	}
+	connectedVdrs := h.peerTracker.ConnectedValidators()
+	if connectedVdrs.Len() == 0 {
+		return allVdrs
+	} else if connectedVdrs.Len() == allVdrs.Len() {
+		return set.NewSet[ids.NodeID](0)
+	}
+	// difference is disconnected validator
+	allVdrs.Difference(connectedVdrs)
+
+	return allVdrs
 }
