@@ -499,18 +499,10 @@ func (c *genericCodec) marshal(
 // Unmarshal unmarshals [bytes] into [dest], where [dest] must be a pointer or
 // interface
 func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
-	if dest == nil {
-		return codec.ErrUnmarshalNil
-	}
-
 	p := wrappers.Packer{
 		Bytes: bytes,
 	}
-	destPtr := reflect.ValueOf(dest)
-	if destPtr.Kind() != reflect.Ptr {
-		return errNeedPointer
-	}
-	if err := c.unmarshal(&p, destPtr.Elem(), nil /*=typeStack*/); err != nil {
+	if err := c.UnmarshalFrom(&p, dest); err != nil {
 		return err
 	}
 	if p.Offset != len(bytes) {
