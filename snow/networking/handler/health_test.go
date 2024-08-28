@@ -154,11 +154,16 @@ func TestHealthCheckSubnet(t *testing.T) {
 				require.True(ok)
 				networkingMap, ok := detailsMap["networking"]
 				require.True(ok)
-				networkingDetails, ok := networkingMap.(map[string]float64)
+				networkingDetails, ok := networkingMap.(map[string]interface{})
 				require.True(ok)
 				percentConnected, ok := networkingDetails["percentConnected"]
 				require.True(ok)
 				require.Equal(expectedPercentConnected, percentConnected)
+				disconnectedValidators, ok := networkingDetails["disconnectedValidators"]
+				require.True(ok)
+				vdrSet, ok := disconnectedValidators.(set.Set[ids.NodeID])
+				require.True(ok)
+				require.Equal(vdrSet.Len(), testVdrCount-index-1)
 			}
 		})
 	}
