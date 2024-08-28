@@ -13,7 +13,6 @@ source "$SUBNET_EVM_PATH"/scripts/versions.sh
 
 # WARNING: this will use the most recent commit even if there are un-committed changes present
 BUILD_IMAGE_ID=${BUILD_IMAGE_ID:-"${CURRENT_BRANCH}"}
-DOCKERHUB_TAG=${SUBNET_EVM_COMMIT::8}
 
 VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
 if [[ "${VM_ID}" != "${DEFAULT_VM_ID}"  ]]; then

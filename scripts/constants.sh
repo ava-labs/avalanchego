@@ -30,6 +30,9 @@ else
     SUBNET_EVM_COMMIT="$(git --git-dir="$SUBNET_EVM_PATH/.git" rev-parse HEAD || :)"
 fi
 
+# Shared between ./scripts/build_docker_image.sh and ./scripts/tests.build_docker_image.sh
+DOCKERHUB_TAG=${SUBNET_EVM_COMMIT::8}
+
 echo "Using branch: ${CURRENT_BRANCH}"
 
 # Static compilation
