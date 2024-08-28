@@ -9,33 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func TestPickFeeCalculator(t *testing.T) {
 	var (
-		createAssetTxFee uint64 = 9
-		staticFeeConfig         = fee.StaticConfig{
-			TxFee:                         1,
-			CreateSubnetTxFee:             2,
-			TransformSubnetTxFee:          3,
-			CreateBlockchainTxFee:         4,
-			AddPrimaryNetworkValidatorFee: 5,
-			AddPrimaryNetworkDelegatorFee: 6,
-			AddSubnetValidatorFee:         7,
-			AddSubnetDelegatorFee:         8,
-		}
-		dynamicFeeConfig = gas.Config{
-			Weights:                  gas.Dimensions{1},
-			MaxCapacity:              2,
-			MaxPerSecond:             3,
-			TargetPerSecond:          4,
-			MinPrice:                 5,
-			ExcessConversionConstant: 6,
-		}
+		createAssetTxFee = genesis.LocalParams.CreateAssetTxFee
+		staticFeeConfig  = genesis.LocalParams.StaticFeeConfig
+		dynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
 	)
 
 	apricotPhase2StaticFeeConfig := staticFeeConfig
