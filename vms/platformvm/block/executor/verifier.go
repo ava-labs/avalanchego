@@ -468,7 +468,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 			txComplexity, err := fee.TxComplexity(tx.Unsigned)
 			if err != nil {
 				txID := tx.ID()
-				v.MarkDropped(txID, err) // cache tx as dropped
+				v.MarkDropped(txID, err)
 				return nil, nil, nil, err
 			}
 
