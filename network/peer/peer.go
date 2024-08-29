@@ -594,6 +594,7 @@ func (p *peer) writeMessages() {
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
+		zap.String("op", msg.Op().String()),
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
 	)
