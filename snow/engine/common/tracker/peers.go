@@ -273,8 +273,7 @@ func (p *peerData) SampleValidator() (ids.NodeID, bool) {
 }
 
 func (p *peerData) GetValidators() set.Set[ids.NodeID] {
-	vdrs := set.Of(maps.Keys(p.validators)...)
-	return vdrs
+	return set.Of(maps.Keys(p.validators)...)
 }
 
 func (p *peerData) ConnectedValidators() set.Set[ids.NodeID] {
