@@ -373,7 +373,9 @@ func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*
 		return err
 	}
 	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
-	if _, err := fmt.Fprintf(w, "\nMetrics: %s\n", MetricsLinkForNetwork(n.UUID, strconv.FormatInt(startTime.UnixMilli(), 10), "")); err != nil {
+	startTimeStr := strconv.FormatInt(startTime.UnixMilli(), 10)
+	metricsURL := MetricsLinkForNetwork(n.UUID, startTimeStr, "")
+	if _, err := fmt.Fprintf(w, "\nMetrics: %s\n", metricsURL); err != nil {
 		return err
 	}
 
