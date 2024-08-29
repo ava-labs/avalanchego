@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -16,11 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
@@ -66,15 +62,15 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				addrs.Add(key.Address())
 			}
 
-			cfg := *env.config
-			cfg.StaticFeeConfig.CreateSubnetTxFee = test.fee
-			factory := txstest.NewWalletFactory(env.ctx, &cfg, env.state)
-			builder, signer := factory.NewWallet(genesistest.DefaultFundedKeys...)
-			utx, err := builder.NewCreateSubnetTx(
+			config := *env.config
+			config.StaticFeeConfig.CreateSubnetTxFee = test.fee
+			wallet := newWallet(t, env, walletConfig{
+				config: &config,
+			})
+
+			tx, err := wallet.IssueCreateSubnetTx(
 				&secp256k1fx.OutputOwners{},
 			)
-			require.NoError(err)
-			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
