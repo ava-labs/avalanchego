@@ -4,6 +4,7 @@
 package uptime
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -12,6 +13,11 @@ import (
 )
 
 var _ Manager = (*manager)(nil)
+
+var (
+	errAlreadyStartedTracking = errors.New("already started tracking")
+	errNotStartedTracking     = errors.New("not started tracking")
+)
 
 type Manager interface {
 	Tracker
@@ -54,9 +60,12 @@ func NewManager(state State, clk *mockable.Clock) Manager {
 }
 
 func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
+	if m.startedTracking {
+		return errAlreadyStartedTracking
+	}
 	now := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
-		upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
+		upDuration, lastUpdated, err := m.CalculateUptime(nodeID)
 		if err != nil {
 			return err
 		}
@@ -67,9 +76,7 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 			continue
 		}
 
-		durationOffline := now.Sub(lastUpdated)
-		newUpDuration := upDuration + durationOffline
-		if err := m.state.SetUptime(nodeID, newUpDuration, now); err != nil {
+		if err := m.state.SetUptime(nodeID, upDuration, lastUpdated); err != nil {
 			return err
 		}
 	}
@@ -78,9 +85,8 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 }
 
 func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
-	// TODO: this was not here before, should we add it?
 	if !m.startedTracking {
-		return nil
+		return errNotStartedTracking
 	}
 	defer func() {
 		m.startedTracking = false
@@ -89,8 +95,8 @@ func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
 	for _, nodeID := range nodeIDs {
 		// If the node is already connected, then we can just
 		// update the uptime in the state and remove the connection
-		if _, isConnected := m.connections[nodeID]; isConnected {
-			if err := m.disconnect(nodeID); err != nil {
+		if m.IsConnected(nodeID) {
+			if err := m.Disconnect(nodeID); err != nil {
 				return err
 			}
 			continue
@@ -127,15 +133,11 @@ func (m *manager) IsConnected(nodeID ids.NodeID) bool {
 }
 
 func (m *manager) Disconnect(nodeID ids.NodeID) error {
-	return m.disconnect(nodeID)
-}
-
-func (m *manager) disconnect(nodeID ids.NodeID) error {
+	defer delete(m.connections, nodeID)
 	if err := m.updateUptime(nodeID); err != nil {
 		return err
 	}
-	// TODO: shall we delete the connection regardless of the error?
-	delete(m.connections, nodeID)
+
 	return nil
 }
 
