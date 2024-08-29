@@ -43,7 +43,8 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 func (h *handler) networkHealthCheck() (interface{}, error) {
 	percentConnected := h.peerTracker.ConnectedPercent()
 	details := map[string]interface{}{
-		"percentConnected": percentConnected,
+		"percentConnected":       percentConnected,
+		"disconnectedValidators": h.getDisconnectedValidators(),
 	}
 
 	var err error
@@ -55,11 +56,6 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 			percentConnected*100,
 			minPercentConnected*100,
 		)
-	}
-
-	disconnectedVdrs := h.getDisconnectedValidators()
-	if disconnectedVdrs.Len() > 0 {
-		details["disconnectedValidators"] = disconnectedVdrs
 	}
 
 	return details, err
