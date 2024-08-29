@@ -184,6 +184,9 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 
 	// align chain time and local clock
 	vm.state.SetTimestamp(vm.clock.Time())
+	vm.state.SetFeeState(gas.State{
+		Capacity: defaultDynamicFeeConfig.MaxCapacity,
+	})
 
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
@@ -245,7 +248,7 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgradetest.Durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2034,7 +2037,7 @@ func TestTransferSubnetOwnershipTx(t *testing.T) {
 
 func TestBaseTx(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgradetest.Durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
