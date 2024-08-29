@@ -38,7 +38,7 @@ type Peers interface {
 	// GetValidators returns the set of all validators
 	// known to this peer manager
 	GetValidators() set.Set[ids.NodeID]
-	// GetConnectedValidators returns the set of all validators
+	// ConnectedValidators returns the set of all validators
 	// that are currently connected
 	ConnectedValidators() set.Set[ids.NodeID]
 }
