@@ -277,7 +277,9 @@ func (p *peerData) GetValidators() set.Set[ids.NodeID] {
 }
 
 func (p *peerData) ConnectedValidators() set.Set[ids.NodeID] {
-	// copy in case
-	vdrs := set.Of(p.connectedValidators.List()...)
-	return vdrs
+	// The set is copied to avoid future changes from being reflected in the
+	// returned set.
+	copied := set.NewSet[ids.NodeID](len(p.connectedValidators))
+	copied.Union(p.connectedValidators)
+	return copied
 }
