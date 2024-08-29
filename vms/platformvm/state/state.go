@@ -302,7 +302,7 @@ type state struct {
 
 	currentStakers       *baseStakers
 	pendingStakers       *baseStakers
-	subnetOnlyValidators *subnetOnlyValidators
+	subnetOnlyValidators *baseSubnetOnlyValidators
 
 	currentHeight uint64
 
@@ -613,20 +613,9 @@ func New(
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(BlockPrefix, baseDB),
 
-		currentStakers: newBaseStakers(),
-		pendingStakers: newBaseStakers(),
-		subnetOnlyValidators: newSubnetOnlyValidators(
-			&ValidatorState{
-				Current:                  0,
-				Target:                   10_000,
-				Capacity:                 20_000,
-				Excess:                   0,
-				MinFee:                   2048,
-				ExcessConversionConstant: 60_480_000_000,
-			},
-			linkeddb.NewDefault(currentSubnetOnlyValidatorBaseDB),
-			cfg.Validators,
-		),
+		currentStakers:       newBaseStakers(),
+		pendingStakers:       newBaseStakers(),
+		subnetOnlyValidators: newBaseSubnetOnlyValidators(currentSubnetOnlyValidatorBaseDB),
 
 		validatorsDB:                     validatorsDB,
 		currentValidatorsDB:              currentValidatorsDB,
@@ -1714,7 +1703,6 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.subnetOnlyValidators.Write(height, s.validatorWeightDiffsDB, s.validatorPublicKeyDiffsDB),
 		s.writeMetadata(),
 	)
 }
