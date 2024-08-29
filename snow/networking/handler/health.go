@@ -57,7 +57,10 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 		)
 	}
 
-	details["disconnectedValidators"] = h.getDisconnectedValidators()
+	disconnectedVdrs := h.getDisconnectedValidators()
+	if disconnectedVdrs.Len() > 0 {
+		details["disconnectedValidators"] = disconnectedVdrs
+	}
 
 	return details, err
 }
@@ -65,13 +68,13 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 func (h *handler) getDisconnectedValidators() set.Set[ids.NodeID] {
 	allVdrs := h.peerTracker.GetValidators()
 	if allVdrs.Len() == 0 {
-		return set.NewSet[ids.NodeID](0)
+		return nil
 	}
 	connectedVdrs := h.peerTracker.ConnectedValidators()
 	if connectedVdrs.Len() == 0 {
 		return allVdrs
 	} else if connectedVdrs.Len() == allVdrs.Len() {
-		return set.NewSet[ids.NodeID](0)
+		return nil
 	}
 	// difference is disconnected validator
 	allVdrs.Difference(connectedVdrs)
