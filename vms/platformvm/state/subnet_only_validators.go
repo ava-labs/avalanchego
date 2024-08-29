@@ -382,7 +382,6 @@ func (b *baseSubnetOnlyValidators) Write(
 	}
 
 	for subnetID, nodeIDKeys := range b.endingPublicKeys {
-		delete(b.endingPublicKeys, subnetID)
 		for nodeID, publicKey := range nodeIDKeys {
 			if b.beginningPublicKeys != nil && b.beginningPublicKeys[subnetID] != nil && bytes.Equal(b.beginningPublicKeys[subnetID][nodeID], publicKey) {
 				continue
