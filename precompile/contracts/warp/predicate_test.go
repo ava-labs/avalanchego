@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 const pChainHeight uint64 = 1337
@@ -49,7 +48,6 @@ var (
 	numTestVdrs = 10_000
 	testVdrs    []*testValidator
 	vdrs        map[ids.NodeID]*validators.GetValidatorOutput
-	tests       []signatureTest
 
 	predicateTests = make(map[string]testutils.PredicateTest)
 )
@@ -130,15 +128,6 @@ func newTestValidator() *testValidator {
 			NodeIDs:        []ids.NodeID{nodeID},
 		},
 	}
-}
-
-type signatureTest struct {
-	name      string
-	stateF    func(*gomock.Controller) validators.State
-	quorumNum uint64
-	quorumDen uint64
-	msgF      func(*require.Assertions) *avalancheWarp.Message
-	err       error
 }
 
 // createWarpMessage constructs a signed warp message using the global variable [unsignedMsg]
