@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -34,6 +35,12 @@ type Peers interface {
 	// SampleValidator returns a randomly selected connected validator. If there
 	// are no currently connected validators then it will return false.
 	SampleValidator() (ids.NodeID, bool)
+	// GetValidators returns the set of all validators
+	// known to this peer manager
+	GetValidators() set.Set[ids.NodeID]
+	// ConnectedValidators returns the set of all validators
+	// that are currently connected
+	ConnectedValidators() set.Set[ids.NodeID]
 }
 
 type lockedPeers struct {
@@ -103,6 +110,20 @@ func (p *lockedPeers) SampleValidator() (ids.NodeID, bool) {
 	defer p.lock.RUnlock()
 
 	return p.peers.SampleValidator()
+}
+
+func (p *lockedPeers) GetValidators() set.Set[ids.NodeID] {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.peers.GetValidators()
+}
+
+func (p *lockedPeers) ConnectedValidators() set.Set[ids.NodeID] {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.peers.ConnectedValidators()
 }
 
 type meteredPeers struct {
@@ -249,4 +270,16 @@ func (p *peerData) ConnectedPercent() float64 {
 
 func (p *peerData) SampleValidator() (ids.NodeID, bool) {
 	return p.connectedValidators.Peek()
+}
+
+func (p *peerData) GetValidators() set.Set[ids.NodeID] {
+	return set.Of(maps.Keys(p.validators)...)
+}
+
+func (p *peerData) ConnectedValidators() set.Set[ids.NodeID] {
+	// The set is copied to avoid future changes from being reflected in the
+	// returned set.
+	copied := set.NewSet[ids.NodeID](len(p.connectedValidators))
+	copied.Union(p.connectedValidators)
+	return copied
 }
