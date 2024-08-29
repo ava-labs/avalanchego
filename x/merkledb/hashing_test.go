@@ -13,72 +13,82 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-var sha256HashNodeTests = []struct {
-	name         string
-	n            *node
-	expectedHash string
+var hashNodeTests = []struct {
+	name               string
+	newNode            func(hasher Hasher) *node
+	expectedSHA256Hash string
+	expectedBLAKE3Hash string
 }{
 	{
-		name:         "empty node",
-		n:            newNode(Key{}),
-		expectedHash: "rbhtxoQ1DqWHvb6w66BZdVyjmPAneZUSwQq9uKj594qvFSdav",
+		name: "empty node",
+		newNode: func(Hasher) *node {
+			return newNode(Key{})
+		},
+		expectedSHA256Hash: "rbhtxoQ1DqWHvb6w66BZdVyjmPAneZUSwQq9uKj594qvFSdav",
+		expectedBLAKE3Hash: "2713tJzWKeBB4UqkqHzs2kkKAvvnXw16rcaKXehjYraznE3cYC",
 	},
 	{
 		name: "has value",
-		n: func() *node {
+		newNode: func(hasher Hasher) *node {
 			n := newNode(Key{})
-			n.setValue(SHA256Hasher, maybe.Some([]byte("value1")))
+			n.setValue(hasher, maybe.Some([]byte("value1")))
 			return n
-		}(),
-		expectedHash: "2vx2xueNdWoH2uB4e8hbMU5jirtZkZ1c3ePCWDhXYaFRHpCbnQ",
+		},
+		expectedSHA256Hash: "2vx2xueNdWoH2uB4e8hbMU5jirtZkZ1c3ePCWDhXYaFRHpCbnQ",
+		expectedBLAKE3Hash: "7w2q1s8ZrGhuX6cQtBnBCbN9TujSRigEAznXCKLPp91aJq6sx",
 	},
 	{
-		name:         "has key",
-		n:            newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7})),
-		expectedHash: "2vA8ggXajhFEcgiF8zHTXgo8T2ALBFgffp1xfn48JEni1Uj5uK",
+		name: "has key",
+		newNode: func(Hasher) *node {
+			return newNode(ToKey([]byte{0, 1, 2, 3, 4, 5, 6, 7}))
+		},
+		expectedSHA256Hash: "2vA8ggXajhFEcgiF8zHTXgo8T2ALBFgffp1xfn48JEni1Uj5uK",
+		expectedBLAKE3Hash: "jHpUfw75cszxAMSo4aMMa6JAxh6dtKbaVJGiCEbQBoFtUmzQq",
 	},
 	{
 		name: "1 child",
-		n: func() *node {
-			n := newNode(Key{})
+		newNode: func(hasher Hasher) *node {
 			childNode := newNode(ToKey([]byte{255}))
-			childNode.setValue(SHA256Hasher, maybe.Some([]byte("value1")))
-			n.addChildWithID(childNode, 4, SHA256Hasher.HashNode(childNode))
+			childNode.setValue(hasher, maybe.Some([]byte("value1")))
+
+			n := newNode(Key{})
+			n.addChildWithID(childNode, 4, hasher.HashNode(childNode))
 			return n
-		}(),
-		expectedHash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
+		},
+		expectedSHA256Hash: "YfJRufqUKBv9ez6xZx6ogpnfDnw9fDsyebhYDaoaH57D3vRu3",
+		expectedBLAKE3Hash: "2ovNiNxAeLh7XHNSjGQDDiLCikVzbHfTa86TDnsSYrSvxoDZp1",
 	},
 	{
 		name: "2 children",
-		n: func() *node {
-			n := newNode(Key{})
-
+		newNode: func(hasher Hasher) *node {
 			childNode1 := newNode(ToKey([]byte{255}))
-			childNode1.setValue(SHA256Hasher, maybe.Some([]byte("value1")))
+			childNode1.setValue(hasher, maybe.Some([]byte("value1")))
 
 			childNode2 := newNode(ToKey([]byte{237}))
-			childNode2.setValue(SHA256Hasher, maybe.Some([]byte("value2")))
+			childNode2.setValue(hasher, maybe.Some([]byte("value2")))
 
-			n.addChildWithID(childNode1, 4, SHA256Hasher.HashNode(childNode1))
-			n.addChildWithID(childNode2, 4, SHA256Hasher.HashNode(childNode2))
+			n := newNode(Key{})
+			n.addChildWithID(childNode1, 4, hasher.HashNode(childNode1))
+			n.addChildWithID(childNode2, 4, hasher.HashNode(childNode2))
 			return n
-		}(),
-		expectedHash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
+		},
+		expectedSHA256Hash: "YVmbx5MZtSKuYhzvHnCqGrswQcxmozAkv7xE1vTA2EiGpWUkv",
+		expectedBLAKE3Hash: "MmwSZRw7dm34AK5yHpw1n8H4FvWsc6RjCCWrr8h6Q8WrBvgQ9",
 	},
 	{
 		name: "16 children",
-		n: func() *node {
+		newNode: func(hasher Hasher) *node {
 			n := newNode(Key{})
-
 			for i := byte(0); i < 16; i++ {
 				childNode := newNode(ToKey([]byte{i << 4}))
-				childNode.setValue(SHA256Hasher, maybe.Some([]byte("some value")))
+				childNode.setValue(hasher, maybe.Some([]byte("some value")))
 
-				n.addChildWithID(childNode, 4, SHA256Hasher.HashNode(childNode))
+				n.addChildWithID(childNode, 4, hasher.HashNode(childNode))
 			}
 			return n
-		}(),
-		expectedHash: "5YiFLL7QV3f441See9uWePi3wVKsx9fgvX5VPhU8PRxtLqhwY",
+		},
+		expectedSHA256Hash: "5YiFLL7QV3f441See9uWePi3wVKsx9fgvX5VPhU8PRxtLqhwY",
+		expectedBLAKE3Hash: "ZnCsxyX1qQzAjwocmzQ7gxKQfk6VmB5jk6p6KppYVfr3b6pVe",
 	},
 }
 
@@ -138,19 +148,44 @@ func Fuzz_SHA256_HashNode(f *testing.F) {
 }
 
 func Test_SHA256_HashNode(t *testing.T) {
-	for _, test := range sha256HashNodeTests {
+	for _, test := range hashNodeTests {
 		t.Run(test.name, func(t *testing.T) {
-			hash := SHA256Hasher.HashNode(test.n)
-			require.Equal(t, test.expectedHash, hash.String())
+			hash := SHA256Hasher.HashNode(test.newNode(SHA256Hasher))
+			require.Equal(t, test.expectedSHA256Hash, hash.String())
+		})
+	}
+}
+
+func Test_BLAKE3_HashNode(t *testing.T) {
+	for _, test := range hashNodeTests {
+		t.Run(test.name, func(t *testing.T) {
+			hash := BLAKE3Hasher.HashNode(test.newNode(BLAKE3Hasher))
+			require.Equal(t, test.expectedBLAKE3Hash, hash.String())
 		})
 	}
 }
 
 func Benchmark_SHA256_HashNode(b *testing.B) {
-	for _, benchmark := range sha256HashNodeTests {
+	for _, benchmark := range hashNodeTests {
 		b.Run(benchmark.name, func(b *testing.B) {
+			n := benchmark.newNode(SHA256Hasher)
+
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				SHA256Hasher.HashNode(benchmark.n)
+				SHA256Hasher.HashNode(n)
+			}
+		})
+	}
+}
+
+func Benchmark_BLAKE3_HashNode(b *testing.B) {
+	for _, benchmark := range hashNodeTests {
+		b.Run(benchmark.name, func(b *testing.B) {
+			n := benchmark.newNode(BLAKE3Hasher)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				BLAKE3Hasher.HashNode(n)
 			}
 		})
 	}
