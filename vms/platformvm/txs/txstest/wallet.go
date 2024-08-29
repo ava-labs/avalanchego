@@ -81,7 +81,7 @@ func NewWallet(
 		owners[subnetID] = owner
 	}
 
-	builderContext := newContext(ctx, config, state.GetTimestamp())
+	builderContext := newContext(ctx, config, state)
 	backend := wallet.NewBackend(
 		builderContext,
 		common.NewChainUTXOs(constants.PlatformChainID, utxos),
