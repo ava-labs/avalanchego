@@ -18,7 +18,11 @@ const HashLength = 32
 
 var (
 	SHA256Hasher Hasher = &sha256Hasher{}
-	BLAKE3Hasher Hasher = &blake3Hasher{}
+	// This hasher is not safe to use as it is not thread safe. However, it is
+	// useful to show the performance difference between SHA256 and BLAKE3.
+	BLAKE3Hasher Hasher = &blake3Hasher{
+		blake: blake3.New(),
+	}
 
 	// If a Hasher isn't specified, this package defaults to using the
 	// [SHA256Hasher].
@@ -95,16 +99,16 @@ func (*sha256Hasher) HashValue(value []byte) ids.ID {
 	return sha256.Sum256(value)
 }
 
-// TODO: If the hasher were not used concurrently, we could reset the internal
-// state for a significant performance improvement.
-type blake3Hasher struct{}
+type blake3Hasher struct {
+	blake *blake3.Hasher
+}
 
 // This method is performance critical. It is not expected to perform any memory
 // allocations.
-func (*blake3Hasher) HashNode(n *node) ids.ID {
+func (b *blake3Hasher) HashNode(n *node) ids.ID {
 	var (
 		// blake.Write always returns nil, so we ignore its return values.
-		blake = blake3.New()
+		blake = b.blake
 		hash  ids.ID
 		// The hash length is larger than the maximum Uvarint length. This
 		// ensures binary.AppendUvarint doesn't perform any memory allocations.
@@ -151,11 +155,18 @@ func (*blake3Hasher) HashNode(n *node) ids.ID {
 	_, _ = blake.Write(binary.AppendUvarint(emptyHashBuffer, uint64(n.key.length)))
 	_, _ = blake.Write(n.key.Bytes())
 	blake.Sum(emptyHashBuffer)
+	blake.Reset()
 	return hash
 }
 
 // This method is performance critical. It is not expected to perform any memory
 // allocations.
-func (*blake3Hasher) HashValue(value []byte) ids.ID {
-	return blake3.Sum256(value)
+func (b *blake3Hasher) HashValue(value []byte) ids.ID {
+	// blake.Write always returns nil, so we ignore its return values.
+	_, _ = b.blake.Write(value)
+
+	var hash ids.ID
+	b.blake.Sum(hash[:0])
+	b.blake.Reset()
+	return hash
 }
