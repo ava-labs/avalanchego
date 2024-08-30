@@ -1408,7 +1408,7 @@ func CommitToMemDB(b *testing.B, batchSize int, batchCount int) {
 
 func CommitBatch(b *testing.B, db *merkleDB, batchSize int, seed int64) {
 	ops := make([]database.BatchOp, batchSize)
-	r := rand.New(rand.NewSource(seed))
+	r := rand.New(rand.NewSource(seed)) // #nosec G404
 	for i := range ops {
 		size := r.Intn(64) + 1
 		ops[i] = database.BatchOp{
