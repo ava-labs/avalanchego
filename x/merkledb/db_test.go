@@ -8,13 +8,14 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"math/rand"
 	"slices"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -1409,10 +1410,10 @@ func CommitBatch(b *testing.B, db *merkleDB, batchSize int, seed int64) {
 	ops := make([]database.BatchOp, batchSize)
 	r := rand.New(rand.NewSource(seed))
 	for i := range ops {
-		size := r.Intn(10)
+		size := r.Intn(64) + 1
 		ops[i] = database.BatchOp{
 			Key:   make([]byte, size),
-			Value: make([]byte, size),
+			Value: make([]byte, 32),
 		}
 		r.Read(ops[i].Key)
 		r.Read(ops[i].Value)
