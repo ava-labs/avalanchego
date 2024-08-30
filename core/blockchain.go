@@ -1226,6 +1226,9 @@ func (bc *BlockChain) Reject(block *types.Block) error {
 		return fmt.Errorf("failed to write delete block batch: %w", err)
 	}
 
+	// Remove the block from the block cache (ignore return value of whether it was in the cache)
+	_ = bc.blockCache.Remove(block.Hash())
+
 	return nil
 }
 
@@ -1780,32 +1783,6 @@ func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, e
 	badBlockCounter.Inc(1)
 	bc.addBadBlock(block, reason)
 	log.Debug(reason.String())
-}
-
-func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
-	batch := bc.db.NewBatch()
-
-	for i := start; i < end; i++ {
-		hashes := rawdb.ReadAllHashes(bc.db, i)
-		canonicalBlock := bc.GetBlockByNumber((i))
-		if canonicalBlock == nil {
-			return fmt.Errorf("failed to retrieve block by number at height %d", i)
-		}
-		canonicalHash := canonicalBlock.Hash()
-		for _, hash := range hashes {
-			if hash == canonicalHash {
-				continue
-			}
-			rawdb.DeleteBlock(batch, hash, i)
-		}
-
-		if err := batch.Write(); err != nil {
-			return fmt.Errorf("failed to write delete rejected block batch at height %d", i)
-		}
-		batch.Reset()
-	}
-
-	return nil
 }
 
 // reprocessBlock reprocesses a previously accepted block. This is often used

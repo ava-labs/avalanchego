@@ -494,6 +494,7 @@ func TestAcceptNonCanonicalBlock(t *testing.T, create func(db ethdb.Database, gs
 		if err := blockchain.Reject(chain1[i]); err != nil {
 			t.Fatal(err)
 		}
+		require.False(t, blockchain.HasBlock(chain1[i].Hash(), chain1[i].NumberU64()))
 	}
 
 	lastAcceptedBlock := blockchain.LastConsensusAcceptedBlock()
