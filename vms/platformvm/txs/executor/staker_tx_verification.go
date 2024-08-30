@@ -41,6 +41,7 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	ErrRemoveValidatorManagedSubnet    = errors.New("RemoveSubnetValidatorTx cannot be used to remove a validator from a Subnet with a manager")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -304,6 +305,16 @@ func verifyRemoveSubnetValidatorTx(
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
 		return nil, false, err
+	}
+
+	if backend.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
+		_, _, err := chainState.GetSubnetManager(tx.Subnet)
+		if err == nil {
+			return nil, false, fmt.Errorf("%w: %q", ErrRemoveValidatorManagedSubnet, tx.Subnet)
+		}
+		if err != database.ErrNotFound {
+			return nil, false, err
+		}
 	}
 
 	isCurrentValidator := true

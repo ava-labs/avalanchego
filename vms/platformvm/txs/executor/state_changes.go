@@ -165,12 +165,22 @@ func AdvanceTimeTo(
 		changed = true
 	}
 
-	if err := changes.Apply(parentState); err != nil {
-		return false, err
+	if backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
+		previousChainTime := changes.GetTimestamp()
+		duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+		feeState := changes.GetFeeState()
+		feeState = feeState.AdvanceTime(
+			backend.Config.DynamicFeeConfig.MaxCapacity,
+			backend.Config.DynamicFeeConfig.MaxPerSecond,
+			backend.Config.DynamicFeeConfig.TargetPerSecond,
+			duration,
+		)
+		changes.SetFeeState(feeState)
 	}
 
-	parentState.SetTimestamp(newChainTime)
-	return changed, nil
+	changes.SetTimestamp(newChainTime)
+	return changed, changes.Apply(parentState)
 }
 
 func GetRewardsCalculator(

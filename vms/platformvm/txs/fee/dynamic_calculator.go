@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -20,8 +20,8 @@ var (
 )
 
 func NewDynamicCalculator(
-	weights fee.Dimensions,
-	price fee.GasPrice,
+	weights gas.Dimensions,
+	price gas.Price,
 ) Calculator {
 	return &dynamicCalculator{
 		weights: weights,
@@ -30,8 +30,8 @@ func NewDynamicCalculator(
 }
 
 type dynamicCalculator struct {
-	weights fee.Dimensions
-	price   fee.GasPrice
+	weights gas.Dimensions
+	price   gas.Price
 }
 
 func (c *dynamicCalculator) CalculateFee(tx txs.UnsignedTx) (uint64, error) {

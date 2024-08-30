@@ -12,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/databasemock"
 	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
@@ -111,7 +112,7 @@ func TestIterator(t *testing.T) {
 			databaseErrBefore: nil,
 			expectedErr:       errIter,
 			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
-				mockInnerIter := database.NewMockIterator(ctrl)
+				mockInnerIter := databasemock.NewIterator(ctrl)
 				mockInnerIter.EXPECT().Next().Return(false)
 				mockInnerIter.EXPECT().Error().Return(errIter)
 				iter.Iterator = mockInnerIter
@@ -135,7 +136,7 @@ func TestIterator(t *testing.T) {
 			databaseErrBefore: nil,
 			expectedErr:       errIter,
 			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
-				mockInnerIter := database.NewMockIterator(ctrl)
+				mockInnerIter := databasemock.NewIterator(ctrl)
 				mockInnerIter.EXPECT().Error().Return(errIter)
 				iter.Iterator = mockInnerIter
 			},

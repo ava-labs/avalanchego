@@ -36,13 +36,13 @@ build_and_test() {
   local target_images=(
     "$image_name:$commit_hash"
     "$image_name:$image_tag"
-    "$image_name:$commit_hash-race"
-    "$image_name:$image_tag-race"
+    "$image_name:$commit_hash-r"
+    "$image_name:$image_tag-r"
   )
 
   for arch in "${arches[@]}"; do
     for target_image in "${target_images[@]}"; do
-      if [[ "$host_arch" == "amd64" && "$arch" == "arm64" && "$target_image" =~ "-race" ]]; then
+      if [[ "$host_arch" == "amd64" && "$arch" == "arm64" && "$target_image" =~ "-r" ]]; then
         # Error reported when trying to sanity check this configuration in github ci:
         #
         #   FATAL: ThreadSanitizer: unsupported VMA range

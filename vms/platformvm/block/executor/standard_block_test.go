@@ -14,19 +14,20 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestApricotStandardBlockTimeVerification(t *testing.T) {
@@ -57,7 +58,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	chainTime := env.clk.Time().Truncate(time.Second)
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(fee.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -116,7 +117,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 
 	// store just once current staker to mark next staker time.
-	currentStakerIt := state.NewMockStakerIterator(ctrl)
+	currentStakerIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
 	currentStakerIt.EXPECT().Value().Return(
 		&state.Staker{
@@ -128,13 +129,13 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
 
 	// no pending stakers
-	pendingIt := state.NewMockStakerIterator(ctrl)
+	pendingIt := iteratormock.NewIterator[*state.Staker](ctrl)
 	pendingIt.EXPECT().Next().Return(false).AnyTimes()
 	pendingIt.EXPECT().Release().Return().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
-	onParentAccept.EXPECT().GetFeeState().Return(fee.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 
 	txID := ids.GenerateTestID()
 	utxo := &avax.UTXO{
@@ -142,7 +143,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 			TxID: txID,
 		},
 		Asset: avax.Asset{
-			ID: avaxAssetID,
+			ID: snowtest.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: env.config.StaticFeeConfig.CreateSubnetTxFee,
@@ -295,19 +296,19 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorStartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
-	addPendingValidatorTx, err := addPendingValidator(
+	addPendingValidatorTx := addPendingValidator(
+		t,
 		env,
 		pendingValidatorStartTime,
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 	)
-	require.NoError(err)
 
 	// build standard block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
@@ -362,8 +363,8 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 	staker1 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf1}),
 		rewardAddress: ids.ShortID{0xf1},
-		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		startTime:     genesistest.DefaultValidatorStartTime.Add(1 * time.Minute),
+		endTime:       genesistest.DefaultValidatorStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
 	}
 	staker2 := staker{
 		nodeID:        ids.BuildTestNodeID([]byte{0xf2}),
@@ -498,20 +499,23 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 			env.config.TrackedSubnets.Add(subnetID)
 
 			for _, staker := range test.stakers {
-				_, err := addPendingValidator(
+				addPendingValidator(
+					t,
 					env,
 					staker.startTime,
 					staker.endTime,
 					staker.nodeID,
 					staker.rewardAddress,
-					[]*secp256k1.PrivateKey{preFundedKeys[0]},
+					[]*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 				)
-				require.NoError(err)
 			}
 
 			for _, staker := range test.subnetStakers {
-				builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
-				utx, err := builder.NewAddSubnetValidatorTx(
+				wallet := newWallet(t, env, walletConfig{
+					subnetIDs: []ids.ID{subnetID},
+				})
+
+				tx, err := wallet.IssueAddSubnetValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: staker.nodeID,
@@ -522,8 +526,6 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 						Subnet: subnetID,
 					},
 				)
-				require.NoError(err)
-				tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 				require.NoError(err)
 
 				staker, err := state.NewPendingStaker(
@@ -600,24 +602,24 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	subnetID := testSubnet1.ID()
 	env.config.TrackedSubnets.Add(subnetID)
 
+	wallet := newWallet(t, env, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
 	// Add a subnet validator to the staker set
-	subnetValidatorNodeID := genesisNodeIDs[0]
-	subnetVdr1StartTime := defaultValidateStartTime
-	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
-	utx, err := builder.NewAddSubnetValidatorTx(
+	subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
+	subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
+	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: subnetValidatorNodeID,
-				Start:  uint64(subnetVdr1StartTime.Unix()),
+				Start:  genesistest.DefaultValidatorStartTimeUnix,
 				End:    uint64(subnetVdr1EndTime.Unix()),
 				Wght:   1,
 			},
 			Subnet: subnetID,
 		},
 	)
-	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	addSubnetValTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
@@ -636,8 +638,8 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// The above validator is now part of the staking set
 
 	// Queue a staker that joins the staker set after the above validator leaves
-	subnetVdr2NodeID := genesisNodeIDs[1]
-	utx, err = builder.NewAddSubnetValidatorTx(
+	subnetVdr2NodeID := genesistest.DefaultNodeIDs[1]
+	tx, err = wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
 				NodeID: subnetVdr2NodeID,
@@ -648,8 +650,6 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 			Subnet: subnetID,
 		},
 	)
-	require.NoError(err)
-	tx, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	staker, err = state.NewPendingStaker(
@@ -706,12 +706,15 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 				env.config.TrackedSubnets.Add(subnetID)
 			}
 
+			wallet := newWallet(t, env, walletConfig{
+				subnetIDs: []ids.ID{subnetID},
+			})
+
 			// Add a subnet validator to the staker set
-			subnetValidatorNodeID := genesisNodeIDs[0]
-			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
-			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
-			builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1])
-			utx, err := builder.NewAddSubnetValidatorTx(
+			subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
+			subnetVdr1StartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Minute)
+			subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
+			tx, err := wallet.IssueAddSubnetValidatorTx(
 				&txs.SubnetValidator{
 					Validator: txs.Validator{
 						NodeID: subnetValidatorNodeID,
@@ -722,8 +725,6 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 					Subnet: subnetID,
 				},
 			)
-			require.NoError(err)
-			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			staker, err := state.NewPendingStaker(
@@ -767,19 +768,19 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Case: Timestamp is after next validator start time
 	// Add a pending validator
-	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
+	pendingValidatorStartTime := genesistest.DefaultValidatorStartTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMaxStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
 	rewardAddress := ids.GenerateTestShortID()
-	_, err := addPendingValidator(
+	addPendingValidator(
+		t,
 		env,
 		pendingValidatorStartTime,
 		pendingValidatorEndTime,
 		nodeID,
 		rewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
 	)
-	require.NoError(err)
 
 	// build standard block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
@@ -801,12 +802,13 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	vdrWeight := env.config.Validators.GetWeight(constants.PrimaryNetworkID, nodeID)
 	require.Equal(env.config.MinValidatorStake, vdrWeight)
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	// Add delegator
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0], preFundedKeys[1], preFundedKeys[4])
-	utx, err := builder.NewAddDelegatorTx(
+	addDelegatorTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(pendingDelegatorStartTime.Unix()),
@@ -815,11 +817,9 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 		},
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		},
 	)
-	require.NoError(err)
-	addDelegatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	staker, err := state.NewPendingStaker(

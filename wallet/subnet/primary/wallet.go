@@ -17,6 +17,7 @@ import (
 
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	psigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+	pwallet "github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	xsigner "github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 )
@@ -25,18 +26,18 @@ var _ Wallet = (*wallet)(nil)
 
 // Wallet provides chain wallets for the primary network.
 type Wallet interface {
-	P() p.Wallet
+	P() pwallet.Wallet
 	X() x.Wallet
 	C() c.Wallet
 }
 
 type wallet struct {
-	p p.Wallet
+	p pwallet.Wallet
 	x x.Wallet
 	c c.Wallet
 }
 
-func (w *wallet) P() p.Wallet {
+func (w *wallet) P() pwallet.Wallet {
 	return w.p
 }
 
@@ -49,7 +50,7 @@ func (w *wallet) C() c.Wallet {
 }
 
 // Creates a new default wallet
-func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
+func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) Wallet {
 	return &wallet{
 		p: p,
 		x: x,
@@ -60,7 +61,7 @@ func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
 // Creates a Wallet with the given set of options
 func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	return NewWallet(
-		p.NewWalletWithOptions(w.P(), options...),
+		pwallet.WithOptions(w.P(), options...),
 		x.NewWalletWithOptions(w.X(), options...),
 		c.NewWalletWithOptions(w.C(), options...),
 	)
@@ -105,7 +106,8 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		return nil, err
 	}
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)
 
@@ -122,7 +124,7 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
 
 	return NewWallet(
-		p.NewWallet(pBuilder, pSigner, avaxState.PClient, pBackend),
+		pwallet.New(pClient, pBuilder, pSigner),
 		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
 		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
 	), nil
