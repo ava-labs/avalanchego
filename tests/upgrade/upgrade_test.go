@@ -50,13 +50,12 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	ginkgo.It("can upgrade versions", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
 
-		{
-			// Get the default genesis so we can modify it
-			genesis, err := network.DefaultGenesis()
-			require.NoError(err)
-			network.Genesis = genesis
-		}
+		// Get the default genesis so we can modify it
+		genesis, err := network.DefaultGenesis()
+		require.NoError(err)
+		network.Genesis = genesis
 
+		// Configure network upgrade flag
 		latestUnscheduled := upgradetest.GetConfig(upgradetest.Latest - 1)
 		upgradeJSON, err := json.Marshal(latestUnscheduled)
 		require.NoError(err)
