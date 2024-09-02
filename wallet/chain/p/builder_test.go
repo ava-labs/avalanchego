@@ -679,7 +679,7 @@ func TestConvertSubnetTx(t *testing.T) {
 					constants.PlatformChainID: utxos,
 				})
 				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
-				builder = builder.New(set.Of(utxoAddr, rewardAddr), e.context, backend)
+				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
 			utx, err := builder.NewConvertSubnetTx(
