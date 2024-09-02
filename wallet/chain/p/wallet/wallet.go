@@ -135,8 +135,8 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	// NewConvertSubnetTx creates, signs, and issues a transaction that converts
-	// the subnet to a Permissionless L1.
+	// IssueConvertSubnetTx creates, signs, and issues a transaction that
+	// converts the subnet to a Permissionless L1.
 	//
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
