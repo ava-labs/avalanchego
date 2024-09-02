@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var (
@@ -27,7 +28,7 @@ type ConvertSubnetTx struct {
 	// Chain where the Subnet manager lives
 	ChainID ids.ID `serialize:"true" json:"chainID"`
 	// Address of the Subnet manager
-	Address []byte `serialize:"true" json:"address"`
+	Address types.JSONByteSlice `serialize:"true" json:"address"`
 	// Authorizes this conversion
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
