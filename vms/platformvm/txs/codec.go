@@ -38,8 +38,10 @@ func init() {
 		// we skip positions for the blocks.
 		c.SkipRegistrations(5)
 
-		errs.Add(RegisterApricotTypes(c))
-		errs.Add(RegisterBanffTypes(c))
+		errs.Add(
+			RegisterApricotTypes(c),
+			RegisterBanffTypes(c),
+		)
 
 		c.SkipRegistrations(4)
 
