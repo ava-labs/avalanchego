@@ -605,7 +605,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 					SigIndices: []uint32{1, 0},
 				},
 			},
-			expectedErr: errInvalidSubnetAuth,
+			expectedErr: secp256k1fx.ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name: "passes verification",
