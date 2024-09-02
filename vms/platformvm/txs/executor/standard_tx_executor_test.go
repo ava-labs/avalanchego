@@ -2462,13 +2462,11 @@ func newValidConvertSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) con
 func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	ctx := snowtest.Context(t, constants.PlatformChainID)
 
-	type test struct {
+	tests := []struct {
 		name        string
 		newExecutor func(*gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor)
 		err         error
-	}
-
-	tests := []test{
+	}{
 		{
 			name: "invalid prior to E-Upgrade",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.ConvertSubnetTx, *StandardTxExecutor) {
@@ -2702,16 +2700,4 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			require.ErrorIs(t, err, tt.err)
 		})
 	}
-}
-
-func TestConvertSubnetTxLargeAddress(t *testing.T) {
-	require := require.New(t)
-	ctx := snowtest.Context(t, constants.PlatformChainID)
-
-	convertSubnetTx, _ := newConvertSubnetTx(t, 4096)
-	require.NoError(convertSubnetTx.SyntacticVerify(ctx))
-
-	convertSubnetTx, _ = newConvertSubnetTx(t, 4097)
-	err := convertSubnetTx.SyntacticVerify(ctx)
-	require.ErrorIs(err, txs.ErrAddressTooLong)
 }

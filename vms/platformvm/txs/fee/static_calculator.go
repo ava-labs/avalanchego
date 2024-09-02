@@ -47,6 +47,10 @@ func (*staticVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
+func (*staticVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+	return ErrUnsupportedTx
+}
+
 func (c *staticVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
 	c.fee = c.config.AddPrimaryNetworkValidatorFee
 	return nil
@@ -116,11 +120,6 @@ func (c *staticVisitor) ImportTx(*txs.ImportTx) error {
 }
 
 func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
-	c.fee = c.config.TxFee
-	return nil
-}
-
-func (c *staticVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	c.fee = c.config.TxFee
 	return nil
 }
