@@ -535,23 +535,19 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 
 func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 	var (
-		ctx = snowtest.Context(t, ids.GenerateTestID())
-
-		// A BaseTx that already passed syntactic verification.
-		verifiedBaseTx = BaseTx{
-			SyntacticallyVerified: true,
-		}
-
-		// A BaseTx that will pass syntactic verification.
+		ctx         = snowtest.Context(t, ids.GenerateTestID())
 		validBaseTx = BaseTx{
 			BaseTx: avax.BaseTx{
 				NetworkID:    ctx.NetworkID,
 				BlockchainID: ctx.ChainID,
 			},
 		}
-
-		// A BaseTx that will fail syntactic verification.
-		invalidBaseTx = BaseTx{}
+		validSubnetID     = ids.GenerateTestID()
+		invalidAddress    = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
+		validSubnetAuth   = &secp256k1fx.Input{}
+		invalidSubnetAuth = &secp256k1fx.Input{
+			SigIndices: []uint32{1, 0},
+		}
 	)
 
 	tests := []struct {
@@ -567,43 +563,49 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 		{
 			name: "already verified",
 			tx: &ConvertSubnetTx{
-				BaseTx: verifiedBaseTx,
+				BaseTx: BaseTx{
+					SyntacticallyVerified: true,
+				},
+				Subnet:     constants.PrimaryNetworkID,
+				Address:    invalidAddress,
+				SubnetAuth: invalidSubnetAuth,
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "invalid subnetID",
 			tx: &ConvertSubnetTx{
-				BaseTx: validBaseTx,
-				Subnet: constants.PrimaryNetworkID,
+				BaseTx:     validBaseTx,
+				Subnet:     constants.PrimaryNetworkID,
+				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: ErrConvertPermissionlessSubnet,
 		},
 		{
 			name: "invalid address",
 			tx: &ConvertSubnetTx{
-				BaseTx:  validBaseTx,
-				Subnet:  ids.GenerateTestID(),
-				Address: make(types.JSONByteSlice, MaxSubnetAddressLength+1),
+				BaseTx:     validBaseTx,
+				Subnet:     validSubnetID,
+				Address:    make(types.JSONByteSlice, MaxSubnetAddressLength+1),
+				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: ErrAddressTooLong,
 		},
 		{
 			name: "invalid BaseTx",
 			tx: &ConvertSubnetTx{
-				BaseTx: invalidBaseTx,
-				Subnet: ids.GenerateTestID(),
+				BaseTx:     BaseTx{},
+				Subnet:     validSubnetID,
+				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "invalid subnetAuth",
 			tx: &ConvertSubnetTx{
-				BaseTx: validBaseTx,
-				Subnet: ids.GenerateTestID(),
-				SubnetAuth: &secp256k1fx.Input{
-					SigIndices: []uint32{1, 0},
-				},
+				BaseTx:     validBaseTx,
+				Subnet:     validSubnetID,
+				SubnetAuth: invalidSubnetAuth,
 			},
 			expectedErr: secp256k1fx.ErrInputIndicesNotSortedUnique,
 		},
@@ -611,8 +613,8 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			name: "passes verification",
 			tx: &ConvertSubnetTx{
 				BaseTx:     validBaseTx,
-				Subnet:     ids.GenerateTestID(),
-				SubnetAuth: &secp256k1fx.Input{},
+				Subnet:     validSubnetID,
+				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: nil,
 		},
