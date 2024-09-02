@@ -45,8 +45,10 @@ func init() {
 
 		c.SkipRegistrations(4)
 
-		errs.Add(RegisterDurangoTypes(c))
-		errs.Add(RegisterEtnaUnsignedTxsTypes(c))
+		errs.Add(
+			RegisterDurangoTypes(c),
+			RegisterEtnaTypes(c),
+		)
 	}
 
 	Codec = codec.NewDefaultManager()
@@ -116,7 +118,9 @@ func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
 	)
 }
 
-func RegisterEtnaUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
+// RegisterEtnaTypes registers the type information for transactions that
+// were valid during the Etna series of upgrades.
+func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&ConvertSubnetTx{}),
 	)
