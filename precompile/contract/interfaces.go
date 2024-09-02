@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 )
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
@@ -26,8 +27,8 @@ type StateDB interface {
 	SetNonce(common.Address, uint64)
 	GetNonce(common.Address) uint64
 
-	GetBalance(common.Address) *big.Int
-	AddBalance(common.Address, *big.Int)
+	GetBalance(common.Address) *uint256.Int
+	AddBalance(common.Address, *uint256.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool

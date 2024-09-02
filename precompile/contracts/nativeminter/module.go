@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 )
 
 var _ contract.Configurator = &configurator{}
@@ -52,8 +53,9 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	}
 	for to, amount := range config.InitialMint {
 		if amount != nil {
-			bigIntAmount := (*big.Int)(amount)
-			state.AddBalance(to, bigIntAmount)
+			amountBig := (*big.Int)(amount)
+			amountU256, _ := uint256.FromBig(amountBig)
+			state.AddBalance(to, amountU256)
 		}
 	}
 

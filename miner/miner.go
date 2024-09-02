@@ -47,7 +47,8 @@ type Backend interface {
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Etherbase common.Address `toml:",omitempty"` // Public address for block mining rewards
+	Etherbase                    common.Address `toml:",omitempty"` // Public address for block mining rewards
+	TestOnlyAllowDuplicateBlocks bool           // Allow mining of duplicate blocks (used in tests only)
 }
 
 type Miner struct {

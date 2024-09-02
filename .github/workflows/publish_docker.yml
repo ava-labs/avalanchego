@@ -15,7 +15,6 @@ on:
     branches:
       - master
 
-
 jobs:
   publish_docker_image:
     name: Publish Docker Image

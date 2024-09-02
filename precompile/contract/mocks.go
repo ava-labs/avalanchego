@@ -16,6 +16,7 @@ import (
 	snow "github.com/ava-labs/avalanchego/snow"
 	precompileconfig "github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	common "github.com/ethereum/go-ethereum/common"
+	uint256 "github.com/holiman/uint256"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -187,7 +188,7 @@ func (m *MockStateDB) EXPECT() *MockStateDBMockRecorder {
 }
 
 // AddBalance mocks base method.
-func (m *MockStateDB) AddBalance(arg0 common.Address, arg1 *big.Int) {
+func (m *MockStateDB) AddBalance(arg0 common.Address, arg1 *uint256.Int) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddBalance", arg0, arg1)
 }
@@ -237,10 +238,10 @@ func (mr *MockStateDBMockRecorder) Exist(arg0 any) *gomock.Call {
 }
 
 // GetBalance mocks base method.
-func (m *MockStateDB) GetBalance(arg0 common.Address) *big.Int {
+func (m *MockStateDB) GetBalance(arg0 common.Address) *uint256.Int {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBalance", arg0)
-	ret0, _ := ret[0].(*big.Int)
+	ret0, _ := ret[0].(*uint256.Int)
 	return ret0
 }
 

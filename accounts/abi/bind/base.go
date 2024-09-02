@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/interfaces"
+	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
@@ -387,7 +388,8 @@ func (c *BoundContract) estimateGasLimit(opts *TransactOpts, contract *common.Ad
 
 func (c *BoundContract) getNonce(opts *TransactOpts) (uint64, error) {
 	if opts.Nonce == nil {
-		return c.transactor.AcceptedNonceAt(ensureContext(opts.Context), opts.From)
+		pendingBlock := big.NewInt(int64(rpc.PendingBlockNumber))
+		return c.transactor.NonceAt(ensureContext(opts.Context), opts.From, pendingBlock)
 	} else {
 		return opts.Nonce.Uint64(), nil
 	}

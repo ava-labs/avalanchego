@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -285,7 +286,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	// Verify the new account doesn't exist yet
 	genesisState, err := vm.blockChain.State()
 	require.NoError(t, err)
-	require.Equal(t, common.Big0, genesisState.GetBalance(newAccount))
+	require.Equal(t, common.U2560, genesisState.GetBalance(newAccount))
 
 	// Advance the chain to the upgrade time
 	vm.clock.Set(upgradeTimestamp)
@@ -308,9 +309,11 @@ func TestVMStateUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	// Existing account
-	expectedGenesisAccountBalance := new(big.Int).Add(
-		genesisAccount.Balance,
-		(*big.Int)(genesisAccountUpgrade.BalanceChange),
+	expectedGenesisAccountBalance := uint256.MustFromBig(
+		new(big.Int).Add(
+			genesisAccount.Balance,
+			(*big.Int)(genesisAccountUpgrade.BalanceChange),
+		),
 	)
 	require.Equal(t, state.GetBalance(testEthAddrs[0]), expectedGenesisAccountBalance)
 	require.Equal(t, state.GetState(testEthAddrs[0], storageKey), genesisAccountUpgrade.Storage[storageKey])
@@ -319,8 +322,8 @@ func TestVMStateUpgrade(t *testing.T) {
 	require.Equal(t, state.GetNonce(testEthAddrs[0]), genesisAccount.Nonce) // Nonce should be preserved since it was non-zero
 
 	// New account
-	expectedNewAccountBalance := newAccountUpgrade.BalanceChange
-	require.Equal(t, state.GetBalance(newAccount), (*big.Int)(expectedNewAccountBalance))
+	expectedNewAccountBalance := uint256.MustFromBig((*big.Int)(newAccountUpgrade.BalanceChange))
+	require.Equal(t, state.GetBalance(newAccount), expectedNewAccountBalance)
 	require.Equal(t, state.GetCode(newAccount), upgradedCode)
 	require.Equal(t, state.GetCodeHash(newAccount), crypto.Keccak256Hash(upgradedCode))
 	require.Equal(t, state.GetNonce(newAccount), uint64(1)) // Nonce should be set to 1 when code is set if nonce was 0

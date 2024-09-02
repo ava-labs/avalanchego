@@ -30,7 +30,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"testing"
 
@@ -42,6 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,7 +64,7 @@ func updateTrie(addrHash common.Hash, root common.Hash, dirties, cleans map[comm
 func generateAccount(storageRoot common.Hash) types.StateAccount {
 	return types.StateAccount{
 		Nonce:    uint64(rand.Intn(100)),
-		Balance:  big.NewInt(rand.Int63()),
+		Balance:  uint256.NewInt(rand.Uint64()),
 		CodeHash: testutil.RandBytes(32),
 		Root:     storageRoot,
 	}

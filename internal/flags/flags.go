@@ -266,7 +266,8 @@ type BigFlag struct {
 	Hidden     bool
 	HasBeenSet bool
 
-	Value *big.Int
+	Value        *big.Int
+	defaultValue *big.Int
 
 	Aliases []string
 	EnvVars []string
@@ -279,6 +280,10 @@ func (f *BigFlag) IsSet() bool     { return f.HasBeenSet }
 func (f *BigFlag) String() string  { return cli.FlagStringer(f) }
 
 func (f *BigFlag) Apply(set *flag.FlagSet) error {
+	// Set default value so that environment wont be able to overwrite it
+	if f.Value != nil {
+		f.defaultValue = new(big.Int).Set(f.Value)
+	}
 	for _, envVar := range f.EnvVars {
 		envVar = strings.TrimSpace(envVar)
 		if value, found := syscall.Getenv(envVar); found {
@@ -293,7 +298,6 @@ func (f *BigFlag) Apply(set *flag.FlagSet) error {
 		f.Value = new(big.Int)
 		set.Var((*bigValue)(f.Value), f.Name, f.Usage)
 	})
-
 	return nil
 }
 
@@ -320,7 +324,7 @@ func (f *BigFlag) GetDefaultText() string {
 	if f.DefaultText != "" {
 		return f.DefaultText
 	}
-	return f.GetValue()
+	return f.defaultValue.String()
 }
 
 // bigValue turns *big.Int into a flag.Value

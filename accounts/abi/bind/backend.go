@@ -94,6 +94,11 @@ type BlockHashContractCaller interface {
 // used when the user does not provide some needed values, but rather leaves it up
 // to the transactor to decide.
 type ContractTransactor interface {
+	interfaces.GasEstimator
+	interfaces.GasPricer
+	interfaces.GasPricer1559
+	interfaces.TransactionSender
+
 	// HeaderByNumber returns a block header from the current canonical chain. If
 	// number is nil, the latest known header is returned.
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
@@ -101,46 +106,20 @@ type ContractTransactor interface {
 	// AcceptedCodeAt returns the code of the given account in the accepted state.
 	AcceptedCodeAt(ctx context.Context, account common.Address) ([]byte, error)
 
-	// AcceptedNonceAt retrieves the current accepted nonce associated with an account.
-	AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error)
-
-	// SuggestGasPrice retrieves the currently suggested gas price to allow a timely
-	// execution of a transaction.
-	SuggestGasPrice(ctx context.Context) (*big.Int, error)
-
-	// SuggestGasTipCap retrieves the currently suggested 1559 priority fee to allow
-	// a timely execution of a transaction.
-	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
-
-	// EstimateGas tries to estimate the gas needed to execute a specific
-	// transaction based on the current pending state of the backend blockchain.
-	// There is no guarantee that this is the true gas limit requirement as other
-	// transactions may be added or removed by miners, but it should provide a basis
-	// for setting a reasonable default.
-	EstimateGas(ctx context.Context, call interfaces.CallMsg) (gas uint64, err error)
-
-	// SendTransaction injects the transaction into the pending pool for execution.
-	SendTransaction(ctx context.Context, tx *types.Transaction) error
-}
-
-// ContractFilterer defines the methods needed to access log events using one-off
-// queries or continuous event subscriptions.
-type ContractFilterer interface {
-	// FilterLogs executes a log filter operation, blocking during execution and
-	// returning all the results in one batch.
-	//
-	// TODO(karalabe): Deprecate when the subscription one can return past data too.
-	FilterLogs(ctx context.Context, query interfaces.FilterQuery) ([]types.Log, error)
-
-	// SubscribeFilterLogs creates a background log filtering operation, returning
-	// a subscription immediately, which can be used to stream the found events.
-	SubscribeFilterLogs(ctx context.Context, query interfaces.FilterQuery, ch chan<- types.Log) (interfaces.Subscription, error)
+	// NonceAt retrieves the nonce associated with an account.
+	NonceAt(ctx context.Context, account common.Address, blockNum *big.Int) (uint64, error)
 }
 
 // DeployBackend wraps the operations needed by WaitMined and WaitDeployed.
 type DeployBackend interface {
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error)
+}
+
+// ContractFilterer defines the methods needed to access log events using one-off
+// queries or continuous event subscriptions.
+type ContractFilterer interface {
+	interfaces.LogFilterer
 }
 
 // ContractBackend defines the methods needed to work with contracts on a read-write basis.

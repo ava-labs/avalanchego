@@ -2707,7 +2707,7 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	}
 
 	balance := blkState.GetBalance(etherBase)
-	require.Equal(t, 1, balance.Cmp(common.Big0))
+	require.Equal(t, 1, balance.Cmp(common.U2560))
 }
 
 func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
@@ -2797,7 +2797,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	balance := blkState.GetBalance(testAddr)
-	require.Equal(t, 1, balance.Cmp(common.Big0))
+	require.Equal(t, 1, balance.Cmp(common.U2560))
 
 	// Test Case: Disable reward manager
 	// This should revert back to enabling fee recipients
@@ -2935,7 +2935,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.NoError(t, err)
 
 	balance := blkState.GetBalance(etherBase)
-	require.Equal(t, 1, balance.Cmp(common.Big0))
+	require.Equal(t, 1, balance.Cmp(common.U2560))
 
 	// Test Case: Disable reward manager
 	// This should revert back to burning fees

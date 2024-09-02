@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	syncHandlers "github.com/ava-labs/subnet-evm/sync/handlers"
 	syncStats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
-	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ava-labs/subnet-evm/warp"
 	warpHandlers "github.com/ava-labs/subnet-evm/warp/handlers"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -31,7 +31,7 @@ type networkHandler struct {
 func newNetworkHandler(
 	provider syncHandlers.SyncDataProvider,
 	diskDB ethdb.KeyValueReader,
-	evmTrieDB *trie.Database,
+	evmTrieDB *triedb.Database,
 	warpBackend warp.Backend,
 	networkCodec codec.Manager,
 ) message.RequestHandler {

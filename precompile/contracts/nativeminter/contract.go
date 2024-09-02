@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 )
 
 const (
@@ -117,7 +118,8 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		stateDB.CreateAccount(to)
 	}
 
-	stateDB.AddBalance(to, amount)
+	amountU256, _ := uint256.FromBig(amount)
+	stateDB.AddBalance(to, amountU256)
 	// Return an empty output and the remaining gas
 	return []byte{}, remainingGas, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 )
 
 // Configure applies the state upgrade to the state.
@@ -29,7 +30,8 @@ func upgradeAccount(account common.Address, upgrade params.StateUpgradeAccount, 
 	}
 
 	if upgrade.BalanceChange != nil {
-		state.AddBalance(account, (*big.Int)(upgrade.BalanceChange))
+		balanceChange, _ := uint256.FromBig((*big.Int)(upgrade.BalanceChange))
+		state.AddBalance(account, balanceChange)
 	}
 	if len(upgrade.Code) != 0 {
 		// if the nonce is 0, set the nonce to 1 as we would when deploying a contract at

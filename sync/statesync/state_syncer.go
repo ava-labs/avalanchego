@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	syncclient "github.com/ava-labs/subnet-evm/sync/client"
-	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"golang.org/x/sync/errgroup"
@@ -37,7 +37,7 @@ type StateSyncerConfig struct {
 type stateSync struct {
 	db        ethdb.Database    // database we are syncing
 	root      common.Hash       // root of the EVM state we are syncing to
-	trieDB    *trie.Database    // trieDB on top of db we are syncing. used to restore any existing tries.
+	trieDB    *triedb.Database  // trieDB on top of db we are syncing. used to restore any existing tries.
 	snapshot  snapshot.Snapshot // used to access the database we are syncing as a snapshot.
 	batchSize int               // write batches when they reach this size
 	client    syncclient.Client // used to contact peers over the network
@@ -68,7 +68,7 @@ func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
 		db:              config.DB,
 		client:          config.Client,
 		root:            config.Root,
-		trieDB:          trie.NewDatabase(config.DB, nil),
+		trieDB:          triedb.NewDatabase(config.DB, nil),
 		snapshot:        snapshot.NewDiskLayer(config.DB),
 		stats:           newTrieSyncStats(),
 		triesInProgress: make(map[common.Hash]*trieToSync),

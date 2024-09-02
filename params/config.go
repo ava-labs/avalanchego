@@ -236,7 +236,8 @@ func (c *ChainConfig) Description() string {
 	}
 
 	banner += "Hard forks (timestamp based):\n"
-	banner += fmt.Sprintf(" - Cancun Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(c.CancunTime))
+	banner += fmt.Sprintf(" - Cancun Timestamp:              @%-10v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md)\n", ptrToString(c.CancunTime))
+	banner += fmt.Sprintf(" - Verkle Timestamp:              @%-10v", ptrToString(c.VerkleTime))
 
 	banner += "Avalanche Upgrades (timestamp based):\n"
 	banner += c.NetworkUpgrades.Description()
@@ -628,6 +629,7 @@ type EthRules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsCancun                                                bool
+	IsVerkle                                                bool
 }
 
 // Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
@@ -675,6 +677,7 @@ func (c *ChainConfig) rules(num *big.Int, timestamp uint64) Rules {
 			IsPetersburg:     c.IsPetersburg(num),
 			IsIstanbul:       c.IsIstanbul(num),
 			IsCancun:         c.IsCancun(num, timestamp),
+			IsVerkle:         c.IsVerkle(num, timestamp),
 		},
 	}
 }

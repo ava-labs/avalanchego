@@ -33,7 +33,7 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 	copyConfig := *params.TestChainConfig
 	genesis := &core.Genesis{
 		Config: &copyConfig,
-		Alloc: core.GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
 			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
 			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
@@ -139,7 +139,7 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 	copyConfig := *params.TestChainConfig
 	genesis := &core.Genesis{
 		Config: &copyConfig,
-		Alloc: core.GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			accounts[0].addr: {Balance: big.NewInt(params.Ether)},
 			accounts[1].addr: {Balance: big.NewInt(params.Ether)},
 			accounts[2].addr: {Balance: big.NewInt(params.Ether)},
@@ -203,7 +203,7 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 	copyConfig := *params.TestChainConfig
 	genesis := &core.Genesis{
 		Config: &copyConfig,
-		Alloc: core.GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			accounts[0].addr: {Balance: big.NewInt(5 * params.Ether)},
 			accounts[1].addr: {Balance: big.NewInt(5 * params.Ether)},
 			accounts[2].addr: {Balance: big.NewInt(5 * params.Ether)},
@@ -300,7 +300,7 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 	copyConfig := *params.TestChainConfig
 	genesis := &core.Genesis{
 		Config: &copyConfig,
-		Alloc: core.GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			accounts[0].addr: {Balance: big.NewInt(5 * params.Ether)},
 			accounts[1].addr: {Balance: big.NewInt(5 * params.Ether)},
 			accounts[2].addr: {Balance: big.NewInt(5 * params.Ether)},
