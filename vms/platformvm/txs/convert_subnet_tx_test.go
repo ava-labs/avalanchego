@@ -8,15 +8,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify/verifymock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
@@ -527,7 +526,7 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 	"memo": "0xf09f98850a77656c6c2074686174277301234521",
 	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
 	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
-	"address": "AAAAAAAAAAAAAAAAAAAAAAAA3q0=",
+	"address": "0x000000000000000000000000000000000000dead",
 	"subnetAuthorization": {
 		"signatureIndices": []
 	}
@@ -535,124 +534,100 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 }
 
 func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
-	type test struct {
-		name        string
-		txFunc      func(*gomock.Controller) *ConvertSubnetTx
-		expectedErr error
-	}
-
 	var (
-		networkID = uint32(1337)
-		chainID   = ids.GenerateTestID()
+		ctx = snowtest.Context(t, ids.GenerateTestID())
+
+		// A BaseTx that already passed syntactic verification.
+		verifiedBaseTx = BaseTx{
+			SyntacticallyVerified: true,
+		}
+
+		// A BaseTx that will pass syntactic verification.
+		validBaseTx = BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    ctx.NetworkID,
+				BlockchainID: ctx.ChainID,
+			},
+		}
+
+		// A BaseTx that will fail syntactic verification.
+		invalidBaseTx = BaseTx{}
 	)
 
-	ctx := &snow.Context{
-		ChainID:   chainID,
-		NetworkID: networkID,
-	}
-
-	// A BaseTx that already passed syntactic verification.
-	verifiedBaseTx := BaseTx{
-		SyntacticallyVerified: true,
-	}
-	// Sanity check.
-	require.NoError(t, verifiedBaseTx.SyntacticVerify(ctx))
-
-	// A BaseTx that passes syntactic verification.
-	validBaseTx := BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		},
-	}
-	// Sanity check.
-	require.NoError(t, validBaseTx.SyntacticVerify(ctx))
-	// Make sure we're not caching the verification result.
-	require.False(t, validBaseTx.SyntacticallyVerified)
-
-	// A BaseTx that fails syntactic verification.
-	invalidBaseTx := BaseTx{}
-
-	tests := []test{
+	tests := []struct {
+		name        string
+		tx          *ConvertSubnetTx
+		expectedErr error
+	}{
 		{
-			name: "nil tx",
-			txFunc: func(*gomock.Controller) *ConvertSubnetTx {
-				return nil
-			},
+			name:        "nil tx",
+			tx:          nil,
 			expectedErr: ErrNilTx,
 		},
 		{
 			name: "already verified",
-			txFunc: func(*gomock.Controller) *ConvertSubnetTx {
-				return &ConvertSubnetTx{BaseTx: verifiedBaseTx}
+			tx: &ConvertSubnetTx{
+				BaseTx: verifiedBaseTx,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "invalid BaseTx",
-			txFunc: func(*gomock.Controller) *ConvertSubnetTx {
-				return &ConvertSubnetTx{
-					// Set subnetID so we don't error on that check.
-					Subnet: ids.GenerateTestID(),
-					BaseTx: invalidBaseTx,
-				}
-			},
-			expectedErr: avax.ErrWrongNetworkID,
-		},
-		{
 			name: "invalid subnetID",
-			txFunc: func(*gomock.Controller) *ConvertSubnetTx {
-				return &ConvertSubnetTx{
-					BaseTx: validBaseTx,
-					Subnet: constants.PrimaryNetworkID,
-				}
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: constants.PrimaryNetworkID,
 			},
 			expectedErr: ErrConvertPermissionlessSubnet,
 		},
 		{
+			name: "invalid address",
+			tx: &ConvertSubnetTx{
+				BaseTx:  validBaseTx,
+				Subnet:  ids.GenerateTestID(),
+				Address: make(types.JSONByteSlice, MaxSubnetAddressLength+1),
+			},
+			expectedErr: ErrAddressTooLong,
+		},
+		{
+			name: "invalid BaseTx",
+			tx: &ConvertSubnetTx{
+				BaseTx: invalidBaseTx,
+				Subnet: ids.GenerateTestID(),
+			},
+			expectedErr: avax.ErrWrongNetworkID,
+		},
+		{
 			name: "invalid subnetAuth",
-			txFunc: func(ctrl *gomock.Controller) *ConvertSubnetTx {
-				// This SubnetAuth fails verification.
-				invalidSubnetAuth := verifymock.NewVerifiable(ctrl)
-				invalidSubnetAuth.EXPECT().Verify().Return(errInvalidSubnetAuth)
-				return &ConvertSubnetTx{
-					// Set subnetID so we don't error on that check.
-					Subnet:     ids.GenerateTestID(),
-					BaseTx:     validBaseTx,
-					SubnetAuth: invalidSubnetAuth,
-				}
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: ids.GenerateTestID(),
+				SubnetAuth: &secp256k1fx.Input{
+					SigIndices: []uint32{1, 0},
+				},
 			},
 			expectedErr: errInvalidSubnetAuth,
 		},
 		{
 			name: "passes verification",
-			txFunc: func(ctrl *gomock.Controller) *ConvertSubnetTx {
-				// This SubnetAuth passes verification.
-				validSubnetAuth := verifymock.NewVerifiable(ctrl)
-				validSubnetAuth.EXPECT().Verify().Return(nil)
-				return &ConvertSubnetTx{
-					// Set subnetID so we don't error on that check.
-					Subnet:     ids.GenerateTestID(),
-					BaseTx:     validBaseTx,
-					SubnetAuth: validSubnetAuth,
-				}
+			tx: &ConvertSubnetTx{
+				BaseTx:     validBaseTx,
+				Subnet:     ids.GenerateTestID(),
+				SubnetAuth: &secp256k1fx.Input{},
 			},
 			expectedErr: nil,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
-			tx := tt.txFunc(ctrl)
-			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr != nil {
+			err := test.tx.SyntacticVerify(ctx)
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr != nil {
 				return
 			}
-			require.True(tx.SyntacticallyVerified)
+			require.True(test.tx.SyntacticallyVerified)
 		})
 	}
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
+const MaxSubnetAddressLength = 4096
+
 var (
 	_ UnsignedTx = (*TransferSubnetOwnershipTx)(nil)
 
@@ -42,7 +44,7 @@ func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.Subnet == constants.PrimaryNetworkID:
 		return ErrConvertPermissionlessSubnet
-	case len(tx.Address) > 4096:
+	case len(tx.Address) > MaxSubnetAddressLength:
 		return ErrAddressTooLong
 	}
 
