@@ -32,13 +32,6 @@ type ConvertSubnetTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [ConvertSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so
-// that the addresses can be json marshalled into human readable format
-func (tx *ConvertSubnetTx) InitCtx(ctx *snow.Context) {
-	tx.BaseTx.InitCtx(ctx)
-}
-
 func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
