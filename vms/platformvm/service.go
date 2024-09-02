@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -439,8 +440,8 @@ type GetSubnetResponse struct {
 	// subnet transformation tx ID for an elastic subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
 	// subnet manager information for a permissionless L1
-	ManagerChainID ids.ID `json:"managerChainID"`
-	ManagerAddress []byte `json:"managerAddress"`
+	ManagerChainID ids.ID              `json:"managerChainID"`
+	ManagerAddress types.JSONByteSlice `json:"managerAddress"`
 }
 
 func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetSubnetResponse) error {
