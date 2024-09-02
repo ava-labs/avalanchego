@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
+var DefaultNodeID = ids.GenerateTestNodeID()
+
 type Config struct {
 	DB              database.Database
 	Genesis         []byte
@@ -44,10 +46,13 @@ func New(t testing.TB, c Config) state.State {
 		c.DB = memdb.New()
 	}
 	if len(c.Genesis) == 0 {
-		c.Genesis = genesistest.NewBytes(t)
+		c.Genesis = genesistest.NewBytes(t, genesistest.Config{})
 	}
 	if c.Registerer == nil {
 		c.Registerer = prometheus.NewRegistry()
+	}
+	if c.Validators == nil {
+		c.Validators = validators.NewManager()
 	}
 	if c.Upgrades == (upgrade.Config{}) {
 		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
@@ -58,7 +63,7 @@ func New(t testing.TB, c Config) state.State {
 	if c.Context == nil {
 		c.Context = &snow.Context{
 			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
+			NodeID:    DefaultNodeID,
 			Log:       logging.NoLog{},
 		}
 	}

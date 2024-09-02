@@ -29,15 +29,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -50,43 +47,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
-	defaultWeight = 10000
-	trackChecksum = false
-)
-
-var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	defaultTxFee              = uint64(100)
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = preFundedKeys[0:3]
-
-	// Node IDs of genesis validators. Initialized in init function
-	genesisNodeIDs []ids.NodeID
+	defaultTxFee = 100 * units.NanoAvax
 )
 
-func init() {
-	genesisNodeIDs = make([]ids.NodeID, len(preFundedKeys))
-	for i := range preFundedKeys {
-		genesisNodeIDs[i] = ids.GenerateTestNodeID()
-	}
-}
+var testSubnet1 *txs.Tx
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -109,7 +84,6 @@ type environment struct {
 	state          state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	factory        *txstest.WalletFactory
 	backend        txexecutor.Backend
 }
 
@@ -141,7 +115,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = statetest.New(t, statetest.Config{
 		DB:         res.baseDB,
-		Genesis:    buildGenesisTest(t, res.ctx),
+		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
 		Validators: res.config.Validators,
 		Context:    res.ctx,
 		Rewards:    rewardsCalc,
@@ -149,7 +123,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
@@ -229,26 +202,44 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	return res
 }
 
+type walletConfig struct {
+	keys      []*secp256k1.PrivateKey
+	subnetIDs []ids.ID
+}
+
+func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
+	if len(c.keys) == 0 {
+		c.keys = genesistest.DefaultFundedKeys
+	}
+	return txstest.NewWallet(
+		t,
+		e.ctx,
+		e.config,
+		e.state,
+		secp256k1fx.NewKeychain(c.keys...),
+		c.subnetIDs,
+		[]ids.ID{e.ctx.CChainID, e.ctx.XChainID},
+	)
+}
+
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
-	utx, err := builder.NewCreateSubnetTx(
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[:1],
+	})
+
+	var err error
+	testSubnet1, err = wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
-				preFundedKeys[0].PublicKey().Address(),
-				preFundedKeys[1].PublicKey().Address(),
-				preFundedKeys[2].PublicKey().Address(),
+				genesistest.DefaultFundedKeys[0].Address(),
+				genesistest.DefaultFundedKeys[1].Address(),
+				genesistest.DefaultFundedKeys[2].Address(),
 			},
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
-		}),
 	)
-	require.NoError(err)
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	genesisID := env.state.GetLastAccepted()
@@ -275,7 +266,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 	upgradetest.SetTimesTo(
 		&upgrades,
 		min(f, upgradetest.ApricotPhase5),
-		defaultValidateEndTime,
+		genesistest.DefaultValidatorEndTime,
 	)
 
 	return &config.Config{
@@ -305,7 +296,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
 	clk := &mockable.Clock{}
-	clk.Set(defaultGenesisTime)
+	clk.Set(genesistest.DefaultValidatorStartTime)
 	return clk
 }
 
@@ -341,61 +332,4 @@ func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstra
 		require.NoError(res.Bootstrapped())
 	}
 	return res
-}
-
-func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
-	require := require.New(t)
-
-	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
-		require.NoError(err)
-		genesisUTXOs[i] = api.UTXO{
-			Amount:  json.Uint64(defaultBalance),
-			Address: addr,
-		}
-	}
-
-	genesisValidators := make([]api.GenesisPermissionlessValidator, len(genesisNodeIDs))
-	for i, nodeID := range genesisNodeIDs {
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-		require.NoError(err)
-		genesisValidators[i] = api.GenesisPermissionlessValidator{
-			GenesisValidator: api.GenesisValidator{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
-			},
-			RewardOwner: &api.Owner{
-				Threshold: 1,
-				Addresses: []string{addr},
-			},
-			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
-				Address: addr,
-			}},
-			DelegationFee: reward.PercentDenominator,
-		}
-	}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   ctx.AVAXAssetID,
-		UTXOs:         genesisUTXOs,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(defaultGenesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	require.NoError(err)
-
-	return genesisBytes
 }

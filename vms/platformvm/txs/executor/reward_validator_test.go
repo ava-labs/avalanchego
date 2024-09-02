@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -18,13 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
@@ -137,7 +135,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	onCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
-	require.Equal(oldBalance+stakerToRemove.Weight+27697, onCommitBalance)
+	require.Equal(oldBalance+stakerToRemove.Weight+38944, onCommitBalance)
 }
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
@@ -243,15 +241,16 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 	dummyHeight := uint64(1)
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
-	uVdrTx, err := builder.NewAddValidatorTx(
+	vdrTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -265,13 +264,11 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		reward.PercentDenominator/4,
 	)
 	require.NoError(err)
-	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
-	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	uDelTx, err := builder.NewAddDelegatorTx(
+	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -283,8 +280,6 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 	)
-	require.NoError(err)
-	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
@@ -377,15 +372,16 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Cortina)
 	dummyHeight := uint64(1)
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
-	uVdrTx, err := builder.NewAddValidatorTx(
+	vdrTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -399,13 +395,11 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		reward.PercentDenominator/4,
 	)
 	require.NoError(err)
-	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
-	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	uDelTx, err := builder.NewAddDelegatorTx(
+	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -417,8 +411,6 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 	)
-	require.NoError(err)
-	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
@@ -607,15 +599,16 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	env := newEnvironment(t, upgradetest.Cortina)
 	dummyHeight := uint64(1)
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
-	uVdrTx, err := builder.NewAddValidatorTx(
+	vdrTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -629,13 +622,11 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 		reward.PercentDenominator/4,
 	)
 	require.NoError(err)
-	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
-	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	uDelTx, err := builder.NewAddDelegatorTx(
+	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -647,8 +638,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 	)
-	require.NoError(err)
-	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
@@ -780,18 +769,19 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 	dummyHeight := uint64(1)
 
+	wallet := newWallet(t, env, walletConfig{})
+
 	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
 
 	vdrRewardAddress := ids.GenerateTestShortID()
 	delRewardAddress := ids.GenerateTestShortID()
 
-	vdrStartTime := uint64(defaultValidateStartTime.Unix()) + 1
-	vdrEndTime := uint64(defaultValidateStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
-	builder, signer := env.factory.NewWallet(preFundedKeys[0])
-	uVdrTx, err := builder.NewAddValidatorTx(
+	vdrTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  vdrStartTime,
@@ -805,13 +795,11 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		reward.PercentDenominator/4,
 	)
 	require.NoError(err)
-	vdrTx, err := walletsigner.SignUnsigned(context.Background(), signer, uVdrTx)
-	require.NoError(err)
 
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 
-	uDelTx, err := builder.NewAddDelegatorTx(
+	delTx, err := wallet.IssueAddDelegatorTx(
 		&txs.Validator{
 			NodeID: vdrNodeID,
 			Start:  delStartTime,
@@ -823,8 +811,6 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 			Addrs:     []ids.ShortID{delRewardAddress},
 		},
 	)
-	require.NoError(err)
-	delTx, err := walletsigner.SignUnsigned(context.Background(), signer, uDelTx)
 	require.NoError(err)
 
 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
