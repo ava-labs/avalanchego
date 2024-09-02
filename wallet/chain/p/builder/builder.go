@@ -784,9 +784,7 @@ func (b *builder) NewConvertSubnetTx(
 	address []byte,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
-	}
+	toBurn := map[ids.ID]uint64{}
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
