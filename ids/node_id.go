@@ -47,7 +47,7 @@ func ToNodeID(bytes []byte) (NodeID, error) {
 func ParseNodeID(bytes []byte) (NodeID, error) {
 	if len(bytes) == ShortIDLen {
 		var node NodeID
-		copy(node.ShortNodeID[:], bytes[:])
+		copy(node.ShortNodeID[:], bytes)
 		return node, nil
 	}
 	return NodeID{}, errWrongNodeIDLength
