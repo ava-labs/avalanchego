@@ -660,7 +660,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"destinationChain": "2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w",
 		"exportedOutputs": [
 			{
@@ -800,7 +800,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"name": "Team Rocket",
 		"symbol": "TR",
 		"denomination": 0,
@@ -1617,7 +1617,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
