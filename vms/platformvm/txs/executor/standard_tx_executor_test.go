@@ -2507,17 +2507,17 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			wallet := txstest.NewWallet(
-				t,
-				ctx,
-				defaultConfig,
-				baseState,
-				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-				[]ids.ID{subnetID},
-				nil, // chainIDs
-			)
-
+			// Create the ConvertSubnetTx
 			var (
+				wallet = txstest.NewWallet(
+					t,
+					ctx,
+					defaultConfig,
+					baseState,
+					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+					[]ids.ID{subnetID},
+					nil, // chainIDs
+				)
 				chainID = ids.GenerateTestID()
 				address = utils.RandomBytes(32)
 			)
