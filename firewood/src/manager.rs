@@ -18,10 +18,10 @@ use storage::{Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, T
 #[derive(Clone, Debug, TypedBuilder)]
 pub struct RevisionManagerConfig {
     /// The number of historical revisions to keep in memory.
-    #[builder(default = 64)]
+    #[builder(default = 128)]
     max_revisions: usize,
 
-    #[builder(default_code = "NonZero::new(1024).expect(\"non-zero\")")]
+    #[builder(default_code = "NonZero::new(20480).expect(\"non-zero\")")]
     node_cache_size: NonZero<usize>,
 }
 
@@ -120,18 +120,34 @@ impl RevisionManager {
         {
             return Err(RevisionManagerError::NotLatest);
         }
-        // 2. Persist delete list
-        // TODO
+
+        let mut committed = proposal.as_committed();
+
+        // 2. Persist delete list for this committed revision to disk for recovery
+
+        // 2.5 Take the deleted entries from the oldest revision and mark them as free for this revision
+        // If you crash after freeing some of these, then the free list will point to nodes that are not actually free.
+        // TODO: Handle the case where we get something off the free list that is not free
+        if self.historical.len() > self.max_revisions {
+            let oldest = self.historical.pop_front().expect("must be present");
+            if let Some(oldest_hash) = oldest.kind.root_hash() {
+                self.by_hash.remove(&oldest_hash);
+            }
+
+            if let Some(oldest) = Arc::into_inner(oldest) {
+                committed.reap_deleted(&oldest)?;
+            }
+        }
 
         // 3. Set last committed revision
-        let committed: CommittedRevision = proposal.as_committed().into();
+        let committed: CommittedRevision = committed.into();
         self.historical.push_back(committed.clone());
         if let Some(hash) = committed.kind.root_hash() {
             self.by_hash.insert(hash, committed.clone());
         }
         // TODO: We could allow other commits to start here using the pending list
 
-        // 4. Free list flush
+        // 4. Free list flush, which will prevent allocating on top of the nodes we are about to write
         proposal.flush_freelist()?;
 
         // 5. Node flush
@@ -148,9 +164,6 @@ impl RevisionManager {
         for p in self.proposals.iter() {
             proposal.commit_reparent(p);
         }
-
-        // 8. Revision reaping
-        // TODO
 
         Ok(())
     }

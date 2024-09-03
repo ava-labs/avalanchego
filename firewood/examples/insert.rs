@@ -6,11 +6,13 @@
 
 use clap::Parser;
 use std::{
-    borrow::BorrowMut as _, collections::HashMap, error::Error, ops::RangeInclusive, time::Instant,
+    borrow::BorrowMut as _, collections::HashMap, error::Error, num::NonZeroUsize,
+    ops::RangeInclusive, time::Instant,
 };
 
 use firewood::{
     db::{Batch, BatchOp, Db, DbConfig},
+    manager::RevisionManagerConfig,
     v2::api::{Db as _, DbView, Proposal as _},
 };
 use rand::{distributions::Alphanumeric, Rng, SeedableRng as _};
@@ -29,6 +31,12 @@ struct Args {
     read_verify_percent: u16,
     #[arg(short, long)]
     seed: Option<u64>,
+    #[arg(short, long, default_value_t = NonZeroUsize::new(20480).expect("is non-zero"))]
+    cache_size: NonZeroUsize,
+    #[arg(short, long, default_value_t = true)]
+    truncate: bool,
+    #[arg(short, long, default_value_t = 128)]
+    revisions: usize,
 }
 
 fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error + Sync + Send>> {
@@ -45,9 +53,16 @@ fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error +
 /// cargo run --release --example insert
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let cfg = DbConfig::builder().truncate(true).build();
-
     let args = Args::parse();
+
+    let mgrcfg = RevisionManagerConfig::builder()
+        .node_cache_size(args.cache_size)
+        .max_revisions(args.revisions)
+        .build();
+    let cfg = DbConfig::builder()
+        .truncate(args.truncate)
+        .manager(mgrcfg)
+        .build();
 
     let db = Db::new("rev_db", cfg)
         .await

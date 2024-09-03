@@ -436,68 +436,37 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
 
         Ok((addr, index))
     }
+}
 
-    // TODO danlaine: Use this code inside the revision management code or delete it.
-    // The inner implementation of `create_node` that doesn't update the free lists.
-    // fn create_node_inner(&mut self, node: Node) -> Result<LinearAddress, Error> {
-    //     let (addr, index) = self.allocate_node(&node)?;
+impl<S: WritableStorage> NodeStore<Committed, S> {
+    /// Deletes the [Node] at the given address, updating the next pointer at
+    /// the given addr, and changing the header of this committed nodestore to
+    /// have the address on the freelist
+    pub fn delete_node(&mut self, addr: LinearAddress) -> Result<(), Error> {
+        debug_assert!(addr.get() % 8 == 0);
 
-    //     let stored_area = StoredArea {
-    //         area_size_index: index,
-    //         area: Area::<_, FreeArea>::Node(node),
-    //     };
+        let (area_size_index, _) = self.area_index_and_size(addr)?;
 
-    //     let stored_area_bytes =
-    //         bincode::serialize(&stored_area).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        // The area that contained the node is now free.
+        let area: Area<Node, FreeArea> = Area::Free(FreeArea {
+            next_free_block: self.header.free_lists[area_size_index as usize],
+        });
 
-    //     self.storage
-    //         .write(addr.get(), stored_area_bytes.as_slice())?;
+        let stored_area = StoredArea {
+            area_size_index,
+            area,
+        };
 
-    //     Ok(addr)
-    // }
+        let stored_area_bytes =
+            bincode::serialize(&stored_area).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
-    // TODO danlaine: use this code in the revision management code or delete it.
-    // Update a node in-place. This should only be used when the node was allocated using
-    // allocate_node.
-    // TODO: We should enforce this by having a new type for allocated nodes, which could
-    // carry the size information too
-    // pub fn update_in_place(&mut self, addr: LinearAddress, node: &Node) -> Result<(), Error> {
-    //     let new_area: Area<&Node, FreeArea> = Area::Node(node);
-    //     let new_area_bytes =
-    //         bincode::serialize(&new_area).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        self.storage.write(addr.into(), &stored_area_bytes)?;
 
-    //     let addr = addr.get() + 1; // Skip the index byte
-    //     self.storage.write(addr, new_area_bytes.as_slice())?;
-    //     Ok(())
-    // }
+        // The newly freed block is now the head of the free list.
+        self.header.free_lists[area_size_index as usize] = Some(addr);
 
-    // TODO danlaine: use this code in the revision management code.
-    // Deletes the [Node] at the given address.
-    // pub fn delete_node(&mut self, addr: LinearAddress) -> Result<(), Error> {
-    //     debug_assert!(addr.get() % 8 == 0);
-
-    //     let (area_size_index, _) = self.area_index_and_size(addr)?;
-
-    //     // The area that contained the node is now free.
-    //     let area: Area<Node, FreeArea> = Area::Free(FreeArea {
-    //         next_free_block: self.header.free_lists[area_size_index as usize],
-    //     });
-
-    //     let stored_area = StoredArea {
-    //         area_size_index,
-    //         area,
-    //     };
-
-    //     let stored_area_bytes =
-    //         bincode::serialize(&stored_area).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
-
-    //     self.storage.write(addr.into(), &stored_area_bytes)?;
-
-    //     // The newly freed block is now the head of the free list.
-    //     self.header.free_lists[area_size_index as usize] = Some(addr);
-
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
 
 /// An error from doing an update
@@ -1074,6 +1043,18 @@ where
         } else {
             Ok(None)
         }
+    }
+}
+
+impl<S: WritableStorage> NodeStore<Committed, S> {
+    /// adjust the freelist of this proposal to reflect the freed nodes in the oldest proposal
+    pub fn reap_deleted(&mut self, oldest: &NodeStore<Committed, S>) -> Result<(), Error> {
+        self.storage
+            .invalidate_cached_nodes(oldest.kind.deleted.iter());
+        for addr in oldest.kind.deleted.iter() {
+            self.delete_node(*addr)?;
+        }
+        Ok(())
     }
 }
 

@@ -71,8 +71,6 @@ impl ReadableStorage for FileBacked {
 }
 
 impl WritableStorage for FileBacked {
-    /// Write to the backend filestore. This does not implement [crate::WritableStorage]
-    /// because we don't want someone accidentally writing nodes directly to disk
     fn write(&self, offset: u64, object: &[u8]) -> Result<usize, Error> {
         self.fd
             .lock()
@@ -89,5 +87,12 @@ impl WritableStorage for FileBacked {
             guard.put(*addr, node.clone());
         }
         Ok(())
+    }
+
+    fn invalidate_cached_nodes<'a>(&self, addresses: impl Iterator<Item = &'a LinearAddress>) {
+        let mut guard = self.cache.lock().expect("poisoned lock");
+        for addr in addresses {
+            guard.pop(addr);
+        }
     }
 }
