@@ -1403,7 +1403,7 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// Verify that the validator was added
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID.NodeID())
 	require.NoError(err)
 
 	secondEndTime := firstEndTime.Add(duration)
@@ -1427,7 +1427,7 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// Verify that the validator does not exist
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that the invalid transaction was not executed
