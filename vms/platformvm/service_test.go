@@ -795,6 +795,7 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				[]ids.ID{},
 				"chain name",
+				common.WithMemo([]byte{}),
 			)
 			require.NoError(err)
 

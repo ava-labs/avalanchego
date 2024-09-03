@@ -972,7 +972,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1117,7 +1117,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1292,7 +1292,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1439,7 +1439,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1759,7 +1759,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
