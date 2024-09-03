@@ -46,3 +46,11 @@ func TestJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalJSONNullKeepsInitialValue(t *testing.T) {
+	require := require.New(t)
+
+	unmarshaled := JSONByteSlice{1, 2, 3}
+	require.NoError(json.Unmarshal([]byte(nullStr), &unmarshaled))
+	require.Equal(JSONByteSlice{1, 2, 3}, unmarshaled)
+}
