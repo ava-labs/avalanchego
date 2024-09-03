@@ -586,7 +586,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx:     validBaseTx,
 				Subnet:     validSubnetID,
-				Address:    make(types.JSONByteSlice, MaxSubnetAddressLength+1),
+				Address:    invalidAddress,
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: ErrAddressTooLong,
