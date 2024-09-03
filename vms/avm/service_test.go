@@ -660,7 +660,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"destinationChain": "2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w",
 		"exportedOutputs": [
 			{
@@ -800,7 +800,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"name": "Team Rocket",
 		"symbol": "TR",
 		"denomination": 0,
@@ -972,7 +972,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1117,7 +1117,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1292,7 +1292,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1439,7 +1439,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1617,7 +1617,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1759,7 +1759,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
