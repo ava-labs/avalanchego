@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -48,10 +47,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -98,7 +96,6 @@ type environment struct {
 	mockedState    *state.MockState
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	factory        *txstest.WalletFactory
 	backend        *executor.Backend
 }
 
@@ -132,20 +129,10 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 
 		res.uptimes = uptime.NewManager(res.state, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.factory = txstest.NewWalletFactory(
-			res.ctx,
-			res.config,
-			res.state,
-		)
 	} else {
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState, res.clk)
 		res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-		res.factory = txstest.NewWalletFactory(
-			res.ctx,
-			res.config,
-			res.mockedState,
-		)
 
 		// setup expectations strictly needed for environment creation
 		res.mockedState.EXPECT().GetLastAccepted().Return(ids.GenerateTestID()).Times(1)
@@ -181,7 +168,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 			res.backend,
 			pvalidators.TestManager,
 		)
-		addSubnet(res)
+		addSubnet(t, res)
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
@@ -222,9 +209,35 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	return res
 }
 
-func addSubnet(env *environment) {
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewCreateSubnetTx(
+type walletConfig struct {
+	keys      []*secp256k1.PrivateKey
+	subnetIDs []ids.ID
+}
+
+func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
+	if len(c.keys) == 0 {
+		c.keys = genesistest.DefaultFundedKeys
+	}
+	return txstest.NewWallet(
+		t,
+		e.ctx,
+		e.config,
+		e.state,
+		secp256k1fx.NewKeychain(c.keys...),
+		c.subnetIDs,
+		[]ids.ID{e.ctx.CChainID, e.ctx.XChainID},
+	)
+}
+
+func addSubnet(t testing.TB, env *environment) {
+	require := require.New(t)
+
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[:1],
+	})
+
+	var err error
+	testSubnet1, err = wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -233,24 +246,13 @@ func addSubnet(env *environment) {
 				genesistest.DefaultFundedKeys[2].Address(),
 			},
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
-	if err != nil {
-		panic(err)
-	}
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
+
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
 	executor := executor.StandardTxExecutor{
 		Backend:       env.backend,
@@ -258,18 +260,11 @@ func addSubnet(env *environment) {
 		FeeCalculator: feeCalculator,
 		Tx:            testSubnet1,
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	if err := stateDiff.Apply(env.state); err != nil {
-		panic(err)
-	}
-	if err := env.state.Commit(); err != nil {
-		panic(err)
-	}
+	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 }
 
 func defaultConfig(f upgradetest.Fork) *config.Config {
@@ -348,15 +343,21 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 }
 
 func addPendingValidator(
+	t testing.TB,
 	env *environment,
 	startTime time.Time,
 	endTime time.Time,
 	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
-) (*txs.Tx, error) {
-	builder, signer := env.factory.NewWallet(keys...)
-	utx, err := builder.NewAddValidatorTx(
+) *txs.Tx {
+	require := require.New(t)
+
+	wallet := newWallet(t, env, walletConfig{
+		keys: keys,
+	})
+
+	addValidatorTx, err := wallet.IssueAddValidatorTx(
 		&txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -369,28 +370,17 @@ func addPendingValidator(
 		},
 		reward.PercentDenominator,
 	)
-	if err != nil {
-		return nil, err
-	}
-	addPendingValidatorTx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(err)
 
 	staker, err := state.NewPendingStaker(
-		addPendingValidatorTx.ID(),
-		addPendingValidatorTx.Unsigned.(*txs.AddValidatorTx),
+		addValidatorTx.ID(),
+		addValidatorTx.Unsigned.(*txs.AddValidatorTx),
 	)
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(err)
 
-	env.state.PutPendingValidator(staker)
-	env.state.AddTx(addPendingValidatorTx, status.Committed)
-	dummyHeight := uint64(1)
-	env.state.SetHeight(dummyHeight)
-	if err := env.state.Commit(); err != nil {
-		return nil, err
-	}
-	return addPendingValidatorTx, nil
+	require.NoError(env.state.PutPendingValidator(staker))
+	env.state.AddTx(addValidatorTx, status.Committed)
+	env.state.SetHeight(1)
+	require.NoError(env.state.Commit())
+	return addValidatorTx
 }

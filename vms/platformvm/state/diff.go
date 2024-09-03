@@ -180,8 +180,8 @@ func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, e
 	return parentState.GetDelegateeReward(subnetID, nodeID)
 }
 
-func (d *diff) PutCurrentValidator(staker *Staker) {
-	d.currentStakerDiffs.PutValidator(staker)
+func (d *diff) PutCurrentValidator(staker *Staker) error {
+	return d.currentStakerDiffs.PutValidator(staker)
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
@@ -243,8 +243,8 @@ func (d *diff) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	}
 }
 
-func (d *diff) PutPendingValidator(staker *Staker) {
-	d.pendingStakerDiffs.PutValidator(staker)
+func (d *diff) PutPendingValidator(staker *Staker) error {
+	return d.pendingStakerDiffs.PutValidator(staker)
 }
 
 func (d *diff) DeletePendingValidator(staker *Staker) {
@@ -444,7 +444,9 @@ func (d *diff) Apply(baseState Chain) error {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			switch validatorDiff.validatorStatus {
 			case added:
-				baseState.PutCurrentValidator(validatorDiff.validator)
+				if err := baseState.PutCurrentValidator(validatorDiff.validator); err != nil {
+					return err
+				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
 			}
@@ -471,7 +473,9 @@ func (d *diff) Apply(baseState Chain) error {
 		for _, validatorDiff := range subnetValidatorDiffs {
 			switch validatorDiff.validatorStatus {
 			case added:
-				baseState.PutPendingValidator(validatorDiff.validator)
+				if err := baseState.PutPendingValidator(validatorDiff.validator); err != nil {
+					return err
+				}
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator)
 			}

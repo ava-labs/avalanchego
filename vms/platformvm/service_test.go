@@ -78,8 +78,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(t, upgradetest.Latest)
+func defaultService(t *testing.T, fork upgradetest.Fork) (*Service, *mutableSharedMemory) {
+	vm, _, mutableSharedMemory := defaultVM(t, fork)
 	return &Service{
 		vm:          vm,
 		addrManager: avax.NewAddressManager(vm.ctx),
@@ -92,7 +92,7 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, upgradetest.Latest)
 	service.vm.ctx.Lock.Lock()
 
 	ks := keystore.New(logging.NoLog{}, memdb.New())
@@ -122,7 +122,7 @@ func TestExportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory := defaultService(t)
+	service, mutableSharedMemory := defaultService(t, upgradetest.Latest)
 	service.vm.ctx.Lock.Lock()
 
 	recipientKey, err := secp256k1.NewPrivateKey()
@@ -234,6 +234,7 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					[]ids.ID{},
 					"chain name",
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -266,6 +267,7 @@ func TestGetTx(t *testing.T) {
 					rewardsOwner,
 					rewardsOwner,
 					0,
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -289,6 +291,7 @@ func TestGetTx(t *testing.T) {
 							},
 						},
 					}},
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -304,7 +307,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _ := defaultService(t)
+				service, _ := defaultService(t, upgradetest.Latest)
 
 				service.vm.ctx.Lock.Lock()
 				tx := test.createTx(t, service)
@@ -366,10 +369,10 @@ func TestGetTx(t *testing.T) {
 
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, upgradetest.Durango)
 
 	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
-	createSubnetFee, err := feeCalculator.CalculateFee(&txs.CreateSubnetTx{})
+	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
 	require.NoError(err)
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -405,7 +408,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, upgradetest.Latest)
 
 	// Ensure GetStake is correct for each of the genesis validators
 	genesis := genesistest.New(t, genesistest.Config{})
@@ -579,7 +582,7 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	service.vm.state.PutPendingValidator(staker)
+	require.NoError(service.vm.state.PutPendingValidator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -605,7 +608,7 @@ func TestGetStake(t *testing.T) {
 
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, upgradetest.Latest)
 
 	genesis := genesistest.New(t, genesistest.Config{})
 
@@ -741,7 +744,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, upgradetest.Latest)
 
 	reply := GetTimestampReply{}
 	require.NoError(service.GetTimestamp(nil, nil, &reply))
@@ -777,7 +780,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _ := defaultService(t)
+			service, _ := defaultService(t, upgradetest.Latest)
 			service.vm.ctx.Lock.Lock()
 
 			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
@@ -792,6 +795,7 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				[]ids.ID{},
 				"chain name",
+				common.WithMemo([]byte{}),
 			)
 			require.NoError(err)
 
@@ -1066,7 +1070,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetSubnets(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, upgradetest.Latest)
 
 	testSubnet1ID := testSubnet1.ID()
 
@@ -1138,7 +1142,7 @@ func TestGetFeeConfig(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			service, _ := defaultService(t)
+			service, _ := defaultService(t, upgradetest.Latest)
 			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
 
 			var reply gas.Config
@@ -1152,7 +1156,7 @@ func FuzzGetFeeState(f *testing.F) {
 	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
 		require := require.New(t)
 
-		service, _ := defaultService(t)
+		service, _ := defaultService(t, upgradetest.Latest)
 
 		var (
 			expectedState = gas.State{
