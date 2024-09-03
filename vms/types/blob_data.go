@@ -32,10 +32,13 @@ func (b *JSONByteSlice) UnmarshalJSON(jsonBytes []byte) error {
 	}
 
 	var hexData string
-	err := json.Unmarshal(jsonBytes, &hexData)
+	if err := json.Unmarshal(jsonBytes, &hexData); err != nil {
+		return err
+	}
+	v, err := formatting.Decode(formatting.HexNC, hexData)
 	if err != nil {
 		return err
 	}
-	*b, err = formatting.Decode(formatting.HexNC, hexData)
-	return err
+	*b = v
+	return nil
 }
