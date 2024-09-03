@@ -139,6 +139,12 @@ The plugin version is updated to `37` all plugins must update to be compatible.
 - Use wallet in `platformvm/txs` tests by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3333
 - [ci] Configure buf-setup-action for check_generated_protobuf job with token by @marun in https://github.com/ava-labs/avalanchego/pull/3341
 - Add P-chain dynamic fees execution by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3251
+- Include disconnected validators in health message by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3344
+- Print type of message sent in the verbose log by @yacovm in https://github.com/ava-labs/avalanchego/pull/3348
+- Remove local chain config from e2e test by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3293
+- Separate codec registries by upgrade by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3353
+- Support unmarshalling of json byte slices by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3354
+- Add explicit p-chain current validator check in AddValidator by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3355
 
 ### New Contributors
 
