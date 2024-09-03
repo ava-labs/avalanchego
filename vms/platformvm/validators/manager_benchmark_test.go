@@ -115,7 +115,7 @@ func addPrimaryValidator(
 	}
 
 	nodeID := ids.GenerateTestNodeID()
-	s.PutCurrentValidator(&state.Staker{
+	if err := s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		PublicKey:       bls.PublicFromSecretKey(sk),
@@ -126,7 +126,9 @@ func addPrimaryValidator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
-	})
+	}); err != nil {
+		return ids.EmptyNodeID, err
+	}
 
 	blk, err := block.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
@@ -146,7 +148,7 @@ func addSubnetValidator(
 	nodeID ids.NodeID,
 	height uint64,
 ) error {
-	s.PutCurrentValidator(&state.Staker{
+	if err := s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		SubnetID:        subnetID,
@@ -156,7 +158,9 @@ func addSubnetValidator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        txs.SubnetPermissionlessValidatorCurrentPriority,
-	})
+	}); err != nil {
+		return err
+	}
 
 	blk, err := block.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
