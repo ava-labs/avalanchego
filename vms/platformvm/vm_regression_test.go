@@ -1402,6 +1402,10 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 	// Accept firstAddSubnetValidatorTx
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
+	// Verify that the validator was added
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+
 	secondEndTime := firstEndTime.Add(duration)
 	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
 		Validator: txs.Validator{
@@ -1421,6 +1425,14 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 
 	// Remove the first subnet validator
 	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// Verify that the validator does not exist
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Verify that the invalid transaction was not executed
+	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // GetValidatorSet must return the BLS keys for a given validator correctly when
