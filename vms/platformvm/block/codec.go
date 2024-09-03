@@ -33,10 +33,8 @@ func init() {
 	for _, c := range []linearcodec.Codec{c, gc} {
 		errs.Add(
 			RegisterApricotTypes(c),
-			txs.RegisterApricotTypes(c),
-			txs.RegisterBanffTypes(c),
 			RegisterBanffTypes(c),
-			txs.RegisterDurangoTypes(c),
+			RegisterDurangoTypes(c),
 		)
 	}
 
@@ -53,23 +51,31 @@ func init() {
 
 // RegisterApricotTypes registers the type information for blocks that were
 // valid during the Apricot series of upgrades.
-func RegisterApricotTypes(targetCodec codec.Registry) error {
+func RegisterApricotTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&ApricotProposalBlock{}),
 		targetCodec.RegisterType(&ApricotAbortBlock{}),
 		targetCodec.RegisterType(&ApricotCommitBlock{}),
 		targetCodec.RegisterType(&ApricotStandardBlock{}),
 		targetCodec.RegisterType(&ApricotAtomicBlock{}),
+		txs.RegisterApricotTypes(targetCodec),
 	)
 }
 
 // RegisterBanffTypes registers the type information for blocks that were valid
 // during the Banff series of upgrades.
-func RegisterBanffTypes(targetCodec codec.Registry) error {
+func RegisterBanffTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
+		txs.RegisterBanffTypes(targetCodec),
 		targetCodec.RegisterType(&BanffProposalBlock{}),
 		targetCodec.RegisterType(&BanffAbortBlock{}),
 		targetCodec.RegisterType(&BanffCommitBlock{}),
 		targetCodec.RegisterType(&BanffStandardBlock{}),
 	)
+}
+
+// RegisterDurangoTypes registers the type information for blocks that were
+// valid during the Durango series of upgrades.
+func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterDurangoTypes(targetCodec)
 }
