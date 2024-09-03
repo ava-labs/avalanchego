@@ -3,16 +3,23 @@
 
 package ids
 
-import "github.com/ava-labs/avalanchego/utils"
+import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 const (
 	NodeIDPrefix = "NodeID-"
+	NodeIDLen    = ShortIDLen // this would eventually be updated to 32 byte length.
 )
 
 var (
 	EmptyNodeID = NodeID{}
 
 	_ utils.Sortable[NodeID] = NodeID{}
+
+	errWrongNodeIDLength = errors.New("wrong NodeID length")
 )
 
 type NodeID struct {
@@ -35,4 +42,13 @@ func NodeIDFromString(nodeIDStr string) (NodeID, error) {
 func ToNodeID(bytes []byte) (NodeID, error) {
 	nodeID, err := ToShortID(bytes)
 	return NodeID{ShortNodeID: ShortNodeID(nodeID)}, err
+}
+
+func ParseNodeID(bytes []byte) (NodeID, error) {
+	if len(bytes) == ShortIDLen {
+		var node NodeID
+		copy(node.ShortNodeID[:], bytes[:])
+		return node, nil
+	}
+	return NodeID{}, errWrongNodeIDLength
 }

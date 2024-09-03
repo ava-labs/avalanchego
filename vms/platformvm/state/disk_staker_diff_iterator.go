@@ -14,8 +14,8 @@ import (
 const (
 	// startDiffKey = [subnetID] + [inverseHeight]
 	startDiffKeyLength = ids.IDLen + database.Uint64Size
-	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	diffKeyLength = startDiffKeyLength + ids.ShortNodeIDLen
+	// diffKey = [subnetID] + [inverseHeight] + [shortNodeID]/[NodeID]
+	minDiffKeyLength = startDiffKeyLength + ids.ShortNodeIDLen
 	// diffKeyNodeIDOffset = [subnetIDLen] + [inverseHeightLen]
 	diffKeyNodeIDOffset = ids.IDLen + database.Uint64Size
 
@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	errUnexpectedDiffKeyLength     = fmt.Errorf("expected diff key length %d", diffKeyLength)
+	errUnexpectedDiffKeyLength     = fmt.Errorf("expected min diff key length of %d", minDiffKeyLength)
 	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 )
 
@@ -40,25 +40,31 @@ func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 }
 
 func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
-	key := make([]byte, diffKeyLength)
+	nodeIDBytes := nodeID.Bytes()
+	keyLength := startDiffKeyLength + len(nodeIDBytes)
+	key := make([]byte, keyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
-	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
+	copy(key[diffKeyNodeIDOffset:], nodeIDBytes)
 	return key
 }
 
 func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
-	if len(key) != diffKeyLength {
+	if len(key) < minDiffKeyLength {
 		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
 	}
 	var (
-		subnetID    ids.ID
-		shortNodeID ids.ShortNodeID
+		subnetID ids.ID
+		nodeID   ids.NodeID
+		err      error
 	)
+	nodeID, err = ids.ParseNodeID(key[diffKeyNodeIDOffset:])
+	if err != nil {
+		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
+	}
 	copy(subnetID[:], key)
 	height := unpackIterableHeight(key[ids.IDLen:])
-	copy(shortNodeID[:], key[diffKeyNodeIDOffset:])
-	return subnetID, height, shortNodeID.NodeID(), nil
+	return subnetID, height, nodeID, err
 }
 
 func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {
