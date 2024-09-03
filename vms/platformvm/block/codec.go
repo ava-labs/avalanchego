@@ -32,10 +32,9 @@ func init() {
 	errs := wrappers.Errs{}
 	for _, c := range []linearcodec.Codec{c, gc} {
 		errs.Add(
-			RegisterApricotBlockTypes(c),
-			txs.RegisterUnsignedTxsTypes(c),
-			RegisterBanffBlockTypes(c),
-			txs.RegisterDurangoUnsignedTxsTypes(c),
+			RegisterApricotTypes(c),
+			RegisterBanffTypes(c),
+			RegisterDurangoTypes(c),
 		)
 	}
 
@@ -50,25 +49,33 @@ func init() {
 	}
 }
 
-// RegisterApricotBlockTypes allows registering relevant type of blocks package
-// in the right sequence. Following repackaging of platformvm package, a few
-// subpackage-level codecs were introduced, each handling serialization of
-// specific types.
-func RegisterApricotBlockTypes(targetCodec codec.Registry) error {
+// RegisterApricotTypes registers the type information for blocks that were
+// valid during the Apricot series of upgrades.
+func RegisterApricotTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&ApricotProposalBlock{}),
 		targetCodec.RegisterType(&ApricotAbortBlock{}),
 		targetCodec.RegisterType(&ApricotCommitBlock{}),
 		targetCodec.RegisterType(&ApricotStandardBlock{}),
 		targetCodec.RegisterType(&ApricotAtomicBlock{}),
+		txs.RegisterApricotTypes(targetCodec),
 	)
 }
 
-func RegisterBanffBlockTypes(targetCodec codec.Registry) error {
+// RegisterBanffTypes registers the type information for blocks that were valid
+// during the Banff series of upgrades.
+func RegisterBanffTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
+		txs.RegisterBanffTypes(targetCodec),
 		targetCodec.RegisterType(&BanffProposalBlock{}),
 		targetCodec.RegisterType(&BanffAbortBlock{}),
 		targetCodec.RegisterType(&BanffCommitBlock{}),
 		targetCodec.RegisterType(&BanffStandardBlock{}),
 	)
+}
+
+// RegisterDurangoTypes registers the type information for blocks that were
+// valid during the Durango series of upgrades.
+func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterDurangoTypes(targetCodec)
 }
