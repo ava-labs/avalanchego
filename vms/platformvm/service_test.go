@@ -234,6 +234,7 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					[]ids.ID{},
 					"chain name",
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -266,6 +267,7 @@ func TestGetTx(t *testing.T) {
 					rewardsOwner,
 					rewardsOwner,
 					0,
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -289,6 +291,7 @@ func TestGetTx(t *testing.T) {
 							},
 						},
 					}},
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
