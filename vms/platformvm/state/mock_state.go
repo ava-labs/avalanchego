@@ -651,9 +651,11 @@ func (mr *MockStateMockRecorder) PutCurrentDelegator(staker any) *gomock.Call {
 }
 
 // PutCurrentValidator mocks base method.
-func (m *MockState) PutCurrentValidator(staker *Staker) {
+func (m *MockState) PutCurrentValidator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PutCurrentValidator", staker)
+	ret := m.ctrl.Call(m, "PutCurrentValidator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PutCurrentValidator indicates an expected call of PutCurrentValidator.
@@ -675,9 +677,11 @@ func (mr *MockStateMockRecorder) PutPendingDelegator(staker any) *gomock.Call {
 }
 
 // PutPendingValidator mocks base method.
-func (m *MockState) PutPendingValidator(staker *Staker) {
+func (m *MockState) PutPendingValidator(staker *Staker) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PutPendingValidator", staker)
+	ret := m.ctrl.Call(m, "PutPendingValidator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PutPendingValidator indicates an expected call of PutPendingValidator.

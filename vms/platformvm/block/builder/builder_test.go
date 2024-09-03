@@ -221,10 +221,10 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 	)
 
 	// Add a staker to [env.state]
-	env.state.PutCurrentValidator(&state.Staker{
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		NextTime: nextTime,
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-	})
+	}))
 
 	// Advance wall clock to [nextTime]
 	env.backend.Clk.Set(nextTime)
@@ -278,10 +278,10 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	)
 
 	// Add a staker to [env.state]
-	env.state.PutCurrentValidator(&state.Staker{
+	require.NoError(env.state.PutCurrentValidator(&state.Staker{
 		NextTime: nextTime,
 		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-	})
+	}))
 
 	// Advance wall clock to [nextTime] + [txexecutor.SyncBound]
 	env.backend.Clk.Set(nextTime.Add(txexecutor.SyncBound))

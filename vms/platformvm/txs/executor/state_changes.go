@@ -97,7 +97,9 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 			changed = true
 			continue
@@ -126,7 +128,9 @@ func AdvanceTimeTo(
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
