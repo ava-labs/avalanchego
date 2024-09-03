@@ -8,6 +8,7 @@ The plugin version is updated to `37` all plugins must update to be compatible.
 
 ### APIs
 
+- Updated JSON marshalling of the `Memo` field to follow best practices
 - Added `info.upgrades`
 - Added `platform.getFeeConfig`
 - Added `platform.getFeeState`
@@ -20,6 +21,7 @@ The plugin version is updated to `37` all plugins must update to be compatible.
 - Added `avalanche_network_tracked_peers` metric
 - Added `avalanche_network_tracked_subnets` metric
 - Removed `avalanche_network_tracked_ips` metric
+- Added disconnected validators to the health check result
 
 
 ### Configs
