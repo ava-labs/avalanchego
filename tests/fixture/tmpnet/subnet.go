@@ -339,14 +339,10 @@ func WaitForActiveValidators(
 
 // Reads subnets from [network dir]/subnets/[subnet name].json
 func readSubnets(subnetDir string) ([]*Subnet, error) {
-	if _, err := os.Stat(subnetDir); os.IsNotExist(err) {
+	entries, err := os.ReadDir(subnetDir)
+	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(subnetDir)
-	if err != nil {
 		return nil, fmt.Errorf("failed to read subnet dir: %w", err)
 	}
 
