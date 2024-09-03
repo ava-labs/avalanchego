@@ -148,7 +148,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(staker)
+				r.NoError(s.PutCurrentValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 				return staker
@@ -243,7 +243,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(val)
+				r.NoError(s.PutCurrentValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -308,7 +308,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutPendingValidator(staker)
+				r.NoError(s.PutPendingValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 				return staker
@@ -375,7 +375,7 @@ func TestPersistStakers(t *testing.T) {
 				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
 				r.NoError(err)
 
-				s.PutPendingValidator(val)
+				r.NoError(s.PutPendingValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -428,7 +428,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(staker)
+				r.NoError(s.PutCurrentValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -517,7 +517,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(val)
+				r.NoError(s.PutCurrentValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 
 				s.PutCurrentDelegator(del)
@@ -582,7 +582,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutPendingValidator(staker)
+				r.NoError(s.PutPendingValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -649,7 +649,7 @@ func TestPersistStakers(t *testing.T) {
 				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
 				r.NoError(err)
 
-				s.PutPendingValidator(val)
+				r.NoError(s.PutPendingValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 
 				s.PutPendingDelegator(del)
@@ -1099,7 +1099,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	for currentIndex, diff := range diffs {
 		for _, added := range diff.addedValidators {
 			added := added
-			state.PutCurrentValidator(&added)
+			require.NoError(state.PutCurrentValidator(&added))
 		}
 		for _, added := range diff.addedDelegators {
 			added := added

@@ -4,12 +4,16 @@
 package state
 
 import (
+	"errors"
+
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
+
+var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
 
 type Stakers interface {
 	CurrentStakers
@@ -26,7 +30,7 @@ type CurrentStakers interface {
 	// staker set.
 	//
 	// Invariant: [staker] is not currently a CurrentValidator
-	PutCurrentValidator(staker *Staker)
+	PutCurrentValidator(staker *Staker) error
 
 	// DeleteCurrentValidator removes the [staker] describing a validator from
 	// the staker set.
@@ -72,7 +76,7 @@ type PendingStakers interface {
 
 	// PutPendingValidator adds the [staker] describing a validator to the
 	// staker set.
-	PutPendingValidator(staker *Staker)
+	PutPendingValidator(staker *Staker) error
 
 	// DeletePendingValidator removes the [staker] describing a validator from
 	// the staker set.
@@ -289,8 +293,14 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	return nil, validatorDiff.validatorStatus
 }
 
-func (s *diffStakers) PutValidator(staker *Staker) {
+func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.validatorStatus == deleted {
+		// Enforce the invariant that a validator cannot be added after being
+		// deleted.
+		return ErrAddingStakerAfterDeletion
+	}
+
 	validatorDiff.validatorStatus = added
 	validatorDiff.validator = staker
 
@@ -298,6 +308,7 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
 	s.addedStakers.ReplaceOrInsert(staker)
+	return nil
 }
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
