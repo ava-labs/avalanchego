@@ -111,7 +111,6 @@ pub struct DbConfig {
     pub manager: RevisionManagerConfig,
 }
 
-/// TODO danlaine: implement
 #[derive(Debug)]
 pub struct Db {
     metrics: Arc<DbMetrics>,

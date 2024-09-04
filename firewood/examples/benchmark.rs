@@ -2,7 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 // The idea behind this benchmark:
-// Generate known keys from the SHA256 of the row number, starting at 0
+// Phase 1: Generate known keys from the SHA256 of the row number, starting at 0, for 1B keys
+// 
 
 use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
@@ -11,6 +12,7 @@ use sha2::{Digest, Sha256};
 use std::{
     borrow::BorrowMut as _, collections::HashMap, error::Error, net::{Ipv4Addr, SocketAddr}, num::NonZeroUsize, ops::RangeInclusive, time::{Duration, Instant}
 };
+use Url::Url;
 
 use firewood::{
     db::{Batch, BatchOp, Db, DbConfig},
@@ -37,6 +39,8 @@ struct Args {
     truncate: bool,
     #[arg(short, long, default_value_t = 128)]
     revisions: usize,
+    #[arg(short = 'p', long, default_value_t = 3000)]
+    prometheus_port: u16,
 }
 
 fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error + Sync + Send>> {
@@ -57,11 +61,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let builder = PrometheusBuilder::new();
     builder
-        .with_push_gateway("http://localhost:9090", Duration::from_secs(10), None, None)
-        .expect("cannot setup push gateway")
         .with_http_listener(SocketAddr::new(
             Ipv4Addr::UNSPECIFIED.into(),
-            3000,
+            args.prometheus_port,
         ))
         .idle_timeout(
             MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,

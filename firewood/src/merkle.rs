@@ -6,6 +6,7 @@ use crate::range_proof::RangeProof;
 use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
+use metrics::{counter, histogram};
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future::ready;
@@ -402,6 +403,8 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
     pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
+        histogram!("firewood.insert.key.length").record(key.len() as f64);
+        histogram!("firewood.insert.data.length").record(value.len() as f64);
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -414,6 +417,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 value,
             });
             *root = root_node.into();
+            counter!("firewood.merkle.insert.root").increment(1);
             return Ok(());
         };
 
@@ -452,6 +456,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             (None, None) => {
                 // 1. The node is at `key`
                 node.update_value(value);
+                counter!("firewood.merkle.update").increment(1);
                 Ok(node)
             }
             (None, Some((child_index, partial_path))) => {
@@ -471,6 +476,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 // Shorten the node's partial path since it has a new parent.
                 node.update_partial_path(partial_path);
                 branch.update_child(child_index, Some(Child::Node(node)));
+                counter!("firewood.merkle.insert.above").increment(1);
 
                 Ok(Node::Branch(Box::new(branch)))
             }
@@ -483,6 +489,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 //    ... (key may be below)       ... (key is below)
                 match node {
                     Node::Branch(ref mut branch) => {
+                        counter!("firewood.merkle.insert.below").increment(1);
                         #[allow(clippy::indexing_slicing)]
                         let child = match std::mem::take(&mut branch.children[child_index as usize])
                         {
@@ -509,6 +516,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         Ok(node)
                     }
                     Node::Leaf(ref mut leaf) => {
+                        counter!("firewood.merkle.inserted.split").increment(1);
                         // Turn this node into a branch node and put a new leaf as a child.
                         let mut branch = BranchNode {
                             partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
@@ -535,6 +543,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 //     |                           |    \
                 //                               node   key
                 // Make a branch node that has both the current node and a new leaf node as children.
+                counter!("firewood.merkle.inserted.split").increment(1);
                 let mut branch = BranchNode {
                     partial_path: path_overlap.shared.into(),
                     value: None,
@@ -565,11 +574,17 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         let root = self.nodestore.mut_root();
         let Some(root_node) = std::mem::take(root) else {
             // The trie is empty. There is nothing to remove.
+            counter!("firewood.merkle.remove.nonexistent").increment(1);
             return Ok(None);
         };
 
         let (root_node, removed_value) = self.remove_helper(root_node, &key)?;
         *self.nodestore.mut_root() = root_node;
+        if removed_value.is_some() {
+            counter!("firewood.merkle.remove.success").increment(1);
+        } else {
+            counter!("firewood.merkle.remove.nonexistent").increment(1);
+        }
         Ok(removed_value)
     }
 
