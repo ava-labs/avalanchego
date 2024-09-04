@@ -142,7 +142,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	e.OnCommitState.PutPendingValidator(newStaker)
+	if err := e.OnCommitState.PutPendingValidator(newStaker); err != nil {
+		return err
+	}
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
@@ -189,7 +191,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	e.OnCommitState.PutPendingValidator(newStaker)
+	if err := e.OnCommitState.PutPendingValidator(newStaker); err != nil {
+		return err
+	}
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
