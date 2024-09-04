@@ -630,7 +630,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		var ok bool
 		preferenceAtHeight, ok = e.Consensus.PreferenceAtHeight(requestedHeight)
 		if !ok {
-			e.Ctx.Log.Debug("failed fetching processing block",
+			e.Ctx.Log.Debug("processing block not found",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
