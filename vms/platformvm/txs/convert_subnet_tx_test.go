@@ -580,6 +580,8 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 		},
 		{
 			name: "already verified",
+			// The tx includes invalid data to verify that a cached result is
+			// returned.
 			tx: &ConvertSubnetTx{
 				BaseTx: BaseTx{
 					SyntacticallyVerified: true,
