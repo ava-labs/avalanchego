@@ -5,6 +5,7 @@ package txs
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -449,9 +450,13 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 			ctx := snowtest.Context(t, constants.PlatformChainID)
 			test.tx.InitCtx(ctx)
 
-			txJSON, err := json.MarshalIndent(test.tx, "", "    ")
+			txJSON, err := json.MarshalIndent(test.tx, "", "\t")
 			require.NoError(err)
-			require.Equal(string(test.expectedJSON), string(txJSON))
+			require.Equal(
+				// Normalize newlines for Windows
+				strings.ReplaceAll(string(test.expectedJSON), "\r\n", "\n"),
+				string(txJSON),
+			)
 		})
 	}
 }
