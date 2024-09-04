@@ -53,7 +53,7 @@ type HistoricalRev = NodeStore<Committed, FileBacked>;
 
 
 pub struct DbMetrics {
-    _proposals: metrics::Counter,
+    proposals: metrics::Counter,
 }
 
 impl std::fmt::Debug for DbMetrics {
@@ -174,7 +174,7 @@ where
             .expect("poisoned lock")
             .add_proposal(immutable.clone());
 
-        counter!("firewood.proposals").increment(1);
+        self.metrics.proposals.increment(1);
 
         Ok(Self::Proposal {
             nodestore: immutable,
@@ -186,7 +186,7 @@ where
 
 impl Db {
     pub async fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        let metrics = Arc::new(DbMetrics { _proposals: counter!("firewood.proposals") });
+        let metrics = Arc::new(DbMetrics { proposals: counter!("firewood.proposals") });
         describe_counter!("firewood.proposals", "Number of proposals created");
         let manager = RevisionManager::new(
             db_path.as_ref().to_path_buf(),
