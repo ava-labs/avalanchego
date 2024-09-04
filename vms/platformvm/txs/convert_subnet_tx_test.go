@@ -449,7 +449,7 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 			ctx := snowtest.Context(t, constants.PlatformChainID)
 			test.tx.InitCtx(ctx)
 
-			txJSON, err := json.MarshalIndent(test.tx, "", "\t")
+			txJSON, err := json.MarshalIndent(test.tx, "", "    ")
 			require.NoError(err)
 			require.Equal(string(test.expectedJSON), string(txJSON))
 		})
