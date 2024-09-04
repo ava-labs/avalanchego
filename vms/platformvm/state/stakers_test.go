@@ -162,7 +162,7 @@ func TestDiffStakersValidator(t *testing.T) {
 	stakerIterator := v.GetStakerIterator(iterator.Empty[*Staker]{})
 	assertIteratorsEqual(t, iterator.FromSlice(delegator), stakerIterator)
 
-	v.PutValidator(staker)
+	require.NoError(v.PutValidator(staker))
 
 	returnedStaker, status := v.GetValidator(staker.SubnetID, staker.NodeID)
 	require.Equal(added, status)
@@ -203,7 +203,7 @@ func TestDiffStakersDelegator(t *testing.T) {
 
 	v := diffStakers{}
 
-	v.PutValidator(staker)
+	require.NoError(t, v.PutValidator(staker))
 
 	delegatorIterator := v.GetDelegatorIterator(iterator.Empty[*Staker]{}, ids.GenerateTestID(), delegator.NodeID)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
@@ -221,7 +221,7 @@ func TestDiffStakersDelegator(t *testing.T) {
 
 func newTestStaker() *Staker {
 	startTime := time.Now().Round(time.Second)
-	endTime := startTime.Add(genesistest.ValidatorDuration)
+	endTime := startTime.Add(genesistest.DefaultValidatorDuration)
 	return &Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          ids.GenerateTestNodeID(),

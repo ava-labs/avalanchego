@@ -97,7 +97,9 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 			changed = true
 			continue
@@ -126,7 +128,9 @@ func AdvanceTimeTo(
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
@@ -165,12 +169,22 @@ func AdvanceTimeTo(
 		changed = true
 	}
 
-	if err := changes.Apply(parentState); err != nil {
-		return false, err
+	if backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
+		previousChainTime := changes.GetTimestamp()
+		duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+		feeState := changes.GetFeeState()
+		feeState = feeState.AdvanceTime(
+			backend.Config.DynamicFeeConfig.MaxCapacity,
+			backend.Config.DynamicFeeConfig.MaxPerSecond,
+			backend.Config.DynamicFeeConfig.TargetPerSecond,
+			duration,
+		)
+		changes.SetFeeState(feeState)
 	}
 
-	parentState.SetTimestamp(newChainTime)
-	return changed, nil
+	changes.SetTimestamp(newChainTime)
+	return changed, changes.Apply(parentState)
 }
 
 func GetRewardsCalculator(

@@ -784,9 +784,7 @@ func (b *builder) NewConvertSubnetTx(
 	address []byte,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
-	toBurn := map[ids.ID]uint64{
-		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
-	}
+	toBurn := map[ids.ID]uint64{}
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
@@ -796,8 +794,12 @@ func (b *builder) NewConvertSubnetTx(
 	}
 
 	memo := ops.Memo()
+	additionalBytes, err := math.Add(uint64(len(memo)), uint64(len(address)))
+	if err != nil {
+		return nil, err
+	}
 	bytesComplexity := gas.Dimensions{
-		gas.Bandwidth: uint64(len(memo)) + uint64(len(address)),
+		gas.Bandwidth: additionalBytes,
 	}
 	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {

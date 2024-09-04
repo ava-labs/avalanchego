@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
+
+const MaxSubnetAddressLength = 4096
 
 var (
 	_ UnsignedTx = (*TransferSubnetOwnershipTx)(nil)
@@ -27,16 +30,9 @@ type ConvertSubnetTx struct {
 	// Chain where the Subnet manager lives
 	ChainID ids.ID `serialize:"true" json:"chainID"`
 	// Address of the Subnet manager
-	Address []byte `serialize:"true" json:"address"`
+	Address types.JSONByteSlice `serialize:"true" json:"address"`
 	// Authorizes this conversion
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
-}
-
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [ConvertSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so
-// that the addresses can be json marshalled into human readable format
-func (tx *ConvertSubnetTx) InitCtx(ctx *snow.Context) {
-	tx.BaseTx.InitCtx(ctx)
 }
 
 func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
@@ -48,7 +44,7 @@ func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.Subnet == constants.PrimaryNetworkID:
 		return ErrConvertPermissionlessSubnet
-	case len(tx.Address) > 4096:
+	case len(tx.Address) > MaxSubnetAddressLength:
 		return ErrAddressTooLong
 	}
 

@@ -47,16 +47,22 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var defaultValidatorNodeID = ids.GenerateTestNodeID()
+
 func newTestState(t testing.TB, db database.Database) *state {
 	s, err := New(
 		db,
-		genesistest.NewBytes(t),
+		genesistest.NewBytes(t, genesistest.Config{
+			NodeIDs: []ids.NodeID{defaultValidatorNodeID},
+		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
 		upgradetest.GetConfig(upgradetest.Latest),
 		&config.DefaultExecutionConfig,
 		&snow.Context{
-			Log: logging.NoLog{},
+			NetworkID: constants.UnitTestID,
+			NodeID:    ids.GenerateTestNodeID(),
+			Log:       logging.NoLog{},
 		},
 		metrics.Noop,
 		reward.NewCalculator(reward.Config{
@@ -75,12 +81,12 @@ func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
 	state := newTestState(t, memdb.New())
 
-	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
 	require.NotNil(staker)
-	require.Equal(genesistest.ValidatorNodeID, staker.NodeID)
+	require.Equal(defaultValidatorNodeID, staker.NodeID)
 
-	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
 
@@ -88,10 +94,10 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.FromSlice(staker), stakerIterator)
 
-	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, genesistest.ValidatorNodeID)
+	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
 }
@@ -142,7 +148,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(staker)
+				r.NoError(s.PutCurrentValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 				return staker
@@ -237,7 +243,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(val)
+				r.NoError(s.PutCurrentValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -302,7 +308,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutPendingValidator(staker)
+				r.NoError(s.PutPendingValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 				return staker
@@ -369,7 +375,7 @@ func TestPersistStakers(t *testing.T) {
 				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
 				r.NoError(err)
 
-				s.PutPendingValidator(val)
+				r.NoError(s.PutPendingValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -422,7 +428,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(staker)
+				r.NoError(s.PutCurrentValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -511,7 +517,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutCurrentValidator(val)
+				r.NoError(s.PutCurrentValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 
 				s.PutCurrentDelegator(del)
@@ -576,7 +582,7 @@ func TestPersistStakers(t *testing.T) {
 				)
 				r.NoError(err)
 
-				s.PutPendingValidator(staker)
+				r.NoError(s.PutPendingValidator(staker))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 				r.NoError(s.Commit())
 
@@ -643,7 +649,7 @@ func TestPersistStakers(t *testing.T) {
 				del, err := NewPendingStaker(addPermDelTx.ID(), utxDel)
 				r.NoError(err)
 
-				s.PutPendingValidator(val)
+				r.NoError(s.PutPendingValidator(val))
 				s.AddTx(addPermValTx, status.Committed) // this is currently needed to reload the staker
 
 				s.PutPendingDelegator(del)
@@ -1093,7 +1099,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	for currentIndex, diff := range diffs {
 		for _, added := range diff.addedValidators {
 			added := added
-			state.PutCurrentValidator(&added)
+			require.NoError(state.PutCurrentValidator(&added))
 		}
 		for _, added := range diff.addedDelegators {
 			added := added

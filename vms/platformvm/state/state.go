@@ -693,8 +693,9 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 	return s.currentStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutCurrentValidator(staker *Staker) {
+func (s *state) PutCurrentValidator(staker *Staker) error {
 	s.currentStakers.PutValidator(staker)
+	return nil
 }
 
 func (s *state) DeleteCurrentValidator(staker *Staker) {
@@ -721,8 +722,9 @@ func (s *state) GetPendingValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 	return s.pendingStakers.GetValidator(subnetID, nodeID)
 }
 
-func (s *state) PutPendingValidator(staker *Staker) {
+func (s *state) PutPendingValidator(staker *Staker) error {
 	s.pendingStakers.PutValidator(staker)
+	return nil
 }
 
 func (s *state) DeletePendingValidator(staker *Staker) {
@@ -1298,7 +1300,9 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 			return err
 		}
 
-		s.PutCurrentValidator(staker)
+		if err := s.PutCurrentValidator(staker); err != nil {
+			return err
+		}
 		s.AddTx(vdrTx, status.Committed)
 		s.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
 	}

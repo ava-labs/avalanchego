@@ -723,11 +723,15 @@ func (e *StandardTxExecutor) putStaker(stakerTx txs.Staker) error {
 
 	switch priority := staker.Priority; {
 	case priority.IsCurrentValidator():
-		e.State.PutCurrentValidator(staker)
+		if err := e.State.PutCurrentValidator(staker); err != nil {
+			return err
+		}
 	case priority.IsCurrentDelegator():
 		e.State.PutCurrentDelegator(staker)
 	case priority.IsPendingValidator():
-		e.State.PutPendingValidator(staker)
+		if err := e.State.PutPendingValidator(staker); err != nil {
+			return err
+		}
 	case priority.IsPendingDelegator():
 		e.State.PutPendingDelegator(staker)
 	default:
