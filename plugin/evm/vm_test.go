@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -82,6 +83,7 @@ var (
 		g := new(core.Genesis)
 		g.Difficulty = big.NewInt(0)
 		g.GasLimit = 0x5f5e100
+		g.Timestamp = uint64(upgrade.InitiallyActiveTime.Unix())
 
 		// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 		// config overridden in vm.Initialize.
@@ -283,7 +285,8 @@ func GenesisVM(t *testing.T,
 	upgradeJSON string,
 ) (
 	chan commonEng.Message,
-	*VM, database.Database,
+	*VM,
+	database.Database,
 	*atomic.Memory,
 	*enginetest.Sender,
 ) {
@@ -301,7 +304,8 @@ func GenesisVMWithClock(
 	clock mockable.Clock,
 ) (
 	chan commonEng.Message,
-	*VM, database.Database,
+	*VM,
+	database.Database,
 	*atomic.Memory,
 	*enginetest.Sender,
 ) {
@@ -3850,21 +3854,21 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:          "non-empty parent beacon root in Cancun",
-			genesisJSON:   genesisJSONCancun,
+			name:          "non-empty parent beacon root in E-Upgrade (Cancun)",
+			genesisJSON:   genesisJSONEtna,
 			beaconRoot:    &common.Hash{0x01},
 			expectedError: true,
 			errString:     "expected empty hash",
 		},
 		{
-			name:          "empty parent beacon root in Cancun",
-			genesisJSON:   genesisJSONCancun,
+			name:          "empty parent beacon root in E-Upgrade (Cancun)",
+			genesisJSON:   genesisJSONEtna,
 			beaconRoot:    &common.Hash{},
 			expectedError: false,
 		},
 		{
-			name:          "nil parent beacon root in Cancun",
-			genesisJSON:   genesisJSONCancun,
+			name:          "nil parent beacon root in E-Upgrade (Cancun)",
+			genesisJSON:   genesisJSONEtna,
 			beaconRoot:    nil,
 			expectedError: true,
 			errString:     "header is missing parentBeaconRoot",

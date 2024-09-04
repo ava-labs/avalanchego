@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -74,9 +73,6 @@ func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*type
 // show that a geth tx discovered from gossip is requested to the same node that
 // gossiped it
 func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
-	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
-		t.Skip("FLAKY")
-	}
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -17,14 +18,23 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// This test copies the test coverage from https://github.com/ava-labs/avalanchego/blob/v1.10.0/vms/platformvm/warp/signature_test.go#L137.
+type signatureTest struct {
+	name      string
+	stateF    func(*gomock.Controller) validators.State
+	quorumNum uint64
+	quorumDen uint64
+	msgF      func(*require.Assertions) *avalancheWarp.Message
+	err       error
+}
+
+// This test copies the test coverage from https://github.com/ava-labs/avalanchego/blob/0117ab96/vms/platformvm/warp/signature_test.go#L137.
 // These tests are only expected to fail if there is a breaking change in AvalancheGo that unexpectedly changes behavior.
 func TestSignatureVerification(t *testing.T) {
-	tests = []signatureTest{
+	tests := []signatureTest{
 		{
 			name: "can't get subnetID",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, errTest)
 				return state
 			},
@@ -50,7 +60,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "can't get validator set",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(nil, errTest)
 				return state
@@ -77,7 +87,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "weight overflow",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
 					testVdrs[0].nodeID: {
@@ -117,7 +127,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "invalid bit set index",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -147,7 +157,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "unknown index",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -180,7 +190,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "insufficient weight",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -224,7 +234,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "can't parse sig",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -258,7 +268,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "no validators",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(nil, nil)
 				return state
@@ -293,7 +303,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "invalid signature (substitute)",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -337,7 +347,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "invalid signature (missing one)",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -377,7 +387,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "invalid signature (extra one)",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -422,7 +432,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "valid signature",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -466,7 +476,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "valid signature (boundary)",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(vdrs, nil)
 				return state
@@ -510,7 +520,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "valid signature (missing key)",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
 					testVdrs[0].nodeID: {
@@ -571,7 +581,7 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name: "valid signature (duplicate key)",
 			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validators.NewMockState(ctrl)
+				state := validatorsmock.NewState(ctrl)
 				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(sourceSubnetID, nil)
 				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, sourceSubnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
 					testVdrs[0].nodeID: {

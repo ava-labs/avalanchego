@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/stretchr/testify/require"
@@ -22,11 +23,11 @@ func TestGetValidatorSetPrimaryNetwork(t *testing.T) {
 	mySubnetID := ids.GenerateTestID()
 	otherSubnetID := ids.GenerateTestID()
 
-	mockState := validators.NewMockState(ctrl)
+	mockState := validatorsmock.NewState(ctrl)
 	snowCtx := utils.TestSnowContext()
 	snowCtx.SubnetID = mySubnetID
 	snowCtx.ValidatorState = mockState
-	state := NewState(snowCtx)
+	state := NewState(snowCtx.ValidatorState, snowCtx.SubnetID, snowCtx.ChainID, false)
 	// Expect that requesting my validator set returns my validator set
 	mockState.EXPECT().GetValidatorSet(gomock.Any(), gomock.Any(), mySubnetID).Return(make(map[ids.NodeID]*validators.GetValidatorOutput), nil)
 	output, err := state.GetValidatorSet(context.Background(), 10, mySubnetID)

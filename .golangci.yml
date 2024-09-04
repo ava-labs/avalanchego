@@ -8,8 +8,6 @@ run:
   skip-dirs-use-default: true
   # Include non-test files tagged as test-only.
   # Context: https://github.com/ava-labs/avalanchego/pull/3173
-  build-tags:
-    - test
 
 linters:
   disable-all: true
