@@ -35,6 +35,7 @@ func init() {
 			RegisterApricotTypes(c),
 			RegisterBanffTypes(c),
 			RegisterDurangoTypes(c),
+			RegisterEtnaTypes(c),
 		)
 	}
 
@@ -78,4 +79,10 @@ func RegisterBanffTypes(targetCodec linearcodec.Codec) error {
 // valid during the Durango series of upgrades.
 func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
 	return txs.RegisterDurangoTypes(targetCodec)
+}
+
+// RegisterEtnaTypes registers the type information for blocks that were valid
+// during the Etna series of upgrades.
+func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
+	return txs.RegisterEtnaTypes(targetCodec)
 }

@@ -175,6 +175,17 @@ var (
 		gas.DBWrite: 1,
 		gas.Compute: 0,
 	}
+	IntrinsicConvertSubnetTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // subnetID
+			ids.IDLen + // chainID
+			wrappers.IntLen + // address length
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
+	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
@@ -590,6 +601,25 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		&baseTxComplexity,
 		&authComplexity,
 		&ownerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(tx.Address)),
+		},
 	)
 	return err
 }
