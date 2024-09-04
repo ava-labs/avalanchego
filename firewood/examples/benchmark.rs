@@ -25,8 +25,6 @@ use rand::{distributions::Alphanumeric, Rng, SeedableRng as _};
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value = "1-64", value_parser = string_to_range)]
-    keylen: RangeInclusive<usize>,
     #[arg(short, long, default_value = "32", value_parser = string_to_range)]
     valuelen: RangeInclusive<usize>,
     #[arg(short, long, default_value_t = 1)]
@@ -93,9 +91,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for key in 0..args.number_of_batches {
         let valuelen = rng.gen_range(args.valuelen.clone());
         let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
-            .map(|_| {
+            .map(|inner_key| {
                 (
-                    Sha256::digest(key.to_ne_bytes()).to_vec(),
+                    Sha256::digest((key * keys + inner_key).to_ne_bytes()).to_vec(),
                     rng.borrow_mut()
                         .sample_iter(&Alphanumeric)
                         .take(valuelen)
