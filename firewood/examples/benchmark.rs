@@ -6,14 +6,10 @@
 
 use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
 use std::{
-    borrow::BorrowMut as _,
-    collections::HashMap,
-    error::Error,
-    num::NonZeroUsize,
-    ops::RangeInclusive,
-    time::{Duration, Instant},
+    borrow::BorrowMut as _, collections::HashMap, error::Error, net::{Ipv4Addr, SocketAddr}, num::NonZeroUsize, ops::RangeInclusive, time::{Duration, Instant}
 };
 
 use firewood::{
@@ -63,6 +59,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     builder
         .with_push_gateway("http://localhost:9090", Duration::from_secs(10))
         .expect("cannot setup push gateway")
+        .with_http_listener(SocketAddr::new(
+            Ipv4Addr::UNSPECIFIED.into(),
+            3000,
+        ))
+        .idle_timeout(
+            MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
+            Some(Duration::from_secs(10)),
+        )
         .install()
         .expect("unable in run prometheusbuilder");
 
