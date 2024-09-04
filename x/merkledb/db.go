@@ -1256,7 +1256,8 @@ func (db *merkleDB) maskChangesInSnapshots(changes *changeSummary) error {
 	reversedChanges := &changeSummary{
 		rootID: changes.rootID,
 		values: make(map[Key]*change[maybe.Maybe[[]byte]], len(changes.values)),
-		nodes:  make(map[Key]*change[*node], len(changes.nodes))}
+		nodes:  make(map[Key]*change[*node], len(changes.nodes)),
+	}
 	reversedChanges.rootChange = change[maybe.Maybe[*node]]{before: changes.rootChange.after, after: changes.rootChange.before}
 	for key, currentChange := range changes.values {
 		reversedChanges.values[key] = &change[maybe.Maybe[[]byte]]{before: currentChange.after, after: currentChange.before}
