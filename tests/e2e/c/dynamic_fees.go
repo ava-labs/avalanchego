@@ -39,6 +39,13 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
 		e2e.GetEnv(tc).StartPrivateNetwork(privateNetwork)
 
+		// Avoid emitting a spec-scoped metrics link for the shared
+		// network since the link emitted by the start of the private
+		// network is more relevant.
+		//
+		// TODO(marun) Make this implicit to the start of a private network
+		e2e.EmitMetricsLink = false
+
 		tc.By("allocating a pre-funded key")
 		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := evm.GetEthAddress(key)

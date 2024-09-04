@@ -77,14 +77,12 @@ func (p *NodeProcess) setProcessContext(processContext node.NodeProcessContext) 
 
 func (p *NodeProcess) readState() error {
 	path := p.getProcessContextPath()
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+	bytes, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
 		p.setProcessContext(node.NodeProcessContext{})
 		return nil
-	}
-
-	bytes, err := os.ReadFile(path)
-	if err != nil {
+	} else if err != nil {
 		return fmt.Errorf("failed to read node process context: %w", err)
 	}
 	processContext := node.NodeProcessContext{}
