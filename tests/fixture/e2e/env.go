@@ -58,6 +58,9 @@ type TestEnvironment struct {
 
 // Retrieve the test environment configured with the provided test context.
 func GetEnv(tc tests.TestContext) *TestEnvironment {
+	if env == nil {
+		return nil
+	}
 	return &TestEnvironment{
 		NetworkDir:                  env.NetworkDir,
 		URIs:                        env.URIs,
