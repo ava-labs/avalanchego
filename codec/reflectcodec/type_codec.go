@@ -496,25 +496,6 @@ func (c *genericCodec) marshal(
 	}
 }
 
-// Unmarshal unmarshals [bytes] into [dest], where [dest] must be a pointer or
-// interface
-func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
-	p := wrappers.Packer{
-		Bytes: bytes,
-	}
-	if err := c.UnmarshalFrom(&p, dest); err != nil {
-		return err
-	}
-	if p.Offset != len(bytes) {
-		return fmt.Errorf("%w: read %d provided %d",
-			codec.ErrExtraSpace,
-			p.Offset,
-			len(bytes),
-		)
-	}
-	return nil
-}
-
 // UnmarshalFrom unmarshals [p.Bytes] into [dest], where [dest] must be a pointer or
 // interface
 func (c *genericCodec) UnmarshalFrom(p *wrappers.Packer, dest interface{}) error {
