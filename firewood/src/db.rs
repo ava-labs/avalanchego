@@ -10,7 +10,7 @@ pub use crate::v2::api::{Batch, BatchOp};
 
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
-use metered::metered;
+use metered::{metered, HitCount, Throughput};
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -109,6 +109,7 @@ pub struct Db {
     manager: RwLock<RevisionManager>,
 }
 
+#[metered(registry = DbMetrics, visibility = pub)]
 #[async_trait]
 impl api::Db for Db
 where
@@ -131,6 +132,7 @@ where
         Ok(self.manager.read().expect("poisoned lock").root_hash()?)
     }
 
+    #[measure([HitCount, Throughput])]
     async fn propose<'p, K: KeyType, V: ValueType>(
         &'p self,
         batch: api::Batch<K, V>,
@@ -171,7 +173,6 @@ where
     }
 }
 
-#[metered(registry = DbMetrics, visibility = pub)]
 impl Db {
     pub async fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
         let metrics = DbMetrics::default().into();
