@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -436,8 +437,11 @@ type GetSubnetResponse struct {
 	ControlKeys []string       `json:"controlKeys"`
 	Threshold   avajson.Uint32 `json:"threshold"`
 	Locktime    avajson.Uint64 `json:"locktime"`
-	// subnet transformation tx ID for a permissionless subnet
+	// subnet transformation tx ID for an elastic subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
+	// subnet manager information for a permissionless L1
+	ManagerChainID ids.ID              `json:"managerChainID"`
+	ManagerAddress types.JSONByteSlice `json:"managerAddress"`
 }
 
 func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetSubnetResponse) error {
@@ -482,6 +486,18 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	case database.ErrNotFound:
 		response.IsPermissioned = true
 		response.SubnetTransformationTxID = ids.Empty
+	default:
+		return err
+	}
+
+	switch chainID, addr, err := s.vm.state.GetSubnetManager(args.SubnetID); err {
+	case nil:
+		response.IsPermissioned = false
+		response.ManagerChainID = chainID
+		response.ManagerAddress = addr
+	case database.ErrNotFound:
+		response.ManagerChainID = ids.Empty
+		response.ManagerAddress = []byte(nil)
 	default:
 		return err
 	}

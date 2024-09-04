@@ -234,6 +234,7 @@ func TestGetTx(t *testing.T) {
 					constants.AVMID,
 					[]ids.ID{},
 					"chain name",
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -266,6 +267,7 @@ func TestGetTx(t *testing.T) {
 					rewardsOwner,
 					rewardsOwner,
 					0,
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -289,6 +291,7 @@ func TestGetTx(t *testing.T) {
 							},
 						},
 					}},
+					common.WithMemo([]byte{}),
 				)
 				require.NoError(t, err)
 				return tx
@@ -579,7 +582,7 @@ func TestGetStake(t *testing.T) {
 	)
 	require.NoError(err)
 
-	service.vm.state.PutPendingValidator(staker)
+	require.NoError(service.vm.state.PutPendingValidator(staker))
 	service.vm.state.AddTx(tx, status.Committed)
 	require.NoError(service.vm.state.Commit())
 
@@ -792,6 +795,7 @@ func TestGetBlock(t *testing.T) {
 				constants.AVMID,
 				[]ids.ID{},
 				"chain name",
+				common.WithMemo([]byte{}),
 			)
 			require.NoError(err)
 
