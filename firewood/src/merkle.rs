@@ -405,6 +405,8 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
         histogram!("firewood.insert.key.length").record(key.len() as f64);
         histogram!("firewood.insert.data.length").record(value.len() as f64);
+        counter!("firewood.merkle.insert").increment(1);
+
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -417,7 +419,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 value,
             });
             *root = root_node.into();
-            counter!("firewood.merkle.insert.root").increment(1);
             return Ok(());
         };
 
@@ -489,7 +490,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 //    ... (key may be below)       ... (key is below)
                 match node {
                     Node::Branch(ref mut branch) => {
-                        counter!("firewood.merkle.insert.below").increment(1);
                         #[allow(clippy::indexing_slicing)]
                         let child = match std::mem::take(&mut branch.children[child_index as usize])
                         {
@@ -501,6 +501,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                     partial_path,
                                 });
                                 branch.update_child(child_index, Some(Child::Node(new_leaf)));
+                                counter!("firewood.merkle.insert.below").increment(1);
                                 return Ok(node);
                             }
                             Some(Child::Node(child)) => child,
@@ -516,7 +517,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         Ok(node)
                     }
                     Node::Leaf(ref mut leaf) => {
-                        counter!("firewood.merkle.inserted.split").increment(1);
                         // Turn this node into a branch node and put a new leaf as a child.
                         let mut branch = BranchNode {
                             partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
@@ -531,6 +531,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
                         branch.update_child(child_index, Some(Child::Node(new_leaf)));
 
+                        counter!("firewood.merkle.insert.split").increment(1);
                         Ok(Node::Branch(Box::new(branch)))
                     }
                 }
@@ -543,7 +544,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 //     |                           |    \
                 //                               node   key
                 // Make a branch node that has both the current node and a new leaf node as children.
-                counter!("firewood.merkle.inserted.split").increment(1);
                 let mut branch = BranchNode {
                     partial_path: path_overlap.shared.into(),
                     value: None,
@@ -559,6 +559,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 });
                 branch.update_child(key_index, Some(Child::Node(new_leaf)));
 
+                counter!("firewood.merkle.insert.split").increment(1);
                 Ok(Node::Branch(Box::new(branch)))
             }
         }

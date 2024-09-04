@@ -12,7 +12,6 @@ use sha2::{Digest, Sha256};
 use std::{
     borrow::BorrowMut as _, collections::HashMap, error::Error, net::{Ipv4Addr, SocketAddr}, num::NonZeroUsize, ops::RangeInclusive, time::{Duration, Instant}
 };
-use Url::Url;
 
 use firewood::{
     db::{Batch, BatchOp, Db, DbConfig},

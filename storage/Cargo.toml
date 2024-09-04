@@ -16,6 +16,7 @@ sha2 = "0.10.8"
 integer-encoding = "4.0.0"
 arc-swap = "1.7.1"
 lru = "0.12.4"
+metrics = "0.23.0"
 
 [dev-dependencies]
 rand = "0.8.5"

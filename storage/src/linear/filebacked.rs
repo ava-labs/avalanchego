@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use lru::LruCache;
+use metrics::counter;
 
 use crate::{LinearAddress, Node};
 
@@ -66,7 +67,13 @@ impl ReadableStorage for FileBacked {
 
     fn read_cached_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
         let mut guard = self.cache.lock().expect("poisoned lock");
-        guard.get(&addr).cloned()
+        let cached = guard.get(&addr).cloned();
+        if cached.is_some() {
+            counter!("firewood.node.cache.hit").increment(1);
+        } else {
+            counter!("firewood.node.cache.miss").increment(1);
+        }
+        cached
     }
 }
 
