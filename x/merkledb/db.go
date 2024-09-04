@@ -157,6 +157,7 @@ type MerkleDB interface {
 	ChangeProofer
 	RangeProofer
 	Prefetcher
+	NewSnapshot(revisionsLifetime int) (ReadOnlyTrie, error)
 }
 
 type Config struct {
@@ -232,6 +233,9 @@ type merkleDB struct {
 
 	// Valid children of this trie.
 	childViews []*view
+
+	// Snapshots of this trie.
+	snapshots []*snapshot
 
 	// hashNodesKeyPool controls the number of goroutines that are created
 	// inside [hashChangedNode] at any given time and provides slices for the
@@ -973,6 +977,10 @@ func (db *merkleDB) commitView(ctx context.Context, trieToCommit *view) error {
 	))
 	defer span.End()
 
+	if err := db.maskChangesInSnapshots(changes); err != nil {
+		return err
+	}
+
 	// invalidate all child views except for the view being committed
 	db.invalidateChildrenExcept(trieToCommit)
 
@@ -1203,6 +1211,67 @@ func (db *merkleDB) VerifyChangeProof(
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, calculatedRoot, expectedEndRootID)
 	}
 
+	return nil
+}
+
+// NewSnapshot returns a snapshot of this database that can provide the key/values of the database exactly as it was when NewSnapshot was called.
+// After a revisionsLifetime number of new revisions have been committed to the database, the ReadOnlyTrie will become invalid
+//
+// Assumes [db.lock] isn't held.
+func (db *merkleDB) NewSnapshot(revisionsLifetime int) (ReadOnlyTrie, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	baseView, err := newView(db, db, ViewChanges{})
+	if err != nil {
+		return nil, err
+	}
+	snap := &snapshot{
+		innermostParent: baseView,
+		innerView:       baseView,
+		revisionsLeft:   revisionsLifetime,
+	}
+	db.snapshots = append(db.snapshots, snap)
+	return snap, nil
+}
+
+// maskChangesInSnapshots inserts a new view in all snapshots' parent trie chains that masks out the new changes from the db
+// additionally cleans up old snapshots once they have hit their revision limit
+// Assumes [db.lock] is held.
+func (db *merkleDB) maskChangesInSnapshots(changes *changeSummary) error {
+	// clean up all snapshots
+	for i := 0; i < len(db.snapshots); i++ {
+		for db.snapshots[i].revisionsLeft == 0 {
+			db.snapshots[i] = db.snapshots[len(db.snapshots)-1]
+			db.snapshots = db.snapshots[:len(db.snapshots)-1]
+		}
+	}
+
+	// don't construct the reversed changes view if it isn't needed
+	if len(db.snapshots) == 0 {
+		return nil
+	}
+
+	// create a new view that contains the
+	reversedChanges := &changeSummary{
+		rootID: changes.rootID,
+		values: make(map[Key]*change[maybe.Maybe[[]byte]], len(changes.values)),
+		nodes:  make(map[Key]*change[*node], len(changes.nodes))}
+	reversedChanges.rootChange = change[maybe.Maybe[*node]]{before: changes.rootChange.after, after: changes.rootChange.before}
+	for key, currentChange := range changes.values {
+		reversedChanges.values[key] = &change[maybe.Maybe[[]byte]]{before: currentChange.after, after: currentChange.before}
+	}
+	for key, currentChange := range changes.nodes {
+		reversedChanges.nodes[key] = &change[*node]{before: currentChange.after, after: currentChange.before}
+	}
+	newParentView, err := newViewWithChanges(db, reversedChanges)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(db.snapshots); i++ {
+		db.snapshots[i].updateParent(newParentView)
+	}
 	return nil
 }
 
