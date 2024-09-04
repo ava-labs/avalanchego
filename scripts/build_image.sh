@@ -88,7 +88,7 @@ ${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
               "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
 if [[ -z "${SKIP_BUILD_RACE}" ]]; then
-   echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
+   echo "Building Docker Image with tags (race detector): $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
    ${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
                  "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 fi
