@@ -66,8 +66,8 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 	tests := []struct {
 		name          string
 		tx            *ConvertSubnetTx
-		expectedBytes []byte
 		expectedJSON  string
+		expectedBytes []byte
 	}{
 		{
 			name: "simple",
@@ -104,6 +104,34 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 					SigIndices: []uint32{3},
 				},
 			},
+			expectedJSON: `{
+	"networkID": 10,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000,
+				"signatureIndices": [
+					5
+				]
+			}
+		}
+	],
+	"memo": "0x",
+	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
+	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
+	"address": "0x000000000000000000000000000000000000dead",
+	"subnetAuthorization": {
+		"signatureIndices": [
+			3
+		]
+	}
+}`,
 			expectedBytes: []byte{
 				// Codec version
 				0x00, 0x00,
@@ -166,34 +194,6 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				// index of signer
 				0x00, 0x00, 0x00, 0x03,
 			},
-			expectedJSON: `{
-	"networkID": 10,
-	"blockchainID": "11111111111111111111111111111111LpoYY",
-	"outputs": [],
-	"inputs": [
-		{
-			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
-			"outputIndex": 1,
-			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"input": {
-				"amount": 1000000,
-				"signatureIndices": [
-					5
-				]
-			}
-		}
-	],
-	"memo": "0x",
-	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
-	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
-	"address": "0x000000000000000000000000000000000000dead",
-	"subnetAuthorization": {
-		"signatureIndices": [
-			3
-		]
-	}
-}`,
 		},
 		{
 			name: "complex",
@@ -298,6 +298,87 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 					SigIndices: []uint32{},
 				},
 			},
+			expectedJSON: `{
+	"networkID": 10,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 87654321,
+				"output": {
+					"addresses": [],
+					"amount": 1,
+					"locktime": 12345678,
+					"threshold": 0
+				}
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 876543210,
+				"output": {
+					"addresses": [
+						"P-testing1g32kvaugnx4tk3z4vemc3xd2hdz92enhgrdu9n"
+					],
+					"amount": 18446744073709551615,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000000,
+				"signatureIndices": [
+					2,
+					5
+				]
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 2,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"locktime": 876543210,
+				"input": {
+					"amount": 17293822569102704639,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 3,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1152921504606846976,
+				"signatureIndices": []
+			}
+		}
+	],
+	"memo": "0xf09f98850a77656c6c2074686174277301234521",
+	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
+	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
+	"address": "0x000000000000000000000000000000000000dead",
+	"subnetAuthorization": {
+		"signatureIndices": []
+	}
+}`,
 			expectedBytes: []byte{
 				// Codec version
 				0x00, 0x00,
@@ -452,104 +533,23 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				// number of signatures needed in authorization
 				0x00, 0x00, 0x00, 0x00,
 			},
-			expectedJSON: `{
-	"networkID": 10,
-	"blockchainID": "11111111111111111111111111111111LpoYY",
-	"outputs": [
-		{
-			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"output": {
-				"locktime": 87654321,
-				"output": {
-					"addresses": [],
-					"amount": 1,
-					"locktime": 12345678,
-					"threshold": 0
-				}
-			}
-		},
-		{
-			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"output": {
-				"locktime": 876543210,
-				"output": {
-					"addresses": [
-						"P-testing1g32kvaugnx4tk3z4vemc3xd2hdz92enhgrdu9n"
-					],
-					"amount": 18446744073709551615,
-					"locktime": 0,
-					"threshold": 1
-				}
-			}
-		}
-	],
-	"inputs": [
-		{
-			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
-			"outputIndex": 1,
-			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"input": {
-				"amount": 1000000000,
-				"signatureIndices": [
-					2,
-					5
-				]
-			}
-		},
-		{
-			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
-			"outputIndex": 2,
-			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"input": {
-				"locktime": 876543210,
-				"input": {
-					"amount": 17293822569102704639,
-					"signatureIndices": [
-						0
-					]
-				}
-			}
-		},
-		{
-			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
-			"outputIndex": 3,
-			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
-			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
-			"input": {
-				"amount": 1152921504606846976,
-				"signatureIndices": []
-			}
-		}
-	],
-	"memo": "0xf09f98850a77656c6c2074686174277301234521",
-	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
-	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
-	"address": "0x000000000000000000000000000000000000dead",
-	"subnetAuthorization": {
-		"signatureIndices": []
-	}
-}`,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
+			ctx := snowtest.Context(t, constants.PlatformChainID)
+			test.tx.InitCtx(ctx)
+
+			txJSONBytes, err := json.MarshalIndent(test.tx, "", "\t")
+			require.NoError(err)
+			require.Equal(test.expectedJSON, string(txJSONBytes))
+
 			var unsignedTx UnsignedTx = test.tx
 			txBytes, err := Codec.Marshal(CodecVersion, &unsignedTx)
 			require.NoError(err)
 			require.Equal(test.expectedBytes, txBytes)
-
-			ctx := snowtest.Context(t, constants.PlatformChainID)
-			unsignedTx.InitCtx(ctx)
-
-			txJSONBytes, err := json.MarshalIndent(unsignedTx, "", "\t")
-			require.NoError(err)
-			require.Equal(test.expectedJSON, string(txJSONBytes))
 		})
 	}
 }
