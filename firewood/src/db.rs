@@ -10,7 +10,7 @@ pub use crate::v2::api::{Batch, BatchOp};
 
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
-use metrics::counter;
+use metrics::{counter, describe_counter};
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -51,8 +51,16 @@ impl Error for DbError {}
 
 type HistoricalRev = NodeStore<Committed, FileBacked>;
 
-#[derive(Debug, Default)]
-pub struct DbMetrics;
+
+pub struct DbMetrics {
+    _proposals: metrics::Counter,
+}
+
+impl std::fmt::Debug for DbMetrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DbMetrics").finish()
+    }
+}
 
 #[async_trait]
 impl api::DbView for HistoricalRev {
@@ -166,6 +174,8 @@ where
             .expect("poisoned lock")
             .add_proposal(immutable.clone());
 
+        counter!("firewood.proposals").increment(1);
+
         Ok(Self::Proposal {
             nodestore: immutable,
             db: self,
@@ -176,7 +186,8 @@ where
 
 impl Db {
     pub async fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        let metrics = Arc::new(DbMetrics);
+        let metrics = Arc::new(DbMetrics { _proposals: counter!("firewood.proposals") });
+        describe_counter!("firewood.proposals", "Number of proposals created");
         let manager = RevisionManager::new(
             db_path.as_ref().to_path_buf(),
             cfg.truncate,
@@ -278,7 +289,6 @@ impl<'a> api::Proposal for Proposal<'a> {
             .expect("poisoned lock")
             .add_proposal(immutable.clone());
 
-        counter!("firewood.proposals").increment(1);
 
         Ok(Self::Proposal {
             nodestore: immutable,

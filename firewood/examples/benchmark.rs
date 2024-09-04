@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let builder = PrometheusBuilder::new();
     builder
-        .with_push_gateway("http://localhost:9090", Duration::from_secs(10))
+        .with_push_gateway("http://localhost:9090", Duration::from_secs(10), None, None)
         .expect("cannot setup push gateway")
         .with_http_listener(SocketAddr::new(
             Ipv4Addr::UNSPECIFIED.into(),
