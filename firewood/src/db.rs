@@ -10,7 +10,7 @@ pub use crate::v2::api::{Batch, BatchOp};
 
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
-use metered::{metered, HitCount, Throughput};
+use metrics::counter;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -50,6 +50,9 @@ impl From<std::io::Error> for DbError {
 impl Error for DbError {}
 
 type HistoricalRev = NodeStore<Committed, FileBacked>;
+
+#[derive(Debug, Default)]
+pub struct DbMetrics;
 
 #[async_trait]
 impl api::DbView for HistoricalRev {
@@ -109,7 +112,6 @@ pub struct Db {
     manager: RwLock<RevisionManager>,
 }
 
-#[metered(registry = DbMetrics, visibility = pub)]
 #[async_trait]
 impl api::Db for Db
 where
@@ -132,7 +134,6 @@ where
         Ok(self.manager.read().expect("poisoned lock").root_hash()?)
     }
 
-    #[measure([HitCount, Throughput])]
     async fn propose<'p, K: KeyType, V: ValueType>(
         &'p self,
         batch: api::Batch<K, V>,
@@ -175,7 +176,7 @@ where
 
 impl Db {
     pub async fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        let metrics = DbMetrics::default().into();
+        let metrics = Arc::new(DbMetrics);
         let manager = RevisionManager::new(
             db_path.as_ref().to_path_buf(),
             cfg.truncate,
@@ -276,6 +277,8 @@ impl<'a> api::Proposal for Proposal<'a> {
             .write()
             .expect("poisoned lock")
             .add_proposal(immutable.clone());
+
+        counter!("firewood.proposals").increment(1);
 
         Ok(Self::Proposal {
             nodestore: immutable,
