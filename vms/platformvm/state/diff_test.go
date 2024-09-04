@@ -111,7 +111,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
 	}
-	d.PutCurrentValidator(currentValidator)
+	require.NoError(d.PutCurrentValidator(currentValidator))
 
 	// Assert that we get the current validator back
 	gotCurrentValidator, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
@@ -145,7 +145,7 @@ func TestDiffPendingValidator(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
 	}
-	d.PutPendingValidator(pendingValidator)
+	require.NoError(d.PutPendingValidator(pendingValidator))
 
 	// Assert that we get the pending validator back
 	gotPendingValidator, err := d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
