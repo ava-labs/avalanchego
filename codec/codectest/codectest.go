@@ -1178,4 +1178,12 @@ func TestImplementsUnmarshalFrom(t testing.TB, codec codecpkg.GeneralCodec) {
 	var sliceUnmarshaled []bool
 	require.NoError(codec.UnmarshalFrom(&p, &sliceUnmarshaled))
 	require.Equal(mySlice, sliceUnmarshaled)
+	require.Equal(
+		wrappers.Packer{
+			Bytes:   p.Bytes,
+			MaxSize: p.MaxSize,
+			Offset:  11,
+		},
+		p,
+	)
 }
