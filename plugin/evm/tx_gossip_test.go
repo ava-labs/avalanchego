@@ -590,5 +590,5 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	inboundGossipMsg := append(binary.AppendUvarint(nil, atomicTxGossipProtocol), inboundGossipBytes...)
 
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
-	require.True(vm.mempool.has(tx.ID()))
+	require.True(vm.mempool.Has(tx.ID()))
 }
