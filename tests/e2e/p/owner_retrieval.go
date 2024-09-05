@@ -4,6 +4,7 @@
 package p
 
 import (
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -11,8 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
