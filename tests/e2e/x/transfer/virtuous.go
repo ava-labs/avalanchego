@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -25,8 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (

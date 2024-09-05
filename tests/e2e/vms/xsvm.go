@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const pollingInterval = 50 * time.Millisecond

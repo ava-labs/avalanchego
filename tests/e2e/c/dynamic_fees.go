@@ -12,12 +12,11 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // This test uses the compiled bin for `hashing.sol` as
