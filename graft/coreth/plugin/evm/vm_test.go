@@ -1102,9 +1102,9 @@ func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
 				t.Fatalf("Expected to fail with err: %s, but found err: %s", errConflictingAtomicTx, err)
 			}
 
-			assert.True(t, vm.mempool.has(importTx1.ID()))
-			assert.True(t, vm.mempool.has(importTx2.ID()))
-			assert.False(t, vm.mempool.has(reissuanceTx1.ID()))
+			assert.True(t, vm.mempool.Has(importTx1.ID()))
+			assert.True(t, vm.mempool.Has(importTx2.ID()))
+			assert.False(t, vm.mempool.Has(reissuanceTx1.ID()))
 
 			reissuanceTx2, err := vm.newImportTxWithUTXOs(vm.ctx.XChainID, testEthAddrs[0], new(big.Int).Mul(big.NewInt(4), initialBaseFee), kc, []*avax.UTXO{utxo1, utxo2})
 			if err != nil {

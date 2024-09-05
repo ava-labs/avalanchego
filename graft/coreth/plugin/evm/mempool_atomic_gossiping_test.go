@@ -47,18 +47,18 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			// add a tx to the mempool
 			err := vm.mempool.AddLocalTx(tx)
 			assert.NoError(err)
-			has := mempool.has(txID)
+			has := mempool.Has(txID)
 			assert.True(has, "valid tx not recorded into mempool")
 
 			// try to add a conflicting tx
 			err = vm.mempool.AddLocalTx(conflictingTx)
 			assert.ErrorIs(err, errConflictingAtomicTx)
-			has = mempool.has(conflictingTxID)
+			has = mempool.Has(conflictingTxID)
 			assert.False(has, "conflicting tx in mempool")
 
 			<-issuer
 
-			has = mempool.has(txID)
+			has = mempool.Has(txID)
 			assert.True(has, "valid tx not recorded into mempool")
 
 			// Show that BuildBlock generates a block containing [txID] and that it is
@@ -71,7 +71,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			assert.Equal(txID, evmBlk.atomicTxs[0].ID(), "block does not include expected transaction")
 
-			has = mempool.has(txID)
+			has = mempool.Has(txID)
 			assert.True(has, "tx should stay in mempool until block is accepted")
 
 			err = blk.Verify(context.Background())
@@ -80,7 +80,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			err = blk.Accept(context.Background())
 			assert.NoError(err)
 
-			has = mempool.has(txID)
+			has = mempool.Has(txID)
 			assert.False(has, "tx shouldn't be in mempool after block is accepted")
 		})
 	}
@@ -105,13 +105,13 @@ func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	mempool.maxSize = 0
 
 	assert.ErrorIs(mempool.AddTx(tx), errTooManyAtomicTx)
-	assert.False(mempool.has(tx.ID()))
+	assert.False(mempool.Has(tx.ID()))
 
 	// shortcut to simulated empty mempool
 	mempool.maxSize = defaultMempoolSize
 
 	assert.NoError(mempool.AddTx(tx))
-	assert.True(mempool.has(tx.ID()))
+	assert.True(mempool.Has(tx.ID()))
 }
 
 // mempool will drop transaction with the lowest fee
@@ -136,22 +136,22 @@ func TestMempoolPriorityDrop(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.NoError(mempool.AddTx(tx1))
-	assert.True(mempool.has(tx1.ID()))
+	assert.True(mempool.Has(tx1.ID()))
 
 	tx2, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], initialBaseFee, []*secp256k1.PrivateKey{testKeys[1]})
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.ErrorIs(mempool.AddTx(tx2), errInsufficientAtomicTxFee)
-	assert.True(mempool.has(tx1.ID()))
-	assert.False(mempool.has(tx2.ID()))
+	assert.True(mempool.Has(tx1.ID()))
+	assert.False(mempool.Has(tx2.ID()))
 
 	tx3, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[1], new(big.Int).Mul(initialBaseFee, big.NewInt(2)), []*secp256k1.PrivateKey{testKeys[1]})
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.NoError(mempool.AddTx(tx3))
-	assert.False(mempool.has(tx1.ID()))
-	assert.False(mempool.has(tx2.ID()))
-	assert.True(mempool.has(tx3.ID()))
+	assert.False(mempool.Has(tx1.ID()))
+	assert.False(mempool.Has(tx2.ID()))
+	assert.True(mempool.Has(tx3.ID()))
 }
