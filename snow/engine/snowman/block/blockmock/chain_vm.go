@@ -132,6 +132,22 @@ func (mr *ChainVMMockRecorder) Connected(arg0, arg1, arg2 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*ChainVM)(nil).Connected), arg0, arg1, arg2)
 }
 
+// CreateGRPCService mocks base method.
+func (m *ChainVM) CreateGRPCService(arg0 context.Context) (string, http.Handler, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateGRPCService", arg0)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(http.Handler)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// CreateGRPCService indicates an expected call of CreateGRPCService.
+func (mr *ChainVMMockRecorder) CreateGRPCService(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateGRPCService", reflect.TypeOf((*ChainVM)(nil).CreateGRPCService), arg0)
+}
+
 // CreateHandlers mocks base method.
 func (m *ChainVM) CreateHandlers(arg0 context.Context) (map[string]http.Handler, error) {
 	m.ctrl.T.Helper()

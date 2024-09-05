@@ -363,6 +363,30 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 	return resp, nil
 }
 
+func (vm *VMServer) CreateGRPCService(ctx context.Context, _ *emptypb.Empty) (*vmpb.CreateGRPCHandlerResponse, error) {
+	serviceName, handler, err := vm.vm.CreateGRPCService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	serverListener, err := grpcutils.NewListener()
+	if err != nil {
+		return nil, err
+	}
+
+	server := grpcutils.NewServer()
+	vm.serverCloser.Add(server)
+	httppb.RegisterHTTPServer(server, ghttp.NewServer(handler))
+
+	// Start HTTP service
+	go grpcutils.Serve(serverListener, server)
+
+	return &vmpb.CreateGRPCHandlerResponse{
+		ServiceName: serviceName,
+		ServerAddr:  serverListener.Addr().String(),
+	}, nil
+}
+
 func (vm *VMServer) Connected(ctx context.Context, req *vmpb.ConnectedRequest) (*emptypb.Empty, error) {
 	nodeID, err := ids.ToNodeID(req.NodeId)
 	if err != nil {
