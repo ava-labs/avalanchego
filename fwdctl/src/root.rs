@@ -4,6 +4,9 @@
 use clap::Args;
 use std::str;
 
+use firewood::db::{Db, DbConfig};
+use firewood::v2::api::{self, Db as _};
+
 #[derive(Debug, Args)]
 pub struct Options {
     /// The database path (if no path is provided, return an error). Defaults to firewood.
@@ -17,13 +20,13 @@ pub struct Options {
     pub db: String,
 }
 
-// pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-//     log::debug!("root hash {:?}", opts);
-//     let cfg = DbConfig::builder().truncate(false);
+pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
+    let cfg = DbConfig::builder().truncate(false);
 
-//     let db = Db::new(opts.db.clone(), cfg.build()).await?;
+    let db = Db::new(opts.db.clone(), cfg.build()).await?;
 
-//     let root = db.root_hash().await?;
-//     println!("{root:X?}");
-//     Ok(())
-// }
+    let hash = db.root_hash().await?;
+
+    println!("{hash:?}");
+    Ok(())
+}

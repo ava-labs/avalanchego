@@ -2,6 +2,8 @@
 // See the file LICENSE.md for licensing terms.
 
 use clap::Args;
+use firewood::db::{BatchOp, Db, DbConfig};
+use firewood::v2::api::{self, Db as _, Proposal as _};
 
 #[derive(Debug, Args)]
 pub struct Options {
@@ -20,18 +22,18 @@ pub struct Options {
     pub db: String,
 }
 
-// pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-//     log::debug!("deleting key {:?}", opts);
-//     let cfg = DbConfig::builder().truncate(false);
+pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
+    log::debug!("deleting key {:?}", opts);
+    let cfg = DbConfig::builder().truncate(false);
 
-//     let db = Db::new(opts.db.clone(), cfg.build()).await?;
+    let db = Db::new(opts.db.clone(), cfg.build()).await?;
 
-//     let batch: Vec<BatchOp<String, String>> = vec![BatchOp::Delete {
-//         key: opts.key.clone(),
-//     }];
-//     let proposal = db.propose(batch).await?;
-//     proposal.commit().await?;
+    let batch: Vec<BatchOp<String, String>> = vec![BatchOp::Delete {
+        key: opts.key.clone(),
+    }];
+    let proposal = db.propose(batch).await?;
+    proposal.commit().await?;
 
-//     println!("key {} deleted successfully", opts.key);
-//     Ok(())
-// }
+    println!("key {} deleted successfully", opts.key);
+    Ok(())
+}

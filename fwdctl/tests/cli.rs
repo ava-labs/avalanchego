@@ -5,7 +5,8 @@ use anyhow::{anyhow, Result};
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;
-use std::{fs::remove_dir_all, path::PathBuf};
+use std::fs::remove_dir_all;
+use std::path::PathBuf;
 
 const PRG: &str = "fwdctl";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
