@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics"
 )
 
-// RequestHandlerStats provides the interface for metrics for both app requests and cross chain requests.
+// RequestHandlerStats provides the interface for metrics for app requests.
 type RequestHandlerStats interface {
 	UpdateTimeUntilDeadline(duration time.Duration)
 	IncDeadlineDroppedRequest()
