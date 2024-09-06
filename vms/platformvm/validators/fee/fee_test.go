@@ -34,8 +34,7 @@ const (
 )
 
 var (
-	_excessConversionConstantFloat = excessConversionConstantFloat
-	excessConversionConstant       = gas.Gas(_excessConversionConstantFloat)
+	excessConversionConstant = floatToGas(excessConversionConstantFloat)
 
 	tests = []struct {
 		name     string
@@ -369,4 +368,10 @@ func unoptimizedCalculateDuration(
 		}
 	}
 	return duration
+}
+
+// floatToGas converts f to gas.Gas by truncation. `gas.Gas(f)` is preferred and
+// floatToGas should only be used if its argument is a `const`.
+func floatToGas(f float64) gas.Gas {
+	return gas.Gas(f)
 }
