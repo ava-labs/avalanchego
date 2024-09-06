@@ -29,11 +29,9 @@ use firewood::v2::api::{Db as _, DbView, Proposal as _};
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value = "32", value_parser = string_to_range)]
-    valuelen: RangeInclusive<usize>,
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 10000)]
     batch_size: u64,
-    #[arg(short, long, default_value_t = 100)]
+    #[arg(short, long, default_value_t = 100000)]
     number_of_batches: u64,
     #[arg(short = 'p', long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
@@ -43,7 +41,7 @@ struct Args {
         help = "Only initialize the database, do not do the insert/delete/update loop"
     )]
     initialize_only: bool,
-    #[arg(short, long, default_value_t = NonZeroUsize::new(20480).expect("is non-zero"))]
+    #[arg(short, long, default_value_t = NonZeroUsize::new(1500000).expect("is non-zero"))]
     cache_size: NonZeroUsize,
     #[arg(short, long)]
     assume_preloaded_rows: Option<u64>,
@@ -53,18 +51,6 @@ struct Args {
     prometheus_port: u16,
 }
 
-fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error + Sync + Send>> {
-    //<usize as std::str::FromStr>::Err> {
-    let parts: Vec<&str> = input.split('-').collect();
-    #[allow(clippy::indexing_slicing)]
-    match parts.len() {
-        1 => Ok(input.parse()?..=input.parse()?),
-        2 => Ok(parts[0].parse()?..=parts[1].parse()?),
-        _ => Err("Too many dashes in input string".into()),
-    }
-}
-
-/// cargo run --release --example insert
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
