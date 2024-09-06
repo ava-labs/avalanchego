@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::num::NonZeroUsize;
-use std::ops::RangeInclusive;
 use std::time::{Duration, Instant};
 
 use firewood::db::{Batch, BatchOp, Db, DbConfig};
