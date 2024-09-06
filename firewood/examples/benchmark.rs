@@ -2,43 +2,54 @@
 // See the file LICENSE.md for licensing terms.
 
 // The idea behind this benchmark:
-// Phase 1: Generate known keys from the SHA256 of the row number, starting at 0, for 1B keys
-// 
+// Phase 1: (setup) Generate known keys from the SHA256 of the row number, starting at 0, for 1B keys
+// Phase 2: (steady-state) Continuously insert, delete, and update keys in the database
+
+// Phase 2 consists of:
+// 1. 25% of batch size is inserting more rows like phase 1
+// 2. 25% of batch size is deleting rows from the beginning
+// 3. 50% of batch size is updating rows in the middle, but setting the value to the hash of the first row inserted
+//
 
 use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
-use std::{
-    borrow::BorrowMut as _, collections::HashMap, error::Error, net::{Ipv4Addr, SocketAddr}, num::NonZeroUsize, ops::RangeInclusive, time::{Duration, Instant}
-};
+use std::collections::HashMap;
+use std::error::Error;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::num::NonZeroUsize;
+use std::ops::RangeInclusive;
+use std::time::{Duration, Instant};
 
-use firewood::{
-    db::{Batch, BatchOp, Db, DbConfig},
-    manager::RevisionManagerConfig,
-    v2::api::{Db as _, DbView, Proposal as _},
-};
-use rand::{distributions::Alphanumeric, Rng, SeedableRng as _};
+use firewood::db::{Batch, BatchOp, Db, DbConfig};
+use firewood::manager::RevisionManagerConfig;
+use firewood::v2::api::{Db as _, DbView, Proposal as _};
+use rand::Rng;
 
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short, long, default_value = "32", value_parser = string_to_range)]
     valuelen: RangeInclusive<usize>,
     #[arg(short, long, default_value_t = 1)]
-    batch_size: usize,
+    batch_size: u64,
     #[arg(short, long, default_value_t = 100)]
-    number_of_batches: usize,
+    number_of_batches: u64,
     #[arg(short = 'p', long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
-    #[arg(short, long)]
-    seed: Option<u64>,
+    #[arg(
+        short,
+        long,
+        help = "Only initialize the database, do not do the insert/delete/update loop"
+    )]
+    initialize_only: bool,
     #[arg(short, long, default_value_t = NonZeroUsize::new(20480).expect("is non-zero"))]
     cache_size: NonZeroUsize,
-    #[arg(short, long, default_value_t = true)]
-    truncate: bool,
+    #[arg(short, long)]
+    assume_preloaded_rows: Option<u64>,
     #[arg(short, long, default_value_t = 128)]
     revisions: usize,
-    #[arg(short = 'p', long, default_value_t = 3000)]
+    #[arg(short = 'l', long, default_value_t = 3000)]
     prometheus_port: u16,
 }
 
@@ -76,7 +87,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .max_revisions(args.revisions)
         .build();
     let cfg = DbConfig::builder()
-        .truncate(args.truncate)
+        .truncate(args.assume_preloaded_rows.is_none())
         .manager(mgrcfg)
         .build();
 
@@ -87,42 +98,93 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let keys = args.batch_size;
     let start = Instant::now();
 
-    let mut rng = if let Some(seed) = args.seed {
-        rand::rngs::StdRng::seed_from_u64(seed)
-    } else {
-        rand::rngs::StdRng::from_entropy()
-    };
+    if args.assume_preloaded_rows.is_none() {
+        for key in 0..args.number_of_batches {
+            let batch = generate_inserts(key * keys, args.batch_size).collect();
 
-    for key in 0..args.number_of_batches {
-        let valuelen = rng.gen_range(args.valuelen.clone());
-        let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
-            .map(|inner_key| {
-                (
-                    Sha256::digest((key * keys + inner_key).to_ne_bytes()).to_vec(),
-                    rng.borrow_mut()
-                        .sample_iter(&Alphanumeric)
-                        .take(valuelen)
-                        .collect::<Vec<u8>>(),
-                )
-            })
-            .map(|(key, value)| BatchOp::Put { key, value })
-            .collect();
+            let verify = get_keys_to_verify(&batch, args.read_verify_percent);
 
-        let verify = get_keys_to_verify(&batch, args.read_verify_percent);
+            let proposal = db.propose(batch).await.expect("proposal should succeed");
+            proposal.commit().await?;
+            verify_keys(&db, verify).await?;
+        }
 
-        #[allow(clippy::unwrap_used)]
-        let proposal = db.propose(batch).await.unwrap();
-        proposal.commit().await?;
-        verify_keys(&db, verify).await?;
+        let duration = start.elapsed();
+        println!(
+            "Generated and inserted {} batches of size {keys} in {duration:?}",
+            args.number_of_batches
+        );
     }
 
-    let duration = start.elapsed();
+    let current_hash = db.root_hash().await?.expect("root hash should exist");
+
+    if args.initialize_only {
+        println!("Completed initialization with hash of {:?}", current_hash);
+
+        return Ok(());
+    }
+
+    // batches consist of
+    // 1. 25% deletes from low
+    // 2. 25% new insertions from high
+    // 3. 50% updates from the middle
+
     println!(
-        "Generated and inserted {} batches of size {keys} in {duration:?}",
-        args.number_of_batches
+        "Starting inner loop with database hash of {:?}",
+        current_hash
     );
 
-    Ok(())
+    let mut low = 0;
+    let mut high = args
+        .assume_preloaded_rows
+        .unwrap_or(args.number_of_batches * args.batch_size);
+    let twenty_five_pct = args.batch_size / 4;
+
+    loop {
+        let batch: Vec<BatchOp<_, _>> = generate_inserts(high, twenty_five_pct)
+            .chain(generate_deletes(low, twenty_five_pct))
+            .chain(generate_updates(low + high / 2, twenty_five_pct * 2, low))
+            .collect();
+        let proposal = db.propose(batch).await.expect("proposal should succeed");
+        proposal.commit().await?;
+        low += twenty_five_pct;
+        high += twenty_five_pct;
+    }
+}
+
+fn generate_inserts(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
+    (start..start + count)
+        .map(|inner_key| {
+            let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+            (digest.clone(), digest)
+        })
+        .map(|(key, value)| BatchOp::Put { key, value })
+        .collect::<Vec<_>>()
+        .into_iter()
+}
+
+fn generate_deletes(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
+    (start..start + count)
+        .map(|key| Sha256::digest(key.to_ne_bytes()).to_vec())
+        .map(|key| BatchOp::Delete { key })
+        .collect::<Vec<_>>()
+        .into_iter()
+}
+
+fn generate_updates(
+    start: u64,
+    count: u64,
+    low: u64,
+) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
+    let hash_of_low = Sha256::digest(low.to_ne_bytes()).to_vec();
+    (start..start + count)
+        .map(|inner_key| {
+            let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+            (digest, hash_of_low.clone())
+        })
+        .map(|(key, value)| BatchOp::Put { key, value })
+        .collect::<Vec<_>>()
+        .into_iter()
 }
 
 fn get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<u8>, Box<[u8]>> {
