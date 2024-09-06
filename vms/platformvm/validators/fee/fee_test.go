@@ -37,95 +37,120 @@ var (
 	excessConversionConstant = floatToGas(excessConversionConstantFloat)
 
 	tests = []struct {
-		name     string
-		target   gas.Gas
-		current  gas.Gas
-		excess   gas.Gas
-		duration uint64
-		cost     uint64
+		name                string
+		target              gas.Gas
+		current             gas.Gas
+		excess              gas.Gas
+		duration            uint64
+		cost                uint64
+		excessAfterDuration gas.Gas
 	}{
 		{
-			name:     "excess=0, current<target, minute",
-			target:   10_000,
-			current:  10,
-			excess:   0,
-			duration: minute,
-			cost:     122_880,
+			name:                "excess=0, current<target, minute",
+			target:              10_000,
+			current:             10,
+			excess:              0,
+			duration:            minute,
+			cost:                122_880,
+			excessAfterDuration: 0,
 		},
 		{
-			name:     "excess=0, current=target, minute",
-			target:   10_000,
-			current:  10_000,
-			excess:   0,
-			duration: minute,
-			cost:     122_880,
+			name:                "excess=0, current=target, minute",
+			target:              10_000,
+			current:             10_000,
+			excess:              0,
+			duration:            minute,
+			cost:                122_880,
+			excessAfterDuration: 0,
 		},
 		{
-			name:     "excess=excessIncreasePerDoubling, current=target, minute",
-			target:   10_000,
-			current:  10_000,
-			excess:   excessIncreasePerDoubling,
-			duration: minute,
-			cost:     245_760,
+			name:                "excess=excessIncreasePerDoubling, current=target, minute",
+			target:              10_000,
+			current:             10_000,
+			excess:              excessIncreasePerDoubling,
+			duration:            minute,
+			cost:                245_760,
+			excessAfterDuration: excessIncreasePerDoubling,
 		},
 		{
-			name:     "excess=K, current=target, minute",
-			target:   10_000,
-			current:  10_000,
-			excess:   excessConversionConstant,
-			duration: minute,
-			cost:     334_020,
+			name:                "excess=K, current=target, minute",
+			target:              10_000,
+			current:             10_000,
+			excess:              excessConversionConstant,
+			duration:            minute,
+			cost:                334_020,
+			excessAfterDuration: excessConversionConstant,
 		},
 		{
-			name:     "excess=0, current>target, minute",
-			target:   10_000,
-			current:  15_000,
-			excess:   0,
-			duration: minute,
-			cost:     122_880,
+			name:                "excess=0, current>target, minute",
+			target:              10_000,
+			current:             15_000,
+			excess:              0,
+			duration:            minute,
+			cost:                122_880,
+			excessAfterDuration: 5_000 * minute,
 		},
 		{
-			name:     "excess hits 0 during, current<target, day",
-			target:   10_000,
-			current:  9_000,
-			excess:   6 * hour * 1_000,
-			duration: day,
-			cost:     177_321_939,
+			name:                "excess hits 0 during, current<target, day",
+			target:              10_000,
+			current:             9_000,
+			excess:              6 * hour * 1_000,
+			duration:            day,
+			cost:                177_321_939,
+			excessAfterDuration: 0,
 		},
 		{
-			name:     "excess=K, current=target, day",
-			target:   10_000,
-			current:  10_000,
-			excess:   excessConversionConstant,
-			duration: day,
-			cost:     480_988_800,
+			name:                "excess=K, current=target, day",
+			target:              10_000,
+			current:             10_000,
+			excess:              excessConversionConstant,
+			duration:            day,
+			cost:                480_988_800,
+			excessAfterDuration: excessConversionConstant,
 		},
 		{
-			name:     "excess=0, current>target, day",
-			target:   10_000,
-			current:  15_000,
-			excess:   0,
-			duration: day,
-			cost:     211_438_809,
+			name:                "excess=0, current>target, day",
+			target:              10_000,
+			current:             15_000,
+			excess:              0,
+			duration:            day,
+			cost:                211_438_809,
+			excessAfterDuration: 5_000 * day,
 		},
 		{
-			name:     "excess=0, current=target, week",
-			target:   10_000,
-			current:  10_000,
-			excess:   0,
-			duration: week,
-			cost:     1_238_630_400,
+			name:                "excess=0, current=target, week",
+			target:              10_000,
+			current:             10_000,
+			excess:              0,
+			duration:            week,
+			cost:                1_238_630_400,
+			excessAfterDuration: 0,
 		},
 		{
-			name:     "excess=0, current>target, week",
-			target:   10_000,
-			current:  15_000,
-			excess:   0,
-			duration: week,
-			cost:     5_265_492_669,
+			name:                "excess=0, current>target, week",
+			target:              10_000,
+			current:             15_000,
+			excess:              0,
+			duration:            week,
+			cost:                5_265_492_669,
+			excessAfterDuration: 5_000 * week,
 		},
 	}
 )
+
+func TestCalculateExcess(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			excess := CalculateExcess(
+				test.target,
+				test.current,
+				test.excess,
+				test.duration,
+			)
+			require.Equal(t, test.excessAfterDuration, excess)
+		})
+	}
+}
 
 func TestCalculateCost(t *testing.T) {
 	for _, test := range tests {
