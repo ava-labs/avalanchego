@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	NumKeys         = 5
+	NumKeys         = 6
 	PollingInterval = 50 * time.Millisecond
 )
 
