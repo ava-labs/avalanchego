@@ -27,7 +27,6 @@ func CalculateExcess(
 
 // CalculateCost calculates the how much to charge based on the dynamic fee
 // mechanism for [duration].
-// at [maxDuration].
 func CalculateCost(
 	target gas.Gas,
 	current gas.Gas,
