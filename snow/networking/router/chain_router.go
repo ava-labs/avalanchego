@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -377,6 +378,7 @@ func (cr *ChainRouter) Shutdown(ctx context.Context) {
 		chainLog := chain.Context().Log
 		if err != nil {
 			chainLog.Warn("timed out while shutting down",
+				zap.String("stack", utils.GetStacktrace(true)),
 				zap.Error(err),
 			)
 		} else {
@@ -700,6 +702,7 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 	chainLog := chain.Context().Log
 	if err != nil {
 		chainLog.Warn("timed out while shutting down",
+			zap.String("stack", utils.GetStacktrace(true)),
 			zap.Error(err),
 		)
 	} else {
