@@ -7,14 +7,16 @@ import (
 	"log"
 
 	"github.com/ava-labs/avalanchego/tests/antithesis"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-const baseImageName = "antithesis-avalanchego"
+const (
+	baseImageName = "antithesis-avalanchego"
+	NumNodes      = 6
+)
 
 // Creates docker-compose.yml and its associated volumes in the target path.
 func main() {
-	network := tmpnet.LocalNetworkOrPanic()
+	network := antithesis.CreateNetwork(NumNodes)
 	if err := antithesis.GenerateComposeConfig(network, baseImageName, "" /* runtimePluginDir */); err != nil {
 		log.Fatalf("failed to generate compose config: %v", err)
 	}
