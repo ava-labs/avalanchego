@@ -240,6 +240,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 }
 
 /// Some nodestore kinds implement Parentable.
+///
 /// This means that the nodestore can have children.
 /// Only [ImmutableProposal] and [Committed] implement this trait.
 /// [MutableProposal] does not implement this trait because it is not a valid parent.
@@ -709,6 +710,7 @@ where
 }
 
 /// Contains the state of a revision of a merkle trie.
+///
 /// The first generic parameter is the type of the revision, which supports reading nodes from parent proposals.
 /// The second generic parameter is the type of the storage used, either
 /// in-memory or on-disk.
