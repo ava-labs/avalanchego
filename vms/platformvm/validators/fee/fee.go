@@ -148,8 +148,8 @@ func calculateDuration(
 	cost uint64,
 	maxDuration uint64,
 ) uint64 {
-	// We can't directly round up because of rounding errors. Instead we
-	// round down and then check if we should have rounded up.
+	// Directly rounding up could cause an overflow. Instead we round down and
+	// then check if we should have rounded up.
 	durationRoundedDown := cost / price
 	if durationRoundedDown >= maxDuration {
 		return maxDuration
