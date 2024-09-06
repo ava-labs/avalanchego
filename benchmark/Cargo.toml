@@ -1,0 +1,13 @@
+[package]
+name = "benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+firewood = { path = "../firewood" }
+clap = { version = "4.5.0", features = ['derive'] }
+sha2 = "0.10.8"
+metrics-util = "0.17.0"
+metrics-exporter-prometheus = "0.15.3"
+tokio = { version = "1.36.0", features = ["rt", "sync", "macros", "rt-multi-thread"] }
+rand = "0.8.5"

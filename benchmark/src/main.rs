@@ -14,6 +14,7 @@
 use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
+use rand::Rng as _;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::error::Error;
@@ -25,7 +26,6 @@ use std::time::{Duration, Instant};
 use firewood::db::{Batch, BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
 use firewood::v2::api::{Db as _, DbView, Proposal as _};
-use rand::Rng;
 
 #[derive(Parser, Debug)]
 struct Args {
