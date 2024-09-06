@@ -156,7 +156,7 @@ func TestCalculateDuration(t *testing.T) {
 				year,
 				test.cost,
 			)
-			require.Equal(t, test.duration, int(duration))
+			require.Equal(t, test.duration, duration)
 		})
 	}
 }
