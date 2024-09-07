@@ -13,7 +13,7 @@ import (
 
 type SubnetOnlyValidator struct {
 	// ValidationID is not serialized because it is used as the key in the
-	// database, and so doesn't need to also be stored in the value.
+	// database, so it doesn't need to be stored in the value.
 	ValidationID ids.ID
 
 	SubnetID ids.ID     `serialize:"true"`
@@ -23,8 +23,9 @@ type SubnetOnlyValidator struct {
 	// guaranteed to be populated.
 	PublicKey []byte `serialize:"true"`
 
-	// Weight of this validator. It is never equal to 0. It can be updated when
-	// the MinNonce is increased.
+	// Weight of this validator. It can be updated when the MinNonce is
+	// increased. If the weight is being set to 0, the validator is being
+	// removed.
 	Weight uint64 `serialize:"true"`
 
 	// MinNonce is the smallest nonce that can be used to modify this
@@ -34,9 +35,9 @@ type SubnetOnlyValidator struct {
 	MinNonce uint64 `serialize:"true"`
 
 	// EndAccumulatedFee is the amount of globally accumulated fees that can
-	// accrue before this validator must be removed. It is equal to the amount
-	// of fees this validator is willing to pay plus the amount of globally
-	// accumulated fees when this validator started validating.
+	// accrue before this validator must be deactivated. It is equal to the
+	// amount of fees this validator is willing to pay plus the amount of
+	// globally accumulated fees when this validator started validating.
 	EndAccumulatedFee uint64 `serialize:"true"`
 }
 
