@@ -6,10 +6,14 @@ package state
 import (
 	"fmt"
 
+	"github.com/google/btree"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
+
+var _ btree.LessFunc[*SubnetOnlyValidator] = (*SubnetOnlyValidator).Less
 
 type SubnetOnlyValidator struct {
 	// ValidationID is not serialized because it is used as the key in the
