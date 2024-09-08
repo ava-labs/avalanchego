@@ -57,12 +57,12 @@ func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
 
 func getGoldenDatabaseDirectory() string {
 	wd, _ := os.Getwd()
-	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-%d", databaseEntries))
+	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-%d", *databaseEntries))
 }
 
 func getRunningDatabaseDirectory() string {
 	wd, _ := os.Getwd()
-	return path.Join(wd, fmt.Sprintf("db-bench-test-running-%d", databaseEntries))
+	return path.Join(wd, fmt.Sprintf("db-bench-test-running-%d", *databaseEntries))
 }
 
 func calculateIndexEncoding(idx uint64) []byte {
