@@ -167,18 +167,7 @@ func resetRunningDatabaseDirectory() error {
 
 func runBenchmark() error {
 	promRegistry := prometheus.NewRegistry()
-	http.Handle("/metrics", promhttp.Handler())
-
-	server := &http.Server{
-		Addr:              fmt.Sprintf(":%d", *httpMetricPort),
-		ReadHeaderTimeout: 3 * time.Second,
-	}
-	go func() {
-		err := server.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "unable to listen and serve : %v\n", err)
-		}
-	}()
+	prometheus.Register(promRegistry)
 
 	writesCounter := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "merkledb_bench",
@@ -192,6 +181,19 @@ func runBenchmark() error {
 	})
 	promRegistry.MustRegister(writesCounter)
 	promRegistry.MustRegister(batchCounter)
+
+	http.Handle("/metrics", promhttp.Handler())
+
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%d", *httpMetricPort),
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "unable to listen and serve : %v\n", err)
+		}
+	}()
 
 	levelDB, err := leveldb.New(
 		getRunningDatabaseDirectory(),
