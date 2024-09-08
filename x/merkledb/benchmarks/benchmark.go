@@ -37,6 +37,7 @@ const (
 var (
 	databaseEntries = pflag.Uint64("n", defaultDatabaseEntries, "number of database entries")
 	httpMetricPort  = pflag.Uint64("p", defaultMetricsPort, "default metrics port")
+	verbose         = pflag.Bool("v", false, "verbose")
 )
 
 func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
@@ -179,8 +180,32 @@ func runBenchmark() error {
 		Name:      "batch",
 		Help:      "Total number of batches written",
 	})
+	deleteRate := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "merkledb_bench",
+		Name:      "entry_delete_rate",
+		Help:      "The rate at which elements are deleted",
+	})
+	updateRate := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "merkledb_bench",
+		Name:      "entry_update_rate",
+		Help:      "The rate at which elements are updated",
+	})
+	insertRate := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "merkledb_bench",
+		Name:      "entry_insert_rate",
+		Help:      "The rate at which elements are inserted",
+	})
+	batchWriteRate := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "merkledb_bench",
+		Name:      "batch_write_rate",
+		Help:      "The rate at which the batch was written",
+	})
 	promRegistry.MustRegister(writesCounter)
 	promRegistry.MustRegister(batchCounter)
+	promRegistry.MustRegister(deleteRate)
+	promRegistry.MustRegister(updateRate)
+	promRegistry.MustRegister(insertRate)
+	promRegistry.MustRegister(batchWriteRate)
 
 	http.Handle("/metrics", promhttp.Handler())
 
@@ -233,6 +258,7 @@ func runBenchmark() error {
 			}
 		}
 		deleteDuration = time.Since(startDeleteTime)
+		deleteRate.Set(float64(time.Second) / float64(deleteDuration))
 
 		// add 2.5k past end.
 		startInsertTime := time.Now()
@@ -245,6 +271,7 @@ func runBenchmark() error {
 			}
 		}
 		addDuration = time.Since(startInsertTime)
+		insertRate.Set(float64(time.Second) / float64(addDuration))
 
 		// update middle 5k entries
 		startUpdateTime := time.Now()
@@ -258,19 +285,25 @@ func runBenchmark() error {
 			}
 		}
 		updateDuration = time.Since(startUpdateTime)
+		updateRate.Set(float64(time.Second) / float64(updateDuration))
 
+		batchWriteStartTime := time.Now()
 		err = batch.Write()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to write batch : %v\n", err)
 			return err
 		}
 		batchDuration = time.Since(startBatchTime)
+		batchWriteDuration := time.Since(batchWriteStartTime)
+		batchWriteRate.Set(float64(time.Second) / float64(batchWriteDuration))
 
-		fmt.Printf("delete rate [%d]	update rate [%d]	insert rate [%d]	batch rate [%d]\n",
-			time.Second/deleteDuration,
-			time.Second/updateDuration,
-			time.Second/addDuration,
-			time.Second/batchDuration)
+		if *verbose {
+			fmt.Printf("delete rate [%d]	update rate [%d]	insert rate [%d]	batch rate [%d]\n",
+				time.Second/deleteDuration,
+				time.Second/updateDuration,
+				time.Second/addDuration,
+				time.Second/batchDuration)
+		}
 		writesCounter.Add(databaseRunningBatchSize + databaseRunningBatchSize + databaseRunningUpdateSize)
 		batchCounter.Inc()
 	}
