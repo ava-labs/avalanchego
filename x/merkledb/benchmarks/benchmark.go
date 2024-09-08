@@ -258,7 +258,7 @@ func runBenchmark() error {
 			}
 		}
 		deleteDuration = time.Since(startDeleteTime)
-		deleteRate.Set(float64(time.Second) / float64(deleteDuration))
+		deleteRate.Set(float64(databaseRunningBatchSize) * float64(time.Second) / float64(deleteDuration))
 
 		// add 2.5k past end.
 		startInsertTime := time.Now()
@@ -271,7 +271,7 @@ func runBenchmark() error {
 			}
 		}
 		addDuration = time.Since(startInsertTime)
-		insertRate.Set(float64(time.Second) / float64(addDuration))
+		insertRate.Set(float64(databaseRunningBatchSize) * float64(time.Second) / float64(addDuration))
 
 		// update middle 5k entries
 		startUpdateTime := time.Now()
@@ -285,7 +285,7 @@ func runBenchmark() error {
 			}
 		}
 		updateDuration = time.Since(startUpdateTime)
-		updateRate.Set(float64(time.Second) / float64(updateDuration))
+		updateRate.Set(float64(databaseRunningUpdateSize) * float64(time.Second) / float64(updateDuration))
 
 		batchWriteStartTime := time.Now()
 		err = batch.Write()
