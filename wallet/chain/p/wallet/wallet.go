@@ -135,6 +135,19 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueConvertSubnetTx creates, signs, and issues a transaction that
+	// converts the subnet to a Permissionless L1.
+	//
+	// - [subnetID] specifies the subnet to be converted
+	// - [chainID] specifies which chain the manager is deployed on
+	// - [address] specifies the address of the manager
+	IssueConvertSubnetTx(
+		subnetID ids.ID,
+		chainID ids.ID,
+		address []byte,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueImportTx creates, signs, and issues an import transaction that
 	// attempts to consume all the available UTXOs and import the funds to [to].
 	//
@@ -369,6 +382,19 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewTransferSubnetOwnershipTx(subnetID, owner, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueConvertSubnetTx(
+	subnetID ids.ID,
+	chainID ids.ID,
+	address []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewConvertSubnetTx(subnetID, chainID, address, options...)
 	if err != nil {
 		return nil, err
 	}

@@ -666,6 +666,46 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	}
 }
 
+func TestConvertSubnetTx(t *testing.T) {
+	var (
+		chainID = ids.GenerateTestID()
+		address = utils.RandomBytes(32)
+	)
+	for _, e := range testEnvironmentPostEtna {
+		t.Run(e.name, func(t *testing.T) {
+			var (
+				require    = require.New(t)
+				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+					constants.PlatformChainID: utxos,
+				})
+				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
+				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
+			)
+
+			utx, err := builder.NewConvertSubnetTx(
+				subnetID,
+				chainID,
+				address,
+				common.WithMemo(e.memo),
+			)
+			require.NoError(err)
+			require.Equal(subnetID, utx.Subnet)
+			require.Equal(chainID, utx.ChainID)
+			require.Equal(types.JSONByteSlice(address), utx.Address)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
+			)
+		})
+	}
+}
+
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs
 	// won't change run by run. This simplifies checking what utxos are included

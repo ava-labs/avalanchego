@@ -6,6 +6,7 @@ package tmpnet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -339,14 +340,10 @@ func WaitForActiveValidators(
 
 // Reads subnets from [network dir]/subnets/[subnet name].json
 func readSubnets(subnetDir string) ([]*Subnet, error) {
-	if _, err := os.Stat(subnetDir); os.IsNotExist(err) {
+	entries, err := os.ReadDir(subnetDir)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(subnetDir)
-	if err != nil {
 		return nil, fmt.Errorf("failed to read subnet dir: %w", err)
 	}
 

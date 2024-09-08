@@ -373,7 +373,9 @@ func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*
 		return err
 	}
 	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
-	if _, err := fmt.Fprintf(w, "\nMetrics: https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%d&to=now\n", n.UUID, startTime.UnixMilli()); err != nil {
+	startTimeStr := strconv.FormatInt(startTime.UnixMilli(), 10)
+	metricsURL := MetricsLinkForNetwork(n.UUID, startTimeStr, "")
+	if _, err := fmt.Fprintf(w, "\nMetrics: %s\n", metricsURL); err != nil {
 		return err
 	}
 
@@ -1008,4 +1010,22 @@ func getRPCVersion(command string, versionArgs ...string) (uint64, error) {
 	}
 
 	return version.RPCChainVM, nil
+}
+
+// MetricsLinkForNetwork returns a link to the default metrics dashboard for the network
+// with the given UUID. The start and end times are accepted as strings to support the
+// use of Grafana's time range syntax (e.g. `now`, `now-1h`).
+func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string) string {
+	if startTime == "" {
+		startTime = "now-1h"
+	}
+	if endTime == "" {
+		endTime = "now"
+	}
+	return fmt.Sprintf(
+		"https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		networkUUID,
+		startTime,
+		endTime,
+	)
 }
