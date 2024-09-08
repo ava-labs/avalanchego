@@ -27,6 +27,10 @@ type SubnetOnlyValidator struct {
 	// guaranteed to be populated.
 	PublicKey []byte `serialize:"true"`
 
+	// StartTime is the unix timestamp, in seconds, when this validator was
+	// added to the set.
+	StartTime uint64 `serialize:"true"`
+
 	// Weight of this validator. It can be updated when the MinNonce is
 	// increased. If the weight is being set to 0, the validator is being
 	// removed.

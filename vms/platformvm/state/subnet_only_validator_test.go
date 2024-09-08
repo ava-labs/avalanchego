@@ -84,6 +84,7 @@ func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
 		SubnetID:          ids.GenerateTestID(),
 		NodeID:            ids.GenerateTestNodeID(),
 		PublicKey:         bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk)),
+		StartTime:         rand.Uint64(), // #nosec G404
 		Weight:            rand.Uint64(), // #nosec G404
 		MinNonce:          rand.Uint64(), // #nosec G404
 		EndAccumulatedFee: rand.Uint64(), // #nosec G404
