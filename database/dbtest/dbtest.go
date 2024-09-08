@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/databasemock"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -466,7 +467,7 @@ func TestBatchReplay(t *testing.T, db database.Database) {
 	require.NoError(batch.Put(key1, value2))
 
 	for i := 0; i < 2; i++ {
-		mockBatch := database.NewMockBatch(ctrl)
+		mockBatch := databasemock.NewBatch(ctrl)
 		gomock.InOrder(
 			mockBatch.EXPECT().Put(key1, value1).Times(1),
 			mockBatch.EXPECT().Put(key2, value2).Times(1),
@@ -497,13 +498,13 @@ func TestBatchReplayPropagateError(t *testing.T, db database.Database) {
 	require.NoError(batch.Put(key1, value1))
 	require.NoError(batch.Put(key2, value2))
 
-	mockBatch := database.NewMockBatch(ctrl)
+	mockBatch := databasemock.NewBatch(ctrl)
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(database.ErrClosed).Times(1),
 	)
 	require.Equal(database.ErrClosed, batch.Replay(mockBatch))
 
-	mockBatch = database.NewMockBatch(ctrl)
+	mockBatch = databasemock.NewBatch(ctrl)
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
 	)

@@ -12,13 +12,11 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // This test uses the compiled bin for `hashing.sol` as
@@ -39,6 +37,13 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("creating a new private network to ensure isolation from other tests")
 		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
 		e2e.GetEnv(tc).StartPrivateNetwork(privateNetwork)
+
+		// Avoid emitting a spec-scoped metrics link for the shared
+		// network since the link emitted by the start of the private
+		// network is more relevant.
+		//
+		// TODO(marun) Make this implicit to the start of a private network
+		e2e.EmitMetricsLink = false
 
 		tc.By("allocating a pre-funded key")
 		key := privateNetwork.PreFundedKeys[0]
@@ -142,9 +147,10 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		tc.By("sending funds at the current gas price", func() {
 			// Create a recipient address
-			recipientKey, err := secp256k1.NewPrivateKey()
-			require.NoError(err)
-			recipientEthAddress := evm.GetEthAddress(recipientKey)
+			var (
+				recipientKey        = e2e.NewPrivateKey(tc)
+				recipientEthAddress = evm.GetEthAddress(recipientKey)
+			)
 
 			// Create transaction
 			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)

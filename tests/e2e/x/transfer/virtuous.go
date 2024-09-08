@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -16,14 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -76,7 +78,42 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 			// Ensure the same set of 10 keys is used for all tests
 			// by retrieving them outside of runFunc.
-			testKeys := env.AllocatePreFundedKeys(10)
+			testKeys := []*secp256k1.PrivateKey{
+				// The funded key will be the source of funds for the new keys
+				env.PreFundedKey,
+			}
+			newKeys, err := tmpnet.NewPrivateKeys(9)
+			require.NoError(err)
+			testKeys = append(testKeys, newKeys...)
+
+			const transferPerRound = units.MilliAvax
+
+			tc.By("Funding new keys")
+			fundingWallet := e2e.NewWallet(tc, env.NewKeychain(), env.GetRandomNodeURI())
+			fundingOutputs := make([]*avax.TransferableOutput, len(newKeys))
+			fundingAssetID := fundingWallet.X().Builder().Context().AVAXAssetID
+			for i, key := range newKeys {
+				fundingOutputs[i] = &avax.TransferableOutput{
+					Asset: avax.Asset{
+						ID: fundingAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						// Enough for 1 transfer per round
+						Amt: totalRounds * transferPerRound,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								key.Address(),
+							},
+						},
+					},
+				}
+			}
+			_, err = fundingWallet.X().IssueBaseTx(
+				fundingOutputs,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
 
 			runFunc := func(round int) {
 				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
@@ -158,9 +195,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				senderOrigBal := testBalances[fromIdx]
 				receiverOrigBal := testBalances[toIdx]
-
-				amountToTransfer := senderOrigBal / 10
-
+				amountToTransfer := transferPerRound
 				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 

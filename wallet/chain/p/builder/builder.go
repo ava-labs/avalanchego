@@ -15,10 +15,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -146,6 +149,18 @@ type Builder interface {
 		owner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*txs.TransferSubnetOwnershipTx, error)
+
+	// NewConvertSubnetTx converts the subnet to a Permissionless L1.
+	//
+	// - [subnetID] specifies the subnet to be converted
+	// - [chainID] specifies which chain the manager is deployed on
+	// - [address] specifies the address of the manager
+	NewConvertSubnetTx(
+		subnetID ids.ID,
+		chainID ids.ID,
+		address []byte,
+		options ...common.Option,
+	) (*txs.ConvertSubnetTx, error)
 
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
@@ -324,7 +339,30 @@ func (b *builder) NewBaseTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	outputComplexity, err := fee.OutputComplexity(outputs...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicBaseTxComplexities.Add(
+		&memoComplexity,
+		&outputComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, changeOutputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +374,7 @@ func (b *builder) NewBaseTx(
 		BlockchainID: constants.PlatformChainID,
 		Ins:          inputs,
 		Outs:         outputs,
-		Memo:         ops.Memo(),
+		Memo:         memo,
 	}}
 	return tx, b.initCtx(tx)
 }
@@ -355,7 +393,14 @@ func (b *builder) NewAddValidatorTx(
 		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		gas.Dimensions{},
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -385,13 +430,37 @@ func (b *builder) NewAddSubnetValidatorTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.AddSubnetValidatorFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicAddSubnetValidatorTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +471,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		SubnetValidator: *vdr,
 		SubnetAuth:      subnetAuth,
@@ -419,13 +488,37 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicRemoveSubnetValidatorTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +551,14 @@ func (b *builder) NewAddDelegatorTx(
 		avaxAssetID: vdr.Wght,
 	}
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		gas.Dimensions{},
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -491,13 +591,53 @@ func (b *builder) NewCreateChainTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.CreateBlockchainTxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	memo := ops.Memo()
+	bandwidth, err := math.Mul(uint64(len(fxIDs)), ids.IDLen)
+	if err != nil {
+		return nil, err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(chainName)))
+	if err != nil {
+		return nil, err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(genesis)))
+	if err != nil {
+		return nil, err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(memo)))
+	if err != nil {
+		return nil, err
+	}
+	dynamicComplexity := gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+	}
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicCreateChainTxComplexities.Add(
+		&dynamicComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +649,7 @@ func (b *builder) NewCreateChainTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		SubnetID:    subnetID,
 		ChainName:   chainName,
@@ -529,8 +669,32 @@ func (b *builder) NewCreateSubnetTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.CreateSubnetTxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	ownerComplexity, err := fee.OwnerComplexity(owner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicCreateSubnetTxComplexities.Add(
+		&memoComplexity,
+		&ownerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -542,7 +706,7 @@ func (b *builder) NewCreateSubnetTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Owner: owner,
 	}
@@ -558,13 +722,42 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 		b.context.AVAXAssetID: b.context.StaticFeeConfig.TxFee,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	ownerComplexity, err := fee.OwnerComplexity(owner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicTransferSubnetOwnershipTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+		&ownerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -576,10 +769,73 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Subnet:     subnetID,
 		Owner:      owner,
+		SubnetAuth: subnetAuth,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewConvertSubnetTx(
+	subnetID ids.ID,
+	chainID ids.ID,
+	address []byte,
+	options ...common.Option,
+) (*txs.ConvertSubnetTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{}
+
+	ops := common.NewOptions(options)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	memo := ops.Memo()
+	additionalBytes, err := math.Add(uint64(len(memo)), uint64(len(address)))
+	if err != nil {
+		return nil, err
+	}
+	bytesComplexity := gas.Dimensions{
+		gas.Bandwidth: additionalBytes,
+	}
+	authComplexity, err := fee.AuthComplexity(subnetAuth)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicConvertSubnetTxComplexities.Add(
+		&bytesComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.ConvertSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		Subnet:     subnetID,
+		ChainID:    chainID,
+		Address:    address,
 		SubnetAuth: subnetAuth,
 	}
 	return tx, b.initCtx(tx)
@@ -645,29 +901,12 @@ func (b *builder) NewImportTx(
 		)
 	}
 
-	var (
-		inputs       []*avax.TransferableInput
-		outputs      = make([]*avax.TransferableOutput, 0, len(importedAmounts))
-		importedAVAX = importedAmounts[avaxAssetID]
-	)
-	if importedAVAX > txFee {
-		importedAmounts[avaxAssetID] -= txFee
-	} else {
-		if importedAVAX < txFee { // imported amount goes toward paying tx fee
-			toBurn := map[ids.ID]uint64{
-				avaxAssetID: txFee - importedAVAX,
-			}
-			toStake := map[ids.ID]uint64{}
-			var err error
-			inputs, outputs, _, err = b.spend(toBurn, toStake, ops)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-			}
-		}
-		delete(importedAmounts, avaxAssetID)
-	}
-
+	outputs := make([]*avax.TransferableOutput, 0, len(importedAmounts))
 	for assetID, amount := range importedAmounts {
+		if assetID == avaxAssetID {
+			continue
+		}
+
 		outputs = append(outputs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
@@ -677,6 +916,51 @@ func (b *builder) NewImportTx(
 		})
 	}
 
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	inputComplexity, err := fee.InputComplexity(importedInputs...)
+	if err != nil {
+		return nil, err
+	}
+	outputComplexity, err := fee.OutputComplexity(outputs...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicImportTxComplexities.Add(
+		&memoComplexity,
+		&inputComplexity,
+		&outputComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		toBurn     = map[ids.ID]uint64{}
+		toStake    = map[ids.ID]uint64{}
+		excessAVAX uint64
+	)
+	if importedAVAX := importedAmounts[avaxAssetID]; importedAVAX < txFee {
+		toBurn[avaxAssetID] = txFee - importedAVAX
+	} else {
+		excessAVAX = importedAVAX - txFee
+	}
+
+	inputs, changeOutputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		excessAVAX,
+		complexity,
+		to,
+		ops,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	outputs = append(outputs, changeOutputs...)
+
 	avax.SortTransferableOutputs(outputs, txs.Codec) // sort imported outputs
 	tx := &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -684,7 +968,7 @@ func (b *builder) NewImportTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		SourceChain:    sourceChainID,
 		ImportedInputs: importedInputs,
@@ -711,7 +995,30 @@ func (b *builder) NewExportTx(
 
 	toStake := map[ids.ID]uint64{}
 	ops := common.NewOptions(options)
-	inputs, changeOutputs, _, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	outputComplexity, err := fee.OutputComplexity(outputs...)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicExportTxComplexities.Add(
+		&memoComplexity,
+		&outputComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, changeOutputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -723,7 +1030,7 @@ func (b *builder) NewExportTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         changeOutputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		DestinationChain: chainID,
 		ExportedOutputs:  outputs,
@@ -753,13 +1060,21 @@ func (b *builder) NewTransformSubnetTx(
 		assetID:               maxSupply - initialSupply,
 	}
 	toStake := map[ids.ID]uint64{}
+
 	ops := common.NewOptions(options)
-	inputs, outputs, _, err := b.spend(toBurn, toStake, ops)
+	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
 
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		gas.Dimensions{},
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -810,8 +1125,42 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,
 	}
+
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	signerComplexity, err := fee.SignerComplexity(signer)
+	if err != nil {
+		return nil, err
+	}
+	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	delegatorOwnerComplexity, err := fee.OwnerComplexity(delegationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+		&memoComplexity,
+		&signerComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -824,7 +1173,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Validator:             vdr.Validator,
 		Subnet:                vdr.Subnet,
@@ -853,8 +1202,32 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,
 	}
+
 	ops := common.NewOptions(options)
-	inputs, baseOutputs, stakeOutputs, err := b.spend(toBurn, toStake, ops)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	ownerComplexity, err := fee.OwnerComplexity(rewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
+		&memoComplexity,
+		&ownerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -866,7 +1239,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 			BlockchainID: constants.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
-			Memo:         ops.Memo(),
+			Memo:         memo,
 		}},
 		Validator:              vdr.Validator,
 		Subnet:                 vdr.Subnet,
@@ -926,18 +1299,28 @@ func (b *builder) getBalance(
 
 // spend takes in the requested burn amounts and the requested stake amounts.
 //
-//   - [amountsToBurn] maps assetID to the amount of the asset to spend without
+//   - [toBurn] maps assetID to the amount of the asset to spend without
 //     producing an output. This is typically used for fees. However, it can
 //     also be used to consume some of an asset that will be produced in
 //     separate outputs, such as ExportedOutputs. Only unlocked UTXOs are able
 //     to be burned here.
-//   - [amountsToStake] maps assetID to the amount of the asset to spend and
-//     place into the staked outputs. First locked UTXOs are attempted to be
-//     used for these funds, and then unlocked UTXOs will be attempted to be
-//     used. There is no preferential ordering on the unlock times.
+//   - [toStake] maps assetID to the amount of the asset to spend and place into
+//     the staked outputs. First locked UTXOs are attempted to be used for these
+//     funds, and then unlocked UTXOs will be attempted to be used. There is no
+//     preferential ordering on the unlock times.
+//   - [excessAVAX] contains the amount of extra AVAX that spend can produce in
+//     the change outputs in addition to the consumed and not burned AVAX.
+//   - [complexity] contains the currently accrued transaction complexity that
+//     will be used to calculate the required fees to be burned.
+//   - [ownerOverride] optionally specifies the output owners to use for the
+//     unlocked AVAX change output if no additional AVAX was needed to be
+//     burned. If this value is nil, the default change owner is used.
 func (b *builder) spend(
-	amountsToBurn map[ids.ID]uint64,
-	amountsToStake map[ids.ID]uint64,
+	toBurn map[ids.ID]uint64,
+	toStake map[ids.ID]uint64,
+	excessAVAX uint64,
+	complexity gas.Dimensions,
+	ownerOverride *secp256k1fx.OutputOwners,
 	options *common.Options,
 ) (
 	inputs []*avax.TransferableInput,
@@ -961,41 +1344,36 @@ func (b *builder) spend(
 		Threshold: 1,
 		Addrs:     []ids.ShortID{addr},
 	})
+	if ownerOverride == nil {
+		ownerOverride = changeOwner
+	}
 
-	// Initialize the return values with empty slices to preserve backward
-	// compatibility of the json representation of transactions with no
-	// inputs or outputs.
-	inputs = make([]*avax.TransferableInput, 0)
-	changeOutputs = make([]*avax.TransferableOutput, 0)
-	stakeOutputs = make([]*avax.TransferableOutput, 0)
+	s := spendHelper{
+		weights:  b.context.ComplexityWeights,
+		gasPrice: b.context.GasPrice,
 
-	// Iterate over the locked UTXOs
-	for _, utxo := range utxos {
+		toBurn:     toBurn,
+		toStake:    toStake,
+		complexity: complexity,
+
+		// Initialize the return values with empty slices to preserve backward
+		// compatibility of the json representation of transactions with no
+		// inputs or outputs.
+		inputs:        make([]*avax.TransferableInput, 0),
+		changeOutputs: make([]*avax.TransferableOutput, 0),
+		stakeOutputs:  make([]*avax.TransferableOutput, 0),
+	}
+
+	utxosByLocktime := splitByLocktime(utxos, minIssuanceTime)
+	for _, utxo := range utxosByLocktime.locked {
 		assetID := utxo.AssetID()
-		remainingAmountToStake := amountsToStake[assetID]
-
-		// If we have staked enough of the asset, then we have no need burn
-		// more.
-		if remainingAmountToStake == 0 {
+		if !s.shouldConsumeLockedAsset(assetID) {
 			continue
 		}
 
-		outIntf := utxo.Out
-		lockedOut, ok := outIntf.(*stakeable.LockOut)
-		if !ok {
-			// This output isn't locked, so it will be handled during the next
-			// iteration of the UTXO set
-			continue
-		}
-		if minIssuanceTime >= lockedOut.Locktime {
-			// This output isn't locked, so it will be handled during the next
-			// iteration of the UTXO set
-			continue
-		}
-
-		out, ok := lockedOut.TransferableOut.(*secp256k1fx.TransferOutput)
-		if !ok {
-			return nil, nil, nil, ErrUnknownOutputType
+		out, locktime, err := unwrapOutput(utxo.Out)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1004,11 +1382,11 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputs = append(inputs, &avax.TransferableInput{
+		err = s.addInput(&avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &stakeable.LockIn{
-				Locktime: lockedOut.Locktime,
+				Locktime: locktime,
 				TransferableIn: &secp256k1fx.TransferInput{
 					Amt: out.Amt,
 					Input: secp256k1fx.Input{
@@ -1017,47 +1395,52 @@ func (b *builder) spend(
 				},
 			},
 		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
 
-		// Stake any value that should be staked
-		amountToStake := min(
-			remainingAmountToStake, // Amount we still need to stake
-			out.Amt,                // Amount available to stake
-		)
-
-		// Add the output to the staked outputs
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+		excess := s.consumeLockedAsset(assetID, out.Amt)
+		err = s.addStakedOutput(&avax.TransferableOutput{
 			Asset: utxo.Asset,
 			Out: &stakeable.LockOut{
-				Locktime: lockedOut.Locktime,
+				Locktime: locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
-					Amt:          amountToStake,
+					Amt:          out.Amt - excess,
 					OutputOwners: out.OutputOwners,
 				},
 			},
 		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
 
-		amountsToStake[assetID] -= amountToStake
-		if remainingAmount := out.Amt - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &stakeable.LockOut{
-					Locktime: lockedOut.Locktime,
-					TransferableOut: &secp256k1fx.TransferOutput{
-						Amt:          remainingAmount,
-						OutputOwners: out.OutputOwners,
-					},
+		if excess == 0 {
+			continue
+		}
+
+		// This input had extra value, so some of it must be returned
+		err = s.addChangeOutput(&avax.TransferableOutput{
+			Asset: utxo.Asset,
+			Out: &stakeable.LockOut{
+				Locktime: locktime,
+				TransferableOut: &secp256k1fx.TransferOutput{
+					Amt:          excess,
+					OutputOwners: out.OutputOwners,
 				},
-			})
+			},
+		})
+		if err != nil {
+			return nil, nil, nil, err
 		}
 	}
 
-	for assetID, amount := range amountsToStake {
+	// Add all the remaining stake amounts assuming unlocked UTXOs.
+	for assetID, amount := range s.toStake {
 		if amount == 0 {
 			continue
 		}
 
-		stakeOutputs = append(stakeOutputs, &avax.TransferableOutput{
+		err = s.addStakedOutput(&avax.TransferableOutput{
 			Asset: avax.Asset{
 				ID: assetID,
 			},
@@ -1066,33 +1449,22 @@ func (b *builder) spend(
 				OutputOwners: *changeOwner,
 			},
 		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
-	// Iterate over the unlocked UTXOs
-	for _, utxo := range utxos {
+	// AVAX is handled last to account for fees.
+	utxosByAVAXAssetID := splitByAssetID(utxosByLocktime.unlocked, b.context.AVAXAssetID)
+	for _, utxo := range utxosByAVAXAssetID.other {
 		assetID := utxo.AssetID()
-		remainingAmountToStake := amountsToStake[assetID]
-		remainingAmountToBurn := amountsToBurn[assetID]
-
-		// If we have consumed enough of the asset, then we have no need burn
-		// more.
-		if remainingAmountToStake == 0 && remainingAmountToBurn == 0 {
+		if !s.shouldConsumeAsset(assetID) {
 			continue
 		}
 
-		outIntf := utxo.Out
-		if lockedOut, ok := outIntf.(*stakeable.LockOut); ok {
-			if lockedOut.Locktime > minIssuanceTime {
-				// This output is currently locked, so this output can't be
-				// burned.
-				continue
-			}
-			outIntf = lockedOut.TransferableOut
-		}
-
-		out, ok := outIntf.(*secp256k1fx.TransferOutput)
-		if !ok {
-			return nil, nil, nil, ErrUnknownOutputType
+		out, _, err := unwrapOutput(utxo.Out)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 
 		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
@@ -1101,7 +1473,7 @@ func (b *builder) spend(
 			continue
 		}
 
-		inputs = append(inputs, &avax.TransferableInput{
+		err = s.addInput(&avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &secp256k1fx.TransferInput{
@@ -1111,58 +1483,122 @@ func (b *builder) spend(
 				},
 			},
 		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
 
-		// Burn any value that should be burned
-		amountToBurn := min(
-			remainingAmountToBurn, // Amount we still need to burn
-			out.Amt,               // Amount available to burn
-		)
-		amountsToBurn[assetID] -= amountToBurn
+		excess := s.consumeAsset(assetID, out.Amt)
+		if excess == 0 {
+			continue
+		}
 
-		amountAvailableToStake := out.Amt - amountToBurn
-		// Burn any value that should be burned
-		amountToStake := min(
-			remainingAmountToStake, // Amount we still need to stake
-			amountAvailableToStake, // Amount available to stake
-		)
-		amountsToStake[assetID] -= amountToStake
-		if remainingAmount := amountAvailableToStake - amountToStake; remainingAmount > 0 {
-			// This input had extra value, so some of it must be returned
-			changeOutputs = append(changeOutputs, &avax.TransferableOutput{
-				Asset: utxo.Asset,
-				Out: &secp256k1fx.TransferOutput{
-					Amt:          remainingAmount,
-					OutputOwners: *changeOwner,
+		// This input had extra value, so some of it must be returned
+		err = s.addChangeOutput(&avax.TransferableOutput{
+			Asset: utxo.Asset,
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          excess,
+				OutputOwners: *changeOwner,
+			},
+		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	for _, utxo := range utxosByAVAXAssetID.requested {
+		requiredFee, err := s.calculateFee()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// If we don't need to burn or stake additional AVAX and we have
+		// consumed enough AVAX to pay the required fee, we should stop
+		// consuming UTXOs.
+		if !s.shouldConsumeAsset(b.context.AVAXAssetID) && excessAVAX >= requiredFee {
+			break
+		}
+
+		out, _, err := unwrapOutput(utxo.Out)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+		if !ok {
+			// We couldn't spend this UTXO, so we skip to the next one
+			continue
+		}
+
+		err = s.addInput(&avax.TransferableInput{
+			UTXOID: utxo.UTXOID,
+			Asset:  utxo.Asset,
+			In: &secp256k1fx.TransferInput{
+				Amt: out.Amt,
+				Input: secp256k1fx.Input{
+					SigIndices: inputSigIndices,
 				},
-			})
+			},
+		})
+		if err != nil {
+			return nil, nil, nil, err
 		}
+
+		excess := s.consumeAsset(b.context.AVAXAssetID, out.Amt)
+		excessAVAX, err = math.Add(excessAVAX, excess)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// If we need to consume additional AVAX, we should be returning the
+		// change to the change address.
+		ownerOverride = changeOwner
 	}
 
-	for assetID, amount := range amountsToStake {
-		if amount != 0 {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q to stake",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
-	}
-	for assetID, amount := range amountsToBurn {
-		if amount != 0 {
-			return nil, nil, nil, fmt.Errorf(
-				"%w: provided UTXOs need %d more units of asset %q",
-				ErrInsufficientFunds,
-				amount,
-				assetID,
-			)
-		}
+	if err := s.verifyAssetsConsumed(); err != nil {
+		return nil, nil, nil, err
 	}
 
-	utils.Sort(inputs)                                     // sort inputs
-	avax.SortTransferableOutputs(changeOutputs, txs.Codec) // sort the change outputs
-	avax.SortTransferableOutputs(stakeOutputs, txs.Codec)  // sort stake outputs
-	return inputs, changeOutputs, stakeOutputs, nil
+	requiredFee, err := s.calculateFee()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if excessAVAX < requiredFee {
+		return nil, nil, nil, fmt.Errorf(
+			"%w: provided UTXOs needed %d more nAVAX (%q)",
+			ErrInsufficientFunds,
+			requiredFee-excessAVAX,
+			b.context.AVAXAssetID,
+		)
+	}
+
+	secpExcessAVAXOutput := &secp256k1fx.TransferOutput{
+		Amt:          0, // Populated later if used
+		OutputOwners: *ownerOverride,
+	}
+	excessAVAXOutput := &avax.TransferableOutput{
+		Asset: avax.Asset{
+			ID: b.context.AVAXAssetID,
+		},
+		Out: secpExcessAVAXOutput,
+	}
+	if err := s.addOutputComplexity(excessAVAXOutput); err != nil {
+		return nil, nil, nil, err
+	}
+
+	requiredFeeWithChange, err := s.calculateFee()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if excessAVAX > requiredFeeWithChange {
+		// It is worth adding the change output
+		secpExcessAVAXOutput.Amt = excessAVAX - requiredFeeWithChange
+		s.changeOutputs = append(s.changeOutputs, excessAVAXOutput)
+	}
+
+	utils.Sort(s.inputs)                                     // sort inputs
+	avax.SortTransferableOutputs(s.changeOutputs, txs.Codec) // sort the change outputs
+	avax.SortTransferableOutputs(s.stakeOutputs, txs.Codec)  // sort stake outputs
+	return s.inputs, s.changeOutputs, s.stakeOutputs, nil
 }
 
 func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
@@ -1199,4 +1635,184 @@ func (b *builder) initCtx(tx txs.UnsignedTx) error {
 
 	tx.InitCtx(ctx)
 	return nil
+}
+
+type spendHelper struct {
+	weights  gas.Dimensions
+	gasPrice gas.Price
+
+	toBurn     map[ids.ID]uint64
+	toStake    map[ids.ID]uint64
+	complexity gas.Dimensions
+
+	inputs        []*avax.TransferableInput
+	changeOutputs []*avax.TransferableOutput
+	stakeOutputs  []*avax.TransferableOutput
+}
+
+func (s *spendHelper) addInput(input *avax.TransferableInput) error {
+	newInputComplexity, err := fee.InputComplexity(input)
+	if err != nil {
+		return err
+	}
+	s.complexity, err = s.complexity.Add(&newInputComplexity)
+	if err != nil {
+		return err
+	}
+
+	s.inputs = append(s.inputs, input)
+	return nil
+}
+
+func (s *spendHelper) addChangeOutput(output *avax.TransferableOutput) error {
+	s.changeOutputs = append(s.changeOutputs, output)
+	return s.addOutputComplexity(output)
+}
+
+func (s *spendHelper) addStakedOutput(output *avax.TransferableOutput) error {
+	s.stakeOutputs = append(s.stakeOutputs, output)
+	return s.addOutputComplexity(output)
+}
+
+func (s *spendHelper) addOutputComplexity(output *avax.TransferableOutput) error {
+	newOutputComplexity, err := fee.OutputComplexity(output)
+	if err != nil {
+		return err
+	}
+	s.complexity, err = s.complexity.Add(&newOutputComplexity)
+	return err
+}
+
+func (s *spendHelper) shouldConsumeLockedAsset(assetID ids.ID) bool {
+	return s.toStake[assetID] != 0
+}
+
+func (s *spendHelper) shouldConsumeAsset(assetID ids.ID) bool {
+	return s.toBurn[assetID] != 0 || s.shouldConsumeLockedAsset(assetID)
+}
+
+func (s *spendHelper) consumeLockedAsset(assetID ids.ID, amount uint64) uint64 {
+	// Stake any value that should be staked
+	toStake := min(
+		s.toStake[assetID], // Amount we still need to stake
+		amount,             // Amount available to stake
+	)
+	s.toStake[assetID] -= toStake
+	return amount - toStake
+}
+
+func (s *spendHelper) consumeAsset(assetID ids.ID, amount uint64) uint64 {
+	// Burn any value that should be burned
+	toBurn := min(
+		s.toBurn[assetID], // Amount we still need to burn
+		amount,            // Amount available to burn
+	)
+	s.toBurn[assetID] -= toBurn
+
+	// Stake any remaining value that should be staked
+	return s.consumeLockedAsset(assetID, amount-toBurn)
+}
+
+func (s *spendHelper) calculateFee() (uint64, error) {
+	gas, err := s.complexity.ToGas(s.weights)
+	if err != nil {
+		return 0, err
+	}
+	return gas.Cost(s.gasPrice)
+}
+
+func (s *spendHelper) verifyAssetsConsumed() error {
+	for assetID, amount := range s.toStake {
+		if amount == 0 {
+			continue
+		}
+
+		return fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q to stake",
+			ErrInsufficientFunds,
+			amount,
+			assetID,
+		)
+	}
+	for assetID, amount := range s.toBurn {
+		if amount == 0 {
+			continue
+		}
+
+		return fmt.Errorf(
+			"%w: provided UTXOs need %d more units of asset %q",
+			ErrInsufficientFunds,
+			amount,
+			assetID,
+		)
+	}
+	return nil
+}
+
+type utxosByLocktime struct {
+	unlocked []*avax.UTXO
+	locked   []*avax.UTXO
+}
+
+// splitByLocktime separates the provided UTXOs into two slices:
+// 1. UTXOs that are unlocked with the provided issuance time
+// 2. UTXOs that are locked with the provided issuance time
+func splitByLocktime(utxos []*avax.UTXO, minIssuanceTime uint64) utxosByLocktime {
+	split := utxosByLocktime{
+		unlocked: make([]*avax.UTXO, 0, len(utxos)),
+		locked:   make([]*avax.UTXO, 0, len(utxos)),
+	}
+	for _, utxo := range utxos {
+		if lockedOut, ok := utxo.Out.(*stakeable.LockOut); ok && minIssuanceTime < lockedOut.Locktime {
+			split.locked = append(split.locked, utxo)
+		} else {
+			split.unlocked = append(split.unlocked, utxo)
+		}
+	}
+	return split
+}
+
+type utxosByAssetID struct {
+	requested []*avax.UTXO
+	other     []*avax.UTXO
+}
+
+// splitByAssetID separates the provided UTXOs into two slices:
+// 1. UTXOs with the provided assetID
+// 2. UTXOs with a different assetID
+func splitByAssetID(utxos []*avax.UTXO, assetID ids.ID) utxosByAssetID {
+	split := utxosByAssetID{
+		requested: make([]*avax.UTXO, 0, len(utxos)),
+		other:     make([]*avax.UTXO, 0, len(utxos)),
+	}
+	for _, utxo := range utxos {
+		if utxo.AssetID() == assetID {
+			split.requested = append(split.requested, utxo)
+		} else {
+			split.other = append(split.other, utxo)
+		}
+	}
+	return split
+}
+
+// unwrapOutput returns the *secp256k1fx.TransferOutput that was, potentially,
+// wrapped by a *stakeable.LockOut.
+//
+// If the output was stakeable and locked, the locktime is returned. Otherwise,
+// the locktime returned will be 0.
+//
+// If the output is not a, potentially wrapped, *secp256k1fx.TransferOutput, an
+// error is returned.
+func unwrapOutput(output verify.State) (*secp256k1fx.TransferOutput, uint64, error) {
+	var locktime uint64
+	if lockedOut, ok := output.(*stakeable.LockOut); ok {
+		output = lockedOut.TransferableOut
+		locktime = lockedOut.Locktime
+	}
+
+	unwrappedOutput, ok := output.(*secp256k1fx.TransferOutput)
+	if !ok {
+		return nil, 0, ErrUnknownOutputType
+	}
+	return unwrappedOutput, locktime, nil
 }

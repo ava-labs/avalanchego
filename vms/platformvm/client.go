@@ -16,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var _ Client = (*client)(nil)
@@ -121,6 +124,10 @@ type Client interface {
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
 	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
+	// GetFeeConfig returns the dynamic fee config of the chain.
+	GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error)
+	// GetFeeState returns the current fee state of the chain.
+	GetFeeState(ctx context.Context, options ...rpc.Option) (gas.State, gas.Price, time.Time, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -228,6 +235,9 @@ type GetSubnetClientResponse struct {
 	Locktime    uint64
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID
+	// subnet manager information for a permissionless L1
+	ManagerChainID ids.ID
+	ManagerAddress []byte
 }
 
 func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (GetSubnetClientResponse, error) {
@@ -249,6 +259,8 @@ func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.
 		Threshold:                uint32(res.Threshold),
 		Locktime:                 uint64(res.Locktime),
 		SubnetTransformationTxID: res.SubnetTransformationTxID,
+		ManagerChainID:           res.ManagerChainID,
+		ManagerAddress:           res.ManagerAddress,
 	}, nil
 }
 
@@ -515,6 +527,18 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
+func (c *client) GetFeeConfig(ctx context.Context, options ...rpc.Option) (*gas.Config, error) {
+	res := &gas.Config{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeConfig", struct{}{}, res, options...)
+	return res, err
+}
+
+func (c *client) GetFeeState(ctx context.Context, options ...rpc.Option) (gas.State, gas.Price, time.Time, error) {
+	res := &GetFeeStateReply{}
+	err := c.requester.SendRequest(ctx, "platform.getFeeState", struct{}{}, res, options...)
+	return res.State, res.Price, res.Time, err
+}
+
 func AwaitTxAccepted(
 	c Client,
 	ctx context.Context,
@@ -542,4 +566,25 @@ func AwaitTxAccepted(
 			return ctx.Err()
 		}
 	}
+}
+
+// GetSubnetOwners returns a map of subnet ID to current subnet's owner
+func GetSubnetOwners(
+	c Client,
+	ctx context.Context,
+	subnetIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	subnetOwners := map[ids.ID]fx.Owner{}
+	for _, subnetID := range subnetIDs {
+		subnetInfo, err := c.GetSubnet(ctx, subnetID)
+		if err != nil {
+			return nil, err
+		}
+		subnetOwners[subnetID] = &secp256k1fx.OutputOwners{
+			Locktime:  subnetInfo.Locktime,
+			Threshold: subnetInfo.Threshold,
+			Addrs:     subnetInfo.ControlKeys,
+		}
+	}
+	return subnetOwners, nil
 }
