@@ -168,7 +168,9 @@ func resetRunningDatabaseDirectory() error {
 
 func runBenchmark() error {
 	promRegistry := prometheus.NewRegistry()
-	prometheus.Register(promRegistry)
+	if err := prometheus.Register(promRegistry); err != nil {
+		return err
+	}
 
 	writesCounter := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "merkledb_bench",
