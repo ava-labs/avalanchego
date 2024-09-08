@@ -31,9 +31,13 @@ const (
 	defaultHistoryLength      = 300
 	databaseRunningBatchSize  = 2500
 	databaseRunningUpdateSize = 5000
+	defaultMetricsPort        = 3000
 )
 
-var databaseEntries = pflag.Uint64("n", defaultDatabaseEntries, "number of database entries")
+var (
+	databaseEntries = pflag.Uint64("n", defaultDatabaseEntries, "number of database entries")
+	httpMetricPort  = pflag.Uint64("p", defaultMetricsPort, "default metrics port")
+)
 
 func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
 	return merkledb.Config{
@@ -166,7 +170,7 @@ func runBenchmark() error {
 	http.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
-		Addr:              ":8080",
+		Addr:              fmt.Sprintf(":%d", *httpMetricPort),
 		ReadHeaderTimeout: 3 * time.Second,
 	}
 	go func() {
