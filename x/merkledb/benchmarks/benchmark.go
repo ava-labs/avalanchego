@@ -26,9 +26,8 @@ import (
 )
 
 const (
-	defaultDatabaseEntries    = 1000000
-	databaseCreationBatchSize = 10000
-	defaultHistoryLength      = 300
+	defaultDatabaseEntries    = 2000000
+	databaseCreationBatchSize = 1000000
 	databaseRunningBatchSize  = 2500
 	databaseRunningUpdateSize = 5000
 	defaultMetricsPort        = 3000
@@ -41,6 +40,7 @@ var (
 )
 
 func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
+	const defaultHistoryLength = 300
 	return merkledb.Config{
 		BranchFactor:                merkledb.BranchFactor16,
 		Hasher:                      merkledb.DefaultHasher,
@@ -51,9 +51,14 @@ func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
 		IntermediateWriteBufferSize: units.KiB,
 		IntermediateWriteBatchSize:  256 * units.KiB,
 		Reg:                         promRegistry,
-		TraceLevel:                  merkledb.InfoTrace,
+		TraceLevel:                  merkledb.NoTrace,
 		Tracer:                      trace.Noop,
 	}
+}
+
+func getGoldenStagingDatabaseDirectory() string {
+	wd, _ := os.Getwd()
+	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-staging-%d", *databaseEntries))
 }
 
 func getGoldenDatabaseDirectory() string {
@@ -74,10 +79,21 @@ func calculateIndexEncoding(idx uint64) []byte {
 }
 
 func createGoldenDatabase() error {
+	err := os.RemoveAll(getGoldenStagingDatabaseDirectory())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to remove running directory : %v\n", err)
+		return err
+	}
+	err = os.Mkdir(getGoldenStagingDatabaseDirectory(), 0o777)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to create golden staging directory : %v\n", err)
+		return err
+	}
+
 	promRegistry := prometheus.NewRegistry()
 
 	levelDB, err := leveldb.New(
-		getGoldenDatabaseDirectory(),
+		getGoldenStagingDatabaseDirectory(),
 		nil,
 		logging.NoLog{},
 		promRegistry,
@@ -87,11 +103,26 @@ func createGoldenDatabase() error {
 		return err
 	}
 
-	mdb, err := merkledb.New(context.Background(), levelDB, getMerkleDBConfig(promRegistry))
+	mdb, err := merkledb.New(context.Background(), levelDB, getMerkleDBConfig(nil))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create merkleDB database : %v\n", err)
 		return err
 	}
+
+	fmt.Printf("Initializing database.")
+	ticksCh := make(chan interface{})
+	go func() {
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ticksCh:
+				return
+			case <-t.C:
+				fmt.Printf(".")
+			}
+		}
+	}()
 
 	startInsertTime := time.Now()
 	var currentBatch database.Batch
@@ -113,6 +144,7 @@ func createGoldenDatabase() error {
 				fmt.Fprintf(os.Stderr, "unable to write value in merkleDB database : %v\n", err)
 				return err
 			}
+			currentBatch = nil
 		}
 	}
 	if (*databaseEntries)%databaseCreationBatchSize != 0 {
@@ -122,6 +154,9 @@ func createGoldenDatabase() error {
 			return err
 		}
 	}
+	close(ticksCh)
+
+	fmt.Printf(" done!\n")
 	rootID, err := mdb.GetMerkleRoot(context.Background())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to get root ID : %v\n", err)
@@ -138,6 +173,11 @@ func createGoldenDatabase() error {
 	err = levelDB.Close()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to close merkleDB database : %v\n", err)
+		return err
+	}
+	err = os.Rename(getGoldenStagingDatabaseDirectory(), getGoldenDatabaseDirectory())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to rename golden staging directory : %v\n", err)
 		return err
 	}
 	fmt.Printf("Completed initialization with hash of %v\n", rootID.Hex())
