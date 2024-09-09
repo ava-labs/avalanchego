@@ -18,27 +18,26 @@ package trie
 
 import (
 	"bytes"
-	"math/big"
 	"reflect"
 	"testing"
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/trie/triedb/pathdb"
 	"github.com/ava-labs/coreth/trie/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 )
 
 var (
 	accounts = map[common.Address]*types.StateAccount{
 		{1}: {
 			Nonce:    100,
-			Balance:  big.NewInt(100),
+			Balance:  uint256.NewInt(100),
 			CodeHash: common.Hash{0x1}.Bytes(),
 		},
 		{2}: {
 			Nonce:    200,
-			Balance:  big.NewInt(200),
+			Balance:  uint256.NewInt(200),
 			CodeHash: common.Hash{0x2}.Bytes(),
 		},
 	}
@@ -57,12 +56,7 @@ var (
 )
 
 func TestVerkleTreeReadWrite(t *testing.T) {
-	db := NewDatabase(rawdb.NewMemoryDatabase(), &Config{
-		IsVerkle: true,
-		PathDB:   pathdb.Defaults,
-	})
-	defer db.Close()
-
+	db := newTestDatabase(rawdb.NewMemoryDatabase(), rawdb.PathScheme)
 	tr, _ := NewVerkleTrie(types.EmptyVerkleHash, db, utils.NewPointCache(100))
 
 	for addr, acct := range accounts {

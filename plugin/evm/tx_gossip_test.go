@@ -218,7 +218,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	}
 	network, err := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(atomicTxGossipProtocol)
+	client := network.NewClient(p2p.AtomicTxGossipHandlerID)
 
 	// we only accept gossip requests from validators
 	requestingNodeID := ids.GenerateTestNodeID()
@@ -500,7 +500,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	vm.atomicTxPushGossiper.Add(&GossipAtomicTx{tx})
 
 	gossipedBytes := <-sender.SentAppGossip
-	require.Equal(byte(atomicTxGossipProtocol), gossipedBytes[0])
+	require.Equal(byte(p2p.AtomicTxGossipHandlerID), gossipedBytes[0])
 
 	outboundGossipMsg := &sdk.PushGossip{}
 	require.NoError(proto.Unmarshal(gossipedBytes[1:], outboundGossipMsg))
@@ -587,7 +587,7 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	inboundGossipBytes, err := proto.Marshal(inboundGossip)
 	require.NoError(err)
 
-	inboundGossipMsg := append(binary.AppendUvarint(nil, atomicTxGossipProtocol), inboundGossipBytes...)
+	inboundGossipMsg := append(binary.AppendUvarint(nil, p2p.AtomicTxGossipHandlerID), inboundGossipBytes...)
 
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
 	require.True(vm.mempool.Has(tx.ID()))

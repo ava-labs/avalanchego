@@ -34,9 +34,9 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 		Difficulty: common.Big0,
 		GasLimit:   uint64(5000000),
 	}
-	funds := make(map[common.Address]core.GenesisAccount)
+	funds := make(map[common.Address]types.GenesisAccount)
 	for _, addr := range addrs {
-		funds[addr] = core.GenesisAccount{
+		funds[addr] = types.GenesisAccount{
 			Balance: balance,
 		}
 	}

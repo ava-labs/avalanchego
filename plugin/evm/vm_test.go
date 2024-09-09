@@ -98,7 +98,7 @@ var (
 		if cfg.IsDurango(0) {
 			addr := common.HexToAddress("0x99b9DEA54C48Dfea6aA9A4Ca4623633EE04ddbB5")
 			balance := new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10))
-			g.Alloc[addr] = core.GenesisAccount{Balance: balance}
+			g.Alloc[addr] = types.GenesisAccount{Balance: balance}
 		}
 
 		b, err := json.Marshal(g)
@@ -168,9 +168,9 @@ func newPrefundedGenesis(
 	balance int,
 	addresses ...common.Address,
 ) *core.Genesis {
-	alloc := core.GenesisAlloc{}
+	alloc := types.GenesisAlloc{}
 	for _, address := range addresses {
-		alloc[address] = core.GenesisAccount{
+		alloc[address] = types.GenesisAccount{
 			Balance: big.NewInt(int64(balance)),
 		}
 	}

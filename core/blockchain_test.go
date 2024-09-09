@@ -21,7 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/stretchr/testify/require"
+	"github.com/holiman/uint256"
 )
 
 var (
@@ -311,7 +311,7 @@ func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 	genesisBalance := big.NewInt(1000000)
 	gspec := &Genesis{
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 
 	blockchain, err := createBlockChain(chainDB, pruningConfig, gspec, common.Hash{})
@@ -424,7 +424,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	genesisBalance := big.NewInt(1000000)
 	gspec := &Genesis{
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})
@@ -478,13 +478,13 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	// After inserting all blocks, we should confirm that txs added after the
 	// async worker shutdown cannot be found.
 	for _, tx := range foundTxs {
-		txLookup := blockchain.GetTransactionLookup(tx)
+		txLookup, _, _ := blockchain.GetTransactionLookup(tx)
 		if txLookup == nil {
 			t.Fatalf("missing transaction: %v", tx)
 		}
 	}
 	for _, tx := range missingTxs {
-		txLookup := blockchain.GetTransactionLookup(tx)
+		txLookup, _, _ := blockchain.GetTransactionLookup(tx)
 		if txLookup != nil {
 			t.Fatalf("transaction should be missing: %v", tx)
 		}
@@ -496,9 +496,10 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 		if nonce != 10 {
 			return fmt.Errorf("expected nonce addr1: 10, found nonce: %d", nonce)
 		}
-		transferredFunds := big.NewInt(100000)
+		transferredFunds := uint256.MustFromBig(big.NewInt(100000))
 		balance1 := sdb.GetBalance(addr1)
-		expectedBalance1 := new(big.Int).Sub(genesisBalance, transferredFunds)
+		genesisBalance := uint256.MustFromBig(genesisBalance)
+		expectedBalance1 := new(uint256.Int).Sub(genesisBalance, transferredFunds)
 		if balance1.Cmp(expectedBalance1) != 0 {
 			return fmt.Errorf("expected addr1 balance: %d, found balance: %d", expectedBalance1, balance1)
 		}
@@ -527,213 +528,12 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 
 		// We should confirm all transactions can now be queried
 		for _, tx := range allTxs {
-			txLookup := bc.GetTransactionLookup(tx)
+			txLookup, _, _ := bc.GetTransactionLookup(tx)
 			if txLookup == nil {
 				t.Fatalf("missing transaction: %v", tx)
 			}
 		}
 	}
-}
-
-func TestTransactionIndices(t *testing.T) {
-	// Configure and generate a sample block chain
-	require := require.New(t)
-	var (
-		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
-		funds   = big.NewInt(10000000000000)
-		gspec   = &Genesis{
-			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-			Alloc:  GenesisAlloc{addr1: {Balance: funds}},
-		}
-		signer = types.LatestSigner(gspec.Config)
-	)
-	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewFakerWithCallbacks(TestCallbacks), 128, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(err)
-		block.AddTx(tx)
-	})
-	require.NoError(err)
-
-	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewFakerWithCallbacks(TestCallbacks), genDb, 10, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(err)
-		block.AddTx(tx)
-	})
-	require.NoError(err)
-
-	conf := &CacheConfig{
-		TrieCleanLimit:            256,
-		TrieDirtyLimit:            256,
-		TrieDirtyCommitTarget:     20,
-		TriePrefetcherParallelism: 4,
-		Pruning:                   true,
-		CommitInterval:            4096,
-		SnapshotLimit:             256,
-		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
-		AcceptorQueueLimit:        64,
-	}
-
-	// Init block chain and check all needed indices has been indexed.
-	chainDB := rawdb.NewMemoryDatabase()
-	chain, err := createBlockChain(chainDB, conf, gspec, common.Hash{})
-	require.NoError(err)
-
-	_, err = chain.InsertChain(blocks)
-	require.NoError(err)
-
-	for _, block := range blocks {
-		err := chain.Accept(block)
-		require.NoError(err)
-	}
-	chain.DrainAcceptorQueue()
-
-	lastAcceptedBlock := blocks[len(blocks)-1]
-	require.Equal(lastAcceptedBlock.Hash(), chain.CurrentHeader().Hash())
-
-	CheckTxIndices(t, nil, lastAcceptedBlock.NumberU64(), chain.db, false) // check all indices has been indexed
-	chain.Stop()
-
-	// Reconstruct a block chain which only reserves limited tx indices
-	// 128 blocks were previously indexed. Now we add a new block at each test step.
-	limits := []uint64{
-		0,   /* tip: 129 reserve all (don't run) */
-		131, /* tip: 130 reserve all */
-		140, /* tip: 131 reserve all */
-		64,  /* tip: 132, limit:64 */
-		32,  /* tip: 133, limit:32  */
-	}
-	for i, l := range limits {
-		t.Run(fmt.Sprintf("test-%d, limit: %d", i+1, l), func(t *testing.T) {
-			conf.TxLookupLimit = l
-
-			chain, err := createBlockChain(chainDB, conf, gspec, lastAcceptedBlock.Hash())
-			require.NoError(err)
-
-			tail := getTail(l, lastAcceptedBlock.NumberU64())
-			// check if startup indices are correct
-			CheckTxIndices(t, tail, lastAcceptedBlock.NumberU64(), chain.db, false)
-
-			newBlks := blocks2[i : i+1]
-			_, err = chain.InsertChain(newBlks) // Feed chain a higher block to trigger indices updater.
-			require.NoError(err)
-
-			lastAcceptedBlock = newBlks[0]
-			err = chain.Accept(lastAcceptedBlock) // Accept the block to trigger indices updater.
-			require.NoError(err)
-			chain.DrainAcceptorQueue()
-
-			tail = getTail(l, lastAcceptedBlock.NumberU64())
-			// check if indices are updated correctly
-			CheckTxIndices(t, tail, lastAcceptedBlock.NumberU64(), chain.db, false)
-			chain.Stop()
-		})
-	}
-}
-
-func getTail(limit uint64, lastAccepted uint64) *uint64 {
-	if limit == 0 {
-		return nil
-	}
-	var tail uint64
-	if lastAccepted > limit {
-		// tail should be the oldest block number which is indexed
-		// i.e the first block number that's in the lookup range
-		tail = lastAccepted - limit + 1
-	}
-	return &tail
-}
-
-func TestTransactionSkipIndexing(t *testing.T) {
-	// Configure and generate a sample block chain
-	require := require.New(t)
-	var (
-		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
-		funds   = big.NewInt(10000000000000)
-		gspec   = &Genesis{
-			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-			Alloc:  GenesisAlloc{addr1: {Balance: funds}},
-		}
-		signer = types.LatestSigner(gspec.Config)
-	)
-	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewFakerWithCallbacks(TestCallbacks), 5, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(err)
-		block.AddTx(tx)
-	})
-	require.NoError(err)
-
-	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewFakerWithCallbacks(TestCallbacks), genDb, 5, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(err)
-		block.AddTx(tx)
-	})
-	require.NoError(err)
-
-	conf := &CacheConfig{
-		TrieCleanLimit:            256,
-		TrieDirtyLimit:            256,
-		TrieDirtyCommitTarget:     20,
-		TriePrefetcherParallelism: 4,
-		Pruning:                   true,
-		CommitInterval:            4096,
-		SnapshotLimit:             256,
-		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
-		AcceptorQueueLimit:        64,
-		SkipTxIndexing:            true,
-	}
-
-	// test1: Init block chain and check all indices has been skipped.
-	chainDB := rawdb.NewMemoryDatabase()
-	chain, err := createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
-		func(b *types.Block) {
-			bNumber := b.NumberU64()
-			checkTxIndicesHelper(t, nil, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
-		})
-	require.NoError(err)
-	chain.Stop()
-
-	// test2: specify lookuplimit with tx index skipping enabled. Blocks should not be indexed but tail should be updated.
-	conf.TxLookupLimit = 2
-	chainDB = rawdb.NewMemoryDatabase()
-	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
-		func(b *types.Block) {
-			bNumber := b.NumberU64()
-			tail := bNumber - conf.TxLookupLimit + 1
-			checkTxIndicesHelper(t, &tail, bNumber+1, bNumber+1, bNumber, chainDB, false) // check all indices has been skipped
-		})
-	require.NoError(err)
-	chain.Stop()
-
-	// test3: tx index skipping and unindexer disabled. Blocks should be indexed and tail should be updated.
-	conf.TxLookupLimit = 0
-	conf.SkipTxIndexing = false
-	chainDB = rawdb.NewMemoryDatabase()
-	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks, common.Hash{},
-		func(b *types.Block) {
-			bNumber := b.NumberU64()
-			checkTxIndicesHelper(t, nil, 0, bNumber, bNumber, chainDB, false) // check all indices has been indexed
-		})
-	require.NoError(err)
-	chain.Stop()
-
-	// now change tx index skipping to true and check that the indices are skipped for the last block
-	// and old indices are removed up to the tail, but [tail, current) indices are still there.
-	conf.TxLookupLimit = 2
-	conf.SkipTxIndexing = true
-	chain, err = createAndInsertChain(chainDB, conf, gspec, blocks2[0:1], chain.CurrentHeader().Hash(),
-		func(b *types.Block) {
-			bNumber := b.NumberU64()
-			tail := bNumber - conf.TxLookupLimit + 1
-			checkTxIndicesHelper(t, &tail, tail, bNumber-1, bNumber, chainDB, false)
-		})
-	require.NoError(err)
-	chain.Stop()
 }
 
 // TestCanonicalHashMarker tests all the canonical hash markers are updated/deleted
@@ -782,7 +582,7 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 		var (
 			gspec = &Genesis{
 				Config:  params.TestChainConfig,
-				Alloc:   GenesisAlloc{},
+				Alloc:   types.GenesisAlloc{},
 				BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
 			}
 			engine = dummy.NewCoinbaseFaker()
@@ -863,7 +663,7 @@ func TestTxLookupBlockChain(t *testing.T) {
 		SnapshotLimit:             256,
 		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:        64,   // ensure channel doesn't block
-		TxLookupLimit:             5,
+		TransactionHistory:        5,
 	}
 	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
 		return createBlockChain(db, cacheConf, gspec, lastAcceptedHash)
@@ -886,7 +686,7 @@ func TestTxLookupSkipIndexingBlockChain(t *testing.T) {
 		SnapshotLimit:             256,
 		SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:        64,   // ensure channel doesn't block
-		TxLookupLimit:             5,
+		TransactionHistory:        5,
 		SkipTxIndexing:            true,
 	}
 	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
@@ -945,7 +745,7 @@ func testCreateThenDelete(t *testing.T, config *params.ChainConfig) {
 	}...)
 	gspec := &Genesis{
 		Config: config,
-		Alloc: GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			address: {Balance: funds},
 		},
 	}
@@ -1031,7 +831,7 @@ func TestDeleteThenCreate(t *testing.T) {
 
 	gspec := &Genesis{
 		Config: params.TestChainConfig,
-		Alloc: GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			address: {Balance: funds},
 		},
 	}
@@ -1147,7 +947,7 @@ func TestTransientStorageReset(t *testing.T) {
 	}...)
 	gspec := &Genesis{
 		Config: params.TestChainConfig,
-		Alloc: GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			address: {Balance: funds},
 		},
 	}
@@ -1293,7 +1093,7 @@ func TestEIP3651(t *testing.T) {
 	// Note this differs from go-ethereum where the miner receives the gasUsed * block baseFee,
 	// as our handling of the coinbase payment is different.
 	// Note we use block.GasUsed() here as there is only one tx.
-	actual := state.GetBalance(block.Coinbase())
+	actual := state.GetBalance(block.Coinbase()).ToBig()
 	tx := block.Transactions()[0]
 	gasPrice := new(big.Int).Add(block.BaseFee(), tx.EffectiveGasTipValue(block.BaseFee()))
 	expected := new(big.Int).SetUint64(block.GasUsed() * gasPrice.Uint64())
@@ -1304,31 +1104,8 @@ func TestEIP3651(t *testing.T) {
 	// 4: Ensure the tx sender paid for the gasUsed * (block baseFee + effectiveGasTip).
 	// Note this differs from go-ethereum where the miner receives the gasUsed * block baseFee,
 	// as our handling of the coinbase payment is different.
-	actual = new(big.Int).Sub(funds, state.GetBalance(addr1))
+	actual = new(big.Int).Sub(funds, state.GetBalance(addr1).ToBig())
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
-}
-
-func createAndInsertChain(db ethdb.Database, cacheConfig *CacheConfig, gspec *Genesis, blocks types.Blocks, lastAcceptedHash common.Hash, accepted func(*types.Block)) (*BlockChain, error) {
-	chain, err := createBlockChain(db, cacheConfig, gspec, lastAcceptedHash)
-	if err != nil {
-		return nil, err
-	}
-	_, err = chain.InsertChain(blocks)
-	if err != nil {
-		return nil, err
-	}
-	for _, block := range blocks {
-		err := chain.Accept(block)
-		if err != nil {
-			return nil, err
-		}
-		chain.DrainAcceptorQueue()
-		if accepted != nil {
-			accepted(block)
-		}
-	}
-
-	return chain, nil
 }

@@ -30,7 +30,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 	var tests []test = []test{
 		{
 			gas:           1,
-			baseFee:       new(big.Int).Set(x2cRate),
+			baseFee:       new(big.Int).Set(x2cRate.ToBig()),
 			expectedValue: 1,
 		},
 		{

@@ -65,7 +65,7 @@ func (mt *mockTransactor) AcceptedCodeAt(ctx context.Context, account common.Add
 	return []byte{1}, nil
 }
 
-func (mt *mockTransactor) AcceptedNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+func (mt *mockTransactor) NonceAt(ctx context.Context, account common.Address, blockNum *big.Int) (uint64, error) {
 	return 0, nil
 }
 
