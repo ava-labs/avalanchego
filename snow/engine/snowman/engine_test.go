@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/ancestor"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -3181,4 +3183,41 @@ func TestShouldIssueBlock(t *testing.T) {
 			require.Equal(t, test.expectedShouldIssue, shouldIssue)
 		})
 	}
+}
+
+type mockConnVDR struct {
+	tracker.Peers
+	percent float64
+}
+
+func (m *mockConnVDR) ConnectedPercent() float64 {
+	return m.percent
+}
+
+type logBuffer struct {
+	bytes.Buffer
+}
+
+func (logBuffer) Close() error {
+	return nil
+}
+
+func TestEngineAbortQueryWhenInPartition(t *testing.T) {
+	require := require.New(t)
+
+	// Buffer to record the log entries
+	buff := logBuffer{}
+
+	conf := DefaultConfig(t)
+	// Overwrite the log to record what it says
+	conf.Ctx.Log = logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, &buff, logging.Plain.ConsoleEncoder()))
+	conf.Params = snowball.DefaultParameters
+	conf.ConnectedValidators = &mockConnVDR{percent: 0.7, Peers: conf.ConnectedValidators}
+
+	_, _, _, _, engine := setup(t, conf)
+
+	// Gossip will cause a pull query if enough stake is connected
+	engine.sendQuery(context.Background(), ids.ID{}, nil, false)
+
+	require.Contains(buff.String(), errInsufficientStake)
 }

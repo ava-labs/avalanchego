@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/onsi/ginkgo/v2"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
 // The ginkgo event handlers defined in this file will be automatically
@@ -36,6 +36,9 @@ var _ = ginkgo.BeforeEach(func() {
 var _ = ginkgo.AfterEach(func() {
 	tc := NewTestContext()
 	env := GetEnv(tc)
+	// The global env isn't guaranteed to be initialized by importers
+	// of this package since initializing a package-local env is also
+	// supported.
 	if env == nil || !EmitMetricsLink {
 		return
 	}
