@@ -804,9 +804,14 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         match node {
             Node::Branch(ref mut b) => {
                 for (nibble, child) in b.children.iter_mut().enumerate() {
-                    // Take child from b.children
+                    // if this is already hashed, we're done
+                    if matches!(child, Some(Child::AddressWithHash(_, _))) {
+                        // We already know the hash of this child.
+                        continue;
+                    }
+
+                    // If this child is a node, hash it and update the child.
                     let Some(Child::Node(child_node)) = std::mem::take(child) else {
-                        // There is no child or we already know its hash.
                         continue;
                     };
 
