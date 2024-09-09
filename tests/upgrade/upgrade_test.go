@@ -4,6 +4,8 @@
 package upgrade
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"testing"
@@ -11,8 +13,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestUpgrade(t *testing.T) {
@@ -45,6 +49,22 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 
 	ginkgo.It("can upgrade versions", func() {
 		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
+
+		// Get the default genesis so we can modify it
+		genesis, err := network.DefaultGenesis()
+		require.NoError(err)
+		network.Genesis = genesis
+
+		// Configure network upgrade flag
+		latestUnscheduled := upgradetest.GetConfig(upgradetest.Latest - 1)
+		upgradeJSON, err := json.Marshal(latestUnscheduled)
+		require.NoError(err)
+		upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
+		if network.DefaultFlags == nil {
+			network.DefaultFlags = tmpnet.FlagsMap{}
+		}
+		network.DefaultFlags[config.UpgradeFileContentKey] = upgradeBase64
+
 		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
 
 		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))

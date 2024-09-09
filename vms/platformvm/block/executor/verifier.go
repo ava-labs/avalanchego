@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -460,6 +461,41 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 	func(),
 	error,
 ) {
+	// Complexity is limited first to avoid processing too large of a block.
+	if timestamp := state.GetTimestamp(); v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		var blockComplexity gas.Dimensions
+		for _, tx := range txs {
+			txComplexity, err := fee.TxComplexity(tx.Unsigned)
+			if err != nil {
+				txID := tx.ID()
+				v.MarkDropped(txID, err)
+				return nil, nil, nil, err
+			}
+
+			blockComplexity, err = blockComplexity.Add(&txComplexity)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
+
+		blockGas, err := blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// If this block exceeds the available capacity, ConsumeGas will return
+		// an error.
+		feeState := state.GetFeeState()
+		feeState, err = feeState.ConsumeGas(blockGas)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// Updating the fee state prior to executing the transactions is fine
+		// because the fee calculator was already created.
+		state.SetFeeState(feeState)
+	}
+
 	var (
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]

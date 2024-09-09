@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	// ensure test packages are scanned by ginkgo
@@ -24,8 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 func TestE2E(t *testing.T) {

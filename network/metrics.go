@@ -35,10 +35,9 @@ type metrics struct {
 	nodeUptimeWeightedAverage    prometheus.Gauge
 	nodeUptimeRewardingStake     prometheus.Gauge
 	peerConnectedLifetimeAverage prometheus.Gauge
-
-	lock                       sync.RWMutex
-	peerConnectedStartTimes    map[ids.NodeID]float64
-	peerConnectedStartTimesSum float64
+	lock                         sync.RWMutex
+	peerConnectedStartTimes      map[ids.NodeID]float64
+	peerConnectedStartTimesSum   float64
 }
 
 func newMetrics(

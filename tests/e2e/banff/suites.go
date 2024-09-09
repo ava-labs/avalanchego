@@ -5,6 +5,7 @@
 package banff
 
 import (
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var _ = ginkgo.Describe("[Banff]", func() {
@@ -25,7 +24,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 	ginkgo.It("can send custom assets X->P and P->X",
 		func() {
 			env := e2e.GetEnv(tc)
-			keychain := env.NewKeychain(1)
+			keychain := env.NewKeychain()
 			wallet := e2e.NewWallet(tc, keychain, env.GetRandomNodeURI())
 
 			// Get the P-chain and the X-chain wallets

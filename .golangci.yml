@@ -170,16 +170,10 @@ linters-settings:
         disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
       - name: unhandled-error
-        disabled: false
-        arguments:
-          - "fmt\\.Fprint"
-          - "fmt\\.Fprintf"
-          - "fmt\\.Fprintln"
-          - "fmt\\.Print"
-          - "fmt\\.Printf"
-          - "fmt\\.Println"
-          - "math/rand\\.Read"
-          - "strings\\.Builder\\.WriteString"
+        # prefer the errcheck linter since it can be disabled directly with nolint directive
+        # but revive's disable directive (e.g. //revive:disable:unhandled-error) is not
+        # supported when run under golangci_lint
+        disabled: true
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
       - name: unused-parameter
         disabled: false

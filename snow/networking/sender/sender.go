@@ -100,7 +100,6 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 			ctx,
 			nodeID,
 			s.ctx.ChainID,
-			s.ctx.ChainID,
 			requestID,
 			message.StateSummaryFrontierOp,
 			inMsg,
@@ -245,7 +244,6 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 			ctx,
 			nodeID,
 			s.ctx.ChainID,
-			s.ctx.ChainID,
 			requestID,
 			message.AcceptedStateSummaryOp,
 			inMsg,
@@ -383,7 +381,6 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 			ctx,
 			nodeID,
 			s.ctx.ChainID,
-			s.ctx.ChainID,
 			requestID,
 			message.AcceptedFrontierOp,
 			inMsg,
@@ -519,7 +516,6 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 			ctx,
 			nodeID,
 			s.ctx.ChainID,
-			s.ctx.ChainID,
 			requestID,
 			message.AcceptedOp,
 			inMsg,
@@ -646,7 +642,6 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		ctx,
 		nodeID,
 		s.ctx.ChainID,
-		s.ctx.ChainID,
 		requestID,
 		message.AncestorsOp,
 		inMsg,
@@ -767,7 +762,6 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	s.router.RegisterRequest(
 		ctx,
 		nodeID,
-		s.ctx.ChainID,
 		s.ctx.ChainID,
 		requestID,
 		message.PutOp,
@@ -908,7 +902,6 @@ func (s *sender) SendPushQuery(
 			ctx,
 			nodeID,
 			s.ctx.ChainID,
-			s.ctx.ChainID,
 			requestID,
 			message.ChitsOp,
 			inMsg,
@@ -1045,7 +1038,6 @@ func (s *sender) SendPullQuery(
 		s.router.RegisterRequest(
 			ctx,
 			nodeID,
-			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
 			message.ChitsOp,
@@ -1212,70 +1204,6 @@ func (s *sender) SendChits(
 	}
 }
 
-func (s *sender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	ctx = context.WithoutCancel(ctx)
-
-	// The failed message is treated as if it was sent by the requested chain
-	failedMsg := message.InternalCrossChainAppError(
-		s.ctx.NodeID,
-		chainID,
-		s.ctx.ChainID,
-		requestID,
-		common.ErrTimeout.Code,
-		common.ErrTimeout.Message,
-	)
-	s.router.RegisterRequest(
-		ctx,
-		s.ctx.NodeID,
-		s.ctx.ChainID,
-		chainID,
-		requestID,
-		message.CrossChainAppResponseOp,
-		failedMsg,
-		p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	)
-
-	inMsg := message.InternalCrossChainAppRequest(
-		s.ctx.NodeID,
-		s.ctx.ChainID,
-		chainID,
-		requestID,
-		s.timeouts.TimeoutDuration(),
-		appRequestBytes,
-	)
-	go s.router.HandleInbound(ctx, inMsg)
-	return nil
-}
-
-func (s *sender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	ctx = context.WithoutCancel(ctx)
-
-	inMsg := message.InternalCrossChainAppResponse(
-		s.ctx.NodeID,
-		s.ctx.ChainID,
-		chainID,
-		requestID,
-		appResponseBytes,
-	)
-	go s.router.HandleInbound(ctx, inMsg)
-	return nil
-}
-
-func (s *sender) SendCrossChainAppError(ctx context.Context, chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) error {
-	ctx = context.WithoutCancel(ctx)
-
-	inMsg := message.InternalCrossChainAppError(
-		s.ctx.NodeID,
-		s.ctx.ChainID,
-		chainID,
-		requestID,
-		errorCode,
-		errorMessage,
-	)
-	go s.router.HandleInbound(ctx, inMsg)
-	return nil
-}
-
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
 	ctx = context.WithoutCancel(ctx)
 
@@ -1295,7 +1223,6 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		s.router.RegisterRequest(
 			ctx,
 			nodeID,
-			s.ctx.ChainID,
 			s.ctx.ChainID,
 			requestID,
 			message.AppResponseOp,

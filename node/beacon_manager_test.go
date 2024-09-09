@@ -11,7 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/snow/networking/router/routermock"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
@@ -36,7 +36,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg := &sync.WaitGroup{}
 
 	ctrl := gomock.NewController(t)
-	mockRouter := router.NewMockRouter(ctrl)
+	mockRouter := routermock.NewRouter(ctrl)
 
 	b := beaconManager{
 		Router:                  mockRouter,
