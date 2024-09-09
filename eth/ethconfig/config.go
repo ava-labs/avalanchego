@@ -171,6 +171,6 @@ type Config struct {
 
 	// SkipTxIndexing skips indexing transactions.
 	// This is useful for validators that don't need to index transactions.
-	// TxLookupLimit can be still used to control unindexing old transactions.
+	// TransactionHistory can be still used to control unindexing old transactions.
 	SkipTxIndexing bool
 }

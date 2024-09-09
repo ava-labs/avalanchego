@@ -1819,7 +1819,7 @@ func setupReceiptBackend(t *testing.T, genBlocks int) (*testBackend, []common.Ha
 		txHashes = make([]common.Hash, genBlocks)
 	)
 
-	backend := newTestBackend(t, genBlocks, genesis, dummy.NewCoinbaseFaker(), func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, dummy.NewFullFaker(), func(i int, b *core.BlockGen) {
 		var (
 			tx  *types.Transaction
 			err error
