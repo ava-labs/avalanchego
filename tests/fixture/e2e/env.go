@@ -10,12 +10,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -31,6 +31,13 @@ func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
 	require.Nil(env, "env already initialized")
 	env = &TestEnvironment{}
 	require.NoError(json.Unmarshal(envBytes, env))
+
+	// Ginkgo parallelization is at the process level, so a given key
+	// can safely be used by all tests in a given process without fear
+	// of conflicting usage.
+	network := env.GetNetwork()
+	env.PreFundedKey = network.PreFundedKeys[ginkgo.GinkgoParallelProcess()]
+	require.NotNil(env.PreFundedKey)
 }
 
 type TestEnvironment struct {
@@ -38,8 +45,8 @@ type TestEnvironment struct {
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
 	URIs []tmpnet.NodeURI
-	// The URI used to access the http server that allocates test data
-	TestDataServerURI string
+	// Pre-funded key for this ginkgo process
+	PreFundedKey *secp256k1.PrivateKey
 	// The duration to wait before shutting down private networks. A
 	// non-zero value may be useful to ensure all metrics can be
 	// scraped before shutdown.
@@ -50,10 +57,13 @@ type TestEnvironment struct {
 
 // Retrieve the test environment configured with the provided test context.
 func GetEnv(tc tests.TestContext) *TestEnvironment {
+	if env == nil {
+		return nil
+	}
 	return &TestEnvironment{
 		NetworkDir:                  env.NetworkDir,
 		URIs:                        env.URIs,
-		TestDataServerURI:           env.TestDataServerURI,
+		PreFundedKey:                env.PreFundedKey,
 		PrivateNetworkShutdownDelay: env.PrivateNetworkShutdownDelay,
 		testContext:                 tc,
 	}
@@ -110,6 +120,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				tc.Outf("No network to stop\n")
 			}
 			os.Exit(0)
+		} else if network != nil && flagVars.RestartNetwork() {
+			// A network is only restarted if it is already running and stop was not requested
+			require.NoError(network.Restart(tc.DefaultContext(), tc.GetWriter()))
 		}
 	}
 
@@ -145,20 +158,20 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 	}
 
+	suiteConfig, _ := ginkgo.GinkgoConfiguration()
+	require.Greater(
+		len(network.PreFundedKeys),
+		suiteConfig.ParallelTotal,
+		"not enough pre-funded keys for the requested number of parallel test processes",
+	)
+
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
 	tc.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
 
-	testDataServerURI, err := fixture.ServeTestData(fixture.TestData{
-		PreFundedKeys: network.PreFundedKeys,
-	})
-	tc.Outf("{{green}}test data server URI: {{/}} %+v\n", testDataServerURI)
-	require.NoError(err)
-
 	return &TestEnvironment{
 		NetworkDir:                  network.Dir,
 		URIs:                        uris,
-		TestDataServerURI:           testDataServerURI,
 		PrivateNetworkShutdownDelay: flagVars.NetworkShutdownDelay(),
 		testContext:                 tc,
 	}
@@ -180,23 +193,9 @@ func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
 	return network
 }
 
-// Retrieve the specified number of funded keys allocated for the caller's exclusive use.
-func (te *TestEnvironment) AllocatePreFundedKeys(count int) []*secp256k1.PrivateKey {
-	keys, err := fixture.AllocatePreFundedKeys(te.TestDataServerURI, count)
-	require.NoError(te.testContext, err)
-	te.testContext.Outf("{{blue}} allocated pre-funded key(s): %+v{{/}}\n", keys)
-	return keys
-}
-
-// Retrieve a funded key allocated for the caller's exclusive use.
-func (te *TestEnvironment) AllocatePreFundedKey() *secp256k1.PrivateKey {
-	return te.AllocatePreFundedKeys(1)[0]
-}
-
-// Create a new keychain with the specified number of test keys.
-func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
-	keys := te.AllocatePreFundedKeys(count)
-	return secp256k1fx.NewKeychain(keys...)
+// Create a new keychain with the process's pre-funded key.
+func (te *TestEnvironment) NewKeychain() *secp256k1fx.Keychain {
+	return secp256k1fx.NewKeychain(te.PreFundedKey)
 }
 
 // Create a new private network that is not shared with other tests.

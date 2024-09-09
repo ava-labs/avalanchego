@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const pollingInterval = 50 * time.Millisecond
@@ -74,8 +73,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		destinationAPINode := destinationValidators[0]
 		tc.Outf(" issuing transactions for destination subnet on %s (%s)\n", destinationAPINode.NodeID, destinationAPINode.URI)
 
-		destinationKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		destinationKey := e2e.NewPrivateKey(tc)
 
 		tc.By("checking that the funded key has sufficient funds for the export")
 		sourceClient := api.NewClient(sourceAPINode.URI, sourceChain.ChainID.String())
@@ -115,8 +113,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		tc.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
 			destinationChain.ChainID, destinationSubnet.SubnetID))
-		recipientKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		recipientKey := e2e.NewPrivateKey(tc)
 		transferTxStatus, err := transfer.Transfer(
 			tc.DefaultContext(),
 			&transfer.Config{

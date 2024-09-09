@@ -8,13 +8,12 @@ import (
 	"io"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 type GinkgoTestContext struct{}
@@ -35,8 +34,12 @@ func (*GinkgoTestContext) GetWriter() io.Writer {
 	return ginkgo.GinkgoWriter
 }
 
-func (*GinkgoTestContext) DeferCleanup(args ...interface{}) {
-	ginkgo.DeferCleanup(args...)
+func (*GinkgoTestContext) Cleanup() {
+	// No-op - ginkgo does this automatically
+}
+
+func (*GinkgoTestContext) DeferCleanup(cleanup func()) {
+	ginkgo.DeferCleanup(cleanup)
 }
 
 func (*GinkgoTestContext) By(text string, callback ...func()) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
@@ -77,7 +78,20 @@ func GetNextStakerChangeTime(state Chain) (time.Time, error) {
 // PickFeeCalculator does not modify [state].
 func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
 	timestamp := state.GetTimestamp()
-	return NewStaticFeeCalculator(cfg, timestamp)
+	if !cfg.UpgradeConfig.IsEtnaActivated(timestamp) {
+		return NewStaticFeeCalculator(cfg, timestamp)
+	}
+
+	feeState := state.GetFeeState()
+	gasPrice := gas.CalculatePrice(
+		cfg.DynamicFeeConfig.MinPrice,
+		feeState.Excess,
+		cfg.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	return fee.NewDynamicCalculator(
+		cfg.DynamicFeeConfig.Weights,
+		gasPrice,
+	)
 }
 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set

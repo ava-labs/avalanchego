@@ -20,21 +20,18 @@ import (
 )
 
 var (
-	errInitialize                 = errors.New("unexpectedly called Initialize")
-	errSetState                   = errors.New("unexpectedly called SetState")
-	errShutdown                   = errors.New("unexpectedly called Shutdown")
-	errCreateHandlers             = errors.New("unexpectedly called CreateHandlers")
-	errHealthCheck                = errors.New("unexpectedly called HealthCheck")
-	errConnected                  = errors.New("unexpectedly called Connected")
-	errDisconnected               = errors.New("unexpectedly called Disconnected")
-	errVersion                    = errors.New("unexpectedly called Version")
-	errAppRequest                 = errors.New("unexpectedly called AppRequest")
-	errAppResponse                = errors.New("unexpectedly called AppResponse")
-	errAppRequestFailed           = errors.New("unexpectedly called AppRequestFailed")
-	errAppGossip                  = errors.New("unexpectedly called AppGossip")
-	errCrossChainAppRequest       = errors.New("unexpectedly called CrossChainAppRequest")
-	errCrossChainAppResponse      = errors.New("unexpectedly called CrossChainAppResponse")
-	errCrossChainAppRequestFailed = errors.New("unexpectedly called CrossChainAppRequestFailed")
+	errInitialize       = errors.New("unexpectedly called Initialize")
+	errSetState         = errors.New("unexpectedly called SetState")
+	errShutdown         = errors.New("unexpectedly called Shutdown")
+	errCreateHandlers   = errors.New("unexpectedly called CreateHandlers")
+	errHealthCheck      = errors.New("unexpectedly called HealthCheck")
+	errConnected        = errors.New("unexpectedly called Connected")
+	errDisconnected     = errors.New("unexpectedly called Disconnected")
+	errVersion          = errors.New("unexpectedly called Version")
+	errAppRequest       = errors.New("unexpectedly called AppRequest")
+	errAppResponse      = errors.New("unexpectedly called AppResponse")
+	errAppRequestFailed = errors.New("unexpectedly called AppRequestFailed")
+	errAppGossip        = errors.New("unexpectedly called AppGossip")
 
 	_ common.VM = (*VM)(nil)
 )
@@ -46,24 +43,20 @@ type VM struct {
 	CantInitialize, CantSetState,
 	CantShutdown, CantCreateHandlers,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
-	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed,
-	CantCrossChainAppRequest, CantCrossChainAppResponse, CantCrossChainAppRequestFailed bool
+	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF                 func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
-	SetStateF                   func(ctx context.Context, state snow.State) error
-	ShutdownF                   func(context.Context) error
-	CreateHandlersF             func(context.Context) (map[string]http.Handler, error)
-	ConnectedF                  func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF               func(ctx context.Context, nodeID ids.NodeID) error
-	HealthCheckF                func(context.Context) (interface{}, error)
-	AppRequestF                 func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
-	AppResponseF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
-	AppGossipF                  func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF           func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
-	VersionF                    func(context.Context) (string, error)
-	CrossChainAppRequestF       func(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, msg []byte) error
-	CrossChainAppResponseF      func(ctx context.Context, chainID ids.ID, requestID uint32, msg []byte) error
-	CrossChainAppRequestFailedF func(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error
+	InitializeF       func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
+	SetStateF         func(ctx context.Context, state snow.State) error
+	ShutdownF         func(context.Context) error
+	CreateHandlersF   func(context.Context) (map[string]http.Handler, error)
+	ConnectedF        func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF     func(ctx context.Context, nodeID ids.NodeID) error
+	HealthCheckF      func(context.Context) (interface{}, error)
+	AppRequestF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF        func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
+	VersionF          func(context.Context) (string, error)
 }
 
 func (vm *VM) Default(cant bool) {
@@ -79,9 +72,6 @@ func (vm *VM) Default(cant bool) {
 	vm.CantVersion = cant
 	vm.CantConnected = cant
 	vm.CantDisconnected = cant
-	vm.CantCrossChainAppRequest = cant
-	vm.CantCrossChainAppRequestFailed = cant
-	vm.CantCrossChainAppResponse = cant
 }
 
 func (vm *VM) Initialize(
@@ -210,45 +200,6 @@ func (vm *VM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) erro
 		require.FailNow(vm.T, errAppGossip.Error())
 	}
 	return errAppGossip
-}
-
-func (vm *VM) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
-	if vm.CrossChainAppRequestF != nil {
-		return vm.CrossChainAppRequestF(ctx, chainID, requestID, deadline, request)
-	}
-	if !vm.CantCrossChainAppRequest {
-		return nil
-	}
-	if vm.T != nil {
-		require.FailNow(vm.T, errCrossChainAppRequest.Error())
-	}
-	return errCrossChainAppRequest
-}
-
-func (vm *VM) CrossChainAppRequestFailed(ctx context.Context, chainID ids.ID, requestID uint32, appErr *common.AppError) error {
-	if vm.CrossChainAppRequestFailedF != nil {
-		return vm.CrossChainAppRequestFailedF(ctx, chainID, requestID, appErr)
-	}
-	if !vm.CantCrossChainAppRequestFailed {
-		return nil
-	}
-	if vm.T != nil {
-		require.FailNow(vm.T, errCrossChainAppRequestFailed.Error())
-	}
-	return errCrossChainAppRequestFailed
-}
-
-func (vm *VM) CrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	if vm.CrossChainAppResponseF != nil {
-		return vm.CrossChainAppResponseF(ctx, chainID, requestID, response)
-	}
-	if !vm.CantCrossChainAppResponse {
-		return nil
-	}
-	if vm.T != nil {
-		require.FailNow(vm.T, errCrossChainAppResponse.Error())
-	}
-	return errCrossChainAppResponse
 }
 
 func (vm *VM) Connected(ctx context.Context, id ids.NodeID, nodeVersion *version.Application) error {

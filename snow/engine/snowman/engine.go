@@ -31,7 +31,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const nonVerifiedCacheSize = 64 * units.MiB
+const (
+	nonVerifiedCacheSize = 64 * units.MiB
+	errInsufficientStake = "insufficient connected stake"
+)
 
 var _ common.Engine = (*Engine)(nil)
 
@@ -871,6 +874,10 @@ func (e *Engine) sendQuery(
 	blkBytes []byte,
 	push bool,
 ) {
+	if e.abortDueToInsufficientConnectedStake(blkID) {
+		return
+	}
+
 	e.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", e.Validators),
 	)
@@ -914,6 +921,21 @@ func (e *Engine) sendQuery(
 	} else {
 		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, nextHeightToAccept)
 	}
+}
+
+func (e *Engine) abortDueToInsufficientConnectedStake(blkID ids.ID) bool {
+	stakeConnectedRatio := e.Config.ConnectedValidators.ConnectedPercent()
+	minConnectedStakeToQuery := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
+
+	if stakeConnectedRatio < minConnectedStakeToQuery {
+		e.Ctx.Log.Debug("dropped query for block",
+			zap.String("reason", errInsufficientStake),
+			zap.Stringer("blkID", blkID),
+			zap.Float64("ratio", stakeConnectedRatio),
+		)
+		return true
+	}
+	return false
 }
 
 // issue [blk] to consensus

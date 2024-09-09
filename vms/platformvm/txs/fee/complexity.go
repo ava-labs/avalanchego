@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -74,8 +74,8 @@ const (
 var (
 	_ txs.Visitor = (*complexityVisitor)(nil)
 
-	IntrinsicAddPermissionlessValidatorTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicAddPermissionlessValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			intrinsicValidatorBandwidth + // validator
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // signer typeID
@@ -83,31 +83,31 @@ var (
 			wrappers.IntLen + // validator rewards typeID
 			wrappers.IntLen + // delegator rewards typeID
 			wrappers.IntLen, // delegation shares
-		fee.DBRead:  1,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
-	IntrinsicAddPermissionlessDelegatorTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicAddPermissionlessDelegatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			intrinsicValidatorBandwidth + // validator
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // num stake outs
 			wrappers.IntLen, // delegator rewards typeID
-		fee.DBRead:  1,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
-	IntrinsicAddSubnetValidatorTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicAddSubnetValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			intrinsicSubnetValidatorBandwidth + // subnetValidator
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		fee.DBRead:  2,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  2,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
-	IntrinsicBaseTxComplexities = fee.Dimensions{
-		fee.Bandwidth: codec.VersionSize + // codecVersion
+	IntrinsicBaseTxComplexities = gas.Dimensions{
+		gas.Bandwidth: codec.VersionSize + // codecVersion
 			wrappers.IntLen + // typeID
 			wrappers.IntLen + // networkID
 			ids.IDLen + // blockchainID
@@ -115,12 +115,12 @@ var (
 			wrappers.IntLen + // number of inputs
 			wrappers.IntLen + // length of memo
 			wrappers.IntLen, // number of credentials
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
-		fee.Compute: 0,
+		gas.DBRead:  0,
+		gas.DBWrite: 0,
+		gas.Compute: 0,
 	}
-	IntrinsicCreateChainTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicCreateChainTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // subnetID
 			wrappers.ShortLen + // chainName length
 			ids.IDLen + // vmID
@@ -128,52 +128,63 @@ var (
 			wrappers.IntLen + // genesis length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		fee.DBRead:  1,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
-	IntrinsicCreateSubnetTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicCreateSubnetTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.IntLen, // owner typeID
-		fee.DBRead:  0,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  0,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
-	IntrinsicExportTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicExportTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // destination chainID
 			wrappers.IntLen, // num exported outputs
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
-		fee.Compute: 0,
+		gas.DBRead:  0,
+		gas.DBWrite: 0,
+		gas.Compute: 0,
 	}
-	IntrinsicImportTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicImportTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // source chainID
 			wrappers.IntLen, // num importing inputs
-		fee.DBRead:  0,
-		fee.DBWrite: 0,
-		fee.Compute: 0,
+		gas.DBRead:  0,
+		gas.DBWrite: 0,
+		gas.Compute: 0,
 	}
-	IntrinsicRemoveSubnetValidatorTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicRemoveSubnetValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.NodeIDLen + // nodeID
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		fee.DBRead:  2,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  2,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
-	IntrinsicTransferSubnetOwnershipTxComplexities = fee.Dimensions{
-		fee.Bandwidth: IntrinsicBaseTxComplexities[fee.Bandwidth] +
+	IntrinsicTransferSubnetOwnershipTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen + // owner typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		fee.DBRead:  1,
-		fee.DBWrite: 1,
-		fee.Compute: 0,
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
+	}
+	IntrinsicConvertSubnetTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // subnetID
+			ids.IDLen + // chainID
+			wrappers.IntLen + // address length
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
 	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
@@ -183,127 +194,141 @@ var (
 	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
-func TxComplexity(tx txs.UnsignedTx) (fee.Dimensions, error) {
-	c := complexityVisitor{}
-	err := tx.Visit(&c)
-	return c.output, err
-}
-
-// OutputComplexity returns the complexity outputs add to a transaction.
-func OutputComplexity(outs ...*avax.TransferableOutput) (fee.Dimensions, error) {
-	var complexity fee.Dimensions
-	for _, out := range outs {
-		outputComplexity, err := outputComplexity(out)
+func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
+	var (
+		c          complexityVisitor
+		complexity gas.Dimensions
+	)
+	for _, tx := range txs {
+		c = complexityVisitor{}
+		err := tx.Visit(&c)
 		if err != nil {
-			return fee.Dimensions{}, err
+			return gas.Dimensions{}, err
 		}
 
-		complexity, err = complexity.Add(&outputComplexity)
+		complexity, err = complexity.Add(&c.output)
 		if err != nil {
-			return fee.Dimensions{}, err
+			return gas.Dimensions{}, err
 		}
 	}
 	return complexity, nil
 }
 
-func outputComplexity(out *avax.TransferableOutput) (fee.Dimensions, error) {
-	complexity := fee.Dimensions{
-		fee.Bandwidth: intrinsicOutputBandwidth + intrinsicSECP256k1FxOutputBandwidth,
-		fee.DBRead:    0,
-		fee.DBWrite:   intrinsicOutputDBWrite,
-		fee.Compute:   0,
+// OutputComplexity returns the complexity outputs add to a transaction.
+func OutputComplexity(outs ...*avax.TransferableOutput) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
+	for _, out := range outs {
+		outputComplexity, err := outputComplexity(out)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&outputComplexity)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func outputComplexity(out *avax.TransferableOutput) (gas.Dimensions, error) {
+	complexity := gas.Dimensions{
+		gas.Bandwidth: intrinsicOutputBandwidth + intrinsicSECP256k1FxOutputBandwidth,
+		gas.DBRead:    0,
+		gas.DBWrite:   intrinsicOutputDBWrite,
+		gas.Compute:   0,
 	}
 
 	outIntf := out.Out
 	if stakeableOut, ok := outIntf.(*stakeable.LockOut); ok {
-		complexity[fee.Bandwidth] += intrinsicStakeableLockedOutputBandwidth
+		complexity[gas.Bandwidth] += intrinsicStakeableLockedOutputBandwidth
 		outIntf = stakeableOut.TransferableOut
 	}
 
 	secp256k1Out, ok := outIntf.(*secp256k1fx.TransferOutput)
 	if !ok {
-		return fee.Dimensions{}, errUnsupportedOutput
+		return gas.Dimensions{}, errUnsupportedOutput
 	}
 
 	numAddresses := uint64(len(secp256k1Out.Addrs))
 	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
-	complexity[fee.Bandwidth], err = math.Add(complexity[fee.Bandwidth], addressBandwidth)
+	complexity[gas.Bandwidth], err = math.Add(complexity[gas.Bandwidth], addressBandwidth)
 	return complexity, err
 }
 
 // InputComplexity returns the complexity inputs add to a transaction.
 // It includes the complexity that the corresponding credentials will add.
-func InputComplexity(ins ...*avax.TransferableInput) (fee.Dimensions, error) {
-	var complexity fee.Dimensions
+func InputComplexity(ins ...*avax.TransferableInput) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
 	for _, in := range ins {
 		inputComplexity, err := inputComplexity(in)
 		if err != nil {
-			return fee.Dimensions{}, err
+			return gas.Dimensions{}, err
 		}
 
 		complexity, err = complexity.Add(&inputComplexity)
 		if err != nil {
-			return fee.Dimensions{}, err
+			return gas.Dimensions{}, err
 		}
 	}
 	return complexity, nil
 }
 
-func inputComplexity(in *avax.TransferableInput) (fee.Dimensions, error) {
-	complexity := fee.Dimensions{
-		fee.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
-		fee.DBRead:    intrinsicInputDBRead,
-		fee.DBWrite:   intrinsicInputDBWrite,
-		fee.Compute:   0, // TODO: Add compute complexity
+func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
+	complexity := gas.Dimensions{
+		gas.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
+		gas.DBRead:    intrinsicInputDBRead,
+		gas.DBWrite:   intrinsicInputDBWrite,
+		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
 	inIntf := in.In
 	if stakeableIn, ok := inIntf.(*stakeable.LockIn); ok {
-		complexity[fee.Bandwidth] += intrinsicStakeableLockedInputBandwidth
+		complexity[gas.Bandwidth] += intrinsicStakeableLockedInputBandwidth
 		inIntf = stakeableIn.TransferableIn
 	}
 
 	secp256k1In, ok := inIntf.(*secp256k1fx.TransferInput)
 	if !ok {
-		return fee.Dimensions{}, errUnsupportedInput
+		return gas.Dimensions{}, errUnsupportedInput
 	}
 
 	numSignatures := uint64(len(secp256k1In.SigIndices))
 	signatureBandwidth, err := math.Mul(numSignatures, intrinsicSECP256k1FxSignatureBandwidth)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
-	complexity[fee.Bandwidth], err = math.Add(complexity[fee.Bandwidth], signatureBandwidth)
+	complexity[gas.Bandwidth], err = math.Add(complexity[gas.Bandwidth], signatureBandwidth)
 	return complexity, err
 }
 
 // OwnerComplexity returns the complexity an owner adds to a transaction.
 // It does not include the typeID of the owner.
-func OwnerComplexity(ownerIntf fx.Owner) (fee.Dimensions, error) {
+func OwnerComplexity(ownerIntf fx.Owner) (gas.Dimensions, error) {
 	owner, ok := ownerIntf.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return fee.Dimensions{}, errUnsupportedOwner
+		return gas.Dimensions{}, errUnsupportedOwner
 	}
 
 	numAddresses := uint64(len(owner.Addrs))
 	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
 
 	bandwidth, err := math.Add(addressBandwidth, intrinsicSECP256k1FxOutputOwnersBandwidth)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
 
-	return fee.Dimensions{
-		fee.Bandwidth: bandwidth,
-		fee.DBRead:    0,
-		fee.DBWrite:   0,
-		fee.Compute:   0,
+	return gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+		gas.DBRead:    0,
+		gas.DBWrite:   0,
+		gas.Compute:   0,
 	}, nil
 }
 
@@ -311,51 +336,51 @@ func OwnerComplexity(ownerIntf fx.Owner) (fee.Dimensions, error) {
 // It does not include the typeID of the authorization.
 // It does includes the complexity that the corresponding credential will add.
 // It does not include the typeID of the credential.
-func AuthComplexity(authIntf verify.Verifiable) (fee.Dimensions, error) {
+func AuthComplexity(authIntf verify.Verifiable) (gas.Dimensions, error) {
 	auth, ok := authIntf.(*secp256k1fx.Input)
 	if !ok {
-		return fee.Dimensions{}, errUnsupportedAuth
+		return gas.Dimensions{}, errUnsupportedAuth
 	}
 
 	numSignatures := uint64(len(auth.SigIndices))
 	signatureBandwidth, err := math.Mul(numSignatures, intrinsicSECP256k1FxSignatureBandwidth)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
 
 	bandwidth, err := math.Add(signatureBandwidth, intrinsicSECP256k1FxInputBandwidth)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
 
-	return fee.Dimensions{
-		fee.Bandwidth: bandwidth,
-		fee.DBRead:    0,
-		fee.DBWrite:   0,
-		fee.Compute:   0, // TODO: Add compute complexity
+	return gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+		gas.DBRead:    0,
+		gas.DBWrite:   0,
+		gas.Compute:   0, // TODO: Add compute complexity
 	}, nil
 }
 
 // SignerComplexity returns the complexity a signer adds to a transaction.
 // It does not include the typeID of the signer.
-func SignerComplexity(s signer.Signer) (fee.Dimensions, error) {
+func SignerComplexity(s signer.Signer) (gas.Dimensions, error) {
 	switch s.(type) {
 	case *signer.Empty:
-		return fee.Dimensions{}, nil
+		return gas.Dimensions{}, nil
 	case *signer.ProofOfPossession:
-		return fee.Dimensions{
-			fee.Bandwidth: intrinsicPoPBandwidth,
-			fee.DBRead:    0,
-			fee.DBWrite:   0,
-			fee.Compute:   0, // TODO: Add compute complexity
+		return gas.Dimensions{
+			gas.Bandwidth: intrinsicPoPBandwidth,
+			gas.DBRead:    0,
+			gas.DBWrite:   0,
+			gas.Compute:   0, // TODO: Add compute complexity
 		}, nil
 	default:
-		return fee.Dimensions{}, errUnsupportedSigner
+		return gas.Dimensions{}, errUnsupportedSigner
 	}
 }
 
 type complexityVisitor struct {
-	output fee.Dimensions
+	output gas.Dimensions
 }
 
 func (*complexityVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
@@ -470,11 +495,11 @@ func (c *complexityVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err != nil {
 		return err
 	}
-	dynamicComplexity := fee.Dimensions{
-		fee.Bandwidth: bandwidth,
-		fee.DBRead:    0,
-		fee.DBWrite:   0,
-		fee.Compute:   0,
+	dynamicComplexity := gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+		gas.DBRead:    0,
+		gas.DBWrite:   0,
+		gas.Compute:   0,
 	}
 
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
@@ -580,21 +605,40 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 	return err
 }
 
-func baseTxComplexity(tx *txs.BaseTx) (fee.Dimensions, error) {
+func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(tx.Address)),
+		},
+	)
+	return err
+}
+
+func baseTxComplexity(tx *txs.BaseTx) (gas.Dimensions, error) {
 	outputsComplexity, err := OutputComplexity(tx.Outs...)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
 	inputsComplexity, err := InputComplexity(tx.Ins...)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
 	complexity, err := outputsComplexity.Add(&inputsComplexity)
 	if err != nil {
-		return fee.Dimensions{}, err
+		return gas.Dimensions{}, err
 	}
-	complexity[fee.Bandwidth], err = math.Add(
-		complexity[fee.Bandwidth],
+	complexity[gas.Bandwidth], err = math.Add(
+		complexity[gas.Bandwidth],
 		uint64(len(tx.Memo)),
 	)
 	return complexity, err

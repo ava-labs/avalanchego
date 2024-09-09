@@ -11,32 +11,34 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+type nilStateGetter struct{}
+
+func (nilStateGetter) GetState(ids.ID) (Chain, bool) {
+	return nil, false
+}
+
 func TestDiffMissingState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-
-	versions := NewMockVersions(ctrl)
-
 	parentID := ids.GenerateTestID()
-	versions.EXPECT().GetState(parentID).Times(1).Return(nil, false)
-
-	_, err := NewDiff(parentID, versions)
+	_, err := NewDiff(parentID, nilStateGetter{})
 	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
 func TestNewDiffOn(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -47,13 +49,13 @@ func TestNewDiffOn(t *testing.T) {
 func TestDiffFeeState(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	initialFeeState := state.GetFeeState()
-	newFeeState := fee.State{
+	newFeeState := gas.State{
 		Capacity: initialFeeState.Capacity + 1,
 		Excess:   initialFeeState.Excess + 1,
 	}
@@ -68,7 +70,7 @@ func TestDiffFeeState(t *testing.T) {
 func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -93,13 +95,12 @@ func TestDiffCurrentSupply(t *testing.T) {
 
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
 
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -110,7 +111,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
 	}
-	d.PutCurrentValidator(currentValidator)
+	require.NoError(d.PutCurrentValidator(currentValidator))
 
 	// Assert that we get the current validator back
 	gotCurrentValidator, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
@@ -133,7 +134,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -144,7 +145,7 @@ func TestDiffPendingValidator(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
 	}
-	d.PutPendingValidator(pendingValidator)
+	require.NoError(d.PutPendingValidator(pendingValidator))
 
 	// Assert that we get the pending validator back
 	gotPendingValidator, err := d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
@@ -173,7 +174,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -183,7 +184,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 	// Assert that we get the current delegator back
 	// Mock iterator for [state] returns no delegators.
-	stateCurrentDelegatorIter := NewMockStakerIterator(ctrl)
+	stateCurrentDelegatorIter := iteratormock.NewIterator[*Staker](ctrl)
 	stateCurrentDelegatorIter.EXPECT().Next().Return(false).Times(2)
 	stateCurrentDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetCurrentDelegatorIterator(
@@ -219,7 +220,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -229,7 +230,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 
 	// Assert that we get the pending delegator back
 	// Mock iterator for [state] returns no delegators.
-	statePendingDelegatorIter := NewMockStakerIterator(ctrl)
+	statePendingDelegatorIter := iteratormock.NewIterator[*Staker](ctrl)
 	statePendingDelegatorIter.EXPECT().Next().Return(false).Times(2)
 	statePendingDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetPendingDelegatorIterator(
@@ -256,12 +257,12 @@ func TestDiffSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	// Initialize parent with one subnet
 	parentStateCreateSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
+			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
 	state.AddSubnet(parentStateCreateSubnetTx.ID())
@@ -282,7 +283,7 @@ func TestDiffSubnet(t *testing.T) {
 	// Put a subnet
 	createSubnetTx := &txs.Tx{
 		Unsigned: &txs.CreateSubnetTx{
-			Owner: fx.NewMockOwner(ctrl),
+			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
 	diff.AddSubnet(createSubnetTx.ID())
@@ -305,7 +306,7 @@ func TestDiffSubnet(t *testing.T) {
 func TestDiffChain(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 	subnetID := ids.GenerateTestID()
 
 	// Initialize parent with one chain
@@ -359,7 +360,7 @@ func TestDiffTx(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -402,7 +403,7 @@ func TestDiffTx(t *testing.T) {
 func TestDiffRewardUTXO(t *testing.T) {
 	require := require.New(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	// Initialize parent with one reward UTXO
 	var (
@@ -456,7 +457,7 @@ func TestDiffUTXO(t *testing.T) {
 	state := NewMockState(ctrl)
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	state.EXPECT().GetFeeState().Return(fee.State{}).Times(1)
+	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -531,11 +532,11 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{
@@ -586,16 +587,9 @@ func TestDiffSubnetOwner(t *testing.T) {
 }
 
 func TestDiffSubnetManager(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	state := newInitializedState(require)
-
-	states := NewMockVersions(ctrl)
-	lastAcceptedID := ids.GenerateTestID()
-	states.EXPECT().GetState(lastAcceptedID).Return(state, true).AnyTimes()
-
 	var (
+		require    = require.New(t)
+		state      = newTestState(t, memdb.New())
 		newManager = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
 		subnetID   = ids.GenerateTestID()
 	)
@@ -605,7 +599,7 @@ func TestDiffSubnetManager(t *testing.T) {
 	require.Equal(ids.Empty, chainID)
 	require.Nil(addr)
 
-	d, err := NewDiff(lastAcceptedID, states)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	chainID, addr, err = d.GetSubnetManager(subnetID)
@@ -638,12 +632,12 @@ func TestDiffStacking(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := newInitializedState(require)
+	state := newTestState(t, memdb.New())
 
 	var (
-		owner1 = fx.NewMockOwner(ctrl)
-		owner2 = fx.NewMockOwner(ctrl)
-		owner3 = fx.NewMockOwner(ctrl)
+		owner1 = fxmock.NewOwner(ctrl)
+		owner2 = fxmock.NewOwner(ctrl)
+		owner3 = fxmock.NewOwner(ctrl)
 
 		createSubnetTx = &txs.Tx{
 			Unsigned: &txs.CreateSubnetTx{

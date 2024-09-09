@@ -4,72 +4,60 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(t, banff)
+	env := newEnvironment(t, upgradetest.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	type test struct {
+	tests := []struct {
 		description        string
 		destinationChainID ids.ID
-		sourceKeys         []*secp256k1.PrivateKey
 		timestamp          time.Time
-	}
-
-	sourceKey := preFundedKeys[0]
-
-	tests := []test{
+	}{
 		{
 			description:        "P->X export",
 			destinationChainID: env.ctx.XChainID,
-			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
-			timestamp:          defaultValidateStartTime,
+			timestamp:          genesistest.DefaultValidatorStartTime,
 		},
 		{
 			description:        "P->C export",
 			destinationChainID: env.ctx.CChainID,
-			sourceKeys:         []*secp256k1.PrivateKey{sourceKey},
 			timestamp:          env.config.UpgradeConfig.ApricotPhase5Time,
 		},
 	}
 
-	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
 
-			builder, signer := env.factory.NewWallet(tt.sourceKeys...)
-			utx, err := builder.NewExportTx(
+			wallet := newWallet(t, env, walletConfig{})
+
+			tx, err := wallet.IssueExportTx(
 				tt.destinationChainID,
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: defaultBalance - defaultTxFee,
+						Amt: genesistest.DefaultInitialBalance - defaultTxFee,
 						OutputOwners: secp256k1fx.OutputOwners{
-							Locktime:  0,
 							Threshold: 1,
-							Addrs:     []ids.ShortID{to},
+							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 						},
 					},
 				}},
 			)
-			require.NoError(err)
-			tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)

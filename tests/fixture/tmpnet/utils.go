@@ -6,7 +6,6 @@ package tmpnet
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -18,8 +17,6 @@ const (
 	DefaultNodeTickerInterval = 50 * time.Millisecond
 )
 
-var ErrNotRunning = errors.New("not running")
-
 // WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
 func WaitForHealthy(ctx context.Context, node *Node) error {
 	if _, ok := ctx.Deadline(); !ok {
@@ -30,7 +27,7 @@ func WaitForHealthy(ctx context.Context, node *Node) error {
 
 	for {
 		healthy, err := node.IsHealthy(ctx)
-		if err != nil && !errors.Is(err, ErrNotRunning) {
+		if err != nil {
 			return fmt.Errorf("failed to wait for health of node %q: %w", node.NodeID, err)
 		}
 		if healthy {
