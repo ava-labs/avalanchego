@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -105,7 +105,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			sender := common.NewMockSender(ctrl)
+			sender := commonmock.NewSender(ctrl)
 			var proof *merkledb.RangeProof
 			sender.EXPECT().SendAppResponse(
 				gomock.Any(), // ctx
@@ -299,7 +299,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			// Store proof returned by server in [proofResult]
 			var proofResult *pb.SyncGetChangeProofResponse
 			var proofBytes []byte
-			sender := common.NewMockSender(ctrl)
+			sender := commonmock.NewSender(ctrl)
 			sender.EXPECT().SendAppResponse(
 				gomock.Any(), // ctx
 				gomock.Any(), // nodeID
@@ -386,7 +386,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 				},
 			},
 			handlerFunc: func(ctrl *gomock.Controller) *NetworkServer {
-				sender := common.NewMockSender(ctrl)
+				sender := commonmock.NewSender(ctrl)
 				sender.EXPECT().SendAppResponse(
 					gomock.Any(),
 					gomock.Any(),
@@ -422,7 +422,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 				},
 			},
 			handlerFunc: func(ctrl *gomock.Controller) *NetworkServer {
-				sender := common.NewMockSender(ctrl)
+				sender := commonmock.NewSender(ctrl)
 				sender.EXPECT().SendAppResponse(
 					gomock.Any(),
 					gomock.Any(),

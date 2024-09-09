@@ -9,8 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -18,6 +17,7 @@ import (
 
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	psigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+	pwallet "github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	xsigner "github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 )
@@ -26,18 +26,18 @@ var _ Wallet = (*wallet)(nil)
 
 // Wallet provides chain wallets for the primary network.
 type Wallet interface {
-	P() p.Wallet
+	P() pwallet.Wallet
 	X() x.Wallet
 	C() c.Wallet
 }
 
 type wallet struct {
-	p p.Wallet
+	p pwallet.Wallet
 	x x.Wallet
 	c c.Wallet
 }
 
-func (w *wallet) P() p.Wallet {
+func (w *wallet) P() pwallet.Wallet {
 	return w.p
 }
 
@@ -50,7 +50,7 @@ func (w *wallet) C() c.Wallet {
 }
 
 // Creates a new default wallet
-func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
+func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) Wallet {
 	return &wallet{
 		p: p,
 		x: x,
@@ -61,7 +61,7 @@ func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
 // Creates a Wallet with the given set of options
 func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	return NewWallet(
-		p.NewWalletWithOptions(w.P(), options...),
+		pwallet.WithOptions(w.P(), options...),
 		x.NewWalletWithOptions(w.X(), options...),
 		c.NewWalletWithOptions(w.C(), options...),
 	)
@@ -73,12 +73,9 @@ type WalletConfig struct {
 	// Keys to use for signing all transactions.
 	AVAXKeychain keychain.Keychain // required
 	EthKeychain  c.EthKeychain     // required
-	// Set of P-chain transactions that the wallet should know about to be able
-	// to generate transactions.
-	PChainTxs map[ids.ID]*txs.Tx // optional
-	// Set of P-chain transactions that the wallet should fetch to be able to
+	// Subnet IDs that the wallet should know about to be able to
 	// generate transactions.
-	PChainTxsToFetch set.Set[ids.ID] // optional
+	SubnetIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -104,25 +101,13 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		return nil, err
 	}
 
-	pChainTxs := config.PChainTxs
-	if pChainTxs == nil {
-		pChainTxs = make(map[ids.ID]*txs.Tx)
+	subnetOwners, err := platformvm.GetSubnetOwners(avaxState.PClient, ctx, config.SubnetIDs...)
+	if err != nil {
+		return nil, err
 	}
-
-	for txID := range config.PChainTxsToFetch {
-		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
-		if err != nil {
-			return nil, err
-		}
-		tx, err := txs.Parse(txs.Codec, txBytes)
-		if err != nil {
-			return nil, err
-		}
-		pChainTxs[txID] = tx
-	}
-
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
+	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)
 
@@ -139,7 +124,7 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
 
 	return NewWallet(
-		p.NewWallet(pBuilder, pSigner, avaxState.PClient, pBackend),
+		pwallet.New(pClient, pBuilder, pSigner),
 		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
 		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
 	), nil

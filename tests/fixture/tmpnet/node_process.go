@@ -26,12 +26,16 @@ import (
 )
 
 const (
-	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
+	AvalancheGoPathEnvName      = "AVALANCHEGO_PATH"
+	AvalancheGoPluginDirEnvName = "AVALANCHEGO_PLUGIN_DIR"
 
 	defaultNodeInitTimeout = 10 * time.Second
 )
 
-var errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
+var (
+	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
+	errNotRunning         = errors.New("node is not running")
+)
 
 func checkNodeHealth(ctx context.Context, uri string) (bool, error) {
 	// Check that the node is reporting healthy
@@ -73,14 +77,12 @@ func (p *NodeProcess) setProcessContext(processContext node.NodeProcessContext) 
 
 func (p *NodeProcess) readState() error {
 	path := p.getProcessContextPath()
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+	bytes, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
 		p.setProcessContext(node.NodeProcessContext{})
 		return nil
-	}
-
-	bytes, err := os.ReadFile(path)
-	if err != nil {
+	} else if err != nil {
 		return fmt.Errorf("failed to read node process context: %w", err)
 	}
 	processContext := node.NodeProcessContext{}
@@ -194,7 +196,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, ErrNotRunning
+		return false, errNotRunning
 	}
 
 	return checkNodeHealth(ctx, p.node.URI)

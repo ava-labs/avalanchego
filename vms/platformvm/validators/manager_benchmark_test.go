@@ -14,22 +14,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -56,78 +52,11 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(db.Close())
 	}()
 
-	avaxAssetID := ids.GenerateTestID()
-	genesisTime := time.Now().Truncate(time.Second)
-	genesisEndTime := genesisTime.Add(28 * 24 * time.Hour)
-
-	addr, err := address.FormatBech32(constants.UnitTestHRP, ids.GenerateTestShortID().Bytes())
-	require.NoError(err)
-
-	genesisValidators := []api.GenesisPermissionlessValidator{{
-		GenesisValidator: api.GenesisValidator{
-			StartTime: json.Uint64(genesisTime.Unix()),
-			EndTime:   json.Uint64(genesisEndTime.Unix()),
-			NodeID:    ids.GenerateTestNodeID(),
-		},
-		RewardOwner: &api.Owner{
-			Threshold: 1,
-			Addresses: []string{addr},
-		},
-		Staked: []api.UTXO{{
-			Amount:  json.Uint64(2 * units.KiloAvax),
-			Address: addr,
-		}},
-		DelegationFee: reward.PercentDenominator,
-	}}
-
-	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
-		AvaxAssetID:   avaxAssetID,
-		UTXOs:         nil,
-		Validators:    genesisValidators,
-		Chains:        nil,
-		Time:          json.Uint64(genesisTime.Unix()),
-		InitialSupply: json.Uint64(360 * units.MegaAvax),
-		Encoding:      formatting.Hex,
-	}
-
-	buildGenesisResponse := api.BuildGenesisReply{}
-	platformvmSS := api.StaticService{}
-	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
-
-	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	require.NoError(err)
-
 	vdrs := validators.NewManager()
-
-	execConfig, err := config.GetExecutionConfig(nil)
-	require.NoError(err)
-
-	metrics, err := metrics.New(prometheus.NewRegistry())
-	require.NoError(err)
-
-	s, err := state.New(
-		db,
-		genesisBytes,
-		prometheus.NewRegistry(),
-		&config.Config{
-			Validators: vdrs,
-		},
-		execConfig,
-		&snow.Context{
-			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
-			Log:       logging.NoLog{},
-		},
-		metrics,
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
-	)
-	require.NoError(err)
+	s := statetest.New(b, statetest.Config{
+		DB:         db,
+		Validators: vdrs,
+	})
 
 	m := NewManager(
 		logging.NoLog{},
@@ -135,7 +64,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 			Validators: vdrs,
 		},
 		s,
-		metrics,
+		metrics.Noop,
 		new(mockable.Clock),
 	)
 
@@ -145,18 +74,18 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	)
 	for i := 0; i < 50; i++ {
 		currentHeight++
-		nodeID, err := addPrimaryValidator(s, genesisTime, genesisEndTime, currentHeight)
+		nodeID, err := addPrimaryValidator(s, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, currentHeight)
 		require.NoError(err)
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 	subnetID := ids.GenerateTestID()
 	for _, nodeID := range nodeIDs {
 		currentHeight++
-		require.NoError(addSubnetValidator(s, subnetID, genesisTime, genesisEndTime, nodeID, currentHeight))
+		require.NoError(addSubnetValidator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeID, currentHeight))
 	}
 	for i := 0; i < 9900; i++ {
 		currentHeight++
-		require.NoError(addSubnetDelegator(s, subnetID, genesisTime, genesisEndTime, nodeIDs, currentHeight))
+		require.NoError(addSubnetDelegator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeIDs, currentHeight))
 	}
 
 	ctx := context.Background()
@@ -186,7 +115,7 @@ func addPrimaryValidator(
 	}
 
 	nodeID := ids.GenerateTestNodeID()
-	s.PutCurrentValidator(&state.Staker{
+	if err := s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		PublicKey:       bls.PublicFromSecretKey(sk),
@@ -197,7 +126,9 @@ func addPrimaryValidator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
-	})
+	}); err != nil {
+		return ids.EmptyNodeID, err
+	}
 
 	blk, err := block.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
@@ -217,7 +148,7 @@ func addSubnetValidator(
 	nodeID ids.NodeID,
 	height uint64,
 ) error {
-	s.PutCurrentValidator(&state.Staker{
+	if err := s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		SubnetID:        subnetID,
@@ -227,7 +158,9 @@ func addSubnetValidator(
 		PotentialReward: 0,
 		NextTime:        endTime,
 		Priority:        txs.SubnetPermissionlessValidatorCurrentPriority,
-	})
+	}); err != nil {
+		return err
+	}
 
 	blk, err := block.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {

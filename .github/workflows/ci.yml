@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-focal-deps
         if: matrix.os == 'custom-arm64-focal'
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-2022'
@@ -165,6 +165,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - uses: bufbuild/buf-setup-action@v1.31.0
+        with:
+          github_token: ${{ github.token }}
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash
@@ -206,6 +208,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Check that the avalanchego workload is sane
+        shell: bash
+        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=60s
       - name: Check image build for avalanchego test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
@@ -216,6 +225,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Build xsvm binary
+        shell: bash
+        run: ./scripts/build_xsvm.sh
+      - name: Check that the xsvm workload is sane
+        shell: bash
+        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=60s
       - name: Check image build for xsvm test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh

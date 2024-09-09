@@ -7,56 +7,56 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var _ = e2e.DescribePChain("[Validator Sets]", func() {
-	tc := e2e.NewTestContext()
-	require := require.New(tc)
+	var (
+		tc      = e2e.NewTestContext()
+		require = require.New(tc)
+	)
 
 	ginkgo.It("should be identical for every height for all nodes in the network", func() {
-		env := e2e.GetEnv(tc)
-
-		network := env.GetNetwork()
+		var (
+			env     = e2e.GetEnv(tc)
+			network = env.GetNetwork()
+		)
 
 		tc.By("creating wallet with a funded key to source delegated funds from")
-		keychain := env.NewKeychain(1)
-		nodeURI := env.GetRandomNodeURI()
-		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
-		pWallet := baseWallet.P()
-
-		pBuilder := pWallet.Builder()
-		pContext := pBuilder.Context()
+		var (
+			keychain    = env.NewKeychain()
+			nodeURI     = env.GetRandomNodeURI()
+			baseWallet  = e2e.NewWallet(tc, keychain, nodeURI)
+			pWallet     = baseWallet.P()
+			pBuilder    = pWallet.Builder()
+			pContext    = pBuilder.Context()
+			avaxAssetID = pContext.AVAXAssetID
+		)
 
 		const delegatorCount = 15
 		tc.By(fmt.Sprintf("adding %d delegators", delegatorCount), func() {
-			rewardKey, err := secp256k1.NewPrivateKey()
-			require.NoError(err)
-			avaxAssetID := pContext.AVAXAssetID
-			startTime := time.Now().Add(tmpnet.DefaultValidatorStartTimeDiff)
-			endTime := startTime.Add(time.Second * 360)
-			// This is the default flag value for MinDelegatorStake.
-			weight := genesis.LocalParams.StakingConfig.MinDelegatorStake
+			var (
+				rewardKey = e2e.NewPrivateKey(tc)
+				endTime   = time.Now().Add(time.Second * 360)
+				// This is the default flag value for MinDelegatorStake.
+				weight = genesis.LocalParams.StakingConfig.MinDelegatorStake
+			)
 
 			for i := 0; i < delegatorCount; i++ {
-				_, err = pWallet.IssueAddPermissionlessDelegatorTx(
+				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
 							NodeID: nodeURI.NodeID,
-							Start:  uint64(startTime.Unix()),
 							End:    uint64(endTime.Unix()),
 							Wght:   weight,
 						},
