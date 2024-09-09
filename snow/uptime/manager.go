@@ -27,6 +27,7 @@ type Manager interface {
 type Tracker interface {
 	StartTracking(nodeIDs []ids.NodeID) error
 	StopTracking(nodeIDs []ids.NodeID) error
+	StartedTracking() bool
 
 	Connect(nodeID ids.NodeID) error
 	IsConnected(nodeID ids.NodeID) bool
@@ -120,6 +121,10 @@ func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
 		}
 	}
 	return nil
+}
+
+func (m *manager) StartedTracking() bool {
+	return m.startedTracking
 }
 
 func (m *manager) Connect(nodeID ids.NodeID) error {
