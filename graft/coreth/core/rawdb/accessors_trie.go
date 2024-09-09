@@ -303,7 +303,7 @@ func ReadStateScheme(db ethdb.Reader) string {
 		return PathScheme
 	}
 	// The root node might be deleted during the initial snap sync, check
-	// the persistentstent state id then.
+	// the persistent state id then.
 	if id := ReadPersistentStateID(db); id != 0 {
 		return PathScheme
 	}

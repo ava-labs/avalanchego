@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +34,7 @@ func TestPrecompiledContractSpendsGas(t *testing.T) {
 
 // CanTransfer checks whether there are enough funds in the address' account to make a transfer.
 // This does not take the necessary gas in to account to make the transfer valid.
-func CanTransfer(db StateDB, addr common.Address, amount *big.Int) bool {
+func CanTransfer(db StateDB, addr common.Address, amount *uint256.Int) bool {
 	return db.GetBalance(addr).Cmp(amount) >= 0
 }
 
@@ -43,7 +44,7 @@ func CanTransferMC(db StateDB, addr common.Address, to common.Address, coinID co
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db
-func Transfer(db StateDB, sender, recipient common.Address, amount *big.Int) {
+func Transfer(db StateDB, sender, recipient common.Address, amount *uint256.Int) {
 	db.SubBalance(sender, amount)
 	db.AddBalance(recipient, amount)
 }
@@ -85,7 +86,7 @@ func TestStatefulPrecompile(t *testing.T) {
 		from                 common.Address
 		precompileAddr       common.Address
 		input                []byte
-		value                *big.Int
+		value                *uint256.Int
 		gasInput             uint64
 		expectedGasRemaining uint64
 		expectedErr          error
@@ -98,9 +99,11 @@ func TestStatefulPrecompile(t *testing.T) {
 	userAddr2 := common.BytesToAddress([]byte("user2"))
 	assetID := common.BytesToHash([]byte("ScoobyCoin"))
 	zeroBytes := make([]byte, 32)
-	bigHundred := big.NewInt(100)
-	oneHundredBytes := make([]byte, 32)
 	big0.FillBytes(zeroBytes)
+	big0 := uint256.NewInt(0)
+	bigHundred := big.NewInt(100)
+	u256Hundred := uint256.NewInt(100)
+	oneHundredBytes := make([]byte, 32)
 	bigFifty := big.NewInt(50)
 	fiftyBytes := make([]byte, 32)
 	bigFifty.FillBytes(fiftyBytes)
@@ -116,7 +119,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				// Create account
 				statedb.CreateAccount(userAddr1)
 				// Set balance to pay for gas fee
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				// Set MultiCoin balance
 				statedb.Finalise(true)
 				return statedb
@@ -140,7 +143,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				// Create account
 				statedb.CreateAccount(userAddr1)
 				// Set balance to pay for gas fee
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance and set it back to 0
 				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.SubBalanceMultiCoin(userAddr1, assetID, bigHundred)
@@ -166,7 +169,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				// Create account
 				statedb.CreateAccount(userAddr1)
 				// Set balance to pay for gas fee
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance to 100
 				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
@@ -229,7 +232,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
-			value:                bigHundred,
+			value:                u256Hundred,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: params.AssetBalanceApricot,
 			expectedErr:          vmerrs.ErrInsufficientBalance,
@@ -242,7 +245,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
@@ -263,7 +266,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				user2AssetBalance := stateDB.GetBalanceMultiCoin(userAddr2, assetID)
 
 				expectedBalance := big.NewInt(50)
-				assert.Equal(t, bigHundred, user1Balance, "user 1 balance")
+				assert.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				assert.Equal(t, big0, user2Balance, "user 2 balance")
 				assert.Equal(t, expectedBalance, user1AssetBalance, "user 1 asset balance")
 				assert.Equal(t, expectedBalance, user2AssetBalance, "user 2 asset balance")
@@ -275,7 +278,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
@@ -283,7 +286,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big.NewInt(49),
+			value:                uint256.NewInt(49),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
@@ -297,9 +300,9 @@ func TestStatefulPrecompile(t *testing.T) {
 				user2AssetBalance := stateDB.GetBalanceMultiCoin(userAddr2, assetID)
 				expectedBalance := big.NewInt(50)
 
-				assert.Equal(t, big.NewInt(51), user1Balance, "user 1 balance")
+				assert.Equal(t, uint256.NewInt(51), user1Balance, "user 1 balance")
 				assert.Equal(t, big0, user2Balance, "user 2 balance")
-				assert.Equal(t, big.NewInt(49), nativeAssetCallAddrBalance, "native asset call addr balance")
+				assert.Equal(t, uint256.NewInt(49), nativeAssetCallAddrBalance, "native asset call addr balance")
 				assert.Equal(t, expectedBalance, user1AssetBalance, "user 1 asset balance")
 				assert.Equal(t, expectedBalance, user2AssetBalance, "user 2 asset balance")
 			},
@@ -310,7 +313,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
 				statedb.Finalise(true)
 				return statedb
@@ -318,7 +321,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(51), nil),
-			value:                big.NewInt(50),
+			value:                uint256.NewInt(50),
 			gasInput:             params.AssetCallApricot,
 			expectedGasRemaining: 0,
 			expectedErr:          vmerrs.ErrInsufficientBalance,
@@ -342,7 +345,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, big.NewInt(50))
+				statedb.SetBalance(userAddr1, uint256.NewInt(50))
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
 				statedb.Finalise(true)
 				return statedb
@@ -350,7 +353,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big.NewInt(51),
+			value:                uint256.NewInt(51),
 			gasInput:             params.AssetCallApricot,
 			expectedGasRemaining: params.AssetCallApricot,
 			expectedErr:          vmerrs.ErrInsufficientBalance,
@@ -374,7 +377,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
@@ -382,7 +385,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big.NewInt(50),
+			value:                uint256.NewInt(50),
 			gasInput:             params.AssetCallApricot - 1,
 			expectedGasRemaining: 0,
 			expectedErr:          vmerrs.ErrOutOfGas,
@@ -395,7 +398,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
@@ -403,7 +406,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big.NewInt(50),
+			value:                uint256.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas - 1,
 			expectedGasRemaining: 0,
 			expectedErr:          vmerrs.ErrOutOfGas,
@@ -427,7 +430,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
@@ -435,7 +438,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                make([]byte, 24),
-			value:                big.NewInt(50),
+			value:                uint256.NewInt(50),
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: params.CallNewAccountGas,
 			expectedErr:          vmerrs.ErrExecutionReverted,
@@ -448,7 +451,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				statedb.SetBalance(userAddr1, bigHundred)
+				statedb.SetBalance(userAddr1, u256Hundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb

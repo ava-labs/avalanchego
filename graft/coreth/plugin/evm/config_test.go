@@ -78,32 +78,38 @@ func TestUnmarshalConfig(t *testing.T) {
 			false,
 		},
 		{
-			"empty tx lookup limit",
+			"empty transaction history ",
 			[]byte(`{}`),
-			Config{TxLookupLimit: 0},
+			Config{TransactionHistory: 0},
 			false,
 		},
 		{
-			"zero tx lookup limit",
-			[]byte(`{"tx-lookup-limit": 0}`),
+			"zero transaction history",
+			[]byte(`{"transaction-history": 0}`),
 			func() Config {
-				return Config{TxLookupLimit: 0}
+				return Config{TransactionHistory: 0}
 			}(),
 			false,
 		},
 		{
-			"1 tx lookup limit",
-			[]byte(`{"tx-lookup-limit": 1}`),
+			"1 transaction history",
+			[]byte(`{"transaction-history": 1}`),
 			func() Config {
-				return Config{TxLookupLimit: 1}
+				return Config{TransactionHistory: 1}
 			}(),
 			false,
 		},
 		{
-			"-1 tx lookup limit",
-			[]byte(`{"tx-lookup-limit": -1}`),
+			"-1 transaction history",
+			[]byte(`{"transaction-history": -1}`),
 			Config{},
 			true,
+		},
+		{
+			"deprecated tx lookup limit",
+			[]byte(`{"tx-lookup-limit": 1}`),
+			Config{TransactionHistory: 1, TxLookupLimit: 1},
+			false,
 		},
 		{
 			"allow unprotected tx hashes",
@@ -121,6 +127,7 @@ func TestUnmarshalConfig(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				tmp.Deprecate()
 				assert.Equal(t, tt.expected, tmp)
 			}
 		})

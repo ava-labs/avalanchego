@@ -175,7 +175,7 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 	// generator function.
 	gspec := &Genesis{
 		Config: params.TestChainConfig,
-		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
+		Alloc:  types.GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
 	}
 	_, chain, _, _ := GenerateChainWithGenesis(gspec, dummy.NewCoinbaseFaker(), b.N, 10, gen)
 
@@ -229,7 +229,7 @@ func BenchmarkChainWrite_full_500k(b *testing.B) {
 
 // makeChainForBench writes a given number of headers or empty blocks/receipts
 // into a database.
-func makeChainForBench(db ethdb.Database, full bool, count uint64) {
+func makeChainForBench(db ethdb.Database, genesis *Genesis, full bool, count uint64) {
 	var hash common.Hash
 	for n := uint64(0); n < count; n++ {
 		header := &types.Header{
@@ -241,13 +241,16 @@ func makeChainForBench(db ethdb.Database, full bool, count uint64) {
 			TxHash:      types.EmptyTxsHash,
 			ReceiptHash: types.EmptyReceiptsHash,
 		}
+		if n == 0 {
+			header = genesis.ToBlock().Header()
+		}
 		hash = header.Hash()
 
 		rawdb.WriteHeader(db, header)
 		rawdb.WriteCanonicalHash(db, hash, n)
 
 		if n == 0 {
-			rawdb.WriteChainConfig(db, hash, params.TestChainConfig)
+			rawdb.WriteChainConfig(db, hash, genesis.Config)
 		}
 		rawdb.WriteHeadHeaderHash(db, hash)
 
@@ -260,13 +263,14 @@ func makeChainForBench(db ethdb.Database, full bool, count uint64) {
 }
 
 func benchWriteChain(b *testing.B, full bool, count uint64) {
+	genesis := &Genesis{Config: params.TestChainConfig}
 	for i := 0; i < b.N; i++ {
 		dir := b.TempDir()
 		db, err := rawdb.NewLevelDBDatabase(dir, 128, 1024, "", false)
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
-		makeChainForBench(db, full, count)
+		makeChainForBench(db, genesis, full, count)
 		db.Close()
 	}
 }
@@ -278,7 +282,8 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 	if err != nil {
 		b.Fatalf("error opening database at %v: %v", dir, err)
 	}
-	makeChainForBench(db, full, count)
+	genesis := &Genesis{Config: params.TestChainConfig}
+	makeChainForBench(db, genesis, full, count)
 	db.Close()
 
 	b.ReportAllocs()
@@ -289,7 +294,7 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
-		chain, err := NewBlockChain(db, DefaultCacheConfig, nil, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
+		chain, err := NewBlockChain(db, DefaultCacheConfig, genesis, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 		if err != nil {
 			b.Fatalf("error creating chain: %v", err)
 		}

@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
@@ -534,7 +534,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 		gspec   = &Genesis{
 			BaseFee: big.NewInt(params.ApricotPhase3InitialBaseFee),
 			Config:  params.TestChainConfig,
-			Alloc:   GenesisAlloc{addr1: {Balance: big.NewInt(params.Ether)}},
+			Alloc:   types.GenesisAlloc{addr1: {Balance: big.NewInt(params.Ether)}},
 		}
 		signer = types.LatestSigner(gspec.Config)
 		engine = dummy.NewFullFaker()
@@ -562,7 +562,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 	var sideblocks types.Blocks
 	if tt.sidechainBlocks > 0 {
 		genDb := rawdb.NewMemoryDatabase()
-		gspec.MustCommit(genDb, trie.NewDatabase(genDb, nil))
+		gspec.MustCommit(genDb, triedb.NewDatabase(genDb, nil))
 		sideblocks, _, err = GenerateChain(gspec.Config, gspec.ToBlock(), engine, genDb, tt.sidechainBlocks, 10, func(i int, b *BlockGen) {
 			b.SetCoinbase(common.Address{0x01})
 			tx, err := types.SignTx(types.NewTransaction(b.TxNonce(addr1), common.Address{0x01}, big.NewInt(10000), params.TxGas, dummy.ApricotPhase3InitialBaseFee, nil), signer, key1)
@@ -575,7 +575,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 		}
 	}
 	genDb := rawdb.NewMemoryDatabase()
-	gspec.MustCommit(genDb, trie.NewDatabase(genDb, nil))
+	gspec.MustCommit(genDb, triedb.NewDatabase(genDb, nil))
 	canonblocks, _, err := GenerateChain(gspec.Config, gspec.ToBlock(), engine, genDb, tt.canonicalBlocks, 10, func(i int, b *BlockGen) {
 		b.SetCoinbase(common.Address{0x02})
 		b.SetDifficulty(big.NewInt(1000000))

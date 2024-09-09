@@ -34,6 +34,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/trie/trienode"
+	"github.com/ava-labs/coreth/triedb/database"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -89,7 +90,7 @@ func (t *Trie) Copy() *Trie {
 // zero hash or the sha3 hash of an empty string, then trie is initially
 // empty, otherwise, the root node must be present in database or returns
 // a MissingNodeError if not.
-func New(id *ID, db *Database) (*Trie, error) {
+func New(id *ID, db database.Database) (*Trie, error) {
 	reader, err := newTrieReader(id.StateRoot, id.Owner, db)
 	if err != nil {
 		return nil, err
@@ -110,7 +111,7 @@ func New(id *ID, db *Database) (*Trie, error) {
 }
 
 // NewEmpty is a shortcut to create empty tree. It's mostly used in tests.
-func NewEmpty(db *Database) *Trie {
+func NewEmpty(db database.Database) *Trie {
 	tr, _ := New(TrieID(types.EmptyRootHash), db)
 	return tr
 }

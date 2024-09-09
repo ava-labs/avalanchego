@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -434,8 +435,7 @@ func (utx *UnsignedImportTx) EVMStateTransfer(ctx *snow.Context, state *state.St
 			log.Debug("import_tx", "src", utx.SourceChain, "addr", to.Address, "amount", to.Amount, "assetID", "AVAX")
 			// If the asset is AVAX, convert the input amount in nAVAX to gWei by
 			// multiplying by the x2c rate.
-			amount := new(big.Int).Mul(
-				new(big.Int).SetUint64(to.Amount), x2cRate)
+			amount := new(uint256.Int).Mul(uint256.NewInt(to.Amount), x2cRate)
 			state.AddBalance(to.Address, amount)
 		} else {
 			log.Debug("import_tx", "src", utx.SourceChain, "addr", to.Address, "amount", to.Amount, "assetID", to.AssetID)

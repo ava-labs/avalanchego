@@ -51,7 +51,7 @@ func getBlock(transactions int, uncles int, dataSize int) *types.Block {
 		funds   = big.NewInt(50000 * 225000000000 * 200)
 		gspec   = &Genesis{
 			Config: params.TestChainConfig,
-			Alloc:  GenesisAlloc{address: {Balance: funds}},
+			Alloc:  types.GenesisAlloc{address: {Balance: funds}},
 		}
 	)
 	// We need to generate as many blocks +1 as uncles

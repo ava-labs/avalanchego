@@ -50,8 +50,9 @@ import (
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/trie/triedb/hashdb"
-	"github.com/ava-labs/coreth/trie/triedb/pathdb"
+	"github.com/ava-labs/coreth/triedb"
+	"github.com/ava-labs/coreth/triedb/hashdb"
+	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -164,7 +165,7 @@ type CacheConfig struct {
 	SnapshotVerify                  bool    // Verify generated snapshots
 	Preimages                       bool    // Whether to store preimage of trie key to the disk
 	AcceptedCacheSize               int     // Depth of accepted headers cache and accepted logs cache at the accepted tip
-	TxLookupLimit                   uint64  // Number of recent blocks for which to maintain transaction lookup indices
+	TransactionHistory              uint64  // Number of recent blocks for which to maintain transaction lookup indices
 	SkipTxIndexing                  bool    // Whether to skip transaction indexing
 	StateHistory                    uint64  // Number of blocks from head whose state histories are reserved.
 	StateScheme                     string  // Scheme used to store ethereum states and merkle tree nodes on top
@@ -174,8 +175,8 @@ type CacheConfig struct {
 }
 
 // triedbConfig derives the configures for trie database.
-func (c *CacheConfig) triedbConfig() *trie.Config {
-	config := &trie.Config{Preimages: c.Preimages}
+func (c *CacheConfig) triedbConfig() *triedb.Config {
+	config := &triedb.Config{Preimages: c.Preimages}
 	if c.StateScheme == rawdb.HashScheme {
 		config.HashDB = &hashdb.Config{
 			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
@@ -215,6 +216,13 @@ func DefaultCacheConfigWithScheme(scheme string) *CacheConfig {
 	return &config
 }
 
+// txLookup is wrapper over transaction lookup along with the corresponding
+// transaction object.
+type txLookup struct {
+	lookup      *rawdb.LegacyTxLookupEntry
+	transaction *types.Transaction
+}
+
 // BlockChain represents the canonical chain given a database with a genesis
 // block. The Blockchain manages chain imports, reverts, chain reorganisations.
 //
@@ -233,10 +241,11 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db           ethdb.Database // Low level persistent database to store final content in
-	snaps        *snapshot.Tree // Snapshot tree for fast trie leaf access
-	triedb       *trie.Database // The database handler for maintaining trie nodes.
-	stateCache   state.Database // State database to reuse between imports (contains state cache)
+	db           ethdb.Database   // Low level persistent database to store final content in
+	snaps        *snapshot.Tree   // Snapshot tree for fast trie leaf access
+	triedb       *triedb.Database // The database handler for maintaining trie nodes.
+	stateCache   state.Database   // State database to reuse between imports (contains state cache)
+	txIndexer    *txIndexer       // Transaction indexer, might be nil if not enabled
 	stateManager TrieWriter
 
 	hc                *HeaderChain
@@ -258,11 +267,11 @@ type BlockChain struct {
 
 	currentBlock atomic.Pointer[types.Header] // Current head of the block chain
 
-	bodyCache     *lru.Cache[common.Hash, *types.Body]                // Cache for the most recent block bodies
-	receiptsCache *lru.Cache[common.Hash, []*types.Receipt]           // Cache for the most recent receipts per block
-	blockCache    *lru.Cache[common.Hash, *types.Block]               // Cache for the most recent entire blocks
-	txLookupCache *lru.Cache[common.Hash, *rawdb.LegacyTxLookupEntry] // Cache for the most recent transaction lookup data.
-	badBlocks     *lru.Cache[common.Hash, *badBlock]                  // Cache for bad blocks
+	bodyCache     *lru.Cache[common.Hash, *types.Body]      // Cache for the most recent block bodies
+	receiptsCache *lru.Cache[common.Hash, []*types.Receipt] // Cache for the most recent receipts per block
+	blockCache    *lru.Cache[common.Hash, *types.Block]     // Cache for the most recent entire blocks
+	txLookupCache *lru.Cache[common.Hash, txLookup]         // Cache for the most recent transaction lookup data.
+	badBlocks     *lru.Cache[common.Hash, *badBlock]        // Cache for bad blocks
 
 	stopping atomic.Bool // false if chain is running, true when stopped
 
@@ -330,7 +339,7 @@ func NewBlockChain(
 		return nil, errCacheConfigNotSpecified
 	}
 	// Open trie database with provided config
-	triedb := trie.NewDatabase(db, cacheConfig.triedbConfig())
+	triedb := triedb.NewDatabase(db, cacheConfig.triedbConfig())
 
 	// Setup the genesis block, commit the provided genesis specification
 	// to database if the genesis block is not present yet, or load the
@@ -358,7 +367,7 @@ func NewBlockChain(
 		bodyCache:         lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
 		receiptsCache:     lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
 		blockCache:        lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
-		txLookupCache:     lru.NewCache[common.Hash, *rawdb.LegacyTxLookupEntry](txLookupCacheLimit),
+		txLookupCache:     lru.NewCache[common.Hash, txLookup](txLookupCacheLimit),
 		badBlocks:         lru.NewCache[common.Hash, *badBlock](badBlockLimit),
 		engine:            engine,
 		vmConfig:          vmConfig,
@@ -425,113 +434,19 @@ func NewBlockChain(
 	bc.warmAcceptedCaches()
 
 	// if txlookup limit is 0 (uindexing disabled), we don't need to repair the tx index tail.
-	if bc.cacheConfig.TxLookupLimit != 0 {
+	if bc.cacheConfig.TransactionHistory != 0 {
 		latestStateSynced := rawdb.GetLatestSyncPerformed(bc.db)
-		bc.setTxIndexTail(latestStateSynced)
+		bc.repairTxIndexTail(latestStateSynced)
 	}
 
 	// Start processing accepted blocks effects in the background
 	go bc.startAcceptor()
 
-	// Start tx indexer/unindexer if required.
-	if bc.cacheConfig.TxLookupLimit != 0 {
-		bc.wg.Add(1)
-		var (
-			headCh = make(chan ChainEvent, 1) // Buffered to avoid locking up the event feed
-			sub    = bc.SubscribeChainAcceptedEvent(headCh)
-		)
-		go func() {
-			defer bc.wg.Done()
-			if sub == nil {
-				log.Warn("could not create chain accepted subscription to unindex txs")
-				return
-			}
-			defer sub.Unsubscribe()
-
-			bc.maintainTxIndex(headCh)
-		}()
+	// Start tx indexer if it's enabled.
+	if bc.cacheConfig.TransactionHistory != 0 {
+		bc.txIndexer = newTxIndexer(bc.cacheConfig.TransactionHistory, bc)
 	}
 	return bc, nil
-}
-
-// unindexBlocks unindexes transactions depending on user configuration
-func (bc *BlockChain) unindexBlocks(tail uint64, head uint64, done chan struct{}) {
-	start := time.Now()
-	txLookupLimit := bc.cacheConfig.TxLookupLimit
-	bc.txIndexTailLock.Lock()
-	defer func() {
-		txUnindexTimer.Inc(time.Since(start).Milliseconds())
-		bc.txIndexTailLock.Unlock()
-		close(done)
-		bc.wg.Done()
-	}()
-
-	// If head is 0, it means the chain is just initialized and no blocks are inserted,
-	// so don't need to indexing anything.
-	if head == 0 {
-		return
-	}
-
-	if head-txLookupLimit+1 >= tail {
-		// Unindex a part of stale indices and forward index tail to HEAD-limit
-		rawdb.UnindexTransactions(bc.db, tail, head-txLookupLimit+1, bc.quit)
-	}
-}
-
-// maintainTxIndex is responsible for the deletion of the
-// transaction index. This does not support reconstruction of removed indexes.
-// Invariant: If TxLookupLimit is 0, it means all tx indices will be preserved.
-// Meaning that this function should never be called.
-func (bc *BlockChain) maintainTxIndex(headCh <-chan ChainEvent) {
-	txLookupLimit := bc.cacheConfig.TxLookupLimit
-
-	// If the user just upgraded to a new version which supports transaction
-	// index pruning, write the new tail and remove anything older.
-	if rawdb.ReadTxIndexTail(bc.db) == nil {
-		rawdb.WriteTxIndexTail(bc.db, 0)
-	}
-
-	// Any reindexing done, start listening to chain events and moving the index window
-	var (
-		done chan struct{} // Non-nil if background unindexing or reindexing routine is active.
-	)
-	log.Info("Initialized transaction unindexer", "limit", txLookupLimit)
-
-	// Launch the initial processing if chain is not empty. This step is
-	// useful in these scenarios that chain has no progress and indexer
-	// is never triggered.
-	if head := bc.CurrentBlock(); head != nil && head.Number.Uint64() > txLookupLimit {
-		done = make(chan struct{})
-		tail := rawdb.ReadTxIndexTail(bc.db)
-		bc.wg.Add(1)
-		go bc.unindexBlocks(*tail, head.Number.Uint64(), done)
-	}
-
-	for {
-		select {
-		case head := <-headCh:
-			headNum := head.Block.NumberU64()
-			if headNum < txLookupLimit {
-				break
-			}
-
-			if done == nil {
-				done = make(chan struct{})
-				// Note: tail will not be nil since it is initialized in this function.
-				tail := rawdb.ReadTxIndexTail(bc.db)
-				bc.wg.Add(1)
-				go bc.unindexBlocks(*tail, headNum, done)
-			}
-		case <-done:
-			done = nil
-		case <-bc.quit:
-			if done != nil {
-				log.Info("Waiting background transaction unindexer to exit")
-				<-done
-			}
-			return
-		}
-	}
 }
 
 // writeBlockAcceptedIndices writes any indices that must be persisted for accepted block.
@@ -929,12 +844,12 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 		// that the transactions have been indexed, if we are checking below the last accepted
 		// block.
 		shouldIndexTxs := !bc.cacheConfig.SkipTxIndexing &&
-			(bc.cacheConfig.TxLookupLimit == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TxLookupLimit)
+			(bc.cacheConfig.TransactionHistory == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TransactionHistory)
 		if current.Number.Uint64() <= bc.lastAccepted.NumberU64() && shouldIndexTxs {
 			// Ensure that all of the transactions have been stored correctly in the canonical
 			// chain
 			for txIndex, tx := range txs {
-				txLookup := bc.GetTransactionLookup(tx.Hash())
+				txLookup, _, _ := bc.GetTransactionLookup(tx.Hash())
 				if txLookup == nil {
 					return fmt.Errorf("failed to find transaction %s", tx.Hash().String())
 				}
@@ -990,6 +905,10 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 func (bc *BlockChain) stopWithoutSaving() {
 	if !bc.stopping.CompareAndSwap(false, true) {
 		return
+	}
+	// Signal shutdown tx indexer.
+	if bc.txIndexer != nil {
+		bc.txIndexer.close()
 	}
 
 	log.Info("Closing quit channel")
@@ -1373,7 +1292,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		// The chain importer is starting and stopping trie prefetchers. If a bad
 		// block or other error is hit however, an early return may not properly
 		// terminate the background threads. This defer ensures that we clean up
-		// and dangling prefetcher, without defering each and holding on live refs.
+		// and dangling prefetcher, without deferring each and holding on live refs.
 		if activeState != nil {
 			activeState.StopPrefetcher()
 		}
@@ -1585,6 +1504,12 @@ func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
 	} else {
 		log.Debug("Preference change (rewind to ancestor) occurred", "oldnum", oldHead.Number, "oldhash", oldHead.Hash(), "newnum", newHead.Number(), "newhash", newHead.Hash())
 	}
+	// Reset the tx lookup cache in case to clear stale txlookups.
+	// This is done before writing any new chain data to avoid the
+	// weird scenario that canonical chain is changed while the
+	// stale lookups are still cached.
+	bc.txLookupCache.Purge()
+
 	// Insert the new chain(except the head block(reverse order)),
 	// taking care of the proper incremental order.
 	for i := len(newChain) - 1; i >= 1; i-- {
@@ -2137,8 +2062,8 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	}
 
 	// if txlookup limit is 0 (uindexing disabled), we don't need to repair the tx index tail.
-	if bc.cacheConfig.TxLookupLimit != 0 {
-		bc.setTxIndexTail(block.NumberU64())
+	if bc.cacheConfig.TransactionHistory != 0 {
+		bc.repairTxIndexTail(block.NumberU64())
 	}
 
 	// Update all in-memory chain markers
@@ -2174,18 +2099,12 @@ func (bc *BlockChain) CacheConfig() *CacheConfig {
 	return bc.cacheConfig
 }
 
-func (bc *BlockChain) setTxIndexTail(newTail uint64) error {
+func (bc *BlockChain) repairTxIndexTail(newTail uint64) error {
 	bc.txIndexTailLock.Lock()
 	defer bc.txIndexTailLock.Unlock()
 
-	tailP := rawdb.ReadTxIndexTail(bc.db)
-	var tailV uint64
-	if tailP != nil {
-		tailV = *tailP
-	}
-
-	if newTail > tailV {
-		log.Info("Repairing tx index tail", "old", tailV, "new", newTail)
+	if curr := rawdb.ReadTxIndexTail(bc.db); curr == nil || *curr < newTail {
+		log.Info("Repairing tx index tail", "old", curr, "new", newTail)
 		rawdb.WriteTxIndexTail(bc.db, newTail)
 	}
 	return nil

@@ -172,18 +172,18 @@ func TestIndexTransactions(t *testing.T) {
 			t.Fatalf("Transaction tail mismatch")
 		}
 	}
-	indexTransactionsForTesting(chainDb, 5, 11, nil, nil)
+	IndexTransactions(chainDb, 5, 11, nil, false)
 	verify(5, 11, true, 5)
 	verify(0, 5, false, 5)
 
-	indexTransactionsForTesting(chainDb, 0, 5, nil, nil)
+	IndexTransactions(chainDb, 0, 5, nil, false)
 	verify(0, 11, true, 0)
 
-	UnindexTransactions(chainDb, 0, 5, nil)
+	UnindexTransactions(chainDb, 0, 5, nil, false)
 	verify(5, 11, true, 5)
 	verify(0, 5, false, 5)
 
-	UnindexTransactions(chainDb, 5, 11, nil)
+	UnindexTransactions(chainDb, 5, 11, nil, false)
 	verify(0, 11, false, 11)
 
 	// Testing corner cases
@@ -200,7 +200,7 @@ func TestIndexTransactions(t *testing.T) {
 	})
 	verify(9, 11, true, 9)
 	verify(0, 9, false, 9)
-	indexTransactionsForTesting(chainDb, 0, 9, nil, nil)
+	IndexTransactions(chainDb, 0, 9, nil, false)
 
 	signal = make(chan struct{})
 	var once2 sync.Once

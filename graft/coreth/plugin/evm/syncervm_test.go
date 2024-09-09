@@ -39,6 +39,7 @@ import (
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/statesync"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -339,7 +340,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	serverSharedMemories.assertOpsApplied(t, exportTx.mustAtomicOps())
 
 	// make some accounts
-	trieDB := trie.NewDatabase(serverVM.chaindb, nil)
+	trieDB := triedb.NewDatabase(serverVM.chaindb, nil)
 	root, accounts := statesync.FillAccountsWithOverlappingStorage(t, trieDB, types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
@@ -512,7 +513,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	}
 
 	// tail should be the last block synced
-	if syncerVM.ethConfig.TxLookupLimit != 0 {
+	if syncerVM.ethConfig.TransactionHistory != 0 {
 		tail := lastSyncedBlock.NumberU64()
 
 		core.CheckTxIndices(t, &tail, tail, syncerVM.chaindb, true)
@@ -540,8 +541,8 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 		}
 	},
 		func(block *types.Block) {
-			if syncerVM.ethConfig.TxLookupLimit != 0 {
-				tail := block.NumberU64() - syncerVM.ethConfig.TxLookupLimit + 1
+			if syncerVM.ethConfig.TransactionHistory != 0 {
+				tail := block.NumberU64() - syncerVM.ethConfig.TransactionHistory + 1
 				// tail should be the minimum last synced block, since we skipped it to the last block
 				if tail < lastSyncedBlock.NumberU64() {
 					tail = lastSyncedBlock.NumberU64()
@@ -582,8 +583,8 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 		}
 	},
 		func(block *types.Block) {
-			if syncerVM.ethConfig.TxLookupLimit != 0 {
-				tail := block.NumberU64() - syncerVM.ethConfig.TxLookupLimit + 1
+			if syncerVM.ethConfig.TransactionHistory != 0 {
+				tail := block.NumberU64() - syncerVM.ethConfig.TransactionHistory + 1
 				// tail should be the minimum last synced block, since we skipped it to the last block
 				if tail < lastSyncedBlock.NumberU64() {
 					tail = lastSyncedBlock.NumberU64()
