@@ -17,7 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -125,12 +124,8 @@ func createGoldenDatabase() error {
 	}()
 
 	startInsertTime := time.Now()
-	var currentBatch database.Batch
+	currentBatch := mdb.NewBatch()
 	for entryIdx := uint64(0); entryIdx < *databaseEntries; entryIdx++ {
-		if entryIdx%databaseCreationBatchSize == 0 {
-			currentBatch = mdb.NewBatch()
-		}
-
 		entryHash := calculateIndexEncoding(entryIdx)
 		err = currentBatch.Put(entryHash, entryHash)
 		if err != nil {
@@ -144,7 +139,7 @@ func createGoldenDatabase() error {
 				fmt.Fprintf(os.Stderr, "unable to write value in merkleDB database : %v\n", err)
 				return err
 			}
-			currentBatch = nil
+			currentBatch.Reset()
 		}
 	}
 	if (*databaseEntries)%databaseCreationBatchSize != 0 {
@@ -285,9 +280,9 @@ func runBenchmark() error {
 
 	low := uint64(0)
 	var deleteDuration, addDuration, updateDuration, batchDuration time.Duration
+	batch := mdb.NewBatch()
 	for {
 		startBatchTime := time.Now()
-		batch := mdb.NewBatch()
 
 		// delete first 2.5k keys from the beginning
 		startDeleteTime := time.Now()
@@ -338,6 +333,8 @@ func runBenchmark() error {
 		batchDuration = time.Since(startBatchTime)
 		batchWriteDuration := time.Since(batchWriteStartTime)
 		batchWriteRate.Set(float64(time.Second) / float64(batchWriteDuration))
+
+		batch.Reset()
 
 		if *verbose {
 			fmt.Printf("delete rate [%d]	update rate [%d]	insert rate [%d]	batch rate [%d]\n",
