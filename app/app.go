@@ -71,6 +71,7 @@ func New(config node.Config) (App, error) {
 
 	n, err := node.New(&config, logFactory, log)
 	if err != nil {
+		log.Fatal("failed to initialize node", zap.Error(err))
 		log.Stop()
 		logFactory.Close()
 		return nil, fmt.Errorf("failed to initialize node: %w", err)
