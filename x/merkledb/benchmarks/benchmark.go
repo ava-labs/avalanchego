@@ -175,16 +175,21 @@ func createGoldenDatabase() error {
 		}
 
 		if entryIdx%databaseCreationBatchSize == (databaseCreationBatchSize - 1) {
+			addDuration := time.Since(startInsertBatchTime)
+			insertRate.Set(float64(databaseCreationBatchSize) * float64(time.Second) / float64(addDuration))
+			insertsCounter.Add(databaseCreationBatchSize)
+
+			batchWriteStartTime := time.Now()
 			err = currentBatch.Write()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "unable to write value in merkleDB database : %v\n", err)
 				return err
 			}
 			currentBatch.Reset()
+			batchWriteDuration := time.Since(batchWriteStartTime)
+			batchWriteRate.Set(float64(time.Second) / float64(batchWriteDuration))
+			batchCounter.Inc()
 
-			addDuration := time.Since(startInsertBatchTime)
-			insertRate.Set(float64(databaseCreationBatchSize) * float64(time.Second) / float64(addDuration))
-			insertsCounter.Add(databaseCreationBatchSize)
 			startInsertBatchTime = time.Now()
 		}
 	}
