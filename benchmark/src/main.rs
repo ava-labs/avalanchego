@@ -12,6 +12,7 @@
 //
 
 use clap::Parser;
+use firewood::logger::debug;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use rand::Rng as _;
@@ -28,9 +29,9 @@ use firewood::v2::api::{Db as _, DbView, Proposal as _};
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value_t = 10000)]
+    #[arg(short, long, default_value_t = 10)]
     batch_size: u64,
-    #[arg(short, long, default_value_t = 100000)]
+    #[arg(short, long, default_value_t = 2)]
     number_of_batches: u64,
     #[arg(short = 'p', long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
@@ -109,7 +110,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    // batches consist of
+    // batches consist of:
     // 1. 25% deletes from low
     // 2. 25% new insertions from high
     // 3. 50% updates from the middle
@@ -141,6 +142,11 @@ fn generate_inserts(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<
     (start..start + count)
         .map(|inner_key| {
             let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+            debug!(
+                "inserting {:?} with digest {}",
+                inner_key,
+                hex::encode(&digest),
+            );
             (digest.clone(), digest)
         })
         .map(|(key, value)| BatchOp::Put { key, value })
@@ -150,7 +156,12 @@ fn generate_inserts(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<
 
 fn generate_deletes(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
     (start..start + count)
-        .map(|key| Sha256::digest(key.to_ne_bytes()).to_vec())
+        .map(|key| {
+            let digest = Sha256::digest(key.to_ne_bytes()).to_vec();
+            debug!("deleting {:?} with digest {}", key, hex::encode(&digest));
+            #[allow(clippy::let_and_return)]
+            digest
+        })
         .map(|key| BatchOp::Delete { key })
         .collect::<Vec<_>>()
         .into_iter()
@@ -165,6 +176,12 @@ fn generate_updates(
     (start..start + count)
         .map(|inner_key| {
             let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+            debug!(
+                "updating {:?} with digest {} to {}",
+                inner_key,
+                hex::encode(&digest),
+                hex::encode(&hash_of_low)
+            );
             (digest, hash_of_low.clone())
         })
         .map(|(key, value)| BatchOp::Put { key, value })
