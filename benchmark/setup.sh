@@ -2,7 +2,7 @@ mkdir -p /etc/apt/keyrings/
 wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
 echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
 apt-get update
-apt-get upgrade
+apt-get upgrade -y
   
 mkdir -p /etc/systemd/system/grafana-server.service.d
 cat > /etc/systemd/system/grafana-server.service.d/override.conf <<!
@@ -38,4 +38,4 @@ cd firewood
 git checkout rkuris/prometheus
 cargo build --release
 
-nohup time cargo run --release --example benchmark -- -b 10000 -c 1500000 -n 100000 &
+nohup time cargo run --release --bin benchmark -- -b 10000 -c 1500000 -n 100000 &
