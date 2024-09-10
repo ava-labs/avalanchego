@@ -19,7 +19,8 @@ const (
 	cliVersion  = "0.0.1"
 	commandName = "bootstrap-monitor"
 
-	defaultPollInterval = 60 * time.Second
+	defaultHealthCheckInterval = 1 * time.Minute
+	defaultImageCheckInterval  = 5 * time.Minute
 )
 
 func main() {
@@ -62,7 +63,10 @@ func main() {
 	}
 	rootCmd.AddCommand(initCmd)
 
-	var pollInterval time.Duration
+	var (
+		healthCheckInterval time.Duration
+		imageCheckInterval  time.Duration
+	)
 	waitCmd := &cobra.Command{
 		Use:   "wait-for-completion",
 		Short: "Wait for the local node to report healthy indicating completion of bootstrapping",
@@ -70,13 +74,17 @@ func main() {
 			if err := checkArgs(namespace, podName, nodeContainerName, dataDir); err != nil {
 				return err
 			}
-			if pollInterval <= 0 {
-				return errors.New("poll-interval must be greater than 0")
+			if healthCheckInterval <= 0 {
+				return errors.New("--health-check-interval must be greater than 0")
 			}
-			return bootstrapmonitor.WaitForCompletion(namespace, podName, nodeContainerName, dataDir, pollInterval)
+			if imageCheckInterval <= 0 {
+				return errors.New("--image-check-interval must be greater than 0")
+			}
+			return bootstrapmonitor.WaitForCompletion(namespace, podName, nodeContainerName, dataDir, healthCheckInterval, imageCheckInterval)
 		},
 	}
-	waitCmd.PersistentFlags().DurationVar(&pollInterval, "poll-interval", defaultPollInterval, "The interval at which to poll")
+	waitCmd.PersistentFlags().DurationVar(&healthCheckInterval, "health-check-interval", defaultHealthCheckInterval, "The interval at which to check for node health")
+	waitCmd.PersistentFlags().DurationVar(&imageCheckInterval, "image-check-interval", defaultImageCheckInterval, "The interval at which to check for a new image")
 	rootCmd.AddCommand(waitCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -88,16 +96,16 @@ func main() {
 
 func checkArgs(namespace string, podName string, nodeContainerName string, dataDir string) error {
 	if len(namespace) == 0 {
-		return errors.New("namespace is required")
+		return errors.New("--namespace is required")
 	}
 	if len(podName) == 0 {
-		return errors.New("pod-name is required")
+		return errors.New("--pod-name is required")
 	}
 	if len(nodeContainerName) == 0 {
-		return errors.New("node-container-name is required")
+		return errors.New("--node-container-name is required")
 	}
 	if len(dataDir) == 0 {
-		return errors.New("data-dir is required")
+		return errors.New("--data-dir is required")
 	}
 	return nil
 }

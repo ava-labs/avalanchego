@@ -54,10 +54,10 @@ const (
 	// of this file.
 	repoRelativePath = "tests/fixture/bootstrapmonitor/e2e"
 
-	nodeImage          = "localhost:5001/avalanchego"
-	latestNodeImage    = nodeImage + ":latest"
-	monitorImage       = "localhost:5001/bootstrap-monitor"
-	latestMonitorImage = monitorImage + ":latest"
+	avalanchegoImage       = "localhost:5001/avalanchego"
+	latestAvalanchegoImage = avalanchegoImage + ":latest"
+	monitorImage           = "localhost:5001/bootstrap-monitor"
+	latestMonitorImage     = monitorImage + ":latest"
 
 	initContainerName    = "init"
 	monitorContainerName = "monitor"
@@ -70,16 +70,16 @@ const (
 )
 
 var (
-	skipNodeImageBuild    bool
-	skipMonitorImageBuild bool
+	skipAvalanchegoImageBuild bool
+	skipMonitorImageBuild     bool
 
 	nodeDataDir = bootstrapmonitor.NodeDataDir(dataDir) // Use a subdirectory of the data path so that os.RemoveAll can be used when starting a new test
 )
 
 func init() {
 	flag.BoolVar(
-		&skipNodeImageBuild,
-		"skip-node-image-build",
+		&skipAvalanchegoImageBuild,
+		"skip-avalanchego-image-build",
 		false,
 		"whether to skip building the avalanchego image",
 	)
@@ -98,11 +98,11 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		tc := e2e.NewTestContext()
 		require := require.New(tc)
 
-		if skipNodeImageBuild {
+		if skipAvalanchegoImageBuild {
 			tc.Outf("{{yellow}}skipping build of avalanchego image{{/}}\n")
 		} else {
 			ginkgo.By("Building the avalanchego image")
-			buildAvalanchegoImage(tc, nodeImage, false /* forceNewHash */)
+			buildAvalanchegoImage(tc, avalanchegoImage, false /* forceNewHash */)
 		}
 
 		if skipMonitorImageBuild {
@@ -127,6 +127,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		}, metav1.CreateOptions{})
 		require.NoError(err)
 		namespace := createdNamespace.Name
+		ginkgo.By(fmt.Sprintf("Created namespace %q", namespace))
 
 		ginkgo.By("Creating a node to bootstrap from")
 		nodeStatefulSet := newNodeStatefulSet("avalanchego-node", defaultNodeFlags())
@@ -138,13 +139,13 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		pod, err := clientset.CoreV1().Pods(namespace).Get(tc.DefaultContext(), nodePodName, metav1.GetOptions{})
 		require.NoError(err)
 		bootstrapIP := pod.Status.PodIP
+		ginkgo.By(fmt.Sprintf("Created pod %s.%s for %s@a%s", namespace, nodePodName, bootstrapID, bootstrapIP))
 
 		ginkgo.By("Creating a node that will bootstrap from the first node")
 		bootstrapStatefulSet := createBootstrapTester(tc, clientset, namespace, bootstrapIP, bootstrapID)
 		bootstrapPodName := bootstrapStatefulSet.Name + "-0"
-
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReadyToStartContainers)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, "")
+		ginkgo.By(fmt.Sprintf("Created pod %s.%s", namespace, bootstrapPodName))
 
 		ginkgo.By("Waiting for the pod image to be updated to include an image digest")
 		var containerImage string
@@ -161,7 +162,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return false
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 
-		ginkgo.By("Waiting for the init container to report the start of a bootstrap test")
+		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
 		bootstrapStartingMessage := bootstrapmonitor.BootstrapStartingMessage(containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
@@ -169,9 +170,8 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		ginkgo.By("Waiting for the pod to report readiness")
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReady)
 
-		ginkgo.By("Waiting for the monitor container to report the success of the bootstrap test")
-		bootstrapSucceededMessage := bootstrapmonitor.BootstrapSucceededMessage(containerImage)
-		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapSucceededMessage)
+		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the success of the bootstrap test", monitorContainerName))
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapmonitor.ImageUnchanged)
 		_ = waitForNodeHealthy(tc, kubeConfig, namespace, nodePodName)
 
 		ginkgo.By("Checking that bootstrap testing is resumed when a pod is rescheduled")
@@ -197,7 +197,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
 
 		ginkgo.By("Building and pushing a new avalanchego image to prompt the start of a new bootstrap test")
-		buildAvalanchegoImage(tc, nodeImage, true /* forceNewHash */)
+		buildAvalanchegoImage(tc, avalanchegoImage, true /* forceNewHash */)
 
 		ginkgo.By("Waiting for the pod image to change")
 		require.Eventually(func() bool {
@@ -213,7 +213,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return false
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 
-		ginkgo.By("Waiting for the init container to report the start of a new bootstrap test")
+		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a new bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
 		bootstrapStartingMessage = bootstrapmonitor.BootstrapStartingMessage(containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
@@ -292,8 +292,13 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
+							Command: []string{"bash"},
+							Args: []string{
+								"-c",
+								"./avalanchego --version && ./avalanchego",
+							},
 							Name:  nodeContainerName,
-							Image: latestNodeImage,
+							Image: latestAvalanchegoImage,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
@@ -459,26 +464,33 @@ func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset
 	statefulSet := newNodeStatefulSet("bootstrap-tester", flags)
 
 	// Add the bootstrap-monitor containers to enable continuous bootstrap testing
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: dataDir,
-		},
-	}
+
 	initContainer := getMonitorContainer(initContainerName, []string{
 		"init",
 		"--node-container-name=" + nodeContainerName,
 		"--data-dir=" + dataDir,
 	})
-	initContainer.VolumeMounts = volumeMounts
+	initContainer.VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: dataDir,
+		},
+	}
 	statefulSet.Spec.Template.Spec.InitContainers = append(statefulSet.Spec.Template.Spec.InitContainers, initContainer)
 	monitorContainer := getMonitorContainer(monitorContainerName, []string{
 		"wait-for-completion",
 		"--node-container-name=" + nodeContainerName,
 		"--data-dir=" + dataDir,
-		"--poll-interval=1s",
+		"--health-check-interval=1s",
+		"--image-check-interval=1s",
 	})
-	monitorContainer.VolumeMounts = volumeMounts
+	monitorContainer.VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: dataDir,
+			ReadOnly:  true, // The volume is only used for checking disk usage
+		},
+	}
 	statefulSet.Spec.Template.Spec.Containers = append(statefulSet.Spec.Template.Spec.Containers, monitorContainer)
 
 	grantMonitorPermissions(tc, clientset, namespace)

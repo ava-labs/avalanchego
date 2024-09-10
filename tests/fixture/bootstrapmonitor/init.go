@@ -73,7 +73,7 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 				log.Printf("failed to get latest image id: %v", err)
 				return false, nil
 			}
-			log.Printf("Updating owning statefulset with image %q", containerImage)
+			log.Printf("Updating owning statefulset with image %q", imageID)
 			if err := setContainerImage(ctx, clientset, namespace, podName, nodeContainerName, imageID); err != nil {
 				log.Printf("failed to set container image: %v", err)
 				return false, nil
@@ -103,7 +103,6 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 		} else if len(recordedImage) > 0 {
 			log.Println("Recorded image name differs from the current image name")
 		}
-		log.Println(BootstrapStartingMessage(containerImage))
 
 		nodeDataDir := NodeDataDir(dataDir)
 		log.Printf("Removing contents of node directory %s", nodeDataDir)
@@ -117,6 +116,8 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 			log.Printf("failed to write version file: %v", err)
 			return false, nil
 		}
+
+		log.Println(BootstrapStartingMessage(containerImage))
 
 		return true, nil
 	})
