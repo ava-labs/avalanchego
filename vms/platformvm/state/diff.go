@@ -35,8 +35,9 @@ type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
 
-	timestamp time.Time
-	feeState  gas.State
+	timestamp   time.Time
+	feeState    gas.State
+	accruedFees uint64
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -79,6 +80,7 @@ func NewDiff(
 		stateVersions:  stateVersions,
 		timestamp:      parentState.GetTimestamp(),
 		feeState:       parentState.GetFeeState(),
+		accruedFees:    parentState.GetAccruedFees(),
 		expiryDiff:     newExpiryDiff(),
 		subnetOwners:   make(map[ids.ID]fx.Owner),
 		subnetManagers: make(map[ids.ID]chainIDAndAddr),
@@ -113,6 +115,14 @@ func (d *diff) GetFeeState() gas.State {
 
 func (d *diff) SetFeeState(feeState gas.State) {
 	d.feeState = feeState
+}
+
+func (d *diff) GetAccruedFees() uint64 {
+	return d.accruedFees
+}
+
+func (d *diff) SetAccruedFees(accruedFees uint64) {
+	d.accruedFees = accruedFees
 }
 
 func (d *diff) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
@@ -475,6 +485,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetFeeState(d.feeState)
+	baseState.SetAccruedFees(d.accruedFees)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}
