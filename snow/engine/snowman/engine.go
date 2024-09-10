@@ -31,7 +31,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const nonVerifiedCacheSize = 64 * units.MiB
+const (
+	nonVerifiedCacheSize = 64 * units.MiB
+	errInsufficientStake = "insufficient connected stake"
+)
 
 var _ common.Engine = (*Engine)(nil)
 
@@ -587,7 +590,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			// Because we only return accepted state here, it's fairly likely
 			// that the requested height is higher than the last accepted block.
 			// That means that this code path is actually quite common.
-			e.Ctx.Log.Debug("failed fetching accepted block",
+			e.Ctx.Log.Debug("unable to retrieve accepted block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
@@ -615,7 +618,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			// Because it is possible for a byzantine node to spam requests at
 			// old heights on a pruning network, we log this as debug. However,
 			// this case is unexpected to be hit by correct peers.
-			e.Ctx.Log.Debug("failed fetching accepted block",
+			e.Ctx.Log.Debug("unable to retrieve accepted block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
@@ -630,7 +633,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		var ok bool
 		preferenceAtHeight, ok = e.Consensus.PreferenceAtHeight(requestedHeight)
 		if !ok {
-			e.Ctx.Log.Debug("failed fetching processing block",
+			e.Ctx.Log.Debug("processing block not found",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
@@ -871,6 +874,10 @@ func (e *Engine) sendQuery(
 	blkBytes []byte,
 	push bool,
 ) {
+	if e.abortDueToInsufficientConnectedStake(blkID) {
+		return
+	}
+
 	e.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", e.Validators),
 	)
@@ -914,6 +921,21 @@ func (e *Engine) sendQuery(
 	} else {
 		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, nextHeightToAccept)
 	}
+}
+
+func (e *Engine) abortDueToInsufficientConnectedStake(blkID ids.ID) bool {
+	stakeConnectedRatio := e.Config.ConnectedValidators.ConnectedPercent()
+	minConnectedStakeToQuery := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
+
+	if stakeConnectedRatio < minConnectedStakeToQuery {
+		e.Ctx.Log.Debug("dropped query for block",
+			zap.String("reason", errInsufficientStake),
+			zap.Stringer("blkID", blkID),
+			zap.Float64("ratio", stakeConnectedRatio),
+		)
+		return true
+	}
+	return false
 }
 
 // issue [blk] to consensus

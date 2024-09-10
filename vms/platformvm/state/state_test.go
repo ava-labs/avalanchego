@@ -1468,6 +1468,22 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	require.Equal(expectedFeeState, s.GetFeeState())
 }
 
+// Verify that committing the state writes the accrued fees to the database and
+// that loading the state fetches the accrued fees from the database.
+func TestStateAccruedFeesCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	expectedAccruedFees := uint64(1)
+	s.SetAccruedFees(expectedAccruedFees)
+	require.NoError(s.Commit())
+
+	s = newTestState(t, db)
+	require.Equal(expectedAccruedFees, s.GetAccruedFees())
+}
+
 func TestMarkAndIsInitialized(t *testing.T) {
 	require := require.New(t)
 

@@ -86,6 +86,7 @@ var (
 
 	TimestampKey       = []byte("timestamp")
 	FeeStateKey        = []byte("fee state")
+	AccruedFeesKey     = []byte("accrued fees")
 	CurrentSupplyKey   = []byte("current supply")
 	LastAcceptedKey    = []byte("last accepted")
 	HeightsIndexedKey  = []byte("heights indexed")
@@ -106,6 +107,9 @@ type Chain interface {
 
 	GetFeeState() gas.State
 	SetFeeState(f gas.State)
+
+	GetAccruedFees() uint64
+	SetAccruedFees(f uint64)
 
 	GetCurrentSupply(subnetID ids.ID) (uint64, error)
 	SetCurrentSupply(subnetID ids.ID, cs uint64)
@@ -279,6 +283,7 @@ type stateBlk struct {
  *   |-- blocksReindexedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- feeStateKey -> feeState
+ *   |-- accruedFeesKey -> accruedFees
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
  *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
@@ -371,6 +376,7 @@ type state struct {
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
 	feeState, persistedFeeState           gas.State
+	accruedFees, persistedAccruedFees     uint64
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
@@ -1052,6 +1058,14 @@ func (s *state) SetFeeState(feeState gas.State) {
 	s.feeState = feeState
 }
 
+func (s *state) GetAccruedFees() uint64 {
+	return s.accruedFees
+}
+
+func (s *state) SetAccruedFees(accruedFees uint64) {
+	s.accruedFees = accruedFees
+}
+
 func (s *state) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
@@ -1342,6 +1356,13 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedFeeState = feeState
 	s.SetFeeState(feeState)
+
+	accruedFees, err := getAccruedFees(s.singletonDB)
+	if err != nil {
+		return err
+	}
+	s.persistedAccruedFees = accruedFees
+	s.SetAccruedFees(accruedFees)
 
 	currentSupply, err := database.GetUInt64(s.singletonDB, CurrentSupplyKey)
 	if err != nil {
@@ -2344,6 +2365,12 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedFeeState = s.feeState
 	}
+	if s.accruedFees != s.persistedAccruedFees {
+		if err := database.PutUInt64(s.singletonDB, AccruedFeesKey, s.accruedFees); err != nil {
+			return fmt.Errorf("failed to write accrued fees: %w", err)
+		}
+		s.persistedAccruedFees = s.accruedFees
+	}
 	if s.persistedCurrentSupply != s.currentSupply {
 		if err := database.PutUInt64(s.singletonDB, CurrentSupplyKey, s.currentSupply); err != nil {
 			return fmt.Errorf("failed to write current supply: %w", err)
@@ -2554,4 +2581,12 @@ func getFeeState(db database.KeyValueReader) (gas.State, error) {
 		return gas.State{}, err
 	}
 	return feeState, nil
+}
+
+func getAccruedFees(db database.KeyValueReader) (uint64, error) {
+	accruedFees, err := database.GetUInt64(db, AccruedFeesKey)
+	if err == database.ErrNotFound {
+		return 0, nil
+	}
+	return accruedFees, err
 }
