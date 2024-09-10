@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -530,14 +531,20 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
 	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		assertIteratorsEqual(t, expectedCurrentStakerIterator, actualCurrentStakerIterator)
+		require.Equal(
+			iterator.ToSlice(expectedCurrentStakerIterator),
+			iterator.ToSlice(actualCurrentStakerIterator),
+		)
 	}
 
 	expectedPendingStakerIterator, expectedErr := expected.GetPendingStakerIterator()
 	actualPendingStakerIterator, actualErr := actual.GetPendingStakerIterator()
 	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		assertIteratorsEqual(t, expectedPendingStakerIterator, actualPendingStakerIterator)
+		require.Equal(
+			iterator.ToSlice(expectedPendingStakerIterator),
+			iterator.ToSlice(actualPendingStakerIterator),
+		)
 	}
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
