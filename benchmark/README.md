@@ -1,6 +1,6 @@
 # Firewood Benchmark
 
-Welcome to the Firewood Benchmark repository! This repository contains the benchmarking code and resources for the Firewood project.
+Welcome to the Firewood Benchmark! This repository contains the benchmarking code and resources for the Firewood project.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -24,10 +24,30 @@ As the benchmark is running, statistics for prometheus are availble on port 3000
 
 If you want to install grafana and prometheus on an AWS host (using Ubuntu as a base), do the following:
 
-```
-
-```
-
+1. Log in to the AWS EC2 console
+2. Launch a new instance:
+  a. Name: Firewood Benchmark
+  b. Click on 'Ubuntu' in the quick start section
+  c. Set the instance type to m5d.2xlarge
+  d. Set your key pair
+  e. Check 'Allow HTTP traffic from the internet' for grafana
+  f. Configure storage to 400GiB disk
+  g. [optional] Save money by selecting 'spot instance' in advanced
+  h. Launch the instance
+3. ssh ubuntu@AWS-IP
+4. Run the script in setup.sh on the instance as root
+5. Log in to grafana on http://AWS-IP
+  a. username: admin, password: admin
+6. When prompted, change the password (firewood_is_fast)
+7. On the left panel, click "Data Sources"
+  a. Select "Prometheus"
+  b. For the URL, use http://localhost:9090
+  c. click "Save and test"
+8. On the left panel, click Dashboards
+  a. On the right top pulldown, click New->Import
+  b. Import the dashboard from the Grafana-dashboard.json file
+  c. Set the data source to Prometheus
+9. You may also want to install a stock dashboard from [here](https://grafana.com/grafana/dashboards/1860-node-exporter-full/)
 
 ## Usage
 Since the benchmark is in two phases, you may want to create the database first and then
@@ -46,10 +66,3 @@ the second phase, use:
 ```
 nohup time cargo run --release --bin benchmark -- --assume-preloaded-rows=1000000000
 ```
-
-
-## Contributing
-We welcome contributions to the Firewood Benchmark repository! If you would like to contribute, please follow our [contribution guidelines](CONTRIBUTING.md).
-
-## License
-The Firewood Benchmark is open source software licensed under the [MIT License](LICENSE).
