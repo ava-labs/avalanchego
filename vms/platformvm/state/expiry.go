@@ -1,0 +1,116 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package state
+
+import (
+	"encoding/binary"
+	"fmt"
+
+	"github.com/google/btree"
+
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/set"
+)
+
+// expiryKey = [timestamp] + [validationID]
+const expiryKeyLength = database.Uint64Size + ids.IDLen
+
+var (
+	errUnexpectedExpiryKeyLength = fmt.Errorf("expected expiry key length %d", expiryKeyLength)
+
+	_ btree.LessFunc[ExpiryEntry] = ExpiryEntry.Less
+)
+
+type Expiry interface {
+	GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error)
+	HasExpiry(timestamp uint64, validationID ids.ID) (bool, error)
+	PutExpiry(timestamp uint64, validationID ids.ID)
+	DeleteExpiry(timestamp uint64, validationID ids.ID)
+}
+
+type ExpiryEntry struct {
+	Timestamp    uint64
+	ValidationID ids.ID
+}
+
+func (e *ExpiryEntry) Marshal() []byte {
+	key := make([]byte, expiryKeyLength)
+	binary.BigEndian.PutUint64(key, e.Timestamp)
+	copy(key[database.Uint64Size:], e.ValidationID[:])
+	return key
+}
+
+func (e *ExpiryEntry) Unmarshal(data []byte) error {
+	if len(data) != expiryKeyLength {
+		return errUnexpectedExpiryKeyLength
+	}
+
+	e.Timestamp = binary.BigEndian.Uint64(data)
+	copy(e.ValidationID[:], data[database.Uint64Size:])
+	return nil
+}
+
+func (e ExpiryEntry) Less(o ExpiryEntry) bool {
+	switch {
+	case e.Timestamp < o.Timestamp:
+		return true
+	case e.Timestamp > o.Timestamp:
+		return false
+	default:
+		return e.ValidationID.Compare(o.ValidationID) == -1
+	}
+}
+
+type expiryDiff struct {
+	added   *btree.BTreeG[ExpiryEntry]
+	removed set.Set[ExpiryEntry]
+}
+
+func newExpiryDiff() *expiryDiff {
+	return &expiryDiff{
+		added: btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
+	}
+}
+
+func (e *expiryDiff) PutExpiry(timestamp uint64, validationID ids.ID) {
+	entry := ExpiryEntry{
+		Timestamp:    timestamp,
+		ValidationID: validationID,
+	}
+	e.added.ReplaceOrInsert(entry)
+	e.removed.Remove(entry)
+}
+
+func (e *expiryDiff) DeleteExpiry(timestamp uint64, validationID ids.ID) {
+	entry := ExpiryEntry{
+		Timestamp:    timestamp,
+		ValidationID: validationID,
+	}
+	e.added.Delete(entry)
+	e.removed.Add(entry)
+}
+
+func (e *expiryDiff) getExpiryIterator(parentIterator iterator.Iterator[ExpiryEntry]) iterator.Iterator[ExpiryEntry] {
+	return iterator.Filter(
+		iterator.Merge(
+			ExpiryEntry.Less,
+			parentIterator,
+			iterator.FromTree(e.added),
+		),
+		e.removed.Contains,
+	)
+}
+
+func (e *expiryDiff) hasExpiry(entry ExpiryEntry) (bool, bool) {
+	switch {
+	case e.removed.Contains(entry):
+		return false, true
+	case e.added.Has(entry):
+		return true, true
+	default:
+		return false, false
+	}
+}

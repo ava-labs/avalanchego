@@ -82,6 +82,7 @@ var (
 	TransformedSubnetPrefix       = []byte("transformedSubnet")
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
+	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
 	SingletonPrefix               = []byte("singleton")
 
 	TimestampKey       = []byte("timestamp")
@@ -96,6 +97,7 @@ var (
 // Chain collects all methods to manage the state of the chain for block
 // execution.
 type Chain interface {
+	Expiry
 	Stakers
 	avax.UTXOAdder
 	avax.UTXOGetter
@@ -274,6 +276,8 @@ type stateBlk struct {
  * | '-. subnetID
  * |   '-. list
  * |     '-- txID -> nil
+ * |-. expiryReplayProtection
+ * | '-- timestamp + validationID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
  *   |-- blocksReindexedKey -> nil
@@ -293,6 +297,9 @@ type state struct {
 	rewards    reward.Calculator
 
 	baseDB *versiondb.Database
+
+	expiry     *btree.BTreeG[ExpiryEntry]
+	expiryDiff *expiryDiff
 
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
@@ -604,6 +611,9 @@ func New(
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(BlockPrefix, baseDB),
 
+		expiry:     btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
+		expiryDiff: newExpiryDiff(),
+
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
@@ -676,6 +686,31 @@ func New(
 	}
 
 	return s, nil
+}
+
+func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
+	return s.expiryDiff.getExpiryIterator(
+		iterator.FromTree(s.expiry),
+	), nil
+}
+
+func (s *state) HasExpiry(timestamp uint64, validationID ids.ID) (bool, error) {
+	entry := ExpiryEntry{
+		Timestamp:    timestamp,
+		ValidationID: validationID,
+	}
+	if has, modified := s.expiryDiff.hasExpiry(entry); modified {
+		return has, nil
+	}
+	return s.expiry.Has(entry), nil
+}
+
+func (s *state) PutExpiry(timestamp uint64, validationID ids.ID) {
+	s.expiryDiff.PutExpiry(timestamp, validationID)
+}
+
+func (s *state) DeleteExpiry(timestamp uint64, validationID ids.ID) {
+	s.expiryDiff.DeleteExpiry(timestamp, validationID)
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
