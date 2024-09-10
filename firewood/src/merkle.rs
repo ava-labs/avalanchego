@@ -405,7 +405,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
         histogram!("firewood.insert.key.length").record(key.len() as f64);
         histogram!("firewood.insert.data.length").record(value.len() as f64);
-        counter!("firewood.merkle.insert").increment(1);
 
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
@@ -457,7 +456,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             (None, None) => {
                 // 1. The node is at `key`
                 node.update_value(value);
-                counter!("firewood.merkle.update").increment(1);
+                counter!("firewood.insert", "merkle" => "update").increment(1);
                 Ok(node)
             }
             (None, Some((child_index, partial_path))) => {
@@ -477,7 +476,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 // Shorten the node's partial path since it has a new parent.
                 node.update_partial_path(partial_path);
                 branch.update_child(child_index, Some(Child::Node(node)));
-                counter!("firewood.insert{merkle=\"above\"}").increment(1);
+                counter!("firewood.insert", "merkle"=>"above").increment(1);
 
                 Ok(Node::Branch(Box::new(branch)))
             }
@@ -501,7 +500,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                     partial_path,
                                 });
                                 branch.update_child(child_index, Some(Child::Node(new_leaf)));
-                                counter!("firewood.insert{merkle=\"below\"}").increment(1);
+                                counter!("firewood.insert", "merkle"=>"below").increment(1);
                                 return Ok(node);
                             }
                             Some(Child::Node(child)) => child,
@@ -531,7 +530,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
                         branch.update_child(child_index, Some(Child::Node(new_leaf)));
 
-                        counter!("firewood.insert{merkle=\"split\"}").increment(1);
+                        counter!("firewood.insert", "merkle"=>"split").increment(1);
                         Ok(Node::Branch(Box::new(branch)))
                     }
                 }
@@ -559,7 +558,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 });
                 branch.update_child(key_index, Some(Child::Node(new_leaf)));
 
-                counter!("firewood.insert{merkle=\"split\"}").increment(1);
+                counter!("firewood.insert", "merkle" => "split").increment(1);
                 Ok(Node::Branch(Box::new(branch)))
             }
         }
@@ -575,16 +574,16 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         let root = self.nodestore.mut_root();
         let Some(root_node) = std::mem::take(root) else {
             // The trie is empty. There is nothing to remove.
-            counter!("firewood.remove{result = \"nonexistent\"}").increment(1);
+            counter!("firewood.remove", "result" => "nonexistent").increment(1);
             return Ok(None);
         };
 
         let (root_node, removed_value) = self.remove_helper(root_node, &key)?;
         *self.nodestore.mut_root() = root_node;
         if removed_value.is_some() {
-            counter!("firewood.remove{result = \"success\"}").increment(1);
+            counter!("firewood.remove", "result" => "success").increment(1);
         } else {
-            counter!("firewood.remove{result = \"nonexistent\"}").increment(1);
+            counter!("firewood.remove", "result" => "nonexistent").increment(1);
         }
         Ok(removed_value)
     }

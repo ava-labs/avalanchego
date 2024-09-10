@@ -566,16 +566,6 @@ pub trait HashedNodeReader: TrieReader {
     }
 }
 
-impl<T> HashedNodeReader for T
-where
-    T: Deref,
-    T::Target: HashedNodeReader,
-{
-    fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
-        self.deref().root_address_and_hash()
-    }
-}
-
 /// Reads nodes and the root address from a merkle trie.
 pub trait TrieReader: NodeReader + RootReader {}
 impl<T> TrieReader for T where T: NodeReader + RootReader {}
@@ -1038,9 +1028,28 @@ impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> RootReader for NodeStore<
     }
 }
 
-impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> HashedNodeReader for NodeStore<T, S>
+impl<T, S> HashedNodeReader for NodeStore<T, S>
 where
     NodeStore<T, S>: TrieReader,
+    T: ReadInMemoryNode,
+    S: ReadableStorage,
+{
+    fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
+        if let Some(root_addr) = self.header.root_address {
+            let root_node = self.read_node(root_addr)?;
+            let root_hash = hash_node(&root_node, &Path::new());
+            Ok(Some((root_addr, root_hash)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl<T, S> HashedNodeReader for Arc<NodeStore<T, S>>
+where
+    NodeStore<T, S>: TrieReader,
+    T: ReadInMemoryNode,
+    S: ReadableStorage,
 {
     fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
         if let Some(root_addr) = self.header.root_address {
