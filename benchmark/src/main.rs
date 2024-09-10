@@ -15,6 +15,7 @@ use clap::Parser;
 use firewood::logger::debug;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
+use pretty_duration::pretty_duration;
 use rand::Rng as _;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -29,9 +30,9 @@ use firewood::v2::api::{Db as _, DbView, Proposal as _};
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value_t = 10)]
+    #[arg(short, long, default_value_t = 10000)]
     batch_size: u64,
-    #[arg(short, long, default_value_t = 2)]
+    #[arg(short, long, default_value_t = 100000)]
     number_of_batches: u64,
     #[arg(short = 'p', long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
     read_verify_percent: u16,
@@ -97,8 +98,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let duration = start.elapsed();
         println!(
-            "Generated and inserted {} batches of size {keys} in {duration:?}",
-            args.number_of_batches
+            "Generated and inserted {} batches of size {keys} in {}",
+            args.number_of_batches,
+            pretty_duration(&duration, None)
         );
     }
 

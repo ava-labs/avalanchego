@@ -13,6 +13,7 @@ metrics-exporter-prometheus = "0.15.3"
 tokio = { version = "1.36.0", features = ["rt", "sync", "macros", "rt-multi-thread"] }
 rand = "0.8.5"
 log = { version = "0.4.20", optional = true }
+pretty-duration = "0.1.1"
 
 [features]
 logger = ["log"]
