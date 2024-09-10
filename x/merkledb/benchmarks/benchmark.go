@@ -135,7 +135,7 @@ func createGoldenDatabase() error {
 		getGoldenStagingDatabaseDirectory(),
 		nil,
 		logging.NoLog{},
-		promRegistry,
+		prometheus.NewRegistry(),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create levelDB database : %v\n", err)
