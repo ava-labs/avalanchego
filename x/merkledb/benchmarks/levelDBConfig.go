@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+
+	"github.com/ava-labs/avalanchego/database/leveldb"
 )
 
 type config struct {
@@ -107,7 +108,7 @@ type config struct {
 	MetricUpdateFrequency time.Duration `json:"metricUpdateFrequency"`
 }
 
-func getLevelDbConfig() []byte {
+func getLevelDBConfig() []byte {
 	parsedConfig := config{
 		BlockCacheCapacity:     16 * opt.MiB,
 		DisableSeeksCompaction: true,

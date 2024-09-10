@@ -133,7 +133,7 @@ func createGoldenDatabase() error {
 
 	levelDB, err := leveldb.New(
 		getGoldenStagingDatabaseDirectory(),
-		getLevelDbConfig(),
+		getLevelDBConfig(),
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 	)
@@ -255,7 +255,7 @@ func resetRunningDatabaseDirectory() error {
 func runBenchmark() error {
 	levelDB, err := leveldb.New(
 		getRunningDatabaseDirectory(),
-		getLevelDbConfig(),
+		getLevelDBConfig(),
 		logging.NoLog{},
 		promRegistry,
 	)
