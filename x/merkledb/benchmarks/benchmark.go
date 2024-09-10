@@ -133,7 +133,7 @@ func createGoldenDatabase() error {
 
 	levelDB, err := leveldb.New(
 		getGoldenStagingDatabaseDirectory(),
-		nil,
+		getLevelDbConfig(),
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 	)
@@ -213,12 +213,12 @@ func createGoldenDatabase() error {
 		(*databaseEntries)/databaseCreationBatchSize, databaseCreationBatchSize, time.Since(startInsertTime))
 	err = mdb.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to close levelDB database : %v\n", err)
+		fmt.Fprintf(os.Stderr, "unable to close merkleDB database : %v\n", err)
 		return err
 	}
 	err = levelDB.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to close merkleDB database : %v\n", err)
+		fmt.Fprintf(os.Stderr, "unable to close levelDB database : %v\n", err)
 		return err
 	}
 	err = os.Rename(getGoldenStagingDatabaseDirectory(), getGoldenDatabaseDirectory())
@@ -255,7 +255,7 @@ func resetRunningDatabaseDirectory() error {
 func runBenchmark() error {
 	levelDB, err := leveldb.New(
 		getRunningDatabaseDirectory(),
-		nil,
+		getLevelDbConfig(),
 		logging.NoLog{},
 		promRegistry,
 	)
