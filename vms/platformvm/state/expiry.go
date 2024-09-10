@@ -26,9 +26,9 @@ var (
 
 type Expiry interface {
 	GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error)
-	HasExpiry(timestamp uint64, validationID ids.ID) (bool, error)
-	PutExpiry(timestamp uint64, validationID ids.ID)
-	DeleteExpiry(timestamp uint64, validationID ids.ID)
+	HasExpiry(ExpiryEntry) (bool, error)
+	PutExpiry(ExpiryEntry)
+	DeleteExpiry(ExpiryEntry)
 }
 
 type ExpiryEntry struct {
@@ -53,6 +53,7 @@ func (e *ExpiryEntry) Unmarshal(data []byte) error {
 	return nil
 }
 
+// Invariant: Less produces the same ordering as the marshalled bytes.
 func (e ExpiryEntry) Less(o ExpiryEntry) bool {
 	switch {
 	case e.Timestamp < o.Timestamp:
@@ -75,20 +76,12 @@ func newExpiryDiff() *expiryDiff {
 	}
 }
 
-func (e *expiryDiff) PutExpiry(timestamp uint64, validationID ids.ID) {
-	entry := ExpiryEntry{
-		Timestamp:    timestamp,
-		ValidationID: validationID,
-	}
+func (e *expiryDiff) PutExpiry(entry ExpiryEntry) {
 	e.added.ReplaceOrInsert(entry)
 	e.removed.Remove(entry)
 }
 
-func (e *expiryDiff) DeleteExpiry(timestamp uint64, validationID ids.ID) {
-	entry := ExpiryEntry{
-		Timestamp:    timestamp,
-		ValidationID: validationID,
-	}
+func (e *expiryDiff) DeleteExpiry(entry ExpiryEntry) {
 	e.added.Delete(entry)
 	e.removed.Add(entry)
 }

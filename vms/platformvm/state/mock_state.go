@@ -258,15 +258,15 @@ func (mr *MockStateMockRecorder) DeleteCurrentValidator(staker any) *gomock.Call
 }
 
 // DeleteExpiry mocks base method.
-func (m *MockState) DeleteExpiry(timestamp uint64, validationID ids.ID) {
+func (m *MockState) DeleteExpiry(arg0 ExpiryEntry) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteExpiry", timestamp, validationID)
+	m.ctrl.Call(m, "DeleteExpiry", arg0)
 }
 
 // DeleteExpiry indicates an expected call of DeleteExpiry.
-func (mr *MockStateMockRecorder) DeleteExpiry(timestamp, validationID any) *gomock.Call {
+func (mr *MockStateMockRecorder) DeleteExpiry(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiry", reflect.TypeOf((*MockState)(nil).DeleteExpiry), timestamp, validationID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiry", reflect.TypeOf((*MockState)(nil).DeleteExpiry), arg0)
 }
 
 // DeletePendingDelegator mocks base method.
@@ -666,18 +666,18 @@ func (mr *MockStateMockRecorder) GetUptime(nodeID, subnetID any) *gomock.Call {
 }
 
 // HasExpiry mocks base method.
-func (m *MockState) HasExpiry(timestamp uint64, validationID ids.ID) (bool, error) {
+func (m *MockState) HasExpiry(arg0 ExpiryEntry) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasExpiry", timestamp, validationID)
+	ret := m.ctrl.Call(m, "HasExpiry", arg0)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HasExpiry indicates an expected call of HasExpiry.
-func (mr *MockStateMockRecorder) HasExpiry(timestamp, validationID any) *gomock.Call {
+func (mr *MockStateMockRecorder) HasExpiry(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasExpiry", reflect.TypeOf((*MockState)(nil).HasExpiry), timestamp, validationID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasExpiry", reflect.TypeOf((*MockState)(nil).HasExpiry), arg0)
 }
 
 // PutCurrentDelegator mocks base method.
@@ -707,15 +707,15 @@ func (mr *MockStateMockRecorder) PutCurrentValidator(staker any) *gomock.Call {
 }
 
 // PutExpiry mocks base method.
-func (m *MockState) PutExpiry(timestamp uint64, validationID ids.ID) {
+func (m *MockState) PutExpiry(arg0 ExpiryEntry) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "PutExpiry", timestamp, validationID)
+	m.ctrl.Call(m, "PutExpiry", arg0)
 }
 
 // PutExpiry indicates an expected call of PutExpiry.
-func (mr *MockStateMockRecorder) PutExpiry(timestamp, validationID any) *gomock.Call {
+func (mr *MockStateMockRecorder) PutExpiry(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutExpiry", reflect.TypeOf((*MockState)(nil).PutExpiry), timestamp, validationID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutExpiry", reflect.TypeOf((*MockState)(nil).PutExpiry), arg0)
 }
 
 // PutPendingDelegator mocks base method.

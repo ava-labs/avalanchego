@@ -28,7 +28,7 @@ func FuzzExpiryEntryMarshal(f *testing.F) {
 	})
 }
 
-func FuzzExpiryEntryMarshalOrdering(f *testing.F) {
+func FuzzExpiryEntryLessAndMarshalOrdering(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var (
 			entry0 ExpiryEntry

@@ -694,23 +694,19 @@ func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	), nil
 }
 
-func (s *state) HasExpiry(timestamp uint64, validationID ids.ID) (bool, error) {
-	entry := ExpiryEntry{
-		Timestamp:    timestamp,
-		ValidationID: validationID,
-	}
+func (s *state) HasExpiry(entry ExpiryEntry) (bool, error) {
 	if has, modified := s.expiryDiff.hasExpiry(entry); modified {
 		return has, nil
 	}
 	return s.expiry.Has(entry), nil
 }
 
-func (s *state) PutExpiry(timestamp uint64, validationID ids.ID) {
-	s.expiryDiff.PutExpiry(timestamp, validationID)
+func (s *state) PutExpiry(entry ExpiryEntry) {
+	s.expiryDiff.PutExpiry(entry)
 }
 
-func (s *state) DeleteExpiry(timestamp uint64, validationID ids.ID) {
-	s.expiryDiff.DeleteExpiry(timestamp, validationID)
+func (s *state) DeleteExpiry(entry ExpiryEntry) {
+	s.expiryDiff.DeleteExpiry(entry)
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {

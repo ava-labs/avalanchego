@@ -153,11 +153,7 @@ func (d *diff) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	return d.expiryDiff.getExpiryIterator(parentIterator), nil
 }
 
-func (d *diff) HasExpiry(timestamp uint64, validationID ids.ID) (bool, error) {
-	entry := ExpiryEntry{
-		Timestamp:    timestamp,
-		ValidationID: validationID,
-	}
+func (d *diff) HasExpiry(entry ExpiryEntry) (bool, error) {
 	if has, modified := d.expiryDiff.hasExpiry(entry); modified {
 		return has, nil
 	}
@@ -167,15 +163,15 @@ func (d *diff) HasExpiry(timestamp uint64, validationID ids.ID) (bool, error) {
 		return false, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.HasExpiry(timestamp, validationID)
+	return parentState.HasExpiry(entry)
 }
 
-func (d *diff) PutExpiry(timestamp uint64, validationID ids.ID) {
-	d.expiryDiff.PutExpiry(timestamp, validationID)
+func (d *diff) PutExpiry(entry ExpiryEntry) {
+	d.expiryDiff.PutExpiry(entry)
 }
 
-func (d *diff) DeleteExpiry(timestamp uint64, validationID ids.ID) {
-	d.expiryDiff.DeleteExpiry(timestamp, validationID)
+func (d *diff) DeleteExpiry(entry ExpiryEntry) {
+	d.expiryDiff.DeleteExpiry(entry)
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -485,11 +481,11 @@ func (d *diff) Apply(baseState Chain) error {
 	addedExpiryIterator := iterator.FromTree(d.expiryDiff.added)
 	for addedExpiryIterator.Next() {
 		entry := addedExpiryIterator.Value()
-		baseState.PutExpiry(entry.Timestamp, entry.ValidationID)
+		baseState.PutExpiry(entry)
 	}
 	addedExpiryIterator.Release()
 	for removed := range d.expiryDiff.removed {
-		baseState.DeleteExpiry(removed.Timestamp, removed.ValidationID)
+		baseState.DeleteExpiry(removed)
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
