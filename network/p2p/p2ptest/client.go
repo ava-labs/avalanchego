@@ -21,15 +21,19 @@ import (
 
 // NewClient generates a client-server pair and returns the client used to
 // communicate with a server with the specified handler
-func NewClient(t *testing.T, rootCtx context.Context, handler p2p.Handler) *p2p.Client {
+func NewClient(
+	t *testing.T,
+	rootCtx context.Context,
+	handler p2p.Handler,
+	clientNodeID ids.NodeID,
+	serverNodeID ids.NodeID,
+) *p2p.Client {
 	clientSender := &enginetest.Sender{}
 	serverSender := &enginetest.Sender{}
 
-	clientNodeID := ids.GenerateTestNodeID()
 	clientNetwork, err := p2p.NewNetwork(logging.NoLog{}, clientSender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 
-	serverNodeID := ids.GenerateTestNodeID()
 	serverNetwork, err := p2p.NewNetwork(logging.NoLog{}, serverSender, prometheus.NewRegistry(), "")
 	require.NoError(t, err)
 
