@@ -11,7 +11,7 @@ import (
 	"github.com/thepudds/fzgen/fuzzer"
 )
 
-func FuzzMarshalExpiryKey(f *testing.F) {
+func FuzzExpiryEntryMarshal(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
@@ -28,7 +28,7 @@ func FuzzMarshalExpiryKey(f *testing.F) {
 	})
 }
 
-func FuzzMarshalExpiryKeyIteration(f *testing.F) {
+func FuzzExpiryEntryMarshalOrdering(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var (
 			entry0 ExpiryEntry
@@ -47,13 +47,13 @@ func FuzzMarshalExpiryKeyIteration(f *testing.F) {
 	})
 }
 
-func FuzzUnmarshalExpiryKey(f *testing.F) {
+func FuzzExpiryEntryUnmarshal(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		require := require.New(t)
 
 		var entry ExpiryEntry
 		if err := entry.Unmarshal(data); err != nil {
-			require.ErrorIs(err, errUnexpectedExpiryKeyLength)
+			require.ErrorIs(err, errUnexpectedExpiryEntryLength)
 			return
 		}
 

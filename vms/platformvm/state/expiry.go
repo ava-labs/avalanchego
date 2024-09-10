@@ -15,11 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// expiryKey = [timestamp] + [validationID]
-const expiryKeyLength = database.Uint64Size + ids.IDLen
+// expiryEntry = [timestamp] + [validationID]
+const expiryEntryLength = database.Uint64Size + ids.IDLen
 
 var (
-	errUnexpectedExpiryKeyLength = fmt.Errorf("expected expiry key length %d", expiryKeyLength)
+	errUnexpectedExpiryEntryLength = fmt.Errorf("expected expiry entry length %d", expiryEntryLength)
 
 	_ btree.LessFunc[ExpiryEntry] = ExpiryEntry.Less
 )
@@ -37,15 +37,15 @@ type ExpiryEntry struct {
 }
 
 func (e *ExpiryEntry) Marshal() []byte {
-	key := make([]byte, expiryKeyLength)
-	binary.BigEndian.PutUint64(key, e.Timestamp)
-	copy(key[database.Uint64Size:], e.ValidationID[:])
-	return key
+	data := make([]byte, expiryEntryLength)
+	binary.BigEndian.PutUint64(data, e.Timestamp)
+	copy(data[database.Uint64Size:], e.ValidationID[:])
+	return data
 }
 
 func (e *ExpiryEntry) Unmarshal(data []byte) error {
-	if len(data) != expiryKeyLength {
-		return errUnexpectedExpiryKeyLength
+	if len(data) != expiryEntryLength {
+		return errUnexpectedExpiryEntryLength
 	}
 
 	e.Timestamp = binary.BigEndian.Uint64(data)
