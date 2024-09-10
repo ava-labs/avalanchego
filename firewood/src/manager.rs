@@ -23,6 +23,9 @@ pub struct RevisionManagerConfig {
 
     #[builder(default_code = "NonZero::new(20480).expect(\"non-zero\")")]
     node_cache_size: NonZero<usize>,
+
+    #[builder(default_code = "NonZero::new(10000).expect(\"non-zero\")")]
+    free_list_cache_size: NonZero<usize>,
 }
 
 type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
@@ -62,7 +65,12 @@ impl RevisionManager {
         truncate: bool,
         config: RevisionManagerConfig,
     ) -> Result<Self, Error> {
-        let storage = Arc::new(FileBacked::new(filename, config.node_cache_size, truncate)?);
+        let storage = Arc::new(FileBacked::new(
+            filename,
+            config.node_cache_size,
+            config.free_list_cache_size,
+            truncate,
+        )?);
         let nodestore = match truncate {
             true => Arc::new(NodeStore::new_empty_committed(storage.clone())?),
             false => Arc::new(NodeStore::open(storage.clone())?),

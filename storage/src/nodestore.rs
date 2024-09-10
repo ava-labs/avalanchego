@@ -380,13 +380,17 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
             if let Some(free_stored_area_addr) = self.header.free_lists[index] {
                 // Update the free list head.
                 // Skip the index byte and Area discriminant byte
-                let free_area_addr = free_stored_area_addr.get() + 2;
-                let free_head_stream = self.storage.stream_from(free_area_addr)?;
-                let free_head: FreeArea = bincode::deserialize_from(free_head_stream)
-                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+                if let Some(free_head) = self.storage.free_list_cache(free_stored_area_addr) {
+                    self.header.free_lists[index] = free_head;
+                } else {
+                    let free_area_addr = free_stored_area_addr.get() + 2;
+                    let free_head_stream = self.storage.stream_from(free_area_addr)?;
+                    let free_head: FreeArea = bincode::deserialize_from(free_head_stream)
+                        .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
-                // Update the free list to point to the next free block.
-                self.header.free_lists[index] = free_head.next_free_block;
+                    // Update the free list to point to the next free block.
+                    self.header.free_lists[index] = free_head.next_free_block;
+                }
 
                 // Return the address of the newly allocated block.
                 return Ok(Some((free_stored_area_addr, index as AreaIndex)));
@@ -462,6 +466,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             bincode::serialize(&stored_area).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
         self.storage.write(addr.into(), &stored_area_bytes)?;
+
+        self.storage
+            .add_to_free_list_cache(addr, self.header.free_lists[area_size_index as usize]);
 
         // The newly freed block is now the head of the free list.
         self.header.free_lists[area_size_index as usize] = Some(addr);

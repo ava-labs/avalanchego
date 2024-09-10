@@ -74,6 +74,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mgrcfg = RevisionManagerConfig::builder()
         .node_cache_size(args.cache_size)
+        .free_list_cache_size(
+            NonZeroUsize::new(2 * args.batch_size as usize).expect("batch size > 0"),
+        )
         .max_revisions(args.revisions)
         .build();
     let cfg = DbConfig::builder()
