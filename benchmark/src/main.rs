@@ -52,6 +52,9 @@ struct Args {
     prometheus_port: u16,
 }
 
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
