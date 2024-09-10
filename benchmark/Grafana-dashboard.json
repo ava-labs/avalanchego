@@ -1,4 +1,41 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "11.2.0"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -18,13 +55,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": null,
   "links": [],
   "panels": [
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "ddxieanioluyoa"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -109,7 +146,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -128,9 +165,8 @@
     },
     {
       "datasource": {
-        "default": true,
         "type": "prometheus",
-        "uid": "ddxieanioluyoa"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -183,7 +219,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -202,9 +238,8 @@
     },
     {
       "datasource": {
-        "default": true,
         "type": "prometheus",
-        "uid": "ddxieanioluyoa"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -261,7 +296,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -277,7 +312,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "100 * sum(increase(firewood_cache_freelist{type=\"hit\"}[$__rate_interval])) by (name) / sum(increase(firewood_cache_freelist[$__rate_interval])) by (name)",
@@ -293,9 +328,8 @@
     },
     {
       "datasource": {
-        "default": true,
         "type": "prometheus",
-        "uid": "ddxieanioluyoa"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -379,7 +413,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -398,9 +432,8 @@
     },
     {
       "datasource": {
-        "default": true,
         "type": "prometheus",
-        "uid": "ddxieanioluyoa"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -479,7 +512,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -498,9 +531,8 @@
     },
     {
       "datasource": {
-        "default": true,
         "type": "prometheus",
-        "uid": "ddxieanioluyoa"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -579,7 +611,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "ddxieanioluyoa"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "node_memory_Dirty_bytes",
