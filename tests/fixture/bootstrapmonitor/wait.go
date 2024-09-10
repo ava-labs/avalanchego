@@ -11,50 +11,73 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	defaultContextDuration = 30 * time.Second
-)
+const minContextDuration = 30 * time.Second
+
+func BootstrapSucceededMessage(containerImage string) string {
+	return "Bootstrap completed successfully for " + containerImage
+}
 
 func WaitForCompletion(namespace string, podName string, nodeContainerName string, dataDir string, interval time.Duration) error {
-	log.Println(("Waiting for node to report healthy..."))
+	clientset, err := getClientset()
+	if err != nil {
+		return fmt.Errorf("failed to get clientset: %w", err)
+	}
+
+	// Ensure a minimum context duration
+	contextDuration := max(minContextDuration, interval)
+
 	var (
-		clientset         *kubernetes.Clientset
+		podReady          bool
 		bootstrapComplete bool
 		containerImage    string
 	)
-	err := wait.PollImmediateInfinite(interval, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultContextDuration)
+	err = wait.PollImmediateInfinite(interval, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
+		// Avoid checking node health before it reports ready
+		if !podReady {
+			log.Println("Waiting for pod readiness")
+
+			err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady)
+			if err != nil {
+				log.Printf("failed to wait for pod condition: %v", err)
+				return false, nil
+			}
+
+			podReady = true
+
+			// Ensure this is only printed once
+			log.Println("Waiting for node to report healthy")
+		}
+
 		if !bootstrapComplete {
-			if healthy, err := tmpnet.CheckNodeHealth(ctx, "http://localhost:9650"); err != nil {
+			// Check whether the node is reporting healthy which indicates that bootstrap is complete
+
+			if healthy, err := tmpnet.CheckNodeHealth(ctx, fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)); err != nil {
 				log.Printf("failed to wait for node health: %v", err)
 				return false, nil
 			} else {
 				cmd := exec.Command("du", "-sh", dataDir)
 				if diskUsage, err := cmd.CombinedOutput(); err != nil {
-					log.Printf("failed to check disk usage")
+					log.Printf("failed to check disk usage: %v", err)
 				} else {
 					log.Printf("Disk usage: %s", string(diskUsage))
 				}
 
 				if !healthy.Healthy {
+					log.Println("Node reported unhealthy")
 					return false, nil
 				}
-			}
 
-			if clientset == nil {
-				var err error
-				clientset, err = getClientset()
-				if err != nil {
-					log.Printf("failed to get clientset: %v", err)
-					return false, nil
-				}
+				log.Println("Node reported healthy")
 			}
 
 			if len(containerImage) == 0 {
@@ -86,8 +109,8 @@ func WaitForCompletion(namespace string, podName string, nodeContainerName strin
 			}
 
 			log.Printf("Found updated image %s", latestImageID)
-			log.Println("Updating StatefulSet to trigger a new test")
 
+			log.Println("Updating StatefulSet to trigger a new test")
 			if err := setContainerImage(ctx, clientset, namespace, podName, nodeContainerName, latestImageID); err != nil {
 				log.Printf("failed to set container image: %v", err)
 				return false, nil
@@ -106,8 +129,4 @@ func WaitForCompletion(namespace string, podName string, nodeContainerName strin
 	// Avoid exiting immediately to avoid container restart before the pod is recreated with the new image
 	time.Sleep(5 * time.Minute)
 	return nil
-}
-
-func BootstrapSucceededMessage(containerImage string) string {
-	return "Bootstrap completed successfully for " + containerImage
 }

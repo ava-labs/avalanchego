@@ -25,6 +25,18 @@ const (
 	recordedImageFilename = "bootstrap_image_name.txt"
 )
 
+func BootstrapStartingMessage(containerImage string) string {
+	return "Starting bootstrap test for image " + containerImage
+}
+
+func BootstrapResumingMessage(containerImage string) string {
+	return "Resuming bootstrap test for image " + containerImage
+}
+
+func NodeDataDir(path string) string {
+	return path + "/avalanchego"
+}
+
 func InitBootstrapTest(namespace string, podName string, nodeContainerName string, dataDir string) error {
 	var (
 		clientset      *kubernetes.Clientset
@@ -108,16 +120,4 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 
 		return true, nil
 	})
-}
-
-func BootstrapStartingMessage(containerImage string) string {
-	return "Starting bootstrap test for image " + containerImage
-}
-
-func BootstrapResumingMessage(containerImage string) string {
-	return "Resuming bootstrap test for image " + containerImage
-}
-
-func NodeDataDir(path string) string {
-	return path + "/avalanchego"
 }

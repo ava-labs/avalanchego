@@ -49,6 +49,11 @@ func TestE2E(t *testing.T) {
 }
 
 const (
+	// The relative path to the repo root enables discovery of the
+	// repo root when the test is executed from the root or the path
+	// of this file.
+	repoRelativePath = "tests/fixture/bootstrapmonitor/e2e"
+
 	nodeImage          = "localhost:5001/avalanchego"
 	latestNodeImage    = nodeImage + ":latest"
 	monitorImage       = "localhost:5001/bootstrap-monitor"
@@ -97,7 +102,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			tc.Outf("{{yellow}}skipping build of avalanchego image{{/}}\n")
 		} else {
 			ginkgo.By("Building the avalanchego image")
-			buildNodeImage(tc, nodeImage, false /* forceNewHash */)
+			buildAvalanchegoImage(tc, nodeImage, false /* forceNewHash */)
 		}
 
 		if skipMonitorImageBuild {
@@ -114,7 +119,6 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		clientset, err := kubernetes.NewForConfig(kubeConfig)
 		require.NoError(err)
 
-		// TODO(marun) Consider optionally deleting the namespace after the test
 		ginkgo.By("Creating a kube namespace to ensure isolation between test runs")
 		createdNamespace, err := clientset.CoreV1().Namespaces().Create(tc.DefaultContext(), &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
@@ -125,8 +129,10 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		namespace := createdNamespace.Name
 
 		ginkgo.By("Creating a node to bootstrap from")
-		nodeStatefulSet := createNode(tc, clientset, namespace)
-		nodePodName := nodeStatefulSet.Name + "-0"
+		nodeStatefulSet := newNodeStatefulSet("avalanchego-node", defaultNodeFlags())
+		createdNodeStatefulSet, err := clientset.AppsV1().StatefulSets(namespace).Create(tc.DefaultContext(), nodeStatefulSet, metav1.CreateOptions{})
+		require.NoError(err)
+		nodePodName := createdNodeStatefulSet.Name + "-0"
 		waitForPodCondition(tc, clientset, namespace, nodePodName, corev1.PodReady)
 		bootstrapID := waitForNodeHealthy(tc, kubeConfig, namespace, nodePodName)
 		pod, err := clientset.CoreV1().Pods(namespace).Get(tc.DefaultContext(), nodePodName, metav1.GetOptions{})
@@ -138,10 +144,6 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		bootstrapPodName := bootstrapStatefulSet.Name + "-0"
 
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReadyToStartContainers)
-		outputLogLine(tc, fmt.Sprintf(
-			"Logs from: %q container of pod %s.%s", initContainerName, namespace, bootstrapPodName))
-		outputLogLine(tc,
-			"================================================================================================================================================")
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, "")
 
 		ginkgo.By("Waiting for the pod image to be updated to include an image digest")
@@ -195,7 +197,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
 
 		ginkgo.By("Building and pushing a new avalanchego image to prompt the start of a new bootstrap test")
-		buildNodeImage(tc, nodeImage, true /* forceNewHash */)
+		buildAvalanchegoImage(tc, nodeImage, true /* forceNewHash */)
 
 		ginkgo.By("Waiting for the pod image to change")
 		require.Eventually(func() bool {
@@ -218,15 +220,14 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 	})
 })
 
-func buildNodeImage(tc tests.TestContext, imageName string, forceNewHash bool) {
+func buildAvalanchegoImage(tc tests.TestContext, imageName string, forceNewHash bool) {
 	buildImage(tc, imageName, forceNewHash, "build_image.sh")
 }
 
 func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scriptName string) {
 	require := require.New(tc)
 
-	relativePath := "tests/fixture/bootstrapmonitor/e2e"
-	repoRoot, err := getRepoRootPath(relativePath)
+	repoRoot, err := e2e.GetRepoRootPath(repoRelativePath)
 	require.NoError(err)
 
 	var args []string
@@ -247,132 +248,15 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		require.FailNow("Image build failed: %v\nWith output: %s", err, output)
+		require.FailNow("Image build failed: %s\nWith output: %s", err, output)
 	}
 }
 
-func createNode(tc tests.TestContext, clientset kubernetes.Interface, namespace string) *appsv1.StatefulSet {
-	statefulSet := newNodeStatefulSet("avalanchego-node", defaultNodeFlags())
-	createdStatefulSet, err := clientset.AppsV1().StatefulSets(namespace).Create(tc.DefaultContext(), statefulSet, metav1.CreateOptions{})
-	require.NoError(tc, err)
-	return createdStatefulSet
-}
-
-func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, bootstrapIP string, bootstrapNodeID ids.NodeID) *appsv1.StatefulSet {
-	flags := defaultNodeFlags()
-	flags[config.BootstrapIPsKey] = fmt.Sprintf("%s:%d", bootstrapIP, config.DefaultStakingPort)
-	flags[config.BootstrapIDsKey] = bootstrapNodeID.String()
-
-	statefulSet := newNodeStatefulSet("bootstrap-tester", flags)
-
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      volumeName,
-			MountPath: dataDir,
-		},
-	}
-
-	// Add the monitor containers to enable continuous bootstrap testing
-	initContainer := getMonitorContainer(initContainerName, []string{
-		"init",
-		"--node-container-name=" + nodeContainerName,
-		"--data-dir=" + dataDir,
-	})
-	initContainer.VolumeMounts = volumeMounts
-	statefulSet.Spec.Template.Spec.InitContainers = append(statefulSet.Spec.Template.Spec.InitContainers, initContainer)
-	monitorContainer := getMonitorContainer(monitorContainerName, []string{
-		"wait-for-completion",
-		"--node-container-name=" + nodeContainerName,
-		"--data-dir=" + dataDir,
-		"--poll-interval=1s",
-	})
-	monitorContainer.VolumeMounts = volumeMounts
-	statefulSet.Spec.Template.Spec.Containers = append(statefulSet.Spec.Template.Spec.Containers, monitorContainer)
-
-	grantMonitorPermissions(tc, clientset, namespace)
-
-	createdStatefulSet, err := clientset.AppsV1().StatefulSets(namespace).Create(tc.DefaultContext(), statefulSet, metav1.CreateOptions{})
-	require.NoError(tc, err)
-
-	return createdStatefulSet
-}
-
-func getMonitorContainer(name string, args []string) corev1.Container {
-	return corev1.Container{
-		Name:    name,
-		Image:   latestMonitorImage,
-		Command: []string{"./bootstrap-monitor"},
-		Args:    args,
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.name",
-					},
-				},
-			},
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.namespace",
-					},
-				},
-			},
-		},
-	}
-}
-
-// grantMonitorPermissions grants the permissions required by the bootstrap monitor to the namespace's default service account.
-func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string) {
-	require := require.New(tc)
-
-	role := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "bootstrap-monitor-role-",
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods"},
-				Verbs:     []string{"get", "create", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{"apps"},
-				Resources: []string{"statefulsets"},
-				Verbs:     []string{"patch"},
-			},
-		},
-	}
-	createdRole, err := clientset.RbacV1().Roles(namespace).Create(tc.DefaultContext(), role, metav1.CreateOptions{})
-	require.NoError(err)
-
-	roleBinding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "bootstrap-monitor-role-binding-",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespace,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind:     "Role",
-			Name:     createdRole.Name,
-			APIGroup: "rbac.authorization.k8s.io",
-		},
-	}
-	_, err = clientset.RbacV1().RoleBindings(namespace).Create(tc.DefaultContext(), roleBinding, metav1.CreateOptions{})
-	require.NoError(err)
-}
-
+// newNodeStatefulSet returns a statefulset for an avalanchego node.
 func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: name,
+			GenerateName: name + "-",
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:    pointer.Int32(1),
@@ -429,14 +313,14 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/ext/health",
+										Path: "/ext/health/liveness",
 										Port: intstr.FromInt(config.DefaultHTTPPort),
 									},
 								},
 								PeriodSeconds:    1,
 								SuccessThreshold: 1,
 							},
-							Env: StringMapToEnvVarSlice(flags),
+							Env: stringMapToEnvVarSlice(flags),
 						},
 					},
 				},
@@ -445,23 +329,8 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 	}
 }
 
-func getRepoRootPath(suffix string) (string, error) {
-	// - When executed via a test binary, the working directory will be wherever
-	// the binary is executed from, but scripts should require execution from
-	// the repo root.
-	//
-	// - When executed via ginkgo (nicer for development + supports
-	// parallel execution) the working directory will always be the
-	// target path (e.g. [repo root]./tests/bootstrap/e2e) and getting the repo
-	// root will require stripping the target path suffix.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSuffix(cwd, suffix), nil
-}
-
-func StringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
+// stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.
+func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
 	envVars := make([]corev1.EnvVar, len(mapping))
 	var i int
 	for k, v := range mapping {
@@ -480,28 +349,31 @@ func envVarName(prefix string, key string) string {
 	return strings.ToUpper(prefix + "_" + config.DashesToUnderscores.Replace(key))
 }
 
-func waitForPodCondition(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) {
-	require.NoError(tc, bootstrapmonitor.WaitForPodStatus(
-		tc.DefaultContext(),
-		clientset,
-		namespace,
-		podName,
-		func(status *corev1.PodStatus) bool {
-			for _, condition := range status.Conditions {
-				if condition.Type == conditionType && condition.Status == corev1.ConditionTrue {
-					return true
-				}
-			}
-			return false
-		},
-	))
+// defaultNodeFlags defines common flags for avalanchego nodes used by this test
+func defaultNodeFlags() map[string]string {
+	return map[string]string{
+		config.DataDirKey:                nodeDataDir,
+		config.NetworkNameKey:            constants.LocalName,
+		config.SybilProtectionEnabledKey: "false",
+		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
+		config.LogDisplayLevelKey:        logging.Debug.String(),
+		config.LogLevelKey:               logging.Debug.String(),
+		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
+	}
 }
 
+// waitForPodCondition waits until the specified pod reports the specified condition
+func waitForPodCondition(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) {
+	require.NoError(tc, bootstrapmonitor.WaitForPodCondition(tc.DefaultContext(), clientset, namespace, podName, conditionType))
+}
+
+// waitForNodeHealthy waits for the node running in the specified pod to report healthy.
 func waitForNodeHealthy(tc tests.TestContext, kubeConfig *restclient.Config, namespace string, podName string) ids.NodeID {
 	require := require.New(tc)
 
+	// A forwarded connection enables connectivity without exposing the node external to the kube cluster
 	ginkgo.By(fmt.Sprintf("Enabling a local forward for pod %s.%s", namespace, podName))
-	localPort, localPortStopChan, err := EnableLocalForwardForPod(kubeConfig, namespace, podName, config.DefaultHTTPPort, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
+	localPort, localPortStopChan, err := enableLocalForwardForPod(kubeConfig, namespace, podName, config.DefaultHTTPPort, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
 	require.NoError(err)
 	defer close(localPortStopChan)
 	localNodeURI := fmt.Sprintf("http://127.0.0.1:%d", localPort)
@@ -523,47 +395,9 @@ func waitForNodeHealthy(tc tests.TestContext, kubeConfig *restclient.Config, nam
 	return bootstrapNodeID
 }
 
-func outputLogLine(tc tests.TestContext, line string) {
-	tc.Outf("{{orange}}%s{{/}}\n", line)
-}
-
-func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput string) {
-	// # TODO(marun) Add a context to limit the maximum runtime
-	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
-		Container: containerName,
-	})
-
-	// Stream the logs until the desired output is seen
-	readCloser, err := req.Stream(tc.DefaultContext())
-	require.NoError(tc, err)
-	defer readCloser.Close()
-
-	scanner := bufio.NewScanner(readCloser)
-	for scanner.Scan() {
-		line := scanner.Text()
-		outputLogLine(tc, line)
-		if len(desiredOutput) > 0 && strings.Contains(line, desiredOutput) {
-			return
-		}
-	}
-}
-
-func defaultNodeFlags() map[string]string {
-	return map[string]string{
-		config.DataDirKey:                nodeDataDir,
-		config.NetworkNameKey:            constants.LocalName,
-		config.SybilProtectionEnabledKey: "false",
-		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
-		config.LogDisplayLevelKey:        logging.Debug.String(),
-		config.LogLevelKey:               logging.Debug.String(),
-		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
-	}
-}
-
-// enableLocalForwardForPod enables traffic forwarding from a local
-// port to the specified pod with client-go. The returned stop channel
-// should be closed to stop the port forwarding.
-func EnableLocalForwardForPod(kubeConfig *restclient.Config, namespace string, name string, port int, out, errOut io.Writer) (uint16, chan struct{}, error) {
+// enableLocalForwardForPod enables traffic forwarding from a local port to the specified pod with client-go. The returned
+// stop channel should be closed to stop the port forwarding.
+func enableLocalForwardForPod(kubeConfig *restclient.Config, namespace string, name string, port int, out, errOut io.Writer) (uint16, chan struct{}, error) {
 	transport, upgrader, err := spdy.RoundTripperFor(kubeConfig)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to create round tripper: %w", err)
@@ -614,4 +448,149 @@ func EnableLocalForwardForPod(kubeConfig *restclient.Config, namespace string, n
 		return 0, nil, fmt.Errorf("failed to find at least one forwarded port: %w", err)
 	}
 	return forwardedPorts[0].Local, stopChan, nil
+}
+
+// createBootstrapTester creates a pod that can continuously bootstrap from the specified bootstrap IP+ID.
+func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, bootstrapIP string, bootstrapNodeID ids.NodeID) *appsv1.StatefulSet {
+	flags := defaultNodeFlags()
+	flags[config.BootstrapIPsKey] = fmt.Sprintf("%s:%d", bootstrapIP, config.DefaultStakingPort)
+	flags[config.BootstrapIDsKey] = bootstrapNodeID.String()
+
+	statefulSet := newNodeStatefulSet("bootstrap-tester", flags)
+
+	// Add the bootstrap-monitor containers to enable continuous bootstrap testing
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: dataDir,
+		},
+	}
+	initContainer := getMonitorContainer(initContainerName, []string{
+		"init",
+		"--node-container-name=" + nodeContainerName,
+		"--data-dir=" + dataDir,
+	})
+	initContainer.VolumeMounts = volumeMounts
+	statefulSet.Spec.Template.Spec.InitContainers = append(statefulSet.Spec.Template.Spec.InitContainers, initContainer)
+	monitorContainer := getMonitorContainer(monitorContainerName, []string{
+		"wait-for-completion",
+		"--node-container-name=" + nodeContainerName,
+		"--data-dir=" + dataDir,
+		"--poll-interval=1s",
+	})
+	monitorContainer.VolumeMounts = volumeMounts
+	statefulSet.Spec.Template.Spec.Containers = append(statefulSet.Spec.Template.Spec.Containers, monitorContainer)
+
+	grantMonitorPermissions(tc, clientset, namespace)
+
+	createdStatefulSet, err := clientset.AppsV1().StatefulSets(namespace).Create(tc.DefaultContext(), statefulSet, metav1.CreateOptions{})
+	require.NoError(tc, err)
+
+	return createdStatefulSet
+}
+
+// getMonitorContainer retrieves the common container definition for bootstrap-monitor containers.
+func getMonitorContainer(name string, args []string) corev1.Container {
+	return corev1.Container{
+		Name:    name,
+		Image:   latestMonitorImage,
+		Command: []string{"./bootstrap-monitor"},
+		Args:    args,
+		Env: []corev1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+		},
+	}
+}
+
+// grantMonitorPermissions grants the permissions required by the bootstrap-monitor to the namespace's default service account.
+func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string) {
+	require := require.New(tc)
+
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "bootstrap-monitor-role-",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "create", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{"apps"},
+				Resources: []string{"statefulsets"},
+				Verbs:     []string{"patch"},
+			},
+		},
+	}
+	createdRole, err := clientset.RbacV1().Roles(namespace).Create(tc.DefaultContext(), role, metav1.CreateOptions{})
+	require.NoError(err)
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "bootstrap-monitor-role-binding-",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     createdRole.Name,
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+	_, err = clientset.RbacV1().RoleBindings(namespace).Create(tc.DefaultContext(), roleBinding, metav1.CreateOptions{})
+	require.NoError(err)
+}
+
+// waitForLogOutput streams the logs from the specified pod container until the desired output is found or the context times out.
+func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput string) {
+	// TODO(marun) Figure out why log output is randomly truncated (not flushed?)
+
+	outputLogLine(tc, fmt.Sprintf(
+		"Logs from: %q container of pod %s.%s (may not be complete)", containerName, namespace, podName))
+	outputLogLine(tc,
+		"================================================================================================================================================")
+
+	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
+		Container: containerName,
+	})
+
+	// Stream the logs until the desired output is seen
+	readCloser, err := req.Stream(tc.DefaultContext())
+	require.NoError(tc, err)
+	defer readCloser.Close()
+
+	scanner := bufio.NewScanner(readCloser)
+	for scanner.Scan() {
+		line := scanner.Text()
+		outputLogLine(tc, line)
+		if len(desiredOutput) > 0 && strings.Contains(line, desiredOutput) {
+			return
+		}
+	}
+}
+
+// outputLogLine outputs logs in a consistent color
+func outputLogLine(tc tests.TestContext, line string) {
+	tc.Outf("{{light-gray}}%s{{/}}\n", line)
 }

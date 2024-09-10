@@ -21,7 +21,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func WaitForPodStatus(
+func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) error {
+	return waitForPodStatus(
+		ctx,
+		clientset,
+		namespace,
+		podName,
+		func(status *corev1.PodStatus) bool {
+			for _, condition := range status.Conditions {
+				if condition.Type == conditionType && condition.Status == corev1.ConditionTrue {
+					return true
+				}
+			}
+			return false
+		},
+	)
+}
+
+func waitForPodStatus(
 	ctx context.Context,
 	clientset *kubernetes.Clientset,
 	namespace string,
@@ -169,7 +186,7 @@ func getLatestImageID(
 		return "", fmt.Errorf("failed to start pod %w", err)
 	}
 
-	err = WaitForPodStatus(ctx, clientset, namespace, createdPod.Name, func(status *corev1.PodStatus) bool {
+	err = waitForPodStatus(ctx, clientset, namespace, createdPod.Name, func(status *corev1.PodStatus) bool {
 		return status.Phase == corev1.PodSucceeded || status.Phase == corev1.PodFailed
 	})
 	if err != nil {
