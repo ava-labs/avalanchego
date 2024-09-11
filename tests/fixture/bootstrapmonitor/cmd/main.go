@@ -54,7 +54,7 @@ func main() {
 	rootCmd.AddCommand(versionCmd)
 
 	// Use avalanchego logger for consistency
-	log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, os.Stderr, logging.Plain.ConsoleEncoder()))
+	log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, os.Stdout, logging.Plain.ConsoleEncoder()))
 
 	initCmd := &cobra.Command{
 		Use:   "init",
