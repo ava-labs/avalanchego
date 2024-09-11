@@ -25,9 +25,19 @@ var (
 )
 
 type Expiry interface {
+	// GetExpiryIterator returns an iterator of all the expiry entries in order
+	// of lowest to highest timestamp.
 	GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error)
+
+	// HasExpiry returns true if the database has the specified entry.
 	HasExpiry(ExpiryEntry) (bool, error)
+
+	// PutExpiry adds the entry to the database. If the entry already exists, it
+	// is a noop.
 	PutExpiry(ExpiryEntry)
+
+	// DeleteExpiry removes the entry from the database. If the entry doesn't
+	// exist, it is a noop.
 	DeleteExpiry(ExpiryEntry)
 }
 
