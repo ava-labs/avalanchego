@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
@@ -110,6 +111,154 @@ func TestDiffCurrentSupply(t *testing.T) {
 
 	require.NoError(d.Apply(state))
 	assertChainsEqual(t, state, d)
+}
+
+func TestDiffExpiry(t *testing.T) {
+	type op struct {
+		put   bool
+		entry ExpiryEntry
+	}
+	tests := []struct {
+		name             string
+		initialExpiries  []ExpiryEntry
+		ops              []op
+		expectedExpiries []ExpiryEntry
+	}{
+		{
+			name: "empty noop",
+		},
+		{
+			name: "insert",
+			ops: []op{
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+			expectedExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+			},
+		},
+		{
+			name: "remove",
+			initialExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+			},
+			ops: []op{
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+		{
+			name: "add and immediately remove",
+			ops: []op{
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+		{
+			name: "add + remove + add",
+			ops: []op{
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+			expectedExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+			},
+		},
+		{
+			name: "everything",
+			initialExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+				{Timestamp: 2},
+				{Timestamp: 3},
+			},
+			ops: []op{
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 2},
+				},
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+			expectedExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+				{Timestamp: 3},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		require := require.New(t)
+
+		state := newTestState(t, memdb.New())
+		for _, expiry := range test.initialExpiries {
+			state.PutExpiry(expiry)
+		}
+
+		d, err := NewDiffOn(state)
+		require.NoError(err)
+
+		otherExpiries := set.Of(test.initialExpiries...)
+		for _, op := range test.ops {
+			if op.put {
+				d.PutExpiry(op.entry)
+			} else {
+				d.DeleteExpiry(op.entry)
+			}
+			otherExpiries.Add(op.entry)
+		}
+		otherExpiries.Remove(test.expectedExpiries...)
+
+		verifyChain := func(chain Chain) {
+			expiryIterator, err := chain.GetExpiryIterator()
+			require.NoError(err)
+			require.Equal(
+				test.expectedExpiries,
+				iterator.ToSlice(expiryIterator),
+			)
+
+			for _, expiry := range test.expectedExpiries {
+				has, err := chain.HasExpiry(expiry)
+				require.NoError(err)
+				require.True(has)
+			}
+			for expiry := range otherExpiries {
+				has, err := chain.HasExpiry(expiry)
+				require.NoError(err)
+				require.False(has)
+			}
+		}
+
+		verifyChain(d)
+		require.NoError(d.Apply(state))
+		verifyChain(state)
+		assertChainsEqual(t, d, state)
+	}
 }
 
 func TestDiffCurrentValidator(t *testing.T) {
@@ -526,6 +675,16 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 	require := require.New(t)
 
 	t.Helper()
+
+	expectedExpiryIterator, expectedErr := expected.GetExpiryIterator()
+	actualExpiryIterator, actualErr := actual.GetExpiryIterator()
+	require.Equal(expectedErr, actualErr)
+	if expectedErr == nil {
+		require.Equal(
+			iterator.ToSlice(expectedExpiryIterator),
+			iterator.ToSlice(actualExpiryIterator),
+		)
+	}
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()

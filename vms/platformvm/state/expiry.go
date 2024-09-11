@@ -87,13 +87,17 @@ func (e *expiryDiff) DeleteExpiry(entry ExpiryEntry) {
 }
 
 func (e *expiryDiff) getExpiryIterator(parentIterator iterator.Iterator[ExpiryEntry]) iterator.Iterator[ExpiryEntry] {
-	return iterator.Filter(
-		iterator.Merge(
-			ExpiryEntry.Less,
-			parentIterator,
-			iterator.FromTree(e.added),
+	// The iterators are deduplicated so that additions that were present in the
+	// parent iterator are not duplicated.
+	return iterator.Deduplicate(
+		iterator.Filter(
+			iterator.Merge(
+				ExpiryEntry.Less,
+				parentIterator,
+				iterator.FromTree(e.added),
+			),
+			e.removed.Contains,
 		),
-		e.removed.Contains,
 	)
 }
 
