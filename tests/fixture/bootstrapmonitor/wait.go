@@ -58,7 +58,7 @@ func WaitForCompletion(
 
 	var (
 		containerImage string
-		nodeURL        string = fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)
+		nodeURL        = fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)
 	)
 	log.Info("Waiting for node to report healthy")
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
