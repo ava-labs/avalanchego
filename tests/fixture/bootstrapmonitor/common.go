@@ -23,6 +23,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
+// WaitForPodCondition watches the specified pod until the status includes the specified condition.
 func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) error {
 	return waitForPodStatus(
 		ctx,
@@ -40,6 +41,7 @@ func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, n
 	)
 }
 
+// waitForPodStatus watches the specified pod until the status is deemed acceptable by the provided test function.
 func waitForPodStatus(
 	ctx context.Context,
 	clientset *kubernetes.Clientset,
@@ -88,12 +90,16 @@ func setContainerImage(ctx context.Context, log logging.Logger, clientset *kuber
 	// Determine the name of the statefulset to update
 	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get pod %s: %w", podName, err)
+		return fmt.Errorf("failed to get pod %s.%s: %w", namespace, podName, err)
 	}
-	if len(pod.OwnerReferences) == 0 {
-		return errors.New("pod has no owner references")
+	if len(pod.OwnerReferences) != 1 {
+		return errors.New("pod does not have exactly one owner reference")
 	}
-	statefulSetName := pod.OwnerReferences[0].Name
+	ownerReference := pod.OwnerReferences[0]
+	if ownerReference.Kind != "StatefulSet" {
+		return errors.New("unexpected owner reference kind: " + ownerReference.Kind)
+	}
+	statefulSetName := ownerReference.Name
 
 	// Define the strategic merge patch data updating the image
 	patchData := map[string]interface{}{
@@ -120,7 +126,7 @@ func setContainerImage(ctx context.Context, log logging.Logger, clientset *kuber
 	// Apply the patch
 	_, err = clientset.AppsV1().StatefulSets(namespace).Patch(context.TODO(), statefulSetName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to patch statefulset %s: %w", statefulSetName, err)
+		return fmt.Errorf("failed to patch statefulset %s.%s: %w", namespace, statefulSetName, err)
 	}
 	log.Info("Updated statefulset to target new image",
 		zap.String("namespace", namespace),
@@ -144,8 +150,8 @@ func getBaseImageName(log logging.Logger, imageName string) (string, error) {
 		return imageName, nil
 	case 2:
 		// Ambiguous image name - could contain a tag or a registry
-		log.Info("Derived image name from ambiguous string",
-			zap.String("ambiguousString", imageNameParts[0]),
+		log.Info("Derived tag-less image name from string",
+			zap.String("tagLessImageName", imageNameParts[0]),
 			zap.String("imageName", imageName),
 		)
 		return imageNameParts[0], nil
@@ -202,7 +208,7 @@ func getLatestImageID(
 
 	terminatedPod, err := clientset.CoreV1().Pods(namespace).Get(ctx, createdPod.Name, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to load terminated pod: %w", err)
+		return "", fmt.Errorf("failed to retrieve terminated pod: %w", err)
 	}
 
 	// Get the image id for the avalanchego image
