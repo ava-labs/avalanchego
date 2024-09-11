@@ -59,7 +59,7 @@ var (
 			},
 			expectedSeconds: minute,
 			expectedCost:    122_880,
-			expectedExcess:  0,
+			expectedExcess:  0, // Should not underflow
 		},
 		{
 			name: "excess=0, current=target, minute",
@@ -134,7 +134,7 @@ var (
 			},
 			expectedSeconds: day,
 			expectedCost:    177_321_939,
-			expectedExcess:  0,
+			expectedExcess:  0, // Should not underflow
 		},
 		{
 			name: "excess=K, current=target, day",
@@ -195,6 +195,36 @@ var (
 			expectedSeconds: week,
 			expectedCost:    5_265_492_669,
 			expectedExcess:  5_000 * week,
+		},
+		{
+			name: "excess=1, current>>target, second",
+			state: State{
+				Current: math.MaxUint64,
+				Excess:  1,
+			},
+			config: Config{
+				Target:                   0,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: 1,
+			expectedCost:    math.MaxUint64, // Should not overflow
+			expectedExcess:  math.MaxUint64, // Should not overflow
+		},
+		{
+			name: "excess=0, current>>target, 11 seconds",
+			state: State{
+				Current: math.MaxUint32,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   0,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: 11,
+			expectedCost:    math.MaxUint64, // Should not overflow
+			expectedExcess:  math.MaxUint32 * 11,
 		},
 	}
 )
