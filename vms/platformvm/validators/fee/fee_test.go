@@ -36,173 +36,224 @@ var (
 	excessConversionConstant = floatToGas(excessConversionConstantFloat)
 
 	tests = []struct {
-		name                string
-		target              gas.Gas
-		current             gas.Gas
-		excess              gas.Gas
-		duration            uint64
-		cost                uint64
-		excessAfterDuration gas.Gas
+		name   string
+		state  State
+		config Config
+
+		// expectedSeconds and expectedCost are used as inputs for some tests
+		// and outputs for other tests.
+		expectedSeconds uint64
+		expectedCost    uint64
+		expectedExcess  gas.Gas
 	}{
 		{
-			name:                "excess=0, current<target, minute",
-			target:              10_000,
-			current:             10,
-			excess:              0,
-			duration:            minute,
-			cost:                122_880,
-			excessAfterDuration: 0,
+			name: "excess=0, current<target, minute",
+			state: State{
+				Current: 10,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: minute,
+			expectedCost:    122_880,
+			expectedExcess:  0,
 		},
 		{
-			name:                "excess=0, current=target, minute",
-			target:              10_000,
-			current:             10_000,
-			excess:              0,
-			duration:            minute,
-			cost:                122_880,
-			excessAfterDuration: 0,
+			name: "excess=0, current=target, minute",
+			state: State{
+				Current: 10_000,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: minute,
+			expectedCost:    122_880,
+			expectedExcess:  0,
 		},
 		{
-			name:                "excess=excessIncreasePerDoubling, current=target, minute",
-			target:              10_000,
-			current:             10_000,
-			excess:              excessIncreasePerDoubling,
-			duration:            minute,
-			cost:                245_760,
-			excessAfterDuration: excessIncreasePerDoubling,
+			name: "excess=excessIncreasePerDoubling, current=target, minute",
+			state: State{
+				Current: 10_000,
+				Excess:  excessIncreasePerDoubling,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: minute,
+			expectedCost:    245_760,
+			expectedExcess:  excessIncreasePerDoubling,
 		},
 		{
-			name:                "excess=K, current=target, minute",
-			target:              10_000,
-			current:             10_000,
-			excess:              excessConversionConstant,
-			duration:            minute,
-			cost:                334_020,
-			excessAfterDuration: excessConversionConstant,
+			name: "excess=K, current=target, minute",
+			state: State{
+				Current: 10_000,
+				Excess:  excessConversionConstant,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: minute,
+			expectedCost:    334_020,
+			expectedExcess:  excessConversionConstant,
 		},
 		{
-			name:                "excess=0, current>target, minute",
-			target:              10_000,
-			current:             15_000,
-			excess:              0,
-			duration:            minute,
-			cost:                122_880,
-			excessAfterDuration: 5_000 * minute,
+			name: "excess=0, current>target, minute",
+			state: State{
+				Current: 15_000,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: minute,
+			expectedCost:    122_880,
+			expectedExcess:  5_000 * minute,
 		},
 		{
-			name:                "excess hits 0 during, current<target, day",
-			target:              10_000,
-			current:             9_000,
-			excess:              6 * hour * 1_000,
-			duration:            day,
-			cost:                177_321_939,
-			excessAfterDuration: 0,
+			name: "excess hits 0 during, current<target, day",
+			state: State{
+				Current: 9_000,
+				Excess:  6 * hour * 1_000,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: day,
+			expectedCost:    177_321_939,
+			expectedExcess:  0,
 		},
 		{
-			name:                "excess=K, current=target, day",
-			target:              10_000,
-			current:             10_000,
-			excess:              excessConversionConstant,
-			duration:            day,
-			cost:                480_988_800,
-			excessAfterDuration: excessConversionConstant,
+			name: "excess=K, current=target, day",
+			state: State{
+				Current: 10_000,
+				Excess:  excessConversionConstant,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: day,
+			expectedCost:    480_988_800,
+			expectedExcess:  excessConversionConstant,
 		},
 		{
-			name:                "excess=0, current>target, day",
-			target:              10_000,
-			current:             15_000,
-			excess:              0,
-			duration:            day,
-			cost:                211_438_809,
-			excessAfterDuration: 5_000 * day,
+			name: "excess=0, current>target, day",
+			state: State{
+				Current: 15_000,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: day,
+			expectedCost:    211_438_809,
+			expectedExcess:  5_000 * day,
 		},
 		{
-			name:                "excess=0, current=target, week",
-			target:              10_000,
-			current:             10_000,
-			excess:              0,
-			duration:            week,
-			cost:                1_238_630_400,
-			excessAfterDuration: 0,
+			name: "excess=0, current=target, week",
+			state: State{
+				Current: 10_000,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: week,
+			expectedCost:    1_238_630_400,
+			expectedExcess:  0,
 		},
 		{
-			name:                "excess=0, current>target, week",
-			target:              10_000,
-			current:             15_000,
-			excess:              0,
-			duration:            week,
-			cost:                5_265_492_669,
-			excessAfterDuration: 5_000 * week,
+			name: "excess=0, current>target, week",
+			state: State{
+				Current: 15_000,
+				Excess:  0,
+			},
+			config: Config{
+				Target:                   10_000,
+				MinPrice:                 minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			},
+			expectedSeconds: week,
+			expectedCost:    5_265_492_669,
+			expectedExcess:  5_000 * week,
 		},
 	}
 )
 
-func TestCalculateExcess(t *testing.T) {
+func TestStateAdvanceTime(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			excess := CalculateExcess(
-				test.target,
-				test.current,
-				test.excess,
-				test.duration,
+			require.Equal(
+				t,
+				State{
+					Current: test.state.Current,
+					Excess:  test.expectedExcess,
+				},
+				test.state.AdvanceTime(test.config.Target, test.expectedSeconds),
 			)
-			require.Equal(t, test.excessAfterDuration, excess)
 		})
 	}
 }
 
-func TestCalculateCost(t *testing.T) {
+func TestStateCostOf(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cost := CalculateCost(
-				test.target,
-				test.current,
-				minPrice,
-				excessConversionConstant,
-				test.excess,
-				test.duration,
+			require.Equal(
+				t,
+				test.expectedCost,
+				test.state.CostOf(test.config, test.expectedSeconds),
 			)
-			require.Equal(t, test.cost, cost)
 		})
 	}
 }
 
-func TestCalculateDuration(t *testing.T) {
+func TestStateSecondsUntil(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			duration := CalculateDuration(
-				test.target,
-				test.current,
-				minPrice,
-				excessConversionConstant,
-				test.excess,
-				year,
-				test.cost,
+			require.Equal(
+				t,
+				test.expectedSeconds,
+				test.state.SecondsUntil(test.config, year, test.expectedCost),
 			)
-			require.Equal(t, test.duration, duration)
 		})
 	}
 }
 
-func BenchmarkCalculateCost(b *testing.B) {
+func BenchmarkStateCostOf(b *testing.B) {
 	benchmarks := []struct {
-		name          string
-		calculateCost func(
-			target gas.Gas,
-			current gas.Gas,
-			minPrice gas.Price,
-			excessConversionConstant gas.Gas,
-			excess gas.Gas,
-			duration uint64,
+		name   string
+		costOf func(
+			s State,
+			c Config,
+			seconds uint64,
 		) uint64
 	}{
 		{
-			name:          "unoptimized",
-			calculateCost: unoptimizedCalculateCost,
+			name:   "unoptimized",
+			costOf: State.unoptimizedCostOf,
 		},
 		{
-			name:          "optimized",
-			calculateCost: CalculateCost,
+			name:   "optimized",
+			costOf: State.CostOf,
 		},
 	}
 	for _, test := range tests {
@@ -210,14 +261,7 @@ func BenchmarkCalculateCost(b *testing.B) {
 			for _, benchmark := range benchmarks {
 				b.Run(benchmark.name, func(b *testing.B) {
 					for i := 0; i < b.N; i++ {
-						benchmark.calculateCost(
-							test.target,
-							test.current,
-							minPrice,
-							excessConversionConstant,
-							test.excess,
-							test.duration,
-						)
+						benchmark.costOf(test.state, test.config, test.expectedSeconds)
 					}
 				})
 			}
@@ -225,26 +269,23 @@ func BenchmarkCalculateCost(b *testing.B) {
 	}
 }
 
-func BenchmarkCalculateDuration(b *testing.B) {
+func BenchmarkStateSecondsUntil(b *testing.B) {
 	benchmarks := []struct {
-		name              string
-		calculateDuration func(
-			target gas.Gas,
-			current gas.Gas,
-			minPrice gas.Price,
-			excessConversionConstant gas.Gas,
-			excess gas.Gas,
-			maxDuration uint64,
+		name         string
+		secondsUntil func(
+			s State,
+			c Config,
+			maxSeconds uint64,
 			targetCost uint64,
 		) uint64
 	}{
 		{
-			name:              "unoptimized",
-			calculateDuration: unoptimizedCalculateDuration,
+			name:         "unoptimized",
+			secondsUntil: State.unoptimizedSecondsUntil,
 		},
 		{
-			name:              "optimized",
-			calculateDuration: CalculateDuration,
+			name:         "optimized",
+			secondsUntil: State.SecondsUntil,
 		},
 	}
 	for _, test := range tests {
@@ -252,15 +293,7 @@ func BenchmarkCalculateDuration(b *testing.B) {
 			for _, benchmark := range benchmarks {
 				b.Run(benchmark.name, func(b *testing.B) {
 					for i := 0; i < b.N; i++ {
-						benchmark.calculateDuration(
-							test.target,
-							test.current,
-							minPrice,
-							excessConversionConstant,
-							test.excess,
-							year,
-							test.cost,
-						)
+						benchmark.secondsUntil(test.state, test.config, year, test.expectedCost)
 					}
 				})
 			}
@@ -268,96 +301,99 @@ func BenchmarkCalculateDuration(b *testing.B) {
 	}
 }
 
-func FuzzCalculateCost(f *testing.F) {
+func FuzzStateCostOf(f *testing.F) {
+	for _, test := range tests {
+		f.Add(
+			uint64(test.state.Current),
+			uint64(test.state.Excess),
+			uint64(test.config.Target),
+			uint64(test.config.MinPrice),
+			uint64(test.config.ExcessConversionConstant),
+			test.expectedSeconds,
+		)
+	}
 	f.Fuzz(
 		func(
 			t *testing.T,
-			target uint64,
 			current uint64,
+			excess uint64,
+			target uint64,
 			minPrice uint64,
 			excessConversionConstant uint64,
-			excess uint64,
-			duration uint64,
+			seconds uint64,
 		) {
-			excessConversionConstant = max(excessConversionConstant, 1)
-			duration = min(duration, year)
-
-			expected := unoptimizedCalculateCost(
-				gas.Gas(target),
-				gas.Gas(current),
-				gas.Price(minPrice),
-				gas.Gas(excessConversionConstant),
-				gas.Gas(excess),
-				duration,
+			s := State{
+				Current: gas.Gas(current),
+				Excess:  gas.Gas(excess),
+			}
+			c := Config{
+				Target:                   gas.Gas(target),
+				MinPrice:                 gas.Price(minPrice),
+				ExcessConversionConstant: gas.Gas(max(excessConversionConstant, 1)),
+			}
+			seconds = min(seconds, year)
+			require.Equal(
+				t,
+				s.unoptimizedCostOf(c, seconds),
+				s.CostOf(c, seconds),
 			)
-			actual := CalculateCost(
-				gas.Gas(target),
-				gas.Gas(current),
-				gas.Price(minPrice),
-				gas.Gas(excessConversionConstant),
-				gas.Gas(excess),
-				duration,
-			)
-			require.Equal(t, expected, actual)
 		},
 	)
 }
 
-func FuzzCalculateDuration(f *testing.F) {
+func FuzzStateSecondsUntil(f *testing.F) {
+	for _, test := range tests {
+		f.Add(
+			uint64(test.state.Current),
+			uint64(test.state.Excess),
+			uint64(test.config.Target),
+			uint64(test.config.MinPrice),
+			uint64(test.config.ExcessConversionConstant),
+			uint64(year),
+			test.expectedCost,
+		)
+	}
 	f.Fuzz(
 		func(
 			t *testing.T,
-			target uint64,
 			current uint64,
+			excess uint64,
+			target uint64,
 			minPrice uint64,
 			excessConversionConstant uint64,
-			excess uint64,
-			maxDuration uint64,
+			maxSeconds uint64,
 			targetCost uint64,
 		) {
-			excessConversionConstant = max(excessConversionConstant, 1)
-			maxDuration = min(maxDuration, year)
-
-			expected := unoptimizedCalculateDuration(
-				gas.Gas(target),
-				gas.Gas(current),
-				gas.Price(minPrice),
-				gas.Gas(excessConversionConstant),
-				gas.Gas(excess),
-				maxDuration,
-				targetCost,
+			s := State{
+				Current: gas.Gas(current),
+				Excess:  gas.Gas(excess),
+			}
+			c := Config{
+				Target:                   gas.Gas(target),
+				MinPrice:                 gas.Price(minPrice),
+				ExcessConversionConstant: gas.Gas(max(excessConversionConstant, 1)),
+			}
+			maxSeconds = min(maxSeconds, year)
+			require.Equal(
+				t,
+				s.unoptimizedSecondsUntil(c, maxSeconds, targetCost),
+				s.SecondsUntil(c, maxSeconds, targetCost),
 			)
-			actual := CalculateDuration(
-				gas.Gas(target),
-				gas.Gas(current),
-				gas.Price(minPrice),
-				gas.Gas(excessConversionConstant),
-				gas.Gas(excess),
-				maxDuration,
-				targetCost,
-			)
-			require.Equal(t, expected, actual)
 		},
 	)
 }
 
-// unoptimizedCalculateCost is a naive implementation of CalculateCost that is
-// used for fuzzing.
-func unoptimizedCalculateCost(
-	target gas.Gas,
-	current gas.Gas,
-	minPrice gas.Price,
-	excessConversionConstant gas.Gas,
-	excess gas.Gas,
-	duration uint64,
-) uint64 {
+// unoptimizedCalculateCost is a naive implementation of CostOf that is used for
+// differential fuzzing.
+func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 	var (
 		cost uint64
 		err  error
 	)
-	for i := uint64(0); i < duration; i++ {
-		excess = CalculateExcess(target, current, excess, 1)
-		price := gas.CalculatePrice(minPrice, excess, excessConversionConstant)
+	for i := uint64(0); i < seconds; i++ {
+		s = s.AdvanceTime(c.Target, 1)
+
+		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
 		cost, err = safemath.Add(cost, uint64(price))
 		if err != nil {
 			return math.MaxUint64
@@ -366,32 +402,25 @@ func unoptimizedCalculateCost(
 	return cost
 }
 
-// unoptimizedCalculateDuration is a naive implementation of CalculateDuration
-// that is used for fuzzing.
-func unoptimizedCalculateDuration(
-	target gas.Gas,
-	current gas.Gas,
-	minPrice gas.Price,
-	excessConversionConstant gas.Gas,
-	excess gas.Gas,
-	maxDuration uint64,
-	targetCost uint64,
-) uint64 {
+// unoptimizedSecondsUntil is a naive implementation of SecondsUntil that is
+// used for differential fuzzing.
+func (s State) unoptimizedSecondsUntil(c Config, maxSeconds uint64, targetCost uint64) uint64 {
 	var (
-		cost     uint64
-		duration uint64
-		err      error
+		cost    uint64
+		seconds uint64
+		err     error
 	)
-	for cost < targetCost && duration < maxDuration {
-		duration++
-		excess = CalculateExcess(target, current, excess, 1)
-		price := gas.CalculatePrice(minPrice, excess, excessConversionConstant)
+	for cost < targetCost && seconds < maxSeconds {
+		s = s.AdvanceTime(c.Target, 1)
+		seconds++
+
+		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
 		cost, err = safemath.Add(cost, uint64(price))
 		if err != nil {
-			return duration
+			return seconds
 		}
 	}
-	return duration
+	return seconds
 }
 
 // floatToGas converts f to gas.Gas by truncation. `gas.Gas(f)` is preferred and

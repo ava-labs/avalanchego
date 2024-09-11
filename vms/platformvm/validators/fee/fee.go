@@ -11,34 +11,41 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// CalculateExcess updates the excess value based on the target and current
-// usage over the provided duration.
-func CalculateExcess(
-	target gas.Gas,
-	current gas.Gas,
-	excess gas.Gas,
-	duration uint64,
-) gas.Gas {
-	if current < target {
-		return excess.SubPerSecond(target-current, duration)
-	}
-	return excess.AddPerSecond(current-target, duration)
+type Config struct {
+	Target                   gas.Gas
+	MinPrice                 gas.Price
+	ExcessConversionConstant gas.Gas
 }
 
-// CalculateCost calculates how much to charge based on the dynamic fee
-// mechanism for [duration].
-func CalculateCost(
-	target gas.Gas,
-	current gas.Gas,
-	minPrice gas.Price,
-	excessConversionConstant gas.Gas,
-	excess gas.Gas,
-	duration uint64,
-) uint64 {
+type State struct {
+	Current gas.Gas
+	Excess  gas.Gas
+}
+
+// AdvanceTime adds (s.Current - target) * seconds to Excess.
+//
+// If Excess would underflow, it is set to 0.
+// If Excess would overflow, it is set to MaxUint64.
+func (s State) AdvanceTime(target gas.Gas, seconds uint64) State {
+	excess := s.Excess
+	if s.Current < target {
+		excess = excess.SubPerSecond(target-s.Current, seconds)
+	} else if s.Current > target {
+		excess = excess.AddPerSecond(s.Current-target, seconds)
+	}
+	return State{
+		Current: s.Current,
+		Excess:  excess,
+	}
+}
+
+// CostOf calculates how much to charge based on the dynamic fee mechanism for
+// [seconds].
+func (s State) CostOf(c Config, seconds uint64) uint64 {
 	// If the current and target are the same, the price is constant.
-	if current == target {
-		price := gas.CalculatePrice(minPrice, excess, excessConversionConstant)
-		cost, err := safemath.Mul(duration, uint64(price))
+	if s.Current == c.Target {
+		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
+		cost, err := safemath.Mul(seconds, uint64(price))
 		if err != nil {
 			return math.MaxUint64
 		}
@@ -49,13 +56,16 @@ func CalculateCost(
 		cost uint64
 		err  error
 	)
-	for i := uint64(0); i < duration; i++ {
-		excess = CalculateExcess(target, current, excess, 1)
-		// If the excess is 0, the price will remain constant for all future
-		// iterations.
-		if excess == 0 {
-			durationWithZeroExcess := duration - i
-			zeroExcessCost, err := safemath.Mul(uint64(minPrice), durationWithZeroExcess)
+	for i := uint64(0); i < seconds; i++ {
+		s = s.AdvanceTime(c.Target, 1)
+
+		// Advancing the time is going to either hold excess constant,
+		// monotonically increase it, or monotonically decrease it. If it is
+		// equal to 0 after performing one of these operations, it is guaranteed
+		// to always remain 0.
+		if s.Excess == 0 {
+			secondsWithZeroExcess := seconds - i
+			zeroExcessCost, err := safemath.Mul(uint64(c.MinPrice), secondsWithZeroExcess)
 			if err != nil {
 				return math.MaxUint64
 			}
@@ -67,7 +77,7 @@ func CalculateCost(
 			return cost
 		}
 
-		price := gas.CalculatePrice(minPrice, excess, excessConversionConstant)
+		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
 		cost, err = safemath.Add(cost, uint64(price))
 		if err != nil {
 			return math.MaxUint64
@@ -76,86 +86,77 @@ func CalculateCost(
 	return cost
 }
 
-// CalculateDuration calculates the duration that it would take to charge at
+// SecondsUntil calculates the number of seconds that it would take to charge at
 // least [targetCost] based on the dynamic fee mechanism. The result is capped
-// at [maxDuration].
-func CalculateDuration(
-	target gas.Gas,
-	current gas.Gas,
-	minPrice gas.Price,
-	excessConversionConstant gas.Gas,
-	excess gas.Gas,
-	maxDuration uint64,
-	targetCost uint64,
-) uint64 {
+// at [maxSeconds].
+func (s State) SecondsUntil(c Config, maxSeconds uint64, targetCost uint64) uint64 {
 	// Because this function can divide by prices, we need to sanity check the
 	// parameters to avoid division by 0.
-	if minPrice == 0 {
+	if c.MinPrice == 0 {
 		if targetCost == 0 {
 			return 0
 		}
-		return maxDuration
+		return maxSeconds
 	}
 
 	// If the current and target are the same, the price is constant.
-	if current == target {
-		price := gas.CalculatePrice(minPrice, excess, excessConversionConstant)
-		return calculateDuration(
+	if s.Current == c.Target {
+		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
+		return secondsUntil(
 			uint64(price),
+			maxSeconds,
 			targetCost,
-			maxDuration,
 		)
 	}
 
 	var (
-		cost     uint64
-		duration uint64
-		err      error
+		cost    uint64
+		seconds uint64
+		err     error
 	)
-	for cost < targetCost && duration < maxDuration {
-		excess = CalculateExcess(target, current, excess, 1)
-		// If the excess is 0, the price will remain constant for all future
-		// iterations.
-		if excess == 0 {
+	for cost < targetCost && seconds < maxSeconds {
+		s = s.AdvanceTime(c.Target, 1)
+
+		// Advancing the time is going to either hold excess constant,
+		// monotonically increase it, or monotonically decrease it. If it is
+		// equal to 0 after performing one of these operations, it is guaranteed
+		// to always remain 0.
+		if s.Excess == 0 {
 			zeroExcessCost := targetCost - cost
-			durationWithZeroExcess := calculateDuration(
-				uint64(minPrice),
+			secondsWithZeroExcess := secondsUntil(
+				uint64(c.MinPrice),
+				maxSeconds,
 				zeroExcessCost,
-				maxDuration,
 			)
 
-			duration, err = safemath.Add(duration, durationWithZeroExcess)
-			if err != nil || duration >= maxDuration {
-				return maxDuration
+			totalSeconds, err := safemath.Add(seconds, secondsWithZeroExcess)
+			if err != nil || totalSeconds >= maxSeconds {
+				return maxSeconds
 			}
-			return duration
+			return totalSeconds
 		}
 
-		duration++
-		price := gas.CalculatePrice(minPrice, excess, excessConversionConstant)
+		seconds++
+		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
 		cost, err = safemath.Add(cost, uint64(price))
 		if err != nil {
-			return duration
+			return seconds
 		}
 	}
-	return duration
+	return seconds
 }
 
-// Calculate the duration that it would take to charge at least [cost] at
-// [price] every second. The result is capped at [maxDuration].
-func calculateDuration(
-	price uint64,
-	cost uint64,
-	maxDuration uint64,
-) uint64 {
+// Calculate the number of seconds that it would take to charge at least [cost]
+// at [price] every second. The result is capped at [maxSeconds].
+func secondsUntil(price uint64, maxSeconds uint64, cost uint64) uint64 {
 	// Directly rounding up could cause an overflow. Instead we round down and
 	// then check if we should have rounded up.
-	durationRoundedDown := cost / price
-	if durationRoundedDown >= maxDuration {
-		return maxDuration
+	secondsRoundedDown := cost / price
+	if secondsRoundedDown >= maxSeconds {
+		return maxSeconds
 	}
 	if cost%price == 0 {
-		return durationRoundedDown
+		return secondsRoundedDown
 	}
-	return durationRoundedDown + 1
+	return secondsRoundedDown + 1
 }
