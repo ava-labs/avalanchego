@@ -22,8 +22,7 @@ func FuzzExpiryEntryMarshal(f *testing.F) {
 		marshalledData := entry.Marshal()
 
 		var parsedEntry ExpiryEntry
-		err := parsedEntry.Unmarshal(marshalledData)
-		require.NoError(err)
+		require.NoError(parsedEntry.Unmarshal(marshalledData))
 		require.Equal(entry, parsedEntry)
 	})
 }
