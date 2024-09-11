@@ -56,19 +56,22 @@ func WaitForCompletion(
 		return fmt.Errorf("failed to wait for pod readiness: %w", err)
 	}
 
-	var containerImage string
+	var (
+		containerImage string
+		nodeURL        string = fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)
+	)
 	log.Info("Waiting for node to report healthy")
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
 		if len(containerImage) == 0 {
-			var err error
 			log.Info("Retrieving pod to determine image of container",
 				zap.String("namespace", namespace),
 				zap.String("pod", podName),
 				zap.String("container", nodeContainerName),
 			)
+			var err error
 			containerImage, err = GetContainerImage(ctx, clientset, namespace, podName, nodeContainerName)
 			if err != nil {
 				log.Error("failed to get container image", zap.Error(err))
@@ -81,7 +84,7 @@ func WaitForCompletion(
 		}
 
 		// Check whether the node is reporting healthy which indicates that bootstrap is complete
-		if healthy, err := tmpnet.CheckNodeHealth(ctx, fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)); err != nil {
+		if healthy, err := tmpnet.CheckNodeHealth(ctx, nodeURL); err != nil {
 			log.Error("failed to check node health", zap.Error(err))
 			return false, nil
 		} else {
@@ -107,7 +110,7 @@ func WaitForCompletion(
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
-		log.Info("Starting pod to check the image id for the `latest` tag")
+		log.Info("Starting pod to get the image id for the `latest` tag")
 		latestImageID, err := getLatestImageID(ctx, log, clientset, namespace, containerImage, nodeContainerName)
 		if err != nil {
 			log.Error("failed to get latest image id", zap.Error(err))
