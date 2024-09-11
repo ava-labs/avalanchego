@@ -58,7 +58,7 @@ func main() {
 
 	initCmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize the data path of  athe Start a new temporary network",
+		Short: "Initialize a new bootstrap test",
 		RunE: func(*cobra.Command, []string) error {
 			if err := checkArgs(namespace, podName, nodeContainerName, dataDir); err != nil {
 				return err
