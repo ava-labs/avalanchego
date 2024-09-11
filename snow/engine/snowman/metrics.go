@@ -23,6 +23,7 @@ type metrics struct {
 	numBlocked                            prometheus.Gauge
 	numBlockers                           prometheus.Gauge
 	numNonVerifieds                       prometheus.Gauge
+	stragglingDuration                    prometheus.Gauge
 	numBuilt                              prometheus.Counter
 	numBuildsFailed                       prometheus.Counter
 	numUselessPutBytes                    prometheus.Counter
@@ -41,6 +42,10 @@ type metrics struct {
 func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	errs := wrappers.Errs{}
 	m := &metrics{
+		stragglingDuration: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "straggling_duration",
+			Help: "For how long we have been straggling behind the rest, in nano-seconds.",
+		}),
 		bootstrapFinished: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "bootstrap_finished",
 			Help: "Whether or not bootstrap process has completed. 1 is success, 0 is fail or ongoing.",
@@ -128,6 +133,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	m.issued.WithLabelValues(unknownSource)
 
 	errs.Add(
+		reg.Register(m.stragglingDuration),
 		reg.Register(m.bootstrapFinished),
 		reg.Register(m.numRequests),
 		reg.Register(m.numBlocked),

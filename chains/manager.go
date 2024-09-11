@@ -1339,11 +1339,13 @@ func (m *manager) createSnowmanChain(
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
-	var engine common.Engine
-	engine, err = smeng.New(engineConfig)
+
+	sme, err := smeng.New(engineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
+
+	engine := smeng.NewDecoratedEngine(sme, time.Now, func(_ time.Duration) {})
 
 	if m.TracingEnabled {
 		engine = common.TraceEngine(engine, m.Tracer)

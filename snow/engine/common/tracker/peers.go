@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -37,10 +36,10 @@ type Peers interface {
 	SampleValidator() (ids.NodeID, bool)
 	// GetValidators returns the set of all validators
 	// known to this peer manager
-	GetValidators() set.Set[ids.NodeID]
+	GetValidators() set.Set[ids.NodeWeight]
 	// ConnectedValidators returns the set of all validators
 	// that are currently connected
-	ConnectedValidators() set.Set[ids.NodeID]
+	ConnectedValidators() set.Set[ids.NodeWeight]
 }
 
 type lockedPeers struct {
@@ -112,14 +111,14 @@ func (p *lockedPeers) SampleValidator() (ids.NodeID, bool) {
 	return p.peers.SampleValidator()
 }
 
-func (p *lockedPeers) GetValidators() set.Set[ids.NodeID] {
+func (p *lockedPeers) GetValidators() set.Set[ids.NodeWeight] {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.peers.GetValidators()
 }
 
-func (p *lockedPeers) ConnectedValidators() set.Set[ids.NodeID] {
+func (p *lockedPeers) ConnectedValidators() set.Set[ids.NodeWeight] {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -272,14 +271,21 @@ func (p *peerData) SampleValidator() (ids.NodeID, bool) {
 	return p.connectedValidators.Peek()
 }
 
-func (p *peerData) GetValidators() set.Set[ids.NodeID] {
-	return set.Of(maps.Keys(p.validators)...)
+func (p *peerData) GetValidators() set.Set[ids.NodeWeight] {
+	res := set.NewSet[ids.NodeWeight](len(p.validators))
+	for k, v := range p.validators {
+		res.Add(ids.NodeWeight{Node: k, Weight: v})
+	}
+	return res
 }
 
-func (p *peerData) ConnectedValidators() set.Set[ids.NodeID] {
+func (p *peerData) ConnectedValidators() set.Set[ids.NodeWeight] {
 	// The set is copied to avoid future changes from being reflected in the
 	// returned set.
-	copied := set.NewSet[ids.NodeID](len(p.connectedValidators))
-	copied.Union(p.connectedValidators)
+	copied := set.NewSet[ids.NodeWeight](len(p.connectedValidators))
+	for _, vdrID := range p.connectedValidators.List() {
+		weight := p.validators[vdrID]
+		copied.Add(ids.NodeWeight{Node: vdrID, Weight: weight})
+	}
 	return copied
 }
