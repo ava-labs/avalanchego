@@ -56,5 +56,13 @@ func (h *handler) getDisconnectedValidators() set.Set[ids.NodeID] {
 	connectedVdrs := h.peerTracker.ConnectedValidators()
 	// vdrs - connectedVdrs is equal to the disconnectedVdrs
 	vdrs.Difference(connectedVdrs)
-	return vdrs
+	return withoutWeights(vdrs)
+}
+
+func withoutWeights(weights set.Set[ids.NodeWeight]) set.Set[ids.NodeID] {
+	var res set.Set[ids.NodeID]
+	for _, nw := range weights.List() {
+		res.Add(nw.ID)
+	}
+	return res
 }
