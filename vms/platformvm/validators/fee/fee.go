@@ -11,15 +11,18 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// Config contains all the static parameters of the dynamic fee mechanism.
 type Config struct {
-	Target                   gas.Gas
-	MinPrice                 gas.Price
-	ExcessConversionConstant gas.Gas
+	Target                   gas.Gas   `json:"target"`
+	MinPrice                 gas.Price `json:"minPrice"`
+	ExcessConversionConstant gas.Gas   `json:"excessConversionConstant"`
 }
 
+// State represents the current on-chain values used in the dynamic fee
+// mechanism.
 type State struct {
-	Current gas.Gas
-	Excess  gas.Gas
+	Current gas.Gas `json:"current"`
+	Excess  gas.Gas `json:"excess"`
 }
 
 // AdvanceTime adds (s.Current - target) * seconds to Excess.
