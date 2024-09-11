@@ -70,17 +70,13 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 
 		// If the image uses the latest tag, determine the latest image id and set the container image to that
 		if strings.HasSuffix(containerImage, ":latest") {
-			log.Info("Determining image id for image",
-				zap.String("image", containerImage),
-			)
+			log.Info("Determining image id for image", zap.String("image", containerImage))
 			imageID, err := getLatestImageID(ctx, log, clientset, namespace, containerImage, nodeContainerName)
 			if err != nil {
 				log.Error("failed to get latest image id", zap.Error(err))
 				return false, nil
 			}
-			log.Info("Updating owning statefulset with image",
-				zap.String("image", imageID),
-			)
+			log.Info("Updating owning statefulset with image", zap.String("image", imageID))
 			if err := setContainerImage(ctx, log, clientset, namespace, podName, nodeContainerName, imageID); err != nil {
 				log.Error("failed to set container image", zap.Error(err))
 				return false, nil
