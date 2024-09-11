@@ -29,8 +29,7 @@ const (
 	maxExcessIncreasePerSecond    = capacity - target
 	doubleEvery                   = day
 	excessIncreasePerDoubling     = maxExcessIncreasePerSecond * doubleEvery
-	ln2                           = .6931471805599453094172321214581765680755001343602552541206800094
-	excessConversionConstantFloat = excessIncreasePerDoubling / ln2
+	excessConversionConstantFloat = excessIncreasePerDoubling / math.Ln2
 )
 
 var (
