@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -67,6 +68,24 @@ func TestDiffFeeState(t *testing.T) {
 	assertChainsEqual(t, state, d)
 }
 
+func TestDiffAccruedFees(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	initialAccruedFees := state.GetAccruedFees()
+	newAccruedFees := initialAccruedFees + 1
+	d.SetAccruedFees(newAccruedFees)
+	require.Equal(newAccruedFees, d.GetAccruedFees())
+	require.Equal(initialAccruedFees, state.GetAccruedFees())
+
+	require.NoError(d.Apply(state))
+	assertChainsEqual(t, state, d)
+}
+
 func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 
@@ -101,6 +120,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -135,6 +155,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -175,6 +196,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -221,6 +243,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -361,6 +384,7 @@ func TestDiffTx(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -458,6 +482,7 @@ func TestDiffUTXO(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -506,18 +531,25 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
 	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		assertIteratorsEqual(t, expectedCurrentStakerIterator, actualCurrentStakerIterator)
+		require.Equal(
+			iterator.ToSlice(expectedCurrentStakerIterator),
+			iterator.ToSlice(actualCurrentStakerIterator),
+		)
 	}
 
 	expectedPendingStakerIterator, expectedErr := expected.GetPendingStakerIterator()
 	actualPendingStakerIterator, actualErr := actual.GetPendingStakerIterator()
 	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		assertIteratorsEqual(t, expectedPendingStakerIterator, actualPendingStakerIterator)
+		require.Equal(
+			iterator.ToSlice(expectedPendingStakerIterator),
+			iterator.ToSlice(actualPendingStakerIterator),
+		)
 	}
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 	require.Equal(expected.GetFeeState(), actual.GetFeeState())
+	require.Equal(expected.GetAccruedFees(), actual.GetAccruedFees())
 
 	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)

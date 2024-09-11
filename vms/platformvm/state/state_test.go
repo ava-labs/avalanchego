@@ -88,18 +88,25 @@ func TestStateSyncGenesis(t *testing.T) {
 
 	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
+	require.Empty(
+		iterator.ToSlice(delegatorIterator),
+	)
 
 	stakerIterator, err := state.GetCurrentStakerIterator()
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.FromSlice(staker), stakerIterator)
+	require.Equal(
+		[]*Staker{staker},
+		iterator.ToSlice(stakerIterator),
+	)
 
 	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
+	require.Empty(
+		iterator.ToSlice(delegatorIterator),
+	)
 }
 
 // Whenever we store a staker, a whole bunch a data structures are updated
@@ -1466,6 +1473,22 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 
 	s = newTestState(t, db)
 	require.Equal(expectedFeeState, s.GetFeeState())
+}
+
+// Verify that committing the state writes the accrued fees to the database and
+// that loading the state fetches the accrued fees from the database.
+func TestStateAccruedFeesCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	expectedAccruedFees := uint64(1)
+	s.SetAccruedFees(expectedAccruedFees)
+	require.NoError(s.Commit())
+
+	s = newTestState(t, db)
+	require.Equal(expectedAccruedFees, s.GetAccruedFees())
 }
 
 func TestMarkAndIsInitialized(t *testing.T) {
