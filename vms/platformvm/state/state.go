@@ -1450,7 +1450,7 @@ func (s *state) loadExpiry() error {
 
 		var entry ExpiryEntry
 		if err := entry.Unmarshal(key); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal ExpiryEntry during load: %w", err)
 		}
 		s.expiry.ReplaceOrInsert(entry)
 	}
