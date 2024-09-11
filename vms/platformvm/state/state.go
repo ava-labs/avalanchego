@@ -305,6 +305,7 @@ type state struct {
 
 	expiry     *btree.BTreeG[ExpiryEntry]
 	expiryDiff *expiryDiff
+	expiryDB   database.Database
 
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
@@ -619,6 +620,7 @@ func New(
 
 		expiry:     btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
 		expiryDiff: newExpiryDiff(),
+		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, baseDB),
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -1367,6 +1369,7 @@ func (s *state) syncGenesis(genesisBlk block.Block, genesis *genesis.Genesis) er
 func (s *state) load() error {
 	return errors.Join(
 		s.loadMetadata(),
+		s.loadExpiry(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
@@ -1435,6 +1438,23 @@ func (s *state) loadMetadata() error {
 		return nil
 	}
 	s.indexedHeights = indexedHeights
+	return nil
+}
+
+func (s *state) loadExpiry() error {
+	it := s.expiryDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		key := it.Key()
+
+		var entry ExpiryEntry
+		if err := entry.Unmarshal(key); err != nil {
+			return err
+		}
+		s.expiry.ReplaceOrInsert(entry)
+	}
+
 	return nil
 }
 
@@ -1736,6 +1756,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 
 	return errors.Join(
 		s.writeBlocks(),
+		s.writeExpiry(),
 		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
@@ -1754,6 +1775,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 
 func (s *state) Close() error {
 	return errors.Join(
+		s.expiryDB.Close(),
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -1958,6 +1980,32 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 
 	s.blockIDCache.Put(height, blkID)
 	return blkID, nil
+}
+
+func (s *state) writeExpiry() error {
+	it := iterator.FromTree(s.expiryDiff.added)
+	defer it.Release()
+
+	for it.Next() {
+		entry := it.Value()
+		s.expiry.ReplaceOrInsert(entry)
+
+		key := entry.Marshal()
+		if err := s.expiryDB.Put(key, nil); err != nil {
+			return err
+		}
+	}
+	for removed := range s.expiryDiff.removed {
+		s.expiry.Delete(removed)
+
+		key := removed.Marshal()
+		if err := s.expiryDB.Delete(key); err != nil {
+			return err
+		}
+	}
+
+	s.expiryDiff = newExpiryDiff()
+	return nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecVersion uint16) error {
