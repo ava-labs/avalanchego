@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/bootstrapmonitor"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -51,6 +53,9 @@ func main() {
 	}
 	rootCmd.AddCommand(versionCmd)
 
+	// Use avalanchego logger for consistency
+	log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, os.Stderr, logging.Plain.ConsoleEncoder()))
+
 	initCmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize the data path of  athe Start a new temporary network",
@@ -58,7 +63,7 @@ func main() {
 			if err := checkArgs(namespace, podName, nodeContainerName, dataDir); err != nil {
 				return err
 			}
-			return bootstrapmonitor.InitBootstrapTest(namespace, podName, nodeContainerName, dataDir)
+			return bootstrapmonitor.InitBootstrapTest(log, namespace, podName, nodeContainerName, dataDir)
 		},
 	}
 	rootCmd.AddCommand(initCmd)
@@ -80,7 +85,7 @@ func main() {
 			if imageCheckInterval <= 0 {
 				return errors.New("--image-check-interval must be greater than 0")
 			}
-			return bootstrapmonitor.WaitForCompletion(namespace, podName, nodeContainerName, dataDir, healthCheckInterval, imageCheckInterval)
+			return bootstrapmonitor.WaitForCompletion(log, namespace, podName, nodeContainerName, dataDir, healthCheckInterval, imageCheckInterval)
 		},
 	}
 	waitCmd.PersistentFlags().DurationVar(&healthCheckInterval, "health-check-interval", defaultHealthCheckInterval, "The interval at which to check for node health")
@@ -88,7 +93,7 @@ func main() {
 	rootCmd.AddCommand(waitCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s failed: %v\n", commandName, err)
+		log.Error(commandName+" failed", zap.Error(err))
 		os.Exit(1)
 	}
 	os.Exit(0)

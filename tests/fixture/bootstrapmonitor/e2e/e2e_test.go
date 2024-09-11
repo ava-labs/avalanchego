@@ -164,7 +164,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapStartingMessage := bootstrapmonitor.BootstrapStartingMessage(containerImage)
+		bootstrapStartingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
 
 		ginkgo.By("Waiting for the pod to report readiness")
@@ -193,7 +193,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			return pod.UID != podUID
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapResumingMessage := bootstrapmonitor.BootstrapResumingMessage(containerImage)
+		bootstrapResumingMessage := bootstrapMessageForImage(bootstrapmonitor.BootstrapResumingMessage, containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapResumingMessage)
 
 		ginkgo.By("Building and pushing a new avalanchego image to prompt the start of a new bootstrap test")
@@ -215,10 +215,14 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a new bootstrap test", initContainerName))
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodInitialized)
-		bootstrapStartingMessage = bootstrapmonitor.BootstrapStartingMessage(containerImage)
+		bootstrapStartingMessage = bootstrapMessageForImage(bootstrapmonitor.BootstrapStartingMessage, containerImage)
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapStartingMessage)
 	})
 })
+
+func bootstrapMessageForImage(message, image string) string {
+	return message + fmt.Sprintf(`{"image": "%s"}`, image)
+}
 
 func buildAvalanchegoImage(tc tests.TestContext, imageName string, forceNewHash bool) {
 	buildImage(tc, imageName, forceNewHash, "build_image.sh")

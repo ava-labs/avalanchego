@@ -7,14 +7,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"os/exec"
+	"strings"
 	"time"
 
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -26,6 +28,7 @@ const (
 )
 
 func WaitForCompletion(
+	log logging.Logger,
 	namespace string,
 	podName string,
 	nodeContainerName string,
@@ -33,19 +36,19 @@ func WaitForCompletion(
 	healthCheckInterval time.Duration,
 	imageCheckInterval time.Duration,
 ) error {
-	clientset, err := getClientset()
+	clientset, err := getClientset(log)
 	if err != nil {
 		return fmt.Errorf("failed to get clientset: %w", err)
 	}
 
 	// Avoid checking node health before it reports initial ready
-	log.Println("Waiting for pod readiness")
+	log.Info("Waiting for pod readiness")
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 		err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady)
 		if err != nil {
-			log.Printf("failed to wait for pod condition: %v", err)
+			log.Error("failed to wait for pod condition", zap.Error(err))
 			return false, nil
 		}
 		return true, nil
@@ -54,66 +57,73 @@ func WaitForCompletion(
 	}
 
 	var containerImage string
-	log.Println("Waiting for node to report healthy")
+	log.Info("Waiting for node to report healthy")
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
 		if len(containerImage) == 0 {
 			var err error
-			log.Printf("Retrieving pod %s.%s to determine the image of container %q", namespace, podName, nodeContainerName)
+			log.Info("Retrieving pod to determine image of container",
+				zap.String("namespace", namespace),
+				zap.String("pod", podName),
+				zap.String("container", nodeContainerName),
+			)
 			containerImage, err = GetContainerImage(ctx, clientset, namespace, podName, nodeContainerName)
 			if err != nil {
-				log.Printf("failed to get container image: %v", err)
+				log.Error("failed to get container image", zap.Error(err))
 				return false, nil
 			}
-			log.Printf("Image for container %q: %s", nodeContainerName, containerImage)
+			log.Info("Image for container",
+				zap.String("container", nodeContainerName),
+				zap.String("image", containerImage),
+			)
 		}
 
 		// Check whether the node is reporting healthy which indicates that bootstrap is complete
 		if healthy, err := tmpnet.CheckNodeHealth(ctx, fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)); err != nil {
-			log.Printf("failed to wait for node health: %v", err)
+			log.Error("failed to check node health", zap.Error(err))
 			return false, nil
 		} else {
-			reportDiskUsage(dataDir)
+			reportDiskUsage(log, dataDir)
 
 			if !healthy.Healthy {
-				log.Println("Node reported unhealthy")
+				log.Info("Node reported unhealthy")
 				return false, nil
 			}
 
-			log.Println("Node reported healthy")
+			log.Info("Node reported healthy")
 		}
 
-		log.Println("Bootstrap completed successfully for " + containerImage)
+		log.Info("Bootstrap completed successfully for image", zap.String("image", containerImage))
 
 		return true, nil
 	}); err != nil {
 		return fmt.Errorf("failed to wait for node to report healthy: %w", err)
 	}
 
-	log.Println("Waiting for new image to test")
+	log.Info("Waiting for new image to test")
 	if err := wait.PollImmediateInfinite(imageCheckInterval, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
-		log.Println("Starting pod to check the image id for the `latest` tag")
-		latestImageID, err := getLatestImageID(ctx, clientset, namespace, containerImage, nodeContainerName)
+		log.Info("Starting pod to check the image id for the `latest` tag")
+		latestImageID, err := getLatestImageID(ctx, log, clientset, namespace, containerImage, nodeContainerName)
 		if err != nil {
-			log.Printf("failed to get latest image id: %v", err)
+			log.Error("failed to get latest image id", zap.Error(err))
 			return false, nil
 		}
 
 		if latestImageID == containerImage {
-			log.Println(ImageUnchanged)
+			log.Info(ImageUnchanged)
 			return false, nil
 		}
 
-		log.Printf("Found updated image %s", latestImageID)
+		log.Info("Found updated image", zap.String("image", latestImageID))
 
-		log.Println("Updating StatefulSet to trigger a new test")
-		if err := setContainerImage(ctx, clientset, namespace, podName, nodeContainerName, latestImageID); err != nil {
-			log.Printf("failed to set container image: %v", err)
+		log.Info("Updating StatefulSet to trigger a new test")
+		if err := setContainerImage(ctx, log, clientset, namespace, podName, nodeContainerName, latestImageID); err != nil {
+			log.Error("failed to set container image", zap.Error(err))
 			return false, nil
 		}
 
@@ -129,7 +139,7 @@ func WaitForCompletion(
 }
 
 // Logs the current disk usage for the specified directory
-func reportDiskUsage(dir string) {
+func reportDiskUsage(log logging.Logger, dir string) {
 	cmd := exec.Command("du", "-sh", dir)
 
 	// Create a buffer to capture stderr in case an unexpected error occurs
@@ -140,7 +150,7 @@ func reportDiskUsage(dir string) {
 	if err != nil {
 		exitError, ok := err.(*exec.ExitError)
 		if !ok {
-			log.Printf("Error executing du: %v", err)
+			log.Error("Error executing du", zap.Error(err))
 			return
 		}
 		switch exitError.ExitCode() {
@@ -149,13 +159,29 @@ func reportDiskUsage(dir string) {
 			// regularly delete files in the db dir, this can be safely ignored and the regular disk
 			// usage message can be printed.
 		case 2:
-			log.Printf("Error: Incorrect usage of du command for %s", dir)
-			log.Printf("Stderr: %s", stderr.String())
+			log.Error("Incorrect usage of du command for dir",
+				zap.String("dir", dir),
+				zap.String("stderr", stderr.String()),
+			)
 			return
 		default:
-			log.Printf("Error: du command failed with exit code %d for %s", exitError.ExitCode(), dir)
+			log.Error("du command failed for dir",
+				zap.Int("exitCode", exitError.ExitCode()),
+				zap.String("dir", dir),
+			)
 			return
 		}
 	}
-	log.Printf("Disk usage: %s", string(output))
+
+	usageParts := strings.Split(string(output), "\t")
+	if len(usageParts) != 2 {
+		log.Error("Unexpected output from du command",
+			zap.String("output", string(output)),
+		)
+	}
+
+	log.Info("Disk usage",
+		zap.String("quantity", usageParts[0]),
+		zap.String("dir", dir),
+	)
 }

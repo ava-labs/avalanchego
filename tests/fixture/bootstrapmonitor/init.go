@@ -6,15 +6,16 @@ package bootstrapmonitor
 import (
 	"context"
 	"errors"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -23,21 +24,16 @@ const (
 	retryInterval = 5 * time.Second
 
 	recordedImageFilename = "bootstrap_image_name.txt"
+
+	BootstrapStartingMessage = "Starting bootstrap test for image"
+	BootstrapResumingMessage = "Resuming bootstrap test for image"
 )
-
-func BootstrapStartingMessage(containerImage string) string {
-	return "Starting bootstrap test for image " + containerImage
-}
-
-func BootstrapResumingMessage(containerImage string) string {
-	return "Resuming bootstrap test for image " + containerImage
-}
 
 func NodeDataDir(path string) string {
 	return path + "/avalanchego"
 }
 
-func InitBootstrapTest(namespace string, podName string, nodeContainerName string, dataDir string) error {
+func InitBootstrapTest(log logging.Logger, namespace string, podName string, nodeContainerName string, dataDir string) error {
 	var (
 		clientset      *kubernetes.Clientset
 		containerImage string
@@ -45,8 +41,8 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 	return wait.PollImmediateInfinite(retryInterval, func() (bool, error) {
 		if clientset == nil {
 			var err error
-			if clientset, err = getClientset(); err != nil {
-				log.Printf("failed to get clientset: %v", err)
+			if clientset, err = getClientset(log); err != nil {
+				log.Error("failed to get clientset", zap.Error(err))
 				return false, nil
 			}
 		}
@@ -57,25 +53,36 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 		if len(containerImage) == 0 {
 			// Retrieve the image used by the node container
 			var err error
-			log.Printf("Retrieving pod %s.%s to determine the image of container %q", namespace, podName, nodeContainerName)
+			log.Info("Retrieving pod to determine image used by container",
+				zap.String("namespace", namespace),
+				zap.String("pod", podName),
+				zap.String("container", nodeContainerName),
+			)
 			if containerImage, err = GetContainerImage(ctx, clientset, namespace, podName, nodeContainerName); err != nil {
-				log.Printf("failed to get container image: %v", err)
+				log.Error("failed to get container image", zap.Error(err))
 				return false, nil
 			}
-			log.Printf("Image for container %q: %s", nodeContainerName, containerImage)
+			log.Info("Image for container",
+				zap.String("container", nodeContainerName),
+				zap.String("image", containerImage),
+			)
 		}
 
 		// If the image uses the latest tag, determine the latest image id and set the container image to that
 		if strings.HasSuffix(containerImage, ":latest") {
-			log.Printf("Determining image id for image %q", containerImage)
-			imageID, err := getLatestImageID(ctx, clientset, namespace, containerImage, nodeContainerName)
+			log.Info("Determining image id for image",
+				zap.String("image", containerImage),
+			)
+			imageID, err := getLatestImageID(ctx, log, clientset, namespace, containerImage, nodeContainerName)
 			if err != nil {
-				log.Printf("failed to get latest image id: %v", err)
+				log.Error("failed to get latest image id", zap.Error(err))
 				return false, nil
 			}
-			log.Printf("Updating owning statefulset with image %q", imageID)
-			if err := setContainerImage(ctx, clientset, namespace, podName, nodeContainerName, imageID); err != nil {
-				log.Printf("failed to set container image: %v", err)
+			log.Info("Updating owning statefulset with image",
+				zap.String("image", imageID),
+			)
+			if err := setContainerImage(ctx, log, clientset, namespace, podName, nodeContainerName, imageID); err != nil {
+				log.Error("failed to set container image", zap.Error(err))
 				return false, nil
 			}
 		}
@@ -87,37 +94,40 @@ func InitBootstrapTest(namespace string, podName string, nodeContainerName strin
 
 		var recordedImage string
 		if recordedImageBytes, err := os.ReadFile(recordedImagePath); errors.Is(err, os.ErrNotExist) {
-			log.Println("Recorded image file does not exist")
+			log.Info("Recorded image file does not exist")
 		} else if err != nil {
-			log.Printf("failed to read recorded image file: %v", err)
+			log.Error("failed to read recorded image file", zap.Error(err))
 			return false, nil
 		} else {
 			recordedImage = string(recordedImageBytes)
-			log.Printf("Recorded image name: %s", recordedImage)
+			log.Info("Recorded image name", zap.String("image", recordedImage))
 		}
 
 		if recordedImage == containerImage {
-			log.Println("Recorded image name matches current image name")
-			log.Println(BootstrapResumingMessage(containerImage))
+			log.Info("Recorded image name matches current image name")
+			log.Info(BootstrapResumingMessage, zap.String("image", containerImage))
 			return true, nil
 		} else if len(recordedImage) > 0 {
-			log.Println("Recorded image name differs from the current image name")
+			log.Info("Recorded image name differs from the current image name")
 		}
 
 		nodeDataDir := NodeDataDir(dataDir)
-		log.Printf("Removing contents of node directory %s", nodeDataDir)
+		log.Info("Removing node directory", zap.String("path", nodeDataDir))
 		if err := os.RemoveAll(nodeDataDir); err != nil {
-			log.Printf("failed to remove contents of node directory: %v", err)
+			log.Error("failed to remove contents of node directory", zap.Error(err))
 			return false, nil
 		}
 
-		log.Printf("Writing %q to %s", containerImage, recordedImagePath)
+		log.Info("Writing image name to file",
+			zap.String("image", containerImage),
+			zap.String("path", recordedImagePath),
+		)
 		if err := os.WriteFile(recordedImagePath, []byte(containerImage), perms.ReadWrite); err != nil {
-			log.Printf("failed to write version file: %v", err)
+			log.Error("failed to write image name to file", zap.Error(err))
 			return false, nil
 		}
 
-		log.Println(BootstrapStartingMessage(containerImage))
+		log.Info(BootstrapStartingMessage, zap.String("image", containerImage))
 
 		return true, nil
 	})

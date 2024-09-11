@@ -8,17 +8,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	restclient "k8s.io/client-go/rest"
 )
 
 func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) error {
@@ -70,9 +72,7 @@ func waitForPodStatus(
 // getContainerImage retrieves the image of the specified container in the specified pod
 func GetContainerImage(context context.Context, clientset *kubernetes.Clientset, namespace string, podName string, containerName string) (string, error) {
 	pod, err := clientset.CoreV1().Pods(namespace).Get(context, podName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return "", nil
-	} else if err != nil {
+	if err != nil {
 		return "", fmt.Errorf("failed to get pod %s.%s: %w", namespace, podName, err)
 	}
 	for _, container := range pod.Spec.Containers {
@@ -84,7 +84,7 @@ func GetContainerImage(context context.Context, clientset *kubernetes.Clientset,
 }
 
 // setContainerImage sets the image of the specified container of the pod's owning statefulset
-func setContainerImage(ctx context.Context, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, image string) error {
+func setContainerImage(ctx context.Context, log logging.Logger, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, image string) error {
 	// Determine the name of the statefulset to update
 	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
@@ -122,13 +122,16 @@ func setContainerImage(ctx context.Context, clientset *kubernetes.Clientset, nam
 	if err != nil {
 		return fmt.Errorf("failed to patch statefulset %s: %w", statefulSetName, err)
 	}
-	log.Printf("Updated statefulset %s.%s to target image %q", namespace, statefulSetName, image)
-
+	log.Info("Updated statefulset to target new image",
+		zap.String("namespace", namespace),
+		zap.String("statefulSetName", statefulSetName),
+		zap.String("image", image),
+	)
 	return nil
 }
 
 // getBaseImageName removes the tag from the image name
-func getBaseImageName(imageName string) (string, error) {
+func getBaseImageName(log logging.Logger, imageName string) (string, error) {
 	if strings.Contains(imageName, "@") {
 		// Image name contains a digest, remove it
 		return strings.Split(imageName, "@")[0], nil
@@ -141,7 +144,10 @@ func getBaseImageName(imageName string) (string, error) {
 		return imageName, nil
 	case 2:
 		// Ambiguous image name - could contain a tag or a registry
-		log.Printf("Derived image name of %q from %q", imageNameParts[0], imageName)
+		log.Info("Derived image name from ambiguous string",
+			zap.String("ambiguousString", imageNameParts[0]),
+			zap.String("imageName", imageName),
+		)
 		return imageNameParts[0], nil
 	case 3:
 		// Image name contains a registry and a tag - remove the tag
@@ -154,12 +160,13 @@ func getBaseImageName(imageName string) (string, error) {
 // getLatestImageID retrieves the image id for the avalanchego image with tag `latest`.
 func getLatestImageID(
 	ctx context.Context,
+	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	namespace string,
 	imageName string,
 	containerName string,
 ) (string, error) {
-	baseImageName, err := getBaseImageName(imageName)
+	baseImageName, err := getBaseImageName(log, imageName)
 	if err != nil {
 		return "", err
 	}
@@ -219,14 +226,25 @@ func getLatestImageID(
 	return imageID, nil
 }
 
-func getClientset() (*kubernetes.Clientset, error) {
-	log.Println("Initializing clientset")
+func getClientset(log logging.Logger) (*kubernetes.Clientset, error) {
+	log.Info("Initializing clientset")
 	kubeconfigPath := os.Getenv("KUBECONFIG")
-	kubeConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+	var (
+		kubeconfig *restclient.Config
+		err        error
+	)
+	if len(kubeconfigPath) > 0 {
+		// Only use BuildConfigFromFlags if a path is provided to avoid the warning logs that
+		// will be omitted in a format that differs from the avalanchego format.
+		if kubeconfig, err = clientcmd.BuildConfigFromFlags("", kubeconfigPath); err != nil {
+			return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+		}
+	} else {
+		if kubeconfig, err = restclient.InClusterConfig(); err != nil {
+			return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+		}
 	}
-	clientset, err := kubernetes.NewForConfig(kubeConfig)
+	clientset, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
