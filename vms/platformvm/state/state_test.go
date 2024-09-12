@@ -88,18 +88,25 @@ func TestStateSyncGenesis(t *testing.T) {
 
 	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
+	require.Empty(
+		iterator.ToSlice(delegatorIterator),
+	)
 
 	stakerIterator, err := state.GetCurrentStakerIterator()
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.FromSlice(staker), stakerIterator)
+	require.Equal(
+		[]*Staker{staker},
+		iterator.ToSlice(stakerIterator),
+	)
 
 	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
+	require.Empty(
+		iterator.ToSlice(delegatorIterator),
+	)
 }
 
 // Whenever we store a staker, a whole bunch a data structures are updated
