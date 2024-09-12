@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -22,6 +23,7 @@ var (
 	errUnexpectedExpiryEntryLength = fmt.Errorf("expected expiry entry length %d", expiryEntryLength)
 
 	_ btree.LessFunc[ExpiryEntry] = ExpiryEntry.Less
+	_ utils.Sortable[ExpiryEntry] = ExpiryEntry{}
 )
 
 type Expiry interface {
@@ -63,15 +65,19 @@ func (e *ExpiryEntry) Unmarshal(data []byte) error {
 	return nil
 }
 
-// Invariant: Less produces the same ordering as the marshalled bytes.
 func (e ExpiryEntry) Less(o ExpiryEntry) bool {
+	return e.Compare(o) == -1
+}
+
+// Invariant: Compare produces the same ordering as the marshalled bytes.
+func (e ExpiryEntry) Compare(o ExpiryEntry) int {
 	switch {
 	case e.Timestamp < o.Timestamp:
-		return true
+		return -1
 	case e.Timestamp > o.Timestamp:
-		return false
+		return 1
 	default:
-		return e.ValidationID.Compare(o.ValidationID) == -1
+		return e.ValidationID.Compare(o.ValidationID)
 	}
 }
 

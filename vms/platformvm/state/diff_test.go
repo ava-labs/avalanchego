@@ -119,10 +119,9 @@ func TestDiffExpiry(t *testing.T) {
 		entry ExpiryEntry
 	}
 	tests := []struct {
-		name             string
-		initialExpiries  []ExpiryEntry
-		ops              []op
-		expectedExpiries []ExpiryEntry
+		name            string
+		initialExpiries []ExpiryEntry
+		ops             []op
 	}{
 		{
 			name: "empty noop",
@@ -134,9 +133,6 @@ func TestDiffExpiry(t *testing.T) {
 					put:   true,
 					entry: ExpiryEntry{Timestamp: 1},
 				},
-			},
-			expectedExpiries: []ExpiryEntry{
-				{Timestamp: 1},
 			},
 		},
 		{
@@ -180,9 +176,6 @@ func TestDiffExpiry(t *testing.T) {
 					entry: ExpiryEntry{Timestamp: 1},
 				},
 			},
-			expectedExpiries: []ExpiryEntry{
-				{Timestamp: 1},
-			},
 		},
 		{
 			name: "everything",
@@ -205,10 +198,6 @@ func TestDiffExpiry(t *testing.T) {
 					entry: ExpiryEntry{Timestamp: 1},
 				},
 			},
-			expectedExpiries: []ExpiryEntry{
-				{Timestamp: 1},
-				{Timestamp: 3},
-			},
 		},
 	}
 
@@ -223,26 +212,39 @@ func TestDiffExpiry(t *testing.T) {
 		d, err := NewDiffOn(state)
 		require.NoError(err)
 
-		unexpectedExpiries := set.Of(test.initialExpiries...)
+		var (
+			expectedExpiries   = set.Of(test.initialExpiries...)
+			unexpectedExpiries set.Set[ExpiryEntry]
+		)
 		for _, op := range test.ops {
 			if op.put {
 				d.PutExpiry(op.entry)
+				expectedExpiries.Add(op.entry)
+				unexpectedExpiries.Remove(op.entry)
 			} else {
 				d.DeleteExpiry(op.entry)
+				expectedExpiries.Remove(op.entry)
+				unexpectedExpiries.Add(op.entry)
 			}
-			unexpectedExpiries.Add(op.entry)
 		}
-		unexpectedExpiries.Remove(test.expectedExpiries...)
+
+		// If expectedExpiries is empty, we want expectedExpiriesSlice to be
+		// nil.
+		var expectedExpiriesSlice []ExpiryEntry
+		if expectedExpiries.Len() > 0 {
+			expectedExpiriesSlice = expectedExpiries.List()
+			utils.Sort(expectedExpiriesSlice)
+		}
 
 		verifyChain := func(chain Chain) {
 			expiryIterator, err := chain.GetExpiryIterator()
 			require.NoError(err)
 			require.Equal(
-				test.expectedExpiries,
+				expectedExpiriesSlice,
 				iterator.ToSlice(expiryIterator),
 			)
 
-			for _, expiry := range test.expectedExpiries {
+			for expiry := range expectedExpiries {
 				has, err := chain.HasExpiry(expiry)
 				require.NoError(err)
 				require.True(has)
