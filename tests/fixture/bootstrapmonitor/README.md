@@ -51,7 +51,7 @@ to test and initiates a new test when one is found.
    - if the image name was present on disk and differs from the current image
      - report that a bootstrap test is being resumed
  - `bootstrap-monitor wait-for-completion` is intended to run as a
-   sidepod of the avalanchego container and mount the same data volume read-only
+   sidecar of the avalanchego container and mount the same data volume read-only
    - every health check interval
      - checks the health of the node
      - logs the disk usage of the data volume
