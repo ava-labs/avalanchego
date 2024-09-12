@@ -44,6 +44,8 @@ func (s State) AdvanceTime(target gas.Gas, seconds uint64) State {
 
 // CostOf calculates how much to charge based on the dynamic fee mechanism for
 // [seconds].
+//
+// This implements the ACP-77 cost over time formula:
 func (s State) CostOf(c Config, seconds uint64) uint64 {
 	// If the current and target are the same, the price is constant.
 	if s.Current == c.Target {
