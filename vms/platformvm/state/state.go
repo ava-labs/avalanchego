@@ -1984,9 +1984,10 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 
 func (s *state) writeExpiry() error {
 	for entry, isAdded := range s.expiryDiff.modified {
-		key := entry.Marshal()
-
-		var err error
+		var (
+			key = entry.Marshal()
+			err error
+		)
 		if isAdded {
 			s.expiry.ReplaceOrInsert(entry)
 			err = s.expiryDB.Put(key, nil)
