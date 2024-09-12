@@ -310,9 +310,9 @@ func runBenchmark() error {
 
 		// update middle 5k entries
 		startUpdateTime := time.Now()
+		updateEntryValue := calculateIndexEncoding(low)
 		for keyToUpdateIdx := low + ((*databaseEntries) / 2); keyToUpdateIdx < low+((*databaseEntries)/2)+databaseRunningUpdateSize; keyToUpdateIdx++ {
 			updateEntryKey := calculateIndexEncoding(keyToUpdateIdx)
-			updateEntryValue := calculateIndexEncoding(keyToUpdateIdx - ((*databaseEntries) / 2))
 			err = batch.Put(updateEntryKey, updateEntryValue)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "unable to update merkleDB entry : %v\n", err)
@@ -344,6 +344,7 @@ func runBenchmark() error {
 		}
 
 		batchCounter.Inc()
+		low += databaseRunningBatchSize
 	}
 
 	// return nil
