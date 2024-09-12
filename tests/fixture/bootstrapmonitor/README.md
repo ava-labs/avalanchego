@@ -28,6 +28,12 @@ To enable, supply `state-sync-enabled: false` as C-Chain configuration.
 
 ## Architecture TODO(marun) Rename
 
+The intention of `bootstrap-monitor` is to enable a statefulset to
+perform continous bootstrap testing for a given avalanchego
+configuration. It ensures that a new testing pod either starts or
+resumes a test, and upon completion of a test, polls for a new image
+to test and initiates a new test when one is found.
+
  - `bootstrap-monitor init` intended to run as init container of an avalanchego node
    - mounts the same data volume
    - if the image of the avalanchego container is tagged with `latest`
