@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/iterator"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // expiryEntry = [timestamp] + [validationID]
@@ -82,48 +81,34 @@ func (e ExpiryEntry) Compare(o ExpiryEntry) int {
 }
 
 type expiryDiff struct {
-	added   *btree.BTreeG[ExpiryEntry]
-	removed set.Set[ExpiryEntry]
+	modified map[ExpiryEntry]bool // bool represents isAdded
+	added    *btree.BTreeG[ExpiryEntry]
 }
 
 func newExpiryDiff() *expiryDiff {
 	return &expiryDiff{
-		added: btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
+		modified: make(map[ExpiryEntry]bool),
+		added:    btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
 	}
 }
 
 func (e *expiryDiff) PutExpiry(entry ExpiryEntry) {
+	e.modified[entry] = true
 	e.added.ReplaceOrInsert(entry)
-	e.removed.Remove(entry)
 }
 
 func (e *expiryDiff) DeleteExpiry(entry ExpiryEntry) {
+	e.modified[entry] = false
 	e.added.Delete(entry)
-	e.removed.Add(entry)
 }
 
 func (e *expiryDiff) getExpiryIterator(parentIterator iterator.Iterator[ExpiryEntry]) iterator.Iterator[ExpiryEntry] {
-	// The iterators are deduplicated so that additions that were present in the
-	// parent iterator are not duplicated.
-	return iterator.Deduplicate(
-		iterator.Filter(
-			iterator.Merge(
-				ExpiryEntry.Less,
-				parentIterator,
-				iterator.FromTree(e.added),
-			),
-			e.removed.Contains,
-		),
+	return iterator.Merge(
+		ExpiryEntry.Less,
+		iterator.Filter(parentIterator, func(entry ExpiryEntry) bool {
+			_, ok := e.modified[entry]
+			return ok
+		}),
+		iterator.FromTree(e.added),
 	)
-}
-
-func (e *expiryDiff) hasExpiry(entry ExpiryEntry) (bool, bool) {
-	switch {
-	case e.removed.Contains(entry):
-		return false, true
-	case e.added.Has(entry):
-		return true, true
-	default:
-		return false, false
-	}
 }

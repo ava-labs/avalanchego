@@ -703,7 +703,7 @@ func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 }
 
 func (s *state) HasExpiry(entry ExpiryEntry) (bool, error) {
-	if has, modified := s.expiryDiff.hasExpiry(entry); modified {
+	if has, modified := s.expiryDiff.modified[entry]; modified {
 		return has, nil
 	}
 	return s.expiry.Has(entry), nil
@@ -1983,23 +1983,18 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 }
 
 func (s *state) writeExpiry() error {
-	it := iterator.FromTree(s.expiryDiff.added)
-	defer it.Release()
-
-	for it.Next() {
-		entry := it.Value()
-		s.expiry.ReplaceOrInsert(entry)
-
+	for entry, isAdded := range s.expiryDiff.modified {
 		key := entry.Marshal()
-		if err := s.expiryDB.Put(key, nil); err != nil {
-			return err
-		}
-	}
-	for removed := range s.expiryDiff.removed {
-		s.expiry.Delete(removed)
 
-		key := removed.Marshal()
-		if err := s.expiryDB.Delete(key); err != nil {
+		var err error
+		if isAdded {
+			s.expiry.ReplaceOrInsert(entry)
+			err = s.expiryDB.Put(key, nil)
+		} else {
+			s.expiry.Delete(entry)
+			err = s.expiryDB.Delete(key)
+		}
+		if err != nil {
 			return err
 		}
 	}

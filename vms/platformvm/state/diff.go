@@ -164,7 +164,7 @@ func (d *diff) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 }
 
 func (d *diff) HasExpiry(entry ExpiryEntry) (bool, error) {
-	if has, modified := d.expiryDiff.hasExpiry(entry); modified {
+	if has, modified := d.expiryDiff.modified[entry]; modified {
 		return has, nil
 	}
 
@@ -489,14 +489,12 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
 	}
-	addedExpiryIterator := iterator.FromTree(d.expiryDiff.added)
-	for addedExpiryIterator.Next() {
-		entry := addedExpiryIterator.Value()
-		baseState.PutExpiry(entry)
-	}
-	addedExpiryIterator.Release()
-	for removed := range d.expiryDiff.removed {
-		baseState.DeleteExpiry(removed)
+	for entry, isAdded := range d.expiryDiff.modified {
+		if isAdded {
+			baseState.PutExpiry(entry)
+		} else {
+			baseState.DeleteExpiry(entry)
+		}
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
