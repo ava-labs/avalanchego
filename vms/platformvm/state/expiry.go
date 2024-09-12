@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 )
 
 // expiryEntry = [timestamp] + [validationID]
@@ -20,7 +22,25 @@ var (
 	errUnexpectedExpiryEntryLength = fmt.Errorf("expected expiry entry length %d", expiryEntryLength)
 
 	_ btree.LessFunc[ExpiryEntry] = ExpiryEntry.Less
+	_ utils.Sortable[ExpiryEntry] = ExpiryEntry{}
 )
+
+type Expiry interface {
+	// GetExpiryIterator returns an iterator of all the expiry entries in order
+	// of lowest to highest timestamp.
+	GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error)
+
+	// HasExpiry returns true if the database has the specified entry.
+	HasExpiry(ExpiryEntry) (bool, error)
+
+	// PutExpiry adds the entry to the database. If the entry already exists, it
+	// is a noop.
+	PutExpiry(ExpiryEntry)
+
+	// DeleteExpiry removes the entry from the database. If the entry doesn't
+	// exist, it is a noop.
+	DeleteExpiry(ExpiryEntry)
+}
 
 type ExpiryEntry struct {
 	Timestamp    uint64
@@ -44,14 +64,51 @@ func (e *ExpiryEntry) Unmarshal(data []byte) error {
 	return nil
 }
 
-// Invariant: Less produces the same ordering as the marshalled bytes.
 func (e ExpiryEntry) Less(o ExpiryEntry) bool {
+	return e.Compare(o) == -1
+}
+
+// Invariant: Compare produces the same ordering as the marshalled bytes.
+func (e ExpiryEntry) Compare(o ExpiryEntry) int {
 	switch {
 	case e.Timestamp < o.Timestamp:
-		return true
+		return -1
 	case e.Timestamp > o.Timestamp:
-		return false
+		return 1
 	default:
-		return e.ValidationID.Compare(o.ValidationID) == -1
+		return e.ValidationID.Compare(o.ValidationID)
 	}
+}
+
+type expiryDiff struct {
+	modified map[ExpiryEntry]bool // bool represents isAdded
+	added    *btree.BTreeG[ExpiryEntry]
+}
+
+func newExpiryDiff() *expiryDiff {
+	return &expiryDiff{
+		modified: make(map[ExpiryEntry]bool),
+		added:    btree.NewG(defaultTreeDegree, ExpiryEntry.Less),
+	}
+}
+
+func (e *expiryDiff) PutExpiry(entry ExpiryEntry) {
+	e.modified[entry] = true
+	e.added.ReplaceOrInsert(entry)
+}
+
+func (e *expiryDiff) DeleteExpiry(entry ExpiryEntry) {
+	e.modified[entry] = false
+	e.added.Delete(entry)
+}
+
+func (e *expiryDiff) getExpiryIterator(parentIterator iterator.Iterator[ExpiryEntry]) iterator.Iterator[ExpiryEntry] {
+	return iterator.Merge(
+		ExpiryEntry.Less,
+		iterator.Filter(parentIterator, func(entry ExpiryEntry) bool {
+			_, ok := e.modified[entry]
+			return ok
+		}),
+		iterator.FromTree(e.added),
+	)
 }
