@@ -114,9 +114,9 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By("Configuring a kubernetes client")
 		kubeconfigPath := os.Getenv("KUBECONFIG")
-		kubeConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+		kubeconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 		require.NoError(err)
-		clientset, err := kubernetes.NewForConfig(kubeConfig)
+		clientset, err := kubernetes.NewForConfig(kubeconfig)
 		require.NoError(err)
 
 		ginkgo.By("Creating a kube namespace to ensure isolation between test runs")
@@ -135,7 +135,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		require.NoError(err)
 		nodePodName := createdNodeStatefulSet.Name + "-0"
 		waitForPodCondition(tc, clientset, namespace, nodePodName, corev1.PodReady)
-		bootstrapID := waitForNodeHealthy(tc, kubeConfig, namespace, nodePodName)
+		bootstrapID := waitForNodeHealthy(tc, kubeconfig, namespace, nodePodName)
 		pod, err := clientset.CoreV1().Pods(namespace).Get(tc.DefaultContext(), nodePodName, metav1.GetOptions{})
 		require.NoError(err)
 		bootstrapIP := pod.Status.PodIP
@@ -172,7 +172,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the success of the bootstrap test", monitorContainerName))
 		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, monitorContainerName, bootstrapmonitor.ImageUnchanged)
-		_ = waitForNodeHealthy(tc, kubeConfig, namespace, nodePodName)
+		_ = waitForNodeHealthy(tc, kubeconfig, namespace, nodePodName)
 
 		ginkgo.By("Checking that bootstrap testing is resumed when a pod is rescheduled")
 		// Retrieve the UID of the pod pre-deletion
@@ -377,12 +377,12 @@ func waitForPodCondition(tc tests.TestContext, clientset *kubernetes.Clientset, 
 }
 
 // waitForNodeHealthy waits for the node running in the specified pod to report healthy.
-func waitForNodeHealthy(tc tests.TestContext, kubeConfig *restclient.Config, namespace string, podName string) ids.NodeID {
+func waitForNodeHealthy(tc tests.TestContext, kubeconfig *restclient.Config, namespace string, podName string) ids.NodeID {
 	require := require.New(tc)
 
 	// A forwarded connection enables connectivity without exposing the node external to the kube cluster
 	ginkgo.By(fmt.Sprintf("Enabling a local forward for pod %s.%s", namespace, podName))
-	localPort, localPortStopChan, err := enableLocalForwardForPod(kubeConfig, namespace, podName, config.DefaultHTTPPort, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
+	localPort, localPortStopChan, err := enableLocalForwardForPod(kubeconfig, namespace, podName, config.DefaultHTTPPort, ginkgo.GinkgoWriter, ginkgo.GinkgoWriter)
 	require.NoError(err)
 	defer close(localPortStopChan)
 	localNodeURI := fmt.Sprintf("http://127.0.0.1:%d", localPort)
@@ -406,8 +406,8 @@ func waitForNodeHealthy(tc tests.TestContext, kubeConfig *restclient.Config, nam
 
 // enableLocalForwardForPod enables traffic forwarding from a local port to the specified pod with client-go. The returned
 // stop channel should be closed to stop the port forwarding.
-func enableLocalForwardForPod(kubeConfig *restclient.Config, namespace string, name string, port int, out, errOut io.Writer) (uint16, chan struct{}, error) {
-	transport, upgrader, err := spdy.RoundTripperFor(kubeConfig)
+func enableLocalForwardForPod(kubeconfig *restclient.Config, namespace string, name string, port int, out, errOut io.Writer) (uint16, chan struct{}, error) {
+	transport, upgrader, err := spdy.RoundTripperFor(kubeconfig)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to create round tripper: %w", err)
 	}
@@ -421,7 +421,7 @@ func enableLocalForwardForPod(kubeConfig *restclient.Config, namespace string, n
 		&url.URL{
 			Scheme: "https",
 			Path:   fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", namespace, name),
-			Host:   strings.TrimPrefix(kubeConfig.Host, "https://"),
+			Host:   strings.TrimPrefix(kubeconfig.Host, "https://"),
 		},
 	)
 	ports := []string{fmt.Sprintf("0:%d", port)}
