@@ -223,16 +223,16 @@ func TestDiffExpiry(t *testing.T) {
 		d, err := NewDiffOn(state)
 		require.NoError(err)
 
-		otherExpiries := set.Of(test.initialExpiries...)
+		unexpectedExpiries := set.Of(test.initialExpiries...)
 		for _, op := range test.ops {
 			if op.put {
 				d.PutExpiry(op.entry)
 			} else {
 				d.DeleteExpiry(op.entry)
 			}
-			otherExpiries.Add(op.entry)
+			unexpectedExpiries.Add(op.entry)
 		}
-		otherExpiries.Remove(test.expectedExpiries...)
+		unexpectedExpiries.Remove(test.expectedExpiries...)
 
 		verifyChain := func(chain Chain) {
 			expiryIterator, err := chain.GetExpiryIterator()
@@ -247,7 +247,7 @@ func TestDiffExpiry(t *testing.T) {
 				require.NoError(err)
 				require.True(has)
 			}
-			for expiry := range otherExpiries {
+			for expiry := range unexpectedExpiries {
 				has, err := chain.HasExpiry(expiry)
 				require.NoError(err)
 				require.False(has)
