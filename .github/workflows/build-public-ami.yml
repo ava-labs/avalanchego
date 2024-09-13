@@ -18,6 +18,9 @@ jobs:
   build-public-ami-and-upload:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
