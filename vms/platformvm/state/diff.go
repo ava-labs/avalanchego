@@ -559,7 +559,22 @@ func (d *diff) Apply(baseState Chain) error {
 			baseState.DeleteExpiry(entry)
 		}
 	}
+	// Ensure that all sov deletions happen before any sov additions. This
+	// ensures that a subnetID+nodeID pair that was deleted and then re-added in
+	// a single diff can't get reordered into the addition happening first;
+	// which would return an error.
 	for _, sov := range d.sovDiff.modified {
+		if sov.Weight != 0 {
+			continue
+		}
+		if err := baseState.PutSubnetOnlyValidator(sov); err != nil {
+			return err
+		}
+	}
+	for _, sov := range d.sovDiff.modified {
+		if sov.Weight == 0 {
+			continue
+		}
 		if err := baseState.PutSubnetOnlyValidator(sov); err != nil {
 			return err
 		}
