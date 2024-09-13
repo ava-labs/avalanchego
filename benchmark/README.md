@@ -31,7 +31,7 @@ If you want to install grafana and prometheus on an AWS host (using Ubuntu as a 
   c. Set the instance type to m5d.2xlarge
   d. Set your key pair
   e. Check 'Allow HTTP traffic from the internet' for grafana
-  f. Configure storage to 400GiB disk
+  f. Configure storage to 20GiB disk
   g. [optional] Save money by selecting 'spot instance' in advanced
   h. Launch the instance
 3. ssh ubuntu@AWS-IP

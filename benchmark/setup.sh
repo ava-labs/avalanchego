@@ -30,6 +30,17 @@ systemctl start grafana-server
 systemctl enable grafana-server.service
 systemctl restart prometheus
   
+NVME_DEV="$(realpath /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_* | uniq)"
+if [ -n "$NVME_DEV" ]; then
+  mkfs.ext4 -E nodiscard -i 6291456 "$NVME_DEV"
+  NVME_MOUNT=/mnt/nvme
+  mkdir -p "$NVME_MOUNT"
+  mount -o noatime "$NVME_DEV" "$NVME_MOUNT"
+  echo "$NVME_DEV $NVME_MOUNT ext4 noatime 0 0" >> /etc/fstab
+  mkdir "$NVME_MOUNT/ubuntu"
+  chown ubuntu:ubuntu "$NVME_MOUNT/ubuntu"
+  ln -s /home/ubuntu/firewood "$NVME_MOUNT/ubuntu/firewood"
+fi
   
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
@@ -38,4 +49,5 @@ cd firewood
 git checkout rkuris/prometheus
 cargo build --release
 
-nohup time cargo run --release --bin benchmark -- -b 10000 -c 1500000 -n 100000 &
+# nohup time cargo run --release --bin benchmark -- -b 10000 -c 1500000 -n 100000 &
+nohup time cargo run --release --bin benchmark -- -b 100000 -c 1500000 -n 1000 -i &
