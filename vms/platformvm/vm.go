@@ -487,9 +487,6 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := vm.uptimeManager.Disconnect(nodeID); err != nil {
 		return err
 	}
-	if err := vm.state.Commit(); err != nil {
-		return err
-	}
 	return vm.Network.Disconnected(ctx, nodeID)
 }
 
