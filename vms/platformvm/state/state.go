@@ -99,6 +99,7 @@ var (
 // execution.
 type Chain interface {
 	Expiry
+	SubnetOnlyValidators
 	Stakers
 	avax.UTXOAdder
 	avax.UTXOGetter
