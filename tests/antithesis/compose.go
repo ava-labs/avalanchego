@@ -236,7 +236,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	}
 
 	workloadEnv := types.Mapping{
-		envVarName(EnvPrefix, URIsKey): uris.String(),
+		config.EnvVarName(EnvPrefix, URIsKey): uris.String(),
 	}
 	chainIDs := CSV{}
 	for _, subnet := range network.Subnets {
@@ -245,7 +245,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 	}
 	if len(chainIDs) > 0 {
-		workloadEnv[envVarName(EnvPrefix, ChainIDsKey)] = chainIDs.String()
+		workloadEnv[config.EnvVarName(EnvPrefix, ChainIDsKey)] = chainIDs.String()
 	}
 
 	workloadName := "workload"
@@ -283,7 +283,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 	envVarMap := make(types.Mapping, len(keyMap))
 	for key, val := range keyMap {
-		envVar := envVarName(config.EnvPrefix, key)
+		envVar := config.EnvVarName(config.EnvPrefix, key)
 		envVarMap[envVar] = val
 	}
 	return envVarMap
