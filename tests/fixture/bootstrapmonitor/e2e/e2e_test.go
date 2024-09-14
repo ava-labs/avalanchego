@@ -150,13 +150,13 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		ginkgo.By("Waiting for the pod image to be updated to include an image digest")
 		var containerImage string
 		require.Eventually(func() bool {
-			image, err := bootstrapmonitor.GetContainerImage(tc.DefaultContext(), clientset, namespace, bootstrapPodName, nodeContainerName)
+			testConfig, err := bootstrapmonitor.GetBootstrapTestConfigFromPod(tc.DefaultContext(), clientset, namespace, bootstrapPodName, nodeContainerName)
 			if err != nil {
 				tc.Outf("Error determining image used by the %q container of pod %s.%s: %v \n", nodeContainerName, namespace, bootstrapPodName, err)
 				return false
 			}
-			if strings.Contains(image, "sha256") {
-				containerImage = image
+			if strings.Contains(testConfig.Image, "sha256") {
+				containerImage = testConfig.Image
 				return true
 			}
 			return false
@@ -201,13 +201,13 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 
 		ginkgo.By("Waiting for the pod image to change")
 		require.Eventually(func() bool {
-			image, err := bootstrapmonitor.GetContainerImage(tc.DefaultContext(), clientset, namespace, bootstrapPodName, nodeContainerName)
+			testConfig, err := bootstrapmonitor.GetBootstrapTestConfigFromPod(tc.DefaultContext(), clientset, namespace, bootstrapPodName, nodeContainerName)
 			if err != nil {
 				tc.Outf("Error determining image used by the %q container of pod %s.%s: %v \n", nodeContainerName, namespace, bootstrapPodName, err)
 				return false
 			}
-			if len(image) > 0 && image != containerImage {
-				containerImage = image
+			if testConfig.Image != containerImage {
+				containerImage = testConfig.Image
 				return true
 			}
 			return false
@@ -292,15 +292,13 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 					Labels: map[string]string{
 						"app": name,
 					},
+					Annotations: map[string]string{
+						bootstrapmonitor.VersionsAnnotationKey: "",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Command: []string{"bash"},
-							Args: []string{
-								"-c",
-								"./avalanchego --version && ./avalanchego",
-							},
 							Name:  nodeContainerName,
 							Image: latestAvalanchegoImage,
 							Ports: []corev1.ContainerPort{
@@ -344,18 +342,12 @@ func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
 	var i int
 	for k, v := range mapping {
 		envVars[i] = corev1.EnvVar{
-			Name:  envVarName(config.EnvPrefix, k),
+			Name:  config.EnvVarName(config.EnvPrefix, k),
 			Value: v,
 		}
 		i++
 	}
 	return envVars
-}
-
-// TODO(marun) Share one implementation with antithesis configuration
-func envVarName(prefix string, key string) string {
-	// e.g. MY_PREFIX, network-id -> MY_PREFIX_NETWORK_ID
-	return strings.ToUpper(prefix + "_" + config.DashesToUnderscores.Replace(key))
 }
 
 // defaultNodeFlags defines common flags for avalanchego nodes used by this test
@@ -546,6 +538,11 @@ func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clients
 				APIGroups: []string{""},
 				Resources: []string{"pods"},
 				Verbs:     []string{"get", "create", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods/log"},
+				Verbs:     []string{"get"},
 			},
 			{
 				APIGroups: []string{"apps"},

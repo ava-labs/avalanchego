@@ -27,6 +27,8 @@ const (
 	ImageUnchanged = "Image unchanged"
 )
 
+var nodeURL = fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)
+
 func WaitForCompletion(
 	log logging.Logger,
 	namespace string,
@@ -41,47 +43,30 @@ func WaitForCompletion(
 		return fmt.Errorf("failed to get clientset: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), initTimeout)
+	defer cancel()
+
+	log.Info("Retrieving pod to determine bootstrap test config",
+		zap.String("namespace", namespace),
+		zap.String("pod", podName),
+		zap.String("container", nodeContainerName),
+	)
+	testConfig, err := GetBootstrapTestConfigFromPod(ctx, clientset, namespace, podName, nodeContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to determine bootstrap test config: %w", err)
+	}
+	log.Info("Retrieved bootstrap test config", zap.Reflect("testConfig", testConfig))
+
 	// Avoid checking node health before it reports initial ready
 	log.Info("Waiting for pod readiness")
-	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
-		defer cancel()
-		err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady)
-		if err != nil {
-			log.Error("failed to wait for pod condition", zap.Error(err))
-			return false, nil
-		}
-		return true, nil
-	}); err != nil {
-		return fmt.Errorf("failed to wait for pod readiness: %w", err)
+	if err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
+		return fmt.Errorf("failed to wait for pod condition: %w", err)
 	}
 
-	var (
-		containerImage string
-		nodeURL        = fmt.Sprintf("http://localhost:%d", config.DefaultHTTPPort)
-	)
 	log.Info("Waiting for node to report healthy")
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
-
-		if len(containerImage) == 0 {
-			log.Info("Retrieving pod to determine image of container",
-				zap.String("namespace", namespace),
-				zap.String("pod", podName),
-				zap.String("container", nodeContainerName),
-			)
-			var err error
-			containerImage, err = GetContainerImage(ctx, clientset, namespace, podName, nodeContainerName)
-			if err != nil {
-				log.Error("failed to get container image", zap.Error(err))
-				return false, nil
-			}
-			log.Info("Image for container",
-				zap.String("container", nodeContainerName),
-				zap.String("image", containerImage),
-			)
-		}
 
 		// Check whether the node is reporting healthy which indicates that bootstrap is complete
 		if healthy, err := tmpnet.CheckNodeHealth(ctx, nodeURL); err != nil {
@@ -98,7 +83,7 @@ func WaitForCompletion(
 			log.Info("Node reported healthy")
 		}
 
-		log.Info("Bootstrap completed successfully for image", zap.String("image", containerImage))
+		log.Info("Bootstrap completed successfully for image", zap.Reflect("testConfig", testConfig))
 
 		return true, nil
 	}); err != nil {
@@ -111,21 +96,24 @@ func WaitForCompletion(
 		defer cancel()
 
 		log.Info("Starting pod to get the image id for the `latest` tag")
-		latestImageID, err := getLatestImageID(ctx, log, clientset, namespace, containerImage, nodeContainerName)
+		latestImageDetails, err := getLatestImageDetails(ctx, log, clientset, namespace, testConfig.Image, nodeContainerName)
 		if err != nil {
 			log.Error("failed to get latest image id", zap.Error(err))
 			return false, nil
 		}
 
-		if latestImageID == containerImage {
+		if latestImageDetails.Image == testConfig.Image {
 			log.Info(ImageUnchanged)
 			return false, nil
 		}
 
-		log.Info("Found updated image", zap.String("image", latestImageID))
+		log.Info("Found updated image",
+			zap.String("image", latestImageDetails.Image),
+			zap.Reflect("versions", latestImageDetails.Versions),
+		)
 
 		log.Info("Updating StatefulSet to trigger a new test")
-		if err := setContainerImage(ctx, log, clientset, namespace, podName, nodeContainerName, latestImageID); err != nil {
+		if err := setImageDetails(ctx, log, clientset, namespace, podName, nodeContainerName, latestImageDetails); err != nil {
 			log.Error("failed to set container image", zap.Error(err))
 			return false, nil
 		}

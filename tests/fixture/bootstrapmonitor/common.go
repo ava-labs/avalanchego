@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,22 +73,8 @@ func waitForPodStatus(
 	}
 }
 
-// getContainerImage retrieves the image of the specified container in the specified pod
-func GetContainerImage(context context.Context, clientset *kubernetes.Clientset, namespace string, podName string, containerName string) (string, error) {
-	pod, err := clientset.CoreV1().Pods(namespace).Get(context, podName, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get pod %s.%s: %w", namespace, podName, err)
-	}
-	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			return container.Image, nil
-		}
-	}
-	return "", fmt.Errorf("failed to find container %q in pod %s.%s", containerName, namespace, podName)
-}
-
-// setContainerImage sets the image of the specified container of the pod's owning statefulset
-func setContainerImage(ctx context.Context, log logging.Logger, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, image string) error {
+// setImageDetails updates the pod's owning statefulset with the image of the specified container and associated version details
+func setImageDetails(ctx context.Context, log logging.Logger, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, imageDetails *ImageDetails) error {
 	// Determine the name of the statefulset to update
 	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
@@ -101,19 +89,23 @@ func setContainerImage(ctx context.Context, log logging.Logger, clientset *kuber
 	}
 	statefulSetName := ownerReference.Name
 
-	// Define the strategic merge patch data updating the image
-	patchData := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"template": map[string]interface{}{
-				"spec": map[string]interface{}{
-					"containers": []map[string]interface{}{
-						{
-							"name":  containerName,
-							"image": image,
-						},
-					},
-				},
-			},
+	// Marshal the versions to JSON
+	versionJSONBytes, err := json.Marshal(imageDetails.Versions)
+	if err != nil {
+		return fmt.Errorf("failed to marshal versions: %w", err)
+	}
+
+	// Create the JSON patch
+	patchData := []map[string]interface{}{
+		{
+			"op":    "replace",
+			"path":  "/spec/template/spec/containers/0/image",
+			"value": imageDetails.Image,
+		},
+		{
+			"op":    "replace",
+			"path":  "/spec/template/metadata/annotations/" + strings.Replace(VersionsAnnotationKey, "/", "~1", -1),
+			"value": string(versionJSONBytes),
 		},
 	}
 
@@ -124,14 +116,15 @@ func setContainerImage(ctx context.Context, log logging.Logger, clientset *kuber
 	}
 
 	// Apply the patch
-	_, err = clientset.AppsV1().StatefulSets(namespace).Patch(context.TODO(), statefulSetName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = clientset.AppsV1().StatefulSets(namespace).Patch(context.TODO(), statefulSetName, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to patch statefulset %s.%s: %w", namespace, statefulSetName, err)
 	}
 	log.Info("Updated statefulset to target new image",
 		zap.String("namespace", namespace),
 		zap.String("statefulSetName", statefulSetName),
-		zap.String("image", image),
+		zap.String("image", imageDetails.Image),
+		zap.Reflect("versions", imageDetails.Versions),
 	)
 	return nil
 }
@@ -163,18 +156,23 @@ func getBaseImageName(log logging.Logger, imageName string) (string, error) {
 	}
 }
 
-// getLatestImageID retrieves the image id for the avalanchego image with tag `latest`.
-func getLatestImageID(
+type ImageDetails struct {
+	Image    string
+	Versions *version.Versions
+}
+
+// GetLatestImageDetails retrieves the image details for the avalanchego image with tag `latest`.
+func getLatestImageDetails(
 	ctx context.Context,
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	namespace string,
 	imageName string,
 	containerName string,
-) (string, error) {
+) (*ImageDetails, error) {
 	baseImageName, err := getBaseImageName(log, imageName)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Start a new pod with the `latest`-tagged avalanchego image to discover its image ID
@@ -187,7 +185,7 @@ func getLatestImageID(
 				{
 					Name:    containerName,
 					Command: []string{"./avalanchego"},
-					Args:    []string{"--version"},
+					Args:    []string{"--version-json"},
 					Image:   baseImageName + ":latest",
 				},
 			},
@@ -196,19 +194,20 @@ func getLatestImageID(
 	}
 	createdPod, err := clientset.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to start pod %w", err)
+		return nil, fmt.Errorf("failed to start pod %w", err)
 	}
+	qualifiedPodName := fmt.Sprintf("%s.%s", namespace, createdPod.Name)
 
 	err = waitForPodStatus(ctx, clientset, namespace, createdPod.Name, func(status *corev1.PodStatus) bool {
 		return status.Phase == corev1.PodSucceeded || status.Phase == corev1.PodFailed
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to wait for pod termination: %w", err)
+		return nil, fmt.Errorf("failed to wait for pod %s to terminate: %w", qualifiedPodName, err)
 	}
 
 	terminatedPod, err := clientset.CoreV1().Pods(namespace).Get(ctx, createdPod.Name, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve terminated pod: %w", err)
+		return nil, fmt.Errorf("failed to retrieve terminated pod %s: %w", qualifiedPodName, err)
 	}
 
 	// Get the image id for the avalanchego image
@@ -220,16 +219,39 @@ func getLatestImageID(
 		}
 	}
 	if len(imageID) == 0 {
-		return "", fmt.Errorf("failed to get image id for pod %s.%s", namespace, createdPod.Name)
+		return nil, fmt.Errorf("failed to get image id for pod %s", qualifiedPodName)
+	}
+
+	// Get the logs for the pod
+	req := clientset.CoreV1().Pods(namespace).GetLogs(createdPod.Name, &corev1.PodLogOptions{
+		Container: containerName,
+	})
+	logStream, err := req.Stream(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logs for pod %s: %w", qualifiedPodName, err)
+	}
+	defer logStream.Close()
+	logs, err := io.ReadAll(logStream)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read logs for pod %s: %w", qualifiedPodName, err)
+	}
+
+	// Attempt to unmarshal the logs to a Versions instance
+	versions := &version.Versions{}
+	if err := json.Unmarshal(logs, versions); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal logs for pod %s: %w", qualifiedPodName, err)
 	}
 
 	// Only delete the pod if successful to aid in debugging
 	err = clientset.CoreV1().Pods(namespace).Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return imageID, nil
+	return &ImageDetails{
+		Image:    imageID,
+		Versions: versions,
+	}, nil
 }
 
 func getClientset(log logging.Logger) (*kubernetes.Clientset, error) {
