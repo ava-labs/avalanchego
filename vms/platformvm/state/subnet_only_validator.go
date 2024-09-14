@@ -30,7 +30,7 @@ type SubnetOnlyValidators interface {
 
 	// NumActiveSubnetOnlyValidators returns the number of currently active
 	// subnet only validators.
-	NumActiveSubnetOnlyValidators() (int, error)
+	NumActiveSubnetOnlyValidators() int
 
 	// GetSubnetOnlyValidator returns the validator with [validationID] if it
 	// exists. If the validator does not exist, [err] will equal
@@ -139,10 +139,10 @@ func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (Su
 	vdr := SubnetOnlyValidator{
 		ValidationID: validationID,
 	}
-	if _, err = block.GenesisCodec.Unmarshal(bytes, &vdr); err != nil {
+	if _, err := block.GenesisCodec.Unmarshal(bytes, &vdr); err != nil {
 		return SubnetOnlyValidator{}, fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
 	}
-	return vdr, err
+	return vdr, nil
 }
 
 func putSubnetOnlyValidator(db database.KeyValueWriter, vdr SubnetOnlyValidator) error {

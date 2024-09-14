@@ -83,6 +83,10 @@ var (
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
 	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
+	SubnetOnlyValidatorsPrefix    = []byte("subnetOnlyValidators")
+	SubnetIDNodeIDPrefix          = []byte("subnetIDNodeID")
+	ActivePrefix                  = []byte("active")
+	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
 
 	TimestampKey       = []byte("timestamp")
@@ -308,6 +312,14 @@ type state struct {
 	expiryDiff *expiryDiff
 	expiryDB   database.Database
 
+	activeSOVLookup        map[ids.ID]SubnetOnlyValidator
+	activeSOVs             *btree.BTreeG[SubnetOnlyValidator]
+	sovDiff                *subnetOnlyValidatorsDiff
+	subnetOnlyValidatorsDB database.Database
+	subnetIDNodeIDDB       database.Database
+	activeDB               database.Database
+	inactiveDB             database.Database
+
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
@@ -497,6 +509,8 @@ func New(
 
 	baseDB := versiondb.New(db)
 
+	subnetOnlyValidatorsDB := prefixdb.New(SubnetOnlyValidatorsPrefix, baseDB)
+
 	validatorsDB := prefixdb.New(ValidatorsPrefix, baseDB)
 
 	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
@@ -623,6 +637,14 @@ func New(
 		expiryDiff: newExpiryDiff(),
 		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, baseDB),
 
+		activeSOVLookup:        make(map[ids.ID]SubnetOnlyValidator),
+		activeSOVs:             btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
+		sovDiff:                newSubnetOnlyValidatorsDiff(),
+		subnetOnlyValidatorsDB: subnetOnlyValidatorsDB,
+		subnetIDNodeIDDB:       prefixdb.New(SubnetIDNodeIDPrefix, subnetOnlyValidatorsDB),
+		activeDB:               prefixdb.New(ActivePrefix, subnetOnlyValidatorsDB),
+		inactiveDB:             prefixdb.New(InactivePrefix, subnetOnlyValidatorsDB),
+
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
@@ -716,6 +738,57 @@ func (s *state) PutExpiry(entry ExpiryEntry) {
 
 func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
+}
+
+func (s *state) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error) {
+	return s.sovDiff.getActiveSubnetOnlyValidatorsIterator(
+		iterator.FromTree(s.activeSOVs),
+	), nil
+}
+
+func (s *state) NumActiveSubnetOnlyValidators() int {
+	return len(s.activeSOVLookup) + s.sovDiff.numAddedActive
+}
+
+func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
+	if sov, modified := s.sovDiff.modified[validationID]; modified {
+		if sov.Weight == 0 {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return sov, nil
+	}
+
+	if sov, ok := s.activeSOVLookup[validationID]; ok {
+		return sov, nil
+	}
+
+	// TODO: Add caching
+	sovBytes, err := s.inactiveDB.Get(validationID[:])
+	if err != nil {
+		return SubnetOnlyValidator{}, err
+	}
+
+	var sov SubnetOnlyValidator
+	if _, err := block.GenesisCodec.Unmarshal(sovBytes, &sov); err != nil {
+		return SubnetOnlyValidator{}, err
+	}
+	return sov, nil
+}
+
+func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+	if has, modified := s.sovDiff.hasSubnetOnlyValidator(subnetID, nodeID); modified {
+		return has, nil
+	}
+
+	// TODO: Add caching
+	key := make([]byte, len(subnetID)+len(nodeID))
+	copy(key, subnetID[:])
+	copy(key[len(subnetID):], nodeID[:])
+	return s.subnetIDNodeIDDB.Has(key)
+}
+
+func (s *state) PutSubnetOnlyValidator(sov SubnetOnlyValidator) error {
+	return s.sovDiff.putSubnetOnlyValidator(s, sov)
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -1371,6 +1444,7 @@ func (s *state) load() error {
 	return errors.Join(
 		s.loadMetadata(),
 		s.loadExpiry(),
+		s.loadActiveSubnetOnlyValidators(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
@@ -1454,6 +1528,34 @@ func (s *state) loadExpiry() error {
 			return fmt.Errorf("failed to unmarshal ExpiryEntry during load: %w", err)
 		}
 		s.expiry.ReplaceOrInsert(entry)
+	}
+
+	return nil
+}
+
+func (s *state) loadActiveSubnetOnlyValidators() error {
+	it := s.activeDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		key := it.Key()
+		validationID, err := ids.ToID(key)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal ValidationID during load: %w", err)
+		}
+
+		var (
+			value = it.Value()
+			sov   = SubnetOnlyValidator{
+				ValidationID: validationID,
+			}
+		)
+		if _, err := block.GenesisCodec.Unmarshal(value, &sov); err != nil {
+			return fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
+		}
+
+		s.activeSOVLookup[validationID] = sov
+		s.activeSOVs.ReplaceOrInsert(sov)
 	}
 
 	return nil
@@ -1758,6 +1860,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	return errors.Join(
 		s.writeBlocks(),
 		s.writeExpiry(),
+		s.writeSubnetOnlyValidators(),
 		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
@@ -2002,6 +2105,75 @@ func (s *state) writeExpiry() error {
 	}
 
 	s.expiryDiff = newExpiryDiff()
+	return nil
+}
+
+// TODO: Write weight and public key diffs
+// TODO: Add caching
+func (s *state) writeSubnetOnlyValidators() error {
+	// Perform deletions:
+	for validationID, sov := range s.sovDiff.modified {
+		if sov.Weight != 0 {
+			continue
+		}
+
+		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
+		copy(subnetIDNodeIDKey, sov.SubnetID[:])
+		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
+		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
+			return err
+		}
+
+		var err error
+		if priorSOV, ok := s.activeSOVLookup[validationID]; ok {
+			delete(s.activeSOVLookup, validationID)
+			s.activeSOVs.Delete(priorSOV)
+			err = s.activeDB.Delete(validationID[:])
+		} else {
+			err = s.inactiveDB.Delete(validationID[:])
+		}
+		if err != nil {
+			return err
+		}
+	}
+	// Perform additions/modifications:
+	for validationID, sov := range s.sovDiff.modified {
+		if sov.Weight == 0 {
+			continue
+		}
+
+		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
+		copy(subnetIDNodeIDKey, sov.SubnetID[:])
+		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
+		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, nil); err != nil {
+			return err
+		}
+
+		var err error
+		if priorSOV, ok := s.activeSOVLookup[validationID]; ok {
+			delete(s.activeSOVLookup, validationID)
+			s.activeSOVs.Delete(priorSOV)
+			err = s.activeDB.Delete(validationID[:])
+		} else {
+			err = s.inactiveDB.Delete(validationID[:])
+		}
+		if err != nil {
+			return err
+		}
+
+		if sov.isActive() {
+			s.activeSOVLookup[validationID] = sov
+			s.activeSOVs.ReplaceOrInsert(sov)
+			err = putSubnetOnlyValidator(s.activeDB, sov)
+		} else {
+			err = putSubnetOnlyValidator(s.inactiveDB, sov)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	s.sovDiff = newSubnetOnlyValidatorsDiff()
 	return nil
 }
 

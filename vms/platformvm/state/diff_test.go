@@ -4,6 +4,7 @@
 package state
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -202,64 +203,429 @@ func TestDiffExpiry(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		require := require.New(t)
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-		state := newTestState(t, memdb.New())
-		for _, expiry := range test.initialExpiries {
-			state.PutExpiry(expiry)
-		}
-
-		d, err := NewDiffOn(state)
-		require.NoError(err)
-
-		var (
-			expectedExpiries   = set.Of(test.initialExpiries...)
-			unexpectedExpiries set.Set[ExpiryEntry]
-		)
-		for _, op := range test.ops {
-			if op.put {
-				d.PutExpiry(op.entry)
-				expectedExpiries.Add(op.entry)
-				unexpectedExpiries.Remove(op.entry)
-			} else {
-				d.DeleteExpiry(op.entry)
-				expectedExpiries.Remove(op.entry)
-				unexpectedExpiries.Add(op.entry)
+			state := newTestState(t, memdb.New())
+			for _, expiry := range test.initialExpiries {
+				state.PutExpiry(expiry)
 			}
-		}
 
-		// If expectedExpiries is empty, we want expectedExpiriesSlice to be
-		// nil.
-		var expectedExpiriesSlice []ExpiryEntry
-		if expectedExpiries.Len() > 0 {
-			expectedExpiriesSlice = expectedExpiries.List()
-			utils.Sort(expectedExpiriesSlice)
-		}
-
-		verifyChain := func(chain Chain) {
-			expiryIterator, err := chain.GetExpiryIterator()
+			d, err := NewDiffOn(state)
 			require.NoError(err)
-			require.Equal(
-				expectedExpiriesSlice,
-				iterator.ToSlice(expiryIterator),
+
+			var (
+				expectedExpiries   = set.Of(test.initialExpiries...)
+				unexpectedExpiries set.Set[ExpiryEntry]
 			)
-
-			for expiry := range expectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.True(has)
+			for _, op := range test.ops {
+				if op.put {
+					d.PutExpiry(op.entry)
+					expectedExpiries.Add(op.entry)
+					unexpectedExpiries.Remove(op.entry)
+				} else {
+					d.DeleteExpiry(op.entry)
+					expectedExpiries.Remove(op.entry)
+					unexpectedExpiries.Add(op.entry)
+				}
 			}
-			for expiry := range unexpectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.False(has)
-			}
-		}
 
-		verifyChain(d)
-		require.NoError(d.Apply(state))
-		verifyChain(state)
-		assertChainsEqual(t, d, state)
+			// If expectedExpiries is empty, we want expectedExpiriesSlice to be
+			// nil.
+			var expectedExpiriesSlice []ExpiryEntry
+			if expectedExpiries.Len() > 0 {
+				expectedExpiriesSlice = expectedExpiries.List()
+				utils.Sort(expectedExpiriesSlice)
+			}
+
+			verifyChain := func(chain Chain) {
+				expiryIterator, err := chain.GetExpiryIterator()
+				require.NoError(err)
+				require.Equal(
+					expectedExpiriesSlice,
+					iterator.ToSlice(expiryIterator),
+				)
+
+				for expiry := range expectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.True(has)
+				}
+				for expiry := range unexpectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.False(has)
+				}
+			}
+
+			verifyChain(d)
+			require.NoError(d.Apply(state))
+			verifyChain(state)
+			assertChainsEqual(t, d, state)
+		})
+	}
+}
+
+func TestDiffSubnetOnlyValidators(t *testing.T) {
+	sov := SubnetOnlyValidator{
+		ValidationID: ids.GenerateTestID(),
+		SubnetID:     ids.GenerateTestID(),
+		NodeID:       ids.GenerateTestNodeID(),
+	}
+
+	tests := []struct {
+		name    string
+		initial []SubnetOnlyValidator
+		sovs    []SubnetOnlyValidator
+	}{
+		{
+			name: "empty noop",
+		},
+		{
+			name: "initially active not modified",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+		},
+		{
+			name: "initially inactive not modified",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+		},
+		{
+			name: "initially active removed",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					Weight:       0, // Removed
+				},
+			},
+		},
+		{
+			name: "initially inactive removed",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					Weight:       0, // Removed
+				},
+			},
+		},
+		{
+			name: "increase active weight",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            2, // Increased
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+		},
+		{
+			name: "deactivate",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+		},
+		{
+			name: "reactivate",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+		},
+		{
+			name: "update multiple times",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            2, // Not removed
+					EndAccumulatedFee: 1, // Inactive
+				},
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            3, // Not removed
+					EndAccumulatedFee: 1, // Inactive
+				},
+			},
+		},
+		{
+			name: "change validationID",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					Weight:       0, // Removed
+				},
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Inactive
+				},
+			},
+		},
+		{
+			name: "added and removed",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+				{
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					Weight:       0, // Removed
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+			expectedSOVs := make(map[ids.ID]SubnetOnlyValidator)
+			for _, sov := range test.initial {
+				require.NoError(state.PutSubnetOnlyValidator(sov))
+				expectedSOVs[sov.ValidationID] = sov
+			}
+
+			d, err := NewDiffOn(state)
+			require.NoError(err)
+
+			for _, sov := range test.sovs {
+				require.NoError(d.PutSubnetOnlyValidator(sov))
+				expectedSOVs[sov.ValidationID] = sov
+			}
+
+			verifyChain := func(chain Chain) {
+				for _, expectedSOV := range expectedSOVs {
+					if expectedSOV.Weight != 0 {
+						continue
+					}
+
+					sov, err := chain.GetSubnetOnlyValidator(expectedSOV.ValidationID)
+					require.ErrorIs(err, database.ErrNotFound)
+					require.Zero(sov)
+				}
+
+				var expectedActive []SubnetOnlyValidator
+				for _, expectedSOV := range expectedSOVs {
+					if expectedSOV.Weight == 0 {
+						continue
+					}
+
+					sov, err := chain.GetSubnetOnlyValidator(expectedSOV.ValidationID)
+					require.NoError(err)
+					require.Equal(expectedSOV, sov)
+
+					has, err := chain.HasSubnetOnlyValidator(expectedSOV.SubnetID, expectedSOV.NodeID)
+					require.NoError(err)
+					require.True(has)
+
+					if expectedSOV.isActive() {
+						expectedActive = append(expectedActive, expectedSOV)
+					}
+				}
+				utils.Sort(expectedActive)
+
+				activeIterator, err := chain.GetActiveSubnetOnlyValidatorsIterator()
+				require.NoError(err)
+				require.Equal(
+					expectedActive,
+					iterator.ToSlice(activeIterator),
+				)
+
+				require.Equal(len(expectedActive), chain.NumActiveSubnetOnlyValidators())
+			}
+
+			verifyChain(d)
+			require.NoError(d.Apply(state))
+			verifyChain(state)
+			assertChainsEqual(t, state, d)
+		})
+	}
+}
+
+func TestDiffSubnetOnlyValidatorsErrors(t *testing.T) {
+	sov := SubnetOnlyValidator{
+		ValidationID: ids.GenerateTestID(),
+		SubnetID:     ids.GenerateTestID(),
+		NodeID:       ids.GenerateTestNodeID(),
+		Weight:       1, // Not removed
+	}
+
+	tests := []struct {
+		name                     string
+		initialEndAccumulatedFee uint64
+		sov                      SubnetOnlyValidator
+		expectedErr              error
+	}{
+		{
+			name:                     "mutate active constants",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: sov.ValidationID,
+				NodeID:       ids.GenerateTestNodeID(),
+			},
+			expectedErr: ErrMutatedSubnetOnlyValidator,
+		},
+		{
+			name:                     "mutate inactive constants",
+			initialEndAccumulatedFee: 0,
+			sov: SubnetOnlyValidator{
+				ValidationID: sov.ValidationID,
+				NodeID:       ids.GenerateTestNodeID(),
+			},
+			expectedErr: ErrMutatedSubnetOnlyValidator,
+		},
+		{
+			name:                     "duplicate active subnetID and nodeID pair",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       sov.NodeID,
+			},
+			expectedErr: ErrDuplicateSubnetOnlyValidator,
+		},
+		{
+			name:                     "duplicate inactive subnetID and nodeID pair",
+			initialEndAccumulatedFee: 0,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       sov.NodeID,
+			},
+			expectedErr: ErrDuplicateSubnetOnlyValidator,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+
+			sov.EndAccumulatedFee = test.initialEndAccumulatedFee
+			require.NoError(state.PutSubnetOnlyValidator(sov))
+
+			d, err := NewDiffOn(state)
+			require.NoError(err)
+
+			// Initialize subnetID, weight, and endAccumulatedFee as they are
+			// constant among all tests.
+			test.sov.SubnetID = sov.SubnetID
+			test.sov.Weight = 1                        // Not removed
+			test.sov.EndAccumulatedFee = rand.Uint64() //#nosec G404
+			err = d.PutSubnetOnlyValidator(test.sov)
+			require.ErrorIs(err, test.expectedErr)
+
+			// The invalid addition should not have modified the diff.
+			assertChainsEqual(t, state, d)
+		})
 	}
 }
 
@@ -272,6 +638,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -307,6 +674,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -348,6 +716,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -395,6 +764,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -536,6 +906,7 @@ func TestDiffTx(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -634,6 +1005,7 @@ func TestDiffUTXO(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -687,6 +1059,18 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 			iterator.ToSlice(actualExpiryIterator),
 		)
 	}
+
+	expectedActiveSOVsIterator, expectedErr := expected.GetActiveSubnetOnlyValidatorsIterator()
+	actualActiveSOVsIterator, actualErr := actual.GetActiveSubnetOnlyValidatorsIterator()
+	require.Equal(expectedErr, actualErr)
+	if expectedErr == nil {
+		require.Equal(
+			iterator.ToSlice(expectedActiveSOVsIterator),
+			iterator.ToSlice(actualActiveSOVsIterator),
+		)
+	}
+
+	require.Equal(expected.NumActiveSubnetOnlyValidators(), actual.NumActiveSubnetOnlyValidators())
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()

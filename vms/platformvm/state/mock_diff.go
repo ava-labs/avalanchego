@@ -218,6 +218,21 @@ func (mr *MockDiffMockRecorder) GetAccruedFees() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccruedFees", reflect.TypeOf((*MockDiff)(nil).GetAccruedFees))
 }
 
+// GetActiveSubnetOnlyValidatorsIterator mocks base method.
+func (m *MockDiff) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveSubnetOnlyValidatorsIterator")
+	ret0, _ := ret[0].(iterator.Iterator[SubnetOnlyValidator])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveSubnetOnlyValidatorsIterator indicates an expected call of GetActiveSubnetOnlyValidatorsIterator.
+func (mr *MockDiffMockRecorder) GetActiveSubnetOnlyValidatorsIterator() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveSubnetOnlyValidatorsIterator", reflect.TypeOf((*MockDiff)(nil).GetActiveSubnetOnlyValidatorsIterator))
+}
+
 // GetCurrentDelegatorIterator mocks base method.
 func (m *MockDiff) GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error) {
 	m.ctrl.T.Helper()
@@ -383,6 +398,21 @@ func (mr *MockDiffMockRecorder) GetSubnetManager(subnetID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockDiff)(nil).GetSubnetManager), subnetID)
 }
 
+// GetSubnetOnlyValidator mocks base method.
+func (m *MockDiff) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetOnlyValidator", validationID)
+	ret0, _ := ret[0].(SubnetOnlyValidator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetOnlyValidator indicates an expected call of GetSubnetOnlyValidator.
+func (mr *MockDiffMockRecorder) GetSubnetOnlyValidator(validationID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetOnlyValidator", reflect.TypeOf((*MockDiff)(nil).GetSubnetOnlyValidator), validationID)
+}
+
 // GetSubnetOwner mocks base method.
 func (m *MockDiff) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 	m.ctrl.T.Helper()
@@ -473,6 +503,35 @@ func (mr *MockDiffMockRecorder) HasExpiry(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasExpiry", reflect.TypeOf((*MockDiff)(nil).HasExpiry), arg0)
 }
 
+// HasSubnetOnlyValidator mocks base method.
+func (m *MockDiff) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasSubnetOnlyValidator", subnetID, nodeID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasSubnetOnlyValidator indicates an expected call of HasSubnetOnlyValidator.
+func (mr *MockDiffMockRecorder) HasSubnetOnlyValidator(subnetID, nodeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasSubnetOnlyValidator", reflect.TypeOf((*MockDiff)(nil).HasSubnetOnlyValidator), subnetID, nodeID)
+}
+
+// NumActiveSubnetOnlyValidators mocks base method.
+func (m *MockDiff) NumActiveSubnetOnlyValidators() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NumActiveSubnetOnlyValidators")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// NumActiveSubnetOnlyValidators indicates an expected call of NumActiveSubnetOnlyValidators.
+func (mr *MockDiffMockRecorder) NumActiveSubnetOnlyValidators() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NumActiveSubnetOnlyValidators", reflect.TypeOf((*MockDiff)(nil).NumActiveSubnetOnlyValidators))
+}
+
 // PutCurrentDelegator mocks base method.
 func (m *MockDiff) PutCurrentDelegator(staker *Staker) {
 	m.ctrl.T.Helper()
@@ -535,6 +594,20 @@ func (m *MockDiff) PutPendingValidator(staker *Staker) error {
 func (mr *MockDiffMockRecorder) PutPendingValidator(staker any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockDiff)(nil).PutPendingValidator), staker)
+}
+
+// PutSubnetOnlyValidator mocks base method.
+func (m *MockDiff) PutSubnetOnlyValidator(sov SubnetOnlyValidator) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutSubnetOnlyValidator", sov)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PutSubnetOnlyValidator indicates an expected call of PutSubnetOnlyValidator.
+func (mr *MockDiffMockRecorder) PutSubnetOnlyValidator(sov any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutSubnetOnlyValidator", reflect.TypeOf((*MockDiff)(nil).PutSubnetOnlyValidator), sov)
 }
 
 // SetAccruedFees mocks base method.

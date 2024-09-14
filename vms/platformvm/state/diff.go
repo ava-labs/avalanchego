@@ -35,9 +35,10 @@ type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
 
-	timestamp   time.Time
-	feeState    gas.State
-	accruedFees uint64
+	timestamp        time.Time
+	feeState         gas.State
+	accruedFees      uint64
+	parentActiveSOVs int
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -77,15 +78,16 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:       parentID,
-		stateVersions:  stateVersions,
-		timestamp:      parentState.GetTimestamp(),
-		feeState:       parentState.GetFeeState(),
-		accruedFees:    parentState.GetAccruedFees(),
-		expiryDiff:     newExpiryDiff(),
-		sovDiff:        newSubnetOnlyValidatorsDiff(),
-		subnetOwners:   make(map[ids.ID]fx.Owner),
-		subnetManagers: make(map[ids.ID]chainIDAndAddr),
+		parentID:         parentID,
+		stateVersions:    stateVersions,
+		timestamp:        parentState.GetTimestamp(),
+		feeState:         parentState.GetFeeState(),
+		accruedFees:      parentState.GetAccruedFees(),
+		parentActiveSOVs: parentState.NumActiveSubnetOnlyValidators(),
+		expiryDiff:       newExpiryDiff(),
+		sovDiff:          newSubnetOnlyValidatorsDiff(),
+		subnetOwners:     make(map[ids.ID]fx.Owner),
+		subnetManagers:   make(map[ids.ID]chainIDAndAddr),
 	}, nil
 }
 
@@ -200,18 +202,8 @@ func (d *diff) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[Subnet
 	return d.sovDiff.getActiveSubnetOnlyValidatorsIterator(parentIterator), nil
 }
 
-func (d *diff) NumActiveSubnetOnlyValidators() (int, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-
-	count, err := parentState.NumActiveSubnetOnlyValidators()
-	if err != nil {
-		return 0, err
-	}
-
-	return count + d.sovDiff.numAddedActive, nil
+func (d *diff) NumActiveSubnetOnlyValidators() int {
+	return d.parentActiveSOVs + d.sovDiff.numAddedActive
 }
 
 func (d *diff) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
