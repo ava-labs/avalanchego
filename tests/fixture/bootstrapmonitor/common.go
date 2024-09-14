@@ -10,7 +10,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/types"
@@ -24,6 +26,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 )
+
+// Path to write the details to on the data volume
+func getTestDetailsPath(dataDir string) string {
+	return filepath.Join(dataDir, "bootstrap_test_details.txt")
+}
+
+// Used to serialize test details to the data volume used for a given test to
+// support resuming a previously started test and tracking test duration.
+type bootstrapTestDetails struct {
+	Image     string    `json:"image"`
+	StartTime time.Time `json:"startTime"`
+}
 
 // WaitForPodCondition watches the specified pod until the status includes the specified condition.
 func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) error {
@@ -74,7 +88,7 @@ func waitForPodStatus(
 }
 
 // setImageDetails updates the pod's owning statefulset with the image of the specified container and associated version details
-func setImageDetails(ctx context.Context, log logging.Logger, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, imageDetails *ImageDetails) error {
+func setImageDetails(ctx context.Context, log logging.Logger, clientset *kubernetes.Clientset, namespace string, podName string, imageDetails *ImageDetails) error {
 	// Determine the name of the statefulset to update
 	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
@@ -104,7 +118,7 @@ func setImageDetails(ctx context.Context, log logging.Logger, clientset *kuberne
 		},
 		{
 			"op":    "replace",
-			"path":  "/spec/template/metadata/annotations/" + strings.Replace(VersionsAnnotationKey, "/", "~1", -1),
+			"path":  "/spec/template/metadata/annotations/" + strings.ReplaceAll(VersionsAnnotationKey, "/", "~1"),
 			"value": string(versionJSONBytes),
 		},
 	}

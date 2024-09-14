@@ -293,6 +293,7 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 						"app": name,
 					},
 					Annotations: map[string]string{
+						// This needs to be present to ensure compatibility with json patch replace
 						bootstrapmonitor.VersionsAnnotationKey: "",
 					},
 				},

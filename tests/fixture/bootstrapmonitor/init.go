@@ -5,10 +5,10 @@ package bootstrapmonitor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,10 +19,7 @@ import (
 )
 
 const (
-	initTimeout   = 2 * time.Minute
-	retryInterval = 5 * time.Second
-
-	recordedImageFilename = "bootstrap_image_name.txt"
+	initTimeout = 2 * time.Minute
 
 	BootstrapStartingMessage = "Starting bootstrap test"
 	BootstrapResumingMessage = "Resuming bootstrap test"
@@ -63,7 +60,7 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 			zap.String("image", latestImageDetails.Image),
 			zap.Reflect("versions", latestImageDetails.Versions),
 		)
-		if err := setImageDetails(ctx, log, clientset, namespace, podName, nodeContainerName, latestImageDetails); err != nil {
+		if err := setImageDetails(ctx, log, clientset, namespace, podName, latestImageDetails); err != nil {
 			return fmt.Errorf("failed to set container image: %w", err)
 		}
 	}
@@ -71,24 +68,26 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 	// A bootstrap is being resumed if a version file exists and the image name it contains matches the container
 	// image. If a bootstrap is being started, the version file should be created and the data path cleared.
 
-	recordedImagePath := filepath.Join(dataDir, recordedImageFilename)
+	testDetailsPath := getTestDetailsPath(dataDir)
 
-	var recordedImage string
-	if recordedImageBytes, err := os.ReadFile(recordedImagePath); errors.Is(err, os.ErrNotExist) {
-		log.Info("Recorded image file does not exist")
+	var testDetails bootstrapTestDetails
+	if testDetailsBytes, err := os.ReadFile(testDetailsPath); errors.Is(err, os.ErrNotExist) {
+		log.Info("Test details file does not exist", zap.String("path", testDetailsPath))
 	} else if err != nil {
-		return fmt.Errorf("failed to read recorded image file: %w", err)
+		return fmt.Errorf("failed to read test details file: %w", err)
 	} else {
-		recordedImage = string(recordedImageBytes)
-		log.Info("Recorded image name", zap.String("image", recordedImage))
+		if err := json.Unmarshal(testDetailsBytes, &testDetails); err != nil {
+			return fmt.Errorf("failed to unmarshal test details: %w", err)
+		}
+		log.Info("Loaded test details", zap.Reflect("testDetails", testDetails))
 	}
 
-	if recordedImage == testConfig.Image {
-		log.Info("Recorded image name matches current image name")
+	if testDetails.Image == testConfig.Image {
+		log.Info("Test details image matches test config image")
 		log.Info(BootstrapResumingMessage, zap.Reflect("testConfig", testConfig))
 		return nil
-	} else if len(recordedImage) > 0 {
-		log.Info("Recorded image name differs from the current image name")
+	} else if len(testDetails.Image) > 0 {
+		log.Info("Test details image differs from test config image")
 	}
 
 	nodeDataDir := NodeDataDir(dataDir)
@@ -97,15 +96,26 @@ func InitBootstrapTest(log logging.Logger, namespace string, podName string, nod
 		return fmt.Errorf("failed to remove contents of node directory: %w", err)
 	}
 
-	log.Info("Writing image name to file",
-		zap.String("image", testConfig.Image),
-		zap.String("path", recordedImagePath),
+	log.Info("Writing test details to file",
+		zap.Reflect("testDetails", testDetails),
+		zap.String("path", testDetailsPath),
 	)
-	if err := os.WriteFile(recordedImagePath, []byte(testConfig.Image), perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write image name to file: %w", err)
+	testDetails = bootstrapTestDetails{
+		Image:     testConfig.Image,
+		StartTime: time.Now(),
+	}
+	testDetailsBytes, err := json.Marshal(testDetails)
+	if err != nil {
+		return fmt.Errorf("failed to marshal test details: %w", err)
+	}
+	if err := os.WriteFile(testDetailsPath, testDetailsBytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write test details to file: %w", err)
 	}
 
-	log.Info(BootstrapStartingMessage, zap.Reflect("testConfig", testConfig))
+	log.Info(BootstrapStartingMessage,
+		zap.Reflect("testConfig", testConfig),
+		zap.Time("startTime", testDetails.StartTime),
+	)
 
 	return nil
 }

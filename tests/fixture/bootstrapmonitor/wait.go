@@ -6,7 +6,9 @@ package bootstrapmonitor
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -38,6 +40,17 @@ func WaitForCompletion(
 	healthCheckInterval time.Duration,
 	imageCheckInterval time.Duration,
 ) error {
+	testDetailsPath := getTestDetailsPath(dataDir)
+	var testDetails bootstrapTestDetails
+	if testDetailsBytes, err := os.ReadFile(testDetailsPath); err != nil {
+		return fmt.Errorf("failed to load test details file %s: %w", testDetailsPath, err)
+	} else {
+		if err := json.Unmarshal(testDetailsBytes, &testDetails); err != nil {
+			return fmt.Errorf("failed to unmarshal test details: %w", err)
+		}
+		log.Info("Loaded test details", zap.Reflect("testDetails", testDetails))
+	}
+
 	clientset, err := getClientset(log)
 	if err != nil {
 		return fmt.Errorf("failed to get clientset: %w", err)
@@ -68,22 +81,28 @@ func WaitForCompletion(
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
+		// Define common fields for logging
+		diskUsage := getDiskUsage(log, dataDir)
+		commonFields := []zap.Field{
+			zap.String("diskUsage", diskUsage),
+			zap.Duration("duration", time.Since(testDetails.StartTime)),
+		}
+
 		// Check whether the node is reporting healthy which indicates that bootstrap is complete
 		if healthy, err := tmpnet.CheckNodeHealth(ctx, nodeURL); err != nil {
 			log.Error("failed to check node health", zap.Error(err))
 			return false, nil
 		} else {
-			reportDiskUsage(log, dataDir)
-
 			if !healthy.Healthy {
-				log.Info("Node reported unhealthy")
+				log.Info("Node reported unhealthy", commonFields...)
 				return false, nil
 			}
 
 			log.Info("Node reported healthy")
 		}
 
-		log.Info("Bootstrap completed successfully for image", zap.Reflect("testConfig", testConfig))
+		commonFields = append(commonFields, zap.Reflect("testConfig", testConfig))
+		log.Info("Bootstrap completed successfully", commonFields...)
 
 		return true, nil
 	}); err != nil {
@@ -113,7 +132,7 @@ func WaitForCompletion(
 		)
 
 		log.Info("Updating StatefulSet to trigger a new test")
-		if err := setImageDetails(ctx, log, clientset, namespace, podName, nodeContainerName, latestImageDetails); err != nil {
+		if err := setImageDetails(ctx, log, clientset, namespace, podName, latestImageDetails); err != nil {
 			log.Error("failed to set container image", zap.Error(err))
 			return false, nil
 		}
@@ -129,8 +148,8 @@ func WaitForCompletion(
 	return nil
 }
 
-// Logs the current disk usage for the specified directory
-func reportDiskUsage(log logging.Logger, dir string) {
+// Determines the current disk usage for the specified directory
+func getDiskUsage(log logging.Logger, dir string) string {
 	cmd := exec.Command("du", "-sh", dir)
 
 	// Create a buffer to capture stderr in case an unexpected error occurs
@@ -142,7 +161,7 @@ func reportDiskUsage(log logging.Logger, dir string) {
 		exitError, ok := err.(*exec.ExitError)
 		if !ok {
 			log.Error("Error executing du", zap.Error(err))
-			return
+			return ""
 		}
 		switch exitError.ExitCode() {
 		case 1:
@@ -154,13 +173,13 @@ func reportDiskUsage(log logging.Logger, dir string) {
 				zap.String("dir", dir),
 				zap.String("stderr", stderr.String()),
 			)
-			return
+			return ""
 		default:
 			log.Error("du command failed for dir",
 				zap.Int("exitCode", exitError.ExitCode()),
 				zap.String("dir", dir),
 			)
-			return
+			return ""
 		}
 	}
 
@@ -171,8 +190,5 @@ func reportDiskUsage(log logging.Logger, dir string) {
 		)
 	}
 
-	log.Info("Disk usage",
-		zap.String("quantity", usageParts[0]),
-		zap.String("dir", dir),
-	)
+	return usageParts[0]
 }

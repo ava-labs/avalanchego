@@ -28,14 +28,14 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 		name           string
 		pod            *corev1.Pod
 		expectedConfig *BootstrapTestConfig
-		expectErr      bool
+		expectedErr    error
 	}{
 		{
 			name: "container not found",
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{},
 			},
-			expectErr: true,
+			expectedErr: errContainerNotFound,
 		},
 		{
 			name: "missing network id env var",
@@ -48,7 +48,7 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expectErr: true,
+			expectedErr: errInvalidNetworkEnvVar,
 		},
 		{
 			name: "valid configuration without versions and state sync disabled",
@@ -84,7 +84,7 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						versionsAnnotationKey: validVersionsString,
+						VersionsAnnotationKey: validVersionsString,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -120,7 +120,7 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						versionsAnnotationKey: invalidVersionsString,
+						VersionsAnnotationKey: invalidVersionsString,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -137,7 +137,7 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expectErr: true,
+			expectedErr: errFailedToUnmarshalAnnoation,
 		},
 	}
 
@@ -146,8 +146,8 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 			require := require.New(t)
 
 			config, err := bootstrapTestConfigForPod(test.pod, nodeContainerName)
-			if test.expectErr {
-				require.Error(err)
+			if test.expectedErr != nil {
+				require.ErrorIs(err, test.expectedErr)
 				return
 			}
 			require.NoError(err)
@@ -164,11 +164,12 @@ func marshalAndEncode(t *testing.T, chainConfigs map[string]chains.ChainConfig) 
 
 func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 	invalidJSON := "asdf"
+	invalidBase64 := "abc$def"
 	tests := []struct {
 		name               string
 		chainConfigContent string
 		expectedEnabled    bool
-		expectErr          bool
+		expectedErr        error
 	}{
 		{
 			name:               "no chain config",
@@ -179,36 +180,37 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 			name: "no C-Chain config",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"Not-C": chains.ChainConfig{},
+					"Not-C": {},
 				},
 			),
 			expectedEnabled: true,
 		},
 		{
 			name:               "invalid encoded content",
-			chainConfigContent: invalidJSON,
-			expectErr:          true,
+			chainConfigContent: invalidBase64,
+			expectedErr:        errFailedToDecodeChainConfigContent,
 		},
 		{
 			name:               "invalid json content",
 			chainConfigContent: base64.StdEncoding.EncodeToString([]byte(invalidJSON)),
-			expectErr:          true,
+			expectedErr:        errFailedToUnmarshalChainConfigContent,
 		},
 		{
 			name: "invalid C-Chain config",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"C": chains.ChainConfig{
-						Config: []byte(invalidJSON)},
+					"C": {
+						Config: []byte(invalidJSON),
+					},
 				},
 			),
-			expectErr: true,
+			expectedErr: errFailedToUnmarshalCChainConfig,
 		},
 		{
 			name: "empty C-Chain config",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"C": chains.ChainConfig{
+					"C": {
 						Config: []byte("{}"),
 					},
 				},
@@ -219,18 +221,18 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 			name: "invalid state sync value",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"C": chains.ChainConfig{
+					"C": {
 						Config: []byte("{\"state-sync-enabled\":1234}"),
 					},
 				},
 			),
-			expectErr: true,
+			expectedErr: errFailedToCastToBool,
 		},
 		{
 			name: "C-Chain config with state sync enabled",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"C": chains.ChainConfig{
+					"C": {
 						Config: []byte("{\"state-sync-enabled\":true}"),
 					},
 				},
@@ -241,7 +243,7 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 			name: "C-Chain config with state sync disabled",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"C": chains.ChainConfig{
+					"C": {
 						Config: []byte("{\"state-sync-enabled\":false}"),
 					},
 				},
@@ -252,7 +254,7 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 			name: "C-Chain config with state sync disabled with string bool",
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
-					"C": chains.ChainConfig{
+					"C": {
 						Config: []byte("{\"state-sync-enabled\":\"false\"}"),
 					},
 				},
@@ -272,8 +274,8 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 				},
 			}
 			enabled, err := stateSyncEnabledFromEnvVars(env)
-			if test.expectErr {
-				require.Error(err)
+			if test.expectedErr != nil {
+				require.ErrorIs(err, test.expectedErr)
 				return
 			}
 			require.NoError(err)

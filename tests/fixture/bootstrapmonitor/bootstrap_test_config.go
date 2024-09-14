@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cast"
@@ -25,6 +26,17 @@ const VersionsAnnotationKey = "avalanche.avax.network/avalanchego-versions"
 var (
 	chainConfigContentEnvName = config.EnvVarName(config.EnvPrefix, config.ChainConfigContentKey)
 	networkEnvName            = config.EnvVarName(config.EnvPrefix, config.NetworkNameKey)
+
+	// Errors for bootstrapTestConfigForPod
+	errContainerNotFound          = errors.New("container not found")
+	errInvalidNetworkEnvVar       = fmt.Errorf("missing or empty %s env var", networkEnvName)
+	errFailedToUnmarshalAnnoation = errors.New("failed to unmarshal versions annotation")
+
+	// Errors for stateSyncEnabledFromEnvVars
+	errFailedToDecodeChainConfigContent    = errors.New("failed to decode chain config content")
+	errFailedToUnmarshalChainConfigContent = errors.New("failed to unmarshal chain config content")
+	errFailedToUnmarshalCChainConfig       = errors.New("failed to unmarshal C-Chain config")
+	errFailedToCastToBool                  = errors.New("failed to cast to bool")
 )
 
 type BootstrapTestConfig struct {
@@ -43,20 +55,18 @@ func GetBootstrapTestConfigFromPod(ctx context.Context, clientset *kubernetes.Cl
 	return bootstrapTestConfigForPod(pod, nodeContainerName)
 }
 
-// Attempt to retrieve the image versions from a pod annotation. The annotation
-// may not be present in the case of a newly-created bootstrap test using an
-// image tagged `latest` that hasn't yet had a chance to discover the versions.
+// bootstrapTestConfigForPod collects the details for a bootstrap test configuration from the provided pod.
 func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*BootstrapTestConfig, error) {
 	// Find the node container
-	var nodeContainer *corev1.Container
+	var nodeContainer corev1.Container
 	for _, container := range pod.Spec.Containers {
 		if container.Name == nodeContainerName {
-			nodeContainer = &container
+			nodeContainer = container
 			break
 		}
 	}
-	if nodeContainer == nil {
-		return nil, fmt.Errorf("%q container not found", nodeContainerName)
+	if len(nodeContainer.Name) == 0 {
+		return nil, fmt.Errorf("%w: %s", errContainerNotFound, nodeContainerName)
 	}
 
 	// Get the network ID from the container's environment
@@ -68,7 +78,7 @@ func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*Boot
 		}
 	}
 	if len(network) == 0 {
-		return nil, fmt.Errorf("%s env var missing for %q container", networkEnvName, nodeContainerName)
+		return nil, fmt.Errorf("%w in container %q", errInvalidNetworkEnvVar, nodeContainerName)
 	}
 
 	// Determine whether state sync is enabled in the env vars
@@ -83,13 +93,13 @@ func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*Boot
 		Image:            nodeContainer.Image,
 	}
 
-	// Attempt to retrieve the image versions from a pod annotation. The annotation
-	// may not be present in the case of a newly-created bootstrap test using an
-	// image tagged `latest` that hasn't yet had a chance to discover the versions.
+	// Attempt to retrieve the image versions from a pod annotation. The annotation may not be populated in
+	// the case of a newly-created bootstrap test using an image tagged `latest` that hasn't yet had a
+	// chance to discover the versions.
 	if versionsAnnotation, ok := pod.Annotations[VersionsAnnotationKey]; ok && len(versionsAnnotation) > 0 {
 		testConfig.Versions = &version.Versions{}
 		if err := json.Unmarshal([]byte(versionsAnnotation), testConfig.Versions); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal versions annotation: %w", err)
+			return nil, fmt.Errorf("%w: %w", errFailedToUnmarshalAnnoation, err)
 		}
 	}
 
@@ -118,10 +128,10 @@ func stateSyncEnabledFromEnvVars(env []corev1.EnvVar) (bool, error) {
 	var chainConfigs map[string]chains.ChainConfig
 	chainConfigContent, err := base64.StdEncoding.DecodeString(encodedChainConfigContent)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode chain config content: %w", err)
+		return false, fmt.Errorf("%w: %w", errFailedToDecodeChainConfigContent, err)
 	}
 	if err := json.Unmarshal(chainConfigContent, &chainConfigs); err != nil {
-		return false, fmt.Errorf("failed to unmarshal chain config content: %w", err)
+		return false, fmt.Errorf("%w: %w", errFailedToUnmarshalChainConfigContent, err)
 	}
 
 	cChainConfig, ok := chainConfigs["C"]
@@ -132,7 +142,7 @@ func stateSyncEnabledFromEnvVars(env []corev1.EnvVar) (bool, error) {
 	// Attempt to unmarshal the C-Chain config
 	var cChainConfigMap map[string]any
 	if err := json.Unmarshal(cChainConfig.Config, &cChainConfigMap); err != nil {
-		return false, fmt.Errorf("failed to unmarshal C chain config: %w", err)
+		return false, fmt.Errorf("%w: %w", errFailedToUnmarshalCChainConfig, err)
 	}
 
 	// Attempt to read the value from the C-Chain config
@@ -142,7 +152,7 @@ func stateSyncEnabledFromEnvVars(env []corev1.EnvVar) (bool, error) {
 	}
 	stateSyncEnabled, err := cast.ToBoolE(rawStateSyncEnabled)
 	if err != nil {
-		return false, fmt.Errorf("failed to cast %v to bool: %w", rawStateSyncEnabled, err)
+		return false, fmt.Errorf("%w (%v): %w", errFailedToCastToBool, rawStateSyncEnabled, err)
 	}
 	return stateSyncEnabled, nil
 }
