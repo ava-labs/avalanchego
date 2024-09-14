@@ -763,16 +763,7 @@ func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator
 	}
 
 	// TODO: Add caching
-	sovBytes, err := s.inactiveDB.Get(validationID[:])
-	if err != nil {
-		return SubnetOnlyValidator{}, err
-	}
-
-	var sov SubnetOnlyValidator
-	if _, err := block.GenesisCodec.Unmarshal(sovBytes, &sov); err != nil {
-		return SubnetOnlyValidator{}, err
-	}
-	return sov, nil
+	return getSubnetOnlyValidator(s.inactiveDB, validationID)
 }
 
 func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
