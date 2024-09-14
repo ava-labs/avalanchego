@@ -1871,6 +1871,10 @@ func (s *state) write(updateValidators bool, height uint64) error {
 func (s *state) Close() error {
 	return errors.Join(
 		s.expiryDB.Close(),
+		s.subnetIDNodeIDDB.Close(),
+		s.activeDB.Close(),
+		s.inactiveDB.Close(),
+		s.subnetOnlyValidatorsDB.Close(),
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -2119,9 +2123,9 @@ func (s *state) writeSubnetOnlyValidators() error {
 		if priorSOV, ok := s.activeSOVLookup[validationID]; ok {
 			delete(s.activeSOVLookup, validationID)
 			s.activeSOVs.Delete(priorSOV)
-			err = s.activeDB.Delete(validationID[:])
+			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
 		} else {
-			err = s.inactiveDB.Delete(validationID[:])
+			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
 		}
 		if err != nil {
 			return err
@@ -2144,9 +2148,9 @@ func (s *state) writeSubnetOnlyValidators() error {
 		if priorSOV, ok := s.activeSOVLookup[validationID]; ok {
 			delete(s.activeSOVLookup, validationID)
 			s.activeSOVs.Delete(priorSOV)
-			err = s.activeDB.Delete(validationID[:])
+			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
 		} else {
-			err = s.inactiveDB.Delete(validationID[:])
+			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
 		}
 		if err != nil {
 			return err
