@@ -32,14 +32,17 @@ type SubnetOnlyValidators interface {
 	// subnet only validators.
 	NumActiveSubnetOnlyValidators() int
 
+	// NumSubnetOnlyValidators returns the total number of subnet only
+	// validators on [subnetID].
+	NumSubnetOnlyValidators(subnetID ids.ID) (int, error)
+
 	// GetSubnetOnlyValidator returns the validator with [validationID] if it
 	// exists. If the validator does not exist, [err] will equal
 	// [database.ErrNotFound].
 	GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error)
 
 	// HasSubnetOnlyValidator returns the validator with [validationID] if it
-	// exists. If the validator does not exist, [err] will equal
-	// [database.ErrNotFound].
+	// exists.
 	HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
 
 	// PutSubnetOnlyValidator inserts [sov] as a validator.
@@ -163,17 +166,19 @@ type subnetIDNodeID struct {
 }
 
 type subnetOnlyValidatorsDiff struct {
-	numAddedActive     int // May be negative
-	modified           map[ids.ID]SubnetOnlyValidator
-	modifiedHasNodeIDs map[subnetIDNodeID]bool
-	active             *btree.BTreeG[SubnetOnlyValidator]
+	numAddedActive        int            // May be negative
+	modifiedNumValidators map[ids.ID]int // subnetID -> numValidators
+	modified              map[ids.ID]SubnetOnlyValidator
+	modifiedHasNodeIDs    map[subnetIDNodeID]bool
+	active                *btree.BTreeG[SubnetOnlyValidator]
 }
 
 func newSubnetOnlyValidatorsDiff() *subnetOnlyValidatorsDiff {
 	return &subnetOnlyValidatorsDiff{
-		modified:           make(map[ids.ID]SubnetOnlyValidator),
-		modifiedHasNodeIDs: make(map[subnetIDNodeID]bool),
-		active:             btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
+		modifiedNumValidators: make(map[ids.ID]int),
+		modified:              make(map[ids.ID]SubnetOnlyValidator),
+		modifiedHasNodeIDs:    make(map[subnetIDNodeID]bool),
+		active:                btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
 	}
 }
 
@@ -198,11 +203,59 @@ func (d *subnetOnlyValidatorsDiff) hasSubnetOnlyValidator(subnetID ids.ID, nodeI
 }
 
 func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValidators, sov SubnetOnlyValidator) error {
-	diff, err := numActiveSubnetOnlyValidatorChange(state, sov)
-	if err != nil {
+	var (
+		prevExists bool
+		prevActive bool
+		newExists  = sov.Weight != 0
+		newActive  = newExists && sov.EndAccumulatedFee != 0
+	)
+	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
+	case nil:
+		if !priorSOV.validateConstants(sov) {
+			return ErrMutatedSubnetOnlyValidator
+		}
+
+		prevExists = true
+		prevActive = priorSOV.EndAccumulatedFee != 0
+	case database.ErrNotFound:
+		if !newExists {
+			return nil // Removing a validator that didn't exist is a noop
+		}
+
+		has, err := state.HasSubnetOnlyValidator(sov.SubnetID, sov.NodeID)
+		if err != nil {
+			return err
+		}
+		if has {
+			return ErrDuplicateSubnetOnlyValidator
+		}
+	default:
 		return err
 	}
-	d.numAddedActive += diff
+
+	switch {
+	case prevExists && !newExists:
+		numSOVs, err := state.NumSubnetOnlyValidators(sov.SubnetID)
+		if err != nil {
+			return err
+		}
+
+		d.modifiedNumValidators[sov.SubnetID] = numSOVs - 1
+	case !prevExists && newExists:
+		numSOVs, err := state.NumSubnetOnlyValidators(sov.SubnetID)
+		if err != nil {
+			return err
+		}
+
+		d.modifiedNumValidators[sov.SubnetID] = numSOVs + 1
+	}
+
+	switch {
+	case prevActive && !newActive:
+		d.numAddedActive--
+	case !prevActive && newActive:
+		d.numAddedActive++
+	}
 
 	if prevSOV, ok := d.modified[sov.ValidationID]; ok {
 		prevSubnetIDNodeID := subnetIDNodeID{
@@ -226,38 +279,4 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValida
 	}
 	d.active.ReplaceOrInsert(sov)
 	return nil
-}
-
-// numActiveSubnetOnlyValidatorChange returns the change in the number of active
-// subnet only validators if [sov] were to be inserted into [state]. If it is
-// invalid for [sov] to be inserted, an error is returned.
-func numActiveSubnetOnlyValidatorChange(state SubnetOnlyValidators, sov SubnetOnlyValidator) (int, error) {
-	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
-	case nil:
-		if !priorSOV.validateConstants(sov) {
-			return 0, ErrMutatedSubnetOnlyValidator
-		}
-		switch {
-		case !priorSOV.isActive() && sov.isActive():
-			return 1, nil // Increasing the number of active validators
-		case priorSOV.isActive() && !sov.isActive():
-			return -1, nil // Decreasing the number of active validators
-		default:
-			return 0, nil
-		}
-	case database.ErrNotFound:
-		has, err := state.HasSubnetOnlyValidator(sov.SubnetID, sov.NodeID)
-		if err != nil {
-			return 0, err
-		}
-		if has {
-			return 0, ErrDuplicateSubnetOnlyValidator
-		}
-		if sov.isActive() {
-			return 1, nil // Increasing the number of active validators
-		}
-		return 0, nil // Adding an inactive validator
-	default:
-		return 0, err
-	}
 }

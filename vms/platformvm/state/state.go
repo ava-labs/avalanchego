@@ -14,6 +14,7 @@ import (
 	"github.com/google/btree"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -84,6 +85,7 @@ var (
 	ChainPrefix                   = []byte("chain")
 	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
 	SubnetOnlyValidatorsPrefix    = []byte("subnetOnlyValidators")
+	NumValidatorsPrefix           = []byte("numValidators")
 	SubnetIDNodeIDPrefix          = []byte("subnetIDNodeID")
 	ActivePrefix                  = []byte("active")
 	InactivePrefix                = []byte("inactive")
@@ -316,6 +318,7 @@ type state struct {
 	activeSOVs             *btree.BTreeG[SubnetOnlyValidator]
 	sovDiff                *subnetOnlyValidatorsDiff
 	subnetOnlyValidatorsDB database.Database
+	numValidatorsDB        database.Database
 	subnetIDNodeIDDB       database.Database
 	activeDB               database.Database
 	inactiveDB             database.Database
@@ -641,6 +644,7 @@ func New(
 		activeSOVs:             btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
 		sovDiff:                newSubnetOnlyValidatorsDiff(),
 		subnetOnlyValidatorsDB: subnetOnlyValidatorsDB,
+		numValidatorsDB:        prefixdb.New(NumValidatorsPrefix, subnetOnlyValidatorsDB),
 		subnetIDNodeIDDB:       prefixdb.New(SubnetIDNodeIDPrefix, subnetOnlyValidatorsDB),
 		activeDB:               prefixdb.New(ActivePrefix, subnetOnlyValidatorsDB),
 		inactiveDB:             prefixdb.New(InactivePrefix, subnetOnlyValidatorsDB),
@@ -748,6 +752,25 @@ func (s *state) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[Subne
 
 func (s *state) NumActiveSubnetOnlyValidators() int {
 	return len(s.activeSOVLookup) + s.sovDiff.numAddedActive
+}
+
+func (s *state) NumSubnetOnlyValidators(subnetID ids.ID) (int, error) {
+	if numSOVs, modified := s.sovDiff.modifiedNumValidators[subnetID]; modified {
+		return numSOVs, nil
+	}
+
+	// TODO: Add caching
+	numSOVs, err := database.GetUInt64(s.numValidatorsDB, subnetID[:])
+	if err == database.ErrNotFound {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if numSOVs > math.MaxInt {
+		return 0, safemath.ErrOverflow
+	}
+	return int(numSOVs), nil
 }
 
 func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
@@ -1871,6 +1894,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 func (s *state) Close() error {
 	return errors.Join(
 		s.expiryDB.Close(),
+		s.numValidatorsDB.Close(),
 		s.subnetIDNodeIDDB.Close(),
 		s.activeDB.Close(),
 		s.inactiveDB.Close(),
@@ -2106,6 +2130,14 @@ func (s *state) writeExpiry() error {
 // TODO: Write weight and public key diffs
 // TODO: Add caching
 func (s *state) writeSubnetOnlyValidators() error {
+	// Write counts:
+	for subnetID, numValidators := range s.sovDiff.modifiedNumValidators {
+		if err := database.PutUInt64(s.numValidatorsDB, subnetID[:], uint64(numValidators)); err != nil {
+			return err
+		}
+	}
+	maps.Clear(s.sovDiff.modifiedNumValidators)
+
 	// Perform deletions:
 	for validationID, sov := range s.sovDiff.modified {
 		if sov.Weight != 0 {

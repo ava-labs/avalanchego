@@ -518,6 +518,21 @@ func (mr *MockChainMockRecorder) NumActiveSubnetOnlyValidators() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NumActiveSubnetOnlyValidators", reflect.TypeOf((*MockChain)(nil).NumActiveSubnetOnlyValidators))
 }
 
+// NumSubnetOnlyValidators mocks base method.
+func (m *MockChain) NumSubnetOnlyValidators(subnetID ids.ID) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NumSubnetOnlyValidators", subnetID)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NumSubnetOnlyValidators indicates an expected call of NumSubnetOnlyValidators.
+func (mr *MockChainMockRecorder) NumSubnetOnlyValidators(subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NumSubnetOnlyValidators", reflect.TypeOf((*MockChain)(nil).NumSubnetOnlyValidators), subnetID)
+}
+
 // PutCurrentDelegator mocks base method.
 func (m *MockChain) PutCurrentDelegator(staker *Staker) {
 	m.ctrl.T.Helper()

@@ -513,7 +513,10 @@ func TestDiffSubnetOnlyValidators(t *testing.T) {
 					require.Zero(sov)
 				}
 
-				var expectedActive []SubnetOnlyValidator
+				var (
+					numSOVs        = make(map[ids.ID]int)
+					expectedActive []SubnetOnlyValidator
+				)
 				for _, expectedSOV := range expectedSOVs {
 					if expectedSOV.Weight == 0 {
 						continue
@@ -527,6 +530,7 @@ func TestDiffSubnetOnlyValidators(t *testing.T) {
 					require.NoError(err)
 					require.True(has)
 
+					numSOVs[sov.SubnetID]++
 					if expectedSOV.isActive() {
 						expectedActive = append(expectedActive, expectedSOV)
 					}
@@ -541,10 +545,17 @@ func TestDiffSubnetOnlyValidators(t *testing.T) {
 				)
 
 				require.Equal(len(expectedActive), chain.NumActiveSubnetOnlyValidators())
+
+				for subnetID, expectedNumSOVs := range numSOVs {
+					numSOVs, err := chain.NumSubnetOnlyValidators(subnetID)
+					require.NoError(err)
+					require.Equal(expectedNumSOVs, numSOVs)
+				}
 			}
 
 			verifyChain(d)
 			require.NoError(d.Apply(state))
+			verifyChain(d)
 			verifyChain(state)
 			assertChainsEqual(t, state, d)
 		})
