@@ -13,6 +13,9 @@ on:
 jobs:
   build-x86_64-binaries-tarball:
     runs-on: ubuntu-20.04
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +75,9 @@ jobs:
 
   build-arm64-binaries-tarball:
     runs-on: custom-arm64-focal
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
