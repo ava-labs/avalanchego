@@ -60,6 +60,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -138,6 +139,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
 
 	txID := ids.GenerateTestID()
 	utxo := &avax.UTXO{
