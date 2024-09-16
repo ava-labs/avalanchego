@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-var convertEToBase2 = math.Log(2)
-
 type continuousAverager struct {
 	halflife    float64
 	weightedSum float64
@@ -34,7 +32,7 @@ func NewAverager(
 	currentTime time.Time,
 ) Averager {
 	return &continuousAverager{
-		halflife:    float64(halflife) / convertEToBase2,
+		halflife:    float64(halflife) / math.Ln2,
 		weightedSum: initialPrediction,
 		normalizer:  1,
 		lastUpdated: currentTime,

@@ -88,18 +88,25 @@ func TestStateSyncGenesis(t *testing.T) {
 
 	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
+	require.Empty(
+		iterator.ToSlice(delegatorIterator),
+	)
 
 	stakerIterator, err := state.GetCurrentStakerIterator()
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.FromSlice(staker), stakerIterator)
+	require.Equal(
+		[]*Staker{staker},
+		iterator.ToSlice(stakerIterator),
+	)
 
 	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, defaultValidatorNodeID)
 	require.NoError(err)
-	assertIteratorsEqual(t, iterator.Empty[*Staker]{}, delegatorIterator)
+	require.Empty(
+		iterator.ToSlice(delegatorIterator),
+	)
 }
 
 // Whenever we store a staker, a whole bunch a data structures are updated
@@ -1574,4 +1581,36 @@ func TestGetFeeStateErrors(t *testing.T) {
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}
+}
+
+// Verify that committing the state writes the expiry changes to the database
+// and that loading the state fetches the expiry from the database.
+func TestStateExpiryCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	// Populate an entry.
+	expiry := ExpiryEntry{
+		Timestamp: 1,
+	}
+	s.PutExpiry(expiry)
+	require.NoError(s.Commit())
+
+	// Verify that the entry was written and loaded correctly.
+	s = newTestState(t, db)
+	has, err := s.HasExpiry(expiry)
+	require.NoError(err)
+	require.True(has)
+
+	// Delete an entry.
+	s.DeleteExpiry(expiry)
+	require.NoError(s.Commit())
+
+	// Verify that the entry was deleted correctly.
+	s = newTestState(t, db)
+	has, err = s.HasExpiry(expiry)
+	require.NoError(err)
+	require.False(has)
 }
