@@ -1885,7 +1885,8 @@ func TestSubnetOnlyValidators(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			state := newTestState(t, memdb.New())
+			db := memdb.New()
+			state := newTestState(t, db)
 
 			var (
 				initialSOVs = make(map[ids.ID]SubnetOnlyValidator)
@@ -2005,13 +2006,17 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				return validatorSet
 			}
 
+			reloadedState := newTestState(t, db)
 			for subnetID := range subnetIDs {
-				expectedValidatorSet := sovsToValidatorSet(initialSOVs, subnetID)
-				endValidatorSet := sovsToValidatorSet(expectedSOVs, subnetID)
+				expectedEndValidatorSet := sovsToValidatorSet(expectedSOVs, subnetID)
+				endValidatorSet := reloadedState.validators.GetMap(subnetID)
+				require.Equal(expectedEndValidatorSet, endValidatorSet)
 
 				require.NoError(state.ApplyValidatorWeightDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
 				require.NoError(state.ApplyValidatorPublicKeyDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
-				require.Equal(expectedValidatorSet, endValidatorSet)
+
+				initialValidatorSet := sovsToValidatorSet(initialSOVs, subnetID)
+				require.Equal(initialValidatorSet, endValidatorSet)
 			}
 		})
 	}
