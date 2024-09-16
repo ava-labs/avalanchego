@@ -197,6 +197,7 @@ type State interface {
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
+		subnetID ids.ID,
 	) error
 
 	SetHeight(height uint64)
@@ -1336,10 +1337,11 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
+	subnetID ids.ID,
 ) error {
 	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
-		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
-		constants.PrimaryNetworkID[:],
+		marshalStartDiffKey(subnetID, startHeight),
+		subnetID[:],
 	)
 	defer diffIter.Release()
 
@@ -2175,15 +2177,20 @@ func (s *state) writeSubnetOnlyValidators(height uint64) error {
 			continue
 		}
 
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// Deleting a non-existent validator is a noop. This can happen if
+			// the validator was added and then immediately removed.
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
 		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
 		copy(subnetIDNodeIDKey, sov.SubnetID[:])
 		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
 		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
-			return err
-		}
-
-		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		if err != nil {
 			return err
 		}
 

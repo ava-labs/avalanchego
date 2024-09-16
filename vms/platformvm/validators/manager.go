@@ -85,6 +85,7 @@ type State interface {
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
+		subnetID ids.ID,
 	) error
 }
 
@@ -271,7 +272,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
-		constants.PlatformChainID,
+		constants.PrimaryNetworkID,
 	)
 	if err != nil {
 		return nil, 0, err
@@ -282,6 +283,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
+		constants.PrimaryNetworkID,
 	)
 	return validatorSet, currentHeight, err
 }
@@ -343,11 +345,13 @@ func (m *manager) makeSubnetValidatorSet(
 		}
 	}
 
+	// Prior to ACP-77, public keys were inherited from the primary network.
 	err = m.state.ApplyValidatorPublicKeyDiffs(
 		ctx,
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
+		constants.PrimaryNetworkID,
 	)
 	return subnetValidatorSet, currentHeight, err
 }

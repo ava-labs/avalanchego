@@ -218,10 +218,6 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValida
 		prevExists = true
 		prevActive = priorSOV.EndAccumulatedFee != 0
 	case database.ErrNotFound:
-		if !newExists {
-			return nil // Removing a validator that didn't exist is a noop
-		}
-
 		has, err := state.HasSubnetOnlyValidator(sov.SubnetID, sov.NodeID)
 		if err != nil {
 			return err
