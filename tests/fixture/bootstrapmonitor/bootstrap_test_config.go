@@ -40,10 +40,10 @@ var (
 )
 
 type BootstrapTestConfig struct {
-	Network          string
-	StateSyncEnabled bool
-	Image            string
-	Versions         *version.Versions
+	Network          string            `json:"network"`
+	StateSyncEnabled bool              `json:"stateSyncEnabled"`
+	Image            string            `json:"image"`
+	Versions         *version.Versions `json:"versions,omitempty"`
 }
 
 // GetBootstrapTestConfigFromPod extracts the bootstrap test configuration from the specified pod.
