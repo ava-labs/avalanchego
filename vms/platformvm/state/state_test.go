@@ -1582,3 +1582,35 @@ func TestGetFeeStateErrors(t *testing.T) {
 		})
 	}
 }
+
+// Verify that committing the state writes the expiry changes to the database
+// and that loading the state fetches the expiry from the database.
+func TestStateExpiryCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	// Populate an entry.
+	expiry := ExpiryEntry{
+		Timestamp: 1,
+	}
+	s.PutExpiry(expiry)
+	require.NoError(s.Commit())
+
+	// Verify that the entry was written and loaded correctly.
+	s = newTestState(t, db)
+	has, err := s.HasExpiry(expiry)
+	require.NoError(err)
+	require.True(has)
+
+	// Delete an entry.
+	s.DeleteExpiry(expiry)
+	require.NoError(s.Commit())
+
+	// Verify that the entry was deleted correctly.
+	s = newTestState(t, db)
+	has, err = s.HasExpiry(expiry)
+	require.NoError(err)
+	require.False(has)
+}
