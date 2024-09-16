@@ -285,8 +285,7 @@ func runBenchmark() error {
 		Cache:             500,
 		Handles:           200,
 		ReadOnly:          false,
-
-		Ephemeral: false,
+		Ephemeral:         false,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create level db database : %v\n", err)
@@ -339,7 +338,7 @@ func runBenchmark() error {
 			entryHash := calculateIndexEncoding(keyToDeleteIdx)
 			err = tdb.Delete(entryHash)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "unable to delete merkleDB entry : %v\n", err)
+				fmt.Fprintf(os.Stderr, "unable to delete trie entry : %v\n", err)
 				return err
 			}
 		}
@@ -353,7 +352,7 @@ func runBenchmark() error {
 			entryHash := calculateIndexEncoding(keyToAddIdx)
 			err = tdb.Update(entryHash, entryHash)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "unable to insert merkleDB entry : %v\n", err)
+				fmt.Fprintf(os.Stderr, "unable to insert trie entry : %v\n", err)
 				return err
 			}
 		}
@@ -368,7 +367,7 @@ func runBenchmark() error {
 			updateEntryKey := calculateIndexEncoding(keyToUpdateIdx)
 			err = tdb.Update(updateEntryKey, updateEntryValue)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "unable to update merkleDB entry : %v\n", err)
+				fmt.Fprintf(os.Stderr, "unable to update trie entry : %v\n", err)
 				return err
 			}
 		}
