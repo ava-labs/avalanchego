@@ -86,7 +86,7 @@ var (
 	ChainPrefix                   = []byte("chain")
 	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
 	SubnetOnlyValidatorsPrefix    = []byte("subnetOnlyValidators")
-	NumValidatorsPrefix           = []byte("numValidators")
+	WeightsPrefix                 = []byte("weights")
 	SubnetIDNodeIDPrefix          = []byte("subnetIDNodeID")
 	ActivePrefix                  = []byte("active")
 	InactivePrefix                = []byte("inactive")
@@ -320,7 +320,7 @@ type state struct {
 	activeSOVs             *btree.BTreeG[SubnetOnlyValidator]
 	sovDiff                *subnetOnlyValidatorsDiff
 	subnetOnlyValidatorsDB database.Database
-	numValidatorsDB        database.Database
+	weightsDB              database.Database
 	subnetIDNodeIDDB       database.Database
 	activeDB               database.Database
 	inactiveDB             database.Database
@@ -646,7 +646,7 @@ func New(
 		activeSOVs:             btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
 		sovDiff:                newSubnetOnlyValidatorsDiff(),
 		subnetOnlyValidatorsDB: subnetOnlyValidatorsDB,
-		numValidatorsDB:        prefixdb.New(NumValidatorsPrefix, subnetOnlyValidatorsDB),
+		weightsDB:              prefixdb.New(WeightsPrefix, subnetOnlyValidatorsDB),
 		subnetIDNodeIDDB:       prefixdb.New(SubnetIDNodeIDPrefix, subnetOnlyValidatorsDB),
 		activeDB:               prefixdb.New(ActivePrefix, subnetOnlyValidatorsDB),
 		inactiveDB:             prefixdb.New(InactivePrefix, subnetOnlyValidatorsDB),
@@ -756,23 +756,17 @@ func (s *state) NumActiveSubnetOnlyValidators() int {
 	return len(s.activeSOVLookup) + s.sovDiff.numAddedActive
 }
 
-func (s *state) NumSubnetOnlyValidators(subnetID ids.ID) (int, error) {
-	if numSOVs, modified := s.sovDiff.modifiedNumValidators[subnetID]; modified {
-		return numSOVs, nil
+func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
+	if weight, modified := s.sovDiff.modifiedTotalWeight[subnetID]; modified {
+		return weight, nil
 	}
 
 	// TODO: Add caching
-	numSOVs, err := database.GetUInt64(s.numValidatorsDB, subnetID[:])
+	weight, err := database.GetUInt64(s.weightsDB, subnetID[:])
 	if err == database.ErrNotFound {
 		return 0, nil
 	}
-	if err != nil {
-		return 0, err
-	}
-	if numSOVs > math.MaxInt {
-		return 0, safemath.ErrOverflow
-	}
-	return int(numSOVs), nil
+	return weight, err
 }
 
 func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
@@ -1901,7 +1895,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 func (s *state) Close() error {
 	return errors.Join(
 		s.expiryDB.Close(),
-		s.numValidatorsDB.Close(),
+		s.weightsDB.Close(),
 		s.subnetIDNodeIDDB.Close(),
 		s.activeDB.Close(),
 		s.inactiveDB.Close(),
@@ -2137,13 +2131,13 @@ func (s *state) writeExpiry() error {
 // TODO: Update validator sets
 // TODO: Add caching
 func (s *state) writeSubnetOnlyValidators(height uint64) error {
-	// Write counts:
-	for subnetID, numValidators := range s.sovDiff.modifiedNumValidators {
-		if err := database.PutUInt64(s.numValidatorsDB, subnetID[:], uint64(numValidators)); err != nil {
+	// Write modified weights:
+	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
+		if err := database.PutUInt64(s.weightsDB, subnetID[:], weight); err != nil {
 			return err
 		}
 	}
-	maps.Clear(s.sovDiff.modifiedNumValidators)
+	maps.Clear(s.sovDiff.modifiedTotalWeight)
 
 	historicalDiffs, err := s.makeSubnetOnlyValidatorHistoricalDiffs()
 	if err != nil {

@@ -206,9 +206,9 @@ func (d *diff) NumActiveSubnetOnlyValidators() int {
 	return d.parentActiveSOVs + d.sovDiff.numAddedActive
 }
 
-func (d *diff) NumSubnetOnlyValidators(subnetID ids.ID) (int, error) {
-	if numSOVs, modified := d.sovDiff.modifiedNumValidators[subnetID]; modified {
-		return numSOVs, nil
+func (d *diff) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
+	if weight, modified := d.sovDiff.modifiedTotalWeight[subnetID]; modified {
+		return weight, nil
 	}
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
@@ -216,7 +216,7 @@ func (d *diff) NumSubnetOnlyValidators(subnetID ids.ID) (int, error) {
 		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.NumSubnetOnlyValidators(subnetID)
+	return parentState.WeightOfSubnetOnlyValidators(subnetID)
 }
 
 func (d *diff) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {

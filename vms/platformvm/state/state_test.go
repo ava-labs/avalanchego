@@ -1922,7 +1922,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				}
 
 				var (
-					numSOVs        = make(map[ids.ID]int)
+					weights        = make(map[ids.ID]uint64)
 					expectedActive []SubnetOnlyValidator
 				)
 				for _, expectedSOV := range expectedSOVs {
@@ -1938,7 +1938,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					require.NoError(err)
 					require.True(has)
 
-					numSOVs[sov.SubnetID]++
+					weights[sov.SubnetID] += sov.Weight
 					if expectedSOV.isActive() {
 						expectedActive = append(expectedActive, expectedSOV)
 					}
@@ -1954,10 +1954,10 @@ func TestSubnetOnlyValidators(t *testing.T) {
 
 				require.Equal(len(expectedActive), chain.NumActiveSubnetOnlyValidators())
 
-				for subnetID, expectedNumSOVs := range numSOVs {
-					numSOVs, err := chain.NumSubnetOnlyValidators(subnetID)
+				for subnetID, expectedWeight := range weights {
+					weight, err := chain.WeightOfSubnetOnlyValidators(subnetID)
 					require.NoError(err)
-					require.Equal(expectedNumSOVs, numSOVs)
+					require.Equal(expectedWeight, weight)
 				}
 			}
 

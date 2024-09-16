@@ -532,21 +532,6 @@ func (mr *MockDiffMockRecorder) NumActiveSubnetOnlyValidators() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NumActiveSubnetOnlyValidators", reflect.TypeOf((*MockDiff)(nil).NumActiveSubnetOnlyValidators))
 }
 
-// NumSubnetOnlyValidators mocks base method.
-func (m *MockDiff) NumSubnetOnlyValidators(subnetID ids.ID) (int, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NumSubnetOnlyValidators", subnetID)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// NumSubnetOnlyValidators indicates an expected call of NumSubnetOnlyValidators.
-func (mr *MockDiffMockRecorder) NumSubnetOnlyValidators(subnetID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NumSubnetOnlyValidators", reflect.TypeOf((*MockDiff)(nil).NumSubnetOnlyValidators), subnetID)
-}
-
 // PutCurrentDelegator mocks base method.
 func (m *MockDiff) PutCurrentDelegator(staker *Staker) {
 	m.ctrl.T.Helper()
@@ -709,4 +694,19 @@ func (m *MockDiff) SetTimestamp(tm time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(tm any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), tm)
+}
+
+// WeightOfSubnetOnlyValidators mocks base method.
+func (m *MockDiff) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WeightOfSubnetOnlyValidators", subnetID)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WeightOfSubnetOnlyValidators indicates an expected call of WeightOfSubnetOnlyValidators.
+func (mr *MockDiffMockRecorder) WeightOfSubnetOnlyValidators(subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WeightOfSubnetOnlyValidators", reflect.TypeOf((*MockDiff)(nil).WeightOfSubnetOnlyValidators), subnetID)
 }

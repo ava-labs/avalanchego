@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -32,9 +34,9 @@ type SubnetOnlyValidators interface {
 	// subnet only validators.
 	NumActiveSubnetOnlyValidators() int
 
-	// NumSubnetOnlyValidators returns the total number of subnet only
-	// validators on [subnetID].
-	NumSubnetOnlyValidators(subnetID ids.ID) (int, error)
+	// WeightOfSubnetOnlyValidators returns the total active and inactive weight
+	// of subnet only validators on [subnetID].
+	WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error)
 
 	// GetSubnetOnlyValidator returns the validator with [validationID] if it
 	// exists. If the validator does not exist, [err] will equal
@@ -166,19 +168,19 @@ type subnetIDNodeID struct {
 }
 
 type subnetOnlyValidatorsDiff struct {
-	numAddedActive        int            // May be negative
-	modifiedNumValidators map[ids.ID]int // subnetID -> numValidators
-	modified              map[ids.ID]SubnetOnlyValidator
-	modifiedHasNodeIDs    map[subnetIDNodeID]bool
-	active                *btree.BTreeG[SubnetOnlyValidator]
+	numAddedActive      int               // May be negative
+	modifiedTotalWeight map[ids.ID]uint64 // subnetID -> totalWeight
+	modified            map[ids.ID]SubnetOnlyValidator
+	modifiedHasNodeIDs  map[subnetIDNodeID]bool
+	active              *btree.BTreeG[SubnetOnlyValidator]
 }
 
 func newSubnetOnlyValidatorsDiff() *subnetOnlyValidatorsDiff {
 	return &subnetOnlyValidatorsDiff{
-		modifiedNumValidators: make(map[ids.ID]int),
-		modified:              make(map[ids.ID]SubnetOnlyValidator),
-		modifiedHasNodeIDs:    make(map[subnetIDNodeID]bool),
-		active:                btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
+		modifiedTotalWeight: make(map[ids.ID]uint64),
+		modified:            make(map[ids.ID]SubnetOnlyValidator),
+		modifiedHasNodeIDs:  make(map[subnetIDNodeID]bool),
+		active:              btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
 	}
 }
 
@@ -204,10 +206,9 @@ func (d *subnetOnlyValidatorsDiff) hasSubnetOnlyValidator(subnetID ids.ID, nodeI
 
 func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValidators, sov SubnetOnlyValidator) error {
 	var (
-		prevExists bool
+		prevWeight uint64
 		prevActive bool
-		newExists  = sov.Weight != 0
-		newActive  = newExists && sov.EndAccumulatedFee != 0
+		newActive  = sov.Weight != 0 && sov.EndAccumulatedFee != 0
 	)
 	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
 	case nil:
@@ -215,7 +216,7 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValida
 			return ErrMutatedSubnetOnlyValidator
 		}
 
-		prevExists = true
+		prevWeight = priorSOV.Weight
 		prevActive = priorSOV.EndAccumulatedFee != 0
 	case database.ErrNotFound:
 		has, err := state.HasSubnetOnlyValidator(sov.SubnetID, sov.NodeID)
@@ -230,20 +231,30 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValida
 	}
 
 	switch {
-	case prevExists && !newExists:
-		numSOVs, err := state.NumSubnetOnlyValidators(sov.SubnetID)
+	case prevWeight < sov.Weight:
+		weight, err := state.WeightOfSubnetOnlyValidators(sov.SubnetID)
 		if err != nil {
 			return err
 		}
 
-		d.modifiedNumValidators[sov.SubnetID] = numSOVs - 1
-	case !prevExists && newExists:
-		numSOVs, err := state.NumSubnetOnlyValidators(sov.SubnetID)
+		weight, err = safemath.Add(weight, sov.Weight-prevWeight)
 		if err != nil {
 			return err
 		}
 
-		d.modifiedNumValidators[sov.SubnetID] = numSOVs + 1
+		d.modifiedTotalWeight[sov.SubnetID] = weight
+	case prevWeight > sov.Weight:
+		weight, err := state.WeightOfSubnetOnlyValidators(sov.SubnetID)
+		if err != nil {
+			return err
+		}
+
+		weight, err = safemath.Sub(weight, prevWeight-sov.Weight)
+		if err != nil {
+			return err
+		}
+
+		d.modifiedTotalWeight[sov.SubnetID] = weight
 	}
 
 	switch {
