@@ -35,11 +35,14 @@ type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
 
-	timestamp time.Time
-	feeState  gas.State
+	timestamp   time.Time
+	feeState    gas.State
+	accruedFees uint64
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
+
+	expiryDiff *expiryDiff
 
 	currentStakerDiffs diffStakers
 	// map of subnetID -> nodeID -> total accrued delegatee rewards
@@ -77,6 +80,8 @@ func NewDiff(
 		stateVersions:  stateVersions,
 		timestamp:      parentState.GetTimestamp(),
 		feeState:       parentState.GetFeeState(),
+		accruedFees:    parentState.GetAccruedFees(),
+		expiryDiff:     newExpiryDiff(),
 		subnetOwners:   make(map[ids.ID]fx.Owner),
 		subnetManagers: make(map[ids.ID]chainIDAndAddr),
 	}, nil
@@ -112,6 +117,14 @@ func (d *diff) SetFeeState(feeState gas.State) {
 	d.feeState = feeState
 }
 
+func (d *diff) GetAccruedFees() uint64 {
+	return d.accruedFees
+}
+
+func (d *diff) SetAccruedFees(accruedFees uint64) {
+	d.accruedFees = accruedFees
+}
+
 func (d *diff) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	supply, ok := d.currentSupply[subnetID]
 	if ok {
@@ -134,6 +147,41 @@ func (d *diff) SetCurrentSupply(subnetID ids.ID, currentSupply uint64) {
 	} else {
 		d.currentSupply[subnetID] = currentSupply
 	}
+}
+
+func (d *diff) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentIterator, err := parentState.GetExpiryIterator()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.expiryDiff.getExpiryIterator(parentIterator), nil
+}
+
+func (d *diff) HasExpiry(entry ExpiryEntry) (bool, error) {
+	if has, modified := d.expiryDiff.modified[entry]; modified {
+		return has, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return false, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.HasExpiry(entry)
+}
+
+func (d *diff) PutExpiry(entry ExpiryEntry) {
+	d.expiryDiff.PutExpiry(entry)
+}
+
+func (d *diff) DeleteExpiry(entry ExpiryEntry) {
+	d.expiryDiff.DeleteExpiry(entry)
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -437,8 +485,16 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetFeeState(d.feeState)
+	baseState.SetAccruedFees(d.accruedFees)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
+	}
+	for entry, isAdded := range d.expiryDiff.modified {
+		if isAdded {
+			baseState.PutExpiry(entry)
+		} else {
+			baseState.DeleteExpiry(entry)
+		}
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range subnetValidatorDiffs {
