@@ -145,34 +145,31 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		return newRollupWindow, baseFee, nil
 	}
 
+	num := new(big.Int)
+
 	if totalGas > parentGasTarget {
 		// If the parent block used more gas than its target, the baseFee should increase.
-		gasUsedDelta := new(big.Int).SetUint64(totalGas - parentGasTarget)
-		x := new(big.Int).Mul(parent.BaseFee, gasUsedDelta)
-		y := x.Div(x, parentGasTargetBig)
-		baseFeeDelta := math.BigMax(
-			x.Div(y, baseFeeChangeDenominator),
-			common.Big1,
-		)
+		num.SetUint64(totalGas - parentGasTarget)
+		num.Mul(num, parent.BaseFee)
+		num.Div(num, parentGasTargetBig)
+		num.Div(num, baseFeeChangeDenominator)
+		baseFeeDelta := math.BigMax(num, common.Big1)
 
 		baseFee.Add(baseFee, baseFeeDelta)
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
-		gasUsedDelta := new(big.Int).SetUint64(parentGasTarget - totalGas)
-		x := new(big.Int).Mul(parent.BaseFee, gasUsedDelta)
-		y := x.Div(x, parentGasTargetBig)
-		baseFeeDelta := math.BigMax(
-			x.Div(y, baseFeeChangeDenominator),
-			common.Big1,
-		)
-
+		num.SetUint64(parentGasTarget - totalGas)
+		num.Mul(num, parent.BaseFee)
+		num.Div(num, parentGasTargetBig)
+		num.Div(num, baseFeeChangeDenominator)
+		baseFeeDelta := math.BigMax(num, common.Big1)
 		// If [roll] is greater than [rollupWindow], apply the state transition to the base fee to account
 		// for the interval during which no blocks were produced.
 		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
 		// that has elapsed between the parent and this block.
 		if roll > rollupWindow {
 			// Note: roll/rollupWindow must be greater than 1 since we've checked that roll > rollupWindow
-			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
+			baseFeeDelta = new(big.Int).Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
 		}
 		baseFee.Sub(baseFee, baseFeeDelta)
 	}
