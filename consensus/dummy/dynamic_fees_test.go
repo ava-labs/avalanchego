@@ -11,9 +11,11 @@ import (
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var testMinBaseFee = big.NewInt(75_000_000_000)
@@ -439,4 +441,33 @@ func TestCalcBlockGasCost(t *testing.T) {
 			)))
 		})
 	}
+}
+
+func TestCalcBaseFeeRegression(t *testing.T) {
+	parentTimestamp := uint64(1)
+	timestamp := parentTimestamp + params.RollupWindow + 1000
+
+	parentHeader := &types.Header{
+		Time:    parentTimestamp,
+		GasUsed: 1_000_000,
+		Number:  big.NewInt(1),
+		BaseFee: big.NewInt(1),
+		Extra:   make([]byte, params.DynamicFeeExtraDataSize),
+	}
+
+	testFeeConfig := commontype.FeeConfig{
+		GasLimit:        big.NewInt(8_000_000),
+		TargetBlockRate: 2, // in seconds
+
+		MinBaseFee:               big.NewInt(1 * params.GWei),
+		TargetGas:                big.NewInt(15_000_000),
+		BaseFeeChangeDenominator: big.NewInt(100000),
+
+		MinBlockGasCost:  big.NewInt(0),
+		MaxBlockGasCost:  big.NewInt(1_000_000),
+		BlockGasCostStep: big.NewInt(200_000),
+	}
+	_, _, err := CalcBaseFee(params.TestChainConfig, testFeeConfig, parentHeader, timestamp)
+	require.NoError(t, err)
+	require.Equalf(t, 0, common.Big1.Cmp(big.NewInt(1)), "big1 should be 1, got %s", common.Big1)
 }
