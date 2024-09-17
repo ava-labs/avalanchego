@@ -125,7 +125,7 @@ and initiates a new test when one is found.
 
 | Filename                 | Purpose                                                                                     |
 |:-------------------------|:--------------------------------------------------------------------------------------------|
-| bootstrap_test_config.go | Defines how the configuration for a bootstrap test is read from a pod.                      |
+| bootstrap_test_config.go | Defines how the configuration for a bootstrap test is read from a pod                      |
 | common.go                | Defines code common between init and wait                                                   |
 | init.go                  | Defines how a bootstrap test is initialized                                                 |
 | wait.go                  | Defines how a bootstrap test is determined to have completed and how a new one is initiated |
