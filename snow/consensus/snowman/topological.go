@@ -29,16 +29,20 @@ var (
 )
 
 // TopologicalFactory implements Factory by returning a topological struct
-type TopologicalFactory struct{}
+type TopologicalFactory struct {
+	factory snowball.Factory
+}
 
-func (TopologicalFactory) New() Consensus {
-	return &Topological{}
+func (tf TopologicalFactory) New() Consensus {
+	return &Topological{Factory: tf.factory}
 }
 
 // Topological implements the Snowman interface by using a tree tracking the
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next block.
 type Topological struct {
+	Factory snowball.Factory
+
 	metrics *metrics
 
 	// pollNumber is the number of times RecordPolls has been called

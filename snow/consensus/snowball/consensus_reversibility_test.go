@@ -23,7 +23,7 @@ func TestSnowballGovernance(t *testing.T) {
 		source              = prng.NewMT19937()
 	)
 
-	nBitwise := NewNetwork(SnowballFactory, params, numColors, source)
+	nBitwise := NewNetwork(SnowflakeFactory, params, numColors, source)
 
 	source.Seed(seed)
 	for i := 0; i < numRed; i++ {

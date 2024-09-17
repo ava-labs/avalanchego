@@ -51,6 +51,7 @@ func NewNetwork(params snowball.Parameters, numColors int, rngSource sampler.Sou
 			HeightV: dependency.HeightV + 1,
 		})
 	}
+
 	return n
 }
 
@@ -63,6 +64,7 @@ func (n *Network) shuffleColors() {
 		colors = append(colors, n.colors[int(index)])
 	}
 	n.colors = colors
+
 	utils.Sort(n.colors)
 }
 
@@ -74,12 +76,14 @@ func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 	}
 
 	n.shuffleColors()
+
 	for _, blk := range n.colors {
 		copiedBlk := *blk
 		if err := sm.Add(&copiedBlk); err != nil {
 			return err
 		}
 	}
+
 	n.nodes = append(n.nodes, sm)
 	n.running = append(n.running, sm)
 	return nil

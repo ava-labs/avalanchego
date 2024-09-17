@@ -6,6 +6,7 @@ package snowman
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path"
 	"reflect"
 	"runtime"
@@ -261,6 +262,47 @@ func AddOnUnknownParentTest(t *testing.T, factory Factory) {
 	// Adding a block with an unknown parent should error.
 	err := sm.Add(block)
 	require.ErrorIs(err, errUnknownParentBlock)
+}
+
+func TestConvergenceSnowFlakeSnowBall(t *testing.T) {
+	require := require.New(t)
+
+	params := snowball.Parameters{
+		K:                     20,
+		AlphaPreference:       15,
+		AlphaConfidence:       15,
+		Beta:                  20,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	numNodes := 5000
+
+	n := NewNetwork(params, 10, prng.NewMT19937())
+	for i := 0; i < numNodes; i++ {
+		var sm Consensus
+		if i%2 == 0 {
+			factory := TopologicalFactory{factory: snowball.SnowflakeFactory}
+			sm = factory.New()
+		} else {
+			factory := TopologicalFactory{factory: snowball.SnowballFactory}
+			sm = factory.New()
+		}
+
+		require.NoError(n.AddNode(t, sm))
+	}
+
+	var i int
+	for !n.Finalized() {
+		require.NoError(n.Round())
+		i++
+	}
+
+	fmt.Println(i)
+
+	require.True(n.Agreement())
 }
 
 func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
@@ -691,7 +733,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor3 := bag.Of(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.Equal(2, sm.NumProcessing())
-	require.Equal(block2.ID(), sm.Preference())
+	require.Equal(block3.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
 	require.Zero(sm.NumProcessing())
@@ -1301,6 +1343,10 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 	require.ErrorIs(err, errTest)
 }
 
+func TestRandomized(t *testing.T) {
+	RandomizedConsistencyTest(t, TopologicalFactory{factory: snowball.SnowflakeFactory})
+}
+
 func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	require := require.New(t)
 
@@ -1329,9 +1375,12 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 		require.NoError(n.AddNode(t, factory.New()))
 	}
 
+	var i int
 	for !n.Finalized() {
+		i++
 		require.NoError(n.Round())
 	}
+	fmt.Println(i)
 
 	require.True(n.Agreement())
 }

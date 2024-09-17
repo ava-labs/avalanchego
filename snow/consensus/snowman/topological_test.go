@@ -3,8 +3,12 @@
 
 package snowman
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+)
 
 func TestTopological(t *testing.T) {
-	runConsensusTests(t, TopologicalFactory{})
+	runConsensusTests(t, TopologicalFactory{factory: snowball.SnowflakeFactory})
 }
