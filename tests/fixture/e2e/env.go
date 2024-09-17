@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
@@ -18,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // Env is used to access shared test fixture. Intended to be
@@ -58,6 +57,9 @@ type TestEnvironment struct {
 
 // Retrieve the test environment configured with the provided test context.
 func GetEnv(tc tests.TestContext) *TestEnvironment {
+	if env == nil {
+		return nil
+	}
 	return &TestEnvironment{
 		NetworkDir:                  env.NetworkDir,
 		URIs:                        env.URIs,

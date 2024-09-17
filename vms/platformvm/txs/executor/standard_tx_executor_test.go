@@ -14,14 +14,17 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -31,8 +34,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -2355,6 +2362,214 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			unsignedTx, executor := tt.newExecutor(ctrl)
 			err := executor.TransformSubnetTx(unsignedTx)
 			require.ErrorIs(t, err, tt.err)
+		})
+	}
+}
+
+func TestStandardExecutorConvertSubnetTx(t *testing.T) {
+	var (
+		fx = &secp256k1fx.Fx{}
+		vm = &secp256k1fx.TestVM{
+			Log: logging.NoLog{},
+		}
+	)
+	require.NoError(t, fx.InitializeVM(vm))
+
+	var (
+		ctx           = snowtest.Context(t, constants.PlatformChainID)
+		defaultConfig = &config.Config{
+			DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
+			UpgradeConfig:    upgradetest.GetConfig(upgradetest.Latest),
+		}
+		baseState = statetest.New(t, statetest.Config{
+			Upgrades: defaultConfig.UpgradeConfig,
+		})
+		wallet = txstest.NewWallet(
+			t,
+			ctx,
+			defaultConfig,
+			baseState,
+			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+			nil, // subnetIDs
+			nil, // chainIDs
+		)
+		flowChecker = utxo.NewVerifier(
+			ctx,
+			&vm.Clk,
+			fx,
+		)
+	)
+
+	// Create the subnet
+	createSubnetTx, err := wallet.IssueCreateSubnetTx(
+		&secp256k1fx.OutputOwners{},
+	)
+	require.NoError(t, err)
+
+	diff, err := state.NewDiffOn(baseState)
+	require.NoError(t, err)
+
+	require.NoError(t, createSubnetTx.Unsigned.Visit(&StandardTxExecutor{
+		Backend: &Backend{
+			Config:       defaultConfig,
+			Bootstrapped: utils.NewAtomic(true),
+			Fx:           fx,
+			FlowChecker:  flowChecker,
+			Ctx:          ctx,
+		},
+		FeeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+		Tx:            createSubnetTx,
+		State:         diff,
+	}))
+	require.NoError(t, diff.Apply(baseState))
+	require.NoError(t, baseState.Commit())
+
+	subnetID := createSubnetTx.ID()
+	tests := []struct {
+		name           string
+		builderOptions []common.Option
+		updateExecutor func(executor *StandardTxExecutor)
+		expectedErr    error
+	}{
+		{
+			name: "invalid prior to E-Upgrade",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.Backend.Config = &config.Config{
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+				}
+			},
+			expectedErr: errEtnaUpgradeNotActive,
+		},
+		{
+			name: "tx fails syntactic verification",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.Backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+			},
+			expectedErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid memo length",
+			builderOptions: []common.Option{
+				common.WithMemo([]byte("memo!")),
+			},
+			expectedErr: avax.ErrMemoTooLarge,
+		},
+		{
+			name: "fail subnet authorization",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.State.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				})
+			},
+			expectedErr: errUnauthorizedSubnetModification,
+		},
+		{
+			name: "invalid if subnet is transformed",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.State.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
+					Subnet: subnetID,
+				}})
+			},
+			expectedErr: errIsImmutable,
+		},
+		{
+			name: "invalid if subnet is converted",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.State.SetSubnetManager(subnetID, ids.GenerateTestID(), nil)
+			},
+			expectedErr: errIsImmutable,
+		},
+		{
+			name: "invalid fee calculation",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.FeeCalculator = fee.NewStaticCalculator(e.Config.StaticFeeConfig)
+			},
+			expectedErr: fee.ErrUnsupportedTx,
+		},
+		{
+			name: "insufficient fee",
+			updateExecutor: func(e *StandardTxExecutor) {
+				e.FeeCalculator = fee.NewDynamicCalculator(
+					e.Config.DynamicFeeConfig.Weights,
+					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
+				)
+			},
+			expectedErr: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name: "valid tx",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Create the ConvertSubnetTx
+			var (
+				wallet = txstest.NewWallet(
+					t,
+					ctx,
+					defaultConfig,
+					baseState,
+					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+					[]ids.ID{subnetID},
+					nil, // chainIDs
+				)
+				chainID = ids.GenerateTestID()
+				address = utils.RandomBytes(32)
+			)
+			convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+				subnetID,
+				chainID,
+				address,
+				test.builderOptions...,
+			)
+			require.NoError(err)
+
+			diff, err := state.NewDiffOn(baseState)
+			require.NoError(err)
+
+			executor := &StandardTxExecutor{
+				Backend: &Backend{
+					Config:       defaultConfig,
+					Bootstrapped: utils.NewAtomic(true),
+					Fx:           fx,
+					FlowChecker:  flowChecker,
+					Ctx:          ctx,
+				},
+				FeeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+				Tx:            convertSubnetTx,
+				State:         diff,
+			}
+			if test.updateExecutor != nil {
+				test.updateExecutor(executor)
+			}
+
+			err = convertSubnetTx.Unsigned.Visit(executor)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				return
+			}
+
+			for utxoID := range convertSubnetTx.InputIDs() {
+				_, err := diff.GetUTXO(utxoID)
+				require.ErrorIs(err, database.ErrNotFound)
+			}
+
+			for _, expectedUTXO := range convertSubnetTx.UTXOs() {
+				utxoID := expectedUTXO.InputID()
+				utxo, err := diff.GetUTXO(utxoID)
+				require.NoError(err)
+				require.Equal(expectedUTXO, utxo)
+			}
+
+			stateChainID, stateAddress, err := diff.GetSubnetManager(subnetID)
+			require.NoError(err)
+			require.Equal(chainID, stateChainID)
+			require.Equal(address, stateAddress)
 		})
 	}
 }

@@ -12,6 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
+// Ensure that this value takes into account the scrape_interval
+// defined in scripts/run_prometheus.sh.
+const networkShutdownDelay = 12 * time.Second
+
 type FlagVars struct {
 	avalancheGoExecPath  string
 	pluginDir            string
@@ -52,9 +56,8 @@ func (v *FlagVars) RestartNetwork() bool {
 
 func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	if v.delayNetworkShutdown {
-		// Only return a non-zero value if the delay is enabled.  Make sure this value takes
-		// into account the scrape_interval defined in scripts/run_prometheus.sh.
-		return 12 * time.Second
+		// Only return a non-zero value if the delay is enabled.
+		return networkShutdownDelay
 	}
 	return 0
 }
