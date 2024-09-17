@@ -542,6 +542,20 @@ func (mr *MockStateMockRecorder) GetRewardUTXOs(txID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockState)(nil).GetRewardUTXOs), txID)
 }
 
+// GetSoVExcess mocks base method.
+func (m *MockState) GetSoVExcess() gas.Gas {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSoVExcess")
+	ret0, _ := ret[0].(gas.Gas)
+	return ret0
+}
+
+// GetSoVExcess indicates an expected call of GetSoVExcess.
+func (mr *MockStateMockRecorder) GetSoVExcess() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSoVExcess", reflect.TypeOf((*MockState)(nil).GetSoVExcess))
+}
+
 // GetStartTime mocks base method.
 func (m *MockState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
 	m.ctrl.T.Helper()
@@ -917,6 +931,18 @@ func (m *MockState) SetLastAccepted(blkID ids.ID) {
 func (mr *MockStateMockRecorder) SetLastAccepted(blkID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID)
+}
+
+// SetSoVExcess mocks base method.
+func (m *MockState) SetSoVExcess(e gas.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSoVExcess", e)
+}
+
+// SetSoVExcess indicates an expected call of SetSoVExcess.
+func (mr *MockStateMockRecorder) SetSoVExcess(e any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSoVExcess", reflect.TypeOf((*MockState)(nil).SetSoVExcess), e)
 }
 
 // SetSubnetManager mocks base method.

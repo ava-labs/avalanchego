@@ -91,6 +91,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
 
 	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
@@ -164,6 +165,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 

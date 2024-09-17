@@ -368,6 +368,20 @@ func (mr *MockChainMockRecorder) GetPendingValidator(subnetID, nodeID any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), subnetID, nodeID)
 }
 
+// GetSoVExcess mocks base method.
+func (m *MockChain) GetSoVExcess() gas.Gas {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSoVExcess")
+	ret0, _ := ret[0].(gas.Gas)
+	return ret0
+}
+
+// GetSoVExcess indicates an expected call of GetSoVExcess.
+func (mr *MockChainMockRecorder) GetSoVExcess() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSoVExcess", reflect.TypeOf((*MockChain)(nil).GetSoVExcess))
+}
+
 // GetSubnetManager mocks base method.
 func (m *MockChain) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
 	m.ctrl.T.Helper()
@@ -644,6 +658,18 @@ func (m *MockChain) SetFeeState(f gas.State) {
 func (mr *MockChainMockRecorder) SetFeeState(f any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeState", reflect.TypeOf((*MockChain)(nil).SetFeeState), f)
+}
+
+// SetSoVExcess mocks base method.
+func (m *MockChain) SetSoVExcess(e gas.Gas) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSoVExcess", e)
+}
+
+// SetSoVExcess indicates an expected call of SetSoVExcess.
+func (mr *MockChainMockRecorder) SetSoVExcess(e any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSoVExcess", reflect.TypeOf((*MockChain)(nil).SetSoVExcess), e)
 }
 
 // SetSubnetManager mocks base method.

@@ -94,6 +94,7 @@ var (
 
 	TimestampKey       = []byte("timestamp")
 	FeeStateKey        = []byte("fee state")
+	SoVExcessKey       = []byte("sov excess")
 	AccruedFeesKey     = []byte("accrued fees")
 	CurrentSupplyKey   = []byte("current supply")
 	LastAcceptedKey    = []byte("last accepted")
@@ -117,6 +118,9 @@ type Chain interface {
 
 	GetFeeState() gas.State
 	SetFeeState(f gas.State)
+
+	GetSoVExcess() gas.Gas
+	SetSoVExcess(e gas.Gas)
 
 	GetAccruedFees() uint64
 	SetAccruedFees(f uint64)
@@ -296,6 +300,7 @@ type stateBlk struct {
  *   |-- blocksReindexedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- feeStateKey -> feeState
+ *   |-- sovExcessKey -> sovExcess
  *   |-- accruedFeesKey -> accruedFees
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
@@ -402,6 +407,7 @@ type state struct {
 	// The persisted fields represent the current database value
 	timestamp, persistedTimestamp         time.Time
 	feeState, persistedFeeState           gas.State
+	sovExcess, persistedSOVExcess         gas.Gas
 	accruedFees, persistedAccruedFees     uint64
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
@@ -1179,6 +1185,14 @@ func (s *state) SetFeeState(feeState gas.State) {
 	s.feeState = feeState
 }
 
+func (s *state) GetSoVExcess() gas.Gas {
+	return s.sovExcess
+}
+
+func (s *state) SetSoVExcess(e gas.Gas) {
+	s.sovExcess = e
+}
+
 func (s *state) GetAccruedFees() uint64 {
 	return s.accruedFees
 }
@@ -1481,7 +1495,14 @@ func (s *state) loadMetadata() error {
 	s.persistedFeeState = feeState
 	s.SetFeeState(feeState)
 
-	accruedFees, err := getAccruedFees(s.singletonDB)
+	sovExcess, err := database.GetOrDefaultUInt64(s.singletonDB, SoVExcessKey, 0)
+	if err != nil {
+		return err
+	}
+	s.persistedSOVExcess = gas.Gas(sovExcess)
+	s.SetSoVExcess(gas.Gas(sovExcess))
+
+	accruedFees, err := database.GetOrDefaultUInt64(s.singletonDB, AccruedFeesKey, 0)
 	if err != nil {
 		return err
 	}
@@ -2904,6 +2925,12 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedFeeState = s.feeState
 	}
+	if s.sovExcess != s.persistedSOVExcess {
+		if err := database.PutUInt64(s.singletonDB, SoVExcessKey, uint64(s.sovExcess)); err != nil {
+			return fmt.Errorf("failed to write sov excess: %w", err)
+		}
+		s.persistedSOVExcess = s.sovExcess
+	}
 	if s.accruedFees != s.persistedAccruedFees {
 		if err := database.PutUInt64(s.singletonDB, AccruedFeesKey, s.accruedFees); err != nil {
 			return fmt.Errorf("failed to write accrued fees: %w", err)
@@ -3120,12 +3147,4 @@ func getFeeState(db database.KeyValueReader) (gas.State, error) {
 		return gas.State{}, err
 	}
 	return feeState, nil
-}
-
-func getAccruedFees(db database.KeyValueReader) (uint64, error) {
-	accruedFees, err := database.GetUInt64(db, AccruedFeesKey)
-	if err == database.ErrNotFound {
-		return 0, nil
-	}
-	return accruedFees, err
 }

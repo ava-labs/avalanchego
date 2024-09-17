@@ -37,6 +37,7 @@ type diff struct {
 
 	timestamp        time.Time
 	feeState         gas.State
+	sovExcess        gas.Gas
 	accruedFees      uint64
 	parentActiveSOVs int
 
@@ -82,6 +83,7 @@ func NewDiff(
 		stateVersions:    stateVersions,
 		timestamp:        parentState.GetTimestamp(),
 		feeState:         parentState.GetFeeState(),
+		sovExcess:        parentState.GetSoVExcess(),
 		accruedFees:      parentState.GetAccruedFees(),
 		parentActiveSOVs: parentState.NumActiveSubnetOnlyValidators(),
 		expiryDiff:       newExpiryDiff(),
@@ -119,6 +121,14 @@ func (d *diff) GetFeeState() gas.State {
 
 func (d *diff) SetFeeState(feeState gas.State) {
 	d.feeState = feeState
+}
+
+func (d *diff) GetSoVExcess() gas.Gas {
+	return d.sovExcess
+}
+
+func (d *diff) SetSoVExcess(excess gas.Gas) {
+	d.sovExcess = excess
 }
 
 func (d *diff) GetAccruedFees() uint64 {
@@ -553,6 +563,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetFeeState(d.feeState)
+	baseState.SetSoVExcess(d.sovExcess)
 	baseState.SetAccruedFees(d.accruedFees)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
