@@ -212,7 +212,7 @@ var (
 			expectedExcess:  math.MaxUint64, // Should not overflow
 		},
 		{
-			name: "excess=0, current>>target, 11 seconds",
+			name: "excess=0, current>>target, 10 seconds",
 			state: State{
 				Current: math.MaxUint32,
 				Excess:  0,
@@ -222,9 +222,9 @@ var (
 				MinPrice:                 minPrice,
 				ExcessConversionConstant: excessConversionConstant,
 			},
-			expectedSeconds: 11,
-			expectedCost:    math.MaxUint64, // Should not overflow
-			expectedExcess:  math.MaxUint32 * 11,
+			expectedSeconds: 10,
+			expectedCost:    1_948_429_840_780_833_612,
+			expectedExcess:  math.MaxUint32 * 10,
 		},
 	}
 )
@@ -256,6 +256,63 @@ func TestStateCostOf(t *testing.T) {
 	}
 }
 
+func TestStateCostOfOverflow(t *testing.T) {
+	const target = 10_000
+	config := Config{
+		Target:                   target,
+		MinPrice:                 minPrice,
+		ExcessConversionConstant: excessConversionConstant,
+	}
+
+	tests := []struct {
+		name    string
+		state   State
+		seconds uint64
+	}{
+		{
+			name: "current > target",
+			state: State{
+				Current: math.MaxUint32,
+				Excess:  0,
+			},
+			seconds: math.MaxUint64,
+		},
+		{
+			name: "current == target",
+			state: State{
+				Current: target,
+				Excess:  0,
+			},
+			seconds: math.MaxUint64,
+		},
+		{
+			name: "current < target",
+			state: State{
+				Current: 0,
+				Excess:  0,
+			},
+			seconds: math.MaxUint64,
+		},
+		{
+			name: "current < target and reasonable excess",
+			state: State{
+				Current: 0,
+				Excess:  target + 1,
+			},
+			seconds: math.MaxUint64/minPrice + 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(
+				t,
+				uint64(math.MaxUint64), // Should not overflow
+				test.state.CostOf(config, test.seconds),
+			)
+		})
+	}
+}
+
 func TestStateSecondsUntil(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -263,6 +320,67 @@ func TestStateSecondsUntil(t *testing.T) {
 				t,
 				test.expectedSeconds,
 				test.state.SecondsUntil(test.config, year, test.expectedCost),
+			)
+		})
+	}
+}
+
+func TestStateSecondsUntilLimit(t *testing.T) {
+	const target = 10_000
+	tests := []struct {
+		name      string
+		state     State
+		minPrice  gas.Price
+		costLimit uint64
+	}{
+		{
+			name: "zero price",
+			state: State{
+				Current: math.MaxUint32,
+				Excess:  0,
+			},
+			minPrice:  0,
+			costLimit: 0,
+		},
+		{
+			name: "current > target",
+			state: State{
+				Current: target + 1,
+				Excess:  0,
+			},
+			minPrice:  minPrice,
+			costLimit: math.MaxUint64,
+		},
+		{
+			name: "current == target",
+			state: State{
+				Current: target,
+				Excess:  0,
+			},
+			minPrice:  minPrice,
+			costLimit: minPrice * (week + 1),
+		},
+		{
+			name: "current < target",
+			state: State{
+				Current: 0,
+				Excess:  0,
+			},
+			minPrice:  minPrice,
+			costLimit: minPrice * (week + 1),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := Config{
+				Target:                   target,
+				MinPrice:                 test.minPrice,
+				ExcessConversionConstant: excessConversionConstant,
+			}
+			require.Equal(
+				t,
+				uint64(week),
+				test.state.SecondsUntil(config, week, test.costLimit),
 			)
 		})
 	}
@@ -434,23 +552,17 @@ func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 
 // unoptimizedSecondsUntil is a naive implementation of SecondsUntil that is
 // used for differential fuzzing.
-func (s State) unoptimizedSecondsUntil(c Config, maxSeconds uint64, targetCost uint64) uint64 {
-	var (
-		cost    uint64
-		seconds uint64
-		err     error
-	)
-	for cost < targetCost && seconds < maxSeconds {
+func (s State) unoptimizedSecondsUntil(c Config, maxSeconds uint64, costLimit uint64) uint64 {
+	for seconds := uint64(0); seconds < maxSeconds; seconds++ {
 		s = s.AdvanceTime(c.Target, 1)
-		seconds++
 
-		price := gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant)
-		cost, err = safemath.Add(cost, uint64(price))
-		if err != nil {
+		price := uint64(gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant))
+		if price > costLimit {
 			return seconds
 		}
+		costLimit -= price
 	}
-	return seconds
+	return maxSeconds
 }
 
 // floatToGas converts f to gas.Gas by truncation. `gas.Gas(f)` is preferred and
