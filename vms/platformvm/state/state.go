@@ -1919,7 +1919,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	return errors.Join(
 		s.writeBlocks(),
 		s.writeExpiry(),
-		s.writeSubnetOnlyValidators(height),
+		s.writeSubnetOnlyValidators(updateValidators, height),
 		s.writeCurrentStakers(updateValidators, height, codecVersion),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
@@ -2174,7 +2174,7 @@ func (s *state) writeExpiry() error {
 
 // TODO: Update validator sets
 // TODO: Add caching
-func (s *state) writeSubnetOnlyValidators(height uint64) error {
+func (s *state) writeSubnetOnlyValidators(updateValidators bool, height uint64) error {
 	// Write modified weights:
 	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
 		if err := database.PutUInt64(s.weightsDB, subnetID[:], weight); err != nil {
@@ -2209,11 +2209,16 @@ func (s *state) writeSubnetOnlyValidators(height uint64) error {
 		}
 	}
 
+	sovChanges := s.sovDiff.modified
 	// Perform deletions:
-	for validationID, sov := range s.sovDiff.modified {
+	for validationID, sov := range sovChanges {
 		if sov.Weight != 0 {
+			// Additions and modifications are handled in the next loops.
 			continue
 		}
+
+		// The next loops shouldn't consider this change.
+		delete(sovChanges, validationID)
 
 		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
 		if err == database.ErrNotFound {
@@ -2242,22 +2247,33 @@ func (s *state) writeSubnetOnlyValidators(height uint64) error {
 		if err != nil {
 			return err
 		}
-	}
-	// Perform additions/modifications:
-	for validationID, sov := range s.sovDiff.modified {
-		if sov.Weight == 0 {
+
+		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
 			continue
 		}
 
-		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
-		copy(subnetIDNodeIDKey, sov.SubnetID[:])
-		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
-		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, nil); err != nil {
+		nodeID := ids.EmptyNodeID
+		if priorSOV.isActive() {
+			nodeID = priorSOV.NodeID
+		}
+		if err := s.validators.RemoveWeight(priorSOV.SubnetID, nodeID, priorSOV.Weight); err != nil {
+			return fmt.Errorf("failed to delete SoV validator: %w", err)
+		}
+	}
+
+	// Perform modifications:
+	for validationID, sov := range sovChanges {
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// New additions are handled in the next loop.
+			continue
+		}
+		if err != nil {
 			return err
 		}
 
-		var err error
-		if priorSOV, ok := s.activeSOVLookup[validationID]; ok {
+		if priorSOV.isActive() {
 			delete(s.activeSOVLookup, validationID)
 			s.activeSOVs.Delete(priorSOV)
 			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
@@ -2274,6 +2290,96 @@ func (s *state) writeSubnetOnlyValidators(height uint64) error {
 			err = putSubnetOnlyValidator(s.activeDB, sov)
 		} else {
 			err = putSubnetOnlyValidator(s.inactiveDB, sov)
+		}
+		if err != nil {
+			return err
+		}
+
+		// The next loop shouldn't consider this change.
+		delete(sovChanges, validationID)
+
+		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
+			continue
+		}
+
+		switch {
+		case !priorSOV.isActive() && sov.isActive():
+			// This validator is being activated.
+			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
+			err = errors.Join(
+				s.validators.RemoveWeight(sov.SubnetID, ids.EmptyNodeID, priorSOV.Weight),
+				s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight),
+			)
+		case priorSOV.isActive() && !sov.isActive():
+			// This validator is being deactivated.
+			inactiveWeight := s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
+			if inactiveWeight == 0 {
+				err = s.validators.AddStaker(sov.SubnetID, ids.EmptyNodeID, nil, ids.Empty, sov.Weight)
+			} else {
+				err = s.validators.AddWeight(sov.SubnetID, ids.EmptyNodeID, sov.Weight)
+			}
+			err = errors.Join(
+				err,
+				s.validators.RemoveWeight(sov.SubnetID, sov.NodeID, priorSOV.Weight),
+			)
+		default:
+			// This validator's active status isn't changing.
+			nodeID := ids.EmptyNodeID
+			if sov.isActive() {
+				nodeID = sov.NodeID
+			}
+			if priorSOV.Weight < sov.Weight {
+				err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
+			} else if priorSOV.Weight > sov.Weight {
+				err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	// Perform additions:
+	for validationID, sov := range sovChanges {
+		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
+		copy(subnetIDNodeIDKey, sov.SubnetID[:])
+		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
+		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, nil); err != nil {
+			return err
+		}
+
+		isActive := sov.isActive()
+		if isActive {
+			s.activeSOVLookup[validationID] = sov
+			s.activeSOVs.ReplaceOrInsert(sov)
+			err = putSubnetOnlyValidator(s.activeDB, sov)
+		} else {
+			err = putSubnetOnlyValidator(s.inactiveDB, sov)
+		}
+		if err != nil {
+			return err
+		}
+
+		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
+			continue
+		}
+
+		if isActive {
+			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
+			if err := s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {
+				return fmt.Errorf("failed to add SoV validator: %w", err)
+			}
+			continue
+		}
+
+		// This validator is inactive
+		inactiveWeight := s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
+		if inactiveWeight == 0 {
+			err = s.validators.AddStaker(sov.SubnetID, ids.EmptyNodeID, nil, ids.Empty, sov.Weight)
+		} else {
+			err = s.validators.AddWeight(sov.SubnetID, ids.EmptyNodeID, sov.Weight)
 		}
 		if err != nil {
 			return err

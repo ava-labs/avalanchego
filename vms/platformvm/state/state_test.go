@@ -2009,8 +2009,11 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			reloadedState := newTestState(t, db)
 			for subnetID := range subnetIDs {
 				expectedEndValidatorSet := sovsToValidatorSet(expectedSOVs, subnetID)
-				endValidatorSet := reloadedState.validators.GetMap(subnetID)
+				endValidatorSet := state.validators.GetMap(subnetID)
 				require.Equal(expectedEndValidatorSet, endValidatorSet)
+
+				reloadedEndValidatorSet := reloadedState.validators.GetMap(subnetID)
+				require.Equal(expectedEndValidatorSet, reloadedEndValidatorSet)
 
 				require.NoError(state.ApplyValidatorWeightDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
 				require.NoError(state.ApplyValidatorPublicKeyDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
