@@ -2172,7 +2172,6 @@ func (s *state) writeExpiry() error {
 	return nil
 }
 
-// TODO: Update validator sets
 // TODO: Add caching
 func (s *state) writeSubnetOnlyValidators(updateValidators bool, height uint64) error {
 	// Write modified weights:
