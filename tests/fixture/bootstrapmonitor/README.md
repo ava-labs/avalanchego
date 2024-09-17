@@ -14,6 +14,9 @@ regressions in compatibility.
 
 ### Types of bootstrap testing for C-Chain
 
+The X-Chain and P-Chain always synchronize all state, but the bulk of
+data for testnet and mainnet is on the C-Chain and there are 2 options:
+
 #### State Sync
 
 A bootstrap with state sync enabled (the default) ensures that only
@@ -26,50 +29,103 @@ default) not all history will be stored.
 
 To enable, supply `state-sync-enabled: false` as C-Chain configuration.
 
-## Architecture TODO(marun) Rename
+## Overview
 
-The intention of `bootstrap-monitor` is to enable a statefulset to
+The intention of `bootstrap-monitor` is to enable a `StatefulSet` to
 perform continous bootstrap testing for a given avalanchego
-configuration. It ensures that a new testing pod either starts or
-resumes a test, and upon completion of a test, polls for a new image
-to test and initiates a new test when one is found.
+configuration. It ensures that a testing pod either starts or resumes
+a test, and upon completion of a test, polls for a new image to test
+and initiates a new test when one is found.
 
- - `bootstrap-monitor init` intended to run as init container of an avalanchego node
-   - mounts the same data volume
-   - if the image of the avalanchego container is tagged with `latest`
-     - runs an avalanchego pod with `latest` to retrieve the
-       associated image id
-       - not possible to retrieve the image id from the running pod
-         since it won't be populated until after the init container
-         has finished execution
-     - updates the managing stateful set with the image id
-   - attempts to read an image name from a file on the data volume
-   - if the file is not present or the image name differs from the image name of the pod
-     - write the image name to a file on the data volume
-     - clear the data volume
-     - report that a new bootstrap test is starting for the current image
-   - if the image name was present on disk and differs from the current image
-     - report that a bootstrap test is being resumed
+ - Both the `init` and `wait-for-completion` commands of the
+   `bootstrap-monitor` binary are intended to run as containers of a
+   pod alongside an avalanchego container. The pod is expected to be
+   managed by a `StatefulSet` to ensure the pod is restarted on
+   failure and that only a single pod runs at a time to avoid
+   contention for the backing data volume. Both commands derive the
+   configuration of a bootstrap test from the pod:
+   - The network targeted by the test is determined by the value of
+     the `AVAGO_NETWORK_NAME` env var set for the avalanchego
+     container.
+   - Whether state sync is enabled is determined by the value of the
+     `AVAGO_CHAIN_CONFIG_CONTENT` env var set for the avalanchego
+     container.
+   - The image used by the test is determined by the image configured
+     for the avalanchego container.
+   - The versions of the avalanchego image used by the test is
+     determined by the pod annotation with key
+     `avalanche.avax.network/avalanchego-versions`.
+ - When a bootstrap testing pod is inevitably rescheduled or
+   restarted, the contents of the `PersistentVolumeClaim` configured
+   by the managing `StatefulSet` will persist across pod restarts to
+   allow resumption of the interrupted test.
+ - Both the `init` and `wait-for-completion` commands of the
+   `bootstrap-monitor` attempt to read serialized test details (namely
+   the image used for the test and the start time of the test) from
+   the same data volume used by the avalanchego node.
+ - The `bootstrap-monitor init` command is intended to run as as the
+   an init container of an avalanchego node and ensure that the ID of
+   the image and its associated versions are recorded for the test and
+   that the contents of the pod's data volume is either cleared for a
+   new test or retained to enable resuming a previously started
+   test. It accomplishes this by:
+   - Mounting the same data volume as the avalanchego node
+   - Reading bootstrap test configuration as described previously
+   - Determining the image ID and versions for an image if the
+     avalanchego image for the pod uses the `latest` tag. This will
+     only need to be performed the first pod that a bootstrap testing
+     `StatefulSet` runs. Subsequent pods from the same `StatefulSet`
+     should have an image qualified with its SHA and version details
+     set by the previous test run's `wait-for-completion` pod.
+     - A new pod will be started with with the `latest` image to
+     execute `avalanchego --versions-json` to determine the exact
+     version of the image and update the `StatefulSet` managing the
+     pod which will prompt a pod restart. This ensures both that a
+     test result can be associated with a specific image SHA and the
+     avalanchego versions (including commit hash) of the binary that
+     the image provides.
+     - A separate pod is used because the image ID of a non-init
+       avalanchego container using a `latest`-tagged image is only
+       available when that container runs rather than when an init container runs.
+     - While it would be possible to add an init container running the
+       same avalanchego image as the primary avalanchego container,
+       have it run the version command, and then have the
+       `bootstrap-monitor init` container read those results, the
+       method of discoverying the versions and image of the
+       avalanchego image currently tagged with `latest` would still be
+       required by the `wait-for-completion` command (described in a
+       subsequent section) to enable discovery of a new image to
+       test. It seemed preferable to have only a single way to
+       discover image details.
+   - Attempting to read the serialized test details from a file on the
+     data volume. This file will not exist if the data volume has not
+     been used before.
+   - Comparing the image from the serialized test details to the image
+     in the test configuration.
+     - If the images differ (or the file was not present), the data
+       volume is initialized for a new test:
+       - The data volume is cleared
+       - The image from the test configuration and and time are written to the data volume
+     - If the images are the same, the data volume is used as-is to
+       enable resuming the in-progress test.
  - `bootstrap-monitor wait-for-completion` is intended to run as a
-   sidecar of the avalanchego container and mount the same data volume read-only
-   - every health check interval
-     - checks the health of the node
-     - logs the disk usage of the data volume
-   - once the node is healthy
-     - every image check interval
-       - starts a pod with the avalanchego image tagged `latest` to find a new image to test
-     - once a new image is found
-       - updates the managing stateful set with the new image to prompt a new bootstrap test
+   sidecar of the avalanchego container. It polls the health of the
+   node container to detect when a bootstrap test has completed
+   successfully, then polls for a new image to test and when one is
+   found, updates the managing `StatefulSet` with that image to
+   trigger the start of a new test. The process to detect a new image
+   is the same as was described for the `init` command.
 
 ## Package details
 
-| Filename        | Purpose                                                        |
-|:----------------|:---------------------------------------------------------------|
-| common.go       | Defines code common between init and wait                      |
-| init.go         | Defines how a bootstrap test is initialized                    |
-| wait.go         | Defines the loop that waits for completion of a bootstrap test |
-| cmd/main.go     | The binary entrypoint for the bootstrap-monitor                |
-| e2e/e2e_test.go | The e2e test that validates the bootstrap-monitor              |
+| Filename                 | Purpose                                                                |
+|:-------------------------|:-----------------------------------------------------------------------|
+| bootstrap_test_config.go | Defines how the configuration for a bootstrap test is read from a pod. |
+| common.go                | Defines code common between init and wait                              |
+| init.go                  | Defines how a bootstrap test is initialized                            |
+| wait.go                  | Defines the loop that waits for completion of a bootstrap test         |
+| cmd/main.go              | The binary entrypoint for the bootstrap-monitor                        |
+| e2e/e2e_test.go          | The e2e test that validates the bootstrap-monitor                      |
 
 ## Supporting files
 
@@ -86,16 +142,26 @@ to test and initiates a new test when one is found.
 
 ## Alternatives considered
 
-### Run bootstrap tests on hosted github workers
+### Run bootstrap tests on github workers
 
- - allow triggering / reporting to happen with github
-   - but 5 day limit on job duration wouldn't probably wouldn't support full sync testing
+ - Public github workers are not compatible with bootstrap testing due
+to the available storage of 30GB being insufficient for even state
+sync bootstrap.
+ - Self-hosted github workers are not compatible with bootstrap testing
+due to the 5 day maximum duration for a job running on a self-hosted
+runner. State sync bootstrap usually completes within 5 days, but full
+sync bootstrap usually takes much longer.
 
 ### Adding a 'bootstrap mode' to avalanchego
- - with a --bootstrap-mode flag, exit on successful bootstrap
-   - but using it without a controller would require using `latest` to
-     ensure that the node version could change on restarts
-   - but when using `latest` there is no way to avoid having pod
-     restart preventing the completion of an in-process bootstrap
-     test. Only by using a specific image tag will it be possible for
-     a restarted pod to reliably resume a bootstrap test.
+
+If avalanchego supported a `--bootstrap-mode` flag that exited on
+successful bootstrap, and a pod configured with this flag used an
+image with a `latest` tag, the pod would continously bootstrap, exit,
+and restart with the current latest image. While appealingly simple,
+this approach doesn't directly support:
+
+ - a mechanism for resuming a long-running bootstrap. Given the
+expected duration of a bootstrap test, and the fact that a workload on
+Kubernetes is not guaranteed to run without interruption, a separate
+init process is suggested to enable resumption of an interrupted test.
+- a mechanism for reporting disk usage and duration of execution
