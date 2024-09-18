@@ -110,7 +110,7 @@ type config struct {
 
 func getLevelDBConfig() []byte {
 	// align with geth test and use 6gb as cache.
-	cacheSize := int(6)
+	cacheSize := int(6000)
 	parsedConfig := config{
 		BlockCacheCapacity:     (cacheSize / 2) * opt.MiB,
 		DisableSeeksCompaction: true,
