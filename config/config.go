@@ -47,8 +47,10 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 const (
@@ -768,7 +770,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		return genesis.TxFeeConfig{
 			CreateAssetTxFee: v.GetUint64(CreateAssetTxFeeKey),
-			StaticFeeConfig: fee.StaticConfig{
+			StaticFeeConfig: txfee.StaticConfig{
 				TxFee:                         v.GetUint64(TxFeeKey),
 				CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
 				TransformSubnetTxFee:          v.GetUint64(TransformSubnetTxFeeKey),
@@ -790,6 +792,12 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				TargetPerSecond:          gas.Gas(v.GetUint64(DynamicFeesTargetGasPerSecondKey)),
 				MinPrice:                 gas.Price(v.GetUint64(DynamicFeesMinGasPriceKey)),
 				ExcessConversionConstant: gas.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
+			},
+			ValidatorFeeCapacity: gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
+			ValidatorFeeConfig: validatorfee.Config{
+				Target:                   gas.Gas(v.GetUint64(ValidatorFeesTargetKey)),
+				MinPrice:                 gas.Price(v.GetUint64(ValidatorFeesMinPriceKey)),
+				ExcessConversionConstant: gas.Gas(v.GetUint64(ValidatorFeesExcessConversionConstantKey)),
 			},
 		}
 	}
