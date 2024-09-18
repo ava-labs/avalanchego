@@ -533,8 +533,6 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				strings.ReplaceAll(string(test.expectedJSON), "\r\n", "\n"),
 				string(txJSON),
 			)
-
-			t.Fatalf("%x", test.expectedBytes)
 		})
 	}
 }
