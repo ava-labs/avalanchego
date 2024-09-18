@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/trie/trienode"
 	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/ethereum/go-ethereum/triedb/pathdb"
 )
 
 const (
@@ -30,6 +31,8 @@ const (
 	databaseRunningBatchSize  = 2500       // 2.5k
 	databaseRunningUpdateSize = 5000       // 5k
 	defaultMetricsPort        = 3000
+	levelDBCacheSize          = 6_000
+	firewoodNumberOfRevisions = 120
 )
 
 var (
@@ -80,24 +83,6 @@ var (
 	promRegistry = prometheus.NewRegistry()
 )
 
-/*
-func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
-	const defaultHistoryLength = 120
-	return merkledb.Config{
-		BranchFactor:                merkledb.BranchFactor16,
-		Hasher:                      merkledb.DefaultHasher,
-		RootGenConcurrency:          0,
-		HistoryLength:               defaultHistoryLength,
-		ValueNodeCacheSize:          units.MiB,
-		IntermediateNodeCacheSize:   1024 * units.MiB,
-		IntermediateWriteBufferSize: units.KiB,
-		IntermediateWriteBatchSize:  256 * units.KiB,
-		Reg:                         promRegistry,
-		TraceLevel:                  merkledb.NoTrace,
-		Tracer:                      trace.Noop,
-	}
-}*/
-
 func getGoldenStagingDatabaseDirectory() string {
 	wd, _ := os.Getwd()
 	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-staging-%d", *databaseEntries))
@@ -120,6 +105,14 @@ func calculateIndexEncoding(idx uint64) []byte {
 	return entryHash[:]
 }
 
+func getPathDBConfig() *pathdb.Config {
+	return &pathdb.Config{
+		StateHistory:   firewoodNumberOfRevisions, // keep the same requiremenet across each db
+		CleanCacheSize: 6 * 1024 * 1024 * 1024,    // 4GB - this is a guess, but I assume we're currently underutilizing memory by a lot
+		DirtyCacheSize: 6 * 1024 * 1024 * 1024,    // 4GB - this is a guess, but I assume we're currently underutilizing memory by a lot
+	}
+}
+
 func createGoldenDatabase() error {
 	stagingDirectory := getGoldenStagingDatabaseDirectory()
 	err := os.RemoveAll(stagingDirectory)
@@ -133,7 +126,7 @@ func createGoldenDatabase() error {
 		return err
 	}
 
-	ldb, err := rawdb.NewLevelDBDatabase(stagingDirectory, 500, 200, "metrics_prefix", false)
+	ldb, err := rawdb.NewLevelDBDatabase(stagingDirectory, levelDBCacheSize, 200, "metrics_prefix", false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create level db database : %v\n", err)
 		return err
@@ -143,7 +136,7 @@ func createGoldenDatabase() error {
 		Preimages: false,
 		IsVerkle:  false,
 		HashDB:    nil,
-		PathDB:    nil,
+		PathDB:    getPathDBConfig(),
 	})
 	tdb := trie.NewEmpty(trieDb)
 
@@ -282,7 +275,7 @@ func runBenchmark() error {
 		Directory:         getRunningDatabaseDirectory(),
 		AncientsDirectory: "",
 		Namespace:         "metrics_prefix",
-		Cache:             500,
+		Cache:             levelDBCacheSize,
 		Handles:           200,
 		ReadOnly:          false,
 		Ephemeral:         false,
@@ -296,7 +289,7 @@ func runBenchmark() error {
 		Preimages: false,
 		IsVerkle:  false,
 		HashDB:    nil,
-		PathDB:    nil,
+		PathDB:    getPathDBConfig(),
 	})
 
 	root := common.BytesToHash(rootBytes)

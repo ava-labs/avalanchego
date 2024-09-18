@@ -30,6 +30,7 @@ const (
 	databaseRunningBatchSize  = 2500       // 2.5k
 	databaseRunningUpdateSize = 5000       // 5k
 	defaultMetricsPort        = 3000
+	firewoodNumberOfRevisions = 120
 )
 
 var (
@@ -81,12 +82,11 @@ var (
 )
 
 func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
-	const defaultHistoryLength = 120
 	return merkledb.Config{
 		BranchFactor:                merkledb.BranchFactor16,
 		Hasher:                      merkledb.DefaultHasher,
 		RootGenConcurrency:          0,
-		HistoryLength:               defaultHistoryLength,
+		HistoryLength:               firewoodNumberOfRevisions,
 		ValueNodeCacheSize:          units.MiB,
 		IntermediateNodeCacheSize:   1024 * units.MiB,
 		IntermediateWriteBufferSize: units.KiB,

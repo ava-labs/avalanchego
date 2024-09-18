@@ -109,11 +109,13 @@ type config struct {
 }
 
 func getLevelDBConfig() []byte {
+	// align with geth test and use 6gb as cache.
+	cacheSize := int(6)
 	parsedConfig := config{
-		BlockCacheCapacity:     16 * opt.MiB,
+		BlockCacheCapacity:     (cacheSize / 2) * opt.MiB,
 		DisableSeeksCompaction: true,
 		OpenFilesCacheCapacity: 64,
-		WriteBuffer:            256 * opt.MiB,
+		WriteBuffer:            (cacheSize / 4) * opt.MiB,
 		FilterBitsPerKey:       leveldb.DefaultBitsPerKey,
 		MaxManifestFileSize:    leveldb.DefaultMaxManifestFileSize,
 		MetricUpdateFrequency:  leveldb.DefaultMetricUpdateFrequency,
