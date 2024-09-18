@@ -156,10 +156,11 @@ func createGoldenDatabase() error {
 	}()
 
 	var root common.Hash
+	parentHash := types.EmptyRootHash
 	writeBatch := func() error {
 		var nodes *trienode.NodeSet
 		root, nodes = tdb.Commit(false)
-		err = trieDb.Update(root, types.EmptyRootHash, 0 /*block*/, trienode.NewWithNodeSet(nodes), nil /*states*/)
+		err = trieDb.Update(root, parentHash, 0 /*block*/, trienode.NewWithNodeSet(nodes), nil /*states*/)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to update trie : %v\n", err)
 			return err
@@ -174,6 +175,7 @@ func createGoldenDatabase() error {
 			fmt.Fprintf(os.Stderr, "unable to create new trie : %v\n", err)
 			return err
 		}
+		parentHash = root
 		return nil
 	}
 
@@ -292,17 +294,17 @@ func runBenchmark() error {
 		PathDB:    getPathDBConfig(),
 	})
 
-	root := common.BytesToHash(rootBytes)
-	tdb, err := trie.New(trie.TrieID(root), trieDb)
+	parentHash := common.BytesToHash(rootBytes)
+	tdb, err := trie.New(trie.TrieID(parentHash), trieDb)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create trie database : %v\n", err)
 		return err
 	}
-
+	var root common.Hash
 	writeBatch := func() error {
 		var nodes *trienode.NodeSet
 		root, nodes = tdb.Commit(false)
-		err = trieDb.Update(root, types.EmptyRootHash, 0 /*block*/, trienode.NewWithNodeSet(nodes), nil /*states*/)
+		err = trieDb.Update(root, parentHash, 0 /*block*/, trienode.NewWithNodeSet(nodes), nil /*states*/)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to update trie : %v\n", err)
 			return err
@@ -317,6 +319,7 @@ func runBenchmark() error {
 			fmt.Fprintf(os.Stderr, "unable to create new trie : %v\n", err)
 			return err
 		}
+		parentHash = root
 		return nil
 	}
 
