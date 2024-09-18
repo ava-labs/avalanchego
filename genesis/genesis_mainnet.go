@@ -50,8 +50,12 @@ var (
 			},
 			ValidatorFeeCapacity: 20_000,
 			ValidatorFeeConfig: validatorfee.Config{
-				Target:                   10_000,
-				MinPrice:                 512,
+				Target:   10_000,
+				MinPrice: 512,
+				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
+				//
+				// ln(2) is a float and the result is consensus critical, we
+				// hardcode the result.
 				ExcessConversionConstant: 1_246_488_515, // Double every day
 			},
 		},
