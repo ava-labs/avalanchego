@@ -1,5 +1,13 @@
 # Release Notes
 
+## [v0.13.8](https://github.com/ava-labs/coreth/releases/tag/v0.13.8)
+- Update geth dependency to v1.13.14
+- eupgrade: lowering the base fee to 1 nAVAX
+- eupgrade/cancun: verify no blobs in header
+- Supports ACP-118 message types
+- Gets network upgrade timestamps from avalanchego
+- Remove cross-chain handlers
+
 ## [v0.13.7](https://github.com/ava-labs/coreth/releases/tag/v0.13.7)
 - Add EUpgrade base definitions
 - Remove Block Status
