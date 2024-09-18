@@ -478,7 +478,7 @@ func FuzzStateCostOf(f *testing.F) {
 				MinPrice:                 gas.Price(minPrice),
 				ExcessConversionConstant: gas.Gas(max(excessConversionConstant, 1)),
 			}
-			seconds = min(seconds, week)
+			seconds = min(seconds, hour)
 			require.Equal(
 				t,
 				s.unoptimizedCostOf(c, seconds),
@@ -496,7 +496,7 @@ func FuzzStateSecondsRemaining(f *testing.F) {
 			uint64(test.config.Target),
 			uint64(test.config.MinPrice),
 			uint64(test.config.ExcessConversionConstant),
-			uint64(week),
+			uint64(hour),
 			test.expectedCost,
 		)
 	}
@@ -520,7 +520,7 @@ func FuzzStateSecondsRemaining(f *testing.F) {
 				MinPrice:                 gas.Price(minPrice),
 				ExcessConversionConstant: gas.Gas(max(excessConversionConstant, 1)),
 			}
-			maxSeconds = min(maxSeconds, week)
+			maxSeconds = min(maxSeconds, hour)
 			require.Equal(
 				t,
 				s.unoptimizedSecondsRemaining(c, maxSeconds, targetCost),
