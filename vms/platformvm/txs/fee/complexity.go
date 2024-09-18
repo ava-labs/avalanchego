@@ -180,6 +180,7 @@ var (
 			ids.IDLen + // subnetID
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
+			wrappers.IntLen + // validators length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
 		gas.DBRead:  1,
@@ -303,6 +304,46 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 	}
 	complexity[gas.Bandwidth], err = math.Add(complexity[gas.Bandwidth], signatureBandwidth)
 	return complexity, err
+}
+
+// ConvertSubnetValidatorComplexity returns the complexity the validators add to
+// a transaction.
+func ConvertSubnetValidatorComplexity(sovs ...txs.ConvertSubnetValidator) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
+	for _, sov := range sovs {
+		sovComplexity, err := convertSubnetValidatorComplexity(sov)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&sovComplexity)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func convertSubnetValidatorComplexity(sov txs.ConvertSubnetValidator) (gas.Dimensions, error) {
+	complexity := gas.Dimensions{
+		gas.Bandwidth: 20 + 8 + 8 + 4 + 4,
+		gas.DBRead:    3,
+		gas.DBWrite:   3,
+		gas.Compute:   0, // TODO: Add compute complexity
+	}
+
+	signerComplexity, err := SignerComplexity(sov.Signer)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+	ownerComplexity, err := OwnerComplexity(sov.RemainingBalanceOwner)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+	return complexity.Add(
+		&signerComplexity,
+		&ownerComplexity,
+	)
 }
 
 // OwnerComplexity returns the complexity an owner adds to a transaction.
@@ -610,12 +651,17 @@ func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	if err != nil {
 		return err
 	}
+	validatorComplexity, err := ConvertSubnetValidatorComplexity(tx.Validators...)
+	if err != nil {
+		return err
+	}
 	authComplexity, err := AuthComplexity(tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
 	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
 		&baseTxComplexity,
+		&validatorComplexity,
 		&authComplexity,
 		&gas.Dimensions{
 			gas.Bandwidth: uint64(len(tx.Address)),

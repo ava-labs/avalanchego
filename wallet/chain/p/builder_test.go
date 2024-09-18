@@ -4,6 +4,7 @@
 package p
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -667,9 +668,35 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetTx(t *testing.T) {
+	sk0, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	sk1, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
 	var (
-		chainID = ids.GenerateTestID()
-		address = utils.RandomBytes(32)
+		chainID    = ids.GenerateTestID()
+		address    = utils.RandomBytes(32)
+		validators = []txs.ConvertSubnetValidator{
+			{
+				NodeID:  ids.GenerateTestNodeID(),
+				Weight:  rand.Uint64(), //#nosec G404
+				Balance: units.Avax,
+				Signer:  signer.NewProofOfPossession(sk0),
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			{
+				NodeID:                ids.GenerateTestNodeID(),
+				Weight:                rand.Uint64(), //#nosec G404
+				Balance:               2 * units.Avax,
+				Signer:                signer.NewProofOfPossession(sk1),
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+			},
+		}
 	)
 	for _, e := range testEnvironmentPostEtna {
 		t.Run(e.name, func(t *testing.T) {
@@ -686,6 +713,7 @@ func TestConvertSubnetTx(t *testing.T) {
 				subnetID,
 				chainID,
 				address,
+				validators,
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
@@ -693,6 +721,8 @@ func TestConvertSubnetTx(t *testing.T) {
 			require.Equal(chainID, utx.ChainID)
 			require.Equal(types.JSONByteSlice(address), utx.Address)
 			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			require.True(utils.IsSortedAndUnique(utx.Validators))
+			require.Equal(validators, utx.Validators)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -700,7 +730,9 @@ func TestConvertSubnetTx(t *testing.T) {
 				&utx.BaseTx.BaseTx,
 				nil,
 				nil,
-				nil,
+				map[ids.ID]uint64{
+					e.context.AVAXAssetID: 3 * units.Avax,
+				},
 			)
 		})
 	}

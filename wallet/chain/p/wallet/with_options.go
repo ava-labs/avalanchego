@@ -147,12 +147,14 @@ func (w *withOptions) IssueConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
+	validators []txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueConvertSubnetTx(
 		subnetID,
 		chainID,
 		address,
+		validators,
 		common.UnionOptions(w.options, options)...,
 	)
 }

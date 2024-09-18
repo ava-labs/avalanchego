@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -18,13 +19,15 @@ import (
 const MaxSubnetAddressLength = 4096
 
 var (
-	_ UnsignedTx = (*ConvertSubnetTx)(nil)
+	_ UnsignedTx                             = (*ConvertSubnetTx)(nil)
+	_ utils.Sortable[ConvertSubnetValidator] = ConvertSubnetValidator{}
 
-	ErrConvertPermissionlessSubnet  = errors.New("cannot convert a permissionless subnet")
-	ErrAddressTooLong               = errors.New("address is too long")
-	ErrConvertMustIncludeValidators = errors.New("conversion must include at least one validator")
-	ErrZeroWeight                   = errors.New("validator weight must be non-zero")
-	ErrMissingPublicKey             = errors.New("missing public key")
+	ErrConvertPermissionlessSubnet         = errors.New("cannot convert a permissionless subnet")
+	ErrAddressTooLong                      = errors.New("address is too long")
+	ErrConvertMustIncludeValidators        = errors.New("conversion must include at least one validator")
+	ErrConvertValidatorsNotSortedAndUnique = errors.New("conversion validators must be sorted and unique")
+	ErrZeroWeight                          = errors.New("validator weight must be non-zero")
+	ErrMissingPublicKey                    = errors.New("missing public key")
 )
 
 type ConvertSubnetTx struct {
@@ -55,6 +58,8 @@ func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrAddressTooLong
 	case len(tx.Validators) == 0:
 		return ErrConvertMustIncludeValidators
+	case !utils.IsSortedAndUnique(tx.Validators):
+		return ErrConvertValidatorsNotSortedAndUnique
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
@@ -85,17 +90,21 @@ func (tx *ConvertSubnetTx) Visit(visitor Visitor) error {
 
 type ConvertSubnetValidator struct {
 	// TODO: Must be Ed25519 NodeID
-	NodeID ids.NodeID `json:"nodeID"`
+	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 	// Weight of this validator used when sampling
-	Weight uint64 `json:"weight"`
+	Weight uint64 `serialize:"true" json:"weight"`
 	// Initial balance for this validator
-	Balance uint64 `json:"balance"`
+	Balance uint64 `serialize:"true" json:"balance"`
 	// [Signer] is the BLS key for this validator.
 	// Note: We do not enforce that the BLS key is unique across all validators.
 	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID + Subnet does uniquely map to a BLS key
-	Signer signer.Signer `json:"signer"`
+	Signer signer.Signer `serialize:"true" json:"signer"`
 	// Leftover $AVAX from the [Balance] will be issued to this owner once it is
 	// removed from the validator set.
-	RemainingBalanceOwner fx.Owner `json:"remainingBalanceOwner"`
+	RemainingBalanceOwner fx.Owner `serialize:"true" json:"remainingBalanceOwner"`
+}
+
+func (v ConvertSubnetValidator) Compare(o ConvertSubnetValidator) int {
+	return v.NodeID.Compare(o.NodeID)
 }

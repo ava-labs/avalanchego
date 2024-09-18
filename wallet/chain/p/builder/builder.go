@@ -155,10 +155,12 @@ type Builder interface {
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
+	// - [validators] specifies the initial SoVs of the converted subnet
 	NewConvertSubnetTx(
 		subnetID ids.ID,
 		chainID ids.ID,
 		address []byte,
+		validators []txs.ConvertSubnetValidator,
 		options ...common.Option,
 	) (*txs.ConvertSubnetTx, error)
 
@@ -782,9 +784,20 @@ func (b *builder) NewConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
+	validators []txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
-	toBurn := map[ids.ID]uint64{}
+	var (
+		toBurn      = map[ids.ID]uint64{}
+		err         error
+		avaxAssetID = b.context.AVAXAssetID
+	)
+	for _, vdr := range validators {
+		toBurn[avaxAssetID], err = math.Add(toBurn[avaxAssetID], vdr.Balance)
+		if err != nil {
+			return nil, err
+		}
+	}
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
@@ -801,12 +814,17 @@ func (b *builder) NewConvertSubnetTx(
 	bytesComplexity := gas.Dimensions{
 		gas.Bandwidth: additionalBytes,
 	}
+	validatorComplexity, err := fee.ConvertSubnetValidatorComplexity(validators...)
+	if err != nil {
+		return nil, err
+	}
 	authComplexity, err := fee.AuthComplexity(subnetAuth)
 	if err != nil {
 		return nil, err
 	}
 	complexity, err := fee.IntrinsicConvertSubnetTxComplexities.Add(
 		&bytesComplexity,
+		&validatorComplexity,
 		&authComplexity,
 	)
 	if err != nil {
@@ -825,6 +843,7 @@ func (b *builder) NewConvertSubnetTx(
 		return nil, err
 	}
 
+	utils.Sort(validators)
 	tx := &txs.ConvertSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
@@ -836,6 +855,7 @@ func (b *builder) NewConvertSubnetTx(
 		Subnet:     subnetID,
 		ChainID:    chainID,
 		Address:    address,
+		Validators: validators,
 		SubnetAuth: subnetAuth,
 	}
 	return tx, b.initCtx(tx)

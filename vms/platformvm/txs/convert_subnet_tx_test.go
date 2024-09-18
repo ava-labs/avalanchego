@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -15,8 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
@@ -30,6 +33,11 @@ var (
 )
 
 func TestConvertSubnetTxSerialization(t *testing.T) {
+	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
+	require.NoError(t, err)
+	sk, err := bls.SecretKeyFromBytes(skBytes)
+	require.NoError(t, err)
+
 	var (
 		addr = ids.ShortID{
 			0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
@@ -71,6 +79,11 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0xde, 0xad,
 		}
+		nodeID = ids.BuildTestNodeID([]byte{
+			0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+			0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+			0x11, 0x22, 0x33, 0x44,
+		})
 	)
 
 	tests := []struct {
@@ -107,9 +120,10 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 						Memo: types.JSONByteSlice{},
 					},
 				},
-				Subnet:  subnetID,
-				ChainID: managerChainID,
-				Address: managerAddress,
+				Subnet:     subnetID,
+				ChainID:    managerChainID,
+				Address:    managerAddress,
+				Validators: []ConvertSubnetValidator{},
 				SubnetAuth: &secp256k1fx.Input{
 					SigIndices: []uint32{3},
 				},
@@ -169,6 +183,8 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0xde, 0xad,
+				// number of validators
+				0x00, 0x00, 0x00, 0x00,
 				// secp256k1fx authorization type ID
 				0x00, 0x00, 0x00, 0x0a,
 				// number of signatures needed in authorization
@@ -277,6 +293,21 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				Subnet:  subnetID,
 				ChainID: managerChainID,
 				Address: managerAddress,
+				Validators: []ConvertSubnetValidator{
+					{
+						NodeID:  nodeID,
+						Weight:  0x0102030405060708,
+						Balance: units.Avax,
+						Signer:  signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Locktime:  0,
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								addr,
+							},
+						},
+					},
+				},
 				SubnetAuth: &secp256k1fx.Input{
 					SigIndices: []uint32{},
 				},
@@ -430,6 +461,51 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0xde, 0xad,
+				// number of validators
+				0x00, 0x00, 0x00, 0x01,
+				// Validators[0]
+				// node ID
+				0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+				0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+				0x11, 0x22, 0x33, 0x44,
+				// weight
+				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+				// balance
+				0x00, 0x00, 0x00, 0x00, 0x3b, 0x9a, 0xca, 0x00,
+				// signer type ID
+				0x00, 0x00, 0x00, 0x1c,
+				// BLS compressed public key
+				0xaf, 0xf4, 0xac, 0xb4, 0xc5, 0x43, 0x9b, 0x5d,
+				0x42, 0x6c, 0xad, 0xf9, 0xe9, 0x46, 0xd3, 0xa4,
+				0x52, 0xf7, 0xde, 0x34, 0x14, 0xd1, 0xad, 0x27,
+				0x33, 0x61, 0x33, 0x21, 0x1d, 0x8b, 0x90, 0xcf,
+				0x49, 0xfb, 0x97, 0xee, 0xbc, 0xde, 0xee, 0xf7,
+				0x14, 0xdc, 0x20, 0xf5, 0x4e, 0xd0, 0xd4, 0xd1,
+				// BLS compressed signature
+				0x8c, 0xfd, 0x79, 0x09, 0xd1, 0x53, 0xb9, 0x60,
+				0x4b, 0x62, 0xb1, 0x43, 0xba, 0x36, 0x20, 0x7b,
+				0xb7, 0xe6, 0x48, 0x67, 0x42, 0x44, 0x80, 0x20,
+				0x2a, 0x67, 0xdc, 0x68, 0x76, 0x83, 0x46, 0xd9,
+				0x5c, 0x90, 0x98, 0x3c, 0x2d, 0x27, 0x9c, 0x64,
+				0xc4, 0x3c, 0x51, 0x13, 0x6b, 0x2a, 0x05, 0xe0,
+				0x16, 0x02, 0xd5, 0x2a, 0xa6, 0x37, 0x6f, 0xda,
+				0x17, 0xfa, 0x6e, 0x2a, 0x18, 0xa0, 0x83, 0xe4,
+				0x9d, 0x9c, 0x45, 0x0e, 0xab, 0x7b, 0x89, 0xb1,
+				0xd5, 0x55, 0x5d, 0xa5, 0xc4, 0x89, 0x87, 0x2e,
+				0x02, 0xb7, 0xe5, 0x22, 0x7b, 0x77, 0x55, 0x0a,
+				0xf1, 0x33, 0x0e, 0x5a, 0x71, 0xf8, 0xc3, 0x68,
+				// RemainingBalanceOwner type ID
+				0x00, 0x00, 0x00, 0x0b,
+				// locktime
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				// threshold
+				0x00, 0x00, 0x00, 0x01,
+				// number of addresses
+				0x00, 0x00, 0x00, 0x01,
+				// Addrs[0]
+				0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+				0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+				0x44, 0x55, 0x66, 0x77,
 				// secp256k1fx authorization type ID
 				0x00, 0x00, 0x00, 0x0a,
 				// number of signatures needed in authorization
@@ -462,6 +538,9 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 }
 
 func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
 	var (
 		ctx         = snowtest.Context(t, ids.GenerateTestID())
 		validBaseTx = BaseTx{
@@ -470,8 +549,17 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				BlockchainID: ctx.ChainID,
 			},
 		}
-		validSubnetID     = ids.GenerateTestID()
-		invalidAddress    = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
+		validSubnetID   = ids.GenerateTestID()
+		invalidAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
+		validValidators = []ConvertSubnetValidator{
+			{
+				NodeID:                ids.GenerateTestNodeID(),
+				Weight:                1,
+				Balance:               1,
+				Signer:                signer.NewProofOfPossession(sk),
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+			},
+		}
 		validSubnetAuth   = &secp256k1fx.Input{}
 		invalidSubnetAuth = &secp256k1fx.Input{
 			SigIndices: []uint32{1, 0},
@@ -498,6 +586,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				},
 				Subnet:     constants.PrimaryNetworkID,
 				Address:    invalidAddress,
+				Validators: nil,
 				SubnetAuth: invalidSubnetAuth,
 			},
 			expectedErr: nil,
@@ -507,6 +596,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx:     validBaseTx,
 				Subnet:     constants.PrimaryNetworkID,
+				Validators: validValidators,
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: ErrConvertPermissionlessSubnet,
@@ -517,15 +607,110 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				BaseTx:     validBaseTx,
 				Subnet:     validSubnetID,
 				Address:    invalidAddress,
+				Validators: validValidators,
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: ErrAddressTooLong,
+		},
+		{
+			name: "invalid number of validators",
+			tx: &ConvertSubnetTx{
+				BaseTx:     validBaseTx,
+				Subnet:     validSubnetID,
+				Validators: nil,
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: ErrConvertMustIncludeValidators,
+		},
+		{
+			name: "invalid validator order",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []ConvertSubnetValidator{
+					{
+						NodeID: ids.NodeID{1},
+					},
+					{
+						NodeID: ids.NodeID{0},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: ErrConvertValidatorsNotSortedAndUnique,
+		},
+		{
+			name: "invalid validator weight",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []ConvertSubnetValidator{
+					{
+						Weight:                0,
+						Signer:                signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: ErrZeroWeight,
+		},
+		{
+			name: "invalid validator pop",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []ConvertSubnetValidator{
+					{
+						Weight:                1,
+						Signer:                &signer.ProofOfPossession{},
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: bls.ErrFailedPublicKeyDecompress,
+		},
+		{
+			name: "invalid validator owner",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []ConvertSubnetValidator{
+					{
+						Weight: 1,
+						Signer: signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Threshold: 1,
+						},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: secp256k1fx.ErrOutputUnspendable,
+		},
+		{
+			name: "invalid validator signer",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []ConvertSubnetValidator{
+					{
+						Weight:                1,
+						Signer:                &signer.Empty{},
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: ErrMissingPublicKey,
 		},
 		{
 			name: "invalid BaseTx",
 			tx: &ConvertSubnetTx{
 				BaseTx:     BaseTx{},
 				Subnet:     validSubnetID,
+				Validators: validValidators,
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: avax.ErrWrongNetworkID,
@@ -535,6 +720,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx:     validBaseTx,
 				Subnet:     validSubnetID,
+				Validators: validValidators,
 				SubnetAuth: invalidSubnetAuth,
 			},
 			expectedErr: secp256k1fx.ErrInputIndicesNotSortedUnique,
@@ -544,6 +730,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx:     validBaseTx,
 				Subnet:     validSubnetID,
+				Validators: validValidators,
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: nil,
