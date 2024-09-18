@@ -20,7 +20,6 @@ const (
 	hour   = 60 * minute
 	day    = 24 * hour
 	week   = 7 * day
-	year   = 365 * day
 
 	minPrice = 2_048
 
@@ -313,19 +312,19 @@ func TestStateCostOfOverflow(t *testing.T) {
 	}
 }
 
-func TestStateSecondsUntil(t *testing.T) {
+func TestStateSecondsRemaining(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require.Equal(
 				t,
 				test.expectedSeconds,
-				test.state.SecondsUntil(test.config, year, test.expectedCost),
+				test.state.SecondsRemaining(test.config, week, test.expectedCost),
 			)
 		})
 	}
 }
 
-func TestStateSecondsUntilLimit(t *testing.T) {
+func TestStateSecondsRemainingLimit(t *testing.T) {
 	const target = 10_000
 	tests := []struct {
 		name      string
@@ -380,7 +379,7 @@ func TestStateSecondsUntilLimit(t *testing.T) {
 			require.Equal(
 				t,
 				uint64(week),
-				test.state.SecondsUntil(config, week, test.costLimit),
+				test.state.SecondsRemaining(config, week, test.costLimit),
 			)
 		})
 	}
@@ -417,10 +416,10 @@ func BenchmarkStateCostOf(b *testing.B) {
 	}
 }
 
-func BenchmarkStateSecondsUntil(b *testing.B) {
+func BenchmarkStateSecondsRemaining(b *testing.B) {
 	benchmarks := []struct {
-		name         string
-		secondsUntil func(
+		name             string
+		secondsRemaining func(
 			s State,
 			c Config,
 			maxSeconds uint64,
@@ -428,12 +427,12 @@ func BenchmarkStateSecondsUntil(b *testing.B) {
 		) uint64
 	}{
 		{
-			name:         "unoptimized",
-			secondsUntil: State.unoptimizedSecondsUntil,
+			name:             "unoptimized",
+			secondsRemaining: State.unoptimizedSecondsRemaining,
 		},
 		{
-			name:         "optimized",
-			secondsUntil: State.SecondsUntil,
+			name:             "optimized",
+			secondsRemaining: State.SecondsRemaining,
 		},
 	}
 	for _, test := range tests {
@@ -441,7 +440,7 @@ func BenchmarkStateSecondsUntil(b *testing.B) {
 			for _, benchmark := range benchmarks {
 				b.Run(benchmark.name, func(b *testing.B) {
 					for i := 0; i < b.N; i++ {
-						benchmark.secondsUntil(test.state, test.config, year, test.expectedCost)
+						benchmark.secondsRemaining(test.state, test.config, week, test.expectedCost)
 					}
 				})
 			}
@@ -479,7 +478,7 @@ func FuzzStateCostOf(f *testing.F) {
 				MinPrice:                 gas.Price(minPrice),
 				ExcessConversionConstant: gas.Gas(max(excessConversionConstant, 1)),
 			}
-			seconds = min(seconds, year)
+			seconds = min(seconds, week)
 			require.Equal(
 				t,
 				s.unoptimizedCostOf(c, seconds),
@@ -489,7 +488,7 @@ func FuzzStateCostOf(f *testing.F) {
 	)
 }
 
-func FuzzStateSecondsUntil(f *testing.F) {
+func FuzzStateSecondsRemaining(f *testing.F) {
 	for _, test := range tests {
 		f.Add(
 			uint64(test.state.Current),
@@ -497,7 +496,7 @@ func FuzzStateSecondsUntil(f *testing.F) {
 			uint64(test.config.Target),
 			uint64(test.config.MinPrice),
 			uint64(test.config.ExcessConversionConstant),
-			uint64(year),
+			uint64(week),
 			test.expectedCost,
 		)
 	}
@@ -521,11 +520,11 @@ func FuzzStateSecondsUntil(f *testing.F) {
 				MinPrice:                 gas.Price(minPrice),
 				ExcessConversionConstant: gas.Gas(max(excessConversionConstant, 1)),
 			}
-			maxSeconds = min(maxSeconds, year)
+			maxSeconds = min(maxSeconds, week)
 			require.Equal(
 				t,
-				s.unoptimizedSecondsUntil(c, maxSeconds, targetCost),
-				s.SecondsUntil(c, maxSeconds, targetCost),
+				s.unoptimizedSecondsRemaining(c, maxSeconds, targetCost),
+				s.SecondsRemaining(c, maxSeconds, targetCost),
 			)
 		},
 	)
@@ -550,9 +549,9 @@ func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 	return cost
 }
 
-// unoptimizedSecondsUntil is a naive implementation of SecondsUntil that is
-// used for differential fuzzing.
-func (s State) unoptimizedSecondsUntil(c Config, maxSeconds uint64, costLimit uint64) uint64 {
+// unoptimizedSecondsRemaining is a naive implementation of SecondsRemaining
+// that is used for differential fuzzing.
+func (s State) unoptimizedSecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) uint64 {
 	for seconds := uint64(0); seconds < maxSeconds; seconds++ {
 		s = s.AdvanceTime(c.Target, 1)
 

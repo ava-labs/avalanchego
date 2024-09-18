@@ -91,10 +91,10 @@ func (s State) CostOf(c Config, seconds uint64) uint64 {
 	return cost
 }
 
-// SecondsUntil calculates the maximum number of seconds that a validator can
-// pay fees before their [costLimit] would be exceeded based on the dynamic fee
-// mechanism. The result is capped at [maxSeconds].
-func (s State) SecondsUntil(c Config, maxSeconds uint64, costLimit uint64) uint64 {
+// SecondsRemaining calculates the maximum number of seconds that a validator
+// can pay fees before their [costLimit] would be exceeded based on the dynamic
+// fee mechanism. The result is capped at [maxSeconds].
+func (s State) SecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) uint64 {
 	// Because this function can divide by prices, we need to sanity check the
 	// parameters to avoid division by 0.
 	if c.MinPrice == 0 {
