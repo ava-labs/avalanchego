@@ -2378,8 +2378,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
 		defaultConfig = &config.Config{
-			DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
-			UpgradeConfig:    upgradetest.GetConfig(upgradetest.Latest),
+			DynamicFeeConfig:     genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeCapacity: genesis.LocalParams.ValidatorFeeCapacity,
+			ValidatorFeeConfig:   genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:        upgradetest.GetConfig(upgradetest.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -2424,26 +2426,31 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	subnetID := createSubnetTx.ID()
+	var (
+		subnetID = createSubnetTx.ID()
+		nodeID   = ids.GenerateTestNodeID()
+	)
 	tests := []struct {
 		name           string
 		builderOptions []common.Option
-		updateExecutor func(executor *StandardTxExecutor)
+		updateExecutor func(executor *StandardTxExecutor) error
 		expectedErr    error
 	}{
 		{
 			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.Backend.Config = &config.Config{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
+				return nil
 			},
 			expectedErr: errEtnaUpgradeNotActive,
 		},
 		{
 			name: "tx fails syntactic verification",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.Backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+				return nil
 			},
 			expectedErr: avax.ErrWrongChainID,
 		},
@@ -2456,46 +2463,76 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "fail subnet authorization",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.State.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs: []ids.ShortID{
 						ids.GenerateTestShortID(),
 					},
 				})
+				return nil
 			},
 			expectedErr: errUnauthorizedSubnetModification,
 		},
 		{
 			name: "invalid if subnet is transformed",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.State.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
 					Subnet: subnetID,
 				}})
+				return nil
 			},
 			expectedErr: errIsImmutable,
 		},
 		{
 			name: "invalid if subnet is converted",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.State.SetSubnetManager(subnetID, ids.GenerateTestID(), nil)
+				return nil
 			},
 			expectedErr: errIsImmutable,
 		},
 		{
 			name: "invalid fee calculation",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.FeeCalculator = fee.NewStaticCalculator(e.Config.StaticFeeConfig)
+				return nil
 			},
 			expectedErr: fee.ErrUnsupportedTx,
 		},
 		{
+			name: "too many active validators",
+			updateExecutor: func(e *StandardTxExecutor) error {
+				e.Backend.Config = &config.Config{
+					DynamicFeeConfig:     genesis.LocalParams.DynamicFeeConfig,
+					ValidatorFeeCapacity: 0,
+					ValidatorFeeConfig:   genesis.LocalParams.ValidatorFeeConfig,
+					UpgradeConfig:        upgradetest.GetConfig(upgradetest.Latest),
+				}
+				return nil
+			},
+			expectedErr: errMaxNumActiveValidators,
+		},
+		{
+			name: "invalid subnet only validator",
+			updateExecutor: func(e *StandardTxExecutor) error {
+				return e.State.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID,
+					NodeID:       nodeID,
+					Weight:       1,
+				})
+			},
+			expectedErr: state.ErrDuplicateSubnetOnlyValidator,
+		},
+		{
 			name: "insufficient fee",
-			updateExecutor: func(e *StandardTxExecutor) {
+			updateExecutor: func(e *StandardTxExecutor) error {
 				e.FeeCalculator = fee.NewDynamicCalculator(
 					e.Config.DynamicFeeConfig.Weights,
 					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
 				)
+				return nil
 			},
 			expectedErr: utxo.ErrInsufficientUnlockedFunds,
 		},
@@ -2506,6 +2543,9 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
+
+			sk, err := bls.NewSecretKey()
+			require.NoError(err)
 
 			// Create the ConvertSubnetTx
 			var (
@@ -2525,6 +2565,15 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				subnetID,
 				chainID,
 				address,
+				[]txs.ConvertSubnetValidator{
+					{
+						NodeID:                nodeID,
+						Weight:                1,
+						Balance:               1,
+						Signer:                signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+					},
+				},
 				test.builderOptions...,
 			)
 			require.NoError(err)
@@ -2545,7 +2594,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				State:         diff,
 			}
 			if test.updateExecutor != nil {
-				test.updateExecutor(executor)
+				require.NoError(test.updateExecutor(executor))
 			}
 
 			err = convertSubnetTx.Unsigned.Visit(executor)
