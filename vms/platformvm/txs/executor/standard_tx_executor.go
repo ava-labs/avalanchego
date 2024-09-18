@@ -14,8 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -30,6 +33,7 @@ var (
 	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
 	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxNumActiveValidators     = errors.New("already at the max number of active validators")
 )
 
 type StandardTxExecutor struct {
@@ -522,6 +526,50 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	if err != nil {
 		return err
 	}
+
+	var (
+		txID        = e.Tx.ID()
+		startTime   = uint64(currentTimestamp.Unix())
+		currentFees = e.State.GetAccruedFees()
+	)
+	for i, vdr := range tx.Validators {
+		vdr := vdr
+		balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+		if err != nil {
+			return err
+		}
+
+		sov := state.SubnetOnlyValidator{
+			ValidationID:          txID.Prefix(uint64(i)),
+			SubnetID:              tx.Subnet,
+			NodeID:                vdr.NodeID,
+			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
+			RemainingBalanceOwner: balanceOwner,
+			StartTime:             startTime,
+			Weight:                vdr.Weight,
+			MinNonce:              0,
+			EndAccumulatedFee:     0, // If Balance is 0, this is 0
+		}
+		if vdr.Balance != 0 {
+			if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
+				return errMaxNumActiveValidators
+			}
+
+			sov.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			if err != nil {
+				return err
+			}
+
+			fee, err = math.Add(fee, vdr.Balance)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
+			return err
+		}
+	}
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
 		e.State,
@@ -534,8 +582,6 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	); err != nil {
 		return err
 	}
-
-	txID := e.Tx.ID()
 
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
