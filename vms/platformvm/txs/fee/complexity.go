@@ -62,13 +62,21 @@ const (
 	intrinsicSECP256k1FxSignatureBandwidth = wrappers.IntLen + // signature index
 		secp256k1.SignatureLen // signature length
 
+	intrinsicConvertSubnetValidatorBandwidth = ids.NodeIDLen + // nodeID
+		wrappers.LongLen + // weight
+		wrappers.LongLen + // balance
+		wrappers.IntLen + // signer typeID
+		wrappers.IntLen // owner typeID
+
 	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
 		bls.SignatureLen // signature
 
-	intrinsicInputDBRead = 1
+	intrinsicInputDBRead                  = 1
+	intrinsicConvertSubnetValidatorDBRead = 3 // TODO: Update
 
-	intrinsicInputDBWrite  = 1
-	intrinsicOutputDBWrite = 1
+	intrinsicInputDBWrite                  = 1
+	intrinsicOutputDBWrite                 = 1
+	intrinsicConvertSubnetValidatorDBWrite = 3 // TODO: Update
 )
 
 var (
@@ -326,9 +334,9 @@ func ConvertSubnetValidatorComplexity(sovs ...txs.ConvertSubnetValidator) (gas.D
 
 func convertSubnetValidatorComplexity(sov txs.ConvertSubnetValidator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
-		gas.Bandwidth: 20 + 8 + 8 + 4 + 4,
-		gas.DBRead:    3,
-		gas.DBWrite:   3,
+		gas.Bandwidth: intrinsicConvertSubnetValidatorBandwidth,
+		gas.DBRead:    intrinsicConvertSubnetValidatorDBRead,
+		gas.DBWrite:   intrinsicConvertSubnetValidatorDBWrite,
 		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
