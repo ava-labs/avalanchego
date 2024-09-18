@@ -66,14 +66,8 @@ func (tx *ConvertSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 		return err
 	}
 	for _, vdr := range tx.Validators {
-		if vdr.Weight == 0 {
-			return ErrZeroWeight
-		}
-		if err := verify.All(vdr.Signer, vdr.RemainingBalanceOwner); err != nil {
+		if err := vdr.Verify(); err != nil {
 			return err
-		}
-		if vdr.Signer.Key() == nil {
-			return ErrMissingPublicKey
 		}
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {
@@ -107,4 +101,17 @@ type ConvertSubnetValidator struct {
 
 func (v ConvertSubnetValidator) Compare(o ConvertSubnetValidator) int {
 	return v.NodeID.Compare(o.NodeID)
+}
+
+func (v *ConvertSubnetValidator) Verify() error {
+	if v.Weight == 0 {
+		return ErrZeroWeight
+	}
+	if err := verify.All(v.Signer, v.RemainingBalanceOwner); err != nil {
+		return err
+	}
+	if v.Signer.Key() == nil {
+		return ErrMissingPublicKey
+	}
+	return nil
 }
