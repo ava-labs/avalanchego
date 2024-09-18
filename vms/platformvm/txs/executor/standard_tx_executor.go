@@ -540,7 +540,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 
 		sov := state.SubnetOnlyValidator{
-			ValidationID:          txID.Prefix(uint64(i)),
+			ValidationID:          txID.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
 			SubnetID:              tx.Subnet,
 			NodeID:                vdr.NodeID,
 			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
@@ -551,6 +551,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			EndAccumulatedFee:     0, // If Balance is 0, this is 0
 		}
 		if vdr.Balance != 0 {
+			// We are attempting to add an active validator
 			if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
 				return errMaxNumActiveValidators
 			}
