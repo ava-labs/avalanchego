@@ -413,12 +413,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 				Signer:                nil,
 				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
 			},
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
-			},
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedSigner,
 		},
 		{
@@ -427,12 +422,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 				Signer:                &signer.ProofOfPossession{},
 				RemainingBalanceOwner: nil,
 			},
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
-			},
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedOwner,
 		},
 	}
