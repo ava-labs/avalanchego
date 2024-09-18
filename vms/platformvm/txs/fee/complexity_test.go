@@ -367,6 +367,96 @@ func TestInputComplexity(t *testing.T) {
 	}
 }
 
+func TestConvertSubnetValidatorComplexity(t *testing.T) {
+	tests := []struct {
+		name        string
+		vdr         txs.ConvertSubnetValidator
+		expected    gas.Dimensions
+		expectedErr error
+	}{
+		{
+			name: "any can spend",
+			vdr: txs.ConvertSubnetValidator{
+				Signer:                &signer.ProofOfPossession{},
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 204,
+				gas.DBRead:    3,
+				gas.DBWrite:   3,
+				gas.Compute:   0, // TODO: implement
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "single owner",
+			vdr: txs.ConvertSubnetValidator{
+				Signer: &signer.ProofOfPossession{},
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 224,
+				gas.DBRead:    3,
+				gas.DBWrite:   3,
+				gas.Compute:   0, // TODO: implement
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "invalid signer",
+			vdr: txs.ConvertSubnetValidator{
+				Signer:                nil,
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 0,
+				gas.DBRead:    0,
+				gas.DBWrite:   0,
+				gas.Compute:   0,
+			},
+			expectedErr: errUnsupportedSigner,
+		},
+		{
+			name: "invalid owner",
+			vdr: txs.ConvertSubnetValidator{
+				Signer:                &signer.ProofOfPossession{},
+				RemainingBalanceOwner: nil,
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 0,
+				gas.DBRead:    0,
+				gas.DBWrite:   0,
+				gas.Compute:   0,
+			},
+			expectedErr: errUnsupportedOwner,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			actual, err := ConvertSubnetValidatorComplexity(test.vdr)
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, actual)
+
+			if err != nil {
+				return
+			}
+
+			vdrBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.vdr)
+			require.NoError(err)
+
+			numBytesWithoutCodecVersion := uint64(len(vdrBytes) - codec.VersionSize)
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
+		})
+	}
+}
+
 func TestOwnerComplexity(t *testing.T) {
 	tests := []struct {
 		name        string
