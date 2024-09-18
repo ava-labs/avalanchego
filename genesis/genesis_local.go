@@ -72,7 +72,7 @@ var (
 				MinPrice: 1,
 				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
 				//
-				// ln(2) is a float and the result is consensus critical, we
+				// ln(2) is a float and the result is consensus critical, so we
 				// hardcode the result.
 				ExcessConversionConstant: 865_617, // Double every minute
 			},
