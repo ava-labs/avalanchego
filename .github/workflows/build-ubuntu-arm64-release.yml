@@ -13,6 +13,9 @@ on:
 jobs:
   build-jammy-arm64-package:
     runs-on: custom-arm64-jammy
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +73,9 @@ jobs:
 
   build-focal-arm64-package:
     runs-on: custom-arm64-focal
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
