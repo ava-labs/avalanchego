@@ -68,6 +68,8 @@ github.com/ava-labs/coreth v0.13.8-fixed-genesis-upgrade.0.20240918193034-b8959b
 github.com/ava-labs/coreth v0.13.8-fixed-genesis-upgrade.0.20240918193034-b8959bd74e3c/go.mod h1:t3BSv/eQv0AlDPMfEDCMMoD/jq1RkUsbFzQAFg5qBcE=
 github.com/ava-labs/coreth v0.13.8-fixed-genesis-upgrade.0.20240918212239-9d2a16e33a76 h1:/pzBH/d87z7IlxUTkz4dhQGeGAZwiUEGoVVfgtbvjcU=
 github.com/ava-labs/coreth v0.13.8-fixed-genesis-upgrade.0.20240918212239-9d2a16e33a76/go.mod h1:t3BSv/eQv0AlDPMfEDCMMoD/jq1RkUsbFzQAFg5qBcE=
+github.com/ava-labs/coreth v0.13.8-fixed-genesis-upgrade.0.20240918223012-40364b1e04b6 h1:RH8I/xFRvGZjLTDyhwIsDDuOxWEZo7FRTvuj5i9iUek=
+github.com/ava-labs/coreth v0.13.8-fixed-genesis-upgrade.0.20240918223012-40364b1e04b6/go.mod h1:t3BSv/eQv0AlDPMfEDCMMoD/jq1RkUsbFzQAFg5qBcE=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20240610153809-9c955cc90a95 h1:dOVbtdnZL++pENdTCNZ1nu41eYDQkTML4sWebDnnq8c=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20240610153809-9c955cc90a95/go.mod h1:pJxaT9bUgeRNVmNRgtCHb7sFDIRKy7CzTQVi8gGNT6g=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
