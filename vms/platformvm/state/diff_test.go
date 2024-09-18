@@ -4,6 +4,7 @@
 package state
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -64,6 +65,24 @@ func TestDiffFeeState(t *testing.T) {
 	d.SetFeeState(newFeeState)
 	require.Equal(newFeeState, d.GetFeeState())
 	require.Equal(initialFeeState, state.GetFeeState())
+
+	require.NoError(d.Apply(state))
+	assertChainsEqual(t, state, d)
+}
+
+func TestDiffSoVExcess(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	initialExcess := state.GetSoVExcess()
+	newExcess := initialExcess + 1
+	d.SetSoVExcess(newExcess)
+	require.Equal(newExcess, d.GetSoVExcess())
+	require.Equal(initialExcess, state.GetSoVExcess())
 
 	require.NoError(d.Apply(state))
 	assertChainsEqual(t, state, d)
@@ -202,64 +221,144 @@ func TestDiffExpiry(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		require := require.New(t)
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-		state := newTestState(t, memdb.New())
-		for _, expiry := range test.initialExpiries {
-			state.PutExpiry(expiry)
-		}
-
-		d, err := NewDiffOn(state)
-		require.NoError(err)
-
-		var (
-			expectedExpiries   = set.Of(test.initialExpiries...)
-			unexpectedExpiries set.Set[ExpiryEntry]
-		)
-		for _, op := range test.ops {
-			if op.put {
-				d.PutExpiry(op.entry)
-				expectedExpiries.Add(op.entry)
-				unexpectedExpiries.Remove(op.entry)
-			} else {
-				d.DeleteExpiry(op.entry)
-				expectedExpiries.Remove(op.entry)
-				unexpectedExpiries.Add(op.entry)
+			state := newTestState(t, memdb.New())
+			for _, expiry := range test.initialExpiries {
+				state.PutExpiry(expiry)
 			}
-		}
 
-		// If expectedExpiries is empty, we want expectedExpiriesSlice to be
-		// nil.
-		var expectedExpiriesSlice []ExpiryEntry
-		if expectedExpiries.Len() > 0 {
-			expectedExpiriesSlice = expectedExpiries.List()
-			utils.Sort(expectedExpiriesSlice)
-		}
-
-		verifyChain := func(chain Chain) {
-			expiryIterator, err := chain.GetExpiryIterator()
+			d, err := NewDiffOn(state)
 			require.NoError(err)
-			require.Equal(
-				expectedExpiriesSlice,
-				iterator.ToSlice(expiryIterator),
+
+			var (
+				expectedExpiries   = set.Of(test.initialExpiries...)
+				unexpectedExpiries set.Set[ExpiryEntry]
 			)
-
-			for expiry := range expectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.True(has)
+			for _, op := range test.ops {
+				if op.put {
+					d.PutExpiry(op.entry)
+					expectedExpiries.Add(op.entry)
+					unexpectedExpiries.Remove(op.entry)
+				} else {
+					d.DeleteExpiry(op.entry)
+					expectedExpiries.Remove(op.entry)
+					unexpectedExpiries.Add(op.entry)
+				}
 			}
-			for expiry := range unexpectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.False(has)
-			}
-		}
 
-		verifyChain(d)
-		require.NoError(d.Apply(state))
-		verifyChain(state)
-		assertChainsEqual(t, d, state)
+			// If expectedExpiries is empty, we want expectedExpiriesSlice to be
+			// nil.
+			var expectedExpiriesSlice []ExpiryEntry
+			if expectedExpiries.Len() > 0 {
+				expectedExpiriesSlice = expectedExpiries.List()
+				utils.Sort(expectedExpiriesSlice)
+			}
+
+			verifyChain := func(chain Chain) {
+				expiryIterator, err := chain.GetExpiryIterator()
+				require.NoError(err)
+				require.Equal(
+					expectedExpiriesSlice,
+					iterator.ToSlice(expiryIterator),
+				)
+
+				for expiry := range expectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.True(has)
+				}
+				for expiry := range unexpectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.False(has)
+				}
+			}
+
+			verifyChain(d)
+			require.NoError(d.Apply(state))
+			verifyChain(state)
+			assertChainsEqual(t, d, state)
+		})
+	}
+}
+
+func TestDiffSubnetOnlyValidatorsErrors(t *testing.T) {
+	sov := SubnetOnlyValidator{
+		ValidationID: ids.GenerateTestID(),
+		SubnetID:     ids.GenerateTestID(),
+		NodeID:       ids.GenerateTestNodeID(),
+		Weight:       1, // Not removed
+	}
+
+	tests := []struct {
+		name                     string
+		initialEndAccumulatedFee uint64
+		sov                      SubnetOnlyValidator
+		expectedErr              error
+	}{
+		{
+			name:                     "mutate active constants",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: sov.ValidationID,
+				NodeID:       ids.GenerateTestNodeID(),
+			},
+			expectedErr: ErrMutatedSubnetOnlyValidator,
+		},
+		{
+			name:                     "mutate inactive constants",
+			initialEndAccumulatedFee: 0,
+			sov: SubnetOnlyValidator{
+				ValidationID: sov.ValidationID,
+				NodeID:       ids.GenerateTestNodeID(),
+			},
+			expectedErr: ErrMutatedSubnetOnlyValidator,
+		},
+		{
+			name:                     "duplicate active subnetID and nodeID pair",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       sov.NodeID,
+			},
+			expectedErr: ErrDuplicateSubnetOnlyValidator,
+		},
+		{
+			name:                     "duplicate inactive subnetID and nodeID pair",
+			initialEndAccumulatedFee: 0,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       sov.NodeID,
+			},
+			expectedErr: ErrDuplicateSubnetOnlyValidator,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+
+			sov.EndAccumulatedFee = test.initialEndAccumulatedFee
+			require.NoError(state.PutSubnetOnlyValidator(sov))
+
+			d, err := NewDiffOn(state)
+			require.NoError(err)
+
+			// Initialize subnetID, weight, and endAccumulatedFee as they are
+			// constant among all tests.
+			test.sov.SubnetID = sov.SubnetID
+			test.sov.Weight = 1                        // Not removed
+			test.sov.EndAccumulatedFee = rand.Uint64() //#nosec G404
+			err = d.PutSubnetOnlyValidator(test.sov)
+			require.ErrorIs(err, test.expectedErr)
+
+			// The invalid addition should not have modified the diff.
+			assertChainsEqual(t, state, d)
+		})
 	}
 }
 
@@ -272,6 +371,8 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -307,6 +408,8 @@ func TestDiffPendingValidator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -348,6 +451,8 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -395,6 +500,8 @@ func TestDiffPendingDelegator(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -536,6 +643,8 @@ func TestDiffTx(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -634,6 +743,8 @@ func TestDiffUTXO(t *testing.T) {
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -687,6 +798,18 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 			iterator.ToSlice(actualExpiryIterator),
 		)
 	}
+
+	expectedActiveSOVsIterator, expectedErr := expected.GetActiveSubnetOnlyValidatorsIterator()
+	actualActiveSOVsIterator, actualErr := actual.GetActiveSubnetOnlyValidatorsIterator()
+	require.Equal(expectedErr, actualErr)
+	if expectedErr == nil {
+		require.Equal(
+			iterator.ToSlice(expectedActiveSOVsIterator),
+			iterator.ToSlice(actualActiveSOVsIterator),
+		)
+	}
+
+	require.Equal(expected.NumActiveSubnetOnlyValidators(), actual.NumActiveSubnetOnlyValidators())
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
