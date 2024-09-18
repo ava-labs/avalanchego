@@ -551,15 +551,15 @@ func (s State) unoptimizedCostOf(c Config, seconds uint64) uint64 {
 
 // unoptimizedSecondsRemaining is a naive implementation of SecondsRemaining
 // that is used for differential fuzzing.
-func (s State) unoptimizedSecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) uint64 {
+func (s State) unoptimizedSecondsRemaining(c Config, maxSeconds uint64, fundsRemaining uint64) uint64 {
 	for seconds := uint64(0); seconds < maxSeconds; seconds++ {
 		s = s.AdvanceTime(c.Target, 1)
 
 		price := uint64(gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant))
-		if price > costLimit {
+		if price > fundsRemaining {
 			return seconds
 		}
-		costLimit -= price
+		fundsRemaining -= price
 	}
 	return maxSeconds
 }
