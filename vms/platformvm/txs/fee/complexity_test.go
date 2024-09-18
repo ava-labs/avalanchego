@@ -382,8 +382,8 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 204,
-				gas.DBRead:    3,
-				gas.DBWrite:   3,
+				gas.DBRead:    0,
+				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
 			},
 			expectedErr: nil,
@@ -401,8 +401,8 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 224,
-				gas.DBRead:    3,
-				gas.DBWrite:   3,
+				gas.DBRead:    0,
+				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
 			},
 			expectedErr: nil,

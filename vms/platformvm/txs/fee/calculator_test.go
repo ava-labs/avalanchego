@@ -225,11 +225,11 @@ var (
 			expectedStaticFeeErr: ErrUnsupportedTx,
 			expectedComplexity: gas.Dimensions{
 				gas.Bandwidth: 680, // The length of the tx in bytes
-				gas.DBRead:    IntrinsicConvertSubnetTxComplexities[gas.DBRead] + intrinsicInputDBRead + intrinsicConvertSubnetValidatorDBRead,
+				gas.DBRead:    IntrinsicConvertSubnetTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicConvertSubnetTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite + intrinsicConvertSubnetValidatorDBWrite,
 				gas.Compute:   0, // TODO: implement
 			},
-			expectedDynamicFee: 348_000,
+			expectedDynamicFee: 368_000,
 		},
 	}
 )

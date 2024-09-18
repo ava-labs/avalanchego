@@ -71,12 +71,11 @@ const (
 	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
 		bls.SignatureLen // signature
 
-	intrinsicInputDBRead                  = 1
-	intrinsicConvertSubnetValidatorDBRead = 3 // TODO: Update
+	intrinsicInputDBRead = 1
 
 	intrinsicInputDBWrite                  = 1
 	intrinsicOutputDBWrite                 = 1
-	intrinsicConvertSubnetValidatorDBWrite = 3 // TODO: Update
+	intrinsicConvertSubnetValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
 )
 
 var (
@@ -191,8 +190,8 @@ var (
 			wrappers.IntLen + // validators length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  1,
-		gas.DBWrite: 1,
+		gas.DBRead:  2, // subnet auth + manager lookup
+		gas.DBWrite: 2, // manager + weight
 		gas.Compute: 0,
 	}
 
@@ -335,7 +334,7 @@ func ConvertSubnetValidatorComplexity(sovs ...txs.ConvertSubnetValidator) (gas.D
 func convertSubnetValidatorComplexity(sov txs.ConvertSubnetValidator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetValidatorBandwidth,
-		gas.DBRead:    intrinsicConvertSubnetValidatorDBRead,
+		gas.DBRead:    0,
 		gas.DBWrite:   intrinsicConvertSubnetValidatorDBWrite,
 		gas.Compute:   0, // TODO: Add compute complexity
 	}
