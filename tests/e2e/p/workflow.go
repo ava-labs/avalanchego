@@ -99,7 +99,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 		// Use a random node ID to ensure that repeated test runs will succeed
 		// against a network that persists across runs.
-		validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
+		validatorID, err := ids.ToShortNodeID(utils.RandomBytes(ids.ShortNodeIDLen))
 		require.NoError(err)
 
 		vdr := &txs.SubnetValidator{

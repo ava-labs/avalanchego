@@ -34,7 +34,7 @@ import (
 
 var (
 	subnetID = ids.GenerateTestID()
-	nodeID   = ids.GenerateTestNodeID()
+	nodeID   = ids.GenerateTestShortNodeID()
 
 	testKeys       = secp256k1.TestKeys()
 	subnetAuthKey  = testKeys[0]

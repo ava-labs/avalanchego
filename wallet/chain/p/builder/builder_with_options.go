@@ -92,7 +92,7 @@ func (b *builderWithOptions) NewAddSubnetValidatorTx(
 }
 
 func (b *builderWithOptions) NewRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {

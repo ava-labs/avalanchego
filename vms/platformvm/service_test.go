@@ -255,7 +255,7 @@ func TestGetTx(t *testing.T) {
 				tx, err := wallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
-							NodeID: ids.GenerateTestNodeID(),
+							NodeID: ids.GenerateTestShortNodeID(),
 							Start:  uint64(s.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 							End:    uint64(s.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
 							Wght:   s.vm.MinValidatorStake,
@@ -561,7 +561,7 @@ func TestGetStake(t *testing.T) {
 	// Make sure this works for pending stakers
 	// Add a pending staker
 	stakeAmount = service.vm.MinValidatorStake + 54321
-	pendingStakerNodeID := ids.GenerateTestNodeID()
+	pendingStakerNodeID := ids.GenerateTestShortNodeID()
 	pendingStakerEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = wallet.IssueAddValidatorTx(
 		&txs.Validator{
@@ -626,7 +626,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		found := false
 		for i := 0; i < len(response.Validators); i++ {
 			gotVdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-			if gotVdr.NodeID != nodeID {
+			if gotVdr.NodeID.Compare(nodeID) != 0 {
 				continue
 			}
 
@@ -688,7 +688,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	found := false
 	for i := 0; i < len(response.Validators) && !found; i++ {
 		vdr := response.Validators[i].(pchainapi.PermissionlessValidator)
-		if vdr.NodeID != validatorNodeID {
+		if vdr.NodeID.Compare(validatorNodeID.NodeID()) != 0 {
 			continue
 		}
 		found = true
@@ -735,7 +735,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	for _, vdr := range response.Validators {
 		castVdr := vdr.(pchainapi.PermissionlessValidator)
-		if castVdr.NodeID != validatorNodeID {
+		if castVdr.NodeID.Compare(validatorNodeID.NodeID()) != 0 {
 			continue
 		}
 		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))

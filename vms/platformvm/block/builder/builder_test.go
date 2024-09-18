@@ -105,7 +105,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 
 	var (
 		now    = env.backend.Clk.Time()
-		nodeID = ids.GenerateTestNodeID()
+		nodeID = ids.GenerateTestShortNodeID()
 
 		defaultValidatorStake = 100 * units.MilliAvax
 		validatorStartTime    = now.Add(2 * txexecutor.SyncBound)
@@ -158,7 +158,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.True(env.blkManager.SetPreference(blk.ID()))
 
 	// Validator should now be current
-	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID.NodeID())
 	require.NoError(err)
 	require.Equal(txID, staker.TxID)
 
@@ -330,7 +330,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	tx1, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				Start:  uint64(now.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
 				Wght:   defaultValidatorStake,
@@ -359,7 +359,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	tx2, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				Start:  uint64(now.Unix()),
 				End:    uint64(validator2EndTime.Unix()),
 				Wght:   defaultValidatorStake,

@@ -98,7 +98,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}
 
-	b.proposer = ids.NodeIDFromCert(b.cert)
+	b.proposer = ids.ShortNodeIDFromCert(b.cert).NodeID()
 	return nil
 }
 

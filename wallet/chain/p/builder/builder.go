@@ -95,7 +95,7 @@ type Builder interface {
 	// NewRemoveSubnetValidatorTx removes [nodeID] from the validator
 	// set [subnetID].
 	NewRemoveSubnetValidatorTx(
-		nodeID ids.NodeID,
+		nodeID ids.ShortNodeID,
 		subnetID ids.ID,
 		options ...common.Option,
 	) (*txs.RemoveSubnetValidatorTx, error)
@@ -480,7 +480,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {

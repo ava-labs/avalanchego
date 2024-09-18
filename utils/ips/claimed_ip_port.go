@@ -50,13 +50,13 @@ func NewClaimedIPPort(
 		AddrPort:  ipPort,
 		Timestamp: timestamp,
 		Signature: signature,
-		NodeID:    ids.NodeIDFromCert(cert),
+		NodeID:    ids.ShortNodeIDFromCert(cert).NodeID(),
 	}
 
 	packer := wrappers.Packer{
 		Bytes: make([]byte, preimageLen),
 	}
-	packer.PackFixedBytes(ip.NodeID[:])
+	packer.PackFixedBytes(ip.NodeID.Bytes())
 	packer.PackLong(timestamp)
 	ip.GossipID = hashing.ComputeHash256Array(packer.Bytes)
 	return ip

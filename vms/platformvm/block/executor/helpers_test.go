@@ -67,7 +67,7 @@ var testSubnet1 *txs.Tx
 type stakerStatus uint
 
 type staker struct {
-	nodeID             ids.NodeID
+	nodeID             ids.ShortNodeID
 	rewardAddress      ids.ShortID
 	startTime, endTime time.Time
 }
@@ -77,8 +77,8 @@ type test struct {
 	stakers               []staker
 	subnetStakers         []staker
 	advanceTimeTo         []time.Time
-	expectedStakers       map[ids.NodeID]stakerStatus
-	expectedSubnetStakers map[ids.NodeID]stakerStatus
+	expectedStakers       map[ids.ShortNodeID]stakerStatus
+	expectedSubnetStakers map[ids.ShortNodeID]stakerStatus
 }
 
 type environment struct {
@@ -347,7 +347,7 @@ func addPendingValidator(
 	env *environment,
 	startTime time.Time,
 	endTime time.Time,
-	nodeID ids.NodeID,
+	nodeID ids.ShortNodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
 ) *txs.Tx {

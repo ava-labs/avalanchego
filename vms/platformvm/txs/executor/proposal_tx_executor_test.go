@@ -31,7 +31,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	}
 	nodeID := genesistest.DefaultNodeIDs[0]
 
-	newValidatorID := ids.GenerateTestNodeID()
+	newValidatorID := ids.GenerateTestShortNodeID()
 	newValidatorStartTime := uint64(genesistest.DefaultValidatorStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(genesistest.DefaultValidatorEndTime.Add(-5 * time.Second).Unix())
 
@@ -115,7 +115,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		stakeAmount uint64
 		startTime   uint64
 		endTime     uint64
-		nodeID      ids.NodeID
+		nodeID      ids.ShortNodeID
 		feeKeys     []*secp256k1.PrivateKey
 		setup       func(*environment)
 		AP3Time     time.Time
@@ -287,8 +287,9 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	nodeID := genesistest.DefaultNodeIDs[0]
+	shortNodeID := genesistest.DefaultNodeIDs[0]
 	subnetID := testSubnet1.ID()
+
 	{
 		// Case: Proposed validator currently validating primary network
 		// but stops validating subnet after stops validating primary network
@@ -299,7 +300,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    genesistest.DefaultValidatorEndTimeUnix + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -338,7 +339,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    genesistest.DefaultValidatorEndTimeUnix,
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -367,7 +368,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	// Add a validator to pending validator set of primary network
 	// Starts validating primary network 10 seconds after genesis
-	pendingDSValidatorID := ids.GenerateTestNodeID()
+	pendingDSValidatorID := ids.GenerateTestShortNodeID()
 	dsStartTime := genesistest.DefaultValidatorStartTime.Add(10 * time.Second)
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
@@ -564,7 +565,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  uint64(newTimestamp.Unix()),
 					End:    uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()),
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -603,7 +604,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: shortNodeID,
 				Start:  genesistest.DefaultValidatorStartTimeUnix,
 				End:    genesistest.DefaultValidatorEndTimeUnix,
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -635,7 +636,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		duplicateSubnetTx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    genesistest.DefaultValidatorEndTimeUnix,
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -675,7 +676,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -718,7 +719,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -760,7 +761,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		tx, err := wallet.IssueAddSubnetValidatorTx(
 			&txs.SubnetValidator{
 				Validator: txs.Validator{
-					NodeID: nodeID,
+					NodeID: shortNodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    uint64(genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration).Unix()) + 1,
 					Wght:   genesistest.DefaultValidatorWeight,
@@ -809,7 +810,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 	chainTime := env.state.GetTimestamp()
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -850,13 +851,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	}
 
 	{
-		nodeID := genesistest.DefaultNodeIDs[0]
+		shortNodeID := genesistest.DefaultNodeIDs[0]
 
 		// Case: Validator already validating primary network
 		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddValidatorTx(
 			&txs.Validator{
-				NodeID: nodeID,
+				NodeID: shortNodeID,
 				Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 				End:    genesistest.DefaultValidatorEndTimeUnix,
 				Wght:   env.config.MinValidatorStake,
@@ -940,7 +941,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		})
 		tx, err := wallet.IssueAddValidatorTx(
 			&txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 				End:    genesistest.DefaultValidatorEndTimeUnix,
 				Wght:   env.config.MinValidatorStake,

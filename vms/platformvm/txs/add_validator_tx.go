@@ -58,7 +58,7 @@ func (*AddValidatorTx) SubnetID() ids.ID {
 }
 
 func (tx *AddValidatorTx) NodeID() ids.NodeID {
-	return tx.Validator.NodeID
+	return tx.Validator.NodeID.NodeID()
 }
 
 func (*AddValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {

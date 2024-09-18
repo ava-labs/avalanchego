@@ -18,7 +18,7 @@ var (
 // Validator is a validator.
 type Validator struct {
 	// Node ID of the validator
-	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
+	NodeID ids.ShortNodeID `serialize:"true" json:"nodeID"`
 
 	// Unix time this validator starts validating
 	Start uint64 `serialize:"true" json:"start"`

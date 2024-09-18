@@ -105,7 +105,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	require.NoError(err)
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
-	config.MyNodeID = ids.NodeIDFromCert(cert)
+	config.MyNodeID = ids.ShortNodeIDFromCert(cert).NodeID()
 
 	ip := utils.NewAtomic(netip.AddrPortFrom(
 		netip.IPv6Loopback(),

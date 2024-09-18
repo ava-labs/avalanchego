@@ -75,7 +75,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 			},
 			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				// Note: [Start] is not set here as it will be ignored
 				// Post-Durango in favor of the current chain time
 				End:  uint64(endTime.Unix()),

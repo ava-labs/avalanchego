@@ -59,9 +59,13 @@ func main() {
 	avaxAssetID := pContext.AVAXAssetID
 
 	addValidatorStartTime := time.Now()
+	shortNodeID, err := ids.ShortNodeIDFromNodeID(nodeID)
+	if err != nil {
+		log.Fatalf("failed turning NodeID %s into shortNodeID: %s\n", nodeID, err)
+	}
 	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{
-			NodeID: nodeID,
+			NodeID: shortNodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(startTime.Add(duration).Unix()),
 			Wght:   weight,

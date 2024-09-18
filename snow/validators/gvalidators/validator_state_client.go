@@ -70,10 +70,11 @@ func (c *Client) GetValidatorSet(
 
 	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
-		nodeID, err := ids.ToNodeID(validator.NodeId)
+		shortNodeID, err := ids.ToShortNodeID(validator.NodeId)
 		if err != nil {
 			return nil, err
 		}
+		nodeID := shortNodeID.NodeID()
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
 			// This is a performance optimization to avoid the cost of

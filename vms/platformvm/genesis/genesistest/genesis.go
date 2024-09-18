@@ -47,18 +47,18 @@ var (
 	DefaultFundedKeys = secp256k1.TestKeys()
 
 	// Node IDs of genesis validators
-	DefaultNodeIDs []ids.NodeID
+	DefaultNodeIDs []ids.ShortNodeID
 )
 
 func init() {
-	DefaultNodeIDs = make([]ids.NodeID, len(DefaultFundedKeys))
+	DefaultNodeIDs = make([]ids.ShortNodeID, len(DefaultFundedKeys))
 	for i := range DefaultFundedKeys {
-		DefaultNodeIDs[i] = ids.GenerateTestNodeID()
+		DefaultNodeIDs[i] = ids.GenerateTestShortNodeID()
 	}
 }
 
 type Config struct {
-	NodeIDs            []ids.NodeID
+	NodeIDs            []ids.ShortNodeID
 	ValidatorWeight    uint64
 	ValidatorStartTime time.Time
 	ValidatorEndTime   time.Time
@@ -69,7 +69,7 @@ type Config struct {
 
 func New(t testing.TB, c Config) *platformvmgenesis.Genesis {
 	if len(c.NodeIDs) == 0 {
-		c.NodeIDs = DefaultNodeIDs
+		c.NodeIDs = append(c.NodeIDs, DefaultNodeIDs...)
 	}
 	if c.ValidatorWeight == 0 {
 		c.ValidatorWeight = DefaultValidatorWeight

@@ -285,8 +285,8 @@ func TestGenesis(t *testing.T) {
 	// Ensure current validator set of primary network is correct
 	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
 
-	for _, nodeID := range genesistest.DefaultNodeIDs {
-		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
+	for _, shortNodeID := range genesistest.DefaultNodeIDs {
+		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, shortNodeID.NodeID())
 		require.True(ok)
 	}
 
@@ -306,7 +306,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	var (
 		endTime      = vm.clock.Time().Add(defaultMinStakingDuration)
-		nodeID       = ids.GenerateTestNodeID()
+		nodeID       = ids.GenerateTestShortNodeID()
 		rewardsOwner = &secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
@@ -345,7 +345,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator now in current validator set
-	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID.NodeID())
 	require.NoError(err)
 }
 
@@ -358,7 +358,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 	startTime := genesistest.DefaultValidatorStartTime.Add(-txexecutor.SyncBound).Add(-1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
@@ -416,7 +416,7 @@ func TestAddValidatorReject(t *testing.T) {
 	var (
 		startTime     = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 		endTime       = startTime.Add(defaultMinStakingDuration)
-		nodeID        = ids.GenerateTestNodeID()
+		nodeID        = ids.GenerateTestShortNodeID()
 		rewardAddress = ids.GenerateTestShortID()
 	)
 
@@ -450,7 +450,7 @@ func TestAddValidatorReject(t *testing.T) {
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -516,9 +516,9 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	})
 
 	var (
-		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime   = startTime.Add(defaultMinStakingDuration)
-		nodeID    = genesistest.DefaultNodeIDs[0]
+		startTime   = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime     = startTime.Add(defaultMinStakingDuration)
+		shortNodeID = genesistest.DefaultNodeIDs[0]
 	)
 
 	// create valid tx
@@ -527,7 +527,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: shortNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -548,7 +548,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	// Verify that new validator is in current validator set
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, shortNodeID.NodeID())
 	require.NoError(err)
 }
 
@@ -565,9 +565,9 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	})
 
 	var (
-		startTime = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
-		endTime   = startTime.Add(defaultMinStakingDuration)
-		nodeID    = genesistest.DefaultNodeIDs[0]
+		startTime   = vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
+		endTime     = startTime.Add(defaultMinStakingDuration)
+		shortNodeID = genesistest.DefaultNodeIDs[0]
 	)
 
 	// create valid tx
@@ -576,7 +576,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	tx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: shortNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -601,7 +601,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Verify that new validator NOT in validator set
-	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), nodeID)
+	_, err = vm.state.GetCurrentValidator(testSubnet1.ID(), shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -834,14 +834,15 @@ func TestCreateSubnet(t *testing.T) {
 	require.Contains(subnetIDs, subnetID)
 
 	// Now that we've created a new subnet, add a validator to that subnet
-	nodeID := genesistest.DefaultNodeIDs[0]
+
+	shortNodeID := genesistest.DefaultNodeIDs[0]
 	startTime := vm.clock.Time().Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: nodeID,
+				NodeID: shortNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   genesistest.DefaultValidatorWeight,
@@ -861,20 +862,20 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, shortNodeID.NodeID())
 	require.NoError(err)
 
 	// remove validator from current validator set
 	vm.clock.Set(endTime)
 	require.NoError(buildAndAcceptStandardBlock(vm))
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	_, err = vm.state.GetCurrentValidator(subnetID, shortNodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -1633,7 +1634,7 @@ func TestMaxStakeAmount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID)
+			staker, err := txexecutor.GetValidator(vm.state, constants.PrimaryNetworkID, nodeID.NodeID())
 			require.NoError(err)
 
 			amount, err := txexecutor.GetMaxWeight(vm.state, staker, test.startTime, test.endTime)
@@ -1899,7 +1900,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	nodeID := ids.GenerateTestNodeID()
+	nodeID := ids.GenerateTestShortNodeID()
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1984,7 +1985,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(block.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
+	_, err = vm.state.GetPendingValidator(subnetID, nodeID.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -2126,7 +2127,7 @@ func TestPruneMempool(t *testing.T) {
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
 			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: ids.GenerateTestShortNodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultMinValidatorStake,

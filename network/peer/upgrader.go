@@ -75,6 +75,6 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeI
 		return ids.EmptyNodeID, nil, nil, err
 	}
 
-	nodeID := ids.NodeIDFromCert(peerCert)
+	nodeID := ids.ShortNodeIDFromCert(peerCert).NodeID()
 	return nodeID, conn, peerCert, nil
 }

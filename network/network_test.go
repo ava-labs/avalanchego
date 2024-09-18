@@ -172,7 +172,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 
 		cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 		require.NoError(t, err)
-		nodeID := ids.NodeIDFromCert(cert)
+		nodeID := ids.ShortNodeIDFromCert(cert).NodeID()
 
 		blsKey, err := bls.NewSecretKey()
 		require.NoError(t, err)
@@ -411,7 +411,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
-	nodeID := ids.NodeIDFromCert(cert)
+	nodeID := ids.ShortNodeIDFromCert(cert).NodeID()
 
 	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 

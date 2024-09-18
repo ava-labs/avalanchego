@@ -65,7 +65,7 @@ func (a Allocation) Compare(other Allocation) int {
 }
 
 type Staker struct {
-	NodeID        ids.NodeID                `json:"nodeID"`
+	NodeID        ids.ShortNodeID           `json:"nodeID"`
 	RewardAddress ids.ShortID               `json:"rewardAddress"`
 	DelegationFee uint32                    `json:"delegationFee"`
 	Signer        *signer.ProofOfPossession `json:"signer,omitempty"`
