@@ -43,7 +43,7 @@ func (s State) AdvanceTime(target gas.Gas, seconds uint64) State {
 }
 
 // CostOf calculates how much to charge based on the dynamic fee mechanism for
-// [seconds].
+// seconds.
 //
 // This implements the ACP-77 cost over time formula:
 func (s State) CostOf(c Config, seconds uint64) uint64 {
@@ -92,9 +92,9 @@ func (s State) CostOf(c Config, seconds uint64) uint64 {
 }
 
 // SecondsRemaining calculates the maximum number of seconds that a validator
-// can pay fees before their [costLimit] would be exceeded based on the dynamic
-// fee mechanism. The result is capped at [maxSeconds].
-func (s State) SecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) uint64 {
+// can pay fees before their fundsRemaining would be exhausted based on the
+// dynamic fee mechanism. The result is capped at maxSeconds.
+func (s State) SecondsRemaining(c Config, maxSeconds uint64, fundsRemaining uint64) uint64 {
 	// Because this function can divide by prices, we need to sanity check the
 	// parameters to avoid division by 0.
 	if c.MinPrice == 0 {
@@ -104,7 +104,7 @@ func (s State) SecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) u
 	// If the current and target are the same, the price is constant.
 	if s.Current == c.Target {
 		price := uint64(gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant))
-		seconds := costLimit / price
+		seconds := fundsRemaining / price
 		return min(seconds, maxSeconds)
 	}
 
@@ -116,7 +116,7 @@ func (s State) SecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) u
 		// equal to 0 after performing one of these operations, it is guaranteed
 		// to always remain 0.
 		if s.Excess == 0 {
-			secondsWithZeroExcess := costLimit / uint64(c.MinPrice)
+			secondsWithZeroExcess := fundsRemaining / uint64(c.MinPrice)
 			totalSeconds, err := safemath.Add(seconds, secondsWithZeroExcess)
 			if err != nil {
 				// This is technically unreachable, but makes the code more
@@ -127,10 +127,10 @@ func (s State) SecondsRemaining(c Config, maxSeconds uint64, costLimit uint64) u
 		}
 
 		price := uint64(gas.CalculatePrice(c.MinPrice, s.Excess, c.ExcessConversionConstant))
-		if price > costLimit {
+		if price > fundsRemaining {
 			return seconds
 		}
-		costLimit -= price
+		fundsRemaining -= price
 	}
 	return maxSeconds
 }
