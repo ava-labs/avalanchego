@@ -55,6 +55,22 @@ func (mr *MockStateMockRecorder) GetCurrentHeight(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentHeight", reflect.TypeOf((*MockState)(nil).GetCurrentHeight), arg0)
 }
 
+// GetCurrentValidatorSet mocks base method.
+func (m *MockState) GetCurrentValidatorSet(arg0 context.Context, arg1 ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentValidatorSet", arg0, arg1)
+	ret0, _ := ret[0].(map[ids.ID]*GetCurrentValidatorOutput)
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetCurrentValidatorSet indicates an expected call of GetCurrentValidatorSet.
+func (mr *MockStateMockRecorder) GetCurrentValidatorSet(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidatorSet", reflect.TypeOf((*MockState)(nil).GetCurrentValidatorSet), arg0, arg1)
+}
+
 // GetMinimumHeight mocks base method.
 func (m *MockState) GetMinimumHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()

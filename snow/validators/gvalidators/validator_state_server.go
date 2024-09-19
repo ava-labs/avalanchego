@@ -79,3 +79,40 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 	}
 	return resp, nil
 }
+
+func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentValidatorSetRequest) (*pb.GetCurrentValidatorSetResponse, error) {
+	subnetID, err := ids.ToID(req.SubnetId)
+	if err != nil {
+		return nil, err
+	}
+
+	vdrs, currentHeight, err := s.state.GetCurrentValidatorSet(ctx, subnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &pb.GetCurrentValidatorSetResponse{
+		Validators:    make([]*pb.CurrentValidator, len(vdrs)),
+		CurrentHeight: currentHeight,
+	}
+
+	i := 0
+	for _, vdr := range vdrs {
+		vdrPB := &pb.CurrentValidator{
+			NodeId:         vdr.NodeID.Bytes(),
+			StartTime:      vdr.StartTime,
+			IsActive:       vdr.IsActive,
+			ValidationId:   vdr.ValidationID[:],
+			Weight:         vdr.Weight,
+			SetWeightNonce: vdr.SetWeightNonce,
+		}
+		if vdr.PublicKey != nil {
+			// This is a performance optimization to avoid the cost of compression
+			// from PublicKeyToCompressedBytes.
+			vdrPB.PublicKey = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
+		}
+		resp.Validators[i] = vdrPB
+		i++
+	}
+	return resp, nil
+}

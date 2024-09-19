@@ -1291,6 +1291,22 @@ func (mr *MockStateMockRecorder) GetCurrentValidator(arg0, arg1 any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidator", reflect.TypeOf((*MockState)(nil).GetCurrentValidator), arg0, arg1)
 }
 
+// GetCurrentValidatorSet mocks base method.
+func (m *MockState) GetCurrentValidatorSet(arg0 ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentValidatorSet", arg0)
+	ret0, _ := ret[0].(map[ids.ID]*validators.GetCurrentValidatorOutput)
+	ret1, _ := ret[1].(uint64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetCurrentValidatorSet indicates an expected call of GetCurrentValidatorSet.
+func (mr *MockStateMockRecorder) GetCurrentValidatorSet(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidatorSet", reflect.TypeOf((*MockState)(nil).GetCurrentValidatorSet), arg0)
+}
+
 // GetDelegateeReward mocks base method.
 func (m *MockState) GetDelegateeReward(arg0 ids.ID, arg1 ids.NodeID) (uint64, error) {
 	m.ctrl.T.Helper()

@@ -175,6 +175,8 @@ type State interface {
 
 	SetHeight(height uint64)
 
+	GetCurrentValidatorSet(subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+
 	// Discard uncommitted changes to the database.
 	Abort()
 
@@ -661,7 +663,7 @@ func newState(
 	}, nil
 }
 
-func (s *state) GetCurrentValidators(subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, error) {
+func (s *state) GetCurrentValidatorSet(subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
 	for _, staker := range s.currentStakers.validators[subnetID] {
 		validator := staker.validator
@@ -676,7 +678,7 @@ func (s *state) GetCurrentValidators(subnetID ids.ID) (map[ids.ID]*validators.Ge
 			IsActive: true,
 		}
 	}
-	return result, nil
+	return result, s.currentHeight, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {

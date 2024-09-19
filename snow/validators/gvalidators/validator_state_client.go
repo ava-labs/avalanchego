@@ -94,3 +94,49 @@ func (c *Client) GetValidatorSet(
 	}
 	return vdrs, nil
 }
+
+func (c *Client) GetCurrentValidatorSet(
+	ctx context.Context,
+	subnetID ids.ID,
+) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+	resp, err := c.client.GetCurrentValidatorSet(ctx, &pb.GetCurrentValidatorSetRequest{
+		SubnetId: subnetID[:],
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	vdrs := make(map[ids.ID]*validators.GetCurrentValidatorOutput, len(resp.Validators))
+	for _, validator := range resp.Validators {
+		nodeID, err := ids.ToNodeID(validator.NodeId)
+		if err != nil {
+			return nil, 0, err
+		}
+		var publicKey *bls.PublicKey
+		if len(validator.PublicKey) > 0 {
+			// This is a performance optimization to avoid the cost of
+			// compression and key re-verification with
+			// PublicKeyFromCompressedBytes. We can safely assume that the BLS
+			// Public Keys are verified before being added to the P-Chain and
+			// served by the gRPC server.
+			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
+			if publicKey == nil {
+				return nil, 0, errFailedPublicKeyDeserialize
+			}
+		}
+		validationID, err := ids.ToID(validator.ValidationId)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		vdrs[validationID] = &validators.GetCurrentValidatorOutput{
+			NodeID:         nodeID,
+			PublicKey:      publicKey,
+			Weight:         validator.Weight,
+			StartTime:      validator.StartTime,
+			SetWeightNonce: validator.SetWeightNonce,
+			IsActive:       validator.IsActive,
+		}
+	}
+	return vdrs, resp.GetCurrentHeight(), nil
+}

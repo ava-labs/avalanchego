@@ -31,6 +31,7 @@ type GetValidatorOutput struct {
 }
 
 type GetCurrentValidatorOutput struct {
+	ValidationID   ids.ID
 	NodeID         ids.NodeID
 	PublicKey      *bls.PublicKey
 	Weight         uint64
