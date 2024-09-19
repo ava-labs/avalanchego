@@ -71,15 +71,14 @@ jobs:
           rm -rf ./build
           rm -rf /tmp/avalanchego
 
-  build-focal-arm64-package:
-    runs-on: custom-arm64-focal
+  build-noble-arm64-package:
+    runs-on: custom-arm64-noble
     permissions:
       id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/install-focal-deps
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
@@ -119,12 +118,12 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "arm64"
-          RELEASE: "focal"
+          RELEASE: "noble"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4
         with:
-          name: focal
+          name: noble
           path: /tmp/avalanchego/avalanchego-${{ env.TAG }}-arm64.deb
 
       - name: Cleanup
