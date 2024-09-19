@@ -4,11 +4,16 @@
 package state
 
 import (
+	"errors"
+
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 )
+
+var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
 
 type Stakers interface {
 	CurrentStakers
@@ -25,7 +30,7 @@ type CurrentStakers interface {
 	// staker set.
 	//
 	// Invariant: [staker] is not currently a CurrentValidator
-	PutCurrentValidator(staker *Staker)
+	PutCurrentValidator(staker *Staker) error
 
 	// DeleteCurrentValidator removes the [staker] describing a validator from
 	// the staker set.
@@ -44,7 +49,7 @@ type CurrentStakers interface {
 	// GetCurrentDelegatorIterator returns the delegators associated with the
 	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
 	// removal from current staker set.
-	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
+	GetCurrentDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error)
 
 	// PutCurrentDelegator adds the [staker] describing a delegator to the
 	// staker set.
@@ -60,7 +65,7 @@ type CurrentStakers interface {
 
 	// GetCurrentStakerIterator returns stakers in order of their removal from
 	// the current staker set.
-	GetCurrentStakerIterator() (StakerIterator, error)
+	GetCurrentStakerIterator() (iterator.Iterator[*Staker], error)
 }
 
 type PendingStakers interface {
@@ -71,7 +76,7 @@ type PendingStakers interface {
 
 	// PutPendingValidator adds the [staker] describing a validator to the
 	// staker set.
-	PutPendingValidator(staker *Staker)
+	PutPendingValidator(staker *Staker) error
 
 	// DeletePendingValidator removes the [staker] describing a validator from
 	// the staker set.
@@ -80,7 +85,7 @@ type PendingStakers interface {
 	// GetPendingDelegatorIterator returns the delegators associated with the
 	// validator on [subnetID] with [nodeID]. Delegators are sorted by their
 	// removal from pending staker set.
-	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (StakerIterator, error)
+	GetPendingDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) (iterator.Iterator[*Staker], error)
 
 	// PutPendingDelegator adds the [staker] describing a delegator to the
 	// staker set.
@@ -92,7 +97,7 @@ type PendingStakers interface {
 
 	// GetPendingStakerIterator returns stakers in order of their removal from
 	// the pending staker set.
-	GetPendingStakerIterator() (StakerIterator, error)
+	GetPendingStakerIterator() (iterator.Iterator[*Staker], error)
 }
 
 type baseStakers struct {
@@ -154,16 +159,16 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.stakers.Delete(staker)
 }
 
-func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
+func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) iterator.Iterator[*Staker] {
 	subnetValidators, ok := v.validators[subnetID]
 	if !ok {
-		return EmptyIterator
+		return iterator.Empty[*Staker]{}
 	}
 	validator, ok := subnetValidators[nodeID]
 	if !ok {
-		return EmptyIterator
+		return iterator.Empty[*Staker]{}
 	}
-	return NewTreeIterator(validator.delegators)
+	return iterator.FromTree(validator.delegators)
 }
 
 func (v *baseStakers) PutDelegator(staker *Staker) {
@@ -198,8 +203,8 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	v.stakers.Delete(staker)
 }
 
-func (v *baseStakers) GetStakerIterator() StakerIterator {
-	return NewTreeIterator(v.stakers)
+func (v *baseStakers) GetStakerIterator() iterator.Iterator[*Staker] {
+	return iterator.FromTree(v.stakers)
 }
 
 func (v *baseStakers) getOrCreateValidator(subnetID ids.ID, nodeID ids.NodeID) *baseStaker {
@@ -288,8 +293,14 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	return nil, validatorDiff.validatorStatus
 }
 
-func (s *diffStakers) PutValidator(staker *Staker) {
+func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
+	if validatorDiff.validatorStatus == deleted {
+		// Enforce the invariant that a validator cannot be added after being
+		// deleted.
+		return ErrAddingStakerAfterDeletion
+	}
+
 	validatorDiff.validatorStatus = added
 	validatorDiff.validator = staker
 
@@ -297,6 +308,7 @@ func (s *diffStakers) PutValidator(staker *Staker) {
 		s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
 	}
 	s.addedStakers.ReplaceOrInsert(staker)
+	return nil
 }
 
 func (s *diffStakers) DeleteValidator(staker *Staker) {
@@ -318,27 +330,31 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 }
 
 func (s *diffStakers) GetDelegatorIterator(
-	parentIterator StakerIterator,
+	parentIterator iterator.Iterator[*Staker],
 	subnetID ids.ID,
 	nodeID ids.NodeID,
-) StakerIterator {
+) iterator.Iterator[*Staker] {
 	var (
-		addedDelegatorIterator = EmptyIterator
+		addedDelegatorIterator iterator.Iterator[*Staker] = iterator.Empty[*Staker]{}
 		deletedDelegators      map[ids.ID]*Staker
 	)
 	if subnetValidatorDiffs, ok := s.validatorDiffs[subnetID]; ok {
 		if validatorDiff, ok := subnetValidatorDiffs[nodeID]; ok {
-			addedDelegatorIterator = NewTreeIterator(validatorDiff.addedDelegators)
+			addedDelegatorIterator = iterator.FromTree(validatorDiff.addedDelegators)
 			deletedDelegators = validatorDiff.deletedDelegators
 		}
 	}
 
-	return NewMaskedIterator(
-		NewMergedIterator(
+	return iterator.Filter(
+		iterator.Merge(
+			(*Staker).Less,
 			parentIterator,
 			addedDelegatorIterator,
 		),
-		deletedDelegators,
+		func(staker *Staker) bool {
+			_, ok := deletedDelegators[staker.TxID]
+			return ok
+		},
 	)
 }
 
@@ -368,13 +384,17 @@ func (s *diffStakers) DeleteDelegator(staker *Staker) {
 	s.deletedStakers[staker.TxID] = staker
 }
 
-func (s *diffStakers) GetStakerIterator(parentIterator StakerIterator) StakerIterator {
-	return NewMaskedIterator(
-		NewMergedIterator(
+func (s *diffStakers) GetStakerIterator(parentIterator iterator.Iterator[*Staker]) iterator.Iterator[*Staker] {
+	return iterator.Filter(
+		iterator.Merge(
+			(*Staker).Less,
 			parentIterator,
-			NewTreeIterator(s.addedStakers),
+			iterator.FromTree(s.addedStakers),
 		),
-		s.deletedStakers,
+		func(staker *Staker) bool {
+			_, ok := s.deletedStakers[staker.TxID]
+			return ok
+		},
 	)
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -53,6 +54,7 @@ type Parameters struct {
 	NetworkID   uint32
 	TxFeeConfig genesis.TxFeeConfig
 	VMManager   vms.Manager
+	Upgrades    upgrade.Config
 }
 
 func NewService(
@@ -283,6 +285,17 @@ func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *
 	return nil
 }
 
+// Upgrades returns the upgrade schedule this node is running.
+func (i *Info) Upgrades(_ *http.Request, _ *struct{}, reply *upgrade.Config) error {
+	i.log.Debug("API called",
+		zap.String("service", "info"),
+		zap.String("method", "upgrades"),
+	)
+
+	*reply = i.Parameters.Upgrades
+	return nil
+}
+
 // UptimeResponse are the results from calling Uptime
 type UptimeResponse struct {
 	// RewardingStakePercentage shows what percent of network stake thinks we're
@@ -301,15 +314,23 @@ type UptimeResponse struct {
 }
 
 type UptimeRequest struct {
-	// if omitted, defaults to primary network
+	// Deprecated: SubnetID in UptimeRequest is deprecated.
+	// Uptime API will be available only for Primary Network Validators.
 	SubnetID ids.ID `json:"subnetID"`
 }
 
 func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
-	i.log.Debug("API called",
-		zap.String("service", "info"),
-		zap.String("method", "uptime"),
-	)
+	if args.SubnetID != constants.PrimaryNetworkID {
+		i.log.Warn("Deprecated API called",
+			zap.String("service", "info"),
+			zap.String("method", "uptime"),
+		)
+	} else {
+		i.log.Debug("API called",
+			zap.String("service", "info"),
+			zap.String("method", "uptime"),
+		)
+	}
 
 	result, err := i.networking.NodeUptime(args.SubnetID)
 	if err != nil {

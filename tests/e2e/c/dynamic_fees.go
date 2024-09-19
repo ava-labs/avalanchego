@@ -12,21 +12,19 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 // This test uses the compiled bin for `hashing.sol` as
 // well as its ABI contained in `hashing_contract.go`.
 
 var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	// Need a gas limit much larger than the standard 21_000 to enable
 	// the contract to induce a gas price increase
@@ -36,24 +34,31 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 	gasTip := big.NewInt(1000 * params.GWei)
 
 	ginkgo.It("should ensure that the gas price is affected by load", func() {
-		ginkgo.By("creating a new private network to ensure isolation from other tests")
+		tc.By("creating a new private network to ensure isolation from other tests")
 		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-dynamic-fees")
-		e2e.Env.StartPrivateNetwork(privateNetwork)
+		e2e.GetEnv(tc).StartPrivateNetwork(privateNetwork)
 
-		ginkgo.By("allocating a pre-funded key")
+		// Avoid emitting a spec-scoped metrics link for the shared
+		// network since the link emitted by the start of the private
+		// network is more relevant.
+		//
+		// TODO(marun) Make this implicit to the start of a private network
+		e2e.EmitMetricsLink = false
+
+		tc.By("allocating a pre-funded key")
 		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := evm.GetEthAddress(key)
 
-		ginkgo.By("initializing a coreth client")
+		tc.By("initializing a coreth client")
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
 			NodeID: node.NodeID,
 			URI:    node.URI,
 		}
-		ethClient := e2e.NewEthClient(nodeURI)
+		ethClient := e2e.NewEthClient(tc, nodeURI)
 
-		ginkgo.By("initializing a transaction signer")
-		cChainID, err := ethClient.ChainID(e2e.DefaultContext())
+		tc.By("initializing a transaction signer")
+		cChainID, err := ethClient.ChainID(tc.DefaultContext())
 		require.NoError(err)
 		signer := types.NewEIP155Signer(cChainID)
 		ecdsaKey := key.ToECDSA()
@@ -64,9 +69,9 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		}
 
 		var contractAddress common.Address
-		ginkgo.By("deploying an expensive contract", func() {
+		tc.By("deploying an expensive contract", func() {
 			// Create transaction
-			nonce, err := ethClient.AcceptedNonceAt(e2e.DefaultContext(), ethAddress)
+			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 			require.NoError(err)
 			compiledContract := common.Hex2Bytes(hashingCompiledContract)
 			tx := types.NewTx(&types.LegacyTx{
@@ -79,13 +84,13 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			// Send the transaction and wait for acceptance
 			signedTx := sign(tx)
-			receipt := e2e.SendEthTransaction(ethClient, signedTx)
+			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 
 			contractAddress = receipt.ContractAddress
 		})
 
 		var gasPrice *big.Int
-		ginkgo.By("calling the expensive contract repeatedly until a gas price increase is detected", func() {
+		tc.By("calling the expensive contract repeatedly until a gas price increase is detected", func() {
 			// Evaluate the bytes representation of the contract
 			hashingABI, err := abi.JSON(strings.NewReader(hashingABIJson))
 			require.NoError(err)
@@ -93,22 +98,22 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			require.NoError(err)
 
 			var initialGasPrice *big.Int
-			e2e.Eventually(func() bool {
+			tc.Eventually(func() bool {
 				// Check the gas price
 				var err error
-				gasPrice, err = ethClient.SuggestGasPrice(e2e.DefaultContext())
+				gasPrice, err = ethClient.SuggestGasPrice(tc.DefaultContext())
 				require.NoError(err)
 				if initialGasPrice == nil {
 					initialGasPrice = gasPrice
-					tests.Outf("{{blue}}initial gas price is %v{{/}}\n", initialGasPrice)
+					tc.Outf("{{blue}}initial gas price is %v{{/}}\n", initialGasPrice)
 				} else if gasPrice.Cmp(initialGasPrice) > 0 {
 					// Gas price has increased
-					tests.Outf("{{blue}}gas price has increased to %v{{/}}\n", gasPrice)
+					tc.Outf("{{blue}}gas price has increased to %v{{/}}\n", gasPrice)
 					return true
 				}
 
 				// Create the transaction
-				nonce, err := ethClient.AcceptedNonceAt(e2e.DefaultContext(), ethAddress)
+				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 				require.NoError(err)
 				tx := types.NewTx(&types.LegacyTx{
 					Nonce:    nonce,
@@ -121,33 +126,34 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 				// Send the transaction and wait for acceptance
 				signedTx := sign(tx)
-				_ = e2e.SendEthTransaction(ethClient, signedTx)
+				_ = e2e.SendEthTransaction(tc, ethClient, signedTx)
 
 				// The gas price will be checked at the start of the next iteration
 				return false
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price increase before timeout")
 		})
 
-		ginkgo.By("waiting for the gas price to decrease...", func() {
+		tc.By("waiting for the gas price to decrease...", func() {
 			initialGasPrice := gasPrice
-			e2e.Eventually(func() bool {
+			tc.Eventually(func() bool {
 				var err error
-				gasPrice, err = ethClient.SuggestGasPrice(e2e.DefaultContext())
+				gasPrice, err = ethClient.SuggestGasPrice(tc.DefaultContext())
 				require.NoError(err)
-				tests.Outf("{{blue}}.{{/}}")
+				tc.Outf("{{blue}}.{{/}}")
 				return initialGasPrice.Cmp(gasPrice) > 0
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
-			tests.Outf("\n{{blue}}gas price has decreased to %v{{/}}\n", gasPrice)
+			tc.Outf("\n{{blue}}gas price has decreased to %v{{/}}\n", gasPrice)
 		})
 
-		ginkgo.By("sending funds at the current gas price", func() {
+		tc.By("sending funds at the current gas price", func() {
 			// Create a recipient address
-			recipientKey, err := secp256k1.NewPrivateKey()
-			require.NoError(err)
-			recipientEthAddress := evm.GetEthAddress(recipientKey)
+			var (
+				recipientKey        = e2e.NewPrivateKey(tc)
+				recipientEthAddress = evm.GetEthAddress(recipientKey)
+			)
 
 			// Create transaction
-			nonce, err := ethClient.AcceptedNonceAt(e2e.DefaultContext(), ethAddress)
+			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
 			require.NoError(err)
 			tx := types.NewTx(&types.LegacyTx{
 				Nonce:    nonce,
@@ -159,9 +165,9 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			// Send the transaction and wait for acceptance
 			signedTx := sign(tx)
-			_ = e2e.SendEthTransaction(ethClient, signedTx)
+			_ = e2e.SendEthTransaction(tc, ethClient, signedTx)
 		})
 
-		e2e.CheckBootstrapIsPossible(privateNetwork)
+		_ = e2e.CheckBootstrapIsPossible(tc, privateNetwork)
 	})
 })

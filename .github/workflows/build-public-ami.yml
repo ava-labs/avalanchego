@@ -18,6 +18,9 @@ jobs:
   build-public-ami-and-upload:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -50,8 +53,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.MARKETPLACE_ID }}
-          aws-secret-access-key: ${{ secrets.MARKETPLACE_KEY }}
+          role-to-assume: ${{ secrets.AWS_MARKETPLACE_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Setup `packer`

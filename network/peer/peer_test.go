@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -41,7 +42,6 @@ type testPeer struct {
 type rawTestPeer struct {
 	config         *Config
 	cert           *staking.Certificate
-	nodeID         ids.NodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 
@@ -83,7 +83,7 @@ func newConfig(t *testing.T) Config {
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		Network:              TestNetwork,
 		Router:               nil,
-		VersionCompatibility: version.GetCompatibility(constants.LocalID),
+		VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 		MySubnets:            nil,
 		Beacons:              validators.NewManager(),
 		Validators:           validators.NewManager(),
@@ -105,7 +105,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	require.NoError(err)
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
-	nodeID := ids.NodeIDFromCert(cert)
+	config.MyNodeID = ids.NodeIDFromCert(cert)
 
 	ip := utils.NewAtomic(netip.AddrPortFrom(
 		netip.IPv6Loopback(),
@@ -125,7 +125,6 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	return &rawTestPeer{
 		config:         &config,
 		cert:           cert,
-		nodeID:         nodeID,
 		inboundMsgChan: inboundMsgChan,
 	}
 }
@@ -136,10 +135,10 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 			self.config,
 			conn,
 			peer.cert,
-			peer.nodeID,
+			peer.config.MyNodeID,
 			NewThrottledMessageQueue(
 				self.config.Metrics,
-				peer.nodeID,
+				peer.config.MyNodeID,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -410,7 +409,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 
 	require.NoError(rawPeer0.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
-		rawPeer1.nodeID,
+		rawPeer1.config.MyNodeID,
 		bls.PublicFromSecretKey(rawPeer1.config.IPSigner.blsSigner),
 		ids.GenerateTestID(),
 		1,
@@ -420,7 +419,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require.NoError(err)
 	require.NoError(rawPeer1.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
-		rawPeer0.nodeID,
+		rawPeer0.config.MyNodeID,
 		bls.PublicFromSecretKey(bogusBLSKey), // This is the wrong BLS key for this peer
 		ids.GenerateTestID(),
 		1,
@@ -451,7 +450,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 				},
 				version: &version.Application{
 					Name:  version.Client,
@@ -463,7 +462,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 				},
 				version: &version.Application{
 					Name:  version.Client,
@@ -479,7 +478,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators:           validators.NewManager(),
 				},
 				version: version.CurrentApp,
@@ -487,7 +486,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators:           validators.NewManager(),
 				},
 				version: version.CurrentApp,
@@ -499,7 +498,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -518,7 +517,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -541,7 +540,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -561,7 +560,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -585,7 +584,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -605,7 +604,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -629,7 +628,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -651,7 +650,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -677,7 +676,7 @@ func TestShouldDisconnect(t *testing.T) {
 			initialPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(
@@ -699,7 +698,7 @@ func TestShouldDisconnect(t *testing.T) {
 			expectedPeer: &peer{
 				Config: &Config{
 					Log:                  logging.NoLog{},
-					VersionCompatibility: version.GetCompatibility(constants.UnitTestID),
+					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators: func() validators.Manager {
 						vdrs := validators.NewManager()
 						require.NoError(t, vdrs.AddStaker(

@@ -11,10 +11,6 @@ service AppSender {
   rpc SendAppResponse(SendAppResponseMsg) returns (google.protobuf.Empty);
   rpc SendAppError(SendAppErrorMsg) returns (google.protobuf.Empty);
   rpc SendAppGossip(SendAppGossipMsg) returns (google.protobuf.Empty);
-
-  rpc SendCrossChainAppRequest(SendCrossChainAppRequestMsg) returns (google.protobuf.Empty);
-  rpc SendCrossChainAppResponse(SendCrossChainAppResponseMsg) returns (google.protobuf.Empty);
-  rpc SendCrossChainAppError(SendCrossChainAppErrorMsg) returns (google.protobuf.Empty);
 }
 
 message SendAppRequestMsg {
@@ -54,33 +50,4 @@ message SendAppGossipMsg {
   uint64 peers = 4;
   // The message body
   bytes msg = 5;
-}
-
-message SendCrossChainAppRequestMsg {
-  // The chain to send this request to
-  bytes chain_id = 1;
-  // the ID of this request
-  uint32 request_id = 2;
-  // The request body
-  bytes request = 3;
-}
-
-message SendCrossChainAppResponseMsg {
-  // The chain to send this response to
-  bytes chain_id = 1;
-  // the ID of this request
-  uint32 request_id = 2;
-  // The response body
-  bytes response = 3;
-}
-
-message SendCrossChainAppErrorMsg {
-  // The chain to send a response to
-  bytes chain_id = 1;
-  // ID of this request
-  uint32 request_id = 2;
-  // Application-defined error code
-  sint32 error_code = 3;
-  // Application-defined error message
-  string error_message = 4;
 }

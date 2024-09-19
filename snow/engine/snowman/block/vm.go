@@ -83,3 +83,11 @@ type Parser interface {
 	// It is expected for all historical blocks to be parseable.
 	ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error)
 }
+
+// ParseFunc defines a function that parses raw bytes into a block.
+type ParseFunc func(context.Context, []byte) (snowman.Block, error)
+
+// ParseBlock wraps a ParseFunc into a ParseBlock function, to be used by a Parser interface
+func (f ParseFunc) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
+	return f(ctx, blockBytes)
+}

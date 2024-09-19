@@ -43,7 +43,7 @@ _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
   go install -v github.com/palantir/go-license@v1.25.0
   local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go')
+  while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go' ! -path './**/*mock/*.go')
 
   # shellcheck disable=SC2086
   go-license \
@@ -99,11 +99,10 @@ function test_import_testing_only_in_tests {
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
   HAVE_TEST_LOGIC=$( printf "%s\n%s\n%s\n%s" "${IMPORT_TESTING}" "${IMPORT_TESTIFY}" "${IMPORT_FROM_TESTS}" "${IMPORT_TEST_PKG}" );
 
-  TAGGED_AS_TEST=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\/\/go:build\s+(.+(,|\s+))?test[,\s]?');
   IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | grep -P '.*test/[^/]+\.go$' ) # directory (hence package name) ends in "test"
 
   # Files in /tests/ are already excluded by the `find ... ! -path`
-  INTENDED_FOR_TESTING=$( printf "%s\n%s" "${TAGGED_AS_TEST}" "${IN_TEST_PKG}" )
+  INTENDED_FOR_TESTING="${IN_TEST_PKG}"
 
   # -3 suppresses files that have test logic and have the "test" build tag
   # -2 suppresses files that are tagged despite not having detectable test logic
@@ -113,7 +112,7 @@ function test_import_testing_only_in_tests {
     return 0;
   fi
 
-  echo 'Non-test Go files importing test-only packages MUST (a) have '//go:build test' tag; (b) be in *test package; or (c) be in /tests/ directory:';
+  echo 'Non-test Go files importing test-only packages MUST (a) be in *test package; or (b) be in /tests/ directory:';
   echo "${UNTAGGED}";
   return 1;
 }

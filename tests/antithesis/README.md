@@ -8,14 +8,17 @@ enables discovery and reproduction of anomalous behavior.
 
 ## Package details
 
-| Filename       | Purpose                                                                            |
-|:---------------|:-----------------------------------------------------------------------------------|
-| compose.go     | Generates Docker Compose project file and initial database for antithesis testing. |
-| config.go      | Defines common flags for the workload binary.                                      |
-| init_db.go     | Initializes initial db state for subnet testing.                                   |
-| node_health.go | Helper to check node health.                                                       |
-| avalanchego/   | Defines an antithesis test setup for avalanchego's primary chains.                 |
-| xsvm/          | Defines an antithesis test setup for the xsvm VM.                                  |
+| Filename                          | Purpose                                                                            |
+|:----------------------------------|:-----------------------------------------------------------------------------------|
+| compose.go                        | Generates Docker Compose project file and initial database for antithesis testing. |
+| config.go                         | Defines common flags for the workload binary.                                      |
+| Dockerfile.builder-instrumented   | Dockerfile for instrumented builds.                                                |
+| Dockerfile.builder-uninstrumented | Dockerfile for uninstrumented builds.                                              |
+| config.go                         | Defines common flags for the workload binary.                                      |
+| init_db.go                        | Initializes initial db state for subnet testing.                                   |
+| node_health.go                    | Helper to check node health.                                                       |
+| avalanchego/                      | Defines an antithesis test setup for avalanchego's primary chains.                 |
+| xsvm/                             | Defines an antithesis test setup for the xsvm VM.                                  |
 
 ## Instrumentation
 
@@ -66,7 +69,7 @@ test setup.
 
 ## Troubleshooting a test setup
 
-### Running a workload directly
+### Running a workload with an existing network
 
 The workload of the 'avalanchego' test setup can be invoked against an
 arbitrary network:
@@ -83,12 +86,26 @@ chain needs to be provided to the workload:
 $ AVAWL_URIS=... CHAIN_IDS="2S9ypz...AzMj9" go run ./tests/antithesis/xsvm
 ```
 
-### Running a workload with docker-compose
+### Running a workload with a tmpnet network
+
+Just like with e2e tests, running an antithesis workload against a
+tmpnet network requires specifying an avalanchego path (either as an
+argument or an env var):
+
+```bash
+$ go run ./tests/antithesis/avalanchego --avalanchego-path=/path/to/avalanchego
+```
+
+All tmpnet flags are supported (e.g. `--reuse-network`,
+`--stop-network`, `--restart-network`, `--node-count`).  See the
+[tmpnet documentation](../fixture/tmpnet/README.md) for more details.
+
+### Running a workload with docker compose v2
 
 Running the test script for a given test setup with the `DEBUG` flag
 set will avoid cleaning up the temporary directory where the
-docker-compose setup is written to. This will allow manual invocation of
-docker-compose to see the log output of the workload.
+docker compose setup is written to. This will allow manual invocation of
+docker compose to see the log output of the workload.
 
 ```bash
 $ DEBUG=1 ./scripts/tests.build_antithesis_images.sh
@@ -99,7 +116,7 @@ directory will appear in the output of the script:
 
 ```
 ...
-using temporary directory /tmp/tmp.E6eHdDr4ln as the docker-compose path"
+using temporary directory /tmp/tmp.E6eHdDr4ln as the docker compose path
 ...
 ```
 
@@ -110,10 +127,10 @@ output appears on stdout for inspection:
 $ cd [temporary directory]
 
 # Start the compose project
-$ docker-compose up
+$ docker compose up
 
 # Cleanup the compose project
-$ docker-compose down --volumes
+$ docker compose down --volumes
 ```
 
 ## Manually triggering an Antithesis test run
@@ -140,6 +157,6 @@ can be performed against master or an arbitrary branch:
    workflow against the desired branch. The branch only determines the
    CI configuration (the images have already been built), so master is
    probably fine. Make sure to supply the same `image_tag` that was
-   provided to the publishing workflow and consider setting
-   `recipients` to your own email rather than sending the test report
-   to everyone on the regular distribution list.
+   provided to the publishing workflow and provide a value for
+   `recipients` (e.g. your email address) to avoid sending the test
+   report to everyone on the regular distribution list.

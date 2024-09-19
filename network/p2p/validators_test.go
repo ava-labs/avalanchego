@@ -14,8 +14,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -169,7 +170,7 @@ func TestValidatorsSample(t *testing.T) {
 			require := require.New(t)
 			subnetID := ids.GenerateTestID()
 			ctrl := gomock.NewController(t)
-			mockValidators := validators.NewMockState(ctrl)
+			mockValidators := validatorsmock.NewState(ctrl)
 
 			calls := make([]any, 0)
 			for _, call := range tt.calls {
@@ -195,7 +196,7 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
 			require.NoError(err)
 
 			ctx := context.Background()
@@ -310,12 +311,12 @@ func TestValidatorsTop(t *testing.T) {
 			}
 
 			subnetID := ids.GenerateTestID()
-			mockValidators := validators.NewMockState(ctrl)
+			mockValidators := validatorsmock.NewState(ctrl)
 
 			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)
 
-			network, err := NewNetwork(logging.NoLog{}, &common.FakeSender{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
 			require.NoError(err)
 
 			ctx := context.Background()

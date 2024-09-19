@@ -20,9 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -35,7 +35,7 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.TestVM) {
+func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *blocktest.VM) {
 	require := require.New(t)
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -43,8 +43,8 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 
 	vdrs := validators.NewManager()
 
-	sender := &common.SenderTest{}
-	vm := &block.TestVM{}
+	sender := &enginetest.Sender{}
+	vm := &blocktest.VM{}
 
 	sender.T = t
 	vm.T = t
@@ -53,7 +53,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	vm.Default(true)
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &enginetest.BootstrapTracker{
 		T: t,
 		IsBootstrappedF: func() bool {
 			return isBootstrapped
@@ -90,6 +90,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 	peerTracker.Connected(peer, version.CurrentApp)
 
 	return Config{
+		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
@@ -98,7 +99,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
+		Timer:                          &enginetest.Timer{},
 		AncestorsMaxContainersReceived: 2000,
 		DB:                             memdb.New(),
 		VM:                             vm,
@@ -108,9 +109,9 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *block.Tes
 func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	require := require.New(t)
 
-	sender := &common.SenderTest{T: t}
-	vm := &block.TestVM{
-		TestVM: common.TestVM{T: t},
+	sender := &enginetest.Sender{T: t}
+	vm := &blocktest.VM{
+		VM: enginetest.VM{T: t},
 	}
 
 	sender.Default(true)
@@ -146,8 +147,8 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		StartupTracker:                 startupTracker,
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
-		BootstrapTracker:               &common.BootstrapTrackerTest{},
-		Timer:                          &common.TimerTest{},
+		BootstrapTracker:               &enginetest.BootstrapTracker{},
+		Timer:                          &enginetest.Timer{},
 		AncestorsMaxContainersReceived: 2000,
 		DB:                             memdb.New(),
 		VM:                             vm,
@@ -610,8 +611,8 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	ctx := snowtest.ConsensusContext(snowCtx)
 	peers := validators.NewManager()
 
-	sender := &common.SenderTest{}
-	vm := &block.TestVM{}
+	sender := &enginetest.Sender{}
+	vm := &blocktest.VM{}
 
 	sender.T = t
 	vm.T = t
@@ -620,7 +621,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 	vm.Default(true)
 
 	isBootstrapped := false
-	bootstrapTracker := &common.BootstrapTrackerTest{
+	bootstrapTracker := &enginetest.BootstrapTracker{
 		T: t,
 		IsBootstrappedF: func() bool {
 			return isBootstrapped
@@ -679,7 +680,7 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &common.TimerTest{},
+		Timer:                          &enginetest.Timer{},
 		AncestorsMaxContainersReceived: 2000,
 		DB:                             intervalDB,
 		VM:                             vm,
@@ -772,7 +773,7 @@ func TestBootstrapperRollbackOnSetState(t *testing.T) {
 	require.Equal(blks[0].HeightV, bs.startingHeight)
 }
 
-func initializeVMWithBlockchain(vm *block.TestVM, blocks []*snowmantest.Block) {
+func initializeVMWithBlockchain(vm *blocktest.VM, blocks []*snowmantest.Block) {
 	vm.CantSetState = false
 	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		blocks,

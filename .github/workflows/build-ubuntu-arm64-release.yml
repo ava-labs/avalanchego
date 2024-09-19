@@ -13,10 +13,13 @@ on:
 jobs:
   build-jammy-arm64-package:
     runs-on: custom-arm64-jammy
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -30,8 +33,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Try to get tag from git
@@ -70,11 +73,14 @@ jobs:
 
   build-focal-arm64-package:
     runs-on: custom-arm64-focal
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-focal-deps
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       - name: Build the avalanchego binaries
@@ -88,8 +94,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Try to get tag from git

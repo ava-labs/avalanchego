@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -16,14 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -40,21 +42,23 @@ var xChainMetricLabels = prometheus.Labels{
 // This test requires that the network not have ongoing blocks and
 // cannot reliably be run in parallel.
 var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
-	require := require.New(ginkgo.GinkgoT())
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
 
 	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
 		func() {
-			rpcEps := make([]string, len(e2e.Env.URIs))
-			for i, nodeURI := range e2e.Env.URIs {
+			env := e2e.GetEnv(tc)
+			rpcEps := make([]string, len(env.URIs))
+			for i, nodeURI := range env.URIs {
 				rpcEps[i] = nodeURI.URI
 			}
 
 			// Waiting for ongoing blocks to have completed before starting this
 			// test avoids the case of a previous test having initiated block
 			// processing but not having completed it.
-			e2e.Eventually(func() bool {
+			tc.Eventually(func() bool {
 				allNodeMetrics, err := tests.GetNodesMetrics(
-					e2e.DefaultContext(),
+					tc.DefaultContext(),
 					rpcEps,
 				)
 				require.NoError(err)
@@ -74,10 +78,45 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 			// Ensure the same set of 10 keys is used for all tests
 			// by retrieving them outside of runFunc.
-			testKeys := e2e.Env.AllocatePreFundedKeys(10)
+			testKeys := []*secp256k1.PrivateKey{
+				// The funded key will be the source of funds for the new keys
+				env.PreFundedKey,
+			}
+			newKeys, err := tmpnet.NewPrivateKeys(9)
+			require.NoError(err)
+			testKeys = append(testKeys, newKeys...)
+
+			const transferPerRound = units.MilliAvax
+
+			tc.By("Funding new keys")
+			fundingWallet := e2e.NewWallet(tc, env.NewKeychain(), env.GetRandomNodeURI())
+			fundingOutputs := make([]*avax.TransferableOutput, len(newKeys))
+			fundingAssetID := fundingWallet.X().Builder().Context().AVAXAssetID
+			for i, key := range newKeys {
+				fundingOutputs[i] = &avax.TransferableOutput{
+					Asset: avax.Asset{
+						ID: fundingAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						// Enough for 1 transfer per round
+						Amt: totalRounds * transferPerRound,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								key.Address(),
+							},
+						},
+					},
+				}
+			}
+			_, err = fundingWallet.X().IssueBaseTx(
+				fundingOutputs,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
 
 			runFunc := func(round int) {
-				tests.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
+				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
 
 				needPermute := round > 3
 				if needPermute {
@@ -88,7 +127,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				}
 
 				keychain := secp256k1fx.NewKeychain(testKeys...)
-				baseWallet := e2e.NewWallet(keychain, e2e.Env.GetRandomNodeURI())
+				baseWallet := e2e.NewWallet(tc, keychain, env.GetRandomNodeURI())
 				xWallet := baseWallet.X()
 				xBuilder := xWallet.Builder()
 				xContext := xBuilder.Context()
@@ -108,13 +147,13 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				}
 
 				metricsBeforeTx, err := tests.GetNodesMetrics(
-					e2e.DefaultContext(),
+					tc.DefaultContext(),
 					rpcEps,
 				)
 				require.NoError(err)
 				for _, uri := range rpcEps {
 					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
-						tests.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
+						tc.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
 					}
 				}
 
@@ -156,13 +195,11 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				senderOrigBal := testBalances[fromIdx]
 				receiverOrigBal := testBalances[toIdx]
-
-				amountToTransfer := senderOrigBal / 10
-
+				amountToTransfer := transferPerRound
 				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
-				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
+				tc.By("X-Chain transfer with wrong amount must fail", func() {
 					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
 							Asset: avax.Asset{
@@ -176,7 +213,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 								},
 							},
 						}},
-						e2e.WithDefaultContext(),
+						tc.WithDefaultContext(),
 					)
 					require.Contains(err.Error(), "insufficient funds")
 				})
@@ -217,19 +254,19 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 							},
 						},
 					}},
-					e2e.WithDefaultContext(),
+					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
 
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
 				senderCurBalX := balances[avaxAssetID]
-				tests.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
+				tc.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
 
 				balances, err = wallets[toIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
 				receiverCurBalX := balances[avaxAssetID]
-				tests.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
+				tc.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
 
 				require.Equal(senderCurBalX, senderNewBal)
 				require.Equal(receiverCurBalX, receiverNewBal)
@@ -237,14 +274,14 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					require.NoError(avm.AwaitTxAccepted(xc, e2e.DefaultContext(), txID, 2*time.Second))
+					require.NoError(avm.AwaitTxAccepted(xc, tc.DefaultContext(), txID, 2*time.Second))
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					require.NoError(avm.AwaitTxAccepted(xc, e2e.DefaultContext(), txID, 2*time.Second))
+					require.NoError(avm.AwaitTxAccepted(xc, tc.DefaultContext(), txID, 2*time.Second))
 
-					mm, err := tests.GetNodeMetrics(e2e.DefaultContext(), u)
+					mm, err := tests.GetNodeMetrics(tc.DefaultContext(), u)
 					require.NoError(err)
 
 					prev := metricsBeforeTx[u]

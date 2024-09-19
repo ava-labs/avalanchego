@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -25,19 +27,19 @@ import (
 var errUnknownBlock = errors.New("unknown block")
 
 type StateSyncEnabledMock struct {
-	*block.TestVM
-	*block.MockStateSyncableVM
+	*blocktest.VM
+	*blockmock.StateSyncableVM
 }
 
-func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *common.SenderTest) {
+func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginetest.Sender) {
 	ctrl := gomock.NewController(t)
 
 	vm := StateSyncEnabledMock{
-		TestVM:              &block.TestVM{},
-		MockStateSyncableVM: block.NewMockStateSyncableVM(ctrl),
+		VM:              &blocktest.VM{},
+		StateSyncableVM: blockmock.NewStateSyncableVM(ctrl),
 	}
 
-	sender := &common.SenderTest{
+	sender := &enginetest.Sender{
 		T: t,
 	}
 	sender.Default(true)

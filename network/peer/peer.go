@@ -534,6 +534,7 @@ func (p *peer) writeMessages() {
 	myVersion := p.VersionCompatibility.Version()
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
+	_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
@@ -550,6 +551,7 @@ func (p *peer) writeMessages() {
 		p.ObjectedACPs,
 		knownPeersFilter,
 		knownPeersSalt,
+		areWeAPrimaryNetworkValidator,
 	)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
@@ -592,6 +594,7 @@ func (p *peer) writeMessages() {
 func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	msgBytes := msg.Bytes()
 	p.Log.Verbo("sending message",
+		zap.Stringer("op", msg.Op()),
 		zap.Stringer("nodeID", p.id),
 		zap.Binary("messageBytes", msgBytes),
 	)
@@ -643,7 +646,12 @@ func (p *peer) sendNetworkMessages() {
 		select {
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
-			msg, err := p.Config.MessageCreator.GetPeerList(knownPeersFilter, knownPeersSalt)
+			_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+			msg, err := p.Config.MessageCreator.GetPeerList(
+				knownPeersFilter,
+				knownPeersSalt,
+				areWeAPrimaryNetworkValidator,
+			)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,
 					zap.Stringer("nodeID", p.id),
@@ -1113,7 +1121,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 
 	p.gotHandshake.Set(true)
 
-	peerIPs := p.Network.Peers(p.id, knownPeers, salt)
+	peerIPs := p.Network.Peers(p.id, p.trackedSubnets, msg.AllSubnets, knownPeers, salt)
 
 	// We bypass throttling here to ensure that the handshake message is
 	// acknowledged correctly.
@@ -1175,7 +1183,7 @@ func (p *peer) handleGetPeerList(msg *p2p.GetPeerList) {
 		return
 	}
 
-	peerIPs := p.Network.Peers(p.id, filter, salt)
+	peerIPs := p.Network.Peers(p.id, p.trackedSubnets, msg.AllSubnets, filter, salt)
 	if len(peerIPs) == 0 {
 		p.Log.Debug("skipping sending of empty peer list",
 			zap.Stringer("nodeID", p.id),

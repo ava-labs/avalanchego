@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -34,6 +35,7 @@ var (
 type verifier struct {
 	*backend
 	txExecutorBackend *executor.Backend
+	pChainHeight      uint64
 }
 
 func (v *verifier) BanffAbortBlock(b *block.BanffAbortBlock) error {
@@ -233,9 +235,10 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 
 		onAcceptState: atomicExecutor.OnAccept,
 
-		inputs:         atomicExecutor.Inputs,
-		timestamp:      atomicExecutor.OnAccept.GetTimestamp(),
-		atomicRequests: atomicExecutor.AtomicRequests,
+		inputs:          atomicExecutor.Inputs,
+		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
+		atomicRequests:  atomicExecutor.AtomicRequests,
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -345,9 +348,10 @@ func (v *verifier) abortBlock(b block.Block) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onAbortState,
-		timestamp:      onAbortState.GetTimestamp(),
+		statelessBlock:  b,
+		onAcceptState:   onAbortState,
+		timestamp:       onAbortState.GetTimestamp(),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -362,9 +366,10 @@ func (v *verifier) commitBlock(b block.Block) error {
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
-		statelessBlock: b,
-		onAcceptState:  onCommitState,
-		timestamp:      onCommitState.GetTimestamp(),
+		statelessBlock:  b,
+		onAcceptState:   onCommitState,
+		timestamp:       onCommitState.GetTimestamp(),
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -415,8 +420,9 @@ func (v *verifier) proposalBlock(
 		// It is safe to use [b.onAbortState] here because the timestamp will
 		// never be modified by an Apricot Abort block and the timestamp will
 		// always be the same as the Banff Proposal Block.
-		timestamp:      onAbortState.GetTimestamp(),
-		atomicRequests: atomicRequests,
+		timestamp:       onAbortState.GetTimestamp(),
+		atomicRequests:  atomicRequests,
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -441,9 +447,10 @@ func (v *verifier) standardBlock(
 		onAcceptState: onAcceptState,
 		onAcceptFunc:  onAcceptFunc,
 
-		timestamp:      onAcceptState.GetTimestamp(),
-		inputs:         inputs,
-		atomicRequests: atomicRequests,
+		timestamp:       onAcceptState.GetTimestamp(),
+		inputs:          inputs,
+		atomicRequests:  atomicRequests,
+		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
 }
@@ -454,6 +461,41 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 	func(),
 	error,
 ) {
+	// Complexity is limited first to avoid processing too large of a block.
+	if timestamp := state.GetTimestamp(); v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		var blockComplexity gas.Dimensions
+		for _, tx := range txs {
+			txComplexity, err := fee.TxComplexity(tx.Unsigned)
+			if err != nil {
+				txID := tx.ID()
+				v.MarkDropped(txID, err)
+				return nil, nil, nil, err
+			}
+
+			blockComplexity, err = blockComplexity.Add(&txComplexity)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
+
+		blockGas, err := blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// If this block exceeds the available capacity, ConsumeGas will return
+		// an error.
+		feeState := state.GetFeeState()
+		feeState, err = feeState.ConsumeGas(blockGas)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// Updating the fee state prior to executing the transactions is fine
+		// because the fee calculator was already created.
+		state.SetFeeState(feeState)
+	}
+
 	var (
 		onAcceptFunc   func()
 		inputs         set.Set[ids.ID]

@@ -100,6 +100,10 @@ func (*ProposalTxExecutor) BaseTx(*txs.BaseTx) error {
 	return ErrWrongTxType
 }
 
+func (*ProposalTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+	return ErrWrongTxType
+}
+
 func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
@@ -138,7 +142,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	e.OnCommitState.PutPendingValidator(newStaker)
+	if err := e.OnCommitState.PutPendingValidator(newStaker); err != nil {
+		return err
+	}
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
@@ -185,7 +191,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 		return err
 	}
 
-	e.OnCommitState.PutPendingValidator(newStaker)
+	if err := e.OnCommitState.PutPendingValidator(newStaker); err != nil {
+		return err
+	}
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs

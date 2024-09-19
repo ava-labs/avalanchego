@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-focal-deps
         if: matrix.os == 'custom-arm64-focal'
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-2022'
@@ -48,7 +48,7 @@ jobs:
       - name: fuzz_test
         shell: bash
         run: ./scripts/build_fuzz.sh 10 # Run each fuzz test 10 seconds
-  e2e:
+  e2e_pre_etna:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +68,28 @@ jobs:
         uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
         with:
-          name: e2e-tmpnet-data
+          name: e2e-pre-etna-tmpnet-data
+  e2e_post_etna:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: E2E_SERIAL=1 ./scripts/tests.e2e.sh --delay-network-shutdown --activate-etna
+          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_id: ${{ secrets.LOKI_ID || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      - name: Upload tmpnet network dir
+        uses: ./.github/actions/upload-tmpnet-artifact
+        if: always()
+        with:
+          name: e2e-post-etna-tmpnet-data
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
@@ -144,6 +165,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - uses: bufbuild/buf-setup-action@v1.31.0
+        with:
+          github_token: ${{ github.token }}
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash
@@ -185,6 +208,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Check that the avalanchego workload is sane
+        shell: bash
+        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=60s
       - name: Check image build for avalanchego test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
@@ -195,6 +225,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Build AvalancheGo Binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Build xsvm binary
+        shell: bash
+        run: ./scripts/build_xsvm.sh
+      - name: Check that the xsvm workload is sane
+        shell: bash
+        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=60s
       - name: Check image build for xsvm test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
