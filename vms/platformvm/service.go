@@ -847,13 +847,24 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 			shares := attr.shares
 			delegationFee := avajson.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
-
-			uptime, err := s.getAPIUptime(currentStaker)
-			if err != nil {
-				return err
+			var uptime *avajson.Float32
+			var connected *bool
+			if args.SubnetID == constants.PrimaryNetworkID {
+				rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(currentStaker.NodeID, currentStaker.StartTime)
+				if err != nil {
+					return err
+				}
+				// Transform this to a percentage (0-100) to make it consistent
+				// with observedUptime in info.peers API
+				currentUptime := avajson.Float32(rawUptime * 100)
+				if err != nil {
+					return err
+				}
+				isConnected := s.vm.uptimeManager.IsConnected(currentStaker.NodeID)
+				connected = &isConnected
+				uptime = &currentUptime
 			}
 
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			var (
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
@@ -913,15 +924,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 
 		case txs.SubnetPermissionedValidatorCurrentPriority:
-			uptime, err := s.getAPIUptime(currentStaker)
-			if err != nil {
-				return err
-			}
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
-				Staker:    apiStaker,
-				Connected: connected,
-				Uptime:    uptime,
+				Staker: apiStaker,
 			})
 
 		default:
@@ -1886,22 +1890,6 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 	)
 	reply.Time = s.vm.state.GetTimestamp()
 	return nil
-}
-
-func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {
-	// Only report uptimes that we have been actively tracking.
-	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
-		return nil, nil
-	}
-
-	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(staker.NodeID, staker.SubnetID, staker.StartTime)
-	if err != nil {
-		return nil, err
-	}
-	// Transform this to a percentage (0-100) to make it consistent
-	// with observedUptime in info.peers API
-	uptime := avajson.Float32(rawUptime * 100)
-	return &uptime, nil
 }
 
 func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Owner, error) {
