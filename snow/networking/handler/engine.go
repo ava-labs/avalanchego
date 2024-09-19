@@ -5,7 +5,6 @@ package handler
 
 import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -18,7 +17,7 @@ type Engine struct {
 
 // Get returns the engine corresponding to the provided state,
 // and whether its corresponding engine is initialized (not nil).
-func (e *Engine) Get(state snow.State) (common.Engine, bool) {
+/*func (e *Engine) Get(state snow.State) (common.Engine, bool) {
 	if e == nil {
 		return nil, false
 	}
@@ -32,7 +31,7 @@ func (e *Engine) Get(state snow.State) (common.Engine, bool) {
 	default:
 		return nil, false
 	}
-}
+}*/
 
 // EngineManager resolves the engine that should be used given the current
 // execution context of the chain.

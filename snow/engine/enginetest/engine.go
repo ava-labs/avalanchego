@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -111,7 +112,8 @@ type Engine struct {
 	HaltF                        func(context.Context)
 	TimeoutF, GossipF, ShutdownF func(context.Context) error
 	NotifyF                      func(context.Context, common.Message) error
-	GetF, GetAncestorsF          func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
+	GetF                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error
+	GetAncestorsF                func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, engineType p2p.EngineType) error
 	PullQueryF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error
 	PutF                         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) error
 	PushQueryF                   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte, requestedHeight uint64) error
@@ -410,9 +412,9 @@ func (e *Engine) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, c
 	return errGet
 }
 
-func (e *Engine) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+func (e *Engine) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, engineType p2p.EngineType) error {
 	if e.GetAncestorsF != nil {
-		return e.GetAncestorsF(ctx, nodeID, requestID, containerID)
+		return e.GetAncestorsF(ctx, nodeID, requestID, containerID, engineType)
 	}
 	if !e.CantGetAncestors {
 		return nil
