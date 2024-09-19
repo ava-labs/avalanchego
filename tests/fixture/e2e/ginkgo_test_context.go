@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
+var _ tests.TestContext = (*GinkgoTestContext)(nil)
+
 type ginkgoWriteCloser struct{}
 
 func (*ginkgoWriteCloser) Write(p []byte) (n int, err error) {
@@ -113,6 +115,10 @@ func (tc *GinkgoTestContext) DefaultContext() context.Context {
 // Helper simplifying use via an option of a timed context configured with the default timeout.
 func (tc *GinkgoTestContext) WithDefaultContext() common.Option {
 	return tests.WithDefaultContext(tc)
+}
+
+func (*GinkgoTestContext) GetDefaultContextParent() context.Context {
+	return nil
 }
 
 // Re-implementation of testify/require.Eventually that is compatible with ginkgo. testify's
