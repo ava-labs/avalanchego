@@ -28,9 +28,7 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -90,9 +88,7 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
