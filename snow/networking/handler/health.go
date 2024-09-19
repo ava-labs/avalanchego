@@ -15,17 +15,7 @@ import (
 var ErrNotConnectedEnoughStake = errors.New("not connected to enough stake")
 
 func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
-	state := h.ctx.State.Get()
-	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w %s running %s",
-			errMissingEngine,
-			state.State,
-			state.Type,
-		)
-	}
-	engineIntf, engineErr := engine.HealthCheck(ctx)
+	engineIntf, engineErr := h.engine.HealthCheck(ctx)
 	networkingIntf, networkingErr := h.networkHealthCheck()
 	intf := map[string]interface{}{
 		"engine":     engineIntf,

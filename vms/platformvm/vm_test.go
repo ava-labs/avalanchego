@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
+	"github.com/ava-labs/avalanchego/snow/engine/unified"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -1378,32 +1379,23 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		},
 		Consensus: &smcon.Topological{},
 	}
-	engine, err := smeng.New(engineConfig)
-	require.NoError(err)
 
-	bootstrapper, err := bootstrap.New(
-		bootstrapConfig,
-		engine.Start,
-	)
-	require.NoError(err)
-
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	factory := &unified.EngineFactory{
+		GetServer:     snowGetHandler,
+		SnowmanConfig: engineConfig,
+		BootConfig:    bootstrapConfig,
+		Logger:        ctx.Log,
+	}
 
 	consensusCtx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.NormalOp,
+		State: snow.Bootstrapping,
 	})
+
+	engine, err := unified.EngineFromEngines(engineConfig.Ctx, factory, vm)
+	require.NoError(err)
+
+	h.SetEngine(engine)
 
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(context.Background(), h)
@@ -1426,7 +1418,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	peerTracker.Connected(peerID, version.CurrentApp)
-	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
+	require.NoError(engine.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1438,7 +1430,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
+	require.NoError(engine.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
 	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1455,7 +1447,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	frontier := set.Of(advanceTimeBlkID)
-	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
+	require.NoError(engine.Accepted(context.Background(), peerID, reqID, frontier))
 
 	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsg, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1469,7 +1461,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	require.NoError(bootstrapper.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
+	require.NoError(engine.Ancestors(context.Background(), peerID, reqID, [][]byte{advanceTimeBlkBytes}))
 
 	externalSender.SendF = func(msg message.OutboundMessage, config common.SendConfig, _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1481,12 +1473,12 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
+	require.NoError(engine.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
+	require.NoError(engine.Accepted(context.Background(), peerID, reqID, frontier))
 	require.Equal(advanceTimeBlk.ID(), vm.manager.Preferred())
 
 	ctx.Lock.Unlock()

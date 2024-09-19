@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -157,7 +158,7 @@ func (e *tracedEngine) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 	return e.engine.GetAcceptedFailed(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
+func (e *tracedEngine) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, engineType p2p.EngineType) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.GetAncestors", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -165,7 +166,7 @@ func (e *tracedEngine) GetAncestors(ctx context.Context, nodeID ids.NodeID, requ
 	))
 	defer span.End()
 
-	return e.engine.GetAncestors(ctx, nodeID, requestID, containerID)
+	return e.engine.GetAncestors(ctx, nodeID, requestID, containerID, engineType)
 }
 
 func (e *tracedEngine) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) error {

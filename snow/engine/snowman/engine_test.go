@@ -514,7 +514,7 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 		require.Equal(snowmantest.GenesisBytes, blk)
 	}
 
-	require.NoError(te.Get(context.Background(), vdr, 123, snowmantest.GenesisID))
+	require.NoError(te.AllGetsServer.Get(context.Background(), vdr, 123, snowmantest.GenesisID))
 	require.True(sentPut)
 }
 

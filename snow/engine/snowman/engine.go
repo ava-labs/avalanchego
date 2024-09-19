@@ -36,7 +36,7 @@ const (
 	errInsufficientStake = "insufficient connected stake"
 )
 
-var _ common.Engine = (*Engine)(nil)
+var _ common.ConsensusEngine = (*Engine)(nil)
 
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
@@ -48,13 +48,6 @@ type Engine struct {
 	Config
 	*metrics
 
-	// list of NoOpsHandler for messages dropped by engine
-	common.StateSummaryFrontierHandler
-	common.AcceptedStateSummaryHandler
-	common.AcceptedFrontierHandler
-	common.AcceptedHandler
-	common.AncestorsHandler
-	common.AppHandler
 	validators.Connector
 
 	requestID uint32
@@ -133,23 +126,17 @@ func New(config Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		Config:                      config,
-		metrics:                     metrics,
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
-		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
-		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
-		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Ctx.Log),
-		AppHandler:                  config.VM,
-		Connector:                   config.VM,
-		pending:                     make(map[ids.ID]snowman.Block),
-		unverifiedIDToAncestor:      ancestor.NewTree(),
-		unverifiedBlockCache:        nonVerifiedCache,
-		acceptedFrontiers:           acceptedFrontiers,
-		blocked:                     job.NewScheduler[ids.ID](),
-		polls:                       polls,
-		blkReqs:                     bimap.New[common.Request, ids.ID](),
-		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
+		Config:                 config,
+		metrics:                metrics,
+		Connector:              config.VM,
+		pending:                make(map[ids.ID]snowman.Block),
+		unverifiedIDToAncestor: ancestor.NewTree(),
+		unverifiedBlockCache:   nonVerifiedCache,
+		acceptedFrontiers:      acceptedFrontiers,
+		blocked:                job.NewScheduler[ids.ID](),
+		polls:                  polls,
+		blkReqs:                bimap.New[common.Request, ids.ID](),
+		blkReqSourceMetric:     make(map[common.Request]prometheus.Counter),
 	}, nil
 }
 

@@ -110,12 +110,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				return ctx
 			}
 
-			handlerIntf.SetEngineManager(&EngineManager{
-				Snowman: &Engine{
-					Bootstrapper: bootstrapper,
-					Consensus:    engine,
-				},
-			})
+			handlerIntf.SetEngine(engine)
 
 			ctx.State.Set(snow.EngineState{
 				Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -21,6 +22,26 @@ import (
 // required.
 type Engine interface {
 	Handler
+
+	// Start engine operations from given request ID
+	Start(ctx context.Context, startReqID uint32) error
+
+	// Returns nil if the engine is healthy.
+	// Periodically called and reported through the health API
+	health.Checker
+}
+
+// ConsensusEngine describes the standard interface of a consensus engine.
+//
+// All nodeIDs are assumed to be authenticated.
+//
+// A consensus engine may recover after returning an error, but it isn't
+// required.
+type ConsensusEngine interface {
+	PutHandler
+	QueryHandler
+	ChitsHandler
+	InternalHandler
 
 	// Start engine operations from given request ID
 	Start(ctx context.Context, startReqID uint32) error
@@ -132,6 +153,11 @@ type AcceptedStateSummaryHandler interface {
 	) error
 }
 
+type StateHandler interface {
+	StateSummaryFrontierHandler
+	AcceptedStateSummaryHandler
+}
+
 type GetAcceptedFrontierHandler interface {
 	// Notify this engine of a request for an AcceptedFrontier message with the
 	// same requestID and the ID of the most recently accepted container.
@@ -215,6 +241,7 @@ type GetAncestorsHandler interface {
 		nodeID ids.NodeID,
 		requestID uint32,
 		containerID ids.ID,
+		engineType p2p.EngineType,
 	) error
 }
 

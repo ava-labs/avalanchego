@@ -71,14 +71,6 @@ type Bootstrapper struct {
 	shouldHalt func() bool
 	*metrics
 
-	// list of NoOpsHandler for messages dropped by bootstrapper
-	common.StateSummaryFrontierHandler
-	common.AcceptedStateSummaryHandler
-	common.PutHandler
-	common.QueryHandler
-	common.ChitsHandler
-	common.AppHandler
-
 	requestID uint32 // Tracks the last requestID that was used in a request
 
 	started   bool
@@ -120,16 +112,10 @@ type Bootstrapper struct {
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
 	return &Bootstrapper{
-		shouldHalt:                  config.ShouldHalt,
-		nonVerifyingParser:          config.NonVerifyingParse,
-		Config:                      config,
-		metrics:                     metrics,
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
-		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:                  config.VM,
+		shouldHalt:         config.ShouldHalt,
+		nonVerifyingParser: config.NonVerifyingParse,
+		Config:             config,
+		metrics:            metrics,
 
 		minority: bootstrapper.Noop,
 		majority: bootstrapper.Noop,

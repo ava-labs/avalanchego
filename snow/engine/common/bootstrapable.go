@@ -3,10 +3,40 @@
 
 package common
 
-import "context"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/api/health"
+)
 
 type BootstrapableEngine interface {
-	Engine
+	AcceptedFrontierHandler
+	AcceptedHandler
+	AncestorsHandler
+	InternalHandler
+
+	// Start engine operations from given request ID
+	Start(ctx context.Context, startReqID uint32) error
+
+	// Returns nil if the engine is healthy.
+	// Periodically called and reported through the health API
+	health.Checker
+
+	// Clear removes all containers to be processed upon bootstrapping
+	Clear(ctx context.Context) error
+}
+
+type AvalancheBootstrapableEngine interface {
+	AncestorsHandler
+
+	InternalHandler
+
+	// Start engine operations from given request ID
+	Start(ctx context.Context, startReqID uint32) error
+
+	// Returns nil if the engine is healthy.
+	// Periodically called and reported through the health API
+	health.Checker
 
 	// Clear removes all containers to be processed upon bootstrapping
 	Clear(ctx context.Context) error

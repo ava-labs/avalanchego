@@ -11,6 +11,7 @@ github.com/ava-labs/avalanchego/snow/engine/snowman/block=BuildBlockWithContextC
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=ChainVM=snow/engine/snowman/block/blockmock/chain_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=StateSyncableVM=snow/engine/snowman/block/blockmock/state_syncable_vm.go
 github.com/ava-labs/avalanchego/snow/engine/snowman/block=WithVerifyContext=snow/engine/snowman/block/blockmock/with_verify_context.go
+github.com/ava-labs/avalanchego/snow/engine/unified=Factory=snow/engine/unified/mocks/mock_factory.go
 github.com/ava-labs/avalanchego/snow/networking/handler=Handler=snow/networking/handler/handlermock/handler.go
 github.com/ava-labs/avalanchego/snow/networking/timeout=Manager=snow/networking/timeout/timeoutmock/manager.go
 github.com/ava-labs/avalanchego/snow/networking/tracker=Targeter=snow/networking/tracker/trackermock/targeter.go

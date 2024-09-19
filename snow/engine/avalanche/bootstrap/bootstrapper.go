@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -43,7 +42,7 @@ const (
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
-var _ common.BootstrapableEngine = (*Bootstrapper)(nil)
+var _ common.AvalancheBootstrapableEngine = (*Bootstrapper)(nil)
 
 func New(
 	config Config,
@@ -52,15 +51,6 @@ func New(
 ) (*Bootstrapper, error) {
 	b := &Bootstrapper{
 		Config: config,
-
-		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
-		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Ctx.Log),
-		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Ctx.Log),
-		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Ctx.Log),
-		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
-		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
-		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:                  config.VM,
 
 		outstandingRequests:     bimap.New[common.Request, ids.ID](),
 		outstandingRequestTimes: make(map[common.Request]time.Time),
@@ -76,16 +66,6 @@ func New(
 type Bootstrapper struct {
 	Config
 	common.Halter
-
-	// list of NoOpsHandler for messages dropped by Bootstrapper
-	common.StateSummaryFrontierHandler
-	common.AcceptedStateSummaryHandler
-	common.AcceptedFrontierHandler
-	common.AcceptedHandler
-	common.PutHandler
-	common.QueryHandler
-	common.ChitsHandler
-	common.AppHandler
 
 	metrics
 
@@ -320,10 +300,6 @@ func (*Bootstrapper) Notify(context.Context, common.Message) error {
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
 
-	b.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
-		State: snow.Bootstrapping,
-	})
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)

@@ -16,6 +16,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
+	common "github.com/ava-labs/avalanchego/snow/engine/common"
 	handler "github.com/ava-labs/avalanchego/snow/networking/handler"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -72,20 +73,6 @@ func (mr *HandlerMockRecorder) Context() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*Handler)(nil).Context))
 }
 
-// GetEngineManager mocks base method.
-func (m *Handler) GetEngineManager() *handler.EngineManager {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEngineManager")
-	ret0, _ := ret[0].(*handler.EngineManager)
-	return ret0
-}
-
-// GetEngineManager indicates an expected call of GetEngineManager.
-func (mr *HandlerMockRecorder) GetEngineManager() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEngineManager", reflect.TypeOf((*Handler)(nil).GetEngineManager))
-}
-
 // HealthCheck mocks base method.
 func (m *Handler) HealthCheck(arg0 context.Context) (any, error) {
 	m.ctrl.T.Helper()
@@ -139,16 +126,16 @@ func (mr *HandlerMockRecorder) RegisterTimeout(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterTimeout", reflect.TypeOf((*Handler)(nil).RegisterTimeout), arg0)
 }
 
-// SetEngineManager mocks base method.
-func (m *Handler) SetEngineManager(arg0 *handler.EngineManager) {
+// SetEngine mocks base method.
+func (m *Handler) SetEngine(arg0 common.Engine) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetEngineManager", arg0)
+	m.ctrl.Call(m, "SetEngine", arg0)
 }
 
-// SetEngineManager indicates an expected call of SetEngineManager.
-func (mr *HandlerMockRecorder) SetEngineManager(arg0 any) *gomock.Call {
+// SetEngine indicates an expected call of SetEngine.
+func (mr *HandlerMockRecorder) SetEngine(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEngineManager", reflect.TypeOf((*Handler)(nil).SetEngineManager), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEngine", reflect.TypeOf((*Handler)(nil).SetEngine), arg0)
 }
 
 // SetOnStopped mocks base method.
