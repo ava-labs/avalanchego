@@ -169,12 +169,6 @@ func enable2929(jt *JumpTable) {
 func enableAP1(jt *JumpTable) {
 	jt[SSTORE].dynamicGas = gasSStoreAP1
 	jt[SELFDESTRUCT].dynamicGas = gasSelfdestructAP1
-	jt[CALLEX].dynamicGas = gasCallExpertAP1
-}
-
-func enableAP2(jt *JumpTable) {
-	jt[BALANCEMC] = &operation{execute: opUndefined, maxStack: maxStack(0, 0)}
-	jt[CALLEX] = &operation{execute: opUndefined, maxStack: maxStack(0, 0)}
 }
 
 // enable3198 applies EIP-3198 (BASEFEE Opcode)
