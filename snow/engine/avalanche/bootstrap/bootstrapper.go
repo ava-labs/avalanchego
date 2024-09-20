@@ -43,14 +43,14 @@ const (
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
-var _ common.BootstrapableEngine = (*bootstrapper)(nil)
+var _ common.BootstrapableEngine = (*Bootstrapper)(nil)
 
 func New(
 	config Config,
 	onFinished func(ctx context.Context, lastReqID uint32) error,
 	reg prometheus.Registerer,
-) (common.BootstrapableEngine, error) {
-	b := &bootstrapper{
+) (*Bootstrapper, error) {
+	b := &Bootstrapper{
 		Config: config,
 
 		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Ctx.Log),
@@ -72,12 +72,12 @@ func New(
 }
 
 // Note: To align with the Snowman invariant, it should be guaranteed the VM is
-// not used until after the bootstrapper has been Started.
-type bootstrapper struct {
+// not used until after the Bootstrapper has been Started.
+type Bootstrapper struct {
 	Config
 	common.Halter
 
-	// list of NoOpsHandler for messages dropped by bootstrapper
+	// list of NoOpsHandler for messages dropped by Bootstrapper
 	common.StateSummaryFrontierHandler
 	common.AcceptedStateSummaryHandler
 	common.AcceptedFrontierHandler
@@ -107,11 +107,11 @@ type bootstrapper struct {
 	onFinished func(ctx context.Context, lastReqID uint32) error
 }
 
-func (b *bootstrapper) Context() *snow.ConsensusContext {
+func (b *Bootstrapper) Context() *snow.ConsensusContext {
 	return b.Ctx
 }
 
-func (b *bootstrapper) Clear(context.Context) error {
+func (b *Bootstrapper) Clear(context.Context) error {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
@@ -130,7 +130,7 @@ func (b *bootstrapper) Clear(context.Context) error {
 // Ancestors handles the receipt of multiple containers. Should be received in
 // response to a GetAncestors message to [nodeID] with request ID [requestID].
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
-func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
+func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
 	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
@@ -254,7 +254,7 @@ func (b *bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, request
 	return b.process(ctx, verticesToProcess...)
 }
 
-func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+func (b *Bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	request := common.Request{
 		NodeID:    nodeID,
 		RequestID: requestID,
@@ -276,7 +276,7 @@ func (b *bootstrapper) GetAncestorsFailed(ctx context.Context, nodeID ids.NodeID
 	return b.fetch(ctx, vtxID)
 }
 
-func (b *bootstrapper) Connected(
+func (b *Bootstrapper) Connected(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
@@ -288,7 +288,7 @@ func (b *bootstrapper) Connected(
 	return b.StartupTracker.Connected(ctx, nodeID, nodeVersion)
 }
 
-func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (b *Bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := b.VM.Disconnected(ctx, nodeID); err != nil {
 		return err
 	}
@@ -296,16 +296,16 @@ func (b *bootstrapper) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return b.StartupTracker.Disconnected(ctx, nodeID)
 }
 
-func (*bootstrapper) Timeout(context.Context) error {
+func (*Bootstrapper) Timeout(context.Context) error {
 	return nil
 }
 
-func (*bootstrapper) Gossip(context.Context) error {
+func (*Bootstrapper) Gossip(context.Context) error {
 	return nil
 }
 
-func (b *bootstrapper) Shutdown(ctx context.Context) error {
-	b.Ctx.Log.Info("shutting down bootstrapper")
+func (b *Bootstrapper) Shutdown(ctx context.Context) error {
+	b.Ctx.Log.Info("shutting down Bootstrapper")
 
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
@@ -313,11 +313,11 @@ func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	return b.VM.Shutdown(ctx)
 }
 
-func (*bootstrapper) Notify(context.Context, common.Message) error {
+func (*Bootstrapper) Notify(context.Context, common.Message) error {
 	return nil
 }
 
-func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
+func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrap")
 
 	b.Ctx.State.Set(snow.EngineState{
@@ -388,7 +388,7 @@ func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	return b.startSyncing(ctx, nil)
 }
 
-func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+func (b *Bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
@@ -403,7 +403,7 @@ func (b *bootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
 // Add the vertices in [vtxIDs] to the set of vertices that we need to fetch,
 // and then fetch vertices (and their ancestors) until either there are no more
 // to fetch or we are at the maximum number of outstanding requests.
-func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
+func (b *Bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
 	for b.needToFetch.Len() > 0 && b.outstandingRequests.Len() < maxOutstandingGetAncestorsRequests {
 		vtxID, _ := b.needToFetch.Pop() // Length checked in predicate above
@@ -442,7 +442,7 @@ func (b *bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 }
 
 // Process the vertices in [vtxs].
-func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) error {
+func (b *Bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) error {
 	// Vertices that we need to process prioritized by vertices that are unknown
 	// or the furthest down the DAG. Unknown vertices are prioritized to ensure
 	// that once we have made it below a certain height in DAG traversal we do
@@ -565,7 +565,7 @@ func (b *bootstrapper) process(ctx context.Context, vtxs ...avalanche.Vertex) er
 }
 
 // startSyncing starts bootstrapping. Process the vertices in [accepterContainerIDs].
-func (b *bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
+func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []ids.ID) error {
 	pendingContainerIDs := b.VtxBlocked.MissingIDs()
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
@@ -592,7 +592,7 @@ func (b *bootstrapper) startSyncing(ctx context.Context, acceptedContainerIDs []
 
 // checkFinish repeatedly executes pending transactions and requests new frontier blocks until there aren't any new ones
 // after which it finishes the bootstrap process
-func (b *bootstrapper) checkFinish(ctx context.Context) error {
+func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	// If we still need to fetch vertices, we can't finish
 	if len(b.VtxBlocked.MissingIDs()) > 0 {
 		return nil
