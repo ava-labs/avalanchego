@@ -12,24 +12,24 @@ import (
 	vmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-var Manager vmvalidators.Manager = testManager{}
+var Manager vmvalidators.Manager = manager{}
 
-type testManager struct{}
+type manager struct{}
 
-func (testManager) GetMinimumHeight(context.Context) (uint64, error) {
+func (manager) GetMinimumHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (testManager) GetCurrentHeight(context.Context) (uint64, error) {
+func (manager) GetCurrentHeight(context.Context) (uint64, error) {
 	return 0, nil
 }
 
-func (testManager) GetSubnetID(context.Context, ids.ID) (ids.ID, error) {
+func (manager) GetSubnetID(context.Context, ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
 }
 
-func (testManager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
+func (manager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
 	return nil, nil
 }
 
-func (testManager) OnAcceptedBlockID(ids.ID) {}
+func (manager) OnAcceptedBlockID(ids.ID) {}
