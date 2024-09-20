@@ -92,6 +92,14 @@ impl RevisionManager {
         Ok(manager)
     }
 
+    pub fn all_hashes(&self) -> Vec<TrieHash> {
+        self.historical
+            .iter()
+            .filter_map(|r| r.kind.root_hash())
+            .chain(self.proposals.iter().filter_map(|p| p.kind.root_hash()))
+            .collect()
+    }
+
     /// Commit a proposal
     /// To commit a proposal involves a few steps:
     /// 1. Commit check.

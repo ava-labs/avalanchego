@@ -140,6 +140,10 @@ where
         Ok(self.manager.read().expect("poisoned lock").root_hash()?)
     }
 
+    async fn all_hashes(&self) -> Result<Vec<TrieHash>, api::Error> {
+        Ok(self.manager.read().expect("poisoned lock").all_hashes())
+    }
+
     async fn propose<'p, K: KeyType, V: ValueType>(
         &'p self,
         batch: api::Batch<K, V>,

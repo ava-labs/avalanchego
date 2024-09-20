@@ -113,6 +113,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    let all_hashes = db.all_hashes().await?;
+    println!(
+        "Database has {} hashes (oldest {:?})",
+        all_hashes.len(),
+        all_hashes.first().expect("one hash must exist")
+    );
+
     // batches consist of:
     // 1. 25% deletes from low
     // 2. 25% new insertions from high

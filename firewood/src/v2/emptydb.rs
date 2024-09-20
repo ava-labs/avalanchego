@@ -52,6 +52,10 @@ impl Db for EmptyDb {
             data,
         ))
     }
+
+    async fn all_hashes(&self) -> Result<Vec<HashKey>, Error> {
+        Ok(vec![])
+    }
 }
 
 #[async_trait]
