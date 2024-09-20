@@ -82,7 +82,7 @@ var (
 )
 
 func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
-	config := merkledb.Config{
+	return merkledb.Config{
 		BranchFactor:                merkledb.BranchFactor16,
 		Hasher:                      merkledb.DefaultHasher,
 		RootGenConcurrency:          0,
@@ -95,11 +95,6 @@ func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
 		TraceLevel:                  merkledb.NoTrace,
 		Tracer:                      trace.Noop,
 	}
-	if promRegistry == nil {
-		// avoid large history during database construction.
-		config.HistoryLength = 4
-	}
-	return config
 }
 
 func getGoldenStagingDatabaseDirectory() string {
