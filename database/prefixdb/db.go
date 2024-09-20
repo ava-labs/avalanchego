@@ -313,6 +313,7 @@ func (b *batch) Reset() {
 	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
 		b.ops = make([]batchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
+		utils.ZeroSlice(b.ops)
 		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()

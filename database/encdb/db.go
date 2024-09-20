@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -204,6 +205,7 @@ func (b *batch) Reset() {
 	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
 		b.ops = make([]database.BatchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
+		utils.ZeroSlice(b.ops)
 		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()

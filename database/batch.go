@@ -7,7 +7,11 @@
 
 package database
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.
@@ -75,6 +79,7 @@ func (b *BatchOps) Size() int {
 }
 
 func (b *BatchOps) Reset() {
+	utils.ZeroSlice(b.Ops)
 	b.Ops = b.Ops[:0]
 	b.size = 0
 }
