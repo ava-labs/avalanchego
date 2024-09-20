@@ -193,7 +193,7 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	GetCurrentValidatorSet(subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -719,9 +719,12 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidatorSet(subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
 	for _, staker := range s.currentStakers.validators[subnetID] {
+		if err := ctx.Err(); err != nil {
+			return nil, 0, err
+		}
 		validator := staker.validator
 		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
 			ValidationID: validator.TxID,
