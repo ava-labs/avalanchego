@@ -69,7 +69,7 @@ var (
 			ValidatorFeeCapacity: 20_000,
 			ValidatorFeeConfig: validatorfee.Config{
 				Target:   10_000,
-				MinPrice: 1,
+				MinPrice: gas.Price(1 * units.NanoAvax),
 				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
 				//
 				// ln(2) is a float and the result is consensus critical, so we

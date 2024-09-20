@@ -108,7 +108,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Validator fees:
 	fs.Uint64(ValidatorFeesCapacityKey, uint64(genesis.LocalParams.ValidatorFeeCapacity), "Maximum number of validators")
 	fs.Uint64(ValidatorFeesTargetKey, uint64(genesis.LocalParams.ValidatorFeeConfig.Target), "Target number of validators")
-	fs.Uint64(ValidatorFeesMinPriceKey, uint64(genesis.LocalParams.ValidatorFeeConfig.MinPrice), "Minimum validator price per second")
+	fs.Uint64(ValidatorFeesMinPriceKey, uint64(genesis.LocalParams.ValidatorFeeConfig.MinPrice), "Minimum validator price in nAVAX per second")
 	fs.Uint64(ValidatorFeesExcessConversionConstantKey, uint64(genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant), "Constant to convert validator excess price")
 	// Dynamic fees:
 	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
