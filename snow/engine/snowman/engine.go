@@ -176,7 +176,7 @@ func (e *Engine) Gossip(ctx context.Context) error {
 	// nodes with a large amount of stake weight.
 	vdrID, ok := e.ConnectedValidators.SampleValidator()
 	if !ok {
-		e.Ctx.Log.Warn("skipping block gossip",
+		e.Ctx.Log.Debug("skipping block gossip",
 			zap.String("reason", "no connected validators"),
 		)
 		return nil
