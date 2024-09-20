@@ -11,31 +11,15 @@ set -euo pipefail
 # Directory above this script
 SUBNET_EVM_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
-# Allow configuring the clone path to point to a shared and/or existing clone of the avalanchego repo
-AVALANCHEGO_CLONE_PATH="${AVALANCHEGO_CLONE_PATH:-${SUBNET_EVM_PATH}/avalanchego}"
-
 # Assume it's necessary to build the avalanchego node image from source
 # TODO(marun) Support use of a released node image if using a release version of avalanchego
 
 source "${SUBNET_EVM_PATH}"/scripts/versions.sh
 source "${SUBNET_EVM_PATH}"/scripts/constants.sh
+source "${SUBNET_EVM_PATH}"/scripts/lib_avalanchego_clone.sh
 
-echo "checking out target avalanchego version ${AVALANCHE_VERSION}"
-if [[ -d "${AVALANCHEGO_CLONE_PATH}" ]]; then
-  echo "updating existing clone"
-  cd "${AVALANCHEGO_CLONE_PATH}"
-  git fetch
-else
-  echo "creating new clone"
-  git clone https://github.com/ava-labs/avalanchego.git "${AVALANCHEGO_CLONE_PATH}"
-  cd "${AVALANCHEGO_CLONE_PATH}"
-fi
-# Branch will be reset to $AVALANCHE_VERSION if it already exists
-git checkout -B "test-${AVALANCHE_VERSION}" "${AVALANCHE_VERSION}"
-cd "${SUBNET_EVM_PATH}"
-
-AVALANCHEGO_COMMIT_HASH="$(git --git-dir="${AVALANCHEGO_CLONE_PATH}/.git" rev-parse HEAD)"
-AVALANCHEGO_IMAGE_TAG="${AVALANCHEGO_COMMIT_HASH::8}"
+clone_avalanchego "${AVALANCHE_VERSION}"
+AVALANCHEGO_IMAGE_TAG="$(avalanchego_image_tag_from_clone)"
 
 # Build avalanchego node image in the clone path
 pushd "${AVALANCHEGO_CLONE_PATH}" > /dev/null

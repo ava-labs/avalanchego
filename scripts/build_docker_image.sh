@@ -20,7 +20,7 @@ if [[ "${VM_ID}" != "${DEFAULT_VM_ID}"  ]]; then
 fi
 
 # Default to the release image. Will need to be overridden when testing against unreleased versions.
-AVALANCHEGO_NODE_IMAGE=${AVALANCHEGO_NODE_IMAGE:-"avaplatform/avalanchego:${AVALANCHE_VERSION}"}
+AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_NODE_IMAGE:-${AVALANCHEGO_IMAGE_NAME}:${AVALANCHE_VERSION}}"
 
 echo "Building Docker Image: $DOCKERHUB_REPO:$BUILD_IMAGE_ID based of AvalancheGo@$AVALANCHE_VERSION"
 docker build -t "$DOCKERHUB_REPO:$BUILD_IMAGE_ID" -t "$DOCKERHUB_REPO:${DOCKERHUB_TAG}" \

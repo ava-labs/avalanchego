@@ -15,6 +15,9 @@ DEFAULT_VM_ID="srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
 # You should probably set it - export DOCKER_REPO='avaplatform/subnet-evm'
 DOCKERHUB_REPO=${DOCKER_REPO:-"subnet-evm"}
 
+# Shared between ./scripts/build_docker_image.sh and ./scripts/tests.build_docker_image.sh
+AVALANCHEGO_IMAGE_NAME="${AVALANCHEGO_IMAGE_NAME:-avaplatform/avalanchego}"
+
 # if this isn't a git repository (say building from a release), don't set our git constants.
 if [ ! -d .git ]; then
     CURRENT_BRANCH=""
