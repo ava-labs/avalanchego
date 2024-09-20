@@ -14,7 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -40,7 +42,7 @@ var (
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: units.MilliAvax,
-			StaticFeeConfig: fee.StaticConfig{
+			StaticFeeConfig: txfee.StaticConfig{
 				TxFee:                         units.MilliAvax,
 				CreateSubnetTxFee:             100 * units.MilliAvax,
 				TransformSubnetTxFee:          100 * units.MilliAvax,
@@ -63,6 +65,16 @@ var (
 				TargetPerSecond:          500,
 				MinPrice:                 1,
 				ExcessConversionConstant: 5_000,
+			},
+			ValidatorFeeCapacity: 20_000,
+			ValidatorFeeConfig: validatorfee.Config{
+				Target:   10_000,
+				MinPrice: gas.Price(1 * units.NanoAvax),
+				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
+				//
+				// ln(2) is a float and the result is consensus critical, so we
+				// hardcode the result.
+				ExcessConversionConstant: 865_617, // Double every minute
 			},
 		},
 		StakingConfig: StakingConfig{
