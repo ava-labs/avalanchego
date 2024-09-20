@@ -724,10 +724,11 @@ func (s *state) GetCurrentValidatorSet(subnetID ids.ID) (map[ids.ID]*validators.
 	for _, staker := range s.currentStakers.validators[subnetID] {
 		validator := staker.validator
 		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			NodeID:    validator.NodeID,
-			PublicKey: validator.PublicKey,
-			Weight:    validator.Weight,
-			StartTime: uint64(validator.StartTime.Unix()),
+			ValidationID: validator.TxID,
+			NodeID:       validator.NodeID,
+			PublicKey:    validator.PublicKey,
+			Weight:       validator.Weight,
+			StartTime:    uint64(validator.StartTime.Unix()),
 			// TODO: not implemented yet
 			SetWeightNonce: 0,
 			// TODO: not implemented yet
