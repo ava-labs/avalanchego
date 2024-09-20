@@ -61,7 +61,7 @@ const (
 
 	initContainerName    = "init"
 	monitorContainerName = "monitor"
-	nodeContainerName    = "node"
+	nodeContainerName    = "avago"
 
 	volumeSize = "128Mi"
 	volumeName = "data"
