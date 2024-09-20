@@ -119,7 +119,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 12,
         "w": 14,
         "x": 0,
         "y": 0
@@ -157,6 +157,23 @@
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "rate(firewood_remove[$__rate_interval])",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B",
           "useBackend": false
         }
       ],
@@ -196,7 +213,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 8
+        "y": 12
       },
       "id": 2,
       "options": {
@@ -223,7 +240,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "firewood_proposals/1000",
+          "expr": "sum(firewood_insert)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -272,7 +289,7 @@
         "h": 4,
         "w": 10,
         "x": 4,
-        "y": 8
+        "y": 12
       },
       "id": 4,
       "options": {
@@ -390,7 +407,7 @@
         "h": 8,
         "w": 14,
         "x": 0,
-        "y": 12
+        "y": 16
       },
       "id": 5,
       "options": {
@@ -493,7 +510,7 @@
         "h": 8,
         "w": 14,
         "x": 0,
-        "y": 20
+        "y": 24
       },
       "id": 6,
       "options": {
@@ -592,7 +609,7 @@
         "h": 8,
         "w": 14,
         "x": 0,
-        "y": 28
+        "y": 32
       },
       "id": 7,
       "options": {
@@ -639,6 +656,6 @@
   "timezone": "browser",
   "title": "Firewood Dashboard",
   "uid": "adxfhfmwx5ypsc",
-  "version": 6,
+  "version": 3,
   "weekStart": ""
 }

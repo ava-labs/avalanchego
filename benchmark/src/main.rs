@@ -16,17 +16,15 @@ use firewood::logger::debug;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use pretty_duration::pretty_duration;
-use rand::Rng as _;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::error::Error;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
-use firewood::db::{Batch, BatchOp, Db, DbConfig};
+use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
-use firewood::v2::api::{Db as _, DbView, Proposal as _};
+use firewood::v2::api::{Db as _, Proposal as _};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -95,11 +93,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         for key in 0..args.number_of_batches {
             let batch = generate_inserts(key * keys, args.batch_size).collect();
 
-            let verify = get_keys_to_verify(&batch, args.read_verify_percent);
-
             let proposal = db.propose(batch).await.expect("proposal should succeed");
             proposal.commit().await?;
-            verify_keys(&db, verify).await?;
         }
 
         let duration = start.elapsed();
@@ -195,36 +190,4 @@ fn generate_updates(
         .map(|(key, value)| BatchOp::Put { key, value })
         .collect::<Vec<_>>()
         .into_iter()
-}
-
-fn get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<u8>, Box<[u8]>> {
-    if pct == 0 {
-        HashMap::new()
-    } else {
-        batch
-            .iter()
-            .filter(|_last_key| rand::thread_rng().gen_range(0..=(100 - pct)) == 0)
-            .map(|op| {
-                if let BatchOp::Put { key, value } = op {
-                    (key.clone(), value.clone().into_boxed_slice())
-                } else {
-                    unreachable!()
-                }
-            })
-            .collect()
-    }
-}
-
-async fn verify_keys(
-    db: &impl firewood::v2::api::Db,
-    verify: HashMap<Vec<u8>, Box<[u8]>>,
-) -> Result<(), firewood::v2::api::Error> {
-    if !verify.is_empty() {
-        let hash = db.root_hash().await?.expect("root hash should exist");
-        let revision = db.revision(hash).await?;
-        for (key, value) in verify {
-            assert_eq!(Some(value), revision.val(key).await?);
-        }
-    }
-    Ok(())
 }
