@@ -108,7 +108,7 @@ func (s *SampleableSet[T]) Remove(elements ...T) {
 // Clear empties this set
 func (s *SampleableSet[T]) Clear() {
 	clear(s.indices)
-	utils.ZeroSlice(s.elements)
+	clear(s.elements)
 	s.elements = s.elements[:0]
 }
 
