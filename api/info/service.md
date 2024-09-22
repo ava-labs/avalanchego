@@ -526,7 +526,6 @@ info.peers({
         lastReceived: string,
         benched: string[],
         observedUptime: int,
-        observedSubnetUptime: map[string]int,
     }
 }
 ```
@@ -542,7 +541,6 @@ info.peers({
 - `lastReceived` is the timestamp of last message received from the peer.
 - `benched` shows chain IDs that the peer is being benched.
 - `observedUptime` is this node's primary network uptime, observed by the peer.
-- `observedSubnetUptime` (Deprecated) is a map of Subnet IDs to this node's Subnet uptimes, observed by the peer.
 
 **Example Call:**
 
@@ -575,7 +573,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:57Z",
         "benched": [],
         "observedUptime": "99",
-        "observedSubnetUptimes": {},
         "trackedSubnets": [],
         "benched": []
       },
@@ -588,9 +585,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:34Z",
         "benched": [],
         "observedUptime": "75",
-        "observedSubnetUptimes": {
-          "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL": "100"
-        },
         "trackedSubnets": [
           "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
         ],
@@ -605,7 +599,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:55Z",
         "benched": [],
         "observedUptime": "95",
-        "observedSubnetUptimes": {},
         "trackedSubnets": [],
         "benched": []
       }
@@ -623,17 +616,12 @@ Other sources may be using data gathered with incomplete (limited) information.
 **Signature:**
 
 ```sh
-info.uptime({
-    subnetID: string // optional
-}) ->
+info.uptime() ->
 {
     rewardingStakePercentage: float64,
     weightedAveragePercentage: float64
 }
 ```
-
-- `subnetID` (Deprecated) is the Subnet to get the uptime of. If not provided, returns the uptime of the node on
-  the primary network.
 
 - `rewardingStakePercentage` is the percent of stake which thinks this node is above the uptime
   requirement.

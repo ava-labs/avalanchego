@@ -41,9 +41,9 @@ func (m *Calculator) EXPECT() *CalculatorMockRecorder {
 }
 
 // CalculateUptime mocks base method.
-func (m *Calculator) CalculateUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time.Time, error) {
+func (m *Calculator) CalculateUptime(arg0 ids.NodeID) (time.Duration, time.Time, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateUptime", arg0, arg1)
+	ret := m.ctrl.Call(m, "CalculateUptime", arg0)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(time.Time)
 	ret2, _ := ret[2].(error)
@@ -51,37 +51,37 @@ func (m *Calculator) CalculateUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duratio
 }
 
 // CalculateUptime indicates an expected call of CalculateUptime.
-func (mr *CalculatorMockRecorder) CalculateUptime(arg0, arg1 any) *gomock.Call {
+func (mr *CalculatorMockRecorder) CalculateUptime(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptime", reflect.TypeOf((*Calculator)(nil).CalculateUptime), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptime", reflect.TypeOf((*Calculator)(nil).CalculateUptime), arg0)
 }
 
 // CalculateUptimePercent mocks base method.
-func (m *Calculator) CalculateUptimePercent(arg0 ids.NodeID, arg1 ids.ID) (float64, error) {
+func (m *Calculator) CalculateUptimePercent(arg0 ids.NodeID) (float64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateUptimePercent", arg0, arg1)
+	ret := m.ctrl.Call(m, "CalculateUptimePercent", arg0)
 	ret0, _ := ret[0].(float64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CalculateUptimePercent indicates an expected call of CalculateUptimePercent.
-func (mr *CalculatorMockRecorder) CalculateUptimePercent(arg0, arg1 any) *gomock.Call {
+func (mr *CalculatorMockRecorder) CalculateUptimePercent(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptimePercent", reflect.TypeOf((*Calculator)(nil).CalculateUptimePercent), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptimePercent", reflect.TypeOf((*Calculator)(nil).CalculateUptimePercent), arg0)
 }
 
 // CalculateUptimePercentFrom mocks base method.
-func (m *Calculator) CalculateUptimePercentFrom(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Time) (float64, error) {
+func (m *Calculator) CalculateUptimePercentFrom(arg0 ids.NodeID, arg1 time.Time) (float64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CalculateUptimePercentFrom", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CalculateUptimePercentFrom", arg0, arg1)
 	ret0, _ := ret[0].(float64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CalculateUptimePercentFrom indicates an expected call of CalculateUptimePercentFrom.
-func (mr *CalculatorMockRecorder) CalculateUptimePercentFrom(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *CalculatorMockRecorder) CalculateUptimePercentFrom(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptimePercentFrom", reflect.TypeOf((*Calculator)(nil).CalculateUptimePercentFrom), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptimePercentFrom", reflect.TypeOf((*Calculator)(nil).CalculateUptimePercentFrom), arg0, arg1)
 }

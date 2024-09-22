@@ -17,7 +17,6 @@ github.com/ava-labs/avalanchego/snow/networking/tracker=Targeter=snow/networking
 github.com/ava-labs/avalanchego/snow/networking/tracker=Tracker=snow/networking/tracker/trackermock/tracker.go
 github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/uptimemock/calculator.go
 github.com/ava-labs/avalanchego/snow/validators=State=snow/validators/validatorsmock/state.go
-github.com/ava-labs/avalanchego/snow/validators=SubnetConnector=snow/validators/validatorsmock/subnet_connector.go
 github.com/ava-labs/avalanchego/utils/crypto/keychain=Ledger=utils/crypto/keychain/keychainmock/ledger.go
 github.com/ava-labs/avalanchego/utils/filesystem=Reader=utils/filesystem/filesystemmock/reader.go
 github.com/ava-labs/avalanchego/utils/hashing=Hasher=utils/hashing/hashingmock/hasher.go
