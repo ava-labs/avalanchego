@@ -1514,6 +1514,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(t, err)
+	t.Logf("primaryStartHeight: %d", primaryStartHeight)
 
 	// insert the subnet validator
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
@@ -1543,6 +1544,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(t, err)
+	t.Logf("subnetStartHeight: %d", subnetStartHeight)
 
 	// move time ahead, terminating the subnet validator
 	vm.clock.Set(subnetEndTime)
@@ -1553,6 +1555,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(t, err)
+	t.Logf("subnetEndHeight: %d", subnetEndHeight)
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime)
@@ -1577,6 +1580,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(t, err)
+	t.Logf("primaryEndHeight: %d", primaryEndHeight)
 
 	// reinsert primary validator with a different BLS key
 	sk2, err := bls.NewSecretKey()
@@ -1615,6 +1619,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(t, err)
+	t.Logf("primaryRestartHeight: %d", primaryRestartHeight)
 
 	for height := uint64(0); height <= primaryRestartHeight; height++ {
 		t.Run(strconv.Itoa(int(height)), func(t *testing.T) {
