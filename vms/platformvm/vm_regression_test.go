@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1450,8 +1451,6 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 //  8. Advance chain time for the primary network validator to be moved to the
 //     current validator set
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
-	// setup
-	require := require.New(t)
 	vm, _, _ := defaultVM(t, upgradetest.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
@@ -1461,7 +1460,6 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		subnetIDs: []ids.ID{subnetID},
 	})
 
-	// A subnet validator stakes and then stops; also its primary network counterpart stops staking
 	var (
 		primaryStartTime   = genesistest.DefaultValidatorStartTime.Add(executor.SyncBound)
 		subnetStartTime    = primaryStartTime.Add(executor.SyncBound)
@@ -1480,7 +1478,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		}
 	)
 	sk1, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 
 	// build primary network validator with BLS key
@@ -1500,22 +1498,22 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		rewardsOwner,
 		reward.PercentDenominator,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(primaryTx))
+	require.NoError(t, vm.issueTxFromRPC(primaryTx))
 	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
 	vm.clock.Set(primaryStartTime)
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// insert the subnet validator
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
@@ -1529,60 +1527,60 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Subnet: subnetID,
 		},
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(subnetTx))
+	require.NoError(t, vm.issueTxFromRPC(subnetTx))
 	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current
 	vm.clock.Set(subnetStartTime)
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// move time ahead, terminating the subnet validator
 	vm.clock.Set(subnetEndTime)
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// move time ahead, terminating primary network validator
 	vm.clock.Set(primaryEndTime)
 	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(t, err)
+	require.NoError(t, blk.Verify(context.Background()))
 
 	proposalBlk := blk.(snowman.OracleBlock)
 	options, err := proposalBlk.Options(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(t, &block.BanffCommitBlock{}, commit.Block)
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(commit.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(t, blk.Accept(context.Background()))
+	require.NoError(t, commit.Verify(context.Background()))
+	require.NoError(t, commit.Accept(context.Background()))
+	require.NoError(t, vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// reinsert primary validator with a different BLS key
 	sk2, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	pk2 := bls.PublicFromSecretKey(sk2)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1601,64 +1599,68 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 		rewardsOwner,
 		reward.PercentDenominator,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(primaryRestartTx))
+	require.NoError(t, vm.issueTxFromRPC(primaryRestartTx))
 	vm.ctx.Lock.Lock()
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
 	vm.clock.Set(primaryReStartTime)
-	require.NoError(buildAndAcceptStandardBlock(vm))
+	require.NoError(t, buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
+	require.NoError(t, err)
 
 	for height := uint64(0); height <= primaryRestartHeight; height++ {
-		// The primary network validator doesn't exist for heights
-		// [0, primaryStartHeight) and [primaryEndHeight, primaryRestartHeight).
-		var expectedPrimaryNetworkErr error
-		if height < primaryStartHeight || (height >= primaryEndHeight && height < primaryRestartHeight) {
-			expectedPrimaryNetworkErr = database.ErrNotFound
-		}
+		t.Run(strconv.Itoa(int(height)), func(t *testing.T) {
+			require := require.New(t)
 
-		// The primary network validator's BLS key is pk1 for the first
-		// validation period and pk2 for the second validation period.
-		var expectedPrimaryNetworkBLSKey *bls.PublicKey
-		if height >= primaryStartHeight && height < primaryEndHeight {
-			expectedPrimaryNetworkBLSKey = pk1
-		} else if height >= primaryRestartHeight {
-			expectedPrimaryNetworkBLSKey = pk2
-		}
+			// The primary network validator doesn't exist for heights
+			// [0, primaryStartHeight) and [primaryEndHeight, primaryRestartHeight).
+			var expectedPrimaryNetworkErr error
+			if height < primaryStartHeight || (height >= primaryEndHeight && height < primaryRestartHeight) {
+				expectedPrimaryNetworkErr = database.ErrNotFound
+			}
 
-		err := checkValidatorBlsKeyIsSet(
-			vm.State,
-			nodeID,
-			constants.PrimaryNetworkID,
-			height,
-			expectedPrimaryNetworkBLSKey,
-		)
-		require.ErrorIs(err, expectedPrimaryNetworkErr)
+			// The primary network validator's BLS key is pk1 for the first
+			// validation period and pk2 for the second validation period.
+			var expectedPrimaryNetworkBLSKey *bls.PublicKey
+			if height >= primaryStartHeight && height < primaryEndHeight {
+				expectedPrimaryNetworkBLSKey = pk1
+			} else if height >= primaryRestartHeight {
+				expectedPrimaryNetworkBLSKey = pk2
+			}
 
-		// The subnet validator doesn't exist for heights
-		// [0, subnetStartHeight) and [subnetEndHeight, primaryRestartHeight).
-		var expectedSubnetErr error
-		if height < subnetStartHeight || height >= subnetEndHeight {
-			expectedSubnetErr = database.ErrNotFound
-		}
+			err := checkValidatorBlsKeyIsSet(
+				vm.State,
+				nodeID,
+				constants.PrimaryNetworkID,
+				height,
+				expectedPrimaryNetworkBLSKey,
+			)
+			require.ErrorIs(err, expectedPrimaryNetworkErr)
 
-		err = checkValidatorBlsKeyIsSet(
-			vm.State,
-			nodeID,
-			subnetID,
-			height,
-			pk1,
-		)
-		require.ErrorIs(err, expectedSubnetErr)
+			// The subnet validator doesn't exist for heights
+			// [0, subnetStartHeight) and [subnetEndHeight, primaryRestartHeight).
+			var expectedSubnetErr error
+			if height < subnetStartHeight || height >= subnetEndHeight {
+				expectedSubnetErr = database.ErrNotFound
+			}
+
+			err = checkValidatorBlsKeyIsSet(
+				vm.State,
+				nodeID,
+				subnetID,
+				height,
+				pk1,
+			)
+			require.ErrorIs(err, expectedSubnetErr)
+		})
 	}
 }
 
