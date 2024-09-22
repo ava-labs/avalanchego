@@ -137,7 +137,7 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			AccruedDelegateeReward: (*uint64)(apiValidator.AccruedDelegateeReward),
 			DelegationFee:          float32(apiValidator.DelegationFee),
 			Uptime:                 (*float32)(apiValidator.Uptime),
-			Connected:              &apiValidator.Connected,
+			Connected:              apiValidator.Connected,
 			Signer:                 apiValidator.Signer,
 			DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
 			DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),
