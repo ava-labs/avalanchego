@@ -97,19 +97,19 @@ func getMerkleDBConfig(promRegistry prometheus.Registerer) merkledb.Config {
 	}
 }
 
-func getGoldenStagingDatabaseDirectory() string {
+func getGoldenStagingDatabaseDirectory(databaseEntries uint64) string {
 	wd, _ := os.Getwd()
-	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-staging-%d", *databaseEntries))
+	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-staging-%d", databaseEntries))
 }
 
-func getGoldenDatabaseDirectory() string {
+func getGoldenDatabaseDirectory(databaseEntries uint64) string {
 	wd, _ := os.Getwd()
-	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-%d", *databaseEntries))
+	return path.Join(wd, fmt.Sprintf("db-bench-test-golden-%d", databaseEntries))
 }
 
-func getRunningDatabaseDirectory() string {
+func getRunningDatabaseDirectory(databaseEntries uint64) string {
 	wd, _ := os.Getwd()
-	return path.Join(wd, fmt.Sprintf("db-bench-test-running-%d", *databaseEntries))
+	return path.Join(wd, fmt.Sprintf("db-bench-test-running-%d", databaseEntries))
 }
 
 func calculateIndexEncoding(idx uint64) []byte {
@@ -119,20 +119,20 @@ func calculateIndexEncoding(idx uint64) []byte {
 	return entryHash[:]
 }
 
-func createGoldenDatabase() error {
-	err := os.RemoveAll(getGoldenStagingDatabaseDirectory())
+func createGoldenDatabase(databaseEntries uint64) error {
+	err := os.RemoveAll(getGoldenStagingDatabaseDirectory(databaseEntries))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to remove running directory : %v\n", err)
 		return err
 	}
-	err = os.Mkdir(getGoldenStagingDatabaseDirectory(), 0o777)
+	err = os.Mkdir(getGoldenStagingDatabaseDirectory(databaseEntries), 0o777)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to create golden staging directory : %v\n", err)
 		return err
 	}
 
 	levelDB, err := leveldb.New(
-		getGoldenStagingDatabaseDirectory(),
+		getGoldenStagingDatabaseDirectory(databaseEntries),
 		getLevelDBConfig(),
 		logging.NoLog{},
 		prometheus.NewRegistry(),
@@ -166,7 +166,7 @@ func createGoldenDatabase() error {
 	startInsertTime := time.Now()
 	startInsertBatchTime := startInsertTime
 	currentBatch := mdb.NewBatch()
-	for entryIdx := uint64(0); entryIdx < *databaseEntries; entryIdx++ {
+	for entryIdx := uint64(0); entryIdx < databaseEntries; entryIdx++ {
 		entryHash := calculateIndexEncoding(entryIdx)
 		err = currentBatch.Put(entryHash, entryHash)
 		if err != nil {
@@ -193,7 +193,7 @@ func createGoldenDatabase() error {
 			startInsertBatchTime = time.Now()
 		}
 	}
-	if (*databaseEntries)%databaseCreationBatchSize != 0 {
+	if databaseEntries%databaseCreationBatchSize != 0 {
 		err = currentBatch.Write()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "unable to write value in merkleDB database : %v\n", err)
@@ -209,8 +209,6 @@ func createGoldenDatabase() error {
 		return err
 	}
 
-	fmt.Printf("Generated and inserted %d batches of size %d in %v\n",
-		(*databaseEntries)/databaseCreationBatchSize, databaseCreationBatchSize, time.Since(startInsertTime))
 	err = mdb.Close()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to close merkleDB database : %v\n", err)
@@ -221,7 +219,11 @@ func createGoldenDatabase() error {
 		fmt.Fprintf(os.Stderr, "unable to close levelDB database : %v\n", err)
 		return err
 	}
-	err = os.Rename(getGoldenStagingDatabaseDirectory(), getGoldenDatabaseDirectory())
+
+	fmt.Printf("Generated and inserted %d batches of size %d in %v\n",
+		databaseEntries/databaseCreationBatchSize, databaseCreationBatchSize, time.Since(startInsertTime))
+
+	err = os.Rename(getGoldenStagingDatabaseDirectory(databaseEntries), getGoldenDatabaseDirectory(databaseEntries))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to rename golden staging directory : %v\n", err)
 		return err
@@ -230,8 +232,8 @@ func createGoldenDatabase() error {
 	return nil
 }
 
-func resetRunningDatabaseDirectory() error {
-	runningDir := getRunningDatabaseDirectory()
+func resetRunningDatabaseDirectory(databaseEntries uint64) error {
+	runningDir := getRunningDatabaseDirectory(databaseEntries)
 	if _, err := os.Stat(runningDir); err == nil {
 		err := os.RemoveAll(runningDir)
 		if err != nil {
@@ -244,7 +246,7 @@ func resetRunningDatabaseDirectory() error {
 		fmt.Fprintf(os.Stderr, "unable to create running directory : %v\n", err)
 		return err
 	}
-	err = CopyDirectory(getGoldenDatabaseDirectory(), runningDir)
+	err = CopyDirectory(getGoldenDatabaseDirectory(databaseEntries), runningDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to duplicate golden directory : %v\n", err)
 		return err
@@ -252,9 +254,9 @@ func resetRunningDatabaseDirectory() error {
 	return nil
 }
 
-func runBenchmark() error {
+func runBenchmark(databaseEntries uint64) error {
 	levelDB, err := leveldb.New(
-		getRunningDatabaseDirectory(),
+		getRunningDatabaseDirectory(databaseEntries),
 		getLevelDBConfig(),
 		logging.NoLog{},
 		promRegistry,
@@ -296,7 +298,7 @@ func runBenchmark() error {
 
 		// add 2.5k past end.
 		startInsertTime := time.Now()
-		for keyToAddIdx := low + (*databaseEntries); keyToAddIdx < low+(*databaseEntries)+databaseRunningBatchSize; keyToAddIdx++ {
+		for keyToAddIdx := low + databaseEntries; keyToAddIdx < low+databaseEntries+databaseRunningBatchSize; keyToAddIdx++ {
 			entryHash := calculateIndexEncoding(keyToAddIdx)
 			err = batch.Put(entryHash, entryHash)
 			if err != nil {
@@ -311,7 +313,7 @@ func runBenchmark() error {
 		// update middle 5k entries
 		startUpdateTime := time.Now()
 		updateEntryValue := calculateIndexEncoding(low)
-		for keyToUpdateIdx := low + ((*databaseEntries) / 2); keyToUpdateIdx < low+((*databaseEntries)/2)+databaseRunningUpdateSize; keyToUpdateIdx++ {
+		for keyToUpdateIdx := low + (databaseEntries / 2); keyToUpdateIdx < low+(databaseEntries/2)+databaseRunningUpdateSize; keyToUpdateIdx++ {
 			updateEntryKey := calculateIndexEncoding(keyToUpdateIdx)
 			err = batch.Put(updateEntryKey, updateEntryValue)
 			if err != nil {
@@ -386,19 +388,19 @@ func main() {
 		return
 	}
 
-	goldenDir := getGoldenDatabaseDirectory()
+	goldenDir := getGoldenDatabaseDirectory(*databaseEntries)
 	if _, err := os.Stat(goldenDir); os.IsNotExist(err) {
 		// create golden image.
-		if createGoldenDatabase() != nil {
+		if createGoldenDatabase(*databaseEntries) != nil {
 			os.Exit(1)
 			return
 		}
 	}
-	if resetRunningDatabaseDirectory() != nil {
+	if resetRunningDatabaseDirectory(*databaseEntries) != nil {
 		os.Exit(1)
 		return
 	}
-	if runBenchmark() != nil {
+	if runBenchmark(*databaseEntries) != nil {
 		os.Exit(1)
 		return
 	}
