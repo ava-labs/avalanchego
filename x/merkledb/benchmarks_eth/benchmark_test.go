@@ -10,8 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/trie/trienode"
 	"github.com/ethereum/go-ethereum/triedb"
+	"github.com/ethereum/go-ethereum/triedb/pathdb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,4 +79,68 @@ func testGoldenDatabaseContent(t *testing.T, size uint64) {
 
 	require.NoError(t, trieDb.Close())
 	require.NoError(t, ldb.Close())
+}
+
+func TestRevisions(t *testing.T) {
+	revisionCount := uint64(10)
+	wd, _ := os.Getwd()
+	dbPath := path.Join(wd, "db-test-revisions")
+	require.NoError(t, os.RemoveAll(dbPath))
+	err := os.Mkdir(dbPath, 0o777)
+	require.NoError(t, err)
+	ldb, err := rawdb.NewLevelDBDatabase(dbPath, levelDBCacheSize, 200, "metrics_prefix", false)
+	require.NoError(t, err)
+	trieDb := triedb.NewDatabase(ldb, &triedb.Config{
+		Preimages: false,
+		IsVerkle:  false,
+		HashDB:    nil,
+		PathDB: &pathdb.Config{
+			StateHistory:   revisionCount, // keep the same requiremenet across each db
+			CleanCacheSize: 1024 * 1024,
+			DirtyCacheSize: 1024 * 1024,
+		},
+	})
+	tdb := trie.NewEmpty(trieDb)
+	for entryIdx := uint64(0); entryIdx < 1000000; entryIdx++ {
+		entryHash := calculateIndexEncoding(entryIdx)
+		tdb.Update(entryHash, make([]byte, 32))
+	}
+
+	revisions := make([]common.Hash, 0)
+	var nodes *trienode.NodeSet
+	var root common.Hash
+	root, nodes = tdb.Commit(false)
+	err = trieDb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil /*states*/)
+	require.NoError(t, err)
+	err = trieDb.Commit(root, false)
+	require.NoError(t, err)
+	tdb, err = trie.New(trie.TrieID(root), trieDb)
+	require.NoError(t, err)
+	revisions = append(revisions, root)
+
+	for currentRev := uint64(1); currentRev < 1000; currentRev++ {
+		// update the tree based on the current revision.
+		for entryIdx := uint64(currentRev-1) * 1000; entryIdx < uint64(currentRev)*1000; entryIdx++ {
+			entryHash := calculateIndexEncoding(entryIdx)
+			tdb.Update(entryHash, entryHash)
+		}
+		root, nodes = tdb.Commit(false)
+		err = trieDb.Update(root, revisions[len(revisions)-1], currentRev, trienode.NewWithNodeSet(nodes), nil /*states*/)
+		require.NoError(t, err)
+		err = trieDb.Commit(root, false)
+		require.NoError(t, err)
+		tdb, err = trie.New(trie.TrieID(root), trieDb)
+		require.NoError(t, err)
+		revisions = append(revisions, root)
+
+		// check all the historical revision and see which ones are available and which one aren't.
+		for revIdx, revRoot := range revisions {
+			_, err = trie.New(trie.TrieID(revRoot), trieDb)
+			if uint64(revIdx)+revisionCount >= currentRev {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		}
+	}
 }
