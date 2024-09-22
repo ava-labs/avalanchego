@@ -1437,6 +1437,18 @@ func TestAddValidatorDuringRemoval(t *testing.T) {
 
 // GetValidatorSet must return the BLS keys for a given validator correctly when
 // queried at a previous height, even in case it has currently expired
+//
+//  1. Add primary network validator
+//  2. Advance chain time for the primary network validator to be moved to the
+//     current validator set
+//  3. Add permissioned subnet validator
+//  4. Advance chain time for the subnet validator to be moved to the current
+//     validator set
+//  5. Advance chain time for the subnet validator to be removed
+//  6. Advance chain time for the primary network validator to be removed
+//  7. Re-add the primary network validator with a different BLS key
+//  8. Advance chain time for the primary network validator to be moved to the
+//     current validator set
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
@@ -1606,53 +1618,47 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// Show that validators are rebuilt with the right BLS key
-	for height := primaryStartHeight; height < primaryEndHeight; height++ {
-		require.NoError(checkValidatorBlsKeyIsSet(
-			vm.State,
-			nodeID,
-			constants.PrimaryNetworkID,
-			height,
-			pk1,
-		))
-	}
-	for height := primaryEndHeight; height < primaryRestartHeight; height++ {
+	for height := uint64(0); height <= primaryRestartHeight; height++ {
+		// The primary network validator doesn't exist for heights
+		// [0, primaryStartHeight) and [primaryEndHeight, primaryRestartHeight).
+		var expectedPrimaryNetworkErr error
+		if height < primaryStartHeight || (height >= primaryEndHeight && height < primaryRestartHeight) {
+			expectedPrimaryNetworkErr = database.ErrNotFound
+		}
+
+		// The primary network validator's BLS key is pk1 for the first
+		// validation period and pk2 for the second validation period.
+		var expectedPrimaryNetworkBLSKey *bls.PublicKey
+		if height >= primaryStartHeight && height < primaryEndHeight {
+			expectedPrimaryNetworkBLSKey = pk1
+		} else if height >= primaryRestartHeight {
+			expectedPrimaryNetworkBLSKey = pk2
+		}
+
 		err := checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			pk1,
+			expectedPrimaryNetworkBLSKey,
 		)
-		require.ErrorIs(err, database.ErrNotFound)
-	}
-	require.NoError(checkValidatorBlsKeyIsSet(
-		vm.State,
-		nodeID,
-		constants.PrimaryNetworkID,
-		primaryRestartHeight,
-		pk2,
-	))
+		require.ErrorIs(err, expectedPrimaryNetworkErr)
 
-	for height := subnetStartHeight; height < subnetEndHeight; height++ {
-		require.NoError(checkValidatorBlsKeyIsSet(
-			vm.State,
-			nodeID,
-			subnetID,
-			height,
-			pk1,
-		))
-	}
+		// The subnet validator doesn't exist for heights
+		// [0, subnetStartHeight) and [subnetEndHeight, primaryRestartHeight).
+		var expectedSubnetErr error
+		if height < subnetStartHeight || height >= subnetEndHeight {
+			expectedSubnetErr = database.ErrNotFound
+		}
 
-	for height := subnetEndHeight; height <= primaryRestartHeight; height++ {
-		err := checkValidatorBlsKeyIsSet(
+		err = checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			subnetID,
 			height,
 			pk1,
 		)
-		require.ErrorIs(err, database.ErrNotFound)
+		require.ErrorIs(err, expectedSubnetErr)
 	}
 }
 
