@@ -1621,7 +1621,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			vm.State,
 			nodeID,
 			constants.PrimaryNetworkID,
-			primaryEndHeight,
+			height,
 			pk1,
 		)
 		require.ErrorIs(err, database.ErrNotFound)
@@ -1649,7 +1649,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			vm.State,
 			nodeID,
 			subnetID,
-			primaryEndHeight,
+			height,
 			pk1,
 		)
 		require.ErrorIs(err, database.ErrNotFound)
