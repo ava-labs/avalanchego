@@ -64,23 +64,13 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 	if m.startedTracking {
 		return errAlreadyStartedTracking
 	}
-	now := m.clock.UnixTime()
+
 	for _, nodeID := range nodeIDs {
-		upDuration, lastUpdated, err := m.CalculateUptime(nodeID)
-		if err != nil {
-			return err
-		}
-
-		// If we are in a weird reality where time has moved backwards, then we
-		// shouldn't modify the validator's uptime.
-		if now.Before(lastUpdated) {
-			continue
-		}
-
-		if err := m.state.SetUptime(nodeID, upDuration, lastUpdated); err != nil {
+		if err := m.updateUptime(nodeID); err != nil {
 			return err
 		}
 	}
+
 	m.startedTracking = true
 	return nil
 }
@@ -89,37 +79,14 @@ func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
 	if !m.startedTracking {
 		return errNotStartedTracking
 	}
-	defer func() {
-		m.startedTracking = false
-	}()
-	now := m.clock.UnixTime()
+
 	for _, nodeID := range nodeIDs {
-		// If the node is already connected, then we can just
-		// update the uptime in the state and remove the connection
-		if m.IsConnected(nodeID) {
-			if err := m.Disconnect(nodeID); err != nil {
-				return err
-			}
-			continue
-		}
-
-		// if the node is not connected, then we need to update
-		// the uptime in the state from the last time the node was connected to current time.
-		upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
-		if err != nil {
-			return err
-		}
-
-		// If we are in a weird reality where time has moved backwards, then we
-		// shouldn't modify the validator's uptime.
-		if now.Before(lastUpdated) {
-			continue
-		}
-
-		if err := m.state.SetUptime(nodeID, upDuration, now); err != nil {
+		if err := m.updateUptime(nodeID); err != nil {
 			return err
 		}
 	}
+
+	m.startedTracking = false
 	return nil
 }
 
@@ -139,11 +106,12 @@ func (m *manager) IsConnected(nodeID ids.NodeID) bool {
 
 func (m *manager) Disconnect(nodeID ids.NodeID) error {
 	defer delete(m.connections, nodeID)
-	if err := m.updateUptime(nodeID); err != nil {
-		return err
+
+	if !m.startedTracking {
+		return nil
 	}
 
-	return nil
+	return m.updateUptime(nodeID)
 }
 
 func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
@@ -159,12 +127,16 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 		return upDuration, lastUpdated, nil
 	}
 
+	// If we haven't started tracking, then we assume that the node has been
+	// online since their last update.
 	if !m.startedTracking {
 		durationOffline := now.Sub(lastUpdated)
 		newUpDuration := upDuration + durationOffline
 		return newUpDuration, now, nil
 	}
 
+	// If we are tracking and they aren't connected, they have been offline
+	// since their last update.
 	timeConnected, isConnected := m.connections[nodeID]
 	if !isConnected {
 		return upDuration, now, nil
@@ -210,15 +182,12 @@ func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.T
 	return uptime, nil
 }
 
-// updateUptime updates the uptime of the node on the state by the amount
-// of time that the node has been connected.
+// updateUptime updates the uptime of the node on the state by the amount of
+// time that the node has been connected.
 func (m *manager) updateUptime(nodeID ids.NodeID) error {
-	if !m.startedTracking {
-		return nil
-	}
 	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID)
 	if err == database.ErrNotFound {
-		// If a non-validator disconnects, we don't care
+		// We don't track the uptimes of non-validators.
 		return nil
 	}
 	if err != nil {
