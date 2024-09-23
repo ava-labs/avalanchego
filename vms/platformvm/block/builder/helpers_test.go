@@ -187,10 +187,10 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 		res.Builder.ShutdownBlockTimer()
 
-		if res.isBootstrapped.Get() {
+		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
-			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			require.NoError(res.uptimes.StopTracking(validatorIDs))
 
 			require.NoError(res.state.Commit())
 		}

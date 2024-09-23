@@ -89,7 +89,6 @@ func TestHealthCheckSubnet(t *testing.T) {
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
-				validators.UnhandledSubnetConnector,
 				sb,
 				peerTracker,
 				p2pTracker,
