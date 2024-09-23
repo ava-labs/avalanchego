@@ -192,7 +192,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 
 		require := require.New(t)
 
-		if res.isBootstrapped.Get() {
+		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 			require.NoError(res.uptimes.StopTracking(validatorIDs))

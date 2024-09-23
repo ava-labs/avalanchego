@@ -4,6 +4,7 @@
 package uptime
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -12,6 +13,11 @@ import (
 )
 
 var _ Manager = (*manager)(nil)
+
+var (
+	errAlreadyStartedTracking = errors.New("already started tracking")
+	errNotStartedTracking     = errors.New("not started tracking")
+)
 
 type Manager interface {
 	Tracker
@@ -56,7 +62,7 @@ func NewManager(state State, clk *mockable.Clock) Manager {
 
 func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 	if m.startedTracking {
-		return nil
+		return errAlreadyStartedTracking
 	}
 	now := m.clock.UnixTime()
 	for _, nodeID := range nodeIDs {
@@ -81,7 +87,7 @@ func (m *manager) StartTracking(nodeIDs []ids.NodeID) error {
 
 func (m *manager) StopTracking(nodeIDs []ids.NodeID) error {
 	if !m.startedTracking {
-		return nil
+		return errNotStartedTracking
 	}
 	defer func() {
 		m.startedTracking = false
