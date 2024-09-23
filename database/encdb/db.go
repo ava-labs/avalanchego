@@ -204,6 +204,7 @@ func (b *batch) Reset() {
 	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
 		b.ops = make([]database.BatchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
+		clear(b.ops)
 		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()
