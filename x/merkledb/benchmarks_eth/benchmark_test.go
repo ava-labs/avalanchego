@@ -107,6 +107,8 @@ func TestRevisions(t *testing.T) {
 	}
 
 	revisions := make([]common.Hash, 0)
+	revisionsTrie := make([]*trie.Trie, 0)
+
 	var nodes *trienode.NodeSet
 	var root common.Hash
 	root, nodes = tdb.Commit(false)
@@ -114,6 +116,9 @@ func TestRevisions(t *testing.T) {
 	require.NoError(t, err)
 	err = trieDb.Commit(root, false)
 	require.NoError(t, err)
+	tdb2, err := trie.New(trie.TrieID(root), trieDb)
+	require.NoError(t, err)
+	revisionsTrie = append(revisionsTrie, tdb2)
 	tdb, err = trie.New(trie.TrieID(root), trieDb)
 	require.NoError(t, err)
 	revisions = append(revisions, root)
@@ -129,18 +134,29 @@ func TestRevisions(t *testing.T) {
 		require.NoError(t, err)
 		err = trieDb.Commit(root, false)
 		require.NoError(t, err)
+		tdb2, err = trie.New(trie.TrieID(root), trieDb)
+		require.NoError(t, err)
+		revisionsTrie = append(revisionsTrie, tdb2)
 		tdb, err = trie.New(trie.TrieID(root), trieDb)
 		require.NoError(t, err)
 		revisions = append(revisions, root)
 
 		// check all the historical revision and see which ones are available and which one aren't.
-		for revIdx, revRoot := range revisions {
-			_, err = trie.New(trie.TrieID(revRoot), trieDb)
-			if uint64(revIdx)+revisionCount >= currentRev {
+		for revIdx, revTrie := range revisionsTrie {
+			entryHash := calculateIndexEncoding(uint64(revIdx) * 1000)
+			entryValue, err := revTrie.Get(entryHash)
+			if revIdx != 0 {
 				require.NoError(t, err)
+				require.Equal(t, make([]byte, 32), entryValue)
 			} else {
-				require.Error(t, err)
+				require.Error(t, err) // should be "missing node error"
+				continue
 			}
+
+			entryHash = calculateIndexEncoding(uint64(revIdx)*1000 - 1)
+			entryValue, err = revTrie.Get(entryHash)
+			require.NoError(t, err)
+			require.Equal(t, entryHash, entryValue)
 		}
 	}
 }
