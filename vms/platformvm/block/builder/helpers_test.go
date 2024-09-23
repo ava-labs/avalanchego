@@ -46,12 +46,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 const (
@@ -153,7 +153,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		metrics,
 		res.state,
 		&res.backend,
-		pvalidators.TestManager,
+		validatorstest.Manager,
 	)
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
