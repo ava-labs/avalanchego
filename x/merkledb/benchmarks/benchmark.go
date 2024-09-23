@@ -30,7 +30,7 @@ const (
 	databaseRunningBatchSize  = 2500       // 2.5k
 	databaseRunningUpdateSize = 5000       // 5k
 	defaultMetricsPort        = 3000
-	firewoodNumberOfRevisions = 120
+	firewoodNumberOfRevisions = 5
 )
 
 var (
