@@ -542,6 +542,20 @@ func (mr *MockStateMockRecorder) GetRewardUTXOs(txID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardUTXOs", reflect.TypeOf((*MockState)(nil).GetRewardUTXOs), txID)
 }
 
+// GetSoVExcess mocks base method.
+func (m *MockState) GetSoVExcess() gas.Gas {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSoVExcess")
+	ret0, _ := ret[0].(gas.Gas)
+	return ret0
+}
+
+// GetSoVExcess indicates an expected call of GetSoVExcess.
+func (mr *MockStateMockRecorder) GetSoVExcess() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSoVExcess", reflect.TypeOf((*MockState)(nil).GetSoVExcess))
+}
+
 // GetStartTime mocks base method.
 func (m *MockState) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	m.ctrl.T.Helper()
