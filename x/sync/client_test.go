@@ -43,7 +43,7 @@ func newModifiedRangeProofHandler(
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.RangeProof),
 ) p2p.Handler {
-	handler := NewSyncGetRangeProofHandler(logging.NoLog{}, db)
+	handler := NewGetRangeProofHandler(logging.NoLog{}, db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -79,7 +79,7 @@ func newModifiedChangeProofHandler(
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.ChangeProof),
 ) p2p.Handler {
-	handler := NewSyncGetChangeProofHandler(logging.NoLog{}, db)
+	handler := NewGetChangeProofHandler(logging.NoLog{}, db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{

@@ -85,7 +85,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			expectedErr: p2p.ErrUnexpected,
 		},
 		{
-			name: "key limit too large",
+			name: "response bounded by key limit",
 			request: &pb.SyncGetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
 				KeyLimit:   2 * defaultRequestKeyLimit,
@@ -94,7 +94,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
 		{
-			name: "bytes limit too large",
+			name: "response bounded by byte limit",
 			request: &pb.SyncGetRangeProofRequest{
 				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
@@ -118,7 +118,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewSyncGetRangeProofHandler(logging.NoLog{}, smallTrieDB)
+			handler := NewGetRangeProofHandler(logging.NoLog{}, smallTrieDB)
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
 			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
@@ -130,17 +130,12 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				require.Nil(responseBytes)
 				return
 			}
-			require.NotNil(responseBytes)
 
-			var proof *merkledb.RangeProof
-			if !test.proofNil {
-				var proofProto pb.RangeProof
-				require.NoError(proto.Unmarshal(responseBytes, &proofProto))
+			var proofProto pb.RangeProof
+			require.NoError(proto.Unmarshal(responseBytes, &proofProto))
 
-				var p merkledb.RangeProof
-				require.NoError(p.UnmarshalProto(&proofProto))
-				proof = &p
-			}
+			var proof merkledb.RangeProof
+			require.NoError(proof.UnmarshalProto(&proofProto))
 
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyValues), test.expectedResponseLen)
@@ -344,7 +339,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewSyncGetChangeProofHandler(logging.NoLog{}, serverDB)
+			handler := NewGetChangeProofHandler(logging.NoLog{}, serverDB)
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)

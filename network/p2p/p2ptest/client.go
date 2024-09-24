@@ -80,10 +80,10 @@ func NewClient(
 		return nil
 	}
 
-	require.NoError(t, clientNetwork.Connected(rootCtx, clientNodeID, nil))
-	require.NoError(t, clientNetwork.Connected(rootCtx, serverNodeID, nil))
-	require.NoError(t, serverNetwork.Connected(rootCtx, clientNodeID, nil))
-	require.NoError(t, serverNetwork.Connected(rootCtx, serverNodeID, nil))
+	require.NoError(t, clientNetwork.Connected(ctx, clientNodeID, nil))
+	require.NoError(t, clientNetwork.Connected(ctx, serverNodeID, nil))
+	require.NoError(t, serverNetwork.Connected(ctx, clientNodeID, nil))
+	require.NoError(t, serverNetwork.Connected(ctx, serverNodeID, nil))
 
 	require.NoError(t, serverNetwork.AddHandler(0, handler))
 	return clientNetwork.NewClient(0)
