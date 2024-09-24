@@ -99,12 +99,13 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	require.True(ok)
 }
 
-// Ensure semantic verification fails when proposed timestamp is at or before current timestamp
+// Ensure semantic verification fails when proposed timestamp is before the
+// current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
-	tx, err := newAdvanceTimeTx(t, env.state.GetTimestamp())
+	tx, err := newAdvanceTimeTx(t, env.state.GetTimestamp().Add(-time.Second))
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -122,7 +123,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 		Tx:            tx,
 	}
 	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, ErrChildBlockNotAfterParent)
+	require.ErrorIs(err, ErrChildBlockEarlierThanParent)
 }
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
