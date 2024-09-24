@@ -38,6 +38,8 @@ func NewClient(
 	require.NoError(t, err)
 
 	clientSender.SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
+		// Send the request asynchronously to avoid deadlock when the server
+		// sends the response back to the client
 		go func() {
 			require.NoError(t, serverNetwork.AppGossip(ctx, clientNodeID, gossipBytes))
 		}()
@@ -56,6 +58,8 @@ func NewClient(
 	}
 
 	serverSender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
+		// Send the request asynchronously to avoid deadlock when the server
+		// sends the response back to the client
 		go func() {
 			require.NoError(t, clientNetwork.AppResponse(ctx, serverNodeID, requestID, responseBytes))
 		}()
@@ -64,6 +68,8 @@ func NewClient(
 	}
 
 	serverSender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+		// Send the request asynchronously to avoid deadlock when the server
+		// sends the response back to the client
 		go func() {
 			require.NoError(t, clientNetwork.AppRequestFailed(ctx, serverNodeID, requestID, &common.AppError{
 				Code:    errorCode,
