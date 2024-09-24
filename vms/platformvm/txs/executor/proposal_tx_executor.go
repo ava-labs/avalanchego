@@ -271,6 +271,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 
 	now := e.Clk.Time()
 	if err := VerifyNewChainTime(
+		e.Config.ValidatorFeeConfig,
 		newChainTime,
 		now,
 		e.OnCommitState,

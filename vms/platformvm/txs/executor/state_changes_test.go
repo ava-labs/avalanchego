@@ -76,7 +76,10 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				s,
+				mockable.MaxTime,
+			)
 			require.NoError(err)
 			require.False(nextTime.After(nextStakerChangeTime))
 

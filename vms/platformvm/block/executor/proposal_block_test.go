@@ -1382,7 +1382,11 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	// Advance time until next staker change time is [validatorEndTime]
 	for {
-		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state, mockable.MaxTime)
+		nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+			env.config.ValidatorFeeConfig,
+			env.state,
+			mockable.MaxTime,
+		)
 		require.NoError(err)
 		if nextStakerChangeTime.Equal(validatorEndTime) {
 			break

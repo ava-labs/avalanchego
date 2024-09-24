@@ -8,13 +8,20 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
-func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
+func NextBlockTime(
+	config validatorfee.Config,
+	state Chain,
+	clk *mockable.Clock,
+) (time.Time, bool, error) {
 	var (
 		timestamp  = clk.Time()
 		parentTime = state.GetTimestamp()
@@ -27,7 +34,7 @@ func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
 	// If the NextStakerChangeTime is after timestamp, then we shouldn't return
 	// that the time was capped.
 	nextStakerChangeTimeCap := timestamp.Add(time.Second)
-	nextStakerChangeTime, err := GetNextStakerChangeTime(state, nextStakerChangeTimeCap)
+	nextStakerChangeTime, err := GetNextStakerChangeTime(config, state, nextStakerChangeTimeCap)
 	if err != nil {
 		return time.Time{}, false, fmt.Errorf("failed getting next staker change time: %w", err)
 	}
@@ -44,7 +51,11 @@ func NextBlockTime(state Chain, clk *mockable.Clock) (time.Time, bool, error) {
 // GetNextStakerChangeTime returns the next time a staker will be either added
 // or removed to/from the current validator set. If the next staker change time
 // is further in the future than [defaultTime], then [defaultTime] is returned.
-func GetNextStakerChangeTime(state Chain, defaultTime time.Time) (time.Time, error) {
+func GetNextStakerChangeTime(
+	config validatorfee.Config,
+	state Chain,
+	defaultTime time.Time,
+) (time.Time, error) {
 	currentIterator, err := state.GetCurrentStakerIterator()
 	if err != nil {
 		return time.Time{}, err
@@ -68,6 +79,43 @@ func GetNextStakerChangeTime(state Chain, defaultTime time.Time) (time.Time, err
 			defaultTime = time
 		}
 	}
+
+	sovIterator, err := state.GetActiveSubnetOnlyValidatorsIterator()
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer sovIterator.Release()
+
+	// If there are no SoVs, return
+	if !sovIterator.Next() {
+		return defaultTime, nil
+	}
+
+	var (
+		currentTime = state.GetTimestamp()
+		maxSeconds  = uint64(defaultTime.Sub(currentTime) / time.Second)
+		sov         = sovIterator.Value()
+		accruedFees = state.GetAccruedFees()
+	)
+	remainingFunds, err := math.Sub(sov.EndAccumulatedFee, accruedFees)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	feeState := validatorfee.State{
+		Current: gas.Gas(state.NumActiveSubnetOnlyValidators()),
+		Excess:  state.GetSoVExcess(),
+	}
+	remainingSeconds := feeState.SecondsRemaining(
+		config,
+		maxSeconds,
+		remainingFunds,
+	)
+
+	deactivationTime := currentTime.Add(time.Duration(remainingSeconds) * time.Second)
+	if deactivationTime.Before(defaultTime) {
+		defaultTime = deactivationTime
+	}
 	return defaultTime, nil
 }
 
@@ -75,31 +123,31 @@ func GetNextStakerChangeTime(state Chain, defaultTime time.Time) (time.Time, err
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
-func PickFeeCalculator(cfg *config.Config, state Chain) fee.Calculator {
+func PickFeeCalculator(config *config.Config, state Chain) txfee.Calculator {
 	timestamp := state.GetTimestamp()
-	if !cfg.UpgradeConfig.IsEtnaActivated(timestamp) {
-		return NewStaticFeeCalculator(cfg, timestamp)
+	if !config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		return NewStaticFeeCalculator(config, timestamp)
 	}
 
 	feeState := state.GetFeeState()
 	gasPrice := gas.CalculatePrice(
-		cfg.DynamicFeeConfig.MinPrice,
+		config.DynamicFeeConfig.MinPrice,
 		feeState.Excess,
-		cfg.DynamicFeeConfig.ExcessConversionConstant,
+		config.DynamicFeeConfig.ExcessConversionConstant,
 	)
-	return fee.NewDynamicCalculator(
-		cfg.DynamicFeeConfig.Weights,
+	return txfee.NewDynamicCalculator(
+		config.DynamicFeeConfig.Weights,
 		gasPrice,
 	)
 }
 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set
 // to either the pre-AP3 or post-AP3 config.
-func NewStaticFeeCalculator(cfg *config.Config, timestamp time.Time) fee.Calculator {
-	config := cfg.StaticFeeConfig
-	if !cfg.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
-		config.CreateSubnetTxFee = cfg.CreateAssetTxFee
-		config.CreateBlockchainTxFee = cfg.CreateAssetTxFee
+func NewStaticFeeCalculator(config *config.Config, timestamp time.Time) txfee.Calculator {
+	feeConfig := config.StaticFeeConfig
+	if !config.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
+		feeConfig.CreateSubnetTxFee = config.CreateAssetTxFee
+		feeConfig.CreateBlockchainTxFee = config.CreateAssetTxFee
 	}
-	return fee.NewStaticCalculator(config)
+	return txfee.NewStaticCalculator(feeConfig)
 }
