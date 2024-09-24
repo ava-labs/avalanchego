@@ -22,7 +22,7 @@ func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
+	subnetIDStr := "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof"
 	genesis := &xsgenesis.Genesis{
 		Timestamp: time.Now().Unix(),
 		Allocations: []xsgenesis.Allocation{

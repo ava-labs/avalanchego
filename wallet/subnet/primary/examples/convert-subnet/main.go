@@ -21,7 +21,7 @@ func main() {
 	key := genesis.EWOQKey
 	uri := "http://localhost:9700"
 	kc := secp256k1fx.NewKeychain(key)
-	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
+	subnetIDStr := "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof"
 	weight := units.Schmeckle
 
 	subnetID, err := ids.FromString(subnetIDStr)
@@ -57,13 +57,20 @@ func main() {
 	pWallet := wallet.P()
 
 	convertSubnetStartTime := time.Now()
-	addValidatorTx, err := pWallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Wght:   weight,
+	addValidatorTx, err := pWallet.IssueConvertSubnetTx(
+		subnetID,
+		ids.Empty,
+		nil,
+		[]txs.ConvertSubnetValidator{
+			{
+				NodeID:                nodeID,
+				Weight:                weight,
+				Balance:               30 * units.NanoAvax, // 30s before being deactivated
+				Signer:                nodePoP,
+				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+			},
 		},
-		Subnet: subnetID,
-	})
+	)
 	if err != nil {
 		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)
 	}
