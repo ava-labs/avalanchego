@@ -293,6 +293,11 @@ func (m *Manager) finishWorkItem() {
 
 // Processes [item] by fetching a change or range proof.
 func (m *Manager) doWork(ctx context.Context, work *workItem) {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		m.finishWorkItem()
+		return
+	}
+
 	// Backoff for failed requests accounting for time this job has already
 	// spent waiting in the unprocessed queue
 	now := time.Now()
