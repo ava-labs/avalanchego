@@ -126,7 +126,8 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	require.ErrorIs(err, ErrChildBlockEarlierThanParent)
 }
 
-// Ensure semantic verification fails when proposed timestamp is after next validator set change time
+// Ensure semantic verification fails when proposed timestamp is after next
+// validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
@@ -167,8 +168,8 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	// fast forward clock to 10 seconds before genesis validators stop validating
-	env.clk.Set(genesistest.DefaultValidatorEndTime.Add(-10 * time.Second))
+	// fast forward clock to when genesis validators stop validating
+	env.clk.Set(genesistest.DefaultValidatorEndTime)
 
 	{
 		// Proposes advancing timestamp to 1 second after genesis validators stop validating
