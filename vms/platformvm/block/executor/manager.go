@@ -127,7 +127,11 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return err
 	}
 
-	nextBlkTime, _, err := state.NextBlockTime(stateDiff, m.txExecutorBackend.Clk)
+	nextBlkTime, _, err := state.NextBlockTime(
+		m.txExecutorBackend.Config.ValidatorFeeConfig,
+		stateDiff,
+		m.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return err
 	}

@@ -31,9 +31,15 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
-// targetBlockSize is maximum number of transaction bytes to place into a
-// StandardBlock
-const targetBlockSize = 128 * units.KiB
+const (
+	// targetBlockSize is maximum number of transaction bytes to place into a
+	// StandardBlock
+	targetBlockSize = 128 * units.KiB
+
+	// maxTimeToSleep is the maximum time to sleep between checking if a block
+	// should be produced.
+	maxTimeToSleep = time.Hour
+)
 
 var (
 	_ Builder = (*builder)(nil)
@@ -174,12 +180,17 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 		return 0, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(preferredState)
+	now := b.txExecutorBackend.Clk.Time()
+	maxTimeToAwake := now.Add(maxTimeToSleep)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		maxTimeToAwake,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("%w of %s: %w", errCalculatingNextStakerTime, preferredID, err)
 	}
 
-	now := b.txExecutorBackend.Clk.Time()
 	return nextStakerChangeTime.Sub(now), nil
 }
 
@@ -219,7 +230,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp, timeWasCapped, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -246,7 +261,11 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 		return nil, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	timestamp, _, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, _, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}

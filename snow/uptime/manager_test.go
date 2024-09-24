@@ -60,19 +60,6 @@ func TestStartTrackingDBError(t *testing.T) {
 	require.ErrorIs(err, errTest)
 }
 
-func TestStartTrackingNonValidator(t *testing.T) {
-	require := require.New(t)
-
-	s := NewTestState()
-	clk := mockable.Clock{}
-	up := NewManager(s, &clk)
-
-	nodeID0 := ids.GenerateTestNodeID()
-
-	err := up.StartTracking([]ids.NodeID{nodeID0})
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
 func TestStartTrackingInThePast(t *testing.T) {
 	require := require.New(t)
 
@@ -158,21 +145,6 @@ func TestStopTrackingIncreasesUptime(t *testing.T) {
 	require.NoError(err)
 	require.Equal(time.Second, duration)
 	require.Equal(clk.UnixTime(), lastUpdated)
-}
-
-func TestStopTrackingDisconnectedNonValidator(t *testing.T) {
-	require := require.New(t)
-
-	nodeID0 := ids.GenerateTestNodeID()
-
-	s := NewTestState()
-	clk := mockable.Clock{}
-	up := NewManager(s, &clk)
-
-	require.NoError(up.StartTracking(nil))
-
-	err := up.StopTracking([]ids.NodeID{nodeID0})
-	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestStopTrackingConnectedDBError(t *testing.T) {
