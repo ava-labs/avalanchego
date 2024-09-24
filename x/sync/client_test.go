@@ -38,7 +38,7 @@ func newDefaultDBConfig() merkledb.Config {
 	}
 }
 
-func newModifiedRangeProofHandler(
+func newFlakyRangeProofHandler(
 	t *testing.T,
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.RangeProof),
@@ -74,7 +74,7 @@ func newModifiedRangeProofHandler(
 	}
 }
 
-func newModifiedChangeProofHandler(
+func newFlakyChangeProofHandler(
 	t *testing.T,
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.ChangeProof),

@@ -775,7 +775,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - too many leaves in response",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
 				})
 
@@ -785,7 +785,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - removed first key in response",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
 				})
 
@@ -795,7 +795,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - removed first key in response and replaced proof",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
 					response.KeyValues = []merkledb.KeyValue{
 						{
@@ -821,7 +821,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - removed key from middle of response",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					i := rand.Intn(max(1, len(response.KeyValues)-1)) // #nosec G404
 					_ = slices.Delete(response.KeyValues, i, min(len(response.KeyValues), i+1))
 				})
@@ -832,7 +832,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - start and end proof nodes removed",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
@@ -843,7 +843,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - end proof removed",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.EndProof = nil
 				})
 
@@ -853,7 +853,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "range proof bad response - empty proof",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 					response.KeyValues = nil
@@ -874,7 +874,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "change proof bad response - too many keys in response",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
 					response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, defaultRequestKeyLimit)...)
 				})
 
@@ -884,7 +884,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "change proof bad response - removed first key in response",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
@@ -894,7 +894,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "change proof bad response - removed key from middle of response",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1)) // #nosec G404
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
@@ -905,7 +905,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		{
 			name: "all proof keys removed from response",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newModifiedChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
