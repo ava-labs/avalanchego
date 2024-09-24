@@ -60,14 +60,7 @@ type Trie interface {
 	MerkleRootGetter
 	ProofGetter
 	database.Iteratee
-
-	// GetValue gets the value associated with the specified key
-	// database.ErrNotFound if the key is not present
-	GetValue(ctx context.Context, key []byte) ([]byte, error)
-
-	// GetValues gets the values associated with the specified keys
-	// database.ErrNotFound if the key is not present
-	GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error)
+	ReadOnlyTrie
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].
@@ -82,6 +75,16 @@ type Trie interface {
 		ctx context.Context,
 		changes ViewChanges,
 	) (View, error)
+}
+
+type ReadOnlyTrie interface {
+	// GetValue gets the value associated with the specified key
+	// database.ErrNotFound if the key is not present
+	GetValue(ctx context.Context, key []byte) ([]byte, error)
+
+	// GetValues gets the values associated with the specified keys
+	// database.ErrNotFound if the key is not present
+	GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error)
 }
 
 type View interface {

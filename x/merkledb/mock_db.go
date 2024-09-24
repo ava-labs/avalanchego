@@ -346,6 +346,21 @@ func (mr *MockMerkleDBMockRecorder) NewIteratorWithStartAndPrefix(start, prefix 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewIteratorWithStartAndPrefix", reflect.TypeOf((*MockMerkleDB)(nil).NewIteratorWithStartAndPrefix), start, prefix)
 }
 
+// NewSnapshot mocks base method.
+func (m *MockMerkleDB) NewSnapshot(revisionsLifetime int) (ReadOnlyTrie, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewSnapshot", revisionsLifetime)
+	ret0, _ := ret[0].(ReadOnlyTrie)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewSnapshot indicates an expected call of NewSnapshot.
+func (mr *MockMerkleDBMockRecorder) NewSnapshot(revisionsLifetime any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewSnapshot", reflect.TypeOf((*MockMerkleDB)(nil).NewSnapshot), revisionsLifetime)
+}
+
 // NewView mocks base method.
 func (m *MockMerkleDB) NewView(ctx context.Context, changes ViewChanges) (View, error) {
 	m.ctrl.T.Helper()
