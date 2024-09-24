@@ -461,6 +461,7 @@ func (m *Manager) retryWork(work *workItem) {
 	m.workLock.Lock()
 	m.unprocessedWork.Insert(work)
 	m.workLock.Unlock()
+	m.unprocessedWorkCond.Signal()
 }
 
 // Returns an error if we should drop the response
