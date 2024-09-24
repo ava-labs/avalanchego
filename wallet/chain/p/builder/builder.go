@@ -164,6 +164,22 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.ConvertSubnetTx, error)
 
+	// RegisterSubnetValidatorTx adds a validator to a Permissionless L1.
+	//
+	// - [balance] that the validator should allocate to continuous fees
+	// - [signer] is the BLS key for this validator
+	// - [remainingBalanceOwner] specifies the owner to send any of the
+	//   remaining balance after removing the continuous fee
+	// - [message] is the Warp message that authorizes this validator to be
+	//   added
+	NewRegisterSubnetValidatorTx(
+		balance uint64,
+		signer *signer.ProofOfPossession,
+		remainingBalanceOwner *secp256k1fx.OutputOwners,
+		message []byte,
+		options ...common.Option,
+	) (*txs.RegisterSubnetValidatorTx, error)
+
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
 	//
@@ -857,6 +873,76 @@ func (b *builder) NewConvertSubnetTx(
 		Address:    address,
 		Validators: validators,
 		SubnetAuth: subnetAuth,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewRegisterSubnetValidatorTx(
+	balance uint64,
+	signer *signer.ProofOfPossession,
+	remainingBalanceOwner *secp256k1fx.OutputOwners,
+	message []byte,
+	options ...common.Option,
+) (*txs.RegisterSubnetValidatorTx, error) {
+	var (
+		toBurn = map[ids.ID]uint64{
+			b.context.AVAXAssetID: balance,
+		}
+		toStake = map[ids.ID]uint64{}
+	)
+
+	ops := common.NewOptions(options)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	signerComplexity, err := fee.SignerComplexity(signer)
+	if err != nil {
+		return nil, err
+	}
+	ownerComplexity, err := fee.OwnerComplexity(remainingBalanceOwner)
+	if err != nil {
+		return nil, err
+	}
+	warpComplexity, err := fee.WarpComplexity(message)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicRegisterSubnetValidatorTxComplexities.Add(
+		&memoComplexity,
+		&signerComplexity,
+		&ownerComplexity,
+		&warpComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(remainingBalanceOwner.Addrs)
+	tx := &txs.RegisterSubnetValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		Balance:               balance,
+		Signer:                signer,
+		RemainingBalanceOwner: remainingBalanceOwner,
+		Message:               message,
 	}
 	return tx, b.initCtx(tx)
 }

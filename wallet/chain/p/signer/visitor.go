@@ -169,6 +169,14 @@ func (s *visitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return sign(s.tx, true, txSigners)
 }
 
+func (s *visitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
 func (s *visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {

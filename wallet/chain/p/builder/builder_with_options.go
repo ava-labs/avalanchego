@@ -171,6 +171,22 @@ func (b *builderWithOptions) NewConvertSubnetTx(
 	)
 }
 
+func (b *builderWithOptions) NewRegisterSubnetValidatorTx(
+	balance uint64,
+	signer *signer.ProofOfPossession,
+	remainingBalanceOwner *secp256k1fx.OutputOwners,
+	message []byte,
+	options ...common.Option,
+) (*txs.RegisterSubnetValidatorTx, error) {
+	return b.builder.NewRegisterSubnetValidatorTx(
+		balance,
+		signer,
+		remainingBalanceOwner,
+		message,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
 func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,

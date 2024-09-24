@@ -593,6 +593,101 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return nil
 }
 
+// TODO: Implement me
+func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	fee, err = math.Add(fee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	var (
+		txID        = e.Tx.ID()
+		startTime   = uint64(currentTimestamp.Unix())
+		currentFees = e.State.GetAccruedFees()
+	)
+	for i, vdr := range tx.Validators {
+		vdr := vdr
+		balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+		if err != nil {
+			return err
+		}
+
+		sov := state.SubnetOnlyValidator{
+			ValidationID:          txID.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
+			SubnetID:              tx.Subnet,
+			NodeID:                vdr.NodeID,
+			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
+			RemainingBalanceOwner: balanceOwner,
+			StartTime:             startTime,
+			Weight:                vdr.Weight,
+			MinNonce:              0,
+			EndAccumulatedFee:     0, // If Balance is 0, this is 0
+		}
+		if vdr.Balance != 0 {
+			// We are attempting to add an active validator
+			if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
+				return errMaxNumActiveValidators
+			}
+
+			sov.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			if err != nil {
+				return err
+			}
+
+			fee, err = math.Add(fee, vdr.Balance)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
+			return err
+		}
+	}
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
+	// Set the new Subnet manager in the database
+	e.State.SetSubnetManager(tx.Subnet, tx.ChainID, tx.Address)
+	return nil
+}
+
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if err := verifyAddPermissionlessValidatorTx(
 		e.Backend,

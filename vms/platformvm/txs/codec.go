@@ -123,5 +123,6 @@ func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
 func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&ConvertSubnetTx{}),
+		targetCodec.RegisterType(&RegisterSubnetValidatorTx{}),
 	)
 }
