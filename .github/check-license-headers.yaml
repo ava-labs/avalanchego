@@ -16,7 +16,8 @@
       "libaio/**",
       "docs/**",
       "CODEOWNERS",
-      "CONTRIBUTING.md"
+      "CONTRIBUTING.md",
+      "benchmark/**",
     ],
     "license": "./.github/license-header.txt"
   },
