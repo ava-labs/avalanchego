@@ -140,6 +140,7 @@ func TestTimeout(t *testing.T) {
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -398,6 +399,7 @@ func TestReliableMessages(t *testing.T) {
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -554,6 +556,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 

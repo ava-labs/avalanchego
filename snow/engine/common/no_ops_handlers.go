@@ -355,13 +355,6 @@ func (nop *noOpInternalHandler) Gossip(context.Context) error {
 	return nil
 }
 
-func (nop *noOpInternalHandler) Halt(context.Context) {
-	nop.log.Debug("dropping request",
-		zap.String("reason", "unhandled by this gear"),
-		zap.String("messageOp", "halt"),
-	)
-}
-
 func (nop *noOpInternalHandler) Shutdown(context.Context) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
