@@ -51,11 +51,9 @@ func TestNodeWeights2Blocks(t *testing.T) {
 }
 
 func TestGetNetworkSnapshot(t *testing.T) {
-	n1, err := ids.NodeIDFromString("NodeID-N5gc5soT3Gpr98NKpqvQQG2SgGrVPL64w")
-	require.NoError(t, err)
+	n1 := ids.GenerateTestNodeID()
 
-	n2, err := ids.NodeIDFromString("NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk")
-	require.NoError(t, err)
+	n2 := ids.GenerateTestNodeID()
 
 	connectedValidators := func(s []ids.NodeWeight) func() set.Set[ids.NodeWeight] {
 		return func() set.Set[ids.NodeWeight] {
@@ -150,11 +148,9 @@ func TestGetNetworkSnapshot(t *testing.T) {
 }
 
 func TestFailedCatchingUp(t *testing.T) {
-	n1, err := ids.NodeIDFromString("NodeID-N5gc5soT3Gpr98NKpqvQQG2SgGrVPL64w")
-	require.NoError(t, err)
+	n1 := ids.GenerateTestNodeID()
 
-	n2, err := ids.NodeIDFromString("NodeID-NpagUxt6KQiwPch9Sd4osv8kD1TZnkjdk")
-	require.NoError(t, err)
+	n2 := ids.GenerateTestNodeID()
 
 	for _, testCase := range []struct {
 		description           string
@@ -300,25 +296,25 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 	for _, testCase := range []struct {
 		description                   string
 		timeAdvanced                  time.Duration
-		evalExtraAssertions           func()
+		evalExtraAssertions           func(t *testing.T)
 		expectedStragglingTime        time.Duration
 		snapshotsRead                 []snapshot
 		haveWeFailedCatchingUpReturns bool
 	}{
 		{
 			description:         "First invocation only sets the time",
-			evalExtraAssertions: func() {},
+			evalExtraAssertions: func(_ *testing.T) {},
 		},
 		{
 			description:         "Should not check yet, as it is not time yet",
 			timeAdvanced:        time.Millisecond * 500,
-			evalExtraAssertions: func() {},
+			evalExtraAssertions: func(_ *testing.T) {},
 		},
 		{
 			description:   "Advance time some more, so now we should check",
 			timeAdvanced:  time.Millisecond * 501,
 			snapshotsRead: []snapshot{{}},
-			evalExtraAssertions: func() {
+			evalExtraAssertions: func(t *testing.T) {
 				require.Contains(t, buff.String(), "No node snapshot obtained")
 			},
 		},
@@ -326,7 +322,7 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 			description:   "Advance time some more to the first check where the snapshot isn't empty",
 			timeAdvanced:  time.Second * 2,
 			snapshotsRead: []snapshot{nonEmptySnap},
-			evalExtraAssertions: func() {
+			evalExtraAssertions: func(t *testing.T) {
 				require.Empty(t, buff.String())
 			},
 		},
@@ -335,7 +331,7 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 			timeAdvanced:                  time.Second * 2,
 			expectedStragglingTime:        time.Second * 2,
 			haveWeFailedCatchingUpReturns: true,
-			evalExtraAssertions: func() {
+			evalExtraAssertions: func(t *testing.T) {
 				require.Empty(t, sd.prevSnapshot)
 			},
 		},
@@ -346,12 +342,12 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 			// We carry over the total straggling time from previous testCase to this check,
 			// as we need the next check to nullify it.
 			expectedStragglingTime: time.Second * 2,
-			evalExtraAssertions:    func() {},
+			evalExtraAssertions:    func(_ *testing.T) {},
 		},
 		{
 			description:         "The fourth check returns we have succeeded in catching up",
 			timeAdvanced:        time.Second * 2,
-			evalExtraAssertions: func() {},
+			evalExtraAssertions: func(_ *testing.T) {},
 		},
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
@@ -365,7 +361,7 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 
 			haveWeFailedCatchingUpReturns = testCase.haveWeFailedCatchingUpReturns
 			require.Equal(t, testCase.expectedStragglingTime, sd.CheckIfWeAreStragglingBehind())
-			testCase.evalExtraAssertions()
+			testCase.evalExtraAssertions(t)
 
 			// Cleanup the log buffer, and make sure no snapshots remain for next testCase.
 			buff.Reset()
