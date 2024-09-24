@@ -23,7 +23,7 @@ import (
 // communicate with a server with the specified handler
 func NewClient(
 	t *testing.T,
-	rootCtx context.Context,
+	ctx context.Context,
 	handler p2p.Handler,
 	clientNodeID ids.NodeID,
 	serverNodeID ids.NodeID,
