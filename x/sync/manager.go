@@ -464,7 +464,7 @@ func (m *Manager) retryWork(work *workItem) {
 }
 
 // Returns an error if we should drop the response
-func (m *Manager) handleResponse(
+func (m *Manager) shouldHandleResponse(
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
@@ -499,7 +499,7 @@ func (m *Manager) handleRangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.handleResponse(request.BytesLimit, responseBytes, err); err != nil {
+	if err := m.shouldHandleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
@@ -550,7 +550,7 @@ func (m *Manager) handleChangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.handleResponse(request.BytesLimit, responseBytes, err); err != nil {
+	if err := m.shouldHandleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
