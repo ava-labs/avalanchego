@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -283,7 +284,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
 		err = block.Verify(context.Background())
-		require.ErrorIs(err, errChildBlockEarlierThanParent)
+		require.ErrorIs(err, executor.ErrChildBlockEarlierThanParent)
 	}
 
 	{
@@ -1381,7 +1382,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	// Advance time until next staker change time is [validatorEndTime]
 	for {
-		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state)
+		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state, mockable.MaxTime)
 		require.NoError(err)
 		if nextStakerChangeTime.Equal(validatorEndTime) {
 			break
