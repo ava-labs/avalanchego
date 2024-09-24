@@ -244,6 +244,7 @@ func AdvanceTimeTo(
 		if err := changes.PutSubnetOnlyValidator(sov); err != nil {
 			return false, err
 		}
+		changed = true
 	}
 
 	validatorFeeState = validatorFeeState.AdvanceTime(
