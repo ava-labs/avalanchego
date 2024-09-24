@@ -34,6 +34,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -616,6 +618,14 @@ func TestGetCurrentValidators(t *testing.T) {
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
+	// Connect to nodes other than the last node in genesis.Validators, which is the node being tested.
+	connectedIDs := set.NewSet[ids.NodeID](len(genesis.Validators) - 1)
+	for _, validatorTx := range genesis.Validators[:len(genesis.Validators)-1] {
+		validator := validatorTx.Unsigned.(*txs.AddValidatorTx)
+		connectedIDs.Add(validator.NodeID())
+		require.NoError(service.vm.Connected(context.Background(), validator.NodeID(), version.CurrentApp))
+	}
+
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
@@ -632,6 +642,8 @@ func TestGetCurrentValidators(t *testing.T) {
 
 			require.Equal(validator.EndTime().Unix(), int64(gotVdr.EndTime))
 			require.Equal(validator.StartTime().Unix(), int64(gotVdr.StartTime))
+			require.Equal(connectedIDs.Contains(validator.NodeID()), *gotVdr.Connected)
+			require.Equal(avajson.Float32(100), *gotVdr.Uptime)
 			found = true
 			break
 		}

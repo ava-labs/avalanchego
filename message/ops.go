@@ -56,7 +56,6 @@ const (
 	AppGossipOp
 	// Internal:
 	ConnectedOp
-	ConnectedSubnetOp
 	DisconnectedOp
 	NotifyOp
 	GossipRequestOp
@@ -113,7 +112,6 @@ var (
 		GetFailedOp,
 		QueryFailedOp,
 		ConnectedOp,
-		ConnectedSubnetOp,
 		DisconnectedOp,
 		NotifyOp,
 		GossipRequestOp,
@@ -151,7 +149,6 @@ var (
 		ChitsOp,
 		// Internal
 		ConnectedOp,
-		ConnectedSubnetOp,
 		DisconnectedOp,
 	}
 
@@ -261,8 +258,6 @@ func (op Op) String() string {
 	// Internal
 	case ConnectedOp:
 		return "connected"
-	case ConnectedSubnetOp:
-		return "connected_subnet"
 	case DisconnectedOp:
 		return "disconnected"
 	case NotifyOp:

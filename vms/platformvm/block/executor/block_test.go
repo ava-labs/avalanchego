@@ -287,7 +287,7 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 
 				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
 
 				manager := &manager{
 					backend: &backend{
@@ -405,7 +405,7 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(transformSubnetTx, nil)
 
 				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
 
 				manager := &manager{
 					backend: &backend{
@@ -467,7 +467,7 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(transformSubnetTx, nil)
 
 				uptimes := uptimemock.NewCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
 
 				manager := &manager{
 					backend: &backend{

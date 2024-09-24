@@ -897,7 +897,6 @@ func (m *manager) createAvalancheChain(
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
-		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
 		connectedValidators,
 		peerTracker,
@@ -1108,10 +1107,7 @@ func (m *manager) createSnowmanChain(
 		messageSender = sender.Trace(messageSender, m.Tracer)
 	}
 
-	var (
-		bootstrapFunc   func()
-		subnetConnector = validators.UnhandledSubnetConnector
-	)
+	var bootstrapFunc func()
 	// If [m.validatorState] is nil then we are creating the P-Chain. Since the
 	// P-Chain is the first chain to be created, we can use it to initialize
 	// required interfaces for the other chains
@@ -1147,12 +1143,6 @@ func (m *manager) createSnowmanChain(
 		// we don't need to be concerned about closing this channel multiple times.
 		bootstrapFunc = func() {
 			close(m.unblockChainCreatorCh)
-		}
-
-		// Set up the subnet connector for the P-Chain
-		subnetConnector, ok = vm.(validators.SubnetConnector)
-		if !ok {
-			return nil, fmt.Errorf("expected validators.SubnetConnector but got %T", vm)
 		}
 	}
 
@@ -1296,7 +1286,6 @@ func (m *manager) createSnowmanChain(
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
-		subnetConnector,
 		sb,
 		connectedValidators,
 		peerTracker,
