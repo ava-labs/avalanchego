@@ -55,6 +55,8 @@ func VerifyNewChainTime(
 		)
 	}
 
+	// nextStakerChangeTime is calculated last to ensure that the function is
+	// able to be calculated efficiently.
 	nextStakerChangeTime, err := state.GetNextStakerChangeTime(currentState, newChainTime)
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
