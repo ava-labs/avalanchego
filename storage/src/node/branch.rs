@@ -10,7 +10,7 @@ use std::fmt::{Debug, Error as FmtError, Formatter};
 /// A child of a branch node.
 pub enum Child {
     /// There is a child at this index, but we haven't hashed it
-    /// or written it to storage yet.
+    /// or allocated space in storage for it yet.
     Node(Node),
     /// We know the child's address and hash.
     AddressWithHash(LinearAddress, TrieHash),
