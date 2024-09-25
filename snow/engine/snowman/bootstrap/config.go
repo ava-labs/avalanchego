@@ -42,4 +42,6 @@ type Config struct {
 	NonVerifyingParse block.ParseFunc
 
 	Bootstrapped func()
+
+	ShouldHalt func() bool
 }

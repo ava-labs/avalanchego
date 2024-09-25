@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap/interval"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -127,7 +126,7 @@ func process(
 // TODO: Replace usage of haltable with context cancellation.
 func execute(
 	ctx context.Context,
-	haltable common.Haltable,
+	shouldHalt func() bool,
 	log logging.Func,
 	db database.Database,
 	nonVerifyingParser block.Parser,
@@ -172,7 +171,7 @@ func execute(
 
 		var (
 			numProcessed = totalNumberToProcess - tree.Len()
-			halted       = haltable.Halted()
+			halted       = shouldHalt()
 		)
 		if numProcessed >= minBlocksToCompact && !halted {
 			log("compacting database after executing blocks...")
@@ -196,7 +195,7 @@ func execute(
 		zap.Uint64("numToExecute", totalNumberToProcess),
 	)
 
-	for !haltable.Halted() && iterator.Next() {
+	for !shouldHalt() && iterator.Next() {
 		blkBytes := iterator.Value()
 		blk, err := nonVerifyingParser.ParseBlock(ctx, blkBytes)
 		if err != nil {
