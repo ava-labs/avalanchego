@@ -12,6 +12,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
@@ -26,14 +27,30 @@ import (
 )
 
 const (
-	defaultDatabaseEntries    = 1_000_000_000
-	databaseCreationBatchSize = 10_000
-	databaseRunningBatchSize  = databaseCreationBatchSize / 4
-	databaseRunningUpdateSize = databaseCreationBatchSize / 2
-	defaultMetricsPort        = 3_000
-	levelDBCacheSize          = 6_000
-	firewoodNumberOfRevisions = 120
+	defaultDatabaseEntries       = 1_000_000_000
+	databaseCreationBatchSize    = 10_000
+	databaseRunningBatchSize     = databaseCreationBatchSize / 4
+	databaseRunningUpdateSize    = databaseCreationBatchSize / 2
+	defaultMetricsPort           = 3_000
+	benchmarkRevisionHistorySize = 128
 )
+
+// TODO: Adjust these cache sizes for maximum performance
+const (
+	cleanCacheSizeBytes = 4 * units.GiB
+	levelDBCacheSizeMB  = 6 * units.GiB / units.MiB
+
+	// TODO: Why 200? The default is 500
+	// see https://pkg.go.dev/github.com/syndtr/goleveldb@v1.0.0/leveldb/opt#Options
+	openFilesCacheCapacity = 200
+)
+
+var pathDBConfig = pathdb.Config{
+	StateHistory:   benchmarkRevisionHistorySize,
+	CleanCacheSize: cleanCacheSizeBytes,
+	DirtyCacheSize: 0,
+	ReadOnly:       false,
+}
 
 var stats = struct {
 	inserts        prometheus.Counter
@@ -123,14 +140,6 @@ func calculateIndexEncoding(idx uint64) []byte {
 	return entryHash[:]
 }
 
-func getPathDBConfig() *pathdb.Config {
-	return &pathdb.Config{
-		StateHistory:   firewoodNumberOfRevisions, // keep the same requiremenet across each db
-		CleanCacheSize: 6 * 1024 * 1024 * 1024,    // 4GB - this is a guess, but I assume we're currently underutilizing memory by a lot
-		DirtyCacheSize: 6 * 1024 * 1024 * 1024,    // 4GB - this is a guess, but I assume we're currently underutilizing memory by a lot
-	}
-}
-
 func createGoldenDatabase(databaseEntries uint64) error {
 	stagingDirectory := getGoldenStagingDatabaseDirectory(databaseEntries)
 	err := os.RemoveAll(stagingDirectory)
@@ -142,7 +151,7 @@ func createGoldenDatabase(databaseEntries uint64) error {
 		return fmt.Errorf("unable to create golden staging directory : %v", err)
 	}
 
-	ldb, err := rawdb.NewLevelDBDatabase(stagingDirectory, levelDBCacheSize, 200, "metrics_prefix", false)
+	ldb, err := rawdb.NewLevelDBDatabase(stagingDirectory, levelDBCacheSizeMB, openFilesCacheCapacity, "metrics_prefix", false)
 	if err != nil {
 		return fmt.Errorf("unable to create level db database : %v", err)
 	}
@@ -151,7 +160,7 @@ func createGoldenDatabase(databaseEntries uint64) error {
 		Preimages: false,
 		IsVerkle:  false,
 		HashDB:    nil,
-		PathDB:    getPathDBConfig(),
+		PathDB:    &pathDBConfig,
 	})
 	tdb := trie.NewEmpty(trieDb)
 
@@ -172,7 +181,7 @@ func createGoldenDatabase(databaseEntries uint64) error {
 
 	var root common.Hash
 	parentHash := types.EmptyRootHash
-	blockHeight := uint64(0)
+	blockHeight := uint64(1)
 	writeBatch := func() error {
 		var nodes *trienode.NodeSet
 		root, nodes = tdb.Commit(false)
@@ -180,10 +189,7 @@ func createGoldenDatabase(databaseEntries uint64) error {
 		if err != nil {
 			return fmt.Errorf("unable to update trie : %v", err)
 		}
-		err = trieDb.Commit(root, false)
-		if err != nil {
-			return fmt.Errorf("unable to commit trie : %v", err)
-		}
+
 		tdb, err = trie.New(trie.TrieID(root), trieDb)
 		if err != nil {
 			return fmt.Errorf("unable to create new trie : %v", err)
@@ -224,6 +230,10 @@ func createGoldenDatabase(databaseEntries uint64) error {
 		if err != nil {
 			return fmt.Errorf("unable to write value in database : %v", err)
 		}
+	}
+	err = trieDb.Commit(root, false)
+	if err != nil {
+		return fmt.Errorf("unable to commit trie : %v", err)
 	}
 	close(ticksCh)
 	fmt.Print(" done!\n")
@@ -281,7 +291,7 @@ func runBenchmark(databaseEntries uint64) error {
 		Directory:         getRunningDatabaseDirectory(databaseEntries),
 		AncientsDirectory: "",
 		Namespace:         "metrics_prefix",
-		Cache:             levelDBCacheSize,
+		Cache:             levelDBCacheSizeMB,
 		Handles:           200,
 		ReadOnly:          false,
 		Ephemeral:         false,
@@ -294,7 +304,7 @@ func runBenchmark(databaseEntries uint64) error {
 		Preimages: false,
 		IsVerkle:  false,
 		HashDB:    nil,
-		PathDB:    getPathDBConfig(),
+		PathDB:    &pathDBConfig,
 	})
 
 	parentHash := common.BytesToHash(rootBytes)
