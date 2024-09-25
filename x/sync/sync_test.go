@@ -540,7 +540,6 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 // Test findNextKey by computing the expected result in a naive, inefficient
 // way and comparing it to the actual result
-
 func TestFindNextKeyRandom(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
