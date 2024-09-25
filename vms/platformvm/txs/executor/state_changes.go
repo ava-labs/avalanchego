@@ -183,6 +183,28 @@ func AdvanceTimeTo(
 		changes.SetFeeState(feeState)
 	}
 
+	// Remove all expiries whose timestamp now implies they can never be
+	// re-issued.
+	//
+	// Recall that the expiry timestamp is the time at which it is no longer
+	// valid, so any expiry with a timestamp less than or equal to the new chain
+	// time can be removed.
+	expiryIterator, err := parentState.GetExpiryIterator()
+	if err != nil {
+		return false, err
+	}
+	defer expiryIterator.Release()
+
+	newChainTimeUnix := uint64(newChainTime.Unix())
+	for expiryIterator.Next() {
+		expiry := expiryIterator.Value()
+		if expiry.Timestamp > newChainTimeUnix {
+			break
+		}
+
+		changes.DeleteExpiry(expiry)
+	}
+
 	changes.SetTimestamp(newChainTime)
 	return changed, changes.Apply(parentState)
 }
