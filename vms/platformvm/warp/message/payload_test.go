@@ -192,6 +192,9 @@ func TestParse(t *testing.T) {
 			msg, err := Parse(test.bytes)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expected, msg)
+			if msg != nil {
+				require.Equal(test.bytes, msg.Bytes())
+			}
 		})
 	}
 }
