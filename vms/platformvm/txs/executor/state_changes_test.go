@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -78,7 +79,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
 			require.NoError(err)
 			require.False(nextTime.After(nextStakerChangeTime))
 
@@ -179,7 +180,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 
 			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
 			require.NoError(err)
 			require.False(newTime.After(nextStakerChangeTime))
 

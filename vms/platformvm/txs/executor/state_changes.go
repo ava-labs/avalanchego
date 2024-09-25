@@ -16,23 +16,52 @@ import (
 )
 
 var (
+	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp before current chain time")
 	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
-// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time
-// given the wall clock time ([now]) and when the next staking set change occurs
-// ([nextStakerChangeTime]).
+// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
 // Requires:
-//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
-//     are skipped.
+//   - [newChainTime] >= [currentChainTime]: to ensure chain time advances
+//     monotonically.
 //   - [newChainTime] <= [now] + [SyncBound]: to ensure chain time approximates
 //     "real" time.
+//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
+//     are skipped.
 func VerifyNewChainTime(
-	newChainTime,
-	nextStakerChangeTime,
+	newChainTime time.Time,
 	now time.Time,
+	currentState state.Chain,
 ) error {
+	currentChainTime := currentState.GetTimestamp()
+	if newChainTime.Before(currentChainTime) {
+		return fmt.Errorf(
+			"%w: proposed timestamp (%s), chain time (%s)",
+			ErrChildBlockEarlierThanParent,
+			newChainTime,
+			currentChainTime,
+		)
+	}
+
+	// Only allow timestamp to be reasonably far forward
+	maxNewChainTime := now.Add(SyncBound)
+	if newChainTime.After(maxNewChainTime) {
+		return fmt.Errorf(
+			"%w, proposed time (%s), local time (%s)",
+			ErrChildBlockBeyondSyncBound,
+			newChainTime,
+			now,
+		)
+	}
+
+	// nextStakerChangeTime is calculated last to ensure that the function is
+	// able to be calculated efficiently.
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(currentState, newChainTime)
+	if err != nil {
+		return fmt.Errorf("could not verify block timestamp: %w", err)
+	}
+
 	// Only allow timestamp to move as far forward as the time of the next
 	// staker set change
 	if newChainTime.After(nextStakerChangeTime) {
@@ -41,17 +70,6 @@ func VerifyNewChainTime(
 			ErrChildBlockAfterStakerChangeTime,
 			newChainTime,
 			nextStakerChangeTime,
-		)
-	}
-
-	// Only allow timestamp to reasonably far forward
-	maxNewChainTime := now.Add(SyncBound)
-	if newChainTime.After(maxNewChainTime) {
-		return fmt.Errorf(
-			"%w, proposed time (%s), local time (%s)",
-			ErrChildBlockBeyondSyncBound,
-			newChainTime,
-			now,
 		)
 	}
 	return nil
