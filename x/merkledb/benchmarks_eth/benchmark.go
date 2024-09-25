@@ -231,6 +231,8 @@ func createGoldenDatabase(databaseEntries uint64) error {
 			return fmt.Errorf("unable to write value in database : %v", err)
 		}
 	}
+	// Note that without this commit, the final hash is not available
+	// TODO: figure out why this is necessary
 	err = trieDb.Commit(root, false)
 	if err != nil {
 		return fmt.Errorf("unable to commit trie : %v", err)
