@@ -14,7 +14,8 @@ import (
 type RegisterSubnetValidator struct {
 	payload
 
-	SubnetID     ids.ID                 `serialize:"true" json:"subnetID"`
+	SubnetID ids.ID `serialize:"true" json:"subnetID"`
+	// TODO: Use a 32-byte nodeID here
 	NodeID       ids.NodeID             `serialize:"true" json:"nodeID"`
 	Weight       uint64                 `serialize:"true" json:"weight"`
 	BLSPublicKey [bls.PublicKeyLen]byte `serialize:"true" json:"blsPublicKey"`
