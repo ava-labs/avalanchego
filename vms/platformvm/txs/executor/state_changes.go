@@ -186,9 +186,11 @@ func AdvanceTimeTo(
 	// Remove all expiries whose timestamp now implies they can never be
 	// re-issued.
 	//
-	// Recall that the expiry timestamp is the time at which it is no longer
-	// valid, so any expiry with a timestamp less than or equal to the new chain
-	// time can be removed.
+	// The expiry timestamp is the time at which it is no longer valid, so any
+	// expiry with a timestamp less than or equal to the new chain time can be
+	// removed.
+	//
+	// Ref: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/77-reinventing-subnets#registersubnetvalidatortx
 	expiryIterator, err := parentState.GetExpiryIterator()
 	if err != nil {
 		return false, err
