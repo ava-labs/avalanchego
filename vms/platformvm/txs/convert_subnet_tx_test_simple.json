@@ -1,0 +1,28 @@
+{
+	"networkID": 10,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000,
+				"signatureIndices": [
+					5
+				]
+			}
+		}
+	],
+	"memo": "0x",
+	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
+	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
+	"address": "0x000000000000000000000000000000000000dead",
+	"subnetAuthorization": {
+		"signatureIndices": [
+			3
+		]
+	}
+}

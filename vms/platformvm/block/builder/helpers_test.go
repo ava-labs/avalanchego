@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -45,13 +46,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
-	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -61,10 +61,7 @@ const (
 	defaultTxFee = 100 * units.NanoAvax
 )
 
-var (
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = genesistest.DefaultFundedKeys[0:3]
-)
+var testSubnet1 *txs.Tx
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -87,7 +84,6 @@ type environment struct {
 	state          state.State
 	uptimes        uptime.Manager
 	utxosVerifier  utxo.Verifier
-	factory        *txstest.WalletFactory
 	backend        txexecutor.Backend
 }
 
@@ -127,7 +123,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
 	res.utxosVerifier = utxo.NewVerifier(res.ctx, res.clk, res.fx)
-	res.factory = txstest.NewWalletFactory(res.ctx, res.config, res.state)
 
 	genesisID := res.state.GetLastAccepted()
 	res.backend = txexecutor.Backend{
@@ -158,7 +153,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		metrics,
 		res.state,
 		&res.backend,
-		pvalidators.TestManager,
+		validatorstest.Manager,
 	)
 
 	txVerifier := network.NewLockedTxVerifier(&res.ctx.Lock, res.blkManager)
@@ -192,10 +187,10 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 		res.Builder.ShutdownBlockTimer()
 
-		if res.isBootstrapped.Get() {
+		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
-			require.NoError(res.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
+			require.NoError(res.uptimes.StopTracking(validatorIDs))
 
 			require.NoError(res.state.Commit())
 		}
@@ -207,11 +202,35 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	return res
 }
 
+type walletConfig struct {
+	keys      []*secp256k1.PrivateKey
+	subnetIDs []ids.ID
+}
+
+func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
+	if len(c.keys) == 0 {
+		c.keys = genesistest.DefaultFundedKeys
+	}
+	return txstest.NewWallet(
+		t,
+		e.ctx,
+		e.config,
+		e.state,
+		secp256k1fx.NewKeychain(c.keys...),
+		c.subnetIDs,
+		[]ids.ID{e.ctx.CChainID, e.ctx.XChainID},
+	)
+}
+
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewCreateSubnetTx(
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[:1],
+	})
+
+	var err error
+	testSubnet1, err = wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -220,13 +239,7 @@ func addSubnet(t *testing.T, env *environment) {
 				genesistest.DefaultFundedKeys[2].Address(),
 			},
 		},
-		walletcommon.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
-	require.NoError(err)
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	genesisID := env.state.GetLastAccepted()

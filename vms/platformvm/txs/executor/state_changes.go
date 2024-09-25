@@ -10,29 +10,66 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 var (
+	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp before current chain time")
 	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
-// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time
-// given the wall clock time ([now]) and when the next staking set change occurs
-// ([nextStakerChangeTime]).
+// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
 // Requires:
-//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
-//     are skipped.
+//   - [newChainTime] >= [currentChainTime]: to ensure chain time advances
+//     monotonically.
 //   - [newChainTime] <= [now] + [SyncBound]: to ensure chain time approximates
 //     "real" time.
+//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
+//     are skipped.
 func VerifyNewChainTime(
-	newChainTime,
-	nextStakerChangeTime,
+	config fee.Config,
+	newChainTime time.Time,
 	now time.Time,
+	currentState state.Chain,
 ) error {
+	currentChainTime := currentState.GetTimestamp()
+	if newChainTime.Before(currentChainTime) {
+		return fmt.Errorf(
+			"%w: proposed timestamp (%s), chain time (%s)",
+			ErrChildBlockEarlierThanParent,
+			newChainTime,
+			currentChainTime,
+		)
+	}
+
+	// Only allow timestamp to be reasonably far forward
+	maxNewChainTime := now.Add(SyncBound)
+	if newChainTime.After(maxNewChainTime) {
+		return fmt.Errorf(
+			"%w, proposed time (%s), local time (%s)",
+			ErrChildBlockBeyondSyncBound,
+			newChainTime,
+			now,
+		)
+	}
+
+	// nextStakerChangeTime is calculated last to ensure that the function is
+	// able to be calculated efficiently.
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		config,
+		currentState,
+		newChainTime,
+	)
+	if err != nil {
+		return fmt.Errorf("could not verify block timestamp: %w", err)
+	}
+
 	// Only allow timestamp to move as far forward as the time of the next
 	// staker set change
 	if newChainTime.After(nextStakerChangeTime) {
@@ -41,17 +78,6 @@ func VerifyNewChainTime(
 			ErrChildBlockAfterStakerChangeTime,
 			newChainTime,
 			nextStakerChangeTime,
-		)
-	}
-
-	// Only allow timestamp to reasonably far forward
-	maxNewChainTime := now.Add(SyncBound)
-	if newChainTime.After(maxNewChainTime) {
-		return fmt.Errorf(
-			"%w, proposed time (%s), local time (%s)",
-			ErrChildBlockBeyondSyncBound,
-			newChainTime,
-			now,
 		)
 	}
 	return nil
@@ -97,7 +123,9 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 			changed = true
 			continue
@@ -126,7 +154,9 @@ func AdvanceTimeTo(
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
@@ -165,12 +195,66 @@ func AdvanceTimeTo(
 		changed = true
 	}
 
-	if err := changes.Apply(parentState); err != nil {
+	if !backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
+		changes.SetTimestamp(newChainTime)
+		return changed, changes.Apply(parentState)
+	}
+
+	// Advance the dynamic fees state
+	previousChainTime := changes.GetTimestamp()
+	duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+	dynamicFeeState := changes.GetFeeState()
+	dynamicFeeState = dynamicFeeState.AdvanceTime(
+		backend.Config.DynamicFeeConfig.MaxCapacity,
+		backend.Config.DynamicFeeConfig.MaxPerSecond,
+		backend.Config.DynamicFeeConfig.TargetPerSecond,
+		duration,
+	)
+	changes.SetFeeState(dynamicFeeState)
+
+	validatorFeeState := fee.State{
+		Current: gas.Gas(changes.NumActiveSubnetOnlyValidators()),
+		Excess:  changes.GetSoVExcess(),
+	}
+	validatorCost := validatorFeeState.CostOf(
+		backend.Config.ValidatorFeeConfig,
+		duration,
+	)
+
+	accruedFees := changes.GetAccruedFees()
+	accruedFees, err = math.Add(accruedFees, validatorCost)
+	if err != nil {
 		return false, err
 	}
 
-	parentState.SetTimestamp(newChainTime)
-	return changed, nil
+	sovIterator, err := parentState.GetActiveSubnetOnlyValidatorsIterator()
+	if err != nil {
+		return false, err
+	}
+	defer sovIterator.Release()
+
+	for sovIterator.Next() {
+		sov := sovIterator.Value()
+		if sov.EndAccumulatedFee > accruedFees {
+			break
+		}
+
+		sov.EndAccumulatedFee = 0 // Deactivate the validator
+		if err := changes.PutSubnetOnlyValidator(sov); err != nil {
+			return false, err
+		}
+		changed = true
+	}
+
+	validatorFeeState = validatorFeeState.AdvanceTime(
+		backend.Config.ValidatorFeeConfig.Target,
+		duration,
+	)
+	changes.SetSoVExcess(validatorFeeState.Excess)
+	changes.SetAccruedFees(accruedFees)
+	changes.SetTimestamp(newChainTime)
+	return changed, changes.Apply(parentState)
 }
 
 func GetRewardsCalculator(
