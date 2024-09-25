@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -25,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -40,9 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 )
 
 const (
@@ -57,8 +55,7 @@ const (
 var (
 	lastAcceptedID = ids.GenerateTestID()
 
-	testSubnet1            *txs.Tx
-	testSubnet1ControlKeys = genesistest.DefaultFundedKeys[0:3]
+	testSubnet1 *txs.Tx
 )
 
 type mutableSharedMemory struct {
@@ -77,7 +74,6 @@ type environment struct {
 	states         map[ids.ID]state.Chain
 	uptimes        uptime.Manager
 	utxosHandler   utxo.Verifier
-	factory        *txstest.WalletFactory
 	backend        Backend
 }
 
@@ -124,8 +120,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	uptimes := uptime.NewManager(baseState, clk)
 	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
-	factory := txstest.NewWalletFactory(ctx, config, baseState)
-
 	backend := Backend{
 		Config:       config,
 		Ctx:          ctx,
@@ -149,7 +143,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		states:         make(map[ids.ID]state.Chain),
 		uptimes:        uptimes,
 		utxosHandler:   utxosVerifier,
-		factory:        factory,
 		backend:        backend,
 	}
 
@@ -162,15 +155,11 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		require := require.New(t)
 
 		if env.isBootstrapped.Get() {
-			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-			require.NoError(env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID))
-
-			for subnetID := range env.config.TrackedSubnets {
-				validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
-
-				require.NoError(env.uptimes.StopTracking(validatorIDs, subnetID))
+			if env.uptimes.StartedTracking() {
+				validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+				require.NoError(env.uptimes.StopTracking(validatorIDs))
 			}
+
 			env.state.SetHeight(math.MaxUint64)
 			require.NoError(env.state.Commit())
 		}
@@ -182,11 +171,40 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	return env
 }
 
+type walletConfig struct {
+	config    *config.Config
+	keys      []*secp256k1.PrivateKey
+	subnetIDs []ids.ID
+	chainIDs  []ids.ID
+}
+
+func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
+	if c.config == nil {
+		c.config = e.config
+	}
+	if len(c.keys) == 0 {
+		c.keys = genesistest.DefaultFundedKeys
+	}
+	return txstest.NewWallet(
+		t,
+		e.ctx,
+		c.config,
+		e.state,
+		secp256k1fx.NewKeychain(c.keys...),
+		c.subnetIDs,
+		c.chainIDs,
+	)
+}
+
 func addSubnet(t *testing.T, env *environment) {
 	require := require.New(t)
 
-	builder, signer := env.factory.NewWallet(genesistest.DefaultFundedKeys[0])
-	utx, err := builder.NewCreateSubnetTx(
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[:1],
+	})
+
+	var err error
+	testSubnet1, err = wallet.IssueCreateSubnetTx(
 		&secp256k1fx.OutputOwners{
 			Threshold: 2,
 			Addrs: []ids.ShortID{
@@ -195,13 +213,7 @@ func addSubnet(t *testing.T, env *environment) {
 				genesistest.DefaultFundedKeys[2].Address(),
 			},
 		},
-		common.WithChangeOwner(&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-		}),
 	)
-	require.NoError(err)
-	testSubnet1, err = walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)

@@ -89,11 +89,11 @@ func TestHealthCheckSubnet(t *testing.T) {
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
-				validators.UnhandledSubnetConnector,
 				sb,
 				peerTracker,
 				p2pTracker,
 				prometheus.NewRegistry(),
+				func() {},
 			)
 			require.NoError(err)
 
@@ -136,8 +136,8 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 				require.NoError(vdrs.AddStaker(ctx.SubnetID, vdrID, nil, ids.Empty, 100))
 			}
-
-			for index, nodeID := range vdrIDs.List() {
+			vdrIDsList := vdrIDs.List()
+			for index, nodeID := range vdrIDsList {
 				require.NoError(peerTracker.Connected(context.Background(), nodeID, nil))
 
 				details, err := handlerIntf.HealthCheck(context.Background())
@@ -152,13 +152,13 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 				detailsMap, ok := details.(map[string]interface{})
 				require.True(ok)
-				networkingMap, ok := detailsMap["networking"]
-				require.True(ok)
-				networkingDetails, ok := networkingMap.(map[string]float64)
-				require.True(ok)
-				percentConnected, ok := networkingDetails["percentConnected"]
-				require.True(ok)
-				require.Equal(expectedPercentConnected, percentConnected)
+				require.Equal(
+					map[string]interface{}{
+						"percentConnected":       expectedPercentConnected,
+						"disconnectedValidators": set.Of(vdrIDsList[index+1:]...),
+					},
+					detailsMap["networking"],
+				)
 			}
 		})
 	}

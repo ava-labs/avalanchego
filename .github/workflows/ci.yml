@@ -25,12 +25,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-12, ubuntu-20.04, ubuntu-22.04, windows-2022, custom-arm64-focal, custom-arm64-jammy]
+        os: [macos-12, ubuntu-20.04, ubuntu-22.04, ubuntu-24.04, windows-2022, custom-arm64-jammy, custom-arm64-noble]
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/install-focal-deps
-        if: matrix.os == 'custom-arm64-focal'
-      - uses: ./.github/actions/setup-go-for-project-v3
+      - uses: ./.github/actions/setup-go-for-project
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-2022'
@@ -41,7 +39,7 @@ jobs:
         env:
           TIMEOUT: ${{ env.TIMEOUT }}
   Fuzz:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
@@ -165,6 +163,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - uses: bufbuild/buf-setup-action@v1.31.0
+        with:
+          github_token: ${{ github.token }}
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash

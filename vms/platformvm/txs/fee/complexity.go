@@ -175,6 +175,17 @@ var (
 		gas.DBWrite: 1,
 		gas.Compute: 0,
 	}
+	IntrinsicConvertSubnetTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // subnetID
+			ids.IDLen + // chainID
+			wrappers.IntLen + // address length
+			wrappers.IntLen + // subnetAuth typeID
+			wrappers.IntLen, // subnetAuthCredential typeID
+		gas.DBRead:  1,
+		gas.DBWrite: 1,
+		gas.Compute: 0,
+	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
@@ -183,10 +194,24 @@ var (
 	errUnsupportedSigner = errors.New("unsupported signer type")
 )
 
-func TxComplexity(tx txs.UnsignedTx) (gas.Dimensions, error) {
-	c := complexityVisitor{}
-	err := tx.Visit(&c)
-	return c.output, err
+func TxComplexity(txs ...txs.UnsignedTx) (gas.Dimensions, error) {
+	var (
+		c          complexityVisitor
+		complexity gas.Dimensions
+	)
+	for _, tx := range txs {
+		c = complexityVisitor{}
+		err := tx.Visit(&c)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&c.output)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
 }
 
 // OutputComplexity returns the complexity outputs add to a transaction.
@@ -576,6 +601,25 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		&baseTxComplexity,
 		&authComplexity,
 		&ownerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(tx.Address)),
+		},
 	)
 	return err
 }

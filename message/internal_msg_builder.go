@@ -335,32 +335,6 @@ func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) Inbo
 	}
 }
 
-// ConnectedSubnet contains the subnet ID of the subnet that the node is
-// connected to.
-type ConnectedSubnet struct {
-	SubnetID ids.ID `json:"subnet_id,omitempty"`
-}
-
-func (m *ConnectedSubnet) String() string {
-	return fmt.Sprintf(
-		"SubnetID: %s",
-		m.SubnetID,
-	)
-}
-
-// InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
-// connected to the subnet with the given [subnetID].
-func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     ConnectedSubnetOp,
-		message: &ConnectedSubnet{
-			SubnetID: subnetID,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
 type Disconnected struct{}
 
 func (Disconnected) String() string {

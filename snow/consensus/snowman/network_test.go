@@ -74,26 +74,11 @@ func (n *Network) AddNode(t testing.TB, sm Consensus) error {
 	}
 
 	n.shuffleColors()
-	deps := map[ids.ID]ids.ID{}
 	for _, blk := range n.colors {
-		myDep, found := deps[blk.ParentV]
-		if !found {
-			myDep = blk.Parent()
-		}
-		myBlock := &snowmantest.Block{
-			Decidable: snowtest.Decidable{
-				IDV:    blk.ID(),
-				Status: blk.Status,
-			},
-			ParentV: myDep,
-			HeightV: blk.Height(),
-			VerifyV: blk.Verify(context.Background()),
-			BytesV:  blk.Bytes(),
-		}
-		if err := sm.Add(myBlock); err != nil {
+		copiedBlk := *blk
+		if err := sm.Add(&copiedBlk); err != nil {
 			return err
 		}
-		deps[myBlock.ID()] = myDep
 	}
 	n.nodes = append(n.nodes, sm)
 	n.running = append(n.running, sm)

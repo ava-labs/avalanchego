@@ -16,23 +16,52 @@ import (
 )
 
 var (
+	ErrChildBlockEarlierThanParent     = errors.New("proposed timestamp before current chain time")
 	ErrChildBlockAfterStakerChangeTime = errors.New("proposed timestamp later than next staker change time")
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
-// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time
-// given the wall clock time ([now]) and when the next staking set change occurs
-// ([nextStakerChangeTime]).
+// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
 // Requires:
-//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
-//     are skipped.
+//   - [newChainTime] >= [currentChainTime]: to ensure chain time advances
+//     monotonically.
 //   - [newChainTime] <= [now] + [SyncBound]: to ensure chain time approximates
 //     "real" time.
+//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
+//     are skipped.
 func VerifyNewChainTime(
-	newChainTime,
-	nextStakerChangeTime,
+	newChainTime time.Time,
 	now time.Time,
+	currentState state.Chain,
 ) error {
+	currentChainTime := currentState.GetTimestamp()
+	if newChainTime.Before(currentChainTime) {
+		return fmt.Errorf(
+			"%w: proposed timestamp (%s), chain time (%s)",
+			ErrChildBlockEarlierThanParent,
+			newChainTime,
+			currentChainTime,
+		)
+	}
+
+	// Only allow timestamp to be reasonably far forward
+	maxNewChainTime := now.Add(SyncBound)
+	if newChainTime.After(maxNewChainTime) {
+		return fmt.Errorf(
+			"%w, proposed time (%s), local time (%s)",
+			ErrChildBlockBeyondSyncBound,
+			newChainTime,
+			now,
+		)
+	}
+
+	// nextStakerChangeTime is calculated last to ensure that the function is
+	// able to be calculated efficiently.
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(currentState, newChainTime)
+	if err != nil {
+		return fmt.Errorf("could not verify block timestamp: %w", err)
+	}
+
 	// Only allow timestamp to move as far forward as the time of the next
 	// staker set change
 	if newChainTime.After(nextStakerChangeTime) {
@@ -43,28 +72,35 @@ func VerifyNewChainTime(
 			nextStakerChangeTime,
 		)
 	}
-
-	// Only allow timestamp to reasonably far forward
-	maxNewChainTime := now.Add(SyncBound)
-	if newChainTime.After(maxNewChainTime) {
-		return fmt.Errorf(
-			"%w, proposed time (%s), local time (%s)",
-			ErrChildBlockBeyondSyncBound,
-			newChainTime,
-			now,
-		)
-	}
 	return nil
 }
 
 // AdvanceTimeTo applies all state changes to [parentState] resulting from
 // advancing the chain time to [newChainTime].
+//
 // Returns true iff the validator set changed.
 func AdvanceTimeTo(
 	backend *Backend,
 	parentState state.Chain,
 	newChainTime time.Time,
 ) (bool, error) {
+	diff, changed, err := advanceTimeTo(backend, parentState, newChainTime)
+	if err != nil {
+		return false, err
+	}
+	return changed, diff.Apply(parentState)
+}
+
+// advanceTimeTo returns the state diff on top of parentState resulting from
+// advancing the chain time to newChainTime. It also returns a boolean
+// indicating if the validator set changed.
+//
+// parentState is not modified.
+func advanceTimeTo(
+	backend *Backend,
+	parentState state.Chain,
+	newChainTime time.Time,
+) (state.Diff, bool, error) {
 	// We promote pending stakers to current stakers first and remove
 	// completed stakers from the current staker set. We assume that any
 	// promoted staker will not immediately be removed from the current staker
@@ -75,17 +111,21 @@ func AdvanceTimeTo(
 
 	changes, err := state.NewDiffOn(parentState)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
+	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
+	//
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer pendingStakerIterator.Release()
 
 	var changed bool
-	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
@@ -97,7 +137,9 @@ func AdvanceTimeTo(
 		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return nil, false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 			changed = true
 			continue
@@ -105,12 +147,12 @@ func AdvanceTimeTo(
 
 		supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
 
 		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
 
 		potentialReward := rewards.Calculate(
@@ -126,7 +168,9 @@ func AdvanceTimeTo(
 
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
-			changes.PutCurrentValidator(&stakerToAdd)
+			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
+				return nil, false, err
+			}
 			changes.DeletePendingValidator(stakerToRemove)
 
 		case txs.PrimaryNetworkDelegatorApricotPendingPriority, txs.PrimaryNetworkDelegatorBanffPendingPriority, txs.SubnetPermissionlessDelegatorPendingPriority:
@@ -134,16 +178,20 @@ func AdvanceTimeTo(
 			changes.DeletePendingDelegator(stakerToRemove)
 
 		default:
-			return false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
+			return nil, false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 
 		changed = true
 	}
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
+	//
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer currentStakerIterator.Release()
 
@@ -165,12 +213,52 @@ func AdvanceTimeTo(
 		changed = true
 	}
 
-	if err := changes.Apply(parentState); err != nil {
-		return false, err
+	if backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
+		previousChainTime := changes.GetTimestamp()
+		duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+		feeState := changes.GetFeeState()
+		feeState = feeState.AdvanceTime(
+			backend.Config.DynamicFeeConfig.MaxCapacity,
+			backend.Config.DynamicFeeConfig.MaxPerSecond,
+			backend.Config.DynamicFeeConfig.TargetPerSecond,
+			duration,
+		)
+		changes.SetFeeState(feeState)
 	}
 
-	parentState.SetTimestamp(newChainTime)
-	return changed, nil
+	// Remove all expiries whose timestamp now implies they can never be
+	// re-issued.
+	//
+	// The expiry timestamp is the time at which it is no longer valid, so any
+	// expiry with a timestamp less than or equal to the new chain time can be
+	// removed.
+	//
+	// Ref: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/77-reinventing-subnets#registersubnetvalidatortx
+	//
+	// The expiry iterator is sorted in order of increasing timestamp.
+	//
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
+	expiryIterator, err := parentState.GetExpiryIterator()
+	if err != nil {
+		return nil, false, err
+	}
+	defer expiryIterator.Release()
+
+	newChainTimeUnix := uint64(newChainTime.Unix())
+	for expiryIterator.Next() {
+		expiry := expiryIterator.Value()
+		if expiry.Timestamp > newChainTimeUnix {
+			break
+		}
+
+		changes.DeleteExpiry(expiry)
+	}
+
+	changes.SetTimestamp(newChainTime)
+	return changes, changed, nil
 }
 
 func GetRewardsCalculator(

@@ -8,29 +8,87 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txsmock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+func newTestVerifier(t testing.TB, s state.State) *verifier {
+	require := require.New(t)
+
+	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
+	require.NoError(err)
+
+	var (
+		upgrades = upgradetest.GetConfig(upgradetest.Latest)
+		ctx      = snowtest.Context(t, constants.PlatformChainID)
+		clock    = &mockable.Clock{}
+		fx       = &secp256k1fx.Fx{}
+	)
+	require.NoError(fx.InitializeVM(&secp256k1fx.TestVM{
+		Clk: *clock,
+		Log: logging.NoLog{},
+	}))
+
+	return &verifier{
+		backend: &backend{
+			Mempool:      mempool,
+			lastAccepted: s.GetLastAccepted(),
+			blkIDToState: make(map[ids.ID]*blockState),
+			state:        s,
+			ctx:          ctx,
+		},
+		txExecutorBackend: &executor.Backend{
+			Config: &config.Config{
+				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
+				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
+				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
+				SybilProtectionEnabled: true,
+				UpgradeConfig:          upgrades,
+			},
+			Ctx: ctx,
+			Clk: clock,
+			Fx:  fx,
+			FlowChecker: utxo.NewVerifier(
+				ctx,
+				clock,
+				fx,
+			),
+			Bootstrapped: utils.NewAtomic(true),
+		},
+	}
+}
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
 	require := require.New(t)
@@ -45,6 +103,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
 	parentOnAcceptState.EXPECT().GetFeeState().Return(gas.State{}).Times(2)
+	parentOnAcceptState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(2)
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -276,6 +335,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -537,6 +597,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
+			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -634,6 +695,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
+			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -749,6 +811,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)
@@ -1041,4 +1104,88 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	// Verify the block.
 	err = verifier.BanffAbortBlock(blk)
 	require.ErrorIs(err, state.ErrMissingParentState)
+}
+
+func TestBlockExecutionWithComplexity(t *testing.T) {
+	s := statetest.New(t, statetest.Config{})
+	verifier := newTestVerifier(t, s)
+	wallet := txstest.NewWallet(
+		t,
+		verifier.ctx,
+		verifier.txExecutorBackend.Config,
+		s,
+		secp256k1fx.NewKeychain(genesis.EWOQKey),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+
+	baseTx0, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+	require.NoError(t, err)
+	baseTx1, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+	require.NoError(t, err)
+
+	blockComplexity, err := fee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
+	require.NoError(t, err)
+	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name             string
+		timestamp        time.Time
+		expectedErr      error
+		expectedFeeState gas.State
+	}{
+		{
+			name:        "no capacity",
+			timestamp:   genesistest.DefaultValidatorStartTime,
+			expectedErr: gas.ErrInsufficientCapacity,
+		},
+		{
+			name:      "updates fee state",
+			timestamp: genesistest.DefaultValidatorStartTime.Add(10 * time.Second),
+			expectedFeeState: gas.State{
+				Capacity: gas.Gas(0).AddPerSecond(verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond, 10) - blockGas,
+				Excess:   blockGas,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Clear the state to prevent prior tests from impacting this test.
+			clear(verifier.blkIDToState)
+
+			verifier.txExecutorBackend.Clk.Set(test.timestamp)
+			timestamp, _, err := state.NextBlockTime(s, verifier.txExecutorBackend.Clk)
+			require.NoError(err)
+
+			lastAcceptedID := s.GetLastAccepted()
+			lastAccepted, err := s.GetStatelessBlock(lastAcceptedID)
+			require.NoError(err)
+
+			blk, err := block.NewBanffStandardBlock(
+				timestamp,
+				lastAcceptedID,
+				lastAccepted.Height()+1,
+				[]*txs.Tx{
+					baseTx0,
+					baseTx1,
+				},
+			)
+			require.NoError(err)
+
+			blkID := blk.ID()
+			err = blk.Visit(verifier)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				require.NotContains(verifier.blkIDToState, blkID)
+				return
+			}
+
+			require.Contains(verifier.blkIDToState, blkID)
+			onAcceptState := verifier.blkIDToState[blkID].onAcceptState
+			require.Equal(test.expectedFeeState, onAcceptState.GetFeeState())
+		})
+	}
 }

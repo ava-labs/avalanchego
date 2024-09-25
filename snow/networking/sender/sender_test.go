@@ -136,11 +136,11 @@ func TestTimeout(t *testing.T) {
 		time.Hour,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -395,11 +395,11 @@ func TestReliableMessages(t *testing.T) {
 		1,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -552,11 +552,11 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 

@@ -15,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
@@ -67,6 +69,24 @@ func TestDiffFeeState(t *testing.T) {
 	assertChainsEqual(t, state, d)
 }
 
+func TestDiffAccruedFees(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	initialAccruedFees := state.GetAccruedFees()
+	newAccruedFees := initialAccruedFees + 1
+	d.SetAccruedFees(newAccruedFees)
+	require.Equal(newAccruedFees, d.GetAccruedFees())
+	require.Equal(initialAccruedFees, state.GetAccruedFees())
+
+	require.NoError(d.Apply(state))
+	assertChainsEqual(t, state, d)
+}
+
 func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 
@@ -93,6 +113,156 @@ func TestDiffCurrentSupply(t *testing.T) {
 	assertChainsEqual(t, state, d)
 }
 
+func TestDiffExpiry(t *testing.T) {
+	type op struct {
+		put   bool
+		entry ExpiryEntry
+	}
+	tests := []struct {
+		name            string
+		initialExpiries []ExpiryEntry
+		ops             []op
+	}{
+		{
+			name: "empty noop",
+		},
+		{
+			name: "insert",
+			ops: []op{
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+		{
+			name: "remove",
+			initialExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+			},
+			ops: []op{
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+		{
+			name: "add and immediately remove",
+			ops: []op{
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+		{
+			name: "add + remove + add",
+			ops: []op{
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+		{
+			name: "everything",
+			initialExpiries: []ExpiryEntry{
+				{Timestamp: 1},
+				{Timestamp: 2},
+				{Timestamp: 3},
+			},
+			ops: []op{
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+				{
+					put:   false,
+					entry: ExpiryEntry{Timestamp: 2},
+				},
+				{
+					put:   true,
+					entry: ExpiryEntry{Timestamp: 1},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		require := require.New(t)
+
+		state := newTestState(t, memdb.New())
+		for _, expiry := range test.initialExpiries {
+			state.PutExpiry(expiry)
+		}
+
+		d, err := NewDiffOn(state)
+		require.NoError(err)
+
+		var (
+			expectedExpiries   = set.Of(test.initialExpiries...)
+			unexpectedExpiries set.Set[ExpiryEntry]
+		)
+		for _, op := range test.ops {
+			if op.put {
+				d.PutExpiry(op.entry)
+				expectedExpiries.Add(op.entry)
+				unexpectedExpiries.Remove(op.entry)
+			} else {
+				d.DeleteExpiry(op.entry)
+				expectedExpiries.Remove(op.entry)
+				unexpectedExpiries.Add(op.entry)
+			}
+		}
+
+		// If expectedExpiries is empty, we want expectedExpiriesSlice to be
+		// nil.
+		var expectedExpiriesSlice []ExpiryEntry
+		if expectedExpiries.Len() > 0 {
+			expectedExpiriesSlice = expectedExpiries.List()
+			utils.Sort(expectedExpiriesSlice)
+		}
+
+		verifyChain := func(chain Chain) {
+			expiryIterator, err := chain.GetExpiryIterator()
+			require.NoError(err)
+			require.Equal(
+				expectedExpiriesSlice,
+				iterator.ToSlice(expiryIterator),
+			)
+
+			for expiry := range expectedExpiries {
+				has, err := chain.HasExpiry(expiry)
+				require.NoError(err)
+				require.True(has)
+			}
+			for expiry := range unexpectedExpiries {
+				has, err := chain.HasExpiry(expiry)
+				require.NoError(err)
+				require.False(has)
+			}
+		}
+
+		verifyChain(d)
+		require.NoError(d.Apply(state))
+		verifyChain(state)
+		assertChainsEqual(t, d, state)
+	}
+}
+
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -101,6 +271,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -111,7 +282,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
 	}
-	d.PutCurrentValidator(currentValidator)
+	require.NoError(d.PutCurrentValidator(currentValidator))
 
 	// Assert that we get the current validator back
 	gotCurrentValidator, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
@@ -135,6 +306,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -145,7 +317,7 @@ func TestDiffPendingValidator(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		NodeID:   ids.GenerateTestNodeID(),
 	}
-	d.PutPendingValidator(pendingValidator)
+	require.NoError(d.PutPendingValidator(pendingValidator))
 
 	// Assert that we get the pending validator back
 	gotPendingValidator, err := d.GetPendingValidator(pendingValidator.SubnetID, pendingValidator.NodeID)
@@ -175,6 +347,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -221,6 +394,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -361,6 +535,7 @@ func TestDiffTx(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -458,6 +633,7 @@ func TestDiffUTXO(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -502,22 +678,39 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	t.Helper()
 
+	expectedExpiryIterator, expectedErr := expected.GetExpiryIterator()
+	actualExpiryIterator, actualErr := actual.GetExpiryIterator()
+	require.Equal(expectedErr, actualErr)
+	if expectedErr == nil {
+		require.Equal(
+			iterator.ToSlice(expectedExpiryIterator),
+			iterator.ToSlice(actualExpiryIterator),
+		)
+	}
+
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
 	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		assertIteratorsEqual(t, expectedCurrentStakerIterator, actualCurrentStakerIterator)
+		require.Equal(
+			iterator.ToSlice(expectedCurrentStakerIterator),
+			iterator.ToSlice(actualCurrentStakerIterator),
+		)
 	}
 
 	expectedPendingStakerIterator, expectedErr := expected.GetPendingStakerIterator()
 	actualPendingStakerIterator, actualErr := actual.GetPendingStakerIterator()
 	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		assertIteratorsEqual(t, expectedPendingStakerIterator, actualPendingStakerIterator)
+		require.Equal(
+			iterator.ToSlice(expectedPendingStakerIterator),
+			iterator.ToSlice(actualPendingStakerIterator),
+		)
 	}
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 	require.Equal(expected.GetFeeState(), actual.GetFeeState())
+	require.Equal(expected.GetAccruedFees(), actual.GetAccruedFees())
 
 	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
