@@ -105,7 +105,7 @@ func TestRevisions(t *testing.T) {
 			HashDB:    nil,
 			PathDB: &pathdb.Config{
 				CleanCacheSize: 1024 * 1024,
-				DirtyCacheSize: 1024 * 1024,
+				DirtyCacheSize: 0, // Disable dirty cache to force trieDB to write to disk.
 			},
 		},
 	)
@@ -174,4 +174,20 @@ func TestRevisions(t *testing.T) {
 		require.NoError(err)
 		require.Empty(entryValue)
 	}
+
+	trieDB = triedb.NewDatabase(
+		ldb,
+		&triedb.Config{
+			Preimages: false,
+			IsVerkle:  false,
+			HashDB:    nil,
+			PathDB: &pathdb.Config{
+				CleanCacheSize: 1024 * 1024,
+				DirtyCacheSize: 0, // Disable dirty cache to force trieDB to write to disk.
+			},
+		},
+	)
+
+	_, err = trieDB.Reader(rootHashes[numPruned])
+	require.NoError(err)
 }
