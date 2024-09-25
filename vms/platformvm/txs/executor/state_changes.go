@@ -209,6 +209,8 @@ func AdvanceTimeTo(
 	// removed.
 	//
 	// Ref: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/77-reinventing-subnets#registersubnetvalidatortx
+	//
+	// The expiry iterator is sorted in order of increasing timestamp.
 	expiryIterator, err := parentState.GetExpiryIterator()
 	if err != nil {
 		return false, err

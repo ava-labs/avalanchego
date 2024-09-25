@@ -108,6 +108,11 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 		currentTime = genesistest.DefaultValidatorStartTime
 		newTime     = currentTime.Add(3 * time.Second)
 		newTimeUnix = uint64(newTime.Unix())
+
+		unexpiredTime         = newTimeUnix + 1
+		expiredTime           = newTimeUnix
+		previouslyExpiredTime = newTimeUnix - 1
+		validationID          = ids.GenerateTestID()
 	)
 
 	tests := []struct {
@@ -122,14 +127,14 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 			name: "unexpired expiry",
 			initialExpiries: []state.ExpiryEntry{
 				{
-					Timestamp:    newTimeUnix + 1,
-					ValidationID: ids.ID{1},
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
 				},
 			},
 			expectedExpiries: []state.ExpiryEntry{
 				{
-					Timestamp:    newTimeUnix + 1,
-					ValidationID: ids.ID{1},
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
 				},
 			},
 		},
@@ -137,7 +142,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 			name: "unexpired expiry at new time",
 			initialExpiries: []state.ExpiryEntry{
 				{
-					Timestamp:    newTimeUnix,
+					Timestamp:    expiredTime,
 					ValidationID: ids.GenerateTestID(),
 				},
 			},
@@ -146,7 +151,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 			name: "unexpired expiry at previous time",
 			initialExpiries: []state.ExpiryEntry{
 				{
-					Timestamp:    newTimeUnix - 1,
+					Timestamp:    previouslyExpiredTime,
 					ValidationID: ids.GenerateTestID(),
 				},
 			},
@@ -155,18 +160,18 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 			name: "limit expiries removed",
 			initialExpiries: []state.ExpiryEntry{
 				{
-					Timestamp:    newTimeUnix,
+					Timestamp:    expiredTime,
 					ValidationID: ids.GenerateTestID(),
 				},
 				{
-					Timestamp:    newTimeUnix + 1,
-					ValidationID: ids.ID{1},
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
 				},
 			},
 			expectedExpiries: []state.ExpiryEntry{
 				{
-					Timestamp:    newTimeUnix + 1,
-					ValidationID: ids.ID{1},
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
 				},
 			},
 		},
