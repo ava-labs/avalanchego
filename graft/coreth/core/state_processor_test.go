@@ -56,6 +56,7 @@ func u64(val uint64) *uint64 { return &val }
 func TestStateProcessorErrors(t *testing.T) {
 	cpcfg := *params.TestChainConfig
 	config := &cpcfg
+	config.ShanghaiTime = u64(0)
 	config.CancunTime = u64(0)
 
 	var (

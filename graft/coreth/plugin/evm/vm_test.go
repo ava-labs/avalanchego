@@ -110,6 +110,7 @@ var (
 
 	activateCancun = func(cfg *params.ChainConfig) *params.ChainConfig {
 		cpy := *cfg
+		cpy.ShanghaiTime = utils.NewUint64(0)
 		cpy.CancunTime = utils.NewUint64(0)
 		return &cpy
 	}
