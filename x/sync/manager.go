@@ -373,7 +373,8 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		defer m.finishWorkItem()
 
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
-			m.config.Log.Debug("dropping response", zap.Error(err))
+			// TODO log responses
+			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			m.retryWork(work)
 			return
 		}
@@ -430,7 +431,8 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		defer m.finishWorkItem()
 
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
-			m.config.Log.Debug("dropping response", zap.Error(err))
+			// TODO log responses
+			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			m.retryWork(work)
 			return
 		}
@@ -612,7 +614,6 @@ func (m *Manager) handleChangeProofResponse(
 
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 	case *pb.SyncGetChangeProofResponse_RangeProof:
-
 		var rangeProof merkledb.RangeProof
 		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
 			return err
