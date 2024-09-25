@@ -19,13 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
-var _ p2p.Handler = (*testHandler)(nil)
+var _ p2p.Handler = (*waitingHandler)(nil)
 
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
@@ -1126,12 +1125,12 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	updatedRootChan <- struct{}{}
 
 	ctx := context.Background()
-	rangeProofClient := p2ptest.NewClient(t, ctx, &testHandler{
+	rangeProofClient := p2ptest.NewClient(t, ctx, &waitingHandler{
 		handler:         NewGetRangeProofHandler(logging.NoLog{}, dbToSync),
 		updatedRootChan: updatedRootChan,
 	}, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
 
-	changeProofClient := p2ptest.NewClient(t, ctx, &testHandler{
+	changeProofClient := p2ptest.NewClient(t, ctx, &waitingHandler{
 		handler:         NewGetChangeProofHandler(logging.NoLog{}, dbToSync),
 		updatedRootChan: updatedRootChan,
 	}, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
@@ -1284,15 +1283,4 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 		i++
 	}
 	return db, batch.Write()
-}
-
-type testHandler struct {
-	p2p.NoOpHandler
-	handler         p2p.Handler
-	updatedRootChan chan struct{}
-}
-
-func (t *testHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	<-t.updatedRootChan
-	return t.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }

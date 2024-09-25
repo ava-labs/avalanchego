@@ -145,3 +145,14 @@ func (c *counter) Inc() int {
 	c.i++
 	return result
 }
+
+type waitingHandler struct {
+	p2p.NoOpHandler
+	handler         p2p.Handler
+	updatedRootChan chan struct{}
+}
+
+func (w *waitingHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	<-w.updatedRootChan
+	return w.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
