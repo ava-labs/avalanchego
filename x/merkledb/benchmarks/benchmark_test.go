@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,7 +28,7 @@ func testGoldenDatabaseCreation(t *testing.T, size uint64) {
 		require.NoError(t, os.RemoveAll(path))
 	}
 	require.NoError(t, createGoldenDatabase(size))
-	resetRunningDatabaseDirectory(size)
+	require.NoError(t, resetRunningDatabaseDirectory(size))
 	testGoldenDatabaseContent(t, size)
 	require.NoError(t, os.RemoveAll(path))
 	require.NoError(t, os.RemoveAll(getRunningDatabaseDirectory(size)))
@@ -58,7 +59,7 @@ func testGoldenDatabaseContent(t *testing.T, size uint64) {
 	// try an entry beyond.
 	entryHash := calculateIndexEncoding(size + 1)
 	_, err = mdb.Get(entryHash)
-	require.Error(t, err)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
-	mdb.Clear()
+	require.NoError(t, mdb.Clear())
 }
