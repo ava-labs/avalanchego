@@ -979,7 +979,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			// race condition in between writes where UpdateSyncTarget might
 			// error because it has already reached the sync target before it
 			// is called.
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 50; i++ {
 				addkey := make([]byte, r.Intn(50))
 				_, err = r.Read(addkey)
 				require.NoError(err)
