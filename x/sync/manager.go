@@ -41,7 +41,7 @@ var (
 	ErrAlreadyStarted                = errors.New("cannot start a Manager that has already been started")
 	ErrAlreadyClosed                 = errors.New("Manager is closed")
 	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
-	ErrNoChangeProofClientProvided   = errors.New("change proofclient is a required field of the sync config")
+	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
 	ErrNoDatabaseProvided            = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
 	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
