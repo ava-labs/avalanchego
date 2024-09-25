@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/iterator"
-	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -94,18 +93,17 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 
-	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	currentStakersIt.EXPECT().Next().Return(true)
-	currentStakersIt.EXPECT().Value().Return(&state.Staker{
-		TxID:      addValTx.ID(),
-		NodeID:    utx.NodeID(),
-		SubnetID:  utx.SubnetID(),
-		StartTime: utx.StartTime(),
-		NextTime:  chainTime,
-		EndTime:   chainTime,
-	}).Times(2)
-	currentStakersIt.EXPECT().Release()
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
+		iterator.FromSlice(&state.Staker{
+			TxID:      addValTx.ID(),
+			NodeID:    utx.NodeID(),
+			SubnetID:  utx.SubnetID(),
+			StartTime: utx.StartTime(),
+			NextTime:  chainTime,
+			EndTime:   chainTime,
+		}),
+		nil,
+	)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
