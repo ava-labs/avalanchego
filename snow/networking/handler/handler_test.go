@@ -77,6 +77,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		commontracker.NewPeers(),
 		peerTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -183,6 +184,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		commontracker.NewPeers(),
 		peerTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -285,6 +287,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		commontracker.NewPeers(),
 		peerTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 	handler := handlerIntf.(*handler)
@@ -375,6 +378,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		commontracker.NewPeers(),
 		peerTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -550,6 +554,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				commontracker.NewPeers(),
 				peerTracker,
 				prometheus.NewRegistry(),
+				func() {},
 			)
 			require.NoError(err)
 
@@ -632,6 +637,7 @@ func TestHandlerStartError(t *testing.T) {
 		commontracker.NewPeers(),
 		peerTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
