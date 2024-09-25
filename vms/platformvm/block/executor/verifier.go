@@ -542,7 +542,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 			accruedFees   = diff.GetAccruedFees()
 			potentialCost = validatorFeeState.CostOf(
 				v.txExecutorBackend.Config.ValidatorFeeConfig,
-				1,
+				1, // 1 second
 			)
 		)
 		potentialAccruedFees, err := math.Add(accruedFees, potentialCost)
@@ -550,8 +550,6 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 			return nil, nil, nil, err
 		}
 
-		// TODO: Remove SoVs that don't have sufficient fee to pay for the next
-		// second.
 		// Invariant: Proposal transactions do not impact SoV state.
 		sovIterator, err := diff.GetActiveSubnetOnlyValidatorsIterator()
 		if err != nil {
@@ -561,7 +559,9 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 		var sovsToDeactivate []state.SubnetOnlyValidator
 		for sovIterator.Next() {
 			sov := sovIterator.Value()
-			if sov.EndAccumulatedFee > potentialAccruedFees {
+			// If the validator has exactly the right amount of fee for the next
+			// second we should not remove them here.
+			if sov.EndAccumulatedFee >= potentialAccruedFees {
 				break
 			}
 

@@ -9,10 +9,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 )
@@ -99,6 +102,118 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 			require.False(validatorsModified)
 			require.Equal(test.expectedState, s.GetFeeState())
 			require.Equal(nextTime, s.GetTimestamp())
+		})
+	}
+}
+
+func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
+	var (
+		currentTime = genesistest.DefaultValidatorStartTime
+		newTime     = currentTime.Add(3 * time.Second)
+		newTimeUnix = uint64(newTime.Unix())
+
+		unexpiredTime         = newTimeUnix + 1
+		expiredTime           = newTimeUnix
+		previouslyExpiredTime = newTimeUnix - 1
+		validationID          = ids.GenerateTestID()
+	)
+
+	tests := []struct {
+		name             string
+		initialExpiries  []state.ExpiryEntry
+		expectedExpiries []state.ExpiryEntry
+	}{
+		{
+			name: "no expiries",
+		},
+		{
+			name: "unexpired expiry",
+			initialExpiries: []state.ExpiryEntry{
+				{
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
+				},
+			},
+			expectedExpiries: []state.ExpiryEntry{
+				{
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
+				},
+			},
+		},
+		{
+			name: "unexpired expiry at new time",
+			initialExpiries: []state.ExpiryEntry{
+				{
+					Timestamp:    expiredTime,
+					ValidationID: ids.GenerateTestID(),
+				},
+			},
+		},
+		{
+			name: "unexpired expiry at previous time",
+			initialExpiries: []state.ExpiryEntry{
+				{
+					Timestamp:    previouslyExpiredTime,
+					ValidationID: ids.GenerateTestID(),
+				},
+			},
+		},
+		{
+			name: "limit expiries removed",
+			initialExpiries: []state.ExpiryEntry{
+				{
+					Timestamp:    expiredTime,
+					ValidationID: ids.GenerateTestID(),
+				},
+				{
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
+				},
+			},
+			expectedExpiries: []state.ExpiryEntry{
+				{
+					Timestamp:    unexpiredTime,
+					ValidationID: validationID,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				require = require.New(t)
+				s       = statetest.New(t, statetest.Config{})
+			)
+
+			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
+			// AdvanceTimeTo is maintained.
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
+			require.NoError(err)
+			require.False(newTime.After(nextStakerChangeTime))
+
+			for _, expiry := range test.initialExpiries {
+				s.PutExpiry(expiry)
+			}
+
+			validatorsModified, err := AdvanceTimeTo(
+				&Backend{
+					Config: &config.Config{
+						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+					},
+				},
+				s,
+				newTime,
+			)
+			require.NoError(err)
+			require.False(validatorsModified)
+
+			expiryIterator, err := s.GetExpiryIterator()
+			require.NoError(err)
+			require.Equal(
+				test.expectedExpiries,
+				iterator.ToSlice(expiryIterator),
+			)
 		})
 	}
 }
