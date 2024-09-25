@@ -903,7 +903,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			},
 		},
 		{
-			name: "all proof keys removed from response",
+			name: "change proof bad response - all proof keys removed from response",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
 					response.StartProof = nil
