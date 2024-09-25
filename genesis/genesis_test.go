@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
-	"github.com/ava-labs/coreth/core"
 )
 
 var (
@@ -514,9 +514,7 @@ func TestCChainGenesisTimestamp(t *testing.T) {
 
 			config := GetConfig(test.networkID)
 			var cChainGenesis core.Genesis
-			err := json.Unmarshal([]byte(config.CChainGenesis), &cChainGenesis)
-			require.NoError(err)
-
+			require.NoError(json.Unmarshal([]byte(config.CChainGenesis), &cChainGenesis))
 			require.Equal(
 				test.expectedGenesisTime,
 				cChainGenesis.Timestamp,
