@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -205,23 +206,20 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTxID := nextStakerTx.ID()
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
-	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
-	currentStakersIt.EXPECT().Value().Return(&state.Staker{
-		TxID:     nextStakerTxID,
-		EndTime:  nextStakerTime,
-		NextTime: nextStakerTime,
-		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	onParentAccept.EXPECT().GetCurrentStakerIterator().DoAndReturn(func() (iterator.Iterator[*state.Staker], error) {
+		return iterator.FromSlice(
+			&state.Staker{
+				TxID:     nextStakerTxID,
+				EndTime:  nextStakerTime,
+				NextTime: nextStakerTime,
+				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			},
+		), nil
 	}).AnyTimes()
-	currentStakersIt.EXPECT().Release().AnyTimes()
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
-
-	pendingStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
-	pendingStakersIt.EXPECT().Release().AnyTimes()
-	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any).Return(
 		time.Microsecond, /*upDuration*/

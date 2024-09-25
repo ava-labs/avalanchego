@@ -77,12 +77,30 @@ func VerifyNewChainTime(
 
 // AdvanceTimeTo applies all state changes to [parentState] resulting from
 // advancing the chain time to [newChainTime].
+//
 // Returns true iff the validator set changed.
 func AdvanceTimeTo(
 	backend *Backend,
 	parentState state.Chain,
 	newChainTime time.Time,
 ) (bool, error) {
+	diff, changed, err := advanceTimeTo(backend, parentState, newChainTime)
+	if err != nil {
+		return false, err
+	}
+	return changed, diff.Apply(parentState)
+}
+
+// advanceTimeTo returns the state diff on top of parentState resulting from
+// advancing the chain time to newChainTime. It also returns a boolean
+// indicating if the validator set changed.
+//
+// parentState is not modified.
+func advanceTimeTo(
+	backend *Backend,
+	parentState state.Chain,
+	newChainTime time.Time,
+) (state.Diff, bool, error) {
 	// We promote pending stakers to current stakers first and remove
 	// completed stakers from the current staker set. We assume that any
 	// promoted staker will not immediately be removed from the current staker
@@ -93,17 +111,21 @@ func AdvanceTimeTo(
 
 	changes, err := state.NewDiffOn(parentState)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
+	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
+	//
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
 	pendingStakerIterator, err := parentState.GetPendingStakerIterator()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer pendingStakerIterator.Release()
 
 	var changed bool
-	// Promote any pending stakers to current if [StartTime] <= [newChainTime].
 	for pendingStakerIterator.Next() {
 		stakerToRemove := pendingStakerIterator.Value()
 		if stakerToRemove.StartTime.After(newChainTime) {
@@ -116,7 +138,7 @@ func AdvanceTimeTo(
 
 		if stakerToRemove.Priority == txs.SubnetPermissionedValidatorPendingPriority {
 			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
-				return false, err
+				return nil, false, err
 			}
 			changes.DeletePendingValidator(stakerToRemove)
 			changed = true
@@ -125,12 +147,12 @@ func AdvanceTimeTo(
 
 		supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
 
 		rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
 
 		potentialReward := rewards.Calculate(
@@ -147,7 +169,7 @@ func AdvanceTimeTo(
 		switch stakerToRemove.Priority {
 		case txs.PrimaryNetworkValidatorPendingPriority, txs.SubnetPermissionlessValidatorPendingPriority:
 			if err := changes.PutCurrentValidator(&stakerToAdd); err != nil {
-				return false, err
+				return nil, false, err
 			}
 			changes.DeletePendingValidator(stakerToRemove)
 
@@ -156,16 +178,20 @@ func AdvanceTimeTo(
 			changes.DeletePendingDelegator(stakerToRemove)
 
 		default:
-			return false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
+			return nil, false, fmt.Errorf("expected staker priority got %d", stakerToRemove.Priority)
 		}
 
 		changed = true
 	}
 
 	// Remove any current stakers whose [EndTime] <= [newChainTime].
+	//
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
 	currentStakerIterator, err := parentState.GetCurrentStakerIterator()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	defer currentStakerIterator.Release()
 
@@ -201,8 +227,38 @@ func AdvanceTimeTo(
 		changes.SetFeeState(feeState)
 	}
 
+	// Remove all expiries whose timestamp now implies they can never be
+	// re-issued.
+	//
+	// The expiry timestamp is the time at which it is no longer valid, so any
+	// expiry with a timestamp less than or equal to the new chain time can be
+	// removed.
+	//
+	// Ref: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/77-reinventing-subnets#registersubnetvalidatortx
+	//
+	// The expiry iterator is sorted in order of increasing timestamp.
+	//
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
+	expiryIterator, err := parentState.GetExpiryIterator()
+	if err != nil {
+		return nil, false, err
+	}
+	defer expiryIterator.Release()
+
+	newChainTimeUnix := uint64(newChainTime.Unix())
+	for expiryIterator.Next() {
+		expiry := expiryIterator.Value()
+		if expiry.Timestamp > newChainTimeUnix {
+			break
+		}
+
+		changes.DeleteExpiry(expiry)
+	}
+
 	changes.SetTimestamp(newChainTime)
-	return changed, changes.Apply(parentState)
+	return changes, changed, nil
 }
 
 func GetRewardsCalculator(

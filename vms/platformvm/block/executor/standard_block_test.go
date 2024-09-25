@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -118,22 +118,19 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
 
 	// store just once current staker to mark next staker time.
-	currentStakerIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	currentStakerIt.EXPECT().Next().Return(true).AnyTimes()
-	currentStakerIt.EXPECT().Value().Return(
-		&state.Staker{
-			NextTime: nextStakerTime,
-			Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-		},
-	).AnyTimes()
-	currentStakerIt.EXPECT().Release().Return().AnyTimes()
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakerIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetCurrentStakerIterator().DoAndReturn(func() (iterator.Iterator[*state.Staker], error) {
+		return iterator.FromSlice(
+			&state.Staker{
+				NextTime: nextStakerTime,
+				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			},
+		), nil
+	}).AnyTimes()
 
 	// no pending stakers
-	pendingIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	pendingIt.EXPECT().Next().Return(false).AnyTimes()
-	pendingIt.EXPECT().Release().Return().AnyTimes()
-	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
+	// no expiries
+	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
