@@ -914,7 +914,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			},
 		},
 		{
-			name: "flaky change proof client",
+			name: "change proof flaky server",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				return p2ptest.NewClient(t, context.Background(), &flakyHandler{
 					Handler: NewGetChangeProofHandler(logging.NoLog{}, db),
