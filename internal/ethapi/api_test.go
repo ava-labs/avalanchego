@@ -786,6 +786,7 @@ func TestEstimateGas(t *testing.T) {
 func TestCall(t *testing.T) {
 	// Enable BLOBHASH opcode in Cancun
 	cfg := *params.TestChainConfig
+	cfg.ShanghaiTime = utils.NewUint64(0)
 	cfg.CancunTime = utils.NewUint64(0)
 	t.Parallel()
 	// Initialize test accounts
@@ -1788,6 +1789,7 @@ func TestRPCGetBlockOrHeader(t *testing.T) {
 
 func setupReceiptBackend(t *testing.T, genBlocks int) (*testBackend, []common.Hash) {
 	config := *params.TestChainConfig
+	config.ShanghaiTime = new(uint64)
 	config.CancunTime = new(uint64)
 	var (
 		acc1Key, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")

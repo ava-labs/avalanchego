@@ -65,6 +65,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -155,6 +157,7 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -185,6 +188,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -215,6 +220,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -245,6 +252,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -275,6 +284,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -305,6 +316,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -335,6 +348,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -365,6 +380,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -395,6 +412,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -425,6 +444,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -455,6 +476,8 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
 		NetworkUpgrades: NetworkUpgrades{
 			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
 			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
@@ -497,11 +520,14 @@ type ChainConfig struct {
 	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	IstanbulBlock       *big.Int `json:"istanbulBlock,omitempty"`       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
+	BerlinBlock         *big.Int `json:"berlinBlock,omitempty"`         // Berlin switch block (nil = no fork, 0 = already on berlin)
+	LondonBlock         *big.Int `json:"londonBlock,omitempty"`         // London switch block (nil = no fork, 0 = already on london)
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-	CancunTime *uint64 `json:"cancunTime,omitempty"` // Cancun switch time (nil = no fork, 0 = already activated)
-	VerkleTime *uint64 `json:"verkleTime,omitempty"` // Verkle switch time (nil = no fork, 0 = already on verkle)
+	ShanghaiTime *uint64 `json:"shanghaiTime,omitempty"` // Shanghai switch time (nil = no fork, 0 = already on shanghai)
+	CancunTime   *uint64 `json:"cancunTime,omitempty"`   // Cancun switch time (nil = no fork, 0 = already activated)
+	VerkleTime   *uint64 `json:"verkleTime,omitempty"`   // Verkle switch time (nil = no fork, 0 = already on verkle)
 
 	NetworkUpgrades // Config for timestamps that enable network upgrades. Skip encoding/decoding directly into ChainConfig.
 
@@ -606,14 +632,29 @@ func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
 	return isBlockForked(c.IstanbulBlock, num)
 }
 
-// IsCancun returns whether time is either equal to the Cancun fork time or greater.
-func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
-	return isTimestampForked(c.CancunTime, time)
+// IsBerlin returns whether num is either equal to the Berlin fork block or greater.
+func (c *ChainConfig) IsBerlin(num *big.Int) bool {
+	return isBlockForked(c.BerlinBlock, num)
 }
 
-// IsVerkle returns whether time is either equal to the Verkle fork time or greater.
+// IsLondon returns whether num is either equal to the London fork block or greater.
+func (c *ChainConfig) IsLondon(num *big.Int) bool {
+	return isBlockForked(c.LondonBlock, num)
+}
+
+// IsShanghai returns whether time is either equal to the Shanghai fork time or greater.
+func (c *ChainConfig) IsShanghai(num *big.Int, time uint64) bool {
+	return c.IsLondon(num) && isTimestampForked(c.ShanghaiTime, time)
+}
+
+// IsCancun returns whether num is either equal to the Cancun fork time or greater.
+func (c *ChainConfig) IsCancun(num *big.Int, time uint64) bool {
+	return c.IsLondon(num) && isTimestampForked(c.CancunTime, time)
+}
+
+// IsVerkle returns whether num is either equal to the Verkle fork time or greater.
 func (c *ChainConfig) IsVerkle(num *big.Int, time uint64) bool {
-	return isTimestampForked(c.VerkleTime, time)
+	return c.IsLondon(num) && isTimestampForked(c.VerkleTime, time)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -662,6 +703,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "petersburgBlock", block: c.PetersburgBlock},
 		{name: "istanbulBlock", block: c.IstanbulBlock},
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
+		{name: "berlinBlock", block: c.BerlinBlock},
+		{name: "londonBlock", block: c.LondonBlock},
+		{name: "shanghaiTime", timestamp: c.ShanghaiTime},
 		{name: "cancunTime", timestamp: c.CancunTime, optional: true},
 		{name: "verkleTime", timestamp: c.VerkleTime, optional: true},
 	}
@@ -774,6 +818,15 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, headNumber *big.Int, 
 	}
 	if isForkBlockIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, headNumber) {
 		return newBlockCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
+	}
+	if isForkBlockIncompatible(c.BerlinBlock, newcfg.BerlinBlock, headNumber) {
+		return newBlockCompatError("Berlin fork block", c.BerlinBlock, newcfg.BerlinBlock)
+	}
+	if isForkBlockIncompatible(c.LondonBlock, newcfg.LondonBlock, headNumber) {
+		return newBlockCompatError("London fork block", c.LondonBlock, newcfg.LondonBlock)
+	}
+	if isForkTimestampIncompatible(c.ShanghaiTime, newcfg.ShanghaiTime, headTimestamp) {
+		return newTimestampCompatError("Shanghai fork timestamp", c.ShanghaiTime, newcfg.ShanghaiTime)
 	}
 	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, headTimestamp) {
 		return newTimestampCompatError("Cancun fork timestamp", c.CancunTime, newcfg.CancunTime)
