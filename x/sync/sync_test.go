@@ -974,8 +974,12 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require.NoError(syncer.Start(ctx))
 
 			// Simulate writes on the server
-			// TODO more than a single write when API is less flaky
-			for i := 0; i <= 1; i++ {
+			//
+			// TODO add more writes when api is not flaky. There is an inherent
+			// race condition in between writes where UpdateSyncTarget might
+			// error because it has already reached the sync target before it
+			// is called.
+			for i := 0; i < 100; i++ {
 				addkey := make([]byte, r.Intn(50))
 				_, err = r.Read(addkey)
 				require.NoError(err)
