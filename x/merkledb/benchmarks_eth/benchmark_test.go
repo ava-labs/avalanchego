@@ -82,81 +82,112 @@ func testGoldenDatabaseContent(t *testing.T, size uint64) {
 }
 
 func TestRevisions(t *testing.T) {
-	revisionCount := uint64(10)
+	require := require.New(t)
+
+	// Clean up the database directory
 	wd, _ := os.Getwd()
 	dbPath := path.Join(wd, "db-test-revisions")
-	require.NoError(t, os.RemoveAll(dbPath))
+	require.NoError(os.RemoveAll(dbPath))
 	err := os.Mkdir(dbPath, 0o777)
-	require.NoError(t, err)
+	require.NoError(err)
+
+	// Create a new leveldb database
 	ldb, err := rawdb.NewLevelDBDatabase(dbPath, levelDBCacheSize, 200, "metrics_prefix", false)
-	require.NoError(t, err)
-	trieDb := triedb.NewDatabase(ldb, &triedb.Config{
-		Preimages: false,
-		IsVerkle:  false,
-		HashDB:    nil,
-		PathDB: &pathdb.Config{
-			StateHistory:   revisionCount, // keep the same requiremenet across each db
-			CleanCacheSize: 1024 * 1024,
-			DirtyCacheSize: 1024 * 1024,
+	require.NoError(err)
+
+	// Create a new trie database
+	const maxDiffs = 128 // triedb will store 128 diffs.
+	trieDB := triedb.NewDatabase(
+		ldb,
+		&triedb.Config{
+			Preimages: false,
+			IsVerkle:  false,
+			HashDB:    nil,
+			PathDB: &pathdb.Config{
+				CleanCacheSize: 1024 * 1024,
+				DirtyCacheSize: 0, // Disable dirty cache to force trieDB to write to disk.
+			},
 		},
-	})
-	tdb := trie.NewEmpty(trieDb)
-	for entryIdx := uint64(0); entryIdx < 1000000; entryIdx++ {
-		entryHash := calculateIndexEncoding(entryIdx)
-		tdb.Update(entryHash, make([]byte, 32))
+	)
+
+	// Initially populate the trie
+	const diffSize = 100
+	var (
+		index uint64
+		tdb   = trie.NewEmpty(trieDB)
+	)
+	for i := 0; i < diffSize; i++ {
+		entryHash := calculateIndexEncoding(index)
+		require.NoError(tdb.Update(entryHash, entryHash))
+		index++
 	}
 
-	revisions := make([]common.Hash, 0)
-	revisionsTrie := make([]*trie.Trie, 0)
+	// Commit the initial state
+	root, nodes := tdb.Commit(false)
+	require.NoError(trieDB.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil /*states*/))
 
-	var nodes *trienode.NodeSet
-	var root common.Hash
-	root, nodes = tdb.Commit(false)
-	err = trieDb.Update(root, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil /*states*/)
-	require.NoError(t, err)
-	err = trieDb.Commit(root, false)
-	require.NoError(t, err)
-	tdb2, err := trie.New(trie.TrieID(root), trieDb)
-	require.NoError(t, err)
-	revisionsTrie = append(revisionsTrie, tdb2)
-	tdb, err = trie.New(trie.TrieID(root), trieDb)
-	require.NoError(t, err)
-	revisions = append(revisions, root)
+	const numDiffs = 150
+	rootHashes := []common.Hash{root}
+	for height := uint64(1); height < numDiffs; height++ {
+		prevRoot := root
+		tdb, err = trie.New(trie.TrieID(prevRoot), trieDB)
+		require.NoError(err)
 
-	for currentRev := uint64(1); currentRev < 1000; currentRev++ {
 		// update the tree based on the current revision.
-		for entryIdx := uint64(currentRev-1) * 1000; entryIdx < uint64(currentRev)*1000; entryIdx++ {
-			entryHash := calculateIndexEncoding(entryIdx)
-			tdb.Update(entryHash, entryHash)
+		for i := 0; i < diffSize; i++ {
+			entryHash := calculateIndexEncoding(index)
+			require.NoError(tdb.Update(entryHash, entryHash))
+			index++
 		}
+
+		// Commit the changes
 		root, nodes = tdb.Commit(false)
-		err = trieDb.Update(root, revisions[len(revisions)-1], currentRev, trienode.NewWithNodeSet(nodes), nil /*states*/)
-		require.NoError(t, err)
-		err = trieDb.Commit(root, false)
-		require.NoError(t, err)
-		tdb2, err = trie.New(trie.TrieID(root), trieDb)
-		require.NoError(t, err)
-		revisionsTrie = append(revisionsTrie, tdb2)
-		tdb, err = trie.New(trie.TrieID(root), trieDb)
-		require.NoError(t, err)
-		revisions = append(revisions, root)
+		require.NoError(trieDB.Update(root, prevRoot, height, trienode.NewWithNodeSet(nodes), nil /*states*/))
 
-		// check all the historical revision and see which ones are available and which one aren't.
-		for revIdx, revTrie := range revisionsTrie {
-			entryHash := calculateIndexEncoding(uint64(revIdx) * 1000)
-			entryValue, err := revTrie.Get(entryHash)
-			if revIdx != 0 {
-				require.NoError(t, err)
-				require.Equal(t, make([]byte, 32), entryValue)
-			} else {
-				require.Error(t, err) // should be "missing node error"
-				continue
-			}
-
-			entryHash = calculateIndexEncoding(uint64(revIdx)*1000 - 1)
-			entryValue, err = revTrie.Get(entryHash)
-			require.NoError(t, err)
-			require.Equal(t, entryHash, entryValue)
-		}
+		rootHashes = append(rootHashes, root)
 	}
+
+	// Verify that old revisions were pruned.
+	numPruned := max(len(rootHashes)-maxDiffs-1, 0)
+	for _, root := range rootHashes[:numPruned] {
+		_, err = trie.New(trie.TrieID(root), trieDB)
+		require.Error(err)
+	}
+
+	// Verify that all 128 revisions are queryable and return the expected data.
+	for height, root := range rootHashes[numPruned:] {
+		height += numPruned
+
+		tdb, err = trie.New(trie.TrieID(root), trieDB)
+		require.NoError(err)
+
+		maxIndex := diffSize * uint64(height+1)
+		for i := uint64(0); i < maxIndex; i++ {
+			entryHash := calculateIndexEncoding(i)
+			entryValue, err := tdb.Get(entryHash)
+			require.NoError(err)
+			require.Equal(entryHash, entryValue)
+		}
+
+		entryHash := calculateIndexEncoding(maxIndex)
+		entryValue, err := tdb.Get(entryHash)
+		require.NoError(err)
+		require.Empty(entryValue)
+	}
+
+	trieDB = triedb.NewDatabase(
+		ldb,
+		&triedb.Config{
+			Preimages: false,
+			IsVerkle:  false,
+			HashDB:    nil,
+			PathDB: &pathdb.Config{
+				CleanCacheSize: 1024 * 1024,
+				DirtyCacheSize: 0, // Disable dirty cache to force trieDB to write to disk.
+			},
+		},
+	)
+
+	_, err = trieDB.Reader(rootHashes[numPruned])
+	require.NoError(err)
 }
