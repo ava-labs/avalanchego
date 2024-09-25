@@ -293,11 +293,6 @@ func (m *Manager) finishWorkItem() {
 
 // Processes [item] by fetching a change or range proof.
 func (m *Manager) doWork(ctx context.Context, work *workItem) {
-	if errors.Is(ctx.Err(), context.Canceled) {
-		m.finishWorkItem()
-		return
-	}
-
 	// Backoff for failed requests accounting for time this job has already
 	// spent waiting in the unprocessed queue
 	now := time.Now()
@@ -310,7 +305,12 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 		return
 	}
 
-	<-time.After(waitTime)
+	select {
+	case <-ctx.Done():
+		m.finishWorkItem()
+		return
+	case <-time.After(waitTime):
+	}
 
 	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
