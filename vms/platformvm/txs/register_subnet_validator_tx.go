@@ -22,12 +22,8 @@ type RegisterSubnetValidatorTx struct {
 	// Leftover $AVAX from the Subnet Validator's Balance will be issued to
 	// this owner after it is removed from the validator set.
 	RemainingBalanceOwner fx.Owner `serialize:"true" json:"remainingBalanceOwner"`
-	// AddressedCall with Payload:
-	//   - SubnetID
-	//   - NodeID (must be Ed25519 NodeID)
-	//   - Weight
-	//   - BLS public key
-	//   - Expiry
+	// Message is expected to be a signed Warp message containing an
+	// AddressedCall payload with the RegisterSubnetValidator message.
 	Message types.JSONByteSlice `serialize:"true" json:"message"`
 }
 
