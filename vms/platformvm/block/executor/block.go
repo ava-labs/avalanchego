@@ -29,25 +29,49 @@ func (*Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 	return true, nil
 }
 
-func (b *Block) VerifyWithContext(_ context.Context, ctx *smblock.Context) error {
-	pChainHeight := uint64(0)
+func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Context) error {
+	var pChainHeight uint64
 	if ctx != nil {
-		pChainHeight = ctx.PChainHeight
+		pChainHeight = blockContext.PChainHeight
 	}
 
 	blkID := b.ID()
 	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
 		if !blkState.verifiedHeights.Contains(pChainHeight) {
-			// PlatformVM blocks are currently valid regardless of the ProposerVM's
-			// PChainHeight. If this changes, those validity checks should be done prior
-			// to adding [pChainHeight] to [verifiedHeights].
+			// Only the validity of warp messages need to be verified because
+			// this block has already passed verification with a different
+			// height.
+			err := VerifyWarpMessages(
+				ctx,
+				b.manager.ctx.NetworkID,
+				b.manager.ctx.ValidatorState,
+				pChainHeight,
+				b,
+			)
+			if err != nil {
+				return err
+			}
+
 			blkState.verifiedHeights.Add(pChainHeight)
 		}
 
-		// This block has already been verified.
-		return nil
+		return nil // This block has already been executed.
 	}
 
+	// Verify the warp messages in the block.
+	err := VerifyWarpMessages(
+		ctx,
+		b.manager.ctx.NetworkID,
+		b.manager.ctx.ValidatorState,
+		pChainHeight,
+		b,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Since the warp messages are valid, we need to execute the rest of the
+	// validity checks.
 	return b.Visit(&verifier{
 		backend:           b.manager.backend,
 		txExecutorBackend: b.manager.txExecutorBackend,
