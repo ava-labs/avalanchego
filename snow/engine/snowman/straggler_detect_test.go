@@ -120,6 +120,16 @@ func TestGetNetworkSnapshot(t *testing.T) {
 			}},
 			expectedOK: true,
 		},
+		{
+			description:         "we're not behind",
+			connectedPercent:    1.0,
+			connectedValidators: connectedValidators([]ids.NodeWeight{{Weight: 999999, Node: n1}}),
+			lastAcceptedFromNodes: map[ids.NodeID]ids.ID{
+				n1: {0x1},
+			},
+			processing:   map[ids.ID]struct{}{{0x2}: {}},
+			lastAccepted: ids.ID{0x0},
+		},
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
 			var buff logBuffer
