@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,6 +25,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 var (
@@ -593,7 +598,6 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return nil
 }
 
-// TODO: Implement me
 func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
 	var (
 		currentTimestamp = e.State.GetTimestamp()
@@ -634,57 +638,92 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	var (
-		txID        = e.Tx.ID()
-		startTime   = uint64(currentTimestamp.Unix())
-		currentFees = e.State.GetAccruedFees()
-	)
-	for i, vdr := range tx.Validators {
-		vdr := vdr
-		balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+	warpMessage, err := warp.ParseMessage(tx.Message)
+	if err != nil {
+		return err
+	}
+	if warpMessage.NetworkID != e.Ctx.NetworkID {
+		return fmt.Errorf("expected networkID %d but got %d", e.Ctx.NetworkID, warpMessage.NetworkID)
+	}
+
+	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
+	if err != nil {
+		return err
+	}
+
+	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
+	if err != nil {
+		return err
+	}
+
+	expectedChainID, expectedAddress, err := e.State.GetSubnetManager(msg.SubnetID)
+	if err != nil {
+		return err
+	}
+	if warpMessage.SourceChainID != expectedChainID {
+		return fmt.Errorf("expected chainID %s but got %s", expectedChainID, warpMessage.SourceChainID)
+	}
+	if !bytes.Equal(addressedCall.SourceAddress, expectedAddress) {
+		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
+	}
+
+	currentTimestampUnix := uint64(currentTimestamp.Unix())
+	if msg.Expiry <= currentTimestampUnix {
+		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
+	}
+
+	validationID := hashing.ComputeHash256Array(addressedCall.Payload)
+	expiry := state.ExpiryEntry{
+		Timestamp:    msg.Expiry,
+		ValidationID: validationID,
+	}
+	isDuplicate, err := e.State.HasExpiry(expiry)
+	if err != nil {
+		return err
+	}
+	if isDuplicate {
+		return fmt.Errorf("expiry %s already exists", expiry)
+	}
+
+	balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &tx.RemainingBalanceOwner)
+	if err != nil {
+		return err
+	}
+
+	sov := state.SubnetOnlyValidator{
+		ValidationID:          validationID,
+		SubnetID:              msg.SubnetID,
+		NodeID:                msg.NodeID,
+		PublicKey:             bls.PublicKeyToUncompressedBytes(tx.Signer.Key()),
+		RemainingBalanceOwner: balanceOwner,
+		StartTime:             currentTimestampUnix,
+		Weight:                msg.Weight,
+		MinNonce:              0,
+		EndAccumulatedFee:     0, // If Balance is 0, this is 0
+	}
+	if tx.Balance != 0 {
+		// We are attempting to add an active validator
+		if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
+			return errMaxNumActiveValidators
+		}
+
+		currentFees := e.State.GetAccruedFees()
+		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
 		if err != nil {
 			return err
 		}
-
-		sov := state.SubnetOnlyValidator{
-			ValidationID:          txID.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
-			SubnetID:              tx.Subnet,
-			NodeID:                vdr.NodeID,
-			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
-			RemainingBalanceOwner: balanceOwner,
-			StartTime:             startTime,
-			Weight:                vdr.Weight,
-			MinNonce:              0,
-			EndAccumulatedFee:     0, // If Balance is 0, this is 0
-		}
-		if vdr.Balance != 0 {
-			// We are attempting to add an active validator
-			if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
-				return errMaxNumActiveValidators
-			}
-
-			sov.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
-			if err != nil {
-				return err
-			}
-
-			fee, err = math.Add(fee, vdr.Balance)
-			if err != nil {
-				return err
-			}
-		}
-
-		if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
-			return err
-		}
 	}
+
+	if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
 
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
-	// Set the new Subnet manager in the database
-	e.State.SetSubnetManager(tx.Subnet, tx.ChainID, tx.Address)
 	return nil
 }
 
