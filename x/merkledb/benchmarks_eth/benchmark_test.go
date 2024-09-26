@@ -95,8 +95,7 @@ func TestRevisions(t *testing.T) {
 	wd, _ := os.Getwd()
 	dbPath := path.Join(wd, "db-test-revisions")
 	require.NoError(os.RemoveAll(dbPath))
-	err := os.Mkdir(dbPath, 0o777)
-	require.NoError(err)
+	require.NoError(os.Mkdir(dbPath, 0o777))
 
 	// Create a new leveldb database
 	ldb, err := rawdb.NewLevelDBDatabase(dbPath, levelDBCacheSizeMB, 200, "metrics_prefix", false)
