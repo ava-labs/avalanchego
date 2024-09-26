@@ -323,10 +323,6 @@ func runBenchmark(databaseEntries uint64) error {
 		if err != nil {
 			return fmt.Errorf("unable to update trie : %v", err)
 		}
-		err = trieDb.Commit(root, false)
-		if err != nil {
-			return fmt.Errorf("unable to commit trie : %v", err)
-		}
 		tdb, err = trie.New(trie.TrieID(root), trieDb)
 		if err != nil {
 			return fmt.Errorf("unable to create new trie : %v", err)
