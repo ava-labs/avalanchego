@@ -5,9 +5,8 @@ package txs
 
 import (
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
@@ -18,11 +17,8 @@ type RegisterSubnetValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// Balance <= sum($AVAX inputs) - sum($AVAX outputs) - TxFee.
 	Balance uint64 `serialize:"true" json:"balance"`
-	// [Signer] is the BLS key for this validator.
-	// Note: We do not enforce that the BLS key is unique across all validators.
-	//       This means that validators can share a key if they so choose.
-	//       However, a NodeID does uniquely map to a BLS key
-	Signer signer.Signer `serialize:"true" json:"signer"`
+	// ProofOfPossession of the BLS key that is included in the Message.
+	ProofOfPossession [bls.SignatureLen]byte `serialize:"true" json:"proofOfPossession"`
 	// Leftover $AVAX from the Subnet Validator's Balance will be issued to
 	// this owner after it is removed from the validator set.
 	RemainingBalanceOwner fx.Owner `serialize:"true" json:"remainingBalanceOwner"`
@@ -47,11 +43,8 @@ func (tx *RegisterSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
-	if err := verify.All(tx.Signer, tx.RemainingBalanceOwner); err != nil {
+	if err := tx.RemainingBalanceOwner.Verify(); err != nil {
 		return err
-	}
-	if tx.Signer.Key() == nil {
-		return ErrMissingPublicKey
 	}
 
 	tx.SyntacticallyVerified = true

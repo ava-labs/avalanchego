@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -672,6 +673,14 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
 	}
 
+	pop := signer.ProofOfPossession{
+		PublicKey:         msg.BLSPublicKey,
+		ProofOfPossession: tx.ProofOfPossession,
+	}
+	if err := pop.Verify(); err != nil {
+		return err
+	}
+
 	validationID := hashing.ComputeHash256Array(addressedCall.Payload)
 	expiry := state.ExpiryEntry{
 		Timestamp:    msg.Expiry,
@@ -694,7 +703,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
 		NodeID:                msg.NodeID,
-		PublicKey:             bls.PublicKeyToUncompressedBytes(tx.Signer.Key()),
+		PublicKey:             bls.PublicKeyToUncompressedBytes(pop.Key()),
 		RemainingBalanceOwner: balanceOwner,
 		StartTime:             currentTimestampUnix,
 		Weight:                msg.Weight,
@@ -724,6 +733,8 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
+	// Prevent this warp message from being replayed
+	e.State.PutExpiry(expiry)
 	return nil
 }
 

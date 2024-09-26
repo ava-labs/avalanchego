@@ -188,11 +188,11 @@ var (
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
 			wrappers.IntLen + // validators length
-			wrappers.IntLen + // subnetAuth typeID
+			bls.SignatureLen + // proofOfPossession
 			wrappers.IntLen, // subnetAuthCredential typeID
 		gas.DBRead:  2, // subnet auth + manager lookup
 		gas.DBWrite: 2, // manager + weight
-		gas.Compute: 0,
+		gas.Compute: 0, // TODO: Add compute complexity (and include the PoP compute)
 	}
 	IntrinsicRegisterSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -700,10 +700,6 @@ func (c *complexityVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVali
 	if err != nil {
 		return err
 	}
-	signerComplexity, err := SignerComplexity(tx.Signer)
-	if err != nil {
-		return err
-	}
 	ownerComplexity, err := OwnerComplexity(tx.RemainingBalanceOwner)
 	if err != nil {
 		return err
@@ -714,7 +710,6 @@ func (c *complexityVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVali
 	}
 	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
 		&baseTxComplexity,
-		&signerComplexity,
 		&ownerComplexity,
 		&warpComplexity,
 	)

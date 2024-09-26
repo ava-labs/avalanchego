@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -167,14 +168,15 @@ type Builder interface {
 	// RegisterSubnetValidatorTx adds a validator to a Permissionless L1.
 	//
 	// - [balance] that the validator should allocate to continuous fees
-	// - [signer] is the BLS key for this validator
+	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
+	//   message
 	// - [remainingBalanceOwner] specifies the owner to send any of the
 	//   remaining balance after removing the continuous fee
 	// - [message] is the Warp message that authorizes this validator to be
 	//   added
 	NewRegisterSubnetValidatorTx(
 		balance uint64,
-		signer *signer.ProofOfPossession,
+		proofOfPossession [bls.SignatureLen]byte,
 		remainingBalanceOwner *secp256k1fx.OutputOwners,
 		message []byte,
 		options ...common.Option,
@@ -879,7 +881,7 @@ func (b *builder) NewConvertSubnetTx(
 
 func (b *builder) NewRegisterSubnetValidatorTx(
 	balance uint64,
-	signer *signer.ProofOfPossession,
+	proofOfPossession [bls.SignatureLen]byte,
 	remainingBalanceOwner *secp256k1fx.OutputOwners,
 	message []byte,
 	options ...common.Option,
@@ -896,10 +898,6 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 	memoComplexity := gas.Dimensions{
 		gas.Bandwidth: uint64(len(memo)),
 	}
-	signerComplexity, err := fee.SignerComplexity(signer)
-	if err != nil {
-		return nil, err
-	}
 	ownerComplexity, err := fee.OwnerComplexity(remainingBalanceOwner)
 	if err != nil {
 		return nil, err
@@ -910,7 +908,6 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 	}
 	complexity, err := fee.IntrinsicRegisterSubnetValidatorTxComplexities.Add(
 		&memoComplexity,
-		&signerComplexity,
 		&ownerComplexity,
 		&warpComplexity,
 	)
@@ -940,7 +937,7 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 			Memo:         memo,
 		}},
 		Balance:               balance,
-		Signer:                signer,
+		ProofOfPossession:     proofOfPossession,
 		RemainingBalanceOwner: remainingBalanceOwner,
 		Message:               message,
 	}

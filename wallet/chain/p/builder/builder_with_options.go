@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -173,14 +174,14 @@ func (b *builderWithOptions) NewConvertSubnetTx(
 
 func (b *builderWithOptions) NewRegisterSubnetValidatorTx(
 	balance uint64,
-	signer *signer.ProofOfPossession,
+	proofOfPossession [bls.SignatureLen]byte,
 	remainingBalanceOwner *secp256k1fx.OutputOwners,
 	message []byte,
 	options ...common.Option,
 ) (*txs.RegisterSubnetValidatorTx, error) {
 	return b.builder.NewRegisterSubnetValidatorTx(
 		balance,
-		signer,
+		proofOfPossession,
 		remainingBalanceOwner,
 		message,
 		common.UnionOptions(b.options, options)...,
