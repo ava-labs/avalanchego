@@ -31,7 +31,7 @@ func (*Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 
 func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Context) error {
 	var pChainHeight uint64
-	if ctx != nil {
+	if blockContext != nil {
 		pChainHeight = blockContext.PChainHeight
 	}
 
