@@ -43,7 +43,7 @@ func TestEngineStragglerDetector(t *testing.T) {
 		listenerShouldInvokeWith = listenerShouldInvokeWith[1:]
 	}
 
-	decoratedEngine := NewDecoratedEngine(engine, fakeTime, f)
+	decoratedEngine := NewDecoratedEngineWithStragglerDetector(engine, fakeTime, f)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
