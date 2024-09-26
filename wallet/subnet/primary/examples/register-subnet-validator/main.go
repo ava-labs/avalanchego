@@ -13,14 +13,16 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 func main() {
 	key := genesis.EWOQKey
-	uri := "http://localhost:9700"
+	uri := "http://localhost:9710"
 	kc := secp256k1fx.NewKeychain(key)
 	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
 	chainID := ids.FromStringOrPanic("2f23iBApzAwJy1LRrgGZ3pGGK4S6UrakHMejZsQiwKy4rKfnzx")
@@ -49,7 +51,6 @@ func main() {
 		URI:          uri,
 		AVAXKeychain: kc,
 		EthKeychain:  kc,
-		SubnetIDs:    []ids.ID{subnetID},
 	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
@@ -58,21 +59,50 @@ func main() {
 
 	// Get the P-chain wallet
 	pWallet := wallet.P()
+	context := pWallet.Builder().Context()
+
+	addressedCallPayload, err := message.NewRegisterSubnetValidator(
+		subnetID,
+		nodeID,
+		weight,
+		nodePoP.PublicKey,
+		uint64(time.Now().Add(5*time.Minute).Unix()),
+	)
+	if err != nil {
+		log.Fatalf("failed to create RegisterSubnetValidator message: %s\n", err)
+	}
+
+	addressedCall, err := payload.NewAddressedCall(
+		address,
+		addressedCallPayload.Bytes(),
+	)
+	if err != nil {
+		log.Fatalf("failed to create AddressedCall message: %s\n", err)
+	}
+
+	unsignedWarp, err := warp.NewUnsignedMessage(
+		context.NetworkID,
+		chainID,
+		addressedCall.Bytes(),
+	)
+	if err != nil {
+		log.Fatalf("failed to create unsigned Warp message: %s\n", err)
+	}
+
+	warp, err := warp.NewMessage(
+		unsignedWarp,
+		&warp.BitSetSignature{},
+	)
+	if err != nil {
+		log.Fatalf("failed to create Warp message: %s\n", err)
+	}
 
 	convertSubnetStartTime := time.Now()
-	addValidatorTx, err := pWallet.IssueConvertSubnetTx(
-		subnetID,
-		chainID,
-		address,
-		[]txs.ConvertSubnetValidator{
-			{
-				NodeID:                nodeID,
-				Weight:                weight,
-				Balance:               units.Avax,
-				Signer:                nodePoP,
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
-			},
-		},
+	addValidatorTx, err := pWallet.IssueRegisterSubnetValidatorTx(
+		units.Avax,
+		nodePoP.ProofOfPossession,
+		&secp256k1fx.OutputOwners{},
+		warp.Bytes(),
 	)
 	if err != nil {
 		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)

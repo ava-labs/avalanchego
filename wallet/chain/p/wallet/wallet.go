@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -147,6 +148,24 @@ type Wallet interface {
 		chainID ids.ID,
 		address []byte,
 		validators []txs.ConvertSubnetValidator,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	// IssueRegisterSubnetValidatorTx creates, signs, and issues a transaction
+	// that adds a validator to a Permissionless L1.
+	//
+	// - [balance] that the validator should allocate to continuous fees
+	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
+	//   message
+	// - [remainingBalanceOwner] specifies the owner to send any of the
+	//   remaining balance after removing the continuous fee
+	// - [message] is the Warp message that authorizes this validator to be
+	//   added
+	IssueRegisterSubnetValidatorTx(
+		balance uint64,
+		proofOfPossession [bls.SignatureLen]byte,
+		remainingBalanceOwner *secp256k1fx.OutputOwners,
+		message []byte,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -398,6 +417,20 @@ func (w *wallet) IssueConvertSubnetTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewConvertSubnetTx(subnetID, chainID, address, validators, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueRegisterSubnetValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	remainingBalanceOwner *secp256k1fx.OutputOwners,
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewRegisterSubnetValidatorTx(balance, proofOfPossession, remainingBalanceOwner, message, options...)
 	if err != nil {
 		return nil, err
 	}

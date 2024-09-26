@@ -31,6 +31,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
+const (
+	second                                = 1
+	minute                                = 60 * second
+	hour                                  = 60 * minute
+	day                                   = 24 * hour
+	RegisterSubnetValidatorTxExpiryWindow = day
+)
+
 var (
 	_ txs.Visitor = (*StandardTxExecutor)(nil)
 
@@ -671,6 +679,16 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
+	}
+	maxAllowedExpiry, err := math.Add(currentTimestampUnix, RegisterSubnetValidatorTxExpiryWindow)
+	if err != nil {
+		// This should never happen, as it would imply that either
+		// currentTimestampUnix or RegisterSubnetValidatorTxExpiryWindow is
+		// significantly larger than expected.
+		return err
+	}
+	if msg.Expiry > maxAllowedExpiry {
+		return fmt.Errorf("expected expiry to be before %d but got %d", maxAllowedExpiry, msg.Expiry)
 	}
 
 	pop := signer.ProofOfPossession{
