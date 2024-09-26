@@ -152,3 +152,10 @@ func (m *txMetrics) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) er
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeightTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "set_subnet_validator_weight",
+	}).Inc()
+	return nil
+}

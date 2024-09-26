@@ -169,6 +169,16 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueSetSubnetValidatorWeightTx creates, signs, and issues a transaction
+	// that sets the weight of a validator on a Permissionless L1.
+	//
+	// - [message] is the Warp message that authorizes this validator's weight
+	//   to be changed
+	IssueSetSubnetValidatorWeightTx(
+		message []byte,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueImportTx creates, signs, and issues an import transaction that
 	// attempts to consume all the available UTXOs and import the funds to [to].
 	//
@@ -431,6 +441,17 @@ func (w *wallet) IssueRegisterSubnetValidatorTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewRegisterSubnetValidatorTx(balance, proofOfPossession, remainingBalanceOwner, message, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueSetSubnetValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewSetSubnetValidatorWeightTx(message, options...)
 	if err != nil {
 		return nil, err
 	}

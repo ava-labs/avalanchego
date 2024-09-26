@@ -22,8 +22,8 @@ func main() {
 	key := genesis.EWOQKey
 	uri := "http://localhost:9700"
 	kc := secp256k1fx.NewKeychain(key)
-	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
-	chainID := ids.FromStringOrPanic("2f23iBApzAwJy1LRrgGZ3pGGK4S6UrakHMejZsQiwKy4rKfnzx")
+	subnetID := ids.FromStringOrPanic("2eZYSgCU738xN7aRw47NsBUPqnKkoqJMYUJexTsX19VdTNSZc9")
+	chainID := ids.FromStringOrPanic("2ko3NCPzHeneKWcYfy55pgAgU1LV9Q9XNrNv2sWG4W2XzE3ViV")
 	addressHex := ""
 	weight := units.Schmeckle
 

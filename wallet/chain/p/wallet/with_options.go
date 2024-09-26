@@ -176,6 +176,16 @@ func (w *withOptions) IssueRegisterSubnetValidatorTx(
 	)
 }
 
+func (w *withOptions) IssueSetSubnetValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueSetSubnetValidatorWeightTx(
+		message,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *withOptions) IssueImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,

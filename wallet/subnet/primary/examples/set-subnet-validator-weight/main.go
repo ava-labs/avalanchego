@@ -9,11 +9,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -23,31 +20,23 @@ import (
 
 func main() {
 	key := genesis.EWOQKey
-	uri := "http://localhost:9710"
+	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	subnetID := ids.FromStringOrPanic("2eZYSgCU738xN7aRw47NsBUPqnKkoqJMYUJexTsX19VdTNSZc9")
 	chainID := ids.FromStringOrPanic("2ko3NCPzHeneKWcYfy55pgAgU1LV9Q9XNrNv2sWG4W2XzE3ViV")
 	addressHex := ""
-	weight := units.Schmeckle
+	validationID := ids.FromStringOrPanic("225kHLzuaBd6rhxZ8aq91kmgLJyPTFtTFVAWJDaPyKRdDiTpQo")
+	nonce := uint64(1)
+	weight := uint64(0)
 
 	address, err := hex.DecodeString(addressHex)
 	if err != nil {
 		log.Fatalf("failed to decode address %q: %s\n", addressHex, err)
 	}
 
-	ctx := context.Background()
-	infoClient := info.NewClient(uri)
-
-	nodeInfoStartTime := time.Now()
-	nodeID, nodePoP, err := infoClient.GetNodeID(ctx)
-	if err != nil {
-		log.Fatalf("failed to fetch node IDs: %s\n", err)
-	}
-	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
-
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
 	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
+	ctx := context.Background()
 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
 		URI:          uri,
 		AVAXKeychain: kc,
@@ -62,15 +51,13 @@ func main() {
 	pWallet := wallet.P()
 	context := pWallet.Builder().Context()
 
-	addressedCallPayload, err := message.NewRegisterSubnetValidator(
-		subnetID,
-		nodeID,
+	addressedCallPayload, err := message.NewSetSubnetValidatorWeight(
+		validationID,
+		nonce,
 		weight,
-		nodePoP.PublicKey,
-		uint64(time.Now().Add(5*time.Minute).Unix()),
 	)
 	if err != nil {
-		log.Fatalf("failed to create RegisterSubnetValidator message: %s\n", err)
+		log.Fatalf("failed to create SetSubnetValidatorWeight message: %s\n", err)
 	}
 
 	addressedCall, err := payload.NewAddressedCall(
@@ -98,17 +85,12 @@ func main() {
 		log.Fatalf("failed to create Warp message: %s\n", err)
 	}
 
-	convertSubnetStartTime := time.Now()
-	addValidatorTx, err := pWallet.IssueRegisterSubnetValidatorTx(
-		units.Avax,
-		nodePoP.ProofOfPossession,
-		&secp256k1fx.OutputOwners{},
+	setWeightStartTime := time.Now()
+	setWeightTx, err := pWallet.IssueSetSubnetValidatorWeightTx(
 		warp.Bytes(),
 	)
 	if err != nil {
-		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)
+		log.Fatalf("failed to issue set subnet validator weight transaction: %s\n", err)
 	}
-
-	var validationID ids.ID = hashing.ComputeHash256Array(addressedCallPayload.Bytes())
-	log.Printf("added new subnet validator %s to subnet %s with txID %s as validationID %s in %s\n", nodeID, subnetID, addValidatorTx.ID(), validationID, time.Since(convertSubnetStartTime))
+	log.Printf("issued set weight of validationID %s to %d with nonce %d and txID %s in %s\n", validationID, weight, nonce, setWeightTx.ID(), time.Since(setWeightStartTime))
 }

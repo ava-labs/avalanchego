@@ -78,6 +78,10 @@ func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidat
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
 	return b.baseTx(tx)
 }
