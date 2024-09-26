@@ -53,6 +53,7 @@ require (
 )
 
 require (
+	github.com/ava-labs/avalanchego v1.11.11
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/ethereum/go-ethereum v1.14.8

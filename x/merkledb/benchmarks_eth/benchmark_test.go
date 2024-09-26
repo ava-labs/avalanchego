@@ -8,6 +8,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -17,6 +18,12 @@ import (
 	"github.com/ethereum/go-ethereum/triedb/pathdb"
 	"github.com/stretchr/testify/require"
 )
+
+var testPathDbConfig = pathdb.Config{
+	CleanCacheSize: units.MiB, // use a small cache for testing
+	DirtyCacheSize: 0,         // force changes to disk
+	ReadOnly:       false,     // allow writes
+}
 
 func TestGoldenDatabaseCreation(t *testing.T) {
 	for _, size := range []uint64{9500, 20000, 50000, 103011} {
@@ -45,7 +52,7 @@ func testGoldenDatabaseContent(t *testing.T, size uint64) {
 		Directory:         getRunningDatabaseDirectory(size),
 		AncientsDirectory: "",
 		Namespace:         "metrics_prefix",
-		Cache:             levelDBCacheSize,
+		Cache:             levelDBCacheSizeMB,
 		Handles:           200,
 		ReadOnly:          false,
 		Ephemeral:         false,
@@ -56,7 +63,7 @@ func testGoldenDatabaseContent(t *testing.T, size uint64) {
 		Preimages: false,
 		IsVerkle:  false,
 		HashDB:    nil,
-		PathDB:    getPathDBConfig(),
+		PathDB:    &testPathDbConfig,
 	})
 
 	parentHash := common.BytesToHash(rootBytes)
@@ -92,7 +99,7 @@ func TestRevisions(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new leveldb database
-	ldb, err := rawdb.NewLevelDBDatabase(dbPath, levelDBCacheSize, 200, "metrics_prefix", false)
+	ldb, err := rawdb.NewLevelDBDatabase(dbPath, levelDBCacheSizeMB, 200, "metrics_prefix", false)
 	require.NoError(err)
 
 	// Create a new trie database
@@ -103,10 +110,7 @@ func TestRevisions(t *testing.T) {
 			Preimages: false,
 			IsVerkle:  false,
 			HashDB:    nil,
-			PathDB: &pathdb.Config{
-				CleanCacheSize: 1024 * 1024,
-				DirtyCacheSize: 0, // Disable dirty cache to force trieDB to write to disk.
-			},
+			PathDB:    &testPathDbConfig,
 		},
 	)
 
