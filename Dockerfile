@@ -53,11 +53,17 @@ RUN mkdir -p /avalanchego/build
 # BUILDPLATFORM have different arches.
 FROM debian:11-slim AS execution
 
+# Install curl and jq to support healthchecks
+RUN apt update && apt install -y curl jq
+
 # Maintain compatibility with previous images
 COPY --from=builder /avalanchego/build /avalanchego/build
 WORKDIR /avalanchego/build
 
 # Copy the executables into the container
 COPY --from=builder /build/build/ .
+
+COPY scripts/docker/healthcheck.sh .
+HEALTHCHECK --timeout=3s --start-period=1m CMD ./healthcheck.sh
 
 CMD [ "./avalanchego" ]
