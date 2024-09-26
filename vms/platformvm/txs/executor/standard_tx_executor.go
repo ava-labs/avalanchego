@@ -709,7 +709,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 	if isDuplicate {
-		return fmt.Errorf("expiry %s already exists", expiry)
+		return fmt.Errorf("expiry for %s already exists", validationID)
 	}
 
 	balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &tx.RemainingBalanceOwner)

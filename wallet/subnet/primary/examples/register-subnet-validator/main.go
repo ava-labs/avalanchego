@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -107,5 +108,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)
 	}
-	log.Printf("added new subnet validator %s to %s with %s in %s\n", nodeID, subnetID, addValidatorTx.ID(), time.Since(convertSubnetStartTime))
+
+	validationID := hashing.ComputeHash256Array(addressedCallPayload.Bytes())
+	log.Printf("added new subnet validator %s to %s with %s as %s in %s\n", nodeID, subnetID, addValidatorTx.ID(), validationID, time.Since(convertSubnetStartTime))
 }
