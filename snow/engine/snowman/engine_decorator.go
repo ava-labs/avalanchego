@@ -13,25 +13,25 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-type DecoratedEngine struct {
+type decoratedEngineWithStragglerDetector struct {
 	*Engine
 	sd *stragglerDetector
 	f  func(time.Duration)
 }
 
-func NewDecoratedEngine(e *Engine, time func() time.Time, f func(time.Duration)) common.Engine {
+func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration)) common.Engine {
 	minConfRatio := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
 	sd := newStragglerDetector(time, e.Config.Ctx.Log, minConfRatio, e.Consensus.LastAccepted,
 		e.Config.ConnectedValidators.ConnectedValidators, e.Config.ConnectedValidators.ConnectedPercent,
 		e.Consensus.Processing, e.acceptedFrontiers.LastAccepted)
-	return &DecoratedEngine{
+	return &decoratedEngineWithStragglerDetector{
 		Engine: e,
 		f:      f,
 		sd:     sd,
 	}
 }
 
-func (de *DecoratedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
+func (de *decoratedEngineWithStragglerDetector) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
 	behindDuration := de.sd.CheckIfWeAreStragglingBehind()
 	if behindDuration > 0 {
 		de.Engine.Config.Ctx.Log.Info("We are behind the rest of the network", zap.Float64("seconds", behindDuration.Seconds()))

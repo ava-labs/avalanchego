@@ -40,7 +40,7 @@ func TestNodeWeightsOverflow(t *testing.T) {
 }
 
 func TestNodeWeights2Blocks(t *testing.T) {
-	nw2b := nodeWeights2Blocks{
+	nw2b := nodeWeightsToBlocks{
 		ids.NodeWeight{Weight: 5}:  ids.Empty,
 		ids.NodeWeight{Weight: 10}: ids.Empty,
 	}
@@ -115,7 +115,7 @@ func TestGetNetworkSnapshot(t *testing.T) {
 			},
 			processing:   map[ids.ID]struct{}{{0x1}: {}},
 			lastAccepted: ids.ID{0x0},
-			expectedSnapshot: snapshot{totalValidatorWeight: 999999, nodeWeights2Blocks: nodeWeights2Blocks{
+			expectedSnapshot: snapshot{totalValidatorWeight: 999999, nodeWeightsToBlocks: nodeWeightsToBlocks{
 				ids.NodeWeight{Node: n1, Weight: 999999}: {0x1},
 			}},
 			expectedOK: true,
@@ -166,7 +166,7 @@ func TestFailedCatchingUp(t *testing.T) {
 		{
 			description: "stake overflow",
 			input: snapshot{
-				nodeWeights2Blocks: nodeWeights2Blocks{
+				nodeWeightsToBlocks: nodeWeightsToBlocks{
 					ids.NodeWeight{Node: n1, Weight: math.MaxUint64 - 10}: ids.ID{0x1},
 					ids.NodeWeight{Node: n2, Weight: 11}:                  ids.ID{0x2},
 				},
@@ -180,7 +180,7 @@ func TestFailedCatchingUp(t *testing.T) {
 		{
 			description: "Straggling behind stake minority",
 			input: snapshot{
-				totalValidatorWeight: 100, nodeWeights2Blocks: nodeWeights2Blocks{
+				totalValidatorWeight: 100, nodeWeightsToBlocks: nodeWeightsToBlocks{
 					ids.NodeWeight{Node: n1, Weight: 25}: ids.ID{0x1},
 					ids.NodeWeight{Node: n2, Weight: 50}: ids.ID{0x2},
 				},
@@ -194,7 +194,7 @@ func TestFailedCatchingUp(t *testing.T) {
 		{
 			description: "Straggling behind stake majority",
 			input: snapshot{
-				totalValidatorWeight: 100, nodeWeights2Blocks: nodeWeights2Blocks{
+				totalValidatorWeight: 100, nodeWeightsToBlocks: nodeWeightsToBlocks{
 					ids.NodeWeight{Node: n1, Weight: 26}: ids.ID{0x1},
 					ids.NodeWeight{Node: n2, Weight: 50}: ids.ID{0x2},
 				},
@@ -209,7 +209,7 @@ func TestFailedCatchingUp(t *testing.T) {
 		{
 			description: "In sync with the majority",
 			input: snapshot{
-				totalValidatorWeight: 100, nodeWeights2Blocks: nodeWeights2Blocks{
+				totalValidatorWeight: 100, nodeWeightsToBlocks: nodeWeightsToBlocks{
 					ids.NodeWeight{Node: n1, Weight: 75}: ids.ID{0x1},
 					ids.NodeWeight{Node: n2, Weight: 25}: ids.ID{0x2},
 				},
@@ -263,7 +263,7 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 	}
 	nonEmptySnap := snapshot{
 		totalValidatorWeight: 100,
-		nodeWeights2Blocks: nodeWeights2Blocks{
+		nodeWeightsToBlocks: nodeWeightsToBlocks{
 			ids.NodeWeight{Weight: 100}: ids.Empty,
 		},
 	}
