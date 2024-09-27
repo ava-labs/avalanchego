@@ -13,12 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func nameVertices(pg *prefixGroup) {
+func nameVertices(pg *prefixGroup) map[*prefixGroup]string {
+	vertexNames := make(map[*prefixGroup]string)
 	nextVertexName := 'a'
 	pg.traverse(func(pg *prefixGroup) {
-		pg.vertexName = nextVertexName
+		vertexNames[pg] = string(nextVertexName)
 		nextVertexName++
 	})
+	return vertexNames
 }
 
 func TestSharedPrefixes(t *testing.T) {
@@ -105,18 +107,19 @@ func TestSharedPrefixes(t *testing.T) {
 	} {
 		t.Run(tst.name, func(t *testing.T) {
 			pg := longestSharedPrefixes(tst.input)
-			nameVertices(pg)
+			vertexNames := nameVertices(pg)
 
 			edges := bytes.Buffer{}
 			members := make(map[string][]ids.ID)
 
 			pg.traverse(func(pg *prefixGroup) {
-				members[string(pg.vertexName)] = pg.members
+				pgVertexName := vertexNames[pg]
+				members[pgVertexName] = pg.members
 				if pg.zg != nil {
-					fmt.Fprintf(&edges, "(%s,%s)", string(pg.vertexName), string(pg.zg.vertexName))
+					fmt.Fprintf(&edges, "(%s,%s)", pgVertexName, vertexNames[pg.zg])
 				}
 				if pg.og != nil {
-					fmt.Fprintf(&edges, "(%s,%s)", string(pg.vertexName), string(pg.og.vertexName))
+					fmt.Fprintf(&edges, "(%s,%s)", pgVertexName, vertexNames[pg.og])
 				}
 			})
 

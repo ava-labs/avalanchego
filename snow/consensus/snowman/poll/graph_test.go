@@ -27,7 +27,7 @@ func TestBuildVotesGraph(t *testing.T) {
 	}
 	wireParents(g)
 
-	getParent := getParent(g)
+	getParent := getParentFunc(g)
 
 	var votes bag.Bag[ids.ID]
 	g.traverse(func(v *voteVertex) {
@@ -37,7 +37,7 @@ func TestBuildVotesGraph(t *testing.T) {
 	parents := make(map[ids.ID]ids.ID)
 	children := make(map[ids.ID]*bag.Bag[ids.ID])
 
-	votesGraph := buildVotesGraph(getParent, votes)
+	votesGraph := buildVoteGraph(getParent, votes)
 	votesGraph.traverse(func(v *voteVertex) {
 		if v.parent == nil {
 			parents[v.id] = ids.Empty
@@ -74,7 +74,7 @@ func TestBuildVotesGraph(t *testing.T) {
 	require.True(t, children[ids.ID{11}].Equals(expected11))
 }
 
-func getParent(g *voteVertex) func(id ids.ID) ids.ID {
+func getParentFunc(g *voteVertex) func(id ids.ID) ids.ID {
 	return func(id ids.ID) ids.ID {
 		var result ids.ID
 		g.traverse(func(v *voteVertex) {
@@ -109,8 +109,8 @@ func TestComputeTransitiveVoteCountGraph(t *testing.T) {
 		votes.Add(v.id)
 	})
 
-	getParent := getParent(g)
-	votesGraph := buildVotesGraph(getParent, votes)
+	getParent := getParentFunc(g)
+	votesGraph := buildVoteGraph(getParent, votes)
 	transitiveVotes := computeTransitiveVoteCountGraph(&votesGraph, votes)
 
 	expected := len(transitiveVotes.List())

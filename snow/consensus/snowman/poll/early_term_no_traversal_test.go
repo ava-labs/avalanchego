@@ -237,10 +237,10 @@ func TestTransitiveVotesForPrefixes(t *testing.T) {
 		},
 	}
 	wireParents(g)
-	getParent := getParent(g)
+	getParent := getParentFunc(g)
 	votes := bag.Of(ids.ID{1}, ids.ID{1}, ids.ID{2}, ids.ID{4})
-	vg := buildVotesGraph(getParent, votes)
-	transitiveVotes := transitiveVotesForPrefixes(&vg, votes)
+	vg := buildVoteGraph(getParent, votes)
+	transitiveVotes := computeTransitiveVotesForPrefixes(&vg, votes)
 
 	var voteCount int
 	for _, count := range transitiveVotes {
