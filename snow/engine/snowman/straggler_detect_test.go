@@ -150,8 +150,7 @@ func TestGetNetworkSnapshot(t *testing.T) {
 				})
 
 			snapshot, ok, err := sd.getNetworkSnapshot()
-			require.Equal(t, testCase.expectedSnapshot.totalValidatorWeight, snapshot.totalValidatorWeight)
-			require.Equal(t, testCase.expectedSnapshot.lastAccepted, snapshot.lastAccepted)
+			require.Equal(t, testCase.expectedSnapshot, snapshot)
 			require.Equal(t, testCase.expectedOK, ok)
 			require.NoError(t, err)
 			require.Contains(t, buff.String(), testCase.expectedLogged)
