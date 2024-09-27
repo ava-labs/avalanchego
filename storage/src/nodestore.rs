@@ -1,9 +1,9 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::logger::trace;
 use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
-use crate::logger::trace;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -395,7 +395,10 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 }
 
                 // Return the address of the newly allocated block.
-                trace!("Allocating from free list: addr: {free_stored_area_addr:?}, size: {}", AREA_SIZES[index]);
+                trace!(
+                    "Allocating from free list: addr: {free_stored_area_addr:?}, size: {}",
+                    AREA_SIZES[index]
+                );
                 return Ok(Some((free_stored_area_addr, index as AreaIndex)));
             }
             // No free blocks in this list, try the next size up.
@@ -456,7 +459,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         debug_assert!(addr.get() % 8 == 0);
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
-        trace!("Deleting node at {addr:?} of size {}", AREA_SIZES[area_size_index as usize]);
+        trace!(
+            "Deleting node at {addr:?} of size {}",
+            AREA_SIZES[area_size_index as usize]
+        );
 
         // The area that contained the node is now free.
         let area: Area<Node, FreeArea> = Area::Free(FreeArea {

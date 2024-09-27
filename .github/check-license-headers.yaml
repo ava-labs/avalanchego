@@ -34,6 +34,7 @@
       "*/Cargo.toml",
       "libaio/**",
       "docs/**",
+      "benchmark/**",
       "CODEOWNERS",
       "CONTRIBUTING.md"
     ],
