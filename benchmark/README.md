@@ -18,7 +18,7 @@ To install the Firewood Benchmark, follow these steps:
 1. Clone the repository: `git clone https://github.com/ava-labs/firewood.git`
 2. Navigate to the firewood directory: `cd firewood`
 3. Build the executable: `cargo build --release`
-4. Execute the benchmark: `nohup time cargo run --release bin benchmark`
+4. Execute the benchmark: `nohup time cargo run --release bin benchmark -- --test-name create`
 
 As the benchmark is running, statistics for prometheus are availble on port 3000 (by default).
 
@@ -57,7 +57,7 @@ command line options.
 To pre-create the database, use the following command:
 
 ```
-nohup time cargo run --release --bin benchmark -- --initialize-only
+nohup time cargo run --release --bin benchmark -- --test-name create
 ```
 
 Then, you can look at nohup.out and see how long the database took to initialize. Then, to run

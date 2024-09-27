@@ -1,6 +1,8 @@
-use std::{error::Error, time::Instant};
+use std::error::Error;
+use std::time::Instant;
 
-use firewood::{db::Db, v2::api::{Db as _, Proposal as _}};
+use firewood::db::Db;
+use firewood::v2::api::{Db as _, Proposal as _};
 
 use pretty_duration::pretty_duration;
 

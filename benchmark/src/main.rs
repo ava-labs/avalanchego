@@ -12,7 +12,7 @@
 //
 
 use clap::Parser;
-use firewood::logger::{debug, trace};
+use firewood::logger::trace;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
@@ -52,43 +52,12 @@ struct Args {
 enum TestName {
     Create,
     TenKRandom,
+    Zipf,
 }
 
 trait TestRunner {
     async fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>>;
-    fn generate_updates(
-        start: u64,
-        count: u64,
-        low: u64,
-    ) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
-        let hash_of_low = Sha256::digest(low.to_ne_bytes()).to_vec();
-        (start..start + count)
-            .map(|inner_key| {
-                let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
-                debug!(
-                    "updating {:?} with digest {} to {}",
-                    inner_key,
-                    hex::encode(&digest),
-                    hex::encode(&hash_of_low)
-                );
-                (digest, hash_of_low.clone())
-            })
-            .map(|(key, value)| BatchOp::Put { key, value })
-            .collect::<Vec<_>>()
-            .into_iter()
-    }
-    fn generate_deletes(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
-        (start..start + count)
-            .map(|key| {
-                let digest = Sha256::digest(key.to_ne_bytes()).to_vec();
-                debug!("deleting {:?} with digest {}", key, hex::encode(&digest));
-                #[allow(clippy::let_and_return)]
-                digest
-            })
-            .map(|key| BatchOp::Delete { key })
-            .collect::<Vec<_>>()
-            .into_iter()
-    }
+
     fn generate_inserts(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
         (start..start + count)
             .map(|inner_key| {
@@ -108,6 +77,7 @@ trait TestRunner {
 
 mod create;
 mod tenkrandom;
+mod zipf;
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -156,7 +126,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let runner = tenkrandom::TenKRandom;
             runner.run(&db, &args).await?;
         }
+        TestName::Zipf => {
+            let runner = zipf::Zipf;
+            runner.run(&db, &args).await?;
+        }
     }
     Ok(())
 }
-
