@@ -9,5 +9,4 @@ TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
 TestVMShutdownWhileSyncing
 TestWalletNotifications
-TestWalletNotifications
 TestWebsocketLargeRead
