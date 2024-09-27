@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	minStragglerCheckInterval                   = time.Second
-	stakeThresholdForStragglerSuspicion         = 0.75
-	minimumStakeThresholdRequiredForNetworkInfo = 0.8
-	knownStakeThresholdRequiredForAnalysis      = 0.8
+	minStragglerCheckInterval   = time.Second
+	stragglerSuspicionThreshold = 0.75
+	lastAcceptedKnownThreshold  = 0.8
+	lastAcceptedAheadThreshold  = 0.8
 )
 
 type stragglerDetectorConfig struct {
@@ -57,8 +57,9 @@ type stragglerDetectorConfig struct {
 	lastAccepted func() ids.ID
 
 	// getSnapshot returns a snapshot of the network's nodes and their last accepted blocks,
-	// or false if it fails from some reason.
-	getSnapshot func() (snapshot, bool)
+	// excluding nodes that have the same last accepted block as we do, along with true if they
+	// reach a certain threshold of the total stake.
+	getSnapshot func() (snapshot, bool, error)
 
 	// haveWeFailedCatchingUp returns whether we have not replicated enough blocks of the given snapshot
 	haveWeFailedCatchingUp func(snapshot) bool
@@ -127,8 +128,11 @@ func (sd *stragglerDetector) CheckIfWeAreStragglingBehind() time.Duration {
 	}()
 
 	if sd.prevSnapshot.isEmpty() {
-		snapshot, ok := sd.getSnapshot()
-		if !ok {
+		snapshot, isBehind, err := sd.getSnapshot()
+		if err != nil {
+			sd.log.Error("Failed to obtain node snapshot", zap.Error(err))
+		}
+		if !isBehind {
 			sd.log.Trace("No node snapshot obtained")
 			sd.continuousStragglingPeriod = 0
 		}
@@ -147,107 +151,65 @@ func (sd *stragglerDetector) CheckIfWeAreStragglingBehind() time.Duration {
 }
 
 func (sd *stragglerDetector) failedCatchingUp(s snapshot) bool {
-	totalValidatorWeight, nodeWeightsToBlocks := s.totalValidatorWeight, s.nodeWeightsToBlocks
-
-	var processingWeight uint64
-	for nw, lastAccepted := range nodeWeightsToBlocks {
-		if sd.processing(lastAccepted) {
-			newProcessingWeight, err := safemath.Add(processingWeight, nw.Weight)
-			if err != nil {
-				sd.log.Error("Cumulative weight overflow", zap.Uint64("cumulative", processingWeight), zap.Uint64("added", nw.Weight))
-				return false
-			}
-			processingWeight = newProcessingWeight
-		}
+	weightProcessing, err := s.lastAccepted.filter(sd.processing).totalWeight()
+	if err != nil {
+		sd.log.Error("Cumulative weight overflow", zap.Error(err))
+		return false
 	}
 
-	sd.log.Trace("Counted total weight that accepted blocks we're still processing", zap.Uint64("weight", processingWeight))
+	sd.log.Trace("Counted total weight that accepted blocks we're still processing", zap.Uint64("weight", weightProcessing))
 
-	ratio := float64(processingWeight) / float64(totalValidatorWeight)
-
-	if ratio > stakeThresholdForStragglerSuspicion {
+	ratio := float64(weightProcessing) / float64(s.totalValidatorWeight)
+	if ratio > stragglerSuspicionThreshold {
 		sd.log.Trace("We are straggling behind", zap.Float64("ratio", ratio))
 		return true
 	}
 
 	sd.log.Trace("Nodes ahead of us:", zap.Float64("ratio", ratio))
-
 	return false
 }
 
-func (sd *stragglerDetector) validateNetInfo(netInfo netInfo) bool {
-	if netInfo.connStakePercent < sd.minConfirmationThreshold {
+func (sd *stragglerDetector) isStraggling(weightTotal, weightLastAcceptedKnown, weightLastAcceptedAhead uint64) bool {
+	connectedPercent := sd.connectedPercent()
+	if connectedPercent < sd.minConfirmationThreshold {
 		// We don't know for sure whether we're behind or not.
 		// Even if we're behind, it's pointless to act before we have established
 		// connectivity with enough validators.
-		sd.log.Verbo("not enough connected stake to determine network info", zap.Float64("ratio", netInfo.connStakePercent))
+		sd.log.Verbo("not enough connected stake to determine network info", zap.Float64("ratio", connectedPercent))
 		return false
 	}
 
-	if netInfo.totalValidatorWeight == 0 {
+	if weightTotal == 0 {
 		sd.log.Trace("Connected to zero weight")
 		return false
 	}
 
-	totalKnownLastBlockStakePercent := float64(netInfo.totalWeightWeKnowItsLastAcceptedBlock) / float64(netInfo.totalValidatorWeight)
-	stakeAheadOfUs := float64(netInfo.totalPendingStake) / float64(netInfo.totalValidatorWeight)
-
-	// Ensure we have collected last accepted blocks for at least 80% (or so) stake of the total weight we are connected to.
-	if totalKnownLastBlockStakePercent < minimumStakeThresholdRequiredForNetworkInfo {
+	// Ensure we have collected last accepted blocks for lastAcceptedKnownThreshold of the total stake.
+	if ratio := float64(weightLastAcceptedKnown) / float64(weightTotal); ratio < lastAcceptedKnownThreshold {
 		sd.log.Trace("Not collected enough information about last accepted blocks for the validators we are connected to",
-			zap.Float64("ratio", totalKnownLastBlockStakePercent))
+			zap.Float64("ratio", ratio))
 		return false
 	}
 
-	if stakeAheadOfUs < knownStakeThresholdRequiredForAnalysis {
+	if ratio := float64(weightLastAcceptedAhead) / float64(weightTotal); ratio < lastAcceptedAheadThreshold {
 		sd.log.Trace("Most stake we're connected to has the same height as we do",
-			zap.Float64("ratio", stakeAheadOfUs))
+			zap.Float64("ratio", ratio))
 		return false
 	}
 
 	return true
 }
 
-func (sd *stragglerDetector) getNetworkSnapshot() (snapshot, bool) {
-	ourLastAcceptedBlock := sd.lastAccepted()
-
-	netInfo, err := sd.getNetworkInfo(ourLastAcceptedBlock)
-	if err != nil {
-		return snapshot{}, false
-	}
-
-	if !sd.validateNetInfo(netInfo) {
-		return snapshot{}, false
-	}
-
-	snap := snapshot{
-		nodeWeightsToBlocks:  netInfo.nodeWeightToLastAccepted,
-		totalValidatorWeight: netInfo.totalValidatorWeight,
-	}
-
-	if sd.haveWeFailedCatchingUp(snap) {
-		return snap, true
-	}
-
-	return snapshot{}, false
-}
-
-type netInfo struct {
-	connStakePercent                      float64
-	totalPendingStake                     uint64
-	totalValidatorWeight                  uint64
-	totalWeightWeKnowItsLastAcceptedBlock uint64
-	nodeWeightToLastAccepted              nodeWeightsToBlocks
-}
-
-func (sd *stragglerDetector) getNetworkInfo(ourLastAcceptedBlock ids.ID) (netInfo, error) {
-	var res netInfo
-
-	res.connStakePercent = sd.connectedPercent()
-
+// getNetworkSnapshot returns a snapshot of the network's nodes and their last accepted blocks,
+// and whether we have failed catching up with the network.
+func (sd *stragglerDetector) getNetworkSnapshot() (snapshot, bool, error) {
 	validators := nodeWeights(sd.connectedValidators().List())
-	nodeWeightToLastAccepted := make(nodeWeightsToBlocks, len(validators))
+	weightTotal, err := validators.totalWeight()
+	if err != nil {
+		return snapshot{}, false, err
+	}
 
+	nodeWeightToLastAccepted := make(nodeWeightsToBlocks, len(validators))
 	for _, vdr := range validators {
 		lastAccepted, ok := sd.lastAcceptedByNodeID(vdr.Node)
 		if !ok {
@@ -256,57 +218,57 @@ func (sd *stragglerDetector) getNetworkInfo(ourLastAcceptedBlock ids.ID) (netInf
 		nodeWeightToLastAccepted[vdr] = lastAccepted
 	}
 
-	totalValidatorWeight, err := validators.totalWeight()
+	weightLastAcceptedKnown, err := nodeWeightToLastAccepted.totalWeight()
 	if err != nil {
-		sd.log.Error("Failed computing total weight", zap.Error(err))
-		return netInfo{}, err
+		return snapshot{}, false, err
 	}
-	res.totalValidatorWeight = totalValidatorWeight
 
-	totalWeightWeKnowItsLastAcceptedBlock, err := nodeWeightToLastAccepted.totalWeight()
+	// Remove nodes that have the same last accepted block as we do to reach
+	// the total weight of validators that have a different last accepted block.
+	lastAccepted := sd.lastAccepted()
+	nodeWeightToLastAccepted = nodeWeightToLastAccepted.filter(func(id ids.ID) bool {
+		return lastAccepted != id
+	})
+	weightLastAcceptedAhead, err := nodeWeightToLastAccepted.totalWeight()
 	if err != nil {
-		sd.log.Error("Failed computing total weight", zap.Error(err))
-		return netInfo{}, err
+		return snapshot{}, false, err
 	}
-	res.totalWeightWeKnowItsLastAcceptedBlock = totalWeightWeKnowItsLastAcceptedBlock
+	sd.log.Trace("Excluding nodes with our own height", zap.Uint64("prev", weightLastAcceptedKnown), zap.Uint64("new", weightLastAcceptedAhead))
 
-	prevLastAcceptedCount := len(nodeWeightToLastAccepted)
-
-	// Ensure we have collected last accepted blocks that are not our own last accepted block.
-	for nodeWeight, lastAccepted := range nodeWeightToLastAccepted {
-		if ourLastAcceptedBlock.Compare(lastAccepted) == 0 {
-			delete(nodeWeightToLastAccepted, nodeWeight)
-		}
+	snap := snapshot{
+		totalValidatorWeight: weightTotal,
+		lastAccepted:         nodeWeightToLastAccepted,
 	}
-
-	res.nodeWeightToLastAccepted = nodeWeightToLastAccepted
-
-	totalPendingStake, err := nodeWeightToLastAccepted.totalWeight()
-	if err != nil {
-		sd.log.Error("Failed computing total weight", zap.Error(err))
-		return netInfo{}, err
+	isStraggling := sd.isStraggling(weightTotal, weightLastAcceptedKnown, weightLastAcceptedAhead)
+	if !isStraggling || !sd.haveWeFailedCatchingUp(snap) {
+		return snapshot{}, false, nil
 	}
-
-	res.totalPendingStake = totalPendingStake
-
-	sd.log.Trace("Excluding nodes with our own height", zap.Int("prev", prevLastAcceptedCount), zap.Uint64("new", totalPendingStake))
-
-	return res, nil
+	return snap, true, nil
 }
 
 type snapshot struct {
 	totalValidatorWeight uint64
-	nodeWeightsToBlocks  nodeWeightsToBlocks
+	lastAccepted         nodeWeightsToBlocks
 }
 
 func (s snapshot) isEmpty() bool {
-	return s.totalValidatorWeight == 0 || len(s.nodeWeightsToBlocks) == 0
+	return s.totalValidatorWeight == 0 || len(s.lastAccepted) == 0
 }
 
 type nodeWeightsToBlocks map[ids.NodeWeight]ids.ID
 
 func (nwb nodeWeightsToBlocks) totalWeight() (uint64, error) {
 	return nodeWeights(maps.Keys(nwb)).totalWeight()
+}
+
+func (nwb nodeWeightsToBlocks) filter(f func(ids.ID) bool) nodeWeightsToBlocks {
+	filtered := make(nodeWeightsToBlocks, len(nwb))
+	for nw, id := range nwb {
+		if f(id) {
+			filtered[nw] = id
+		}
+	}
+	return filtered
 }
 
 func dropHeight(f func() (ids.ID, uint64)) func() ids.ID {
