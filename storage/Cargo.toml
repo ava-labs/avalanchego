@@ -17,7 +17,11 @@ integer-encoding = "4.0.0"
 arc-swap = "1.7.1"
 lru = "0.12.4"
 metrics = "0.23.0"
+log = { version = "0.4.20", optional = true }
 
 [dev-dependencies]
 rand = "0.8.5"
 test-case = "3.3.1"
+
+[features]
+logger = ["log"]

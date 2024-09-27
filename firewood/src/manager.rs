@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{collections::VecDeque, io::Error};
 
+use storage::logger::warn;
 use typed_builder::TypedBuilder;
 
 use crate::v2::api::HashKey;
@@ -150,8 +151,13 @@ impl RevisionManager {
                 self.by_hash.remove(&oldest_hash);
             }
 
-            if let Some(oldest) = Arc::into_inner(oldest) {
-                committed.reap_deleted(&oldest)?;
+            match Arc::try_unwrap(oldest) {
+                Ok(oldest) => committed.reap_deleted(&oldest)?,
+                Err(original) => {
+                    // TODO: try reaping the next revision
+                    warn!("Oldest revision could not be reaped; still referenced");
+                    self.historical.push_front(original);
+                }
             }
         }
 

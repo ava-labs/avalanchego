@@ -17,6 +17,9 @@ mod node;
 mod nodestore;
 mod trie_hash;
 
+/// Logger module for handling logging functionality
+pub mod logger;
+
 // re-export these so callers don't need to know where they are
 pub use hashednode::{hash_node, hash_preimage, Hashable, Preimage, ValueDigest};
 pub use linear::{ReadableStorage, WritableStorage};

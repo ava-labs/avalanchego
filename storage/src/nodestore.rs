@@ -3,6 +3,7 @@
 
 use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
+use crate::logger::trace;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -318,6 +319,7 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
 
     /// Marks the node at `addr` as deleted in this proposal.
     pub fn delete_node(&mut self, addr: LinearAddress) {
+        trace!("Pending delete at {addr:?}");
         self.kind.deleted.push(addr);
     }
 
@@ -393,11 +395,13 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 }
 
                 // Return the address of the newly allocated block.
+                trace!("Allocating from free list: addr: {free_stored_area_addr:?}, size: {}", AREA_SIZES[index]);
                 return Ok(Some((free_stored_area_addr, index as AreaIndex)));
             }
             // No free blocks in this list, try the next size up.
         }
 
+        trace!("No free blocks of sufficient size {index} found");
         Ok(None)
     }
 
@@ -407,6 +411,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         let addr = LinearAddress::new(self.header.size).expect("node store size can't be 0");
         self.header.size += area_size;
         debug_assert!(addr.get() % 8 == 0);
+        trace!("Allocating from end: addr: {:?}, size: {}", addr, area_size);
         Ok((addr, index))
     }
 
@@ -451,6 +456,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         debug_assert!(addr.get() % 8 == 0);
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
+        trace!("Deleting node at {addr:?} of size {}", AREA_SIZES[area_size_index as usize]);
 
         // The area that contained the node is now free.
         let area: Area<Node, FreeArea> = Area::Free(FreeArea {
@@ -1074,7 +1080,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     pub fn reap_deleted(&mut self, oldest: &NodeStore<Committed, S>) -> Result<(), Error> {
         self.storage
             .invalidate_cached_nodes(oldest.kind.deleted.iter());
+        trace!("There are {} nodes to reap", oldest.kind.deleted.len());
         for addr in oldest.kind.deleted.iter() {
+            trace!("reap {addr}");
             self.delete_node(*addr)?;
         }
         Ok(())

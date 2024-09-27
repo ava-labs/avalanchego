@@ -14,6 +14,7 @@ pub use noop_logger::{debug, error, info, trace, warn};
 #[cfg(not(feature = "logger"))]
 mod noop_logger {
     #[macro_export]
+    /// A noop logger, when the logger feature is disabled
     macro_rules! noop {
         ($($arg:tt)+) => {};
     }

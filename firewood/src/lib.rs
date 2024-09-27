@@ -112,5 +112,6 @@ pub mod proof;
 pub mod range_proof;
 pub mod stream;
 
-pub mod logger;
 pub mod v2;
+
+pub use storage::logger;

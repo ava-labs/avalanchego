@@ -12,7 +12,7 @@
 //
 
 use clap::Parser;
-use firewood::logger::debug;
+use firewood::logger::{debug, trace};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use pretty_duration::pretty_duration;
@@ -48,6 +48,8 @@ struct Args {
     revisions: usize,
     #[arg(short = 'l', long, default_value_t = 3000)]
     prometheus_port: u16,
+    #[arg(short, long)]
+    test_name: Option<String>,
 }
 
 #[global_allocator]
@@ -56,6 +58,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+
+    env_logger::init();
 
     let builder = PrometheusBuilder::new();
     builder
@@ -152,7 +156,7 @@ fn generate_inserts(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<
     (start..start + count)
         .map(|inner_key| {
             let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
-            debug!(
+            trace!(
                 "inserting {:?} with digest {}",
                 inner_key,
                 hex::encode(&digest),
