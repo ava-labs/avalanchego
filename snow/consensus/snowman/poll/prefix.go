@@ -12,7 +12,7 @@ import (
 // longestSharedPrefixes creates a prefixGroup that is the root of a graph
 // of prefixGroup vertices.
 // When iterating the graph, each prefixGroup vertex represents a shared bit prefix
-// of IDs, and the members field contains all IDs from the given idList that their bit prefix
+// of IDs, and the members field contains all IDs from the given idList for which their bit prefix
 // matches the prefix field.
 func longestSharedPrefixes(idList []ids.ID) *prefixGroup {
 	originPG := &prefixGroup{members: idList}
@@ -82,9 +82,7 @@ func determineDescendant(pg *prefixGroup) *prefixGroup {
 // according to the next bit index in the index field.
 // Successively splitting prefixGroups yields a graph, with the first prefixGroup as the root.
 type prefixGroup struct {
-	// only used for tests to be readable.
-	vertexName rune
-	// the bit index this prefixGroup would be split according to upon next invocation of split().
+	// the bit index this prefixGroup would be split on the next invocation of split().
 	index int
 	// the bits of the members of this prefixGroup from the first bit to the bit index.
 	prefix []uint8
@@ -94,7 +92,7 @@ type prefixGroup struct {
 	zg, og *prefixGroup
 	// the prefixGroup that this prefixGroup was split from.
 	parent *prefixGroup
-	// was this prefixGroup split before. Used to prevent a prefixGroup to be split more than once,
+	// was this prefixGroup split before. Used to prevent a prefixGroup from being split more than once,
 	// otherwise longestSharedPrefixes() would run indefinitely.
 	wasSplit bool
 }
@@ -135,7 +133,7 @@ func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 // All members in the current prefixGroup with bit zero in the next bit index are returned
 // in the left result, and similarly for the bit one for the right result.
 // Invariant: As long as the current prefixGroup can be split (canSplit() returns true),
-// The method will never return (nil, nil), as if canSplit() returns true, the prefixGroup
+// The method will never return (nil, nil), since if canSplit() returns true, the prefixGroup
 // has at least two members, which means they either differ in the next bit index
 func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 	zg := &prefixGroup{
