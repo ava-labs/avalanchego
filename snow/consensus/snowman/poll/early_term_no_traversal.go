@@ -182,8 +182,6 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	}
 
 	remaining := p.polled.Len()
-	received := p.votes.Len()
-	maxPossibleVotes := received + remaining
 
 	if remaining == 0 {
 		p.finished = true
@@ -191,6 +189,8 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 		return true // Case 1
 	}
 
+	received := p.votes.Len()
+	maxPossibleVotes := received + remaining
 	if maxPossibleVotes < p.alphaPreference {
 		p.finished = true
 		p.metrics.observeEarlyFail(time.Since(p.start))
@@ -203,7 +203,7 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	// We build a vote graph where each vertex represents a block ID.
 	// A vertex 'v' is a parent of vertex 'u' if the ID of 'u' corresponds
 	// to a block that is the successive block of the corresponding block for 'v'.
-	votesGraph := buildVotesGraph(p.bt.GetParent, p.votes)
+	votesGraph := buildVoteGraph(p.bt.GetParent, p.votes)
 
 	// If vertex 'v' is a parent of vertex 'u', then a vote for the ID of vertex 'u'
 	// should also be considered as a vote for the ID of the vertex 'v'.
@@ -217,11 +217,11 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	// The prefix inherits the votes for the IDs of 'u' and 'w'.
 	// We therefore compute the transitive votes for all prefixes of IDs
 	// for each bifurcation in the transitive vote graph.
-	transitiveVotesForPrefixes := transitiveVotesForPrefixes(&votesGraph, transitiveVotes)
+	transitiveVotesForPrefixes := computeTransitiveVotesForPrefixes(&votesGraph, transitiveVotes)
 
 	// We wish to compute the votes for snowflake instances, no matter if they correspond to an actual block ID,
 	// or a unary snowflake instance for a shared prefix between a bifurcation of two competing blocks.
-	// For that, only the number of votes and existence of such snowflake instances matters, and nothing else.
+	// For that, only the number of votes and existence of such snowflake instances matters.
 	voteCountsForIDsOrPrefixes := aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes, transitiveVotes)
 
 	// Given the aforementioned votes, we wish to see whether there exists a snowflake instance
@@ -229,8 +229,8 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	// We therefore check each amount of votes separately and see if voting for that snowflake instance
 	// should terminate, as it cannot be improved by further voting.
 	weCantImproveVoteForSomeIDOrPrefix := make(booleans, len(voteCountsForIDsOrPrefixes))
-	for i, votesForID := range voteCountsForIDsOrPrefixes {
-		shouldTerminate := p.shouldTerminateDueToConfidence(votesForID, maxPossibleVotes, remaining)
+	for i, completedVotes := range voteCountsForIDsOrPrefixes {
+		shouldTerminate := p.shouldTerminateDueToConfidence(completedVotes, maxPossibleVotes, remaining)
 		weCantImproveVoteForSomeIDOrPrefix[i] = shouldTerminate
 	}
 
@@ -292,14 +292,14 @@ func aggregateVotesFromPrefixesAndIDs(transitiveVotesForPrefixes map[string]int,
 	return voteCountsForIDsOrPrefixes
 }
 
-func transitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes bag.Bag[ids.ID]) map[string]int {
+func computeTransitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes bag.Bag[ids.ID]) map[string]int {
 	votesForPrefix := make(map[string]int)
 	votesGraph.traverse(func(v *voteVertex) {
-		descendanstIDs := descendantIDsOfVertex(v)
-		pg := longestSharedPrefixes(descendanstIDs)
-		// Each shared prefix is associated to a bunch of IDs.
+		descendantIDs := descendantIDsOfVertex(v)
+		pg := longestSharedPrefixes(descendantIDs)
+		// Each shared prefix is associated with a bunch of IDs.
 		// Sum up all the transitive votes for these blocks,
-		// and return all such shared prefixes indexed by the underlying transitive descendant IDs..
+		// and return all such shared prefixes indexed by the underlying transitive descendant IDs.
 		pg.bifurcationsWithCommonPrefix(func(ids []ids.ID, _ []uint8) {
 			key := concatIDs(ids)
 			count := sumVotesFromIDs(ids, transitiveVotes)
