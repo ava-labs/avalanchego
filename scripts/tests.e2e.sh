@@ -54,7 +54,15 @@ else
   echo "tests will be executed in parallel"
   GINKGO_ARGS="-p"
 fi
+# Reference: https://onsi.github.io/ginkgo/#spec-randomization
+if [[ -n "${E2E_RANDOM_SEED:-}" ]]; then
+  # Supply a specific seed to simplify reproduction of test failures
+  GINKGO_ARGS+=" --seed=${E2E_RANDOM_SEED}"
+else
+  # Execute in random order to identify unwanted dependency
+  GINKGO_ARGS+=" --randomize-all"
+fi
 
 #################################
-# - Execute in random order to identify unwanted dependency
-ginkgo ${GINKGO_ARGS} -v --randomize-all ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
+
+ginkgo ${GINKGO_ARGS} -v ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
