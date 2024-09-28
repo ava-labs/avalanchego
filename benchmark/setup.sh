@@ -26,8 +26,12 @@ cat >> /etc/prometheus/prometheus.yml <<!
     static_configs:
       - targets: ['localhost:3000']
 !
-  
+cat >> /etc/default/prometheus-node-exporter <<!
+ARGS="--collector.filesystem.mount-points-exclude=\"^/(dev|proc|run|sys|media|var/lib/docker/.+)($|/)\""
+!
+
 systemctl daemon-reload
+killall grafana-server
 systemctl start grafana-server
 systemctl enable grafana-server.service
 systemctl restart prometheus
@@ -39,8 +43,8 @@ if [ -n "$NVME_DEV" ]; then
   mkdir -p "$NVME_MOUNT"
   mount -o noatime "$NVME_DEV" "$NVME_MOUNT"
   echo "$NVME_DEV $NVME_MOUNT ext4 noatime 0 0" >> /etc/fstab
-  mkdir "$NVME_MOUNT/ubuntu"
-  chown ubuntu:ubuntu "$NVME_MOUNT/ubuntu"
+  mkdir -p "$NVME_MOUNT/ubuntu/firewood"
+  chown ubuntu:ubuntu "$NVME_MOUNT/ubuntu" "$NVME_MOUNT/ubuntu/firewood"
   ln -s "$NVME_MOUNT/ubuntu/firewood" /home/ubuntu/firewood
 fi
 
@@ -49,22 +53,24 @@ fi
   
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
-git clone https://github.com/ava-labs/firewood.git
 cd firewood
+git clone https://github.com/ava-labs/firewood.git .
 git checkout rkuris/prometheus
 cargo build --profile maxperf
 
+#### stop here, these commands are run by hand ####
+
 # 10M rows:
-nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 create
-nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 zipf
-nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 single
+nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 create &
+nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 zipf &
+nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 single &
 
 # 50M rows:
-nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 create
-nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 zipf
-nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 single
+nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 create &
+nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 zipf &
+nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 single &
 
 # 100M rows:
-nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 create
-nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 zipf
-nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 single
+nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 create &
+nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 zipf &
+nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 single &
