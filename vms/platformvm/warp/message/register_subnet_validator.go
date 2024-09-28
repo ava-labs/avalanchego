@@ -37,7 +37,7 @@ func NewRegisterSubnetValidator(
 		BLSPublicKey: blsPublicKey,
 		Expiry:       expiry,
 	}
-	return msg, initialize(msg)
+	return msg, Initialize(msg)
 }
 
 // ParseRegisterSubnetValidator parses bytes into an initialized

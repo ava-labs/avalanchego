@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"os"
 	"time"
@@ -26,10 +27,10 @@ import (
 
 func main() {
 	key := genesis.EWOQKey
-	uri := "http://localhost:9650"
+	uri := "http://localhost:9710"
 	kc := secp256k1fx.NewKeychain(key)
-	subnetID := ids.FromStringOrPanic("2eZYSgCU738xN7aRw47NsBUPqnKkoqJMYUJexTsX19VdTNSZc9")
-	chainID := ids.FromStringOrPanic("JCuZD3rg8dEEeY5cJwQxwSj6Shqo8DtRynBCt1nXkBXCouZVw")
+	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
+	chainID := ids.FromStringOrPanic("21G9Uqg2R7hYa81kZK7oMCgstsHEiNGbkpB9kdBLUeWx3wWMsV")
 	addressHex := ""
 	weight := units.Schmeckle
 
@@ -85,6 +86,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create RegisterSubnetValidator message: %s\n", err)
 	}
+	addressedCallPayloadJSON, err := json.MarshalIndent(addressedCallPayload, "", "\t")
+	if err != nil {
+		log.Fatalf("failed to marshal RegisterSubnetValidator message: %s\n", err)
+	}
+	log.Println(string(addressedCallPayloadJSON))
 
 	addressedCall, err := payload.NewAddressedCall(
 		address,

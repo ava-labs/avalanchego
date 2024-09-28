@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 )
 
 var DefaultExecutionConfig = ExecutionConfig{
-	Network:                      network.DefaultConfig,
+	Network:                      DefaultNetworkConfig,
 	BlockCacheSize:               64 * units.MiB,
 	TxCacheSize:                  128 * units.MiB,
 	TransformedSubnetTxCacheSize: 4 * units.MiB,
@@ -28,18 +27,18 @@ var DefaultExecutionConfig = ExecutionConfig{
 
 // ExecutionConfig provides execution parameters of PlatformVM
 type ExecutionConfig struct {
-	Network                      network.Config `json:"network"`
-	BlockCacheSize               int            `json:"block-cache-size"`
-	TxCacheSize                  int            `json:"tx-cache-size"`
-	TransformedSubnetTxCacheSize int            `json:"transformed-subnet-tx-cache-size"`
-	RewardUTXOsCacheSize         int            `json:"reward-utxos-cache-size"`
-	ChainCacheSize               int            `json:"chain-cache-size"`
-	ChainDBCacheSize             int            `json:"chain-db-cache-size"`
-	BlockIDCacheSize             int            `json:"block-id-cache-size"`
-	FxOwnerCacheSize             int            `json:"fx-owner-cache-size"`
-	SubnetManagerCacheSize       int            `json:"subnet-manager-cache-size"`
-	ChecksumsEnabled             bool           `json:"checksums-enabled"`
-	MempoolPruneFrequency        time.Duration  `json:"mempool-prune-frequency"`
+	Network                      NetworkConfig `json:"network"`
+	BlockCacheSize               int           `json:"block-cache-size"`
+	TxCacheSize                  int           `json:"tx-cache-size"`
+	TransformedSubnetTxCacheSize int           `json:"transformed-subnet-tx-cache-size"`
+	RewardUTXOsCacheSize         int           `json:"reward-utxos-cache-size"`
+	ChainCacheSize               int           `json:"chain-cache-size"`
+	ChainDBCacheSize             int           `json:"chain-db-cache-size"`
+	BlockIDCacheSize             int           `json:"block-id-cache-size"`
+	FxOwnerCacheSize             int           `json:"fx-owner-cache-size"`
+	SubnetManagerCacheSize       int           `json:"subnet-manager-cache-size"`
+	ChecksumsEnabled             bool          `json:"checksums-enabled"`
+	MempoolPruneFrequency        time.Duration `json:"mempool-prune-frequency"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig

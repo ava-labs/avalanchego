@@ -193,6 +193,9 @@ func (vm *VM) Initialize(
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		&chainCtx.Lock,
+		vm.state,
+		chainCtx.WarpSigner,
 		registerer,
 		execConfig.Network,
 	)
