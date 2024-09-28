@@ -72,7 +72,7 @@ func (h *handler) getDisconnectedValidators() set.Set[ids.NodeID] {
 func withoutWeights(weights set.Set[ids.NodeWeight]) set.Set[ids.NodeID] {
 	var res set.Set[ids.NodeID]
 	for _, nw := range weights.List() {
-		res.Add(nw.Node)
+		res.Add(nw.ID)
 	}
 	return res
 }

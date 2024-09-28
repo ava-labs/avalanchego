@@ -21,9 +21,30 @@ type decoratedEngineWithStragglerDetector struct {
 
 func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration)) common.Engine {
 	minConfRatio := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
-	sd := newStragglerDetector(time, e.Config.Ctx.Log, minConfRatio, e.Consensus.LastAccepted,
-		e.Config.ConnectedValidators.ConnectedValidators, e.Config.ConnectedValidators.ConnectedPercent,
-		e.Consensus.Processing, e.acceptedFrontiers.LastAccepted)
+
+	sa := &snapshotAnalyzer{
+		log:        e.Config.Ctx.Log,
+		processing: e.Consensus.Processing,
+	}
+
+	s := &snapshotter{
+		log:                      e.Config.Ctx.Log,
+		connectedValidators:      e.Config.ConnectedValidators.ConnectedValidators,
+		minConfirmationThreshold: minConfRatio,
+		lastAcceptedByNodeID:     e.acceptedFrontiers.LastAccepted,
+		lastAccepted:             dropHeight(e.Consensus.LastAccepted),
+	}
+
+	conf := stragglerDetectorConfig{
+		getSnapshot:               s.getNetworkSnapshot,
+		areWeBehindTheRest:        sa.areWeBehindTheRest,
+		minStragglerCheckInterval: minStragglerCheckInterval,
+		log:                       e.Config.Ctx.Log,
+		getTime:                   time,
+	}
+
+	sd := newStragglerDetector(conf)
+
 	return &decoratedEngineWithStragglerDetector{
 		Engine: e,
 		f:      f,

@@ -13,12 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 func TestEngineStragglerDetector(t *testing.T) {
 	require := require.New(t)
 
-	fakeClock := make(chan time.Time, 1)
+	var fakeClock mockable.Clock
 
 	conf := DefaultConfig(t)
 	peerID, _, sender, vm, engine := setup(t, conf)
@@ -26,24 +27,14 @@ func TestEngineStragglerDetector(t *testing.T) {
 	parent := snowmantest.BuildChild(snowmantest.Genesis)
 	require.NoError(conf.Consensus.Add(parent))
 
-	listenerShouldInvokeWith := []time.Duration{0, 0, time.Second * 2}
-
-	fakeTime := func() time.Time {
-		select {
-		case now := <-fakeClock:
-			return now
-		default:
-			require.Fail("should have a time.Time in the channel")
-			return time.Time{}
-		}
-	}
+	listenerShouldInvokeWith := []time.Duration{0, 0, minStragglerCheckInterval * 2}
 
 	f := func(duration time.Duration) {
 		require.Equal(listenerShouldInvokeWith[0], duration)
 		listenerShouldInvokeWith = listenerShouldInvokeWith[1:]
 	}
 
-	decoratedEngine := NewDecoratedEngineWithStragglerDetector(engine, fakeTime, f)
+	decoratedEngine := NewDecoratedEngineWithStragglerDetector(engine, fakeClock.Time, f)
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -62,13 +53,13 @@ func TestEngineStragglerDetector(t *testing.T) {
 	}
 
 	now := time.Now()
-	fakeClock <- now
+	fakeClock.Set(now)
 	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID()))
-	now = now.Add(time.Second * 2)
-	fakeClock <- now
+	now = now.Add(minStragglerCheckInterval * 2)
+	fakeClock.Set(now)
 	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID()))
-	now = now.Add(time.Second * 2)
-	fakeClock <- now
+	now = now.Add(minStragglerCheckInterval * 2)
+	fakeClock.Set(now)
 	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID()))
 	require.Empty(listenerShouldInvokeWith)
 }

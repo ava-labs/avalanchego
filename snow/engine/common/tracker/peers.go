@@ -274,7 +274,7 @@ func (p *peerData) SampleValidator() (ids.NodeID, bool) {
 func (p *peerData) GetValidators() set.Set[ids.NodeWeight] {
 	res := set.NewSet[ids.NodeWeight](len(p.validators))
 	for k, v := range p.validators {
-		res.Add(ids.NodeWeight{Node: k, Weight: v})
+		res.Add(ids.NodeWeight{ID: k, Weight: v})
 	}
 	return res
 }
@@ -285,7 +285,7 @@ func (p *peerData) ConnectedValidators() set.Set[ids.NodeWeight] {
 	copied := set.NewSet[ids.NodeWeight](len(p.connectedValidators))
 	for _, vdrID := range p.connectedValidators.List() {
 		weight := p.validators[vdrID]
-		copied.Add(ids.NodeWeight{Node: vdrID, Weight: weight})
+		copied.Add(ids.NodeWeight{ID: vdrID, Weight: weight})
 	}
 	return copied
 }
