@@ -75,6 +75,9 @@ There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
 --example simple`.
 
+For maximum performance, use `cargo run --maxperf` instead, which enables maximum
+link time compiler optimizations, but takes a lot longer to compile.
+
 ## Logging
 
 If you want logging, enable the `logging` feature flag, and then set RUST\_LOG accordingly.

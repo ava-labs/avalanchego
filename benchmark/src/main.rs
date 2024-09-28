@@ -11,8 +11,9 @@
 // 3. 50% of batch size is updating rows in the middle, but setting the value to the hash of the first row inserted
 //
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use firewood::logger::trace;
+use log::LevelFilter;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
@@ -28,31 +29,48 @@ use firewood::manager::RevisionManagerConfig;
 struct Args {
     #[arg(short, long, default_value_t = 10000)]
     batch_size: u64,
-    #[arg(short, long, default_value_t = 100000)]
+    #[arg(short, long, default_value_t = 1000)]
     number_of_batches: u64,
-    #[arg(short = 'p', long, default_value_t = 0, value_parser = clap::value_parser!(u16).range(0..=100))]
-    read_verify_percent: u16,
-    #[arg(
-        short,
-        long,
-        help = "Only initialize the database, do not do the insert/delete/update loop"
-    )]
-    initialize_only: bool,
     #[arg(short, long, default_value_t = NonZeroUsize::new(1500000).expect("is non-zero"))]
     cache_size: NonZeroUsize,
     #[arg(short, long, default_value_t = 128)]
     revisions: usize,
-    #[arg(short = 'l', long, default_value_t = 3000)]
+    #[arg(short = 'p', long, default_value_t = 3000)]
     prometheus_port: u16,
-    #[arg(short, long)]
+
+    #[clap(flatten)]
+    global_opts: GlobalOpts,
+
+    #[clap(subcommand)]
     test_name: TestName,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(clap::Args, Debug)]
+struct GlobalOpts {
+    #[arg(
+        long,
+        short = 'l',
+        required = false,
+        help = "Log level. Respects RUST_LOG.",
+        value_name = "LOG_LEVEL",
+        num_args = 1,
+        value_parser = ["debug", "info"],
+        default_value_t = String::from("info"),
+    )]
+    log_level: String,
+}
+
+mod create;
+mod single;
+mod tenkrandom;
+mod zipf;
+
+#[derive(Debug, Subcommand)]
 enum TestName {
     Create,
     TenKRandom,
-    Zipf,
+    Zipf(zipf::Args),
+    Single,
 }
 
 trait TestRunner {
@@ -75,10 +93,6 @@ trait TestRunner {
     }
 }
 
-mod create;
-mod tenkrandom;
-mod zipf;
-
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
@@ -86,7 +100,13 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    env_logger::init();
+    env_logger::Builder::new()
+        .filter_level(match args.global_opts.log_level.as_str() {
+            "debug" => LevelFilter::Debug,
+            "info" => LevelFilter::Info,
+            _ => LevelFilter::Info,
+        })
+        .init();
 
     let builder = PrometheusBuilder::new();
     builder
@@ -126,8 +146,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let runner = tenkrandom::TenKRandom;
             runner.run(&db, &args).await?;
         }
-        TestName::Zipf => {
+        TestName::Zipf(_) => {
             let runner = zipf::Zipf;
+            runner.run(&db, &args).await?;
+        }
+        TestName::Single => {
+            let runner = single::Single;
             runner.run(&db, &args).await?;
         }
     }

@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use firewood::db::Db;
 use firewood::v2::api::{Db as _, Proposal as _};
+use log::info;
 
 use pretty_duration::pretty_duration;
 
@@ -26,7 +27,7 @@ impl TestRunner for Create {
             proposal.commit().await?;
         }
         let duration = start.elapsed();
-        println!(
+        info!(
             "Generated and inserted {} batches of size {keys} in {}",
             args.number_of_batches,
             pretty_duration(&duration, None)
