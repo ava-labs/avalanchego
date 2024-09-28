@@ -33,7 +33,7 @@ const (
 	databaseRunningUpdateSize    = databaseCreationBatchSize / 2
 	defaultMetricsPort           = 3_000
 	benchmarkRevisionHistorySize = 128
-	defaultZipfS                 = float64(1.01)
+	defaultZipfS                 = float64(1.2)
 	defaultZipfV                 = float64(2.7)
 )
 
@@ -339,6 +339,16 @@ func main() {
 	zipfCmd := &cobra.Command{
 		Use:   "zipf",
 		Short: "Run the zipf benchmark",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			if *sZipf <= 1.0 {
+				fmt.Fprintf(os.Stderr, "The s value for Zipf distribution must be greater than 1\n")
+				os.Exit(1)
+			}
+			if *vZipf < 1.0 {
+				fmt.Fprintf(os.Stderr, "The v value for Zipf distribution must be greater or equal to 1\n")
+				os.Exit(1)
+			}
+		},
 		RunE: func(*cobra.Command, []string) error {
 			zipfBenchmark()
 			return nil
@@ -349,16 +359,6 @@ func main() {
 	miniCmd := &cobra.Command{
 		Use:   "mini",
 		Short: "Run the mini benchmark",
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if *sZipf <= 1.0 {
-				fmt.Fprintf(os.Stderr, "The s value for Zipf distribution must be greater than 1")
-				os.Exit(1)
-			}
-			if *vZipf < 1.0 {
-				fmt.Fprintf(os.Stderr, "The v value for Zipf distribution must be greater or equal to 1")
-				os.Exit(1)
-			}
-		},
 		RunE: func(*cobra.Command, []string) error {
 			miniBenchmark()
 			return nil
@@ -419,8 +419,8 @@ func zipfBenchmark() {
 func miniBenchmark() {
 	commonBenchmarkBootstrap()
 
-	/*if err := runMiniBenchmark(*databaseEntries); err != nil {
+	if err := runMiniBenchmark(*databaseEntries); err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to run benchmark: %v\n", err)
 		os.Exit(1)
-	}*/
+	}
 }
