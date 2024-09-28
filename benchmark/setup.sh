@@ -1,3 +1,5 @@
+#### run these commands from the root user ####
+
 mkdir -p /etc/apt/keyrings/
 wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
 echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
@@ -39,15 +41,30 @@ if [ -n "$NVME_DEV" ]; then
   echo "$NVME_DEV $NVME_MOUNT ext4 noatime 0 0" >> /etc/fstab
   mkdir "$NVME_MOUNT/ubuntu"
   chown ubuntu:ubuntu "$NVME_MOUNT/ubuntu"
-  ln -s /home/ubuntu/firewood "$NVME_MOUNT/ubuntu/firewood"
+  ln -s "$NVME_MOUNT/ubuntu/firewood" /home/ubuntu/firewood
 fi
+
+
+#### you can switch to the ubuntu user here ####
   
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
 git clone https://github.com/ava-labs/firewood.git
 cd firewood
 git checkout rkuris/prometheus
-cargo build --release
+cargo build --profile maxperf
 
-# nohup time cargo run --release --bin benchmark -- -b 10000 -c 1500000 -n 100000 &
-nohup time cargo run --release --bin benchmark -- -b 100000 -c 1500000 -n 1000 -i &
+# 10M rows:
+nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 create
+nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 zipf
+nohup time cargo run --profile maxperf --bin benchmark -- -n 1000 single
+
+# 50M rows:
+nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 create
+nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 zipf
+nohup time cargo run --profile maxperf --bin benchmark -- -n 5000 single
+
+# 100M rows:
+nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 create
+nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 zipf
+nohup time cargo run --profile maxperf --bin benchmark -- -n 10000 single
