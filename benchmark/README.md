@@ -31,7 +31,7 @@ To install the Firewood Benchmark, follow these steps:
 1. Clone the repository: `git clone https://github.com/ava-labs/firewood.git`
 2. Navigate to the firewood directory: `cd firewood`
 3. Build the executable: `cargo build --release`
-4. Create the benchmark database: `nohup time cargo run --profile maxperf --bin benchmark -- create`. For a larger database, add `--number-of-batches=10000` for a 100M row database (each batch by default is 10K rows) before the subcommand 'create'.
+4. Create the benchmark database: `nohup time cargo run --profile maxperf --bin benchmark -- create`. For a larger database, add `--number-of-batches=10000` before the subcommand 'create' for a 100M row database (each batch by default is 10K rows).
 5. \[Optional] Save the benchmark database in rev_db
 6. Run the benchmark you want: `nohup time cargo run --profile maxperf --bin benchmark -- NAME` (selecting NAME from the list above). If you're not using the default database size, make sure you specify the number of batches here as well.
 
