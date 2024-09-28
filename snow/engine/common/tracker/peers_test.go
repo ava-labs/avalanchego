@@ -58,10 +58,10 @@ func TestConnectedValidators(t *testing.T) {
 
 	require.NoError(p.Connected(context.Background(), nodeID2, version.CurrentApp))
 	require.Equal(uint64(11), p.ConnectedWeight())
-	require.True(set.Of(ids.NodeWeight{Node: nodeID1, Weight: 5}, ids.NodeWeight{Node: nodeID2, Weight: 6}).Equals(p.GetValidators()))
-	require.True(set.Of(ids.NodeWeight{Node: nodeID1, Weight: 5}, ids.NodeWeight{Node: nodeID2, Weight: 6}).Equals(p.ConnectedValidators()))
+	require.True(set.Of(ids.NodeWeight{ID: nodeID1, Weight: 5}, ids.NodeWeight{ID: nodeID2, Weight: 6}).Equals(p.GetValidators()))
+	require.True(set.Of(ids.NodeWeight{ID: nodeID1, Weight: 5}, ids.NodeWeight{ID: nodeID2, Weight: 6}).Equals(p.ConnectedValidators()))
 
 	require.NoError(p.Disconnected(context.Background(), nodeID2))
-	require.True(set.Of(ids.NodeWeight{Node: nodeID1, Weight: 5}, ids.NodeWeight{Node: nodeID2, Weight: 6}).Equals(p.GetValidators()))
-	require.True(set.Of(ids.NodeWeight{Node: nodeID1, Weight: 5}).Equals(p.ConnectedValidators()))
+	require.True(set.Of(ids.NodeWeight{ID: nodeID1, Weight: 5}, ids.NodeWeight{ID: nodeID2, Weight: 6}).Equals(p.GetValidators()))
+	require.True(set.Of(ids.NodeWeight{ID: nodeID1, Weight: 5}).Equals(p.ConnectedValidators()))
 }

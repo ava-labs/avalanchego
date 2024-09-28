@@ -4,6 +4,6 @@
 package ids
 
 type NodeWeight struct {
-	Node   NodeID
+	ID     NodeID
 	Weight uint64
 }
