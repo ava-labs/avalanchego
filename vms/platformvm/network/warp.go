@@ -54,7 +54,6 @@ type signatureRequestHandler struct {
 	signer warp.Signer
 }
 
-// TODO: This should be allowed only for local networks
 func (s signatureRequestHandler) AppRequest(
 	_ context.Context,
 	_ ids.NodeID,
