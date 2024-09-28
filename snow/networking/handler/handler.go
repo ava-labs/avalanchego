@@ -77,6 +77,8 @@ type Handler interface {
 // handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type handler struct {
+	haltBootstrapping func()
+
 	metrics *metrics
 
 	// Useful for faking time in tests
@@ -118,8 +120,6 @@ type handler struct {
 	// Closed when this handler and [engine] are done shutting down
 	closed chan struct{}
 
-	subnetConnector validators.SubnetConnector
-
 	subnet subnets.Subnet
 
 	// Tracks the peers that are currently connected to this subnet
@@ -136,26 +136,26 @@ func New(
 	gossipFrequency time.Duration,
 	threadPoolSize int,
 	resourceTracker tracker.ResourceTracker,
-	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
 	p2pTracker *p2p.PeerTracker,
 	reg prometheus.Registerer,
+	haltBootstrapping func(),
 ) (Handler, error) {
 	h := &handler{
-		ctx:             ctx,
-		validators:      validators,
-		msgFromVMChan:   msgFromVMChan,
-		preemptTimeouts: subnet.OnBootstrapCompleted(),
-		gossipFrequency: gossipFrequency,
-		timeouts:        make(chan struct{}, 1),
-		closingChan:     make(chan struct{}),
-		closed:          make(chan struct{}),
-		resourceTracker: resourceTracker,
-		subnetConnector: subnetConnector,
-		subnet:          subnet,
-		peerTracker:     peerTracker,
-		p2pTracker:      p2pTracker,
+		haltBootstrapping: haltBootstrapping,
+		ctx:               ctx,
+		validators:        validators,
+		msgFromVMChan:     msgFromVMChan,
+		preemptTimeouts:   subnet.OnBootstrapCompleted(),
+		gossipFrequency:   gossipFrequency,
+		timeouts:          make(chan struct{}, 1),
+		closingChan:       make(chan struct{}),
+		closed:            make(chan struct{}),
+		resourceTracker:   resourceTracker,
+		subnet:            subnet,
+		peerTracker:       peerTracker,
+		p2pTracker:        p2pTracker,
 	}
 	h.asyncMessagePool.SetLimit(threadPoolSize)
 
@@ -320,7 +320,7 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 // Note: It is possible for Stop to be called before/concurrently with Start.
 //
 // Invariant: Stop must never block.
-func (h *handler) Stop(ctx context.Context) {
+func (h *handler) Stop(_ context.Context) {
 	h.closeOnce.Do(func() {
 		h.startClosingTime = h.clock.Time()
 
@@ -329,25 +329,7 @@ func (h *handler) Stop(ctx context.Context) {
 		h.syncMessageQueue.Shutdown()
 		h.asyncMessageQueue.Shutdown()
 		close(h.closingChan)
-
-		// TODO: switch this to use a [context.Context] with a cancel function.
-		//
-		// Don't process any more bootstrap messages. If a dispatcher is
-		// processing a bootstrap message, stop. We do this because if we
-		// didn't, and the engine was in the middle of executing state
-		// transitions during bootstrapping, we wouldn't be able to grab
-		// [h.ctx.Lock] until the engine finished executing state transitions,
-		// which may take a long time. As a result, the router would time out on
-		// shutting down this chain.
-		state := h.ctx.State.Get()
-		bootstrapper, ok := h.engineManager.Get(state.Type).Get(snow.Bootstrapping)
-		if !ok {
-			h.ctx.Log.Error("bootstrapping engine doesn't exist",
-				zap.Stringer("type", state.Type),
-			)
-			return
-		}
-		bootstrapper.Halt(ctx)
+		h.haltBootstrapping()
 	})
 }
 
@@ -767,9 +749,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 		h.p2pTracker.Connected(nodeID, msg.NodeVersion)
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
-
-	case *message.ConnectedSubnet:
-		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
 
 	case *message.Disconnected:
 		err := h.peerTracker.Disconnected(ctx, nodeID)

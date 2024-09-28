@@ -13,14 +13,14 @@ var NoOpCalculator Calculator = noOpCalculator{}
 
 type noOpCalculator struct{}
 
-func (noOpCalculator) CalculateUptime(ids.NodeID, ids.ID) (time.Duration, time.Time, error) {
+func (noOpCalculator) CalculateUptime(ids.NodeID) (time.Duration, time.Time, error) {
 	return 0, time.Time{}, nil
 }
 
-func (noOpCalculator) CalculateUptimePercent(ids.NodeID, ids.ID) (float64, error) {
+func (noOpCalculator) CalculateUptimePercent(ids.NodeID) (float64, error) {
 	return 0, nil
 }
 
-func (noOpCalculator) CalculateUptimePercentFrom(ids.NodeID, ids.ID, time.Time) (float64, error) {
+func (noOpCalculator) CalculateUptimePercentFrom(ids.NodeID, time.Time) (float64, error) {
 	return 0, nil
 }

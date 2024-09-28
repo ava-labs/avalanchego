@@ -1319,6 +1319,9 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	bootstrapConfig := bootstrap.Config{
+		ShouldHalt: func() bool {
+			return false
+		},
 		NonVerifyingParse:              vm.ParseBlock,
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
@@ -1349,11 +1352,11 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		time.Hour,
 		2,
 		cpuTracker,
-		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		tracker.NewPeers(),
 		peerTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 

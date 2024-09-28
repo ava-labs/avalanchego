@@ -434,8 +434,6 @@ func (*Engine) Timeout(context.Context) error {
 	return nil
 }
 
-func (*Engine) Halt(context.Context) {}
-
 func (e *Engine) Shutdown(ctx context.Context) error {
 	e.Ctx.Log.Info("shutting down consensus engine")
 

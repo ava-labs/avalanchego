@@ -20,7 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
+	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -92,23 +93,22 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 
-	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	currentStakersIt.EXPECT().Next().Return(true)
-	currentStakersIt.EXPECT().Value().Return(&state.Staker{
-		TxID:      addValTx.ID(),
-		NodeID:    utx.NodeID(),
-		SubnetID:  utx.SubnetID(),
-		StartTime: utx.StartTime(),
-		NextTime:  chainTime,
-		EndTime:   chainTime,
-	}).Times(2)
-	currentStakersIt.EXPECT().Release()
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
+	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
+		iterator.FromSlice(&state.Staker{
+			TxID:      addValTx.ID(),
+			NodeID:    utx.NodeID(),
+			SubnetID:  utx.SubnetID(),
+			StartTime: utx.StartTime(),
+			NextTime:  chainTime,
+			EndTime:   chainTime,
+		}),
+		nil,
+	)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
-	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
+	env.mockedState.EXPECT().GetUptime(gomock.Any()).Return(
 		time.Microsecond, /*upDuration*/
 		time.Time{},      /*lastUpdated*/
 		nil,              /*err*/
@@ -204,25 +204,22 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	nextStakerTxID := nextStakerTx.ID()
 	onParentAccept.EXPECT().GetTx(nextStakerTxID).Return(nextStakerTx, status.Processing, nil)
 
-	currentStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	currentStakersIt.EXPECT().Next().Return(true).AnyTimes()
-	currentStakersIt.EXPECT().Value().Return(&state.Staker{
-		TxID:     nextStakerTxID,
-		EndTime:  nextStakerTime,
-		NextTime: nextStakerTime,
-		Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+	onParentAccept.EXPECT().GetCurrentStakerIterator().DoAndReturn(func() (iterator.Iterator[*state.Staker], error) {
+		return iterator.FromSlice(
+			&state.Staker{
+				TxID:     nextStakerTxID,
+				EndTime:  nextStakerTime,
+				NextTime: nextStakerTime,
+				Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+			},
+		), nil
 	}).AnyTimes()
-	currentStakersIt.EXPECT().Release().AnyTimes()
-	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
-	pendingStakersIt := iteratormock.NewIterator[*state.Staker](ctrl)
-	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
-	pendingStakersIt.EXPECT().Release().AnyTimes()
-	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
-
-	env.mockedState.EXPECT().GetUptime(gomock.Any(), gomock.Any()).Return(
+	env.mockedState.EXPECT().GetUptime(gomock.Any).Return(
 		time.Microsecond, /*upDuration*/
 		time.Time{},      /*lastUpdated*/
 		nil,              /*err*/
@@ -279,7 +276,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 		block := env.blkManager.NewBlock(statelessProposalBlock)
 		err = block.Verify(context.Background())
-		require.ErrorIs(err, errChildBlockEarlierThanParent)
+		require.ErrorIs(err, executor.ErrChildBlockEarlierThanParent)
 	}
 
 	{
@@ -1377,7 +1374,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	// Advance time until next staker change time is [validatorEndTime]
 	for {
-		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state)
+		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state, mockable.MaxTime)
 		require.NoError(err)
 		if nextStakerChangeTime.Equal(validatorEndTime) {
 			break
