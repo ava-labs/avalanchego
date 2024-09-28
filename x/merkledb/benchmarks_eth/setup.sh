@@ -45,7 +45,7 @@ if [ -n "$NVME_DEV" ]; then
   echo "$NVME_DEV $NVME_MOUNT ext4 noatime 0 0" >> /etc/fstab
   mkdir -p "$NVME_MOUNT/ubuntu/firewood"
   chown ubuntu:ubuntu "$NVME_MOUNT/ubuntu" "$NVME_MOUNT/ubuntu/firewood"
-  ln -s "$NVME_MOUNT/ubuntu/firewood" /home/ubuntu/firewood
+  ln -s "$NVME_MOUNT/ubuntu/firewood" /home/ubuntu/avalanchego
 fi
 
 ## install go
@@ -55,27 +55,26 @@ rm -rf /usr/local/go && tar -C /usr/local -xzf ${GO_INSTALLATION_FILE}
 rm ${GO_INSTALLATION_FILE}
 
 #### you can switch to the ubuntu user here ####
+## ----------------------------------------- ###
 
-
-git clone https://github.com/ava-labs/avalanchego.git
+git clone https://github.com/ava-labs/avalanchego.git 
 cd avalanchego
 git checkout tsachi/bench_merkledb
-export PATH=$PATH:/usr/local/go/bin
-go build ./x/merkledb/benchmarks_eth
+cd ./x/merkledb/benchmarks_eth && PATH=$PATH:/usr/local/go/bin go build .
 
 #### stop here, these commands are run by hand ####
 
 # 10M rows:
-nohup benchmarks_eth tenkrandom --n 10000000 > output.txt & 
-nohup benchmarks_eth zipf --n 10000000 > output.txt &
-nohup benchmarks_eth single --n 10000000 > output.txt &
+nohup ./benchmarks_eth tenkrandom --n 10000000 > output.txt & 
+nohup ./benchmarks_eth zipf --n 10000000 > output.txt &
+nohup ./benchmarks_eth single --n 10000000 > output.txt &
 
 # 50M rows:
-nohup benchmarks_eth tenkrandom --n 50000000 > output.txt & 
-nohup benchmarks_eth zipf --n 50000000 > output.txt &
-nohup benchmarks_eth single --n 50000000 > output.txt &
+nohup ./benchmarks_eth tenkrandom --n 50000000 > output.txt & 
+nohup ./benchmarks_eth zipf --n 50000000 > output.txt &
+nohup ./benchmarks_eth single --n 50000000 > output.txt &
 
 # 100M rows:
-nohup benchmarks_eth tenkrandom --n 100000000 > output.txt & 
-nohup benchmarks_eth zipf --n 100000000 > output.txt &
-nohup benchmarks_eth single --n 100000000 > output.txt &
+nohup ./benchmarks_eth tenkrandom --n 100000000 > output.txt & 
+nohup ./benchmarks_eth zipf --n 100000000 > output.txt &
+nohup ./benchmarks_eth single --n 100000000 > output.txt &
