@@ -82,7 +82,7 @@ func determineDescendant(pg *prefixGroup) *prefixGroup {
 // according to the next bit index in the index field.
 // Successively splitting prefixGroups yields a graph, with the first prefixGroup as the root.
 type prefixGroup struct {
-	// the bit index this prefixGroup would be split on the next invocation of split().
+	// the bit index this prefixGroup would be split on by the next invocation of split().
 	index int
 	// the bits of the members of this prefixGroup from the first bit to the bit index.
 	prefix []uint8
@@ -133,8 +133,10 @@ func (pg *prefixGroup) traverse(f func(*prefixGroup)) {
 // All members in the current prefixGroup with bit zero in the next bit index are returned
 // in the left result, and similarly for the bit one for the right result.
 // Invariant: As long as the current prefixGroup can be split (canSplit() returns true),
-// The method will never return (nil, nil), since if canSplit() returns true, the prefixGroup
-// has at least two members, which means they either differ in the next bit index
+// If canSplit() returned true on this prefixGroup, split() will never return (nil, nil),
+// since it has at least two members, which means they either differ in the next bit index,
+// in which case two prefixGroups would be returned, and otherwise they do not differ
+// in the next bit, and then at least one prefixGroup would be returned.
 func (pg *prefixGroup) split() (*prefixGroup, *prefixGroup) {
 	zg := &prefixGroup{
 		parent:  pg,

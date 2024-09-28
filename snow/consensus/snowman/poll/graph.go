@@ -88,7 +88,7 @@ func findLeaves(idToVertex map[ids.ID]*voteVertex) []*voteVertex {
 // buildVoteGraph receives as input a function that returns the ID of a block, or Empty if unknown,
 // as well as a bag of IDs (The bag is for enforcing uniqueness among the IDs in contrast to a list).
 // It returns a voteGraph where each vertex corresponds to an ID and is linked to vertices
-// according to what getParentFunc() returns for each ID.
+// according to what getParent() returns for each ID.
 func buildVoteGraph(getParent func(ids.ID) ids.ID, votes bag.Bag[ids.ID]) voteGraph {
 	idList := votes.List()
 
