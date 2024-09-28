@@ -35,11 +35,11 @@ fn generate_updates(
     start: u64,
     count: u64,
     low: u64,
-) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
-    let hash_of_low = Sha256::digest(low.to_ne_bytes()).to_vec();
+) -> impl Iterator<Item = BatchOp<Box<[u8]>, Box<[u8]>>> {
+    let hash_of_low: Box<[u8]> = Sha256::digest(low.to_ne_bytes())[..].into();
     (start..start + count)
         .map(|inner_key| {
-            let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+            let digest = Sha256::digest(inner_key.to_ne_bytes())[..].into();
             debug!(
                 "updating {:?} with digest {} to {}",
                 inner_key,
@@ -52,10 +52,10 @@ fn generate_updates(
         .collect::<Vec<_>>()
         .into_iter()
 }
-fn generate_deletes(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
+fn generate_deletes(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Box<[u8]>, Box<[u8]>>> {
     (start..start + count)
         .map(|key| {
-            let digest = Sha256::digest(key.to_ne_bytes()).to_vec();
+            let digest = Sha256::digest(key.to_ne_bytes())[..].into();
             debug!("deleting {:?} with digest {}", key, hex::encode(&digest));
             #[allow(clippy::let_and_return)]
             digest

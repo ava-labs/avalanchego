@@ -76,10 +76,13 @@ enum TestName {
 trait TestRunner {
     async fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>>;
 
-    fn generate_inserts(start: u64, count: u64) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
+    fn generate_inserts(
+        start: u64,
+        count: u64,
+    ) -> impl Iterator<Item = BatchOp<Box<[u8]>, Box<[u8]>>> {
         (start..start + count)
             .map(|inner_key| {
-                let digest = Sha256::digest(inner_key.to_ne_bytes()).to_vec();
+                let digest: Box<[u8]> = Sha256::digest(inner_key.to_ne_bytes())[..].into();
                 trace!(
                     "inserting {:?} with digest {}",
                     inner_key,
