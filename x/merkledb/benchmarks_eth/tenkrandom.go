@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-func runClassicBenchmark(databaseEntries uint64) error {
+func runTenkrandomBenchmark(databaseEntries uint64) error {
 	rootBytes, err := os.ReadFile(path.Join(getRunningDatabaseDirectory(databaseEntries), "root.txt"))
 	if err != nil {
 		return fmt.Errorf("unable to read root : %v", err)

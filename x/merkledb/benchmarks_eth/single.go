@@ -4,8 +4,8 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"time"
@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-func runMiniBenchmark(databaseEntries uint64) error {
+func runSingleBenchmark(databaseEntries uint64) error {
 	rootBytes, err := os.ReadFile(path.Join(getRunningDatabaseDirectory(databaseEntries), "root.txt"))
 	if err != nil {
 		return fmt.Errorf("unable to read root : %v", err)
@@ -67,17 +67,15 @@ func runMiniBenchmark(databaseEntries uint64) error {
 		return nil
 	}
 
-	rand := rand.New(rand.NewSource(0))
 	batchIdx := uint64(0)
+	updateEntryKey := calculateIndexEncoding(0)
 	var updateDuration, batchDuration time.Duration
 	for {
 		startBatchTime := time.Now()
 
 		// update a single entry, at random.
 		startUpdateTime := time.Now()
-		keyToUpdateIdx := rand.Uint64() % databaseEntries
-		updateEntryValue := calculateIndexEncoding(batchIdx)
-		err = tdb.Update(calculateIndexEncoding(keyToUpdateIdx), updateEntryValue)
+		err = tdb.Update(updateEntryKey, binary.BigEndian.AppendUint64(nil, batchIdx))
 		if err != nil {
 			return fmt.Errorf("unable to update trie entry : %v", err)
 		}

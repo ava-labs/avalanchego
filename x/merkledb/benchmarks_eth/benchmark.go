@@ -319,7 +319,7 @@ func main() {
 		Use:   "benchmarks_eth",
 		Short: "benchmarks_eth",
 		RunE: func(*cobra.Command, []string) error {
-			fmt.Printf("Please specify which type of benchmark you'd like to run : [classic, zipf]\n")
+			fmt.Printf("Please specify which type of benchmark you'd like to run : [tenkrandom, zipf, single]\n")
 			return nil
 		},
 	}
@@ -328,11 +328,11 @@ func main() {
 	verbose = rootCmd.PersistentFlags().Bool("verbose", false, "Verbose mode")
 	rootCmd.MarkPersistentFlagRequired("n")
 
-	classicCmd := &cobra.Command{
-		Use:   "classic",
-		Short: "Run the classic benchmark",
+	tenkrandomCmd := &cobra.Command{
+		Use:   "tenkrandom",
+		Short: "Run the tenkrandom benchmark",
 		RunE: func(*cobra.Command, []string) error {
-			classicBenchmark()
+			tenkrandomBenchmark()
 			return nil
 		},
 	}
@@ -356,16 +356,16 @@ func main() {
 	}
 	sZipf = zipfCmd.PersistentFlags().Float64("s", defaultZipfS, "s (Zipf distribution = [(v+k)^(-s)], Default = 1.00)")
 	vZipf = zipfCmd.PersistentFlags().Float64("v", defaultZipfV, "v (Zipf distribution = [(v+k)^(-s)], Default = 2.7)")
-	miniCmd := &cobra.Command{
-		Use:   "mini",
-		Short: "Run the mini benchmark",
+	singleCmd := &cobra.Command{
+		Use:   "single",
+		Short: "Run the single benchmark",
 		RunE: func(*cobra.Command, []string) error {
-			miniBenchmark()
+			singleBenchmark()
 			return nil
 		},
 	}
 
-	rootCmd.AddCommand(classicCmd, zipfCmd, miniCmd)
+	rootCmd.AddCommand(tenkrandomCmd, zipfCmd, singleCmd)
 
 	if err := setupMetrics(); err != nil {
 		fmt.Fprintf(os.Stderr, "unable to setup metrics : %v\n", err)
@@ -398,10 +398,10 @@ func commonBenchmarkBootstrap() {
 	}
 }
 
-func classicBenchmark() {
+func tenkrandomBenchmark() {
 	commonBenchmarkBootstrap()
 
-	if err := runClassicBenchmark(*databaseEntries); err != nil {
+	if err := runTenkrandomBenchmark(*databaseEntries); err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to run benchmark: %v\n", err)
 		os.Exit(1)
 	}
@@ -416,10 +416,10 @@ func zipfBenchmark() {
 	}
 }
 
-func miniBenchmark() {
+func singleBenchmark() {
 	commonBenchmarkBootstrap()
 
-	if err := runMiniBenchmark(*databaseEntries); err != nil {
+	if err := runSingleBenchmark(*databaseEntries); err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to run benchmark: %v\n", err)
 		os.Exit(1)
 	}
