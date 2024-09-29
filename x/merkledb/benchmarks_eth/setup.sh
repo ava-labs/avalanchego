@@ -1,5 +1,6 @@
-#### run these commands from the root user ####
+#!/usr/bin/env bash
 
+#### run these commands from the root user ####
 mkdir -p /etc/apt/keyrings/
 wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
 echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
@@ -58,7 +59,7 @@ rm ${GO_INSTALLATION_FILE}
 ## ----------------------------------------- ###
 
 git clone https://github.com/ava-labs/avalanchego.git 
-cd avalanchego
+cd avalanchego || exit
 git checkout tsachi/bench_merkledb
 cd ./x/merkledb/benchmarks_eth && PATH=$PATH:/usr/local/go/bin go build .
 
@@ -78,3 +79,5 @@ nohup ./benchmarks_eth single --n 50000000 > output.txt &
 nohup ./benchmarks_eth tenkrandom --n 100000000 > output.txt & 
 nohup ./benchmarks_eth zipf --n 100000000 > output.txt &
 nohup ./benchmarks_eth single --n 100000000 > output.txt &
+
+cd ~/avalanchego/x/merkledb/benchmarks_eth && git pull && PATH=$PATH:/usr/local/go/bin go build .
