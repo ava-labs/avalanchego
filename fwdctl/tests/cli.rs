@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;
-use std::fs::remove_dir_all;
+use std::fs::remove_file;
 use std::path::PathBuf;
 
 const PRG: &str = "fwdctl";
@@ -13,7 +13,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Removes the firewood database on disk
 fn fwdctl_delete_db() -> Result<()> {
-    if let Err(e) = remove_dir_all(tmpdb::path()) {
+    if let Err(e) = remove_file(tmpdb::path()) {
         eprintln!("failed to delete testing dir: {e}");
         return Err(anyhow!(e));
     }
@@ -36,7 +36,6 @@ fn fwdctl_prints_version() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_creates_database() -> Result<()> {
@@ -51,7 +50,6 @@ fn fwdctl_creates_database() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_insert_successful() -> Result<()> {
@@ -78,7 +76,6 @@ fn fwdctl_insert_successful() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_get_successful() -> Result<()> {
@@ -114,7 +111,6 @@ fn fwdctl_get_successful() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_delete_successful() -> Result<()> {
@@ -149,7 +145,6 @@ fn fwdctl_delete_successful() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_root_hash() -> Result<()> {
@@ -183,7 +178,6 @@ fn fwdctl_root_hash() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "unimplemented"]
 #[test]
 #[serial]
 fn fwdctl_dump() -> Result<()> {

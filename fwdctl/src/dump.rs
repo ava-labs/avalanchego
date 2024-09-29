@@ -29,7 +29,7 @@ pub struct Options {
         help = "Start dumping from this key (inclusive)."
     )]
     pub start_key: Option<Key>,
-    #[arg(short, long, help = "Print the keys and values in hex format.")]
+    #[arg(short = 'x', long, help = "Print the keys and values in hex format.")]
     pub hex: bool,
 }
 

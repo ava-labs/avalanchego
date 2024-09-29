@@ -849,18 +849,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     }
 }
 
-impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
-    /// Persist the freelist from this proposal to storage.
-    pub fn flush_freelist(&self) -> Result<(), Error> {
-        // Write the free lists to storage
-        let free_list_bytes = bincode::serialize(&self.header.free_lists)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
-        let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
-        self.storage
-            .write(free_list_offset, free_list_bytes.as_slice())?;
-        Ok(())
-    }
-
+impl<T, S: WritableStorage> NodeStore<T, S> {
     /// Persist the header from this proposal to storage.
     pub fn flush_header(&self) -> Result<(), Error> {
         let header_bytes = bincode::serialize(&self.header).map_err(|e| {
@@ -872,6 +861,19 @@ impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
 
         self.storage.write(0, header_bytes.as_slice())?;
 
+        Ok(())
+    }
+}
+
+impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
+    /// Persist the freelist from this proposal to storage.
+    pub fn flush_freelist(&self) -> Result<(), Error> {
+        // Write the free lists to storage
+        let free_list_bytes = bincode::serialize(&self.header.free_lists)
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
+        self.storage
+            .write(free_list_offset, free_list_bytes.as_slice())?;
         Ok(())
     }
 
@@ -920,20 +922,6 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
         self.storage
             .write(free_list_offset, free_list_bytes.as_slice())?;
-        Ok(())
-    }
-
-    /// Persist the header from this proposal to storage.
-    pub fn flush_header(&self) -> Result<(), Error> {
-        let header_bytes = bincode::serialize(&self.header).map_err(|e| {
-            Error::new(
-                ErrorKind::InvalidData,
-                format!("Failed to serialize header: {}", e),
-            )
-        })?;
-
-        self.storage.write(0, header_bytes.as_slice())?;
-
         Ok(())
     }
 

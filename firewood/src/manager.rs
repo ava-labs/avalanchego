@@ -90,6 +90,11 @@ impl RevisionManager {
                 nodestore.clone(),
             );
         }
+
+        if truncate {
+            nodestore.flush_header()?;
+        }
+
         Ok(manager)
     }
 
