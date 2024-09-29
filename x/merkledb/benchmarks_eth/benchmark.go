@@ -39,8 +39,8 @@ const (
 
 // TODO: Adjust these cache sizes for maximum performance
 const (
-	cleanCacheSizeBytes = 2 * units.GiB
-	levelDBCacheSizeMB  = 3 * units.GiB / units.MiB
+	cleanCacheSizeBytes = 1 * units.GiB
+	levelDBCacheSizeMB  = 3 * units.GiB / (2 * units.MiB)
 
 	// TODO: Why 200? The default is 500
 	// see https://pkg.go.dev/github.com/syndtr/goleveldb@v1.0.0/leveldb/opt#Options
