@@ -212,16 +212,17 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    pub(crate) fn _key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
+    fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
         MerkleKeyValueStream::from(&self.nodestore)
     }
 
-    pub(crate) fn _key_value_iter_from_key(&self, key: Key) -> MerkleKeyValueStream<'_, T> {
+    fn key_value_iter_from_key<K: AsRef<[u8]>>(&self, key: K) -> MerkleKeyValueStream<'_, T> {
         // TODO danlaine: change key to &[u8]
-        MerkleKeyValueStream::_from_key(&self.nodestore, key)
+        MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
     }
 
-    pub(super) async fn _range_proof(
+    #[allow(dead_code)]
+    pub(super) async fn range_proof(
         &self,
         start_key: Option<&[u8]>,
         end_key: Option<&[u8]>,
@@ -238,8 +239,8 @@ impl<T: TrieReader> Merkle<T> {
 
         let mut stream = match start_key {
             // TODO: fix the call-site to force the caller to do the allocation
-            Some(key) => self._key_value_iter_from_key(key.to_vec().into_boxed_slice()),
-            None => self._key_value_iter(),
+            Some(key) => self.key_value_iter_from_key(key.to_vec().into_boxed_slice()),
+            None => self.key_value_iter(),
         };
 
         // fetch the first key from the stream

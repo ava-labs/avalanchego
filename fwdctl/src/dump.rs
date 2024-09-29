@@ -5,7 +5,7 @@ use clap::Args;
 use firewood::db::{Db, DbConfig};
 use firewood::merkle::Key;
 use firewood::stream::MerkleKeyValueStream;
-use firewood::v2::api::{self, Db as _, DbView};
+use firewood::v2::api::{self, Db as _};
 use futures_util::StreamExt;
 use std::borrow::Cow;
 
@@ -23,6 +23,8 @@ pub struct Options {
     /// The key to start dumping from (if no key is provided, start from the beginning).
     /// Defaults to None.
     #[arg(
+        short = 's',
+        long = "start-key",
         required = false,
         value_name = "START_KEY",
         value_parser = key_parser,
@@ -44,9 +46,8 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         return Ok(());
     };
     let latest_rev = db.revision(latest_hash).await?;
-    latest_rev.val("xxxx".as_bytes()).await?;
-    let _start_key = opts.start_key.clone().unwrap_or(Box::new([]));
-    let mut stream = MerkleKeyValueStream::from(&latest_rev);
+    let start_key = opts.start_key.clone().unwrap_or(Box::new([]));
+    let mut stream = MerkleKeyValueStream::from_key(&latest_rev, start_key);
     loop {
         match stream.next().await {
             None => break,
