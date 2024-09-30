@@ -8,15 +8,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 // RegisterSubnetValidator adds a validator to the subnet.
 type RegisterSubnetValidator struct {
 	payload
 
-	SubnetID ids.ID `serialize:"true" json:"subnetID"`
-	// TODO: Use a 32-byte nodeID here
-	NodeID       ids.NodeID             `serialize:"true" json:"nodeID"`
+	SubnetID     ids.ID                 `serialize:"true" json:"subnetID"`
+	NodeID       types.JSONByteSlice    `serialize:"true" json:"nodeID"`
 	Weight       uint64                 `serialize:"true" json:"weight"`
 	BLSPublicKey [bls.PublicKeyLen]byte `serialize:"true" json:"blsPublicKey"`
 	Expiry       uint64                 `serialize:"true" json:"expiry"`
@@ -32,7 +32,7 @@ func NewRegisterSubnetValidator(
 ) (*RegisterSubnetValidator, error) {
 	msg := &RegisterSubnetValidator{
 		SubnetID:     subnetID,
-		NodeID:       nodeID,
+		NodeID:       nodeID[:],
 		Weight:       weight,
 		BLSPublicKey: blsPublicKey,
 		Expiry:       expiry,

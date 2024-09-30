@@ -9,8 +9,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// SubnetValidatorWeight reports the current nonce and weight of a validator
-// registered on the P-chain.
+// SubnetValidatorWeight is both received and sent by the P-chain.
+//
+// If the P-chain is receiving this message, it is treated as a command to
+// update the weight of the validator.
+//
+// If the P-chain is sending this message, it is reporting the current nonce and
+// weight of the validator.
 type SubnetValidatorWeight struct {
 	payload
 
