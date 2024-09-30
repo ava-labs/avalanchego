@@ -179,6 +179,18 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueIncreaseBalanceTx creates, signs, and issues a transaction that
+	// increases the balance of a validator on Permissionless L1 for the
+	// continuous fee.
+	//
+	// - [validationID] of the validator
+	// - [balance] amount to increase the validator's balance by
+	IssueIncreaseBalanceTx(
+		validationID ids.ID,
+		balance uint64,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueImportTx creates, signs, and issues an import transaction that
 	// attempts to consume all the available UTXOs and import the funds to [to].
 	//
@@ -452,6 +464,18 @@ func (w *wallet) IssueSetSubnetValidatorWeightTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewSetSubnetValidatorWeightTx(message, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueIncreaseBalanceTx(
+	validationID ids.ID,
+	balance uint64,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewIncreaseBalanceTx(validationID, balance, options...)
 	if err != nil {
 		return nil, err
 	}

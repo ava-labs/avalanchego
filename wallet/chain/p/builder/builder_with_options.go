@@ -198,6 +198,18 @@ func (b *builderWithOptions) NewSetSubnetValidatorWeightTx(
 	)
 }
 
+func (b *builderWithOptions) NewIncreaseBalanceTx(
+	validationID ids.ID,
+	balance uint64,
+	options ...common.Option,
+) (*txs.IncreaseBalanceTx, error) {
+	return b.builder.NewIncreaseBalanceTx(
+		validationID,
+		balance,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
 func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,

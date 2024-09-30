@@ -211,6 +211,14 @@ var (
 		gas.DBWrite: 0, // TODO
 		gas.Compute: 0,
 	}
+	IntrinsicIncreaseBalanceTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // validationID
+			wrappers.LongLen, // balance
+		gas.DBRead:  0, // TODO
+		gas.DBWrite: 0, // TODO
+		gas.Compute: 0,
+	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
@@ -735,6 +743,17 @@ func (c *complexityVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidato
 	c.output, err = IntrinsicSetSubnetValidatorWeightTxComplexities.Add(
 		&baseTxComplexity,
 		&warpComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicIncreaseBalanceTxComplexities.Add(
+		&baseTxComplexity,
 	)
 	return err
 }

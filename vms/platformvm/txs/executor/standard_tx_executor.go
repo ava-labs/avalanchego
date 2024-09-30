@@ -880,6 +880,73 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	return nil
 }
 
+func (e *StandardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	fee, err = safemath.Add(fee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	sov, err := e.State.GetSubnetOnlyValidator(tx.ValidationID)
+	if err != nil {
+		return err
+	}
+
+	if sov.EndAccumulatedFee == 0 {
+		sov.EndAccumulatedFee = e.State.GetAccruedFees()
+	}
+	sov.EndAccumulatedFee, err = safemath.Add(sov.EndAccumulatedFee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
 	if err := verifyAddPermissionlessValidatorTx(
 		e.Backend,

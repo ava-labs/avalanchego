@@ -192,6 +192,17 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.SetSubnetValidatorWeightTx, error)
 
+	// NewIncreaseBalanceTx increases the balance of a validator on
+	// Permissionless L1 for the continuous fee.
+	//
+	// - [validationID] of the validator
+	// - [balance] amount to increase the validator's balance by
+	NewIncreaseBalanceTx(
+		validationID ids.ID,
+		balance uint64,
+		options ...common.Option,
+	) (*txs.IncreaseBalanceTx, error)
+
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
 	//
@@ -1000,6 +1011,55 @@ func (b *builder) NewSetSubnetValidatorWeightTx(
 			Memo:         memo,
 		}},
 		Message: message,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewIncreaseBalanceTx(
+	validationID ids.ID,
+	balance uint64,
+	options ...common.Option,
+) (*txs.IncreaseBalanceTx, error) {
+	var (
+		toBurn = map[ids.ID]uint64{
+			b.context.AVAXAssetID: balance,
+		}
+		toStake        = map[ids.ID]uint64{}
+		ops            = common.NewOptions(options)
+		memo           = ops.Memo()
+		memoComplexity = gas.Dimensions{
+			gas.Bandwidth: uint64(len(memo)),
+		}
+	)
+	complexity, err := fee.IntrinsicIncreaseBalanceTxComplexities.Add(
+		&memoComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.IncreaseBalanceTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		ValidationID: validationID,
+		Balance:      balance,
 	}
 	return tx, b.initCtx(tx)
 }

@@ -185,6 +185,14 @@ func (s *visitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx)
 	return sign(s.tx, true, txSigners)
 }
 
+func (s *visitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
 func (s *visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
