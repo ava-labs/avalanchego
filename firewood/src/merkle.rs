@@ -16,7 +16,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use storage::{
     BranchNode, Child, Hashable, HashedNodeReader, ImmutableProposal, LeafNode, LinearAddress,
-    MutableProposal, NibblesIterator, Node, NodeReader, NodeStore, Path, ReadableStorage, TrieHash,
+    MutableProposal, NibblesIterator, Node, NodeStore, Path, ReadableStorage, TrieHash,
     TrieReader, ValueDigest,
 };
 
@@ -153,7 +153,7 @@ impl<T: TrieReader> Merkle<T> {
         &self.nodestore
     }
 
-    pub(crate) fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, MerkleError> {
+    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, MerkleError> {
         self.nodestore.read_node(addr).map_err(Into::into)
     }
 
@@ -506,9 +506,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             }
                             Some(Child::Node(child)) => child,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                let node = self.nodestore.read_node(addr)?;
-                                self.nodestore.delete_node(addr);
-                                (*node).clone()
+                                self.nodestore.read_for_update(addr)?
                             }
                         };
 
@@ -651,9 +649,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             let mut child = match child {
                                 Child::Node(ref mut child_node) => std::mem::take(child_node),
                                 Child::AddressWithHash(addr, _) => {
-                                    let node = self.nodestore.read_node(*addr)?;
-                                    self.nodestore.delete_node(*addr);
-                                    (*node).clone()
+                                    self.nodestore.read_for_update(*addr)?
                                 }
                             };
 
@@ -720,9 +716,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             }
                             Some(Child::Node(node)) => node,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                let node = self.nodestore.read_node(addr)?;
-                                self.nodestore.delete_node(addr);
-                                (*node).clone()
+                                self.nodestore.read_for_update(addr)?
                             }
                         };
 
@@ -770,9 +764,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                 }),
                             ),
                             Child::AddressWithHash(addr, _) => {
-                                let node = self.nodestore.read_node(*addr)?;
-                                self.nodestore.delete_node(*addr);
-                                (*node).clone()
+                                self.nodestore.read_for_update(*addr)?
                             }
                         };
 

@@ -323,6 +323,15 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
         self.kind.deleted.push(addr);
     }
 
+    /// Reads a node for update, marking it as deleted in this proposal.
+    /// We get an arc from cache (reading it from disk if necessary) then
+    /// copy/clone the node and return it.
+    pub fn read_for_update(&mut self, addr: LinearAddress) -> Result<Node, Error> {
+        self.delete_node(addr);
+        let arc_wrapped_node = self.read_node(addr)?;
+        Ok((*arc_wrapped_node).clone())
+    }
+
     /// Returns the root of this proposal.
     pub fn mut_root(&mut self) -> &mut Option<Node> {
         &mut self.kind.root
