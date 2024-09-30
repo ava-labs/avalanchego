@@ -212,11 +212,11 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
+    pub(super) fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
         MerkleKeyValueStream::from(&self.nodestore)
     }
 
-    fn key_value_iter_from_key<K: AsRef<[u8]>>(&self, key: K) -> MerkleKeyValueStream<'_, T> {
+    pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(&self, key: K) -> MerkleKeyValueStream<'_, T> {
         // TODO danlaine: change key to &[u8]
         MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
     }
@@ -1174,7 +1174,7 @@ mod tests {
         let merkle = create_in_memory_merkle();
 
         assert!(matches!(
-            merkle._range_proof(None, None, None).await.unwrap_err(),
+            merkle.range_proof(None, None, None).await.unwrap_err(),
             api::Error::RangeProofOnEmptyTrie
         ));
     }
