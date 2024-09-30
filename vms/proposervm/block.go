@@ -241,6 +241,7 @@ func (p *postForkCommonComponents) buildChild(
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
 			p.vm.StakingLeafSigner,
+			nil,
 		)
 	} else {
 		statelessChild, err = block.BuildUnsigned(
@@ -248,6 +249,7 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
+			nil,
 		)
 	}
 	if err != nil {

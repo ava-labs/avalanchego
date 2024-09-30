@@ -346,6 +346,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		snowmantest.GenesisTimestamp,
 		uint64(2000),
 		yBlock.Bytes(),
+		nil,
 	)
 	require.NoError(err)
 
