@@ -142,7 +142,7 @@ func TestNativeAssetContractCall(t *testing.T) {
 		makeTx(1, contractAddr, common.Big0, 100_000, big.NewInt(params.LaunchMinGasPrice), nil), // No input data is necessary, since this will hit the contract's fallback function.
 	}
 
-	phase6Tests := map[string]stateTransitionTest{
+	tests := map[string]stateTransitionTest{
 		"phase5": {
 			config:  params.TestApricotPhase5Config,
 			txs:     txs,
@@ -167,9 +167,21 @@ func TestNativeAssetContractCall(t *testing.T) {
 			gasUsed: []uint64{132091, 21618},
 			want:    "",
 		},
+		"durango": {
+			config:  params.TestDurangoChainConfig,
+			txs:     txs,
+			gasUsed: []uint64{132117, 21618},
+			want:    "",
+		},
+		"etna": {
+			config:  params.TestEtnaChainConfig,
+			txs:     txs,
+			gasUsed: []uint64{132117, 21618},
+			want:    "",
+		},
 	}
 
-	for name, stTest := range phase6Tests {
+	for name, stTest := range tests {
 		t.Run(name, func(t *testing.T) {
 			executeStateTransitionTest(t, stTest)
 		})
