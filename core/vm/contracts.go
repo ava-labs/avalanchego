@@ -172,6 +172,9 @@ var PrecompiledContractsCancun = map[common.Address]contract.StatefulPrecompiled
 	common.BytesToAddress([]byte{8}):    newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
 	common.BytesToAddress([]byte{9}):    newWrappedPrecompiledContract(&blake2F{}),
 	common.BytesToAddress([]byte{0x0a}): newWrappedPrecompiledContract(&kzgPointEvaluation{}),
+	genesisContractAddr:                 &deprecatedContract{},
+	NativeAssetBalanceAddr:              &deprecatedContract{},
+	NativeAssetCallAddr:                 &deprecatedContract{},
 }
 
 // PrecompiledContractsBLS contains the set of pre-compiled Ethereum
