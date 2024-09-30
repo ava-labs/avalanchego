@@ -1,9 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-// during development only
-#![allow(dead_code)]
-
 // This synchronous file layer is a simple implementation of what we
 // want to do for I/O. This uses a [Mutex] lock around a simple `File`
 // object. Instead, we probably should use an IO system that can perform multiple

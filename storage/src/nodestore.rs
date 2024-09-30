@@ -220,15 +220,6 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
     pub fn new_empty_committed(storage: Arc<S>) -> Result<Self, Error> {
         let header = NodeStoreHeader::new();
 
-        // let header_bytes = bincode::serialize(&header).map_err(|e| {
-        //     Error::new(
-        //         ErrorKind::InvalidData,
-        //         format!("Failed to serialize header: {}", e),
-        //     )
-        // })?;
-
-        // storage.write(0, header_bytes.as_slice())?;
-
         Ok(Self {
             header,
             storage,
@@ -1085,7 +1076,6 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             .invalidate_cached_nodes(oldest.kind.deleted.iter());
         trace!("There are {} nodes to reap", oldest.kind.deleted.len());
         for addr in oldest.kind.deleted.iter() {
-            trace!("reap {addr}");
             self.delete_node(*addr)?;
         }
         Ok(())
