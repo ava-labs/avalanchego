@@ -54,7 +54,7 @@ struct GlobalOpts {
         help = "Log level. Respects RUST_LOG.",
         value_name = "LOG_LEVEL",
         num_args = 1,
-        value_parser = ["debug", "info"],
+        value_parser = ["trace", "debug", "info", "warn", "none"],
         default_value_t = String::from("info"),
     )]
     log_level: String,
@@ -107,6 +107,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter_level(match args.global_opts.log_level.as_str() {
             "debug" => LevelFilter::Debug,
             "info" => LevelFilter::Info,
+            "trace" => LevelFilter::Trace,
+            "none" => LevelFilter::Off,
             _ => LevelFilter::Info,
         })
         .init();
