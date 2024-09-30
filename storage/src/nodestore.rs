@@ -397,7 +397,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 // Return the address of the newly allocated block.
                 trace!(
                     "Allocating from free list: addr: {free_stored_area_addr:?}, size: {}",
-                    AREA_SIZES[index]
+                    index
                 );
                 return Ok(Some((free_stored_area_addr, index as AreaIndex)));
             }
@@ -414,7 +414,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         let addr = LinearAddress::new(self.header.size).expect("node store size can't be 0");
         self.header.size += area_size;
         debug_assert!(addr.get() % 8 == 0);
-        trace!("Allocating from end: addr: {:?}, size: {}", addr, area_size);
+        trace!("Allocating from end: addr: {:?}, size: {}", addr, index);
         Ok((addr, index))
     }
 
@@ -422,9 +422,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     fn stored_len(node: &Node) -> u64 {
         // TODO: calculate length without serializing!
         let area: Area<&Node, FreeArea> = Area::Node(node);
-        let area_bytes = bincode::serialize(&area)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-            .expect("fixme");
+        let area_bytes = bincode::serialize(&area).expect("fixme");
 
         // +1 for the size index byte
         // TODO: do a better job packing the boolean (freed) with the possible node sizes
@@ -459,10 +457,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         debug_assert!(addr.get() % 8 == 0);
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
-        trace!(
-            "Deleting node at {addr:?} of size {}",
-            AREA_SIZES[area_size_index as usize]
-        );
+        trace!("Deleting node at {addr:?} of size {}", area_size_index);
 
         // The area that contained the node is now free.
         let area: Area<Node, FreeArea> = Area::Free(FreeArea {
