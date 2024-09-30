@@ -16,8 +16,8 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use storage::{
     BranchNode, Child, Hashable, HashedNodeReader, ImmutableProposal, LeafNode, LinearAddress,
-    MutableProposal, NibblesIterator, Node, NodeStore, Path, ReadableStorage, TrieHash,
-    TrieReader, ValueDigest,
+    MutableProposal, NibblesIterator, Node, NodeStore, Path, ReadableStorage, TrieHash, TrieReader,
+    ValueDigest,
 };
 
 use thiserror::Error;
@@ -216,7 +216,10 @@ impl<T: TrieReader> Merkle<T> {
         MerkleKeyValueStream::from(&self.nodestore)
     }
 
-    pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(&self, key: K) -> MerkleKeyValueStream<'_, T> {
+    pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(
+        &self,
+        key: K,
+    ) -> MerkleKeyValueStream<'_, T> {
         // TODO danlaine: change key to &[u8]
         MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
     }

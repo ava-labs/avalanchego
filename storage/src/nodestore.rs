@@ -376,19 +376,36 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         // Find the smallest free list that can fit this size.
         let index = area_size_to_index(n)?;
 
-        // rustify: rewrite using self.header.free_lists.iter_mut().find(...)
+        // TODO: rustify: rewrite using self.header.free_lists.iter_mut().find(...)
         for index in index as usize..NUM_AREA_SIZES {
             // Get the first free block of sufficient size.
             if let Some(free_stored_area_addr) = self.header.free_lists[index] {
-                // Update the free list head.
-                // Skip the index byte and Area discriminant byte
                 if let Some(free_head) = self.storage.free_list_cache(free_stored_area_addr) {
+                    trace!("free_head@{free_stored_area_addr}(cached): {free_head:?} size:{index}");
                     self.header.free_lists[index] = free_head;
                 } else {
-                    let free_area_addr = free_stored_area_addr.get() + 2;
+                    let free_area_addr = free_stored_area_addr.get();
                     let free_head_stream = self.storage.stream_from(free_area_addr)?;
-                    let free_head: FreeArea = bincode::deserialize_from(free_head_stream)
-                        .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+                    let free_head: StoredArea<Area<Node, FreeArea>> =
+                        bincode::deserialize_from(free_head_stream)
+                            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+                    let StoredArea {
+                        area: Area::Free(free_head),
+                        area_size_index: read_index,
+                    } = free_head
+                    else {
+                        return Err(Error::new(
+                            ErrorKind::InvalidData,
+                            "Attempted to read a non-free area",
+                        ));
+                    };
+                    debug_assert_eq!(read_index as usize, index);
+
+                    trace!(
+                        "free_head@{}( read ): {:?} size:{index}",
+                        free_area_addr,
+                        free_head
+                    );
 
                     // Update the free list to point to the next free block.
                     self.header.free_lists[index] = free_head.next_free_block;
