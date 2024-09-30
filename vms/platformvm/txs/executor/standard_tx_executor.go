@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -824,15 +825,53 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
 	}
 
-	// If the nonce calculation overflows, weight must be 0, so the validator is
-	// being removed anyways.
+	txID := e.Tx.ID()
+	if msg.Weight == 0 && sov.EndAccumulatedFee != 0 {
+		// If we are removing an active validator, we need to refund the
+		// remaining balance.
+		var remainingBalanceOwner fx.Owner
+		if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+			return err
+		}
+
+		accruedFees := e.State.GetAccruedFees()
+		if sov.EndAccumulatedFee <= accruedFees {
+			// This should never happen as the validator should have been
+			// evicted.
+			return fmt.Errorf("validator has insufficient funds to cover accrued fees")
+		}
+		remainingBalance := sov.EndAccumulatedFee - accruedFees
+
+		outIntf, err := e.Fx.CreateOutput(remainingBalance, remainingBalanceOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(tx.Outs)),
+			},
+			Asset: avax.Asset{
+				ID: e.Ctx.AVAXAssetID,
+			},
+			Out: out,
+		}
+		e.State.AddUTXO(utxo)
+	}
+
+	// If the weight is being set to 0, the validator is being removed and the
+	// nonce doesn't matter.
 	sov.MinNonce = msg.Nonce + 1
 	sov.Weight = msg.Weight
 	if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
 		return err
 	}
-
-	txID := e.Tx.ID()
 
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
