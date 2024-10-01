@@ -667,6 +667,9 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
+	if err := msg.Verify(); err != nil {
+		return err
+	}
 
 	expectedChainID, expectedAddress, err := e.State.GetSubnetManager(msg.SubnetID)
 	if err != nil {
@@ -715,6 +718,11 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return fmt.Errorf("expiry for %s already exists", validationID)
 	}
 
+	nodeID, err := ids.ToNodeID(msg.NodeID)
+	if err != nil {
+		return err
+	}
+
 	balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &tx.RemainingBalanceOwner)
 	if err != nil {
 		return err
@@ -723,7 +731,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	sov := state.SubnetOnlyValidator{
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
-		NodeID:                msg.NodeID,
+		NodeID:                nodeID,
 		PublicKey:             bls.PublicKeyToUncompressedBytes(pop.Key()),
 		RemainingBalanceOwner: balanceOwner,
 		StartTime:             currentTimestampUnix,
