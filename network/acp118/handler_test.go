@@ -19,23 +19,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-var _ Attestor = (*testAttestor)(nil)
+var _ Verifier = (*testVerifier)(nil)
 
 func TestHandler(t *testing.T) {
 	tests := []struct {
 		name           string
-		attestor       Attestor
+		verifier       Verifier
 		expectedErr    error
 		expectedVerify bool
 	}{
 		{
-			name:        "signature fails attestation",
-			attestor:    &testAttestor{Err: &common.AppError{Code: int32(123)}},
+			name:        "signature fails verification",
+			verifier:    &testVerifier{Err: &common.AppError{Code: int32(123)}},
 			expectedErr: &common.AppError{Code: int32(123)},
 		},
 		{
-			name:           "signature attested",
-			attestor:       &testAttestor{},
+			name:           "signature signed",
+			verifier:       &testVerifier{},
 			expectedVerify: true,
 		},
 	}
@@ -51,7 +51,7 @@ func TestHandler(t *testing.T) {
 			networkID := uint32(123)
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
-			h := NewHandler(tt.attestor, signer)
+			h := NewHandler(tt.verifier, signer)
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
 			c := p2ptest.NewClient(
@@ -101,12 +101,12 @@ func TestHandler(t *testing.T) {
 	}
 }
 
-// The zero value of testAttestor attests
-type testAttestor struct {
+// The zero value of testVerifier verifies
+type testVerifier struct {
 	Err *common.AppError
 }
 
-func (t testAttestor) Attest(
+func (t testVerifier) Verify(
 	context.Context,
 	*warp.UnsignedMessage,
 	[]byte,

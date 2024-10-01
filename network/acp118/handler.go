@@ -19,9 +19,9 @@ import (
 
 var _ p2p.Handler = (*Handler)(nil)
 
-// Attestor defines whether to a warp message payload should be attested to
-type Attestor interface {
-	Attest(
+// Verifier defines whether a warp message payload should be verified
+type Verifier interface {
+	Verify(
 		ctx context.Context,
 		message *warp.UnsignedMessage,
 		justification []byte,
@@ -29,9 +29,9 @@ type Attestor interface {
 }
 
 // NewHandler returns an instance of Handler
-func NewHandler(attestor Attestor, signer warp.Signer) *Handler {
+func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
 	return &Handler{
-		attestor: attestor,
+		verifier: verifier,
 		signer:   signer,
 	}
 }
@@ -40,7 +40,7 @@ func NewHandler(attestor Attestor, signer warp.Signer) *Handler {
 type Handler struct {
 	p2p.NoOpHandler
 
-	attestor Attestor
+	verifier Verifier
 	signer   warp.Signer
 }
 
@@ -66,7 +66,7 @@ func (h *Handler) AppRequest(
 		}
 	}
 
-	if err := h.attestor.Attest(ctx, msg, request.Justification); err != nil {
+	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
 		return nil, err
 	}
 
