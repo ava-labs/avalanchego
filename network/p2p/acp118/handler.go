@@ -62,7 +62,7 @@ func (h *Handler) AppRequest(
 	if err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
-			Message: fmt.Sprintf("failed to initialize warp unsigned message: %s", err),
+			Message: fmt.Sprintf("failed to parse warp unsigned message: %s", err),
 		}
 	}
 
