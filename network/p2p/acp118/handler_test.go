@@ -30,8 +30,8 @@ func TestHandler(t *testing.T) {
 	}{
 		{
 			name:        "signature fails verification",
-			verifier:    &testVerifier{Err: &common.AppError{Code: int32(123)}},
-			expectedErr: &common.AppError{Code: int32(123)},
+			verifier:    &testVerifier{Err: &common.AppError{Code: 123}},
+			expectedErr: &common.AppError{Code: 123},
 		},
 		{
 			name:           "signature signed",
