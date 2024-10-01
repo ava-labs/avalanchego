@@ -21,7 +21,11 @@ var _ p2p.Handler = (*Handler)(nil)
 
 // Attestor defines whether to a warp message payload should be attested to
 type Attestor interface {
-	Attest(message *warp.UnsignedMessage, justification []byte) *common.AppError
+	Attest(
+		ctx context.Context,
+		message *warp.UnsignedMessage,
+		justification []byte,
+	) *common.AppError
 }
 
 // NewHandler returns an instance of Handler
@@ -41,7 +45,7 @@ type Handler struct {
 }
 
 func (h *Handler) AppRequest(
-	_ context.Context,
+	ctx context.Context,
 	_ ids.NodeID,
 	_ time.Time,
 	requestBytes []byte,
@@ -62,7 +66,7 @@ func (h *Handler) AppRequest(
 		}
 	}
 
-	if err := h.attestor.Attest(msg, request.Justification); err != nil {
+	if err := h.attestor.Attest(ctx, msg, request.Justification); err != nil {
 		return nil, err
 	}
 

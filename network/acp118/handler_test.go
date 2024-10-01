@@ -106,6 +106,10 @@ type testAttestor struct {
 	Err *common.AppError
 }
 
-func (t testAttestor) Attest(*warp.UnsignedMessage, []byte) *common.AppError {
+func (t testAttestor) Attest(
+	context.Context,
+	*warp.UnsignedMessage,
+	[]byte,
+) *common.AppError {
 	return t.Err
 }
