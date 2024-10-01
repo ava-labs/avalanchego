@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -29,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -857,7 +857,7 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	if msg.Weight == 0 && sov.EndAccumulatedFee != 0 {
 		// If we are removing an active validator, we need to refund the
 		// remaining balance.
-		var remainingBalanceOwner fx.Owner
+		var remainingBalanceOwner message.PChainOwner
 		if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 			return err
 		}
@@ -870,16 +870,6 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		}
 		remainingBalance := sov.EndAccumulatedFee - accruedFees
 
-		outIntf, err := e.Fx.CreateOutput(remainingBalance, remainingBalanceOwner)
-		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
-		}
-
-		out, ok := outIntf.(verify.State)
-		if !ok {
-			return ErrInvalidState
-		}
-
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
@@ -888,7 +878,13 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 			Asset: avax.Asset{
 				ID: e.Ctx.AVAXAssetID,
 			},
-			Out: out,
+			Out: &secp256k1fx.TransferOutput{
+				Amt: remainingBalance,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: remainingBalanceOwner.Threshold,
+					Addrs:     remainingBalanceOwner.Addresses,
+				},
+			},
 		}
 		e.State.AddUTXO(utxo)
 	}
