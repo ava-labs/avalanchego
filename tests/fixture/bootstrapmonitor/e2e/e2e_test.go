@@ -582,8 +582,7 @@ func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, nam
 
 	outputLogLine(tc, fmt.Sprintf(
 		"Logs from: %q container of pod %s.%s (may not be complete)", containerName, namespace, podName))
-	outputLogLine(tc,
-		"================================================================================================================================================")
+	outputLogLine(tc, strings.Repeat("=", 80))
 
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: containerName,

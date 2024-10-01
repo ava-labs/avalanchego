@@ -146,11 +146,7 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 			require := require.New(t)
 
 			config, err := bootstrapTestConfigForPod(test.pod, nodeContainerName)
-			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
-				return
-			}
-			require.NoError(err)
+			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expectedConfig, config)
 		})
 	}
@@ -274,11 +270,7 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 				},
 			}
 			enabled, err := stateSyncEnabledFromEnvVars(env)
-			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
-				return
-			}
-			require.NoError(err)
+			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expectedEnabled, enabled)
 		})
 	}

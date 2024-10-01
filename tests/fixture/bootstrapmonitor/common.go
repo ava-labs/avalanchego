@@ -82,7 +82,7 @@ func waitForPodStatus(
 				return nil
 			}
 		case <-ctx.Done():
-			return errors.New("timeout waiting for pod readiness")
+			return fmt.Errorf("timeout waiting for pod readiness: %w", ctx.Err())
 		}
 	}
 }

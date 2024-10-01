@@ -172,12 +172,14 @@ func getDiskUsage(log logging.Logger, dir string) string {
 			log.Error("Incorrect usage of du command for dir",
 				zap.String("dir", dir),
 				zap.String("stderr", stderr.String()),
+				zap.Error(err),
 			)
 			return ""
 		default:
 			log.Error("du command failed for dir",
-				zap.Int("exitCode", exitError.ExitCode()),
 				zap.String("dir", dir),
+				zap.String("stderr", stderr.String()),
+				zap.Error(err),
 			)
 			return ""
 		}
