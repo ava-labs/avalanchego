@@ -5,7 +5,6 @@ package acp118
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -31,8 +31,8 @@ func TestHandler(t *testing.T) {
 	}{
 		{
 			name:        "signature fails attestation",
-			attestor:    &testAttestor{Err: errors.New("foo")},
-			expectedErr: p2p.ErrUnexpected,
+			attestor:    &testAttestor{Err: &common.AppError{Code: int32(123)}},
+			expectedErr: &common.AppError{Code: int32(123)},
 		},
 		{
 			name:        "signature not attested",
@@ -57,7 +57,7 @@ func TestHandler(t *testing.T) {
 			networkID := uint32(123)
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
-			h := NewHandler(tt.attestor, signer, networkID, chainID)
+			h := NewHandler(tt.attestor, signer)
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
 			c := p2ptest.NewClient(
@@ -110,9 +110,9 @@ func TestHandler(t *testing.T) {
 // The zero value of testAttestor attests
 type testAttestor struct {
 	CantAttest bool
-	Err        error
+	Err        *common.AppError
 }
 
-func (t testAttestor) Attest(*warp.UnsignedMessage, []byte) (bool, error) {
+func (t testAttestor) Attest(*warp.UnsignedMessage, []byte) (bool, *common.AppError) {
 	return !t.CantAttest, t.Err
 }
