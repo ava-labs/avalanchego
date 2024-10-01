@@ -101,7 +101,7 @@ func TestHandler(t *testing.T) {
 	}
 }
 
-// The zero value of testVerifier verifies
+// The zero value of testVerifier allows signing
 type testVerifier struct {
 	Err *common.AppError
 }
