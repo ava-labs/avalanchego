@@ -154,6 +154,7 @@ type OutboundMsgBuilder interface {
 		preferredID ids.ID,
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
+		acceptedHeight uint64,
 	) (OutboundMessage, error)
 
 	AppRequest(
@@ -639,6 +640,7 @@ func (b *outMsgBuilder) Chits(
 	preferredID ids.ID,
 	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
+	acceptedHeight uint64,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -649,6 +651,7 @@ func (b *outMsgBuilder) Chits(
 					PreferredId:         preferredID[:],
 					PreferredIdAtHeight: preferredIDAtHeight[:],
 					AcceptedId:          acceptedID[:],
+					AcceptedHeight:      acceptedHeight,
 				},
 			},
 		},

@@ -147,15 +147,15 @@ func (mr *SenderMockRecorder) SendAppResponse(ctx, nodeID, requestID, appRespons
 }
 
 // SendChits mocks base method.
-func (m *Sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID) {
+func (m *Sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SendChits", ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
+	m.ctrl.Call(m, "SendChits", ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
 
 // SendChits indicates an expected call of SendChits.
-func (mr *SenderMockRecorder) SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID any) *gomock.Call {
+func (mr *SenderMockRecorder) SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*Sender)(nil).SendChits), ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendChits", reflect.TypeOf((*Sender)(nil).SendChits), ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
 
 // SendGet mocks base method.

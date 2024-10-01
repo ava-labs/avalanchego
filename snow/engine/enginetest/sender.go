@@ -52,7 +52,7 @@ type Sender struct {
 	SendAncestorsF               func(context.Context, ids.NodeID, uint32, [][]byte)
 	SendPushQueryF               func(context.Context, set.Set[ids.NodeID], uint32, []byte, uint64)
 	SendPullQueryF               func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64)
-	SendChitsF                   func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID)
+	SendChitsF                   func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64)
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
 	SendAppErrorF                func(context.Context, ids.NodeID, uint32, int32, string) error
@@ -238,9 +238,9 @@ func (s *Sender) SendPullQuery(ctx context.Context, vdrs set.Set[ids.NodeID], re
 // SendChits calls SendChitsF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *Sender) SendChits(ctx context.Context, vdr ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) {
+func (s *Sender) SendChits(ctx context.Context, vdr ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) {
 	if s.SendChitsF != nil {
-		s.SendChitsF(ctx, vdr, requestID, preferredID, preferredIDAtHeight, acceptedID)
+		s.SendChitsF(ctx, vdr, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 	} else if s.CantSendChits && s.T != nil {
 		require.FailNow(s.T, "Unexpectedly called SendChits")
 	}

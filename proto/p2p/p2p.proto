@@ -371,6 +371,8 @@ message Chits {
   bytes accepted_id = 4;
   // Currently preferred block at the requested height
   bytes preferred_id_at_height = 5;
+  // Last accepted block's height
+  uint64 accepted_height = 6;
 }
 
 // AppRequest is a VM-defined request.
