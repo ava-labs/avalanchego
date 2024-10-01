@@ -38,12 +38,12 @@ func newDefaultDBConfig() merkledb.Config {
 	}
 }
 
-func newModifiedRangeProofHandler(
+func newFlakyRangeProofHandler(
 	t *testing.T,
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.RangeProof),
 ) p2p.Handler {
-	handler := NewSyncGetRangeProofHandler(logging.NoLog{}, db)
+	handler := NewGetRangeProofHandler(logging.NoLog{}, db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -74,12 +74,12 @@ func newModifiedRangeProofHandler(
 	}
 }
 
-func newModifiedChangeProofHandler(
+func newFlakyChangeProofHandler(
 	t *testing.T,
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.ChangeProof),
 ) p2p.Handler {
-	handler := NewSyncGetChangeProofHandler(logging.NoLog{}, db)
+	handler := NewGetChangeProofHandler(logging.NoLog{}, db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -144,4 +144,15 @@ func (c *counter) Inc() int {
 
 	c.i++
 	return result
+}
+
+type waitingHandler struct {
+	p2p.NoOpHandler
+	handler         p2p.Handler
+	updatedRootChan chan struct{}
+}
+
+func (w *waitingHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	<-w.updatedRootChan
+	return w.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
