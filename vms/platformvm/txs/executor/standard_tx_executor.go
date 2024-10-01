@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"go.uber.org/zap"
@@ -662,6 +661,9 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
+	if err := msg.Verify(); err != nil {
+		return err
+	}
 
 	expectedChainID, expectedAddress, err := e.State.GetSubnetManager(msg.SubnetID)
 	if err != nil {
@@ -710,6 +712,11 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return fmt.Errorf("expiry for %s already exists", validationID)
 	}
 
+	nodeID, err := ids.ToNodeID(msg.NodeID)
+	if err != nil {
+		return err
+	}
+
 	balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &tx.RemainingBalanceOwner)
 	if err != nil {
 		return err
@@ -718,7 +725,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	sov := state.SubnetOnlyValidator{
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
-		NodeID:                msg.NodeID,
+		NodeID:                nodeID,
 		PublicKey:             bls.PublicKeyToUncompressedBytes(pop.Key()),
 		RemainingBalanceOwner: balanceOwner,
 		StartTime:             currentTimestampUnix,
@@ -798,12 +805,12 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	if err != nil {
 		return err
 	}
-	msg, err := message.ParseSetSubnetValidatorWeight(addressedCall.Payload)
+	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
 	if err != nil {
 		return err
 	}
-	if msg.Nonce == math.MaxUint64 && msg.Weight != 0 {
-		return fmt.Errorf("setting nonce to %d can only be done when removing the validator", msg.Nonce)
+	if err := msg.Verify(); err != nil {
+		return err
 	}
 
 	sov, err := e.State.GetSubnetOnlyValidator(msg.ValidationID)
