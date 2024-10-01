@@ -4,6 +4,7 @@
 use crate::logger::trace;
 use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
+use bincode::Options as _;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -437,15 +438,28 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
 
     /// Returns the length of the serialized area for a node.
     fn stored_len(node: &Node) -> u64 {
+        struct ByteCount(u64);
+
+        impl Write for ByteCount {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.0 += buf.len() as u64;
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
         // TODO: calculate length without serializing!
         let area: Area<&Node, FreeArea> = Area::Node(node);
-        let area_bytes = bincode::serialize(&area).expect("fixme");
-
-        // +1 for the size index byte
-        // TODO: do a better job packing the boolean (freed) with the possible node sizes
-        // A reasonable option is use a i8 and negative values indicate it's freed whereas positive values are non-free
-        // This would still allow for 127 different sizes
-        area_bytes.len() as u64 + 1
+        let mut bytecounter = ByteCount(0);
+        let mut serializer = bincode::Serializer::new(
+            &mut bytecounter,
+            bincode::DefaultOptions::new().with_fixint_encoding(),
+        );
+        area.serialize(&mut serializer).expect("fixme");
+        bytecounter.0 + 1 // Add 1 for the index byte
     }
 
     /// Returns an address that can be used to store the given `node` and updates
@@ -1097,8 +1111,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::linear::memory::MemStore;
+    use crate::{linear::memory::MemStore, BranchNode, LeafNode};
     use arc_swap::access::DynGuard;
+    use test_case::test_case;
 
     use super::*;
 
@@ -1252,5 +1267,37 @@ mod tests {
         assert_eq!(header.version, Version::new());
         let empty_free_list: FreeLists = Default::default();
         assert_eq!(header.free_lists, empty_free_list);
+    }
+
+    #[test_case(BranchNode {
+        partial_path: Path::from([6, 7, 8]),
+        value: Some(vec![9, 10, 11].into_boxed_slice()),
+        children: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), [0; 32].into()))],
+    }; "branch node with 1 child")]
+    #[test_case(
+    Node::Leaf(LeafNode {
+        partial_path: Path::from([0, 1, 2]),
+        value: Box::new([3, 4, 5]),
+    }); "leaf node")]
+
+    fn test_serialized_len<N: Into<Node>>(node: N) {
+        let node = node.into();
+
+        let area_size = NodeStore::<std::sync::Arc<ImmutableProposal>, MemStore>::stored_len(&node);
+
+        let area: Area<&Node, FreeArea> = Area::Node(&node);
+        let actually_serialized = bincode::serialize(&area).unwrap().len() as u64;
+        assert_eq!(area_size, actually_serialized + 1);
+
+        let leaf: Node = Node::Leaf(LeafNode {
+            partial_path: Path::from([0, 1, 2]),
+            value: Box::new([3, 4, 5]),
+        });
+
+        let area_size = NodeStore::<std::sync::Arc<ImmutableProposal>, MemStore>::stored_len(&leaf);
+
+        let area: Area<&Node, FreeArea> = Area::Node(&leaf);
+        let actually_serialized = bincode::serialize(&area).unwrap().len() as u64;
+        assert_eq!(area_size, actually_serialized + 1);
     }
 }

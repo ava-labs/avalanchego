@@ -35,6 +35,18 @@ impl Default for Node {
     }
 }
 
+impl From<BranchNode> for Node {
+    fn from(branch: BranchNode) -> Self {
+        Node::Branch(Box::new(branch))
+    }
+}
+
+impl From<LeafNode> for Node {
+    fn from(leaf: LeafNode) -> Self {
+        Node::Leaf(leaf)
+    }
+}
+
 impl Node {
     /// Returns the partial path of the node.
     pub fn partial_path(&self) -> &Path {
