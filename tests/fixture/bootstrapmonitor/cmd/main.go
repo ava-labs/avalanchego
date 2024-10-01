@@ -26,10 +26,12 @@ const (
 )
 
 func main() {
-	var namespace string
-	var podName string
-	var nodeContainerName string
-	var dataDir string
+	var (
+		namespace         string
+		podName           string
+		nodeContainerName string
+		dataDir           string
+	)
 	rootCmd := &cobra.Command{
 		Use:   commandName,
 		Short: commandName + " commands",
