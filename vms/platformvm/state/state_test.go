@@ -1424,13 +1424,12 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "initially active not modified",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
@@ -1438,13 +1437,12 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "initially inactive not modified",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          ids.GenerateTestID(),
-					SubnetID:              ids.GenerateTestID(),
-					NodeID:                ids.GenerateTestNodeID(),
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     0, // Inactive
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
 				},
 			},
 		},
@@ -1452,23 +1450,21 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "initially active removed",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                0, // Removed
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					PublicKey:    pkBytes,
+					Weight:       0, // Removed
 				},
 			},
 		},
@@ -1476,23 +1472,21 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "initially inactive removed",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     0, // Inactive
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                0, // Removed
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					PublicKey:    pkBytes,
+					Weight:       0, // Removed
 				},
 			},
 		},
@@ -1500,24 +1494,22 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "increase active weight",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                2, // Increased
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            2, // Increased
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
@@ -1525,24 +1517,22 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "deactivate",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     0, // Inactive
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
 				},
 			},
 		},
@@ -1550,24 +1540,22 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "reactivate",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     0, // Inactive
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
@@ -1575,33 +1563,30 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "update multiple times",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                2, // Not removed
-					EndAccumulatedFee:     1, // Inactive
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            2, // Not removed
+					EndAccumulatedFee: 1, // Inactive
 				},
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                3, // Not removed
-					EndAccumulatedFee:     1, // Inactive
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            3, // Not removed
+					EndAccumulatedFee: 1, // Inactive
 				},
 			},
 		},
@@ -1609,32 +1594,29 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "change validationID",
 			initial: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                0, // Removed
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					PublicKey:    pkBytes,
+					Weight:       0, // Removed
 				},
 				{
-					ValidationID:          ids.GenerateTestID(),
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             otherPKBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Inactive
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         otherPKBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Inactive
 				},
 			},
 		},
@@ -1642,21 +1624,19 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			name: "added and removed",
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                1, // Not removed
-					EndAccumulatedFee:     1, // Active
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 1, // Active
 				},
 				{
-					ValidationID:          sov.ValidationID,
-					SubnetID:              sov.SubnetID,
-					NodeID:                sov.NodeID,
-					PublicKey:             pkBytes,
-					RemainingBalanceOwner: []byte{},
-					Weight:                0, // Removed
+					ValidationID: sov.ValidationID,
+					SubnetID:     sov.SubnetID,
+					NodeID:       sov.NodeID,
+					PublicKey:    pkBytes,
+					Weight:       0, // Removed
 				},
 			},
 		},
@@ -1674,6 +1654,9 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				subnetIDs   set.Set[ids.ID]
 			)
 			for _, sov := range test.initial {
+				sov.RemainingBalanceOwner = []byte{}
+				sov.DeactivationOwner = []byte{}
+
 				require.NoError(state.PutSubnetOnlyValidator(sov))
 				initialSOVs[sov.ValidationID] = sov
 				subnetIDs.Add(sov.SubnetID)
@@ -1687,6 +1670,9 @@ func TestSubnetOnlyValidators(t *testing.T) {
 
 			expectedSOVs := maps.Clone(initialSOVs)
 			for _, sov := range test.sovs {
+				sov.RemainingBalanceOwner = []byte{}
+				sov.DeactivationOwner = []byte{}
+
 				require.NoError(d.PutSubnetOnlyValidator(sov))
 				expectedSOVs[sov.ValidationID] = sov
 				subnetIDs.Add(sov.SubnetID)
