@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -378,10 +379,11 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			name: "any can spend",
 			vdr: txs.ConvertSubnetValidator{
 				Signer:                &signer.ProofOfPossession{},
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
 			},
 			expected: gas.Dimensions{
-				gas.Bandwidth: 204,
+				gas.Bandwidth: 200,
 				gas.DBRead:    0,
 				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
@@ -389,18 +391,39 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "single owner",
+			name: "single remaining balance owner",
 			vdr: txs.ConvertSubnetValidator{
 				Signer: &signer.ProofOfPossession{},
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+				RemainingBalanceOwner: message.PChainOwner{
 					Threshold: 1,
-					Addrs: []ids.ShortID{
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBRead:    0,
+				gas.DBWrite:   4,
+				gas.Compute:   0, // TODO: implement
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "single deactivation owner",
+			vdr: txs.ConvertSubnetValidator{
+				Signer:                &signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
 						ids.GenerateTestShortID(),
 					},
 				},
 			},
 			expected: gas.Dimensions{
-				gas.Bandwidth: 224,
+				gas.Bandwidth: 220,
 				gas.DBRead:    0,
 				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
@@ -411,19 +434,11 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			name: "invalid signer",
 			vdr: txs.ConvertSubnetValidator{
 				Signer:                nil,
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
 			},
 			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedSigner,
-		},
-		{
-			name: "invalid owner",
-			vdr: txs.ConvertSubnetValidator{
-				Signer:                &signer.ProofOfPossession{},
-				RemainingBalanceOwner: nil,
-			},
-			expected:    gas.Dimensions{},
-			expectedErr: errUnsupportedOwner,
 		},
 	}
 	for _, test := range tests {

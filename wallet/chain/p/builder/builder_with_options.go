@@ -175,14 +175,12 @@ func (b *builderWithOptions) NewConvertSubnetTx(
 func (b *builderWithOptions) NewRegisterSubnetValidatorTx(
 	balance uint64,
 	proofOfPossession [bls.SignatureLen]byte,
-	remainingBalanceOwner *secp256k1fx.OutputOwners,
 	message []byte,
 	options ...common.Option,
 ) (*txs.RegisterSubnetValidatorTx, error) {
 	return b.builder.NewRegisterSubnetValidatorTx(
 		balance,
 		proofOfPossession,
-		remainingBalanceOwner,
 		message,
 		common.UnionOptions(b.options, options)...,
 	)

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
@@ -299,10 +300,15 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 						Weight:  0x0102030405060708,
 						Balance: units.Avax,
 						Signer:  signer.NewProofOfPossession(sk),
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
-							Locktime:  0,
+						RemainingBalanceOwner: message.PChainOwner{
 							Threshold: 1,
-							Addrs: []ids.ShortID{
+							Addresses: []ids.ShortID{
+								addr,
+							},
+						},
+						DeactivationOwner: message.PChainOwner{
+							Threshold: 1,
+							Addresses: []ids.ShortID{
 								addr,
 							},
 						},
@@ -557,7 +563,8 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				Weight:                1,
 				Balance:               1,
 				Signer:                signer.NewProofOfPossession(sk),
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
 			},
 		}
 		validSubnetAuth   = &secp256k1fx.Input{}
@@ -648,7 +655,8 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 					{
 						Weight:                0,
 						Signer:                signer.NewProofOfPossession(sk),
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner:     message.PChainOwner{},
 					},
 				},
 				SubnetAuth: validSubnetAuth,
@@ -664,7 +672,8 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 					{
 						Weight:                1,
 						Signer:                &signer.ProofOfPossession{},
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner:     message.PChainOwner{},
 					},
 				},
 				SubnetAuth: validSubnetAuth,
@@ -672,7 +681,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			expectedErr: bls.ErrFailedPublicKeyDecompress,
 		},
 		{
-			name: "invalid validator owner",
+			name: "invalid validator remaining balance owner",
 			tx: &ConvertSubnetTx{
 				BaseTx: validBaseTx,
 				Subnet: validSubnetID,
@@ -680,7 +689,27 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 					{
 						Weight: 1,
 						Signer: signer.NewProofOfPossession(sk),
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+						RemainingBalanceOwner: message.PChainOwner{
+							Threshold: 1,
+						},
+						DeactivationOwner: message.PChainOwner{},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: secp256k1fx.ErrOutputUnspendable,
+		},
+		{
+			name: "invalid validator deactivation owner",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []ConvertSubnetValidator{
+					{
+						Weight:                1,
+						Signer:                signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner: message.PChainOwner{
 							Threshold: 1,
 						},
 					},
@@ -698,7 +727,8 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 					{
 						Weight:                1,
 						Signer:                &signer.Empty{},
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner:     message.PChainOwner{},
 					},
 				},
 				SubnetAuth: validSubnetAuth,
