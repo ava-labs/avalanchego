@@ -4,6 +4,7 @@
 package message
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 
@@ -25,4 +26,41 @@ func TestSubnetValidatorWeight(t *testing.T) {
 	parsed, err := ParseSubnetValidatorWeight(msg.Bytes())
 	require.NoError(err)
 	require.Equal(msg, parsed)
+}
+
+func TestSubnetValidatorWeight_Verify(t *testing.T) {
+	mustCreate := func(msg *SubnetValidatorWeight, err error) *SubnetValidatorWeight {
+		require.NoError(t, err)
+		return msg
+	}
+	tests := []struct {
+		name     string
+		msg      *SubnetValidatorWeight
+		expected error
+	}{
+		{
+			name: "Invalid Nonce",
+			msg: mustCreate(NewSubnetValidatorWeight(
+				ids.GenerateTestID(),
+				math.MaxUint64,
+				1,
+			)),
+			expected: ErrNonceReservedForRemoval,
+		},
+		{
+			name: "Valid",
+			msg: mustCreate(NewSubnetValidatorWeight(
+				ids.GenerateTestID(),
+				math.MaxUint64,
+				0,
+			)),
+			expected: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.msg.Verify()
+			require.ErrorIs(t, err, test.expected)
+		})
+	}
 }

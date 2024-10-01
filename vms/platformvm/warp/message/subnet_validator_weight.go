@@ -4,10 +4,14 @@
 package message
 
 import (
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
+
+var ErrNonceReservedForRemoval = errors.New("maxUint64 nonce is reserved for removal")
 
 // SubnetValidatorWeight is both received and sent by the P-chain.
 //
@@ -22,6 +26,13 @@ type SubnetValidatorWeight struct {
 	ValidationID ids.ID `serialize:"true" json:"validationID"`
 	Nonce        uint64 `serialize:"true" json:"nonce"`
 	Weight       uint64 `serialize:"true" json:"weight"`
+}
+
+func (s *SubnetValidatorWeight) Verify() error {
+	if s.Nonce == math.MaxUint64 && s.Weight != 0 {
+		return ErrNonceReservedForRemoval
+	}
+	return nil
 }
 
 // NewSubnetValidatorWeight creates a new initialized SubnetValidatorWeight.
