@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -164,13 +165,13 @@ func New(
 	}
 
 	// We allow all peers to request warp messaging signatures
-	signatureRequestHandler := signatureRequestHandler{
+	signatureRequestVerifier := signatureRequestVerifier{
 		stateLock: stateLock,
 		state:     state,
-		signer:    signer,
 	}
+	signatureRequestHandler := acp118.NewHandler(signatureRequestVerifier, signer)
 
-	if err := p2pNetwork.AddHandler(p2p.SignatureRequestHandlerID, signatureRequestHandler); err != nil {
+	if err := p2pNetwork.AddHandler(acp118.HandlerID, signatureRequestHandler); err != nil {
 		return nil, err
 	}
 
