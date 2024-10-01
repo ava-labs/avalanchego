@@ -96,7 +96,7 @@ func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*Boot
 	// Attempt to retrieve the image versions from a pod annotation. The annotation may not be populated in
 	// the case of a newly-created bootstrap test using an image tagged `latest` that hasn't yet had a
 	// chance to discover the versions.
-	if versionsAnnotation, ok := pod.Annotations[VersionsAnnotationKey]; ok && len(versionsAnnotation) > 0 {
+	if versionsAnnotation := pod.Annotations[VersionsAnnotationKey]; len(versionsAnnotation) > 0 {
 		testConfig.Versions = &version.Versions{}
 		if err := json.Unmarshal([]byte(versionsAnnotation), testConfig.Versions); err != nil {
 			return nil, fmt.Errorf("%w: %w", errFailedToUnmarshalAnnoation, err)
