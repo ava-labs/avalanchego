@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
+const HandlerID = p2p.SignatureRequestHandlerID
+
 var _ p2p.Handler = (*Handler)(nil)
 
 // Verifier verifies that a warp message should be signed

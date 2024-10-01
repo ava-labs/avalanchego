@@ -171,7 +171,7 @@ func New(
 	}
 	signatureRequestHandler := acp118.NewHandler(signatureRequestVerifier, signer)
 
-	if err := p2pNetwork.AddHandler(p2p.SignatureRequestHandlerID, signatureRequestHandler); err != nil {
+	if err := p2pNetwork.AddHandler(acp118.HandlerID, signatureRequestHandler); err != nil {
 		return nil, err
 	}
 
