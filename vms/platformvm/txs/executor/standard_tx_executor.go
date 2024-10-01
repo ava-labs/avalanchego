@@ -725,7 +725,12 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &tx.RemainingBalanceOwner)
+	remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.RemainingBalanceOwner)
+	if err != nil {
+		return err
+	}
+
+	deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.DisableOwner)
 	if err != nil {
 		return err
 	}
@@ -735,7 +740,8 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		SubnetID:              msg.SubnetID,
 		NodeID:                nodeID,
 		PublicKey:             bls.PublicKeyToUncompressedBytes(pop.Key()),
-		RemainingBalanceOwner: balanceOwner,
+		RemainingBalanceOwner: remainingBalanceOwner,
+		DeactivationOwner:     deactivationOwner,
 		StartTime:             currentTimestampUnix,
 		Weight:                msg.Weight,
 		MinNonce:              0,

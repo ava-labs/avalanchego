@@ -170,14 +170,11 @@ type Builder interface {
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
 	//   message
-	// - [remainingBalanceOwner] specifies the owner to send any of the
-	//   remaining balance after removing the continuous fee
 	// - [message] is the Warp message that authorizes this validator to be
 	//   added
 	NewRegisterSubnetValidatorTx(
 		balance uint64,
 		proofOfPossession [bls.SignatureLen]byte,
-		remainingBalanceOwner *secp256k1fx.OutputOwners,
 		message []byte,
 		options ...common.Option,
 	) (*txs.RegisterSubnetValidatorTx, error)
@@ -882,7 +879,6 @@ func (b *builder) NewConvertSubnetTx(
 func (b *builder) NewRegisterSubnetValidatorTx(
 	balance uint64,
 	proofOfPossession [bls.SignatureLen]byte,
-	remainingBalanceOwner *secp256k1fx.OutputOwners,
 	message []byte,
 	options ...common.Option,
 ) (*txs.RegisterSubnetValidatorTx, error) {
@@ -898,17 +894,12 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 	memoComplexity := gas.Dimensions{
 		gas.Bandwidth: uint64(len(memo)),
 	}
-	ownerComplexity, err := fee.OwnerComplexity(remainingBalanceOwner)
-	if err != nil {
-		return nil, err
-	}
 	warpComplexity, err := fee.WarpComplexity(message)
 	if err != nil {
 		return nil, err
 	}
 	complexity, err := fee.IntrinsicRegisterSubnetValidatorTxComplexities.Add(
 		&memoComplexity,
-		&ownerComplexity,
 		&warpComplexity,
 	)
 	if err != nil {
@@ -927,7 +918,6 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 		return nil, err
 	}
 
-	utils.Sort(remainingBalanceOwner.Addrs)
 	tx := &txs.RegisterSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
@@ -936,10 +926,9 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 			Outs:         outputs,
 			Memo:         memo,
 		}},
-		Balance:               balance,
-		ProofOfPossession:     proofOfPossession,
-		RemainingBalanceOwner: remainingBalanceOwner,
-		Message:               message,
+		Balance:           balance,
+		ProofOfPossession: proofOfPossession,
+		Message:           message,
 	}
 	return tx, b.initCtx(tx)
 }
