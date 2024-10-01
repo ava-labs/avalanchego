@@ -82,6 +82,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 		NodeID:                ids.GenerateTestNodeID(),
 		PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
 		RemainingBalanceOwner: utils.RandomBytes(32),
+		DeactivationOwner:     utils.RandomBytes(32),
 		StartTime:             rand.Uint64(), // #nosec G404
 	}
 
@@ -103,6 +104,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				NodeID:                ids.GenerateTestNodeID(),
 				PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
 				RemainingBalanceOwner: utils.RandomBytes(32),
+				DeactivationOwner:     utils.RandomBytes(32),
 				StartTime:             rand.Uint64(), // #nosec G404
 			},
 			expected: true,
@@ -115,6 +117,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				NodeID:                sov.NodeID,
 				PublicKey:             sov.PublicKey,
 				RemainingBalanceOwner: sov.RemainingBalanceOwner,
+				DeactivationOwner:     sov.DeactivationOwner,
 				StartTime:             sov.StartTime,
 			},
 		},
@@ -126,6 +129,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				NodeID:                ids.GenerateTestNodeID(),
 				PublicKey:             sov.PublicKey,
 				RemainingBalanceOwner: sov.RemainingBalanceOwner,
+				DeactivationOwner:     sov.DeactivationOwner,
 				StartTime:             sov.StartTime,
 			},
 		},
@@ -137,6 +141,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				NodeID:                sov.NodeID,
 				PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
 				RemainingBalanceOwner: sov.RemainingBalanceOwner,
+				DeactivationOwner:     sov.DeactivationOwner,
 				StartTime:             sov.StartTime,
 			},
 		},
@@ -148,6 +153,19 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				NodeID:                sov.NodeID,
 				PublicKey:             sov.PublicKey,
 				RemainingBalanceOwner: utils.RandomBytes(32),
+				DeactivationOwner:     sov.DeactivationOwner,
+				StartTime:             sov.StartTime,
+			},
+		},
+		{
+			name: "different deactivationOwner",
+			v: SubnetOnlyValidator{
+				ValidationID:          sov.ValidationID,
+				SubnetID:              sov.SubnetID,
+				NodeID:                sov.NodeID,
+				PublicKey:             sov.PublicKey,
+				RemainingBalanceOwner: sov.RemainingBalanceOwner,
+				DeactivationOwner:     utils.RandomBytes(32),
 				StartTime:             sov.StartTime,
 			},
 		},
@@ -159,6 +177,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				NodeID:                sov.NodeID,
 				PublicKey:             sov.PublicKey,
 				RemainingBalanceOwner: sov.RemainingBalanceOwner,
+				DeactivationOwner:     sov.DeactivationOwner,
 				StartTime:             rand.Uint64(), // #nosec G404
 			},
 		},
