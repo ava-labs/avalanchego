@@ -76,6 +76,10 @@ type SubnetOnlyValidator struct {
 	// balance of the validator after removing accrued fees.
 	RemainingBalanceOwner []byte `serialize:"true"`
 
+	// DeactivationOwner is the owner that can manually deactivate the
+	// validator.
+	DeactivationOwner []byte `serialize:"true"`
+
 	// StartTime is the unix timestamp, in seconds, when this validator was
 	// added to the set.
 	StartTime uint64 `serialize:"true"`
@@ -128,6 +132,7 @@ func (v SubnetOnlyValidator) validateConstants(o SubnetOnlyValidator) bool {
 		v.NodeID == o.NodeID &&
 		bytes.Equal(v.PublicKey, o.PublicKey) &&
 		bytes.Equal(v.RemainingBalanceOwner, o.RemainingBalanceOwner) &&
+		bytes.Equal(v.DeactivationOwner, o.DeactivationOwner) &&
 		v.StartTime == o.StartTime
 }
 
