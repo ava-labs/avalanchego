@@ -209,13 +209,22 @@ func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	var owner fx.Owner = &secp256k1fx.OutputOwners{
+	var remainingBalanceOwner fx.Owner = &secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
 			ids.GenerateTestShortID(),
 		},
 	}
-	ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
+	remainingBalanceOwnerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &remainingBalanceOwner)
+	require.NoError(err)
+
+	var deactivationOwner fx.Owner = &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			ids.GenerateTestShortID(),
+		},
+	}
+	deactivationOwnerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &deactivationOwner)
 	require.NoError(err)
 
 	vdr := SubnetOnlyValidator{
@@ -223,7 +232,8 @@ func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
 		SubnetID:              ids.GenerateTestID(),
 		NodeID:                ids.GenerateTestNodeID(),
 		PublicKey:             pkBytes,
-		RemainingBalanceOwner: ownerBytes,
+		RemainingBalanceOwner: remainingBalanceOwnerBytes,
+		DeactivationOwner:     deactivationOwnerBytes,
 		StartTime:             rand.Uint64(), // #nosec G404
 		Weight:                rand.Uint64(), // #nosec G404
 		MinNonce:              rand.Uint64(), // #nosec G404
