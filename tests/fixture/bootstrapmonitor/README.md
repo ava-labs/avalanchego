@@ -64,9 +64,9 @@ and initiates a new test when one is found.
    `bootstrap-monitor` attempt to read serialized test details (namely
    the image used for the test and the start time of the test) from
    the same data volume used by the avalanchego node. These details
-   are written by the `init` command when it determines that new test
+   are written by the `init` command when it determines that a new test
    is starting.
- - The `bootstrap-monitor init` command is intended to run as as an
+ - The `bootstrap-monitor init` command is intended to run as an
    [init
    container](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/)
    of an avalanchego node and ensure that the ID of the image and its
@@ -109,17 +109,17 @@ and initiates a new test when one is found.
      - If the images differ (or the file was not present), the data
        volume is initialized for a new test:
        - The data volume is cleared
-       - The image from the test configuration and and time are
+       - The image from the test configuration and the time are
          serialized to a file on the data volume
      - If the images are the same, the data volume is used as-is to
        enable resuming an in-progress test.
  - `bootstrap-monitor wait-for-completion` is intended to run as a
    sidecar of the avalanchego container. It polls the health of the
    node container to detect when a bootstrap test has completed
-   successfully, then polls for a new image to test and when one is
-   found, updates the managing `StatefulSet` with the details of that
-   image to trigger a new test. The process to detect a new image is
-   the same as was described for the `init` command.
+   successfully and then polls for a new image to test. When a new
+   image is found, the managing `StatefulSet` is updated with the
+   details of the image to trigger a new test. The process to detect a
+   new image is the same as was described for the `init` command.
 
 ## Package details
 
