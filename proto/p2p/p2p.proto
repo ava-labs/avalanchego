@@ -363,13 +363,13 @@ message PullQuery {
 message Chits {
   // Chain being responded from
   bytes chain_id = 1;
-  // Request id of the original PushQuery/PullQuery request
+  // Request ID of the original PushQuery/PullQuery request
   uint32 request_id = 2;
-  // Currently preferred block
+  // ID of the currently preferred block
   bytes preferred_id = 3;
-  // Last accepted block
+  // ID of the last accepted block
   bytes accepted_id = 4;
-  // Currently preferred block at the requested height
+  // ID of the currently preferred block at the requested height
   bytes preferred_id_at_height = 5;
 }
 
