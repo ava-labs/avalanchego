@@ -252,7 +252,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		require.FailNow("Image build failed: %s\nWith output: %s", err, output)
+		require.FailNow("Image build failed: %v\nWith output: %s", err, output)
 	}
 }
 
