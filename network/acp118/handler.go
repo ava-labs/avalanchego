@@ -25,10 +25,7 @@ type Attestor interface {
 }
 
 // NewHandler returns an instance of Handler
-func NewHandler(
-	attestor Attestor,
-	signer warp.Signer,
-) *Handler {
+func NewHandler(attestor Attestor, signer warp.Signer) *Handler {
 	return &Handler{
 		attestor: attestor,
 		signer:   signer,
