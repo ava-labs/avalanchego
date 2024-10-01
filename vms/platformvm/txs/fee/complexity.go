@@ -66,7 +66,10 @@ const (
 		wrappers.LongLen + // weight
 		wrappers.LongLen + // balance
 		wrappers.IntLen + // signer typeID
-		wrappers.IntLen // owner typeID
+		wrappers.IntLen + // remaining balance owner threshold
+		wrappers.IntLen + // remaining balance owner num addresses
+		wrappers.IntLen + // deactivation owner threshold
+		wrappers.IntLen // deactivation owner num addresses
 
 	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
 		bls.SignatureLen // signature
@@ -198,7 +201,6 @@ var (
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.LongLen + // balance
 			wrappers.IntLen + // signer typeID
-			wrappers.IntLen + // owner typeID
 			wrappers.IntLen, // message length
 		gas.DBRead:  0, // TODO
 		gas.DBWrite: 0, // TODO
@@ -360,13 +362,17 @@ func convertSubnetValidatorComplexity(sov txs.ConvertSubnetValidator) (gas.Dimen
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
-	ownerComplexity, err := OwnerComplexity(sov.RemainingBalanceOwner)
+
+	numAddresses := uint64(len(sov.RemainingBalanceOwner.Addresses) + len(sov.DeactivationOwner.Addresses))
+	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
 	return complexity.Add(
 		&signerComplexity,
-		&ownerComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: addressBandwidth,
+		},
 	)
 }
 
@@ -707,17 +713,12 @@ func (c *complexityVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVali
 	if err != nil {
 		return err
 	}
-	ownerComplexity, err := OwnerComplexity(tx.RemainingBalanceOwner)
-	if err != nil {
-		return err
-	}
 	warpComplexity, err := WarpComplexity(tx.Message)
 	if err != nil {
 		return err
 	}
 	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
 		&baseTxComplexity,
-		&ownerComplexity,
 		&warpComplexity,
 	)
 	return err
