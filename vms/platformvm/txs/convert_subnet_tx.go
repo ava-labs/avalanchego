@@ -11,8 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
@@ -96,7 +97,9 @@ type ConvertSubnetValidator struct {
 	Signer signer.Signer `serialize:"true" json:"signer"`
 	// Leftover $AVAX from the [Balance] will be issued to this owner once it is
 	// removed from the validator set.
-	RemainingBalanceOwner fx.Owner `serialize:"true" json:"remainingBalanceOwner"`
+	RemainingBalanceOwner message.PChainOwner `serialize:"true" json:"remainingBalanceOwner"`
+	// This owner has the authority to manually deactivate this validator.
+	DeactivationOwner message.PChainOwner `serialize:"true" json:"deactivationOwner"`
 }
 
 func (v ConvertSubnetValidator) Compare(o ConvertSubnetValidator) int {
@@ -107,7 +110,18 @@ func (v *ConvertSubnetValidator) Verify() error {
 	if v.Weight == 0 {
 		return ErrZeroWeight
 	}
-	if err := verify.All(v.Signer, v.RemainingBalanceOwner); err != nil {
+	err := verify.All(
+		v.Signer,
+		&secp256k1fx.OutputOwners{
+			Threshold: v.RemainingBalanceOwner.Threshold,
+			Addrs:     v.RemainingBalanceOwner.Addresses,
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: v.DeactivationOwner.Threshold,
+			Addrs:     v.DeactivationOwner.Addresses,
+		},
+	)
+	if err != nil {
 		return err
 	}
 	if v.Signer.Key() == nil {

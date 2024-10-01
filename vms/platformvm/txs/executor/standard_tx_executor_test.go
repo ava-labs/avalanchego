@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -2571,7 +2572,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 						Weight:                1,
 						Balance:               1,
 						Signer:                signer.NewProofOfPossession(sk),
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner:     message.PChainOwner{},
 					},
 				},
 				test.builderOptions...,

@@ -548,17 +548,22 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	)
 	for i, vdr := range tx.Validators {
 		vdr := vdr
-		balanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+		remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
+		if err != nil {
+			return err
+		}
+		deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.DeactivationOwner)
 		if err != nil {
 			return err
 		}
 
 		sov := state.SubnetOnlyValidator{
-			ValidationID:          txID.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
+			ValidationID:          tx.Subnet.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
 			SubnetID:              tx.Subnet,
 			NodeID:                vdr.NodeID,
 			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
-			RemainingBalanceOwner: balanceOwner,
+			RemainingBalanceOwner: remainingBalanceOwner,
+			DeactivationOwner:     deactivationOwner,
 			StartTime:             startTime,
 			Weight:                vdr.Weight,
 			MinNonce:              0,
