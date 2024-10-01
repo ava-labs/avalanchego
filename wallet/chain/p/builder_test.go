@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -682,9 +683,15 @@ func TestConvertSubnetTx(t *testing.T) {
 				Weight:  rand.Uint64(), //#nosec G404
 				Balance: units.Avax,
 				Signer:  signer.NewProofOfPossession(sk0),
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+				RemainingBalanceOwner: message.PChainOwner{
 					Threshold: 1,
-					Addrs: []ids.ShortID{
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
 						ids.GenerateTestShortID(),
 					},
 				},
@@ -694,7 +701,8 @@ func TestConvertSubnetTx(t *testing.T) {
 				Weight:                rand.Uint64(), //#nosec G404
 				Balance:               2 * units.Avax,
 				Signer:                signer.NewProofOfPossession(sk1),
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
 			},
 		}
 	)
