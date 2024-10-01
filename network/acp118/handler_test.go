@@ -95,7 +95,7 @@ func TestHandler(t *testing.T) {
 				require.Equal(tt.expectedVerify, bls.Verify(pk, signature, request.Message))
 			}
 
-			require.NoError(c.AppRequest(ctx, set.Of(serverNodeID), requestBytes, onResponse))
+			require.NoError(c.AppRequest(ctx, set.Of(clientNodeID), requestBytes, onResponse))
 			<-done
 		})
 	}
