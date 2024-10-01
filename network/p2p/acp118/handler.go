@@ -19,7 +19,7 @@ import (
 
 var _ p2p.Handler = (*Handler)(nil)
 
-// Verifier defines whether a warp message payload should be verified
+// Verifier verifies that a warp message should be signed
 type Verifier interface {
 	Verify(
 		ctx context.Context,
