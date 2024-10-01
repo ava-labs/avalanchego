@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"go.uber.org/zap"
@@ -816,12 +815,12 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return err
 	}
 
-	msg, err := message.ParseSetSubnetValidatorWeight(addressedCall.Payload)
+	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
 	if err != nil {
 		return err
 	}
-	if msg.Nonce == math.MaxUint64 && msg.Weight != 0 {
-		return fmt.Errorf("setting nonce to %d can only be done when removing the validator", msg.Nonce)
+	if err := msg.Verify(); err != nil {
+		return err
 	}
 
 	sov, err := e.State.GetSubnetOnlyValidator(msg.ValidationID)
