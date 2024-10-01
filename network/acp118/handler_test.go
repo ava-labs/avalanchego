@@ -11,7 +11,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -33,11 +32,6 @@ func TestHandler(t *testing.T) {
 			name:        "signature fails attestation",
 			attestor:    &testAttestor{Err: &common.AppError{Code: int32(123)}},
 			expectedErr: &common.AppError{Code: int32(123)},
-		},
-		{
-			name:        "signature not attested",
-			attestor:    &testAttestor{CantAttest: true},
-			expectedErr: p2p.ErrAttestFailed,
 		},
 		{
 			name:           "signature attested",
@@ -109,10 +103,9 @@ func TestHandler(t *testing.T) {
 
 // The zero value of testAttestor attests
 type testAttestor struct {
-	CantAttest bool
-	Err        *common.AppError
+	Err *common.AppError
 }
 
-func (t testAttestor) Attest(*warp.UnsignedMessage, []byte) (bool, *common.AppError) {
-	return !t.CantAttest, t.Err
+func (t testAttestor) Attest(*warp.UnsignedMessage, []byte) *common.AppError {
+	return t.Err
 }

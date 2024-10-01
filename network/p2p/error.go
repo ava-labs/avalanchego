@@ -30,10 +30,4 @@ var (
 		Code:    -4,
 		Message: "throttled",
 	}
-	// ErrAttestFailed should be used to indicate that a request failed
-	// to be signed due to the peer being unable to attest the message
-	ErrAttestFailed = &common.AppError{
-		Code:    -5,
-		Message: "failed attestation",
-	}
 )
