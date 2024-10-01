@@ -23,7 +23,6 @@ func init() {
 		lc.RegisterType(&SubnetConversion{}),
 		lc.RegisterType(&RegisterSubnetValidator{}),
 		lc.RegisterType(&SubnetValidatorRegistration{}),
-		lc.RegisterType(&SetSubnetValidatorWeight{}),
 		lc.RegisterType(&SubnetValidatorWeight{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
