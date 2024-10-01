@@ -155,11 +155,12 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 				tc.Outf("Error determining image used by the %q container of pod %s.%s: %v \n", nodeContainerName, namespace, bootstrapPodName, err)
 				return false
 			}
-			if strings.Contains(testConfig.Image, "sha256") {
-				containerImage = testConfig.Image
-				return true
+			if !strings.Contains(testConfig.Image, "sha256") {
+				return false
 			}
-			return false
+			
+			containerImage = testConfig.Image
+			return true
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
 
 		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report the start of a bootstrap test", initContainerName))
