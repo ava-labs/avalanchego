@@ -158,7 +158,6 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 			if !strings.Contains(testConfig.Image, "sha256") {
 				return false
 			}
-			
 			containerImage = testConfig.Image
 			return true
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval)
