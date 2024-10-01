@@ -8,16 +8,10 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
-
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -25,68 +19,45 @@ import (
 )
 
 const (
-	ErrFailedToParseRequest = iota + 1
-	ErrFailedToParseWarp
-	ErrFailedToParseWarpAddressedCall
+	ErrFailedToParseWarpAddressedCall = iota + 1
 	ErrWarpAddressedCallHasSourceAddress
 	ErrFailedToParseWarpAddressedCallPayload
 	ErrUnsupportedWarpAddressedCallPayloadType
+
 	ErrFailedToParseJustification
 	ErrMismatchedValidationID
 	ErrValidationDoesNotExist
 	ErrValidationExists
 	ErrValidationCouldBeRegistered
+
 	ErrImpossibleNonce
 	ErrWrongNonce
 	ErrWrongWeight
-	ErrFailedToSignWarp
+
 	errUnimplemented // TODO: Remove
 )
 
-var _ p2p.Handler = (*signatureRequestHandler)(nil)
+var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
 
-type signatureRequestHandler struct {
-	p2p.NoOpHandler
-
+type signatureRequestVerifier struct {
 	stateLock sync.Locker
 	state     state.Chain
-
-	signer warp.Signer
 }
 
-func (s signatureRequestHandler) AppRequest(
+func (s signatureRequestVerifier) Verify(
 	_ context.Context,
-	_ ids.NodeID,
-	_ time.Time,
-	requestBytes []byte,
-) ([]byte, *common.AppError) {
-	// Per ACP-118, the requestBytes are the serialized form of
-	// sdk.SignatureRequest.
-	var req sdk.SignatureRequest
-	if err := proto.Unmarshal(requestBytes, &req); err != nil {
-		return nil, &common.AppError{
-			Code:    ErrFailedToParseRequest,
-			Message: "failed to unmarshal request: " + err.Error(),
-		}
-	}
-
-	unsignedMessage, err := warp.ParseUnsignedMessage(req.Message)
-	if err != nil {
-		return nil, &common.AppError{
-			Code:    ErrFailedToParseWarp,
-			Message: "failed to parse warp message: " + err.Error(),
-		}
-	}
-
+	unsignedMessage *warp.UnsignedMessage,
+	justification []byte,
+) *common.AppError {
 	msg, err := payload.ParseAddressedCall(unsignedMessage.Payload)
 	if err != nil {
-		return nil, &common.AppError{
+		return &common.AppError{
 			Code:    ErrFailedToParseWarpAddressedCall,
 			Message: "failed to parse warp addressed call: " + err.Error(),
 		}
 	}
 	if len(msg.SourceAddress) != 0 {
-		return nil, &common.AppError{
+		return &common.AppError{
 			Code:    ErrWarpAddressedCallHasSourceAddress,
 			Message: "source address should be empty",
 		}
@@ -94,54 +65,28 @@ func (s signatureRequestHandler) AppRequest(
 
 	payloadIntf, err := message.Parse(msg.Payload)
 	if err != nil {
-		return nil, &common.AppError{
+		return &common.AppError{
 			Code:    ErrFailedToParseWarpAddressedCallPayload,
 			Message: "failed to parse warp addressed call payload: " + err.Error(),
 		}
 	}
 
-	var payloadErr *common.AppError
 	switch payload := payloadIntf.(type) {
 	case *message.SubnetConversion:
-		payloadErr = s.verifySubnetConversion(payload, req.Justification)
+		return s.verifySubnetConversion(payload, justification)
 	case *message.SubnetValidatorRegistration:
-		payloadErr = s.verifySubnetValidatorRegistration(payload, req.Justification)
+		return s.verifySubnetValidatorRegistration(payload, justification)
 	case *message.SubnetValidatorWeight:
-		payloadErr = s.verifySubnetValidatorWeight(payload)
+		return s.verifySubnetValidatorWeight(payload)
 	default:
-		payloadErr = &common.AppError{
+		return &common.AppError{
 			Code:    ErrUnsupportedWarpAddressedCallPayloadType,
 			Message: fmt.Sprintf("unsupported warp addressed call payload type: %T", payloadIntf),
 		}
 	}
-	if payloadErr != nil {
-		return nil, payloadErr
-	}
-
-	sig, err := s.signer.Sign(unsignedMessage)
-	if err != nil {
-		return nil, &common.AppError{
-			Code:    ErrFailedToSignWarp,
-			Message: "failed to sign warp message: " + err.Error(),
-		}
-	}
-
-	// Per ACP-118, the responseBytes are the serialized form of
-	// sdk.SignatureResponse.
-	resp := &sdk.SignatureResponse{
-		Signature: sig,
-	}
-	respBytes, err := proto.Marshal(resp)
-	if err != nil {
-		return nil, &common.AppError{
-			Code:    common.ErrUndefined.Code,
-			Message: "failed to marshal response: " + err.Error(),
-		}
-	}
-	return respBytes, nil
 }
 
-func (s signatureRequestHandler) verifySubnetConversion(
+func (s signatureRequestVerifier) verifySubnetConversion(
 	msg *message.SubnetConversion,
 	justification []byte,
 ) *common.AppError {
@@ -154,23 +99,23 @@ func (s signatureRequestHandler) verifySubnetConversion(
 	}
 }
 
-func (s signatureRequestHandler) verifySubnetValidatorRegistration(
+func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	msg *message.SubnetValidatorRegistration,
 	justification []byte,
 ) *common.AppError {
-	var justificationID ids.ID = hashing.ComputeHash256Array(justification)
-	if msg.ValidationID != justificationID {
-		return &common.AppError{
-			Code:    ErrMismatchedValidationID,
-			Message: fmt.Sprintf("validationID %q != justificationID %q", msg.ValidationID, justificationID),
-		}
-	}
-
 	registerSubnetValidator, err := message.ParseRegisterSubnetValidator(justification)
 	if err != nil {
 		return &common.AppError{
 			Code:    ErrFailedToParseJustification,
 			Message: "failed to parse justification: " + err.Error(),
+		}
+	}
+
+	justificationID := registerSubnetValidator.ValidationID()
+	if msg.ValidationID != justificationID {
+		return &common.AppError{
+			Code:    ErrMismatchedValidationID,
+			Message: fmt.Sprintf("validationID %q != justificationID %q", msg.ValidationID, justificationID),
 		}
 	}
 
@@ -236,7 +181,7 @@ func (s signatureRequestHandler) verifySubnetValidatorRegistration(
 	return nil // The validator has been removed
 }
 
-func (s signatureRequestHandler) verifySubnetValidatorWeight(
+func (s signatureRequestVerifier) verifySubnetValidatorWeight(
 	msg *message.SubnetValidatorWeight,
 ) *common.AppError {
 	if msg.Nonce == math.MaxUint64 {
@@ -268,7 +213,7 @@ func (s signatureRequestHandler) verifySubnetValidatorWeight(
 		}
 	case msg.Weight != sov.Weight:
 		return &common.AppError{
-			Code:    ErrWrongNonce,
+			Code:    ErrWrongWeight,
 			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, sov.Weight),
 		}
 	default:
