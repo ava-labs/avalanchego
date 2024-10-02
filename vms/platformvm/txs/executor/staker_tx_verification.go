@@ -308,7 +308,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	if backend.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
-		_, _, err := chainState.GetSubnetManager(tx.Subnet)
+		_, _, _, err := chainState.GetSubnetConversion(tx.Subnet)
 		if err == nil {
 			return nil, false, fmt.Errorf("%w: %q", ErrRemoveValidatorManagedSubnet, tx.Subnet)
 		}
