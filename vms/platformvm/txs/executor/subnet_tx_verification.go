@@ -44,7 +44,7 @@ func verifyPoASubnetAuthorization(
 		return nil, err
 	}
 
-	_, _, err = chainState.GetSubnetManager(subnetID)
+	_, _, _, err = chainState.GetSubnetConversion(subnetID)
 	if err == nil {
 		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
 	}

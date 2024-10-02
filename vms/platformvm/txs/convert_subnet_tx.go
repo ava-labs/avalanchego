@@ -28,7 +28,6 @@ var (
 	ErrConvertMustIncludeValidators        = errors.New("conversion must include at least one validator")
 	ErrConvertValidatorsNotSortedAndUnique = errors.New("conversion validators must be sorted and unique")
 	ErrZeroWeight                          = errors.New("validator weight must be non-zero")
-	ErrMissingPublicKey                    = errors.New("missing public key")
 )
 
 type ConvertSubnetTx struct {
@@ -84,7 +83,7 @@ func (tx *ConvertSubnetTx) Visit(visitor Visitor) error {
 }
 
 type ConvertSubnetValidator struct {
-	// TODO: Must be Ed25519 NodeID
+	// TODO: Should be a variable length nodeID
 	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
 	// Weight of this validator used when sampling
 	Weight uint64 `serialize:"true" json:"weight"`
@@ -94,7 +93,7 @@ type ConvertSubnetValidator struct {
 	// Note: We do not enforce that the BLS key is unique across all validators.
 	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID + Subnet does uniquely map to a BLS key
-	Signer signer.Signer `serialize:"true" json:"signer"`
+	Signer signer.ProofOfPossession `serialize:"true" json:"signer"`
 	// Leftover $AVAX from the [Balance] will be issued to this owner once it is
 	// removed from the validator set.
 	RemainingBalanceOwner message.PChainOwner `serialize:"true" json:"remainingBalanceOwner"`
@@ -110,8 +109,8 @@ func (v *ConvertSubnetValidator) Verify() error {
 	if v.Weight == 0 {
 		return ErrZeroWeight
 	}
-	err := verify.All(
-		v.Signer,
+	return verify.All(
+		&v.Signer,
 		&secp256k1fx.OutputOwners{
 			Threshold: v.RemainingBalanceOwner.Threshold,
 			Addrs:     v.RemainingBalanceOwner.Addresses,
@@ -121,11 +120,4 @@ func (v *ConvertSubnetValidator) Verify() error {
 			Addrs:     v.DeactivationOwner.Addresses,
 		},
 	)
-	if err != nil {
-		return err
-	}
-	if v.Signer.Key() == nil {
-		return ErrMissingPublicKey
-	}
-	return nil
 }
