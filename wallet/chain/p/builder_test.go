@@ -5,6 +5,7 @@ package p
 
 import (
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
@@ -152,7 +153,7 @@ var (
 			memo:          []byte("memo"),
 		},
 	}
-	testEnvironment = utils.Join(
+	testEnvironment = slices.Concat(
 		testEnvironmentPreEtna,
 		testEnvironmentPostEtna,
 	)
