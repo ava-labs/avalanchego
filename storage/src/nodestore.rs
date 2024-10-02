@@ -5,9 +5,11 @@ use crate::logger::trace;
 use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
 use bincode::{DefaultOptions, Options as _};
+use metrics::{counter, histogram};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
+
 /// The [NodeStore] handles the serialization of nodes and
 /// free space management of nodes in the page store. It lays out the format
 /// of the [PageStore]. More specifically, it places a [FileIdentifyingMagic]
@@ -378,54 +380,58 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// TODO danlaine: If we return a larger area than requested, we should split it.
     fn allocate_from_freed(&mut self, n: u64) -> Result<Option<(LinearAddress, AreaIndex)>, Error> {
         // Find the smallest free list that can fit this size.
-        let index = area_size_to_index(n)?;
+        let index_wanted = area_size_to_index(n)?;
 
-        // TODO: rustify: rewrite using self.header.free_lists.iter_mut().find(...)
-        for index in index as usize..NUM_AREA_SIZES {
+        if let Some((index, free_stored_area_addr)) = self
+            .header
+            .free_lists
+            .iter_mut()
+            .enumerate()
+            .skip(index_wanted as usize)
+            .find(|item| item.1.is_some())
+        {
+            let address = free_stored_area_addr
+                .take()
+                .expect("impossible due to find earlier");
             // Get the first free block of sufficient size.
-            if let Some(free_stored_area_addr) = self.header.free_lists[index] {
-                if let Some(free_head) = self.storage.free_list_cache(free_stored_area_addr) {
-                    trace!("free_head@{free_stored_area_addr}(cached): {free_head:?} size:{index}");
-                    self.header.free_lists[index] = free_head;
-                } else {
-                    let free_area_addr = free_stored_area_addr.get();
-                    let free_head_stream = self.storage.stream_from(free_area_addr)?;
-                    let free_head: StoredArea<Area<Node, FreeArea>> = DefaultOptions::new()
-                        .deserialize_from(free_head_stream)
-                        .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
-                    let StoredArea {
-                        area: Area::Free(free_head),
-                        area_size_index: read_index,
-                    } = free_head
-                    else {
-                        return Err(Error::new(
-                            ErrorKind::InvalidData,
-                            "Attempted to read a non-free area",
-                        ));
-                    };
-                    debug_assert_eq!(read_index as usize, index);
+            if let Some(free_head) = self.storage.free_list_cache(address) {
+                trace!("free_head@{address}(cached): {free_head:?} size:{index}");
+                *free_stored_area_addr = free_head;
+            } else {
+                let free_area_addr = address.get();
+                let free_head_stream = self.storage.stream_from(free_area_addr)?;
+                let free_head: StoredArea<Area<Node, FreeArea>> = DefaultOptions::new()
+                    .deserialize_from(free_head_stream)
+                    .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+                let StoredArea {
+                    area: Area::Free(free_head),
+                    area_size_index: read_index,
+                } = free_head
+                else {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "Attempted to read a non-free area",
+                    ));
+                };
+                debug_assert_eq!(read_index as usize, index);
 
-                    trace!(
-                        "free_head@{}( read ): {:?} size:{index}",
-                        free_area_addr,
-                        free_head
-                    );
-
-                    // Update the free list to point to the next free block.
-                    self.header.free_lists[index] = free_head.next_free_block;
-                }
-
-                // Return the address of the newly allocated block.
-                trace!(
-                    "Allocating from free list: addr: {free_stored_area_addr:?}, size: {}",
-                    index
-                );
-                return Ok(Some((free_stored_area_addr, index as AreaIndex)));
+                // Update the free list to point to the next free block.
+                *free_stored_area_addr = free_head.next_free_block;
             }
-            // No free blocks in this list, try the next size up.
+
+            counter!("firewood.space.reused").increment(AREA_SIZES[index]);
+            counter!("firewood.space.wasted").increment(AREA_SIZES[index] - n);
+
+            // Return the address of the newly allocated block.
+            trace!(
+                "Allocating from free list: addr: {address:?}, size: {}",
+                index
+            );
+            return Ok(Some((address, index as AreaIndex)));
         }
 
         trace!("No free blocks of sufficient size {index} found");
+        counter!("firewood.space.notfree").increment(AREA_SIZES[index_wanted as usize]);
         Ok(None)
     }
 
@@ -451,6 +457,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Also returns the index of the free list the node was allocated from.
     pub fn allocate_node(&mut self, node: &Node) -> Result<(LinearAddress, AreaIndex), Error> {
         let stored_area_size = Self::stored_len(node);
+        histogram!("firewood.node_size").record(stored_area_size as f64);
 
         // Attempt to allocate from a free list.
         // If we can't allocate from a free list, allocate past the existing
@@ -473,6 +480,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
         trace!("Deleting node at {addr:?} of size {}", area_size_index);
+        counter!("firewood.delete_node").increment(1);
+        counter!("firewood.space.freed").increment(AREA_SIZES[area_size_index as usize]);
 
         // The area that contained the node is now free.
         let area: Area<Node, FreeArea> = Area::Free(FreeArea {
