@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -25,6 +26,9 @@ const (
 	ErrUnsupportedWarpAddressedCallPayloadType
 
 	ErrFailedToParseJustification
+	ErrConversionDoesNotExist
+	ErrMismatchedConversionID
+
 	ErrMismatchedValidationID
 	ErrValidationDoesNotExist
 	ErrValidationExists
@@ -33,8 +37,6 @@ const (
 	ErrImpossibleNonce
 	ErrWrongNonce
 	ErrWrongWeight
-
-	errUnimplemented // TODO: Remove
 )
 
 var _ acp118.Verifier = (*signatureRequestVerifier)(nil)
@@ -90,13 +92,39 @@ func (s signatureRequestVerifier) verifySubnetConversion(
 	msg *message.SubnetConversion,
 	justification []byte,
 ) *common.AppError {
-	_ = s
-	_ = msg
-	_ = justification
-	return &common.AppError{
-		Code:    errUnimplemented,
-		Message: "unimplemented",
+	subnetID, err := ids.ToID(justification)
+	if err != nil {
+		return &common.AppError{
+			Code:    ErrFailedToParseJustification,
+			Message: "failed to parse justification: " + err.Error(),
+		}
 	}
+
+	s.stateLock.Lock()
+	defer s.stateLock.Unlock()
+
+	conversionID, _, _, err := s.state.GetSubnetConversion(subnetID)
+	if err == database.ErrNotFound {
+		return &common.AppError{
+			Code:    ErrConversionDoesNotExist,
+			Message: fmt.Sprintf("subnet %q has not been converted", subnetID),
+		}
+	}
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get subnet conversionID: " + err.Error(),
+		}
+	}
+
+	if msg.ID != conversionID {
+		return &common.AppError{
+			Code:    ErrMismatchedConversionID,
+			Message: fmt.Sprintf("provided conversionID %q != expected conversionID %q", msg.ID, conversionID),
+		}
+	}
+
+	return nil
 }
 
 func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
