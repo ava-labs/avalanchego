@@ -2373,10 +2373,12 @@ func (s *state) writeSubnetOnlyValidators(updateValidators bool, height uint64) 
 
 	// Perform additions:
 	for validationID, sov := range sovChanges {
+		validationID := validationID
+
 		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
 		copy(subnetIDNodeIDKey, sov.SubnetID[:])
 		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
-		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, nil); err != nil {
+		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
 			return err
 		}
 
