@@ -1106,23 +1106,24 @@ func TestStateSubnetOwner(t *testing.T) {
 func TestStateSubnetManager(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte)
+		setup func(t *testing.T, s State, subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte)
 	}{
 		{
 			name: "in-memory",
-			setup: func(_ *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
-				s.SetSubnetManager(subnetID, chainID, addr)
+			setup: func(_ *testing.T, s State, subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
+				s.SetSubnetConversion(subnetID, conversionID, chainID, addr)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
-				subnetManagerCache := s.(*state).subnetManagerCache
+			setup: func(t *testing.T, s State, subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
+				subnetManagerCache := s.(*state).subnetConversionCache
 
 				require.Zero(t, subnetManagerCache.Len())
-				subnetManagerCache.Put(subnetID, chainIDAndAddr{
-					ChainID: chainID,
-					Addr:    addr,
+				subnetManagerCache.Put(subnetID, subnetConversion{
+					ConversionID: conversionID,
+					ChainID:      chainID,
+					Addr:         addr,
 				})
 				require.Equal(t, 1, subnetManagerCache.Len())
 			},
@@ -1130,25 +1131,35 @@ func TestStateSubnetManager(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+			var (
+				require            = require.New(t)
+				state              = newTestState(t, memdb.New())
+				subnetID           = ids.GenerateTestID()
+				expectedConversion = subnetConversion{
+					ConversionID: ids.GenerateTestID(),
+					ChainID:      ids.GenerateTestID(),
+					Addr:         []byte{'a', 'd', 'd', 'r'},
+				}
+			)
 
-			initializedState := newTestState(t, memdb.New())
-
-			subnetID := ids.GenerateTestID()
-			chainID, addr, err := initializedState.GetSubnetManager(subnetID)
+			conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
 			require.ErrorIs(err, database.ErrNotFound)
-			require.Equal(ids.Empty, chainID)
-			require.Nil(addr)
+			require.Zero(conversionID)
+			require.Zero(chainID)
+			require.Zero(addr)
 
-			expectedChainID := ids.GenerateTestID()
-			expectedAddr := []byte{'a', 'd', 'd', 'r'}
+			test.setup(t, state, subnetID, expectedConversion.ConversionID, expectedConversion.ChainID, expectedConversion.Addr)
 
-			test.setup(t, initializedState, subnetID, expectedChainID, expectedAddr)
-
-			chainID, addr, err = initializedState.GetSubnetManager(subnetID)
+			conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 			require.NoError(err)
-			require.Equal(expectedChainID, chainID)
-			require.Equal(expectedAddr, addr)
+			require.Equal(
+				expectedConversion,
+				subnetConversion{
+					ConversionID: conversionID,
+					ChainID:      chainID,
+					Addr:         addr,
+				},
+			)
 		})
 	}
 }

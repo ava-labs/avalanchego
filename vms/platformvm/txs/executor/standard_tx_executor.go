@@ -544,9 +544,14 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	}
 
 	var (
-		txID        = e.Tx.ID()
-		startTime   = uint64(currentTimestamp.Unix())
-		currentFees = e.State.GetAccruedFees()
+		startTime            = uint64(currentTimestamp.Unix())
+		currentFees          = e.State.GetAccruedFees()
+		subnetConversionData = message.SubnetConversionData{
+			SubnetID:       tx.Subnet,
+			ManagerChainID: tx.ChainID,
+			ManagerAddress: tx.Address,
+			Validators:     make([]message.SubnetConversionValidatorData, len(tx.Validators)),
+		}
 	)
 	for i, vdr := range tx.Validators {
 		vdr := vdr
@@ -591,6 +596,12 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
 			return err
 		}
+
+		subnetConversionData.Validators[i] = message.SubnetConversionValidatorData{
+			NodeID:       vdr.NodeID.Bytes(),
+			BLSPublicKey: vdr.Signer.PublicKey,
+			Weight:       vdr.Weight,
+		}
 	}
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
@@ -605,12 +616,19 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
+	conversionID, err := message.SubnetConversionID(subnetConversionData)
+	if err != nil {
+		return err
+	}
+
+	var txID = e.Tx.ID()
+
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 	// Set the new Subnet manager in the database
-	e.State.SetSubnetManager(tx.Subnet, tx.ChainID, tx.Address)
+	e.State.SetSubnetConversion(tx.Subnet, conversionID, tx.ChainID, tx.Address)
 	return nil
 }
 
@@ -675,7 +693,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	expectedChainID, expectedAddress, err := e.State.GetSubnetManager(msg.SubnetID)
+	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(msg.SubnetID)
 	if err != nil {
 		return err
 	}
