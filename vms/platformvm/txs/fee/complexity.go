@@ -65,7 +65,6 @@ const (
 	intrinsicConvertSubnetValidatorBandwidth = ids.NodeIDLen + // nodeID
 		wrappers.LongLen + // weight
 		wrappers.LongLen + // balance
-		wrappers.IntLen + // signer typeID
 		wrappers.IntLen + // remaining balance owner threshold
 		wrappers.IntLen + // remaining balance owner num addresses
 		wrappers.IntLen + // deactivation owner threshold
@@ -366,7 +365,7 @@ func convertSubnetValidatorComplexity(sov txs.ConvertSubnetValidator) (gas.Dimen
 		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
-	signerComplexity, err := SignerComplexity(sov.Signer)
+	signerComplexity, err := SignerComplexity(&sov.Signer)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
