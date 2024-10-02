@@ -27,7 +27,7 @@ func TestNewClient_AppGossip(t *testing.T) {
 		},
 	}
 
-	client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+	client := Client{Handler: testHandler}
 	require.NoError(client.AppGossip(ctx, common.SendConfig{}, []byte("foobar")))
 	<-appGossipChan
 }
@@ -37,12 +37,12 @@ func TestNewClient_AppRequest(t *testing.T) {
 		name        string
 		appResponse []byte
 		appErr      error
-		appRequestF func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error
+		appRequestF func(ctx context.Context, client *Client, onResponse p2p.AppResponseCallback) error
 	}{
 		{
 			name:        "AppRequest - response",
 			appResponse: []byte("foobar"),
-			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+			appRequestF: func(ctx context.Context, client *Client, onResponse p2p.AppResponseCallback) error {
 				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
 			},
 		},
@@ -52,14 +52,14 @@ func TestNewClient_AppRequest(t *testing.T) {
 				Code:    123,
 				Message: "foobar",
 			},
-			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+			appRequestF: func(ctx context.Context, client *Client, onResponse p2p.AppResponseCallback) error {
 				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
 			},
 		},
 		{
 			name:        "AppRequestAny - response",
 			appResponse: []byte("foobar"),
-			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+			appRequestF: func(ctx context.Context, client *Client, onResponse p2p.AppResponseCallback) error {
 				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
 			},
 		},
@@ -69,7 +69,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 				Code:    123,
 				Message: "foobar",
 			},
-			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
+			appRequestF: func(ctx context.Context, client *Client, onResponse p2p.AppResponseCallback) error {
 				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
 			},
 		},
@@ -94,7 +94,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 				},
 			}
 
-			client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+			client := &Client{Handler: testHandler}
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,

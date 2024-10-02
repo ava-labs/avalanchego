@@ -19,7 +19,28 @@ import (
 var (
 	ErrRequestPending = errors.New("request pending")
 	ErrNoPeers        = errors.New("no peers")
+
+	_ ClientInterface = (*Client)(nil)
 )
+
+type ClientInterface interface {
+	AppRequestAny(
+		ctx context.Context,
+		appRequestBytes []byte,
+		onResponse AppResponseCallback,
+	) error
+	AppRequest(
+		ctx context.Context,
+		nodeIDs set.Set[ids.NodeID],
+		appRequestBytes []byte,
+		onResponse AppResponseCallback,
+	) error
+	AppGossip(
+		ctx context.Context,
+		config common.SendConfig,
+		appGossipBytes []byte,
+	) error
+}
 
 // AppResponseCallback is called upon receiving an AppResponse for an AppRequest
 // issued by Client.

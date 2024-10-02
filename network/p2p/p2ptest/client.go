@@ -5,86 +5,50 @@ package p2ptest
 
 import (
 	"context"
-	"testing"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// NewClient generates a client-server pair and returns the client used to
-// communicate with a server with the specified handler
-func NewClient(
-	t *testing.T,
-	ctx context.Context,
-	handler p2p.Handler,
-	clientNodeID ids.NodeID,
-	serverNodeID ids.NodeID,
-) *p2p.Client {
-	clientSender := &enginetest.Sender{}
-	serverSender := &enginetest.Sender{}
+var _ p2p.ClientInterface = (*Client)(nil)
 
-	clientNetwork, err := p2p.NewNetwork(logging.NoLog{}, clientSender, prometheus.NewRegistry(), "")
-	require.NoError(t, err)
+// Client is a testing implementation of p2p.ClientInterface against a specified
+// server handler. The zero value of Client times out AppRequest and drops
+// outbound AppGossip messages.
+type Client struct {
+	NodeID       ids.NodeID
+	ServerNodeID ids.NodeID
+	Handler      p2p.Handler
+}
 
-	serverNetwork, err := p2p.NewNetwork(logging.NoLog{}, serverSender, prometheus.NewRegistry(), "")
-	require.NoError(t, err)
+func (c Client) AppRequestAny(ctx context.Context, appRequestBytes []byte, onResponse p2p.AppResponseCallback) error {
+	return c.AppRequest(ctx, nil, appRequestBytes, onResponse)
+}
 
-	clientSender.SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
-		go func() {
-			require.NoError(t, serverNetwork.AppGossip(ctx, clientNodeID, gossipBytes))
-		}()
-
+func (c Client) AppRequest(ctx context.Context, _ set.Set[ids.NodeID], appRequestBytes []byte, onResponse p2p.AppResponseCallback) error {
+	if c.Handler == nil {
+		onResponse(ctx, c.ServerNodeID, nil, common.ErrTimeout)
 		return nil
 	}
 
-	clientSender.SendAppRequestF = func(ctx context.Context, _ set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
-		go func() {
-			require.NoError(t, serverNetwork.AppRequest(ctx, clientNodeID, requestID, time.Time{}, requestBytes))
-		}()
-
+	responseBytes, err := c.Handler.AppRequest(ctx, c.NodeID, time.Time{}, appRequestBytes)
+	if err != nil {
+		onResponse(ctx, c.ServerNodeID, nil, err)
 		return nil
 	}
 
-	serverSender.SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
-		go func() {
-			require.NoError(t, clientNetwork.AppResponse(ctx, serverNodeID, requestID, responseBytes))
-		}()
+	onResponse(ctx, c.ServerNodeID, responseBytes, nil)
+	return nil
+}
 
+func (c Client) AppGossip(ctx context.Context, _ common.SendConfig, appGossipBytes []byte) error {
+	if c.Handler == nil {
 		return nil
 	}
 
-	serverSender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
-		// Send the request asynchronously to avoid deadlock when the server
-		// sends the response back to the client
-		go func() {
-			require.NoError(t, clientNetwork.AppRequestFailed(ctx, serverNodeID, requestID, &common.AppError{
-				Code:    errorCode,
-				Message: errorMessage,
-			}))
-		}()
-
-		return nil
-	}
-
-	require.NoError(t, clientNetwork.Connected(ctx, clientNodeID, nil))
-	require.NoError(t, clientNetwork.Connected(ctx, serverNodeID, nil))
-	require.NoError(t, serverNetwork.Connected(ctx, clientNodeID, nil))
-	require.NoError(t, serverNetwork.Connected(ctx, serverNodeID, nil))
-
-	require.NoError(t, serverNetwork.AddHandler(0, handler))
-	return clientNetwork.NewClient(0)
+	c.Handler.AppGossip(ctx, c.NodeID, appGossipBytes)
+	return nil
 }

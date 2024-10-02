@@ -52,15 +52,7 @@ func TestHandler(t *testing.T) {
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
 			h := NewHandler(tt.verifier, signer)
-			clientNodeID := ids.GenerateTestNodeID()
-			serverNodeID := ids.GenerateTestNodeID()
-			c := p2ptest.NewClient(
-				t,
-				ctx,
-				h,
-				clientNodeID,
-				serverNodeID,
-			)
+			c := p2ptest.Client{Handler: h}
 
 			unsignedMessage, err := warp.NewUnsignedMessage(
 				networkID,
@@ -95,7 +87,7 @@ func TestHandler(t *testing.T) {
 				require.Equal(tt.expectedVerify, bls.Verify(pk, signature, request.Message))
 			}
 
-			require.NoError(c.AppRequest(ctx, set.Of(clientNodeID), requestBytes, onResponse))
+			require.NoError(c.AppRequest(ctx, set.Of(ids.EmptyNodeID), requestBytes, onResponse))
 			<-done
 		})
 	}
