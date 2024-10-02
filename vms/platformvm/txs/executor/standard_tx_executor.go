@@ -860,7 +860,7 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return fmt.Errorf("expected nonce to be at least %d but got %d", sov.MinNonce, msg.Nonce)
 	}
 
-	expectedChainID, expectedAddress, err := e.State.GetSubnetManager(sov.SubnetID)
+	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(sov.SubnetID)
 	if err != nil {
 		return err
 	}
