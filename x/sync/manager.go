@@ -151,8 +151,7 @@ type ManagerConfig struct {
 	BranchFactor          merkledb.BranchFactor
 	StateSyncNodes        []ids.NodeID
 	// If not specified, [merkledb.DefaultHasher] will be used.
-	Hasher  merkledb.Hasher
-	Metrics prometheus.Registerer
+	Hasher merkledb.Hasher
 }
 
 func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
