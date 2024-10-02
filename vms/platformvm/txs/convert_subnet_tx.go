@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -83,8 +84,8 @@ func (tx *ConvertSubnetTx) Visit(visitor Visitor) error {
 }
 
 type ConvertSubnetValidator struct {
-	// TODO: Should be a variable length nodeID
-	NodeID ids.NodeID `serialize:"true" json:"nodeID"`
+	// NodeID of this validator
+	NodeID types.JSONByteSlice `serialize:"true" json:"nodeID"`
 	// Weight of this validator used when sampling
 	Weight uint64 `serialize:"true" json:"weight"`
 	// Initial balance for this validator
@@ -102,12 +103,19 @@ type ConvertSubnetValidator struct {
 }
 
 func (v ConvertSubnetValidator) Compare(o ConvertSubnetValidator) int {
-	return v.NodeID.Compare(o.NodeID)
+	return bytes.Compare(v.NodeID, o.NodeID)
 }
 
 func (v *ConvertSubnetValidator) Verify() error {
 	if v.Weight == 0 {
 		return ErrZeroWeight
+	}
+	nodeID, err := ids.ToNodeID(v.NodeID)
+	if err != nil {
+		return err
+	}
+	if nodeID == ids.EmptyNodeID {
+		return errEmptyNodeID
 	}
 	return verify.All(
 		&v.Signer,
