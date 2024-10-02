@@ -163,14 +163,12 @@ func (w *withOptions) IssueConvertSubnetTx(
 func (w *withOptions) IssueRegisterSubnetValidatorTx(
 	balance uint64,
 	proofOfPossession [bls.SignatureLen]byte,
-	remainingBalanceOwner *secp256k1fx.OutputOwners,
 	message []byte,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueRegisterSubnetValidatorTx(
 		balance,
 		proofOfPossession,
-		remainingBalanceOwner,
 		message,
 		common.UnionOptions(w.options, options)...,
 	)
