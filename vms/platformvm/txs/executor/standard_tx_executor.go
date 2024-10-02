@@ -540,6 +540,12 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	)
 	for i, vdr := range tx.Validators {
 		vdr := vdr
+
+		nodeID, err := ids.ToNodeID(vdr.NodeID)
+		if err != nil {
+			return err
+		}
+
 		remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &vdr.RemainingBalanceOwner)
 		if err != nil {
 			return err
@@ -552,7 +558,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		sov := state.SubnetOnlyValidator{
 			ValidationID:          tx.Subnet.Append(uint32(i)),
 			SubnetID:              tx.Subnet,
-			NodeID:                vdr.NodeID,
+			NodeID:                nodeID,
 			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
 			RemainingBalanceOwner: remainingBalanceOwner,
 			DeactivationOwner:     deactivationOwner,
@@ -583,7 +589,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 
 		subnetConversionData.Validators[i] = message.SubnetConversionValidatorData{
-			NodeID:       vdr.NodeID.Bytes(),
+			NodeID:       vdr.NodeID,
 			BLSPublicKey: vdr.Signer.PublicKey,
 			Weight:       vdr.Weight,
 		}
