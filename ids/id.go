@@ -107,6 +107,22 @@ func (id ID) Prefix(prefixes ...uint64) ID {
 	return hashing.ComputeHash256Array(packer.Bytes)
 }
 
+// Append this id to create a more selective id.
+//
+// This is used to generate the ACP-77 validationIDs.
+func (id ID) Append(suffixes ...uint32) ID {
+	packer := wrappers.Packer{
+		Bytes: make([]byte, IDLen+len(suffixes)*wrappers.IntLen),
+	}
+
+	packer.PackFixedBytes(id[:])
+	for _, suffix := range suffixes {
+		packer.PackInt(suffix)
+	}
+
+	return hashing.ComputeHash256Array(packer.Bytes)
+}
+
 // XOR this id and the provided id and return the resulting id.
 //
 // Note: this id is not modified.
