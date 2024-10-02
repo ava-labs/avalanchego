@@ -313,7 +313,7 @@ type Builder interface {
 
 type Backend interface {
 	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetOwner(ctx context.Context, subnetID ids.ID) (fx.Owner, error)
+	GetOwner(ctx context.Context, subnetID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
@@ -470,7 +470,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	subnetAuth, err := b.authorize(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +528,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -631,7 +631,7 @@ func (b *builder) NewCreateChainTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -762,7 +762,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -837,7 +837,7 @@ func (b *builder) NewConvertSubnetTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1274,7 +1274,7 @@ func (b *builder) NewTransformSubnetTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1813,12 +1813,12 @@ func (b *builder) spend(
 	return s.inputs, s.changeOutputs, s.stakeOutputs, nil
 }
 
-func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
+func (b *builder) authorize(ownerID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
+	ownerIntf, err := b.backend.GetOwner(options.Context(), ownerID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to fetch subnet owner for %q: %w",
-			subnetID,
+			"failed to fetch owner for %q: %w",
+			ownerID,
 			err,
 		)
 	}

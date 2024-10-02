@@ -29,7 +29,7 @@ type Signer interface {
 
 type Backend interface {
 	GetUTXO(ctx stdcontext.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
-	GetSubnetOwner(ctx stdcontext.Context, subnetID ids.ID) (fx.Owner, error)
+	GetOwner(ctx stdcontext.Context, ownerID ids.ID) (fx.Owner, error)
 }
 
 type txSigner struct {

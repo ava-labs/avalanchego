@@ -86,7 +86,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.SubnetID, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.Fx, e.State, e.Tx, tx.SubnetID, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -475,7 +475,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return errMaxStakeDurationTooLarge
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.Fx, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -532,7 +532,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.Fx, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -959,6 +959,113 @@ func (e *StandardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 	return nil
+}
+
+func (e *StandardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	sov, err := e.State.GetSubnetOnlyValidator(tx.ValidationID)
+	if err != nil {
+		return err
+	}
+
+	var disableOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &disableOwner); err != nil {
+		return err
+	}
+
+	baseTxCreds, err := verifyAuthorization(
+		e.Fx,
+		e.Tx,
+		&secp256k1fx.OutputOwners{
+			Threshold: disableOwner.Threshold,
+			Addrs:     disableOwner.Addresses,
+		},
+		tx.DisableAuth,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
+
+	// If the validator is already disabled, there is nothing to do.
+	if sov.EndAccumulatedFee == 0 {
+		return nil
+	}
+
+	var remainingBalanceOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+		return err
+	}
+
+	accruedFees := e.State.GetAccruedFees()
+	if sov.EndAccumulatedFee <= accruedFees {
+		// This should never happen as the validator should have been
+		// evicted.
+		return fmt.Errorf("validator has insufficient funds to cover accrued fees")
+	}
+	remainingBalance := sov.EndAccumulatedFee - accruedFees
+
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(tx.Outs)),
+		},
+		Asset: avax.Asset{
+			ID: e.Ctx.AVAXAssetID,
+		},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: remainingBalance,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: remainingBalanceOwner.Threshold,
+				Addrs:     remainingBalanceOwner.Addresses,
+			},
+		},
+	}
+	e.State.AddUTXO(utxo)
+
+	// Disable the validator
+	sov.EndAccumulatedFee = 0
+	return e.State.PutSubnetOnlyValidator(sov)
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
