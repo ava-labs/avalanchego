@@ -75,6 +75,15 @@ func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnersh
 }
 
 func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	for i, vdr := range tx.Validators {
+		b.b.setOwner(
+			tx.Subnet.Prefix(uint64(i)),
+			&secp256k1fx.OutputOwners{
+				Threshold: vdr.DeactivationOwner.Threshold,
+				Addrs:     vdr.DeactivationOwner.Addresses,
+			},
+		)
+	}
 	return b.baseTx(&tx.BaseTx)
 }
 
