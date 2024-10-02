@@ -46,7 +46,7 @@ func NewSubnetValidatorWeight(
 		Nonce:        nonce,
 		Weight:       weight,
 	}
-	return msg, Initialize(msg)
+	return msg, initialize(msg)
 }
 
 // ParseSubnetValidatorWeight parses bytes into an initialized

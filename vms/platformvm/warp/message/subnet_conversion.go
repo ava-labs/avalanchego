@@ -50,7 +50,7 @@ func NewSubnetConversion(id ids.ID) (*SubnetConversion, error) {
 	msg := &SubnetConversion{
 		ID: id,
 	}
-	return msg, Initialize(msg)
+	return msg, initialize(msg)
 }
 
 // ParseSubnetConversion parses bytes into an initialized SubnetConversion.
