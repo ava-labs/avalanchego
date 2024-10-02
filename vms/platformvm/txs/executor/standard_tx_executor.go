@@ -958,6 +958,7 @@ func (e *StandardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 		return err
 	}
 
+	// If the validator is currently inactive, we are activating it.
 	if sov.EndAccumulatedFee == 0 {
 		sov.EndAccumulatedFee = e.State.GetAccruedFees()
 	}
