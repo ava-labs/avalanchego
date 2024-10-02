@@ -73,9 +73,12 @@ type WalletConfig struct {
 	// Keys to use for signing all transactions.
 	AVAXKeychain keychain.Keychain // required
 	EthKeychain  c.EthKeychain     // required
-	// Subnet IDs that the wallet should know about to be able to
-	// generate transactions.
+	// Subnet IDs that the wallet should know about to be able to generate
+	// transactions.
 	SubnetIDs []ids.ID // optional
+	// Validation IDs that the wallet should know about to be able to generate
+	// transactions.
+	ValidationIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -105,6 +108,8 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Fetch validation disableOwners
+
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
 	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
