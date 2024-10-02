@@ -62,7 +62,8 @@ const (
 	intrinsicSECP256k1FxSignatureBandwidth = wrappers.IntLen + // signature index
 		secp256k1.SignatureLen // signature length
 
-	intrinsicConvertSubnetValidatorBandwidth = ids.NodeIDLen + // nodeID
+	intrinsicConvertSubnetValidatorBandwidth = wrappers.IntLen + // nodeID length
+		ids.NodeIDLen + // nodeID
 		wrappers.LongLen + // weight
 		wrappers.LongLen + // balance
 		wrappers.IntLen + // remaining balance owner threshold
