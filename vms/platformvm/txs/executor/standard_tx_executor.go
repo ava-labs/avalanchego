@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
 var (
@@ -528,9 +529,14 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	}
 
 	var (
-		txID        = e.Tx.ID()
-		startTime   = uint64(currentTimestamp.Unix())
-		currentFees = e.State.GetAccruedFees()
+		startTime            = uint64(currentTimestamp.Unix())
+		currentFees          = e.State.GetAccruedFees()
+		subnetConversionData = message.SubnetConversionData{
+			SubnetID:       tx.Subnet,
+			ManagerChainID: tx.ChainID,
+			ManagerAddress: tx.Address,
+			Validators:     make([]message.SubnetConversionValidatorData, len(tx.Validators)),
+		}
 	)
 	for i, vdr := range tx.Validators {
 		vdr := vdr
@@ -575,6 +581,12 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
 			return err
 		}
+
+		subnetConversionData.Validators[i] = message.SubnetConversionValidatorData{
+			NodeID:       vdr.NodeID.Bytes(),
+			BLSPublicKey: vdr.Signer.PublicKey,
+			Weight:       vdr.Weight,
+		}
 	}
 	if err := e.Backend.FlowChecker.VerifySpend(
 		tx,
@@ -589,13 +601,19 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
+	conversionID, err := message.SubnetConversionID(subnetConversionData)
+	if err != nil {
+		return err
+	}
+
+	var txID = e.Tx.ID()
+
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 	// Set the new Subnet manager in the database
-	// TODO: Populate the conversionID
-	e.State.SetSubnetConversion(tx.Subnet, ids.Empty, tx.ChainID, tx.Address)
+	e.State.SetSubnetConversion(tx.Subnet, conversionID, tx.ChainID, tx.Address)
 	return nil
 }
 
