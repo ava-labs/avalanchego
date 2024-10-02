@@ -52,7 +52,7 @@ func TestHandler(t *testing.T) {
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
 			h := NewHandler(tt.verifier, signer)
-			c := p2ptest.Client{Handler: h}
+			c := p2ptest.Client{ServerHandler: h}
 
 			unsignedMessage, err := warp.NewUnsignedMessage(
 				networkID,

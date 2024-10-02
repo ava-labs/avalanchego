@@ -27,7 +27,7 @@ func TestNewClient_AppGossip(t *testing.T) {
 		},
 	}
 
-	client := Client{Handler: testHandler}
+	client := Client{ServerHandler: testHandler}
 	require.NoError(client.AppGossip(ctx, common.SendConfig{}, []byte("foobar")))
 	<-appGossipChan
 }
@@ -94,7 +94,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 				},
 			}
 
-			client := Client{Handler: testHandler}
+			client := Client{ServerHandler: testHandler}
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,

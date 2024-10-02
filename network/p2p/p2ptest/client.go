@@ -19,9 +19,9 @@ var _ p2p.ClientInterface = (*Client)(nil)
 // server handler. The zero value of Client times out AppRequest and drops
 // outbound AppGossip messages.
 type Client struct {
-	NodeID       ids.NodeID
-	ServerNodeID ids.NodeID
-	Handler      p2p.Handler
+	NodeID        ids.NodeID
+	ServerNodeID  ids.NodeID
+	ServerHandler p2p.Handler
 }
 
 func (c Client) AppRequestAny(ctx context.Context, appRequestBytes []byte, onResponse p2p.AppResponseCallback) error {
@@ -29,12 +29,12 @@ func (c Client) AppRequestAny(ctx context.Context, appRequestBytes []byte, onRes
 }
 
 func (c Client) AppRequest(ctx context.Context, _ set.Set[ids.NodeID], appRequestBytes []byte, onResponse p2p.AppResponseCallback) error {
-	if c.Handler == nil {
+	if c.ServerHandler == nil {
 		onResponse(ctx, c.ServerNodeID, nil, common.ErrTimeout)
 		return nil
 	}
 
-	responseBytes, err := c.Handler.AppRequest(ctx, c.NodeID, time.Time{}, appRequestBytes)
+	responseBytes, err := c.ServerHandler.AppRequest(ctx, c.NodeID, time.Time{}, appRequestBytes)
 	if err != nil {
 		onResponse(ctx, c.ServerNodeID, nil, err)
 		return nil
@@ -45,10 +45,10 @@ func (c Client) AppRequest(ctx context.Context, _ set.Set[ids.NodeID], appReques
 }
 
 func (c Client) AppGossip(ctx context.Context, _ common.SendConfig, appGossipBytes []byte) error {
-	if c.Handler == nil {
+	if c.ServerHandler == nil {
 		return nil
 	}
 
-	c.Handler.AppGossip(ctx, c.NodeID, appGossipBytes)
+	c.ServerHandler.AppGossip(ctx, c.NodeID, appGossipBytes)
 	return nil
 }
