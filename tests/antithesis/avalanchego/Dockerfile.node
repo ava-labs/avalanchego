@@ -13,6 +13,9 @@ RUN ./scripts/build.sh -r
 # ============= Cleanup Stage ================
 FROM debian:11-slim AS execution
 
+# Install curl to simplify debugging
+RUN apt update && apt install curl -y
+
 # Copy identifying information into the container
 COPY --from=builder /build/commit_hash.txt ./commit_hash.txt
 
