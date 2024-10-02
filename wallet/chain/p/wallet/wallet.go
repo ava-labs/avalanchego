@@ -157,14 +157,11 @@ type Wallet interface {
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
 	//   message
-	// - [remainingBalanceOwner] specifies the owner to send any of the
-	//   remaining balance after removing the continuous fee
 	// - [message] is the Warp message that authorizes this validator to be
 	//   added
 	IssueRegisterSubnetValidatorTx(
 		balance uint64,
 		proofOfPossession [bls.SignatureLen]byte,
-		remainingBalanceOwner *secp256k1fx.OutputOwners,
 		message []byte,
 		options ...common.Option,
 	) (*txs.Tx, error)
@@ -448,11 +445,10 @@ func (w *wallet) IssueConvertSubnetTx(
 func (w *wallet) IssueRegisterSubnetValidatorTx(
 	balance uint64,
 	proofOfPossession [bls.SignatureLen]byte,
-	remainingBalanceOwner *secp256k1fx.OutputOwners,
 	message []byte,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewRegisterSubnetValidatorTx(balance, proofOfPossession, remainingBalanceOwner, message, options...)
+	utx, err := w.builder.NewRegisterSubnetValidatorTx(balance, proofOfPossession, message, options...)
 	if err != nil {
 		return nil, err
 	}
