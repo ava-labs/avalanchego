@@ -135,8 +135,8 @@ type Chain interface {
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
 
-	GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error)
-	SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte)
+	GetSubnetConversion(subnetID ids.ID) (ids.ID, ids.ID, []byte, error)
+	SetSubnetConversion(subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -387,9 +387,9 @@ type state struct {
 	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner; if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
-	subnetManagers     map[ids.ID]chainIDAndAddr            // map of subnetID -> manager of the subnet
-	subnetManagerCache cache.Cacher[ids.ID, chainIDAndAddr] // cache of subnetID -> manager
-	subnetManagerDB    database.Database
+	subnetConversions     map[ids.ID]subnetConversion            // map of subnetID -> manager of the subnet
+	subnetConversionCache cache.Cacher[ids.ID, subnetConversion] // cache of subnetID -> manager
+	subnetConversionDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx; if the entry is nil, it is not in the database
@@ -463,9 +463,10 @@ type fxOwnerAndSize struct {
 	size  int
 }
 
-type chainIDAndAddr struct {
-	ChainID ids.ID `serialize:"true"`
-	Addr    []byte `serialize:"true"`
+type subnetConversion struct {
+	ConversionID ids.ID `serialize:"true"`
+	ChainID      ids.ID `serialize:"true"`
+	Addr         []byte `serialize:"true"`
 }
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
@@ -579,10 +580,10 @@ func New(
 	}
 
 	subnetManagerDB := prefixdb.New(SubnetManagerPrefix, baseDB)
-	subnetManagerCache, err := metercacher.New[ids.ID, chainIDAndAddr](
+	subnetManagerCache, err := metercacher.New[ids.ID, subnetConversion](
 		"subnet_manager_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, chainIDAndAddr](execCfg.SubnetManagerCacheSize, func(_ ids.ID, f chainIDAndAddr) int {
+		cache.NewSizedLRU[ids.ID, subnetConversion](execCfg.SubnetManagerCacheSize, func(_ ids.ID, f subnetConversion) int {
 			return 2*ids.IDLen + len(f.Addr)
 		}),
 	)
@@ -701,9 +702,9 @@ func New(
 		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
 
-		subnetManagers:     make(map[ids.ID]chainIDAndAddr),
-		subnetManagerDB:    subnetManagerDB,
-		subnetManagerCache: subnetManagerCache,
+		subnetConversions:     make(map[ids.ID]subnetConversion),
+		subnetConversionDB:    subnetManagerDB,
+		subnetConversionCache: subnetManagerCache,
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
@@ -950,32 +951,33 @@ func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
 }
 
-func (s *state) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
-	if chainIDAndAddr, exists := s.subnetManagers[subnetID]; exists {
-		return chainIDAndAddr.ChainID, chainIDAndAddr.Addr, nil
+func (s *state) GetSubnetConversion(subnetID ids.ID) (ids.ID, ids.ID, []byte, error) {
+	if conversion, exists := s.subnetConversions[subnetID]; exists {
+		return conversion.ConversionID, conversion.ChainID, conversion.Addr, nil
 	}
 
-	if chainIDAndAddr, cached := s.subnetManagerCache.Get(subnetID); cached {
-		return chainIDAndAddr.ChainID, chainIDAndAddr.Addr, nil
+	if conversion, cached := s.subnetConversionCache.Get(subnetID); cached {
+		return conversion.ConversionID, conversion.ChainID, conversion.Addr, nil
 	}
 
-	chainIDAndAddrBytes, err := s.subnetManagerDB.Get(subnetID[:])
+	conversionBytes, err := s.subnetConversionDB.Get(subnetID[:])
 	if err != nil {
-		return ids.Empty, nil, err
+		return ids.Empty, ids.Empty, nil, err
 	}
 
-	var manager chainIDAndAddr
-	if _, err := block.GenesisCodec.Unmarshal(chainIDAndAddrBytes, &manager); err != nil {
-		return ids.Empty, nil, err
+	var conversion subnetConversion
+	if _, err := block.GenesisCodec.Unmarshal(conversionBytes, &conversion); err != nil {
+		return ids.Empty, ids.Empty, nil, err
 	}
-	s.subnetManagerCache.Put(subnetID, manager)
-	return manager.ChainID, manager.Addr, nil
+	s.subnetConversionCache.Put(subnetID, conversion)
+	return conversion.ConversionID, conversion.ChainID, conversion.Addr, nil
 }
 
-func (s *state) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
-	s.subnetManagers[subnetID] = chainIDAndAddr{
-		ChainID: chainID,
-		Addr:    addr,
+func (s *state) SetSubnetConversion(subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
+	s.subnetConversions[subnetID] = subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
 	}
 }
 
@@ -2916,19 +2918,19 @@ func (s *state) writeSubnetOwners() error {
 }
 
 func (s *state) writeSubnetManagers() error {
-	for subnetID, manager := range s.subnetManagers {
+	for subnetID, manager := range s.subnetConversions {
 		subnetID := subnetID
 		manager := manager
-		delete(s.subnetManagers, subnetID)
+		delete(s.subnetConversions, subnetID)
 
 		managerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &manager)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet manager: %w", err)
 		}
 
-		s.subnetManagerCache.Put(subnetID, manager)
+		s.subnetConversionCache.Put(subnetID, manager)
 
-		if err := s.subnetManagerDB.Put(subnetID[:], managerBytes); err != nil {
+		if err := s.subnetConversionDB.Put(subnetID[:], managerBytes); err != nil {
 			return fmt.Errorf("failed to write subnet manager: %w", err)
 		}
 	}
