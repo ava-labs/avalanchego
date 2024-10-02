@@ -563,7 +563,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 
 		sov := state.SubnetOnlyValidator{
-			ValidationID:          tx.Subnet.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
+			ValidationID:          tx.Subnet.Append(uint32(i)),
 			SubnetID:              tx.Subnet,
 			NodeID:                vdr.NodeID,
 			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
