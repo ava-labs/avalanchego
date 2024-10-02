@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -565,7 +564,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 
 		sov := state.SubnetOnlyValidator{
-			ValidationID:          tx.Subnet.Prefix(uint64(i)), // TODO: The spec says this should be a postfix, not a preifx
+			ValidationID:          tx.Subnet.Append(uint32(i)),
 			SubnetID:              tx.Subnet,
 			NodeID:                vdr.NodeID,
 			PublicKey:             bls.PublicKeyToUncompressedBytes(vdr.Signer.Key()),
@@ -727,7 +726,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	validationID := hashing.ComputeHash256Array(addressedCall.Payload)
+	validationID := msg.ValidationID()
 	expiry := state.ExpiryEntry{
 		Timestamp:    msg.Expiry,
 		ValidationID: validationID,
