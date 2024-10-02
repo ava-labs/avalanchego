@@ -39,10 +39,11 @@ RUN [ -d ./build ] && rm -rf ./build/* || true
 # Build avalanchego. The build environment is configured with build_env.sh from the step
 # enabling cross-compilation.
 ARG RACE_FLAG=""
+ARG BUILD_SCRIPT=build.sh
 RUN . ./build_env.sh && \
     echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
     export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
-    ./scripts/build.sh ${RACE_FLAG}
+    ./scripts/${BUILD_SCRIPT} ${RACE_FLAG}
 
 # Create this directory in the builder to avoid requiring anything to be executed in the
 # potentially emulated execution container.
