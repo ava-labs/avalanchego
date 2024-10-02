@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -36,29 +34,6 @@ var (
 	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
 	errNotRunning         = errors.New("node is not running")
 )
-
-func checkNodeHealth(ctx context.Context, uri string) (bool, error) {
-	// Check that the node is reporting healthy
-	health, err := health.NewClient(uri).Health(ctx, nil)
-	if err == nil {
-		return health.Healthy, nil
-	}
-
-	switch t := err.(type) {
-	case *net.OpError:
-		if t.Op == "read" {
-			// Connection refused - potentially recoverable
-			return false, nil
-		}
-	case syscall.Errno:
-		if t == syscall.ECONNREFUSED {
-			// Connection refused - potentially recoverable
-			return false, nil
-		}
-	}
-	// Assume all other errors are not recoverable
-	return false, fmt.Errorf("failed to query node health: %w", err)
-}
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
@@ -199,7 +174,11 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, errNotRunning
 	}
 
-	return checkNodeHealth(ctx, p.node.URI)
+	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
+	if err != nil {
+		return false, err
+	}
+	return healthReply.Healthy, nil
 }
 
 func (p *NodeProcess) getProcessContextPath() string {
