@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -296,10 +297,10 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				Address: managerAddress,
 				Validators: []ConvertSubnetValidator{
 					{
-						NodeID:  nodeID,
+						NodeID:  nodeID[:],
 						Weight:  0x0102030405060708,
 						Balance: units.Avax,
-						Signer:  signer.NewProofOfPossession(sk),
+						Signer:  *signer.NewProofOfPossession(sk),
 						RemainingBalanceOwner: message.PChainOwner{
 							Threshold: 1,
 							Addresses: []ids.ShortID{
@@ -559,10 +560,10 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 		invalidAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
 		validValidators = []ConvertSubnetValidator{
 			{
-				NodeID:                ids.GenerateTestNodeID(),
+				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                1,
 				Balance:               1,
-				Signer:                signer.NewProofOfPossession(sk),
+				Signer:                *signer.NewProofOfPossession(sk),
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner:     message.PChainOwner{},
 			},
@@ -636,10 +637,18 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				Subnet: validSubnetID,
 				Validators: []ConvertSubnetValidator{
 					{
-						NodeID: ids.NodeID{1},
+						NodeID: []byte{
+							0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+							0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+							0x00, 0x00, 0x00, 0x00,
+						},
 					},
 					{
-						NodeID: ids.NodeID{0},
+						NodeID: []byte{
+							0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+							0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+							0x00, 0x00, 0x00, 0x00,
+						},
 					},
 				},
 				SubnetAuth: validSubnetAuth,
@@ -653,8 +662,9 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				Subnet: validSubnetID,
 				Validators: []ConvertSubnetValidator{
 					{
+						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                0,
-						Signer:                signer.NewProofOfPossession(sk),
+						Signer:                *signer.NewProofOfPossession(sk),
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner:     message.PChainOwner{},
 					},
@@ -670,8 +680,9 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				Subnet: validSubnetID,
 				Validators: []ConvertSubnetValidator{
 					{
+						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,
-						Signer:                &signer.ProofOfPossession{},
+						Signer:                signer.ProofOfPossession{},
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner:     message.PChainOwner{},
 					},
@@ -687,8 +698,9 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				Subnet: validSubnetID,
 				Validators: []ConvertSubnetValidator{
 					{
+						NodeID: utils.RandomBytes(ids.NodeIDLen),
 						Weight: 1,
-						Signer: signer.NewProofOfPossession(sk),
+						Signer: *signer.NewProofOfPossession(sk),
 						RemainingBalanceOwner: message.PChainOwner{
 							Threshold: 1,
 						},
@@ -706,8 +718,9 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				Subnet: validSubnetID,
 				Validators: []ConvertSubnetValidator{
 					{
+						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,
-						Signer:                signer.NewProofOfPossession(sk),
+						Signer:                *signer.NewProofOfPossession(sk),
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner: message.PChainOwner{
 							Threshold: 1,
@@ -717,23 +730,6 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: secp256k1fx.ErrOutputUnspendable,
-		},
-		{
-			name: "invalid validator signer",
-			tx: &ConvertSubnetTx{
-				BaseTx: validBaseTx,
-				Subnet: validSubnetID,
-				Validators: []ConvertSubnetValidator{
-					{
-						Weight:                1,
-						Signer:                &signer.Empty{},
-						RemainingBalanceOwner: message.PChainOwner{},
-						DeactivationOwner:     message.PChainOwner{},
-					},
-				},
-				SubnetAuth: validSubnetAuth,
-			},
-			expectedErr: ErrMissingPublicKey,
 		},
 		{
 			name: "invalid BaseTx",
