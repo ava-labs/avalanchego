@@ -21,8 +21,8 @@ import (
 const MaxSubnetAddressLength = 4096
 
 var (
-	_ UnsignedTx                             = (*ConvertSubnetTx)(nil)
-	_ utils.Sortable[ConvertSubnetValidator] = ConvertSubnetValidator{}
+	_ UnsignedTx                              = (*ConvertSubnetTx)(nil)
+	_ utils.Sortable[*ConvertSubnetValidator] = (*ConvertSubnetValidator)(nil)
 
 	ErrConvertPermissionlessSubnet         = errors.New("cannot convert a permissionless subnet")
 	ErrAddressTooLong                      = errors.New("address is too long")
@@ -41,7 +41,7 @@ type ConvertSubnetTx struct {
 	// Address of the Subnet manager
 	Address types.JSONByteSlice `serialize:"true" json:"address"`
 	// Initial pay-as-you-go validators for the Subnet
-	Validators []ConvertSubnetValidator `serialize:"true" json:"validators"`
+	Validators []*ConvertSubnetValidator `serialize:"true" json:"validators"`
 	// Authorizes this conversion
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
@@ -102,7 +102,7 @@ type ConvertSubnetValidator struct {
 	DeactivationOwner message.PChainOwner `serialize:"true" json:"deactivationOwner"`
 }
 
-func (v ConvertSubnetValidator) Compare(o ConvertSubnetValidator) int {
+func (v *ConvertSubnetValidator) Compare(o *ConvertSubnetValidator) int {
 	return bytes.Compare(v.NodeID, o.NodeID)
 }
 

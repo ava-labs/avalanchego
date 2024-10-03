@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -21,12 +23,14 @@ func main() {
 	key := genesis.EWOQKey
 	uri := "http://localhost:9700"
 	kc := secp256k1fx.NewKeychain(key)
-	subnetIDStr := "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof"
+	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
+	chainID := ids.FromStringOrPanic("E8nTR9TtRwfkS7XFjTYUYHENQ91mkPMtDUwwCeu7rNgBBtkqu")
+	addressHex := ""
 	weight := units.Schmeckle
 
-	subnetID, err := ids.FromString(subnetIDStr)
+	address, err := hex.DecodeString(addressHex)
 	if err != nil {
-		log.Fatalf("failed to parse subnet ID: %s\n", err)
+		log.Fatalf("failed to decode address %q: %s\n", addressHex, err)
 	}
 
 	ctx := context.Background()
@@ -38,6 +42,23 @@ func main() {
 		log.Fatalf("failed to fetch node IDs: %s\n", err)
 	}
 	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
+
+	validationID := subnetID.Append(0)
+	conversionID, err := message.SubnetConversionID(message.SubnetConversionData{
+		SubnetID:       subnetID,
+		ManagerChainID: chainID,
+		ManagerAddress: address,
+		Validators: []message.SubnetConversionValidatorData{
+			{
+				NodeID:       nodeID.Bytes(),
+				BLSPublicKey: nodePoP.PublicKey,
+				Weight:       weight,
+			},
+		},
+	})
+	if err != nil {
+		log.Fatalf("failed to calculate conversionID: %s\n", err)
+	}
 
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
 	// [uri] is hosting and registers [subnetID].
@@ -57,22 +78,29 @@ func main() {
 	pWallet := wallet.P()
 
 	convertSubnetStartTime := time.Now()
-	addValidatorTx, err := pWallet.IssueConvertSubnetTx(
+	convertSubnetTx, err := pWallet.IssueConvertSubnetTx(
 		subnetID,
-		ids.Empty,
-		nil,
-		[]txs.ConvertSubnetValidator{
+		chainID,
+		address,
+		[]*txs.ConvertSubnetValidator{
 			{
-				NodeID:                nodeID,
+				NodeID:                nodeID.Bytes(),
 				Weight:                weight,
-				Balance:               30 * units.NanoAvax, // 30s before being deactivated
-				Signer:                nodePoP,
-				RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+				Balance:               units.Avax,
+				Signer:                *nodePoP,
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
 			},
 		},
 	)
 	if err != nil {
-		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)
+		log.Fatalf("failed to issue subnet conversion transaction: %s\n", err)
 	}
-	log.Printf("added new subnet validator %s to %s with %s in %s\n", nodeID, subnetID, addValidatorTx.ID(), time.Since(convertSubnetStartTime))
+	log.Printf("converted subnet %s with transactionID %s, validationID %s, and conversionID %s in %s\n",
+		subnetID,
+		convertSubnetTx.ID(),
+		validationID,
+		conversionID,
+		time.Since(convertSubnetStartTime),
+	)
 }
