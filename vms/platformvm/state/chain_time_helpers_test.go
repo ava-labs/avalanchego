@@ -69,7 +69,11 @@ func TestNextBlockTime(t *testing.T) {
 			s.SetTimestamp(test.chainTime)
 			clk.Set(test.now)
 
-			actualTime, actualCapped, err := NextBlockTime(s, &clk)
+			actualTime, actualCapped, err := NextBlockTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				&clk,
+			)
 			require.NoError(err)
 			require.Equal(test.expectedTime.Local(), actualTime.Local())
 			require.Equal(test.expectedCapped, actualCapped)
@@ -81,6 +85,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 	tests := []struct {
 		name     string
 		pending  []*Staker
+		sovs     []SubnetOnlyValidator
 		maxTime  time.Time
 		expected time.Time
 	}{
@@ -108,6 +113,20 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
+			name: "current and subnet only validators",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1,
+					EndAccumulatedFee: 1, // This validator should be evicted in 1 second.
+				},
+			},
+			maxTime:  mockable.MaxTime,
+			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
+		},
+		{
 			name:     "restricted timestamp",
 			maxTime:  genesistest.DefaultValidatorStartTime,
 			expected: genesistest.DefaultValidatorStartTime,
@@ -122,8 +141,15 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			for _, staker := range test.pending {
 				require.NoError(s.PutPendingValidator(staker))
 			}
+			for _, sov := range test.sovs {
+				require.NoError(s.PutSubnetOnlyValidator(sov))
+			}
 
-			actual, err := GetNextStakerChangeTime(s, test.maxTime)
+			actual, err := GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				test.maxTime,
+			)
 			require.NoError(err)
 			require.Equal(test.expected.Local(), actual.Local())
 		})

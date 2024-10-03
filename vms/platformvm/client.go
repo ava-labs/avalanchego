@@ -236,6 +236,7 @@ type GetSubnetClientResponse struct {
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID
 	// subnet manager information for a permissionless L1
+	ConversionID   ids.ID
 	ManagerChainID ids.ID
 	ManagerAddress []byte
 }
@@ -259,6 +260,7 @@ func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.
 		Threshold:                uint32(res.Threshold),
 		Locktime:                 uint64(res.Locktime),
 		SubnetTransformationTxID: res.SubnetTransformationTxID,
+		ConversionID:             res.ConversionID,
 		ManagerChainID:           res.ManagerChainID,
 		ManagerAddress:           res.ManagerAddress,
 	}, nil
