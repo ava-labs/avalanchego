@@ -60,13 +60,13 @@ func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 
 func (*accepted) OnValidatorWeightChanged(_ ids.NodeID, _, _ uint64) {}
 
-func (a *accepted) SetLastAccepted(nodeID ids.NodeID, frontier ids.ID, height uint64) {
+func (a *accepted) SetLastAccepted(nodeID ids.NodeID, id ids.ID, height uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	if a.validators.Contains(nodeID) {
 		a.lastAccepted[nodeID] = idHeight{
-			id:     frontier,
+			id:     id,
 			height: height,
 		}
 	}
