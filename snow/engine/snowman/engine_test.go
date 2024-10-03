@@ -177,13 +177,14 @@ func TestEngineQuery(t *testing.T) {
 	child := snowmantest.BuildChild(parent)
 
 	var sendChitsCalled bool
-	sender.SendChitsF = func(_ context.Context, _ ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, accepted ids.ID) {
+	sender.SendChitsF = func(_ context.Context, _ ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, accepted ids.ID, acceptedHeight uint64) {
 		require.False(sendChitsCalled)
 		sendChitsCalled = true
 		require.Equal(uint32(15), requestID)
 		require.Equal(snowmantest.GenesisID, preferredID)
 		require.Equal(snowmantest.GenesisID, preferredIDByHeight)
 		require.Equal(snowmantest.GenesisID, accepted)
+		require.Equal(uint64(0), acceptedHeight)
 	}
 
 	var getBlockCalled bool
@@ -264,7 +265,7 @@ func TestEngineQuery(t *testing.T) {
 
 	// Handling chits for [child] register a voter job blocking on [child]'s
 	// issuance and send a request for [child].
-	require.NoError(engine.Chits(context.Background(), queryRequest.NodeID, queryRequest.RequestID, child.ID(), child.ID(), child.ID()))
+	require.NoError(engine.Chits(context.Background(), queryRequest.NodeID, queryRequest.RequestID, child.ID(), child.ID(), child.ID(), child.Height()))
 
 	queryRequest = nil
 	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blockID ids.ID, requestedHeight uint64) {
@@ -412,8 +413,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 		require.Equal(vdr0, inVdr)
 		require.Equal(blk1.ID(), blkID)
 	}
-	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID()))
-	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID()))
+	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
+	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
 
 	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
 		vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -444,7 +445,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	require.NoError(te.Put(context.Background(), vdr0, *getRequestID, blk1.Bytes()))
 
 	// Should be dropped because the query was already filled
-	require.NoError(te.Chits(context.Background(), vdr2, *queryRequestID, blk0.ID(), blk0.ID(), blk0.ID()))
+	require.NoError(te.Chits(context.Background(), vdr2, *queryRequestID, blk0.ID(), blk0.ID(), blk0.ID(), blk0.Height()))
 
 	require.Equal(snowtest.Accepted, blk1.Status)
 	require.Zero(te.blocked.NumDependencies())
@@ -545,7 +546,7 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, acceptedID ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDByHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) {
 		require.False(*chitted)
 		*chitted = true
 		require.Equal(vdr, inVdr)
@@ -553,6 +554,7 @@ func TestEnginePushQuery(t *testing.T) {
 		require.Equal(snowmantest.GenesisID, preferredID)
 		require.Equal(snowmantest.GenesisID, preferredIDByHeight)
 		require.Equal(snowmantest.GenesisID, acceptedID)
+		require.Equal(uint64(0), acceptedHeight)
 	}
 
 	queried := new(bool)
@@ -864,7 +866,7 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID))
+	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID, blk.Height()))
 	require.Equal(1, te.blocked.NumDependencies())
 
 	sender.CantSendPullQuery = false
@@ -917,7 +919,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID))
+	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID, fakeBlkID, blk.Height()))
 	require.Equal(1, te.blocked.NumDependencies())
 
 	sender.CantSendPullQuery = false
@@ -1083,6 +1085,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		blockingBlk.ID(),
 		missingBlk.ID(),
 		blockingBlk.ID(),
+		blockingBlk.Height(),
 	))
 	require.Equal(2, te.blocked.NumDependencies())
 
@@ -1210,7 +1213,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		false,
 		te.metrics.issued.WithLabelValues(unknownSource),
 	))
-	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID))
+	require.NoError(te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID, invalidBlkID, invalidBlk.Height()))
 
 	require.Equal(snowtest.Accepted, validBlk.Status)
 }
@@ -1553,13 +1556,13 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	require.Equal(snowtest.Undecided, blk.Status)
 
-	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
+	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Undecided, blk.Status)
 
-	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
+	require.NoError(te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Undecided, blk.Status)
 
-	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
+	require.NoError(te.Chits(context.Background(), vdr1, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Accepted, blk.Status)
 }
 
@@ -1657,7 +1660,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		}
 	}
 
-	require.NoError(te.Chits(context.Background(), vdr, reqID, blk0.ID(), blk0.ID(), blk0.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, reqID, blk0.ID(), blk0.ID(), blk0.ID(), blk0.Height()))
 
 	require.True(queried)
 }
@@ -1668,7 +1671,7 @@ func TestEngineDropRejectedBlockOnReceipt(t *testing.T) {
 	nodeID, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	// Ignore outbound chits
-	sender.SendChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {}
+	sender.SendChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) {}
 
 	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	rejectedChain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
@@ -1696,7 +1699,7 @@ func TestEngineDropRejectedBlockOnReceipt(t *testing.T) {
 	require.Len(queryRequestIDs, 1)
 
 	// Vote for [acceptedBlk] and cause it to be accepted.
-	require.NoError(te.Chits(context.Background(), nodeID, queryRequestIDs[0], acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID()))
+	require.NoError(te.Chits(context.Background(), nodeID, queryRequestIDs[0], acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.ID(), acceptedBlk.Height()))
 	require.Len(queryRequestIDs, 1) // Shouldn't have caused another query
 	require.Equal(snowtest.Accepted, acceptedBlk.Status)
 
@@ -1862,7 +1865,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Now we are expecting a Chits message, and we receive it for [blk2]
 	// instead of [blk1]. This will cause the node to again request [blk2].
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID(), blk2.Height()))
 
 	// The votes should be bubbled through [blk2] despite the fact that it is
 	// failing verification.
@@ -1902,7 +1905,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require.True(*queried)
 
 	// After a single vote for [blk2], it should be marked as accepted.
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk1.ID(), blk2.ID(), blk2.Height()))
 	require.Equal(snowtest.Accepted, blk2.Status)
 }
 
@@ -2017,7 +2020,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// Now we are expecting a Chits message and we receive it for [blk3].
 	// This will cause the node to again request [blk3].
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk3.ID(), blk1.ID(), blk3.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk3.ID(), blk1.ID(), blk3.ID(), blk3.Height()))
 
 	// Drop the re-request for [blk3] to cause the poll to terminate. The votes
 	// should be bubbled through [blk3] despite the fact that it hasn't been
@@ -2119,8 +2122,8 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require.NoError(te.Put(context.Background(), vdr, 0, parentBlkA.BytesV))
 
 	// Give 2 chits for [parentBlkA]/[parentBlkB]
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestAID, parentBlkB.IDV, grandParentBlk.IDV, parentBlkB.IDV))
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestGPID, parentBlkB.IDV, grandParentBlk.IDV, parentBlkB.IDV))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestAID, parentBlkB.IDV, grandParentBlk.IDV, parentBlkB.IDV, parentBlkB.Height()))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestGPID, parentBlkB.IDV, grandParentBlk.IDV, parentBlkB.IDV, parentBlkB.Height()))
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
@@ -2227,7 +2230,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		require.Equal(uint64(1), requestedHeight)
 	}
 
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
 
 	require.Equal(snowtest.Undecided, blk.Status)
 
@@ -2332,7 +2335,7 @@ func TestEngineRepollsMisconfiguredSubnet(t *testing.T) {
 
 	// Voting for the block that was issued during the period when the validator
 	// set was misconfigured should result in it being accepted successfully.
-	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID()))
+	require.NoError(te.Chits(context.Background(), vdr, queryRequestID, blk.ID(), blk.ID(), blk.ID(), blk.Height()))
 	require.Equal(snowtest.Accepted, blk.Status)
 }
 
@@ -2397,7 +2400,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 
 	sender := &enginetest.Sender{
 		T:          t,
-		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
+		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) {},
 	}
 	sender.Default(true)
 	config.Sender = sender
@@ -2493,6 +2496,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
+		acceptedChain[1].Height(),
 	))
 	require.NoError(engine.Chits(
 		context.Background(),
@@ -2501,6 +2505,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
+		acceptedChain[2].Height(),
 	))
 
 	// Attempt to apply votes in poll 0 for block 3. This will send a Get
@@ -2523,6 +2528,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		rejectedChain[0].ID(),
 		rejectedChain[0].ID(),
 		rejectedChain[0].ID(),
+		rejectedChain[0].Height(),
 	))
 	require.NotNil(getBlock3Request)
 
@@ -2546,6 +2552,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
+		acceptedChain[1].Height(),
 	))
 	require.NoError(engine.Chits(
 		context.Background(),
@@ -2554,6 +2561,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
 		acceptedChain[2].ID(),
+		acceptedChain[2].Height(),
 	))
 	require.NoError(engine.Chits(
 		context.Background(),
@@ -2562,6 +2570,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
+		rejectedChain[1].Height(),
 	))
 
 	// Provide block 3.
@@ -2596,6 +2605,7 @@ func TestEngineVoteStallRegression(t *testing.T) {
 				acceptedChain[2].ID(),
 				acceptedChain[2].ID(),
 				acceptedChain[2].ID(),
+				acceptedChain[2].Height(),
 			))
 		}
 	}
@@ -2617,7 +2627,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 
 	sender := &enginetest.Sender{
 		T:          t,
-		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
+		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) {},
 	}
 	sender.Default(true)
 	config.Sender = sender
@@ -2704,6 +2714,7 @@ func TestEngineEarlyTerminateVoterRegression(t *testing.T) {
 		chain[2].ID(),
 		chain[1].ID(),
 		snowmantest.GenesisID,
+		0,
 	))
 	require.Len(pollRequestIDs, 1)
 	require.Contains(getRequestIDs, chain[1].ID())
@@ -2762,7 +2773,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 
 	sender := &enginetest.Sender{
 		T:          t,
-		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID) {},
+		SendChitsF: func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) {},
 	}
 	sender.Default(true)
 	config.Sender = sender
@@ -2882,6 +2893,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		acceptedChain[0].ID(),
 		acceptedChain[0].ID(),
 		snowmantest.GenesisID,
+		0,
 	))
 	// There are no processing blocks, so no new poll should be created.
 	require.Len(pollRequestIDs, 1)
@@ -2907,6 +2919,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 		snowmantest.GenesisID,
+		0,
 	))
 	require.Len(pollRequestIDs, 3)
 
@@ -2926,6 +2939,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		snowmantest.GenesisID,
+		0,
 	))
 	require.Len(pollRequestIDs, 3)
 	require.Equal(snowtest.Accepted, acceptedChain[1].Status)
@@ -3220,4 +3234,72 @@ func TestEngineAbortQueryWhenInPartition(t *testing.T) {
 	engine.sendQuery(context.Background(), ids.ID{}, nil, false)
 
 	require.Contains(buff.String(), errInsufficientStake)
+}
+
+func TestEngineAcceptedHeight(t *testing.T) {
+	require := require.New(t)
+
+	engCfg := DefaultConfig(t)
+	engCfg.Params = snowball.Parameters{
+		K:                     2,
+		AlphaPreference:       2,
+		AlphaConfidence:       2,
+		Beta:                  1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	vals := validators.NewManager()
+	engCfg.Validators = vals
+
+	_, _, _, vm, te := setup(t, engCfg)
+
+	vdr0 := ids.GenerateTestNodeID()
+	vdr1 := ids.GenerateTestNodeID()
+
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
+	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
+
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+
+	blk1, blk2 := chain[0], chain[1]
+
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk1.ID(), nil
+	}
+
+	vm.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+		return blk1, nil
+	}
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx := snowtest.ConsensusContext(snowCtx)
+	params := snowball.Parameters{
+		K:                     1,
+		AlphaPreference:       1,
+		AlphaConfidence:       1,
+		Beta:                  3,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+
+	require.NoError(engCfg.Consensus.Initialize(ctx, params, blk1.ID(), blk1.Height(), time.Now()))
+
+	require.NoError(te.Chits(context.Background(), vdr0, 1, blk1.ID(), blk1.ID(), blk1.ID(), blk1.Height()))
+	require.NoError(te.Chits(context.Background(), vdr1, 2, blk2.ID(), blk2.ID(), blk2.ID(), blk2.Height()))
+
+	eBlk1, h1, ok := te.acceptedFrontiers.LastAccepted(vdr0)
+	require.True(ok)
+
+	eBlk2, h2, ok := te.acceptedFrontiers.LastAccepted(vdr1)
+	require.True(ok)
+
+	require.Equal(blk1.ID(), eBlk1)
+	require.Equal(blk2.ID(), eBlk2)
+	require.Equal(blk1.Height(), h1)
+	require.Equal(blk2.Height(), h2)
 }
