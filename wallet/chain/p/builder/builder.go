@@ -161,7 +161,7 @@ type Builder interface {
 		subnetID ids.ID,
 		chainID ids.ID,
 		address []byte,
-		validators []txs.ConvertSubnetValidator,
+		validators []*txs.ConvertSubnetValidator,
 		options ...common.Option,
 	) (*txs.ConvertSubnetTx, error)
 
@@ -809,7 +809,7 @@ func (b *builder) NewConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []txs.ConvertSubnetValidator,
+	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
 	var (
