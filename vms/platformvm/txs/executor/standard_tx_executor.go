@@ -626,7 +626,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
-	var txID = e.Tx.ID()
+	txID := e.Tx.ID()
 
 	// Consume the UTXOS
 	avax.Consume(e.State, tx.Ins)

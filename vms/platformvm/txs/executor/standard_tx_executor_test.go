@@ -2554,6 +2554,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			require.NoError(err)
 
 			// Create the ConvertSubnetTx
+			const (
+				weight  = 1
+				balance = 1
+			)
 			var (
 				wallet = txstest.NewWallet(
 					t,
@@ -2566,17 +2570,18 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				)
 				chainID = ids.GenerateTestID()
 				address = utils.RandomBytes(32)
+				pop     = signer.NewProofOfPossession(sk)
 			)
 			convertSubnetTx, err := wallet.IssueConvertSubnetTx(
 				subnetID,
 				chainID,
 				address,
-				[]txs.ConvertSubnetValidator{
+				[]*txs.ConvertSubnetValidator{
 					{
-						NodeID:                nodeID,
-						Weight:                1,
-						Balance:               1,
-						Signer:                signer.NewProofOfPossession(sk),
+						NodeID:                nodeID.Bytes(),
+						Weight:                weight,
+						Balance:               balance,
+						Signer:                *pop,
 						RemainingBalanceOwner: message.PChainOwner{},
 						DeactivationOwner:     message.PChainOwner{},
 					},
@@ -2622,10 +2627,23 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			// TODO: Populate the conversionID
+			expectedConversionID, err := message.SubnetConversionID(message.SubnetConversionData{
+				SubnetID:       subnetID,
+				ManagerChainID: chainID,
+				ManagerAddress: address,
+				Validators: []message.SubnetConversionValidatorData{
+					{
+						NodeID:       nodeID.Bytes(),
+						BLSPublicKey: pop.PublicKey,
+						Weight:       weight,
+					},
+				},
+			})
+			require.NoError(err)
+
 			stateConversionID, stateChainID, stateAddress, err := diff.GetSubnetConversion(subnetID)
 			require.NoError(err)
-			require.Zero(stateConversionID)
+			require.Equal(expectedConversionID, stateConversionID)
 			require.Equal(chainID, stateChainID)
 			require.Equal(address, stateAddress)
 		})

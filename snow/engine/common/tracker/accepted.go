@@ -18,22 +18,28 @@ type Accepted interface {
 	validators.SetCallbackListener
 
 	// SetLastAccepted updates the latest accepted block for [nodeID] to
-	// [blockID]. If [nodeID] is not currently a validator, this is a noop.
-	SetLastAccepted(nodeID ids.NodeID, blockID ids.ID)
+	// [blockID], with a corresponding height.
+	// If [nodeID] is not currently a validator, this is a noop.
+	SetLastAccepted(nodeID ids.NodeID, blockID ids.ID, height uint64)
 	// LastAccepted returns the latest known accepted block of [nodeID]. If
 	// [nodeID]'s last accepted block was never unknown, false will be returned.
-	LastAccepted(nodeID ids.NodeID) (ids.ID, bool)
+	LastAccepted(nodeID ids.NodeID) (ids.ID, uint64, bool)
+}
+
+type idHeight struct {
+	id     ids.ID
+	height uint64
 }
 
 type accepted struct {
-	lock       sync.RWMutex
-	validators set.Set[ids.NodeID]
-	frontier   map[ids.NodeID]ids.ID
+	lock         sync.RWMutex
+	validators   set.Set[ids.NodeID]
+	lastAccepted map[ids.NodeID]idHeight
 }
 
 func NewAccepted() Accepted {
 	return &accepted{
-		frontier: make(map[ids.NodeID]ids.ID),
+		lastAccepted: make(map[ids.NodeID]idHeight),
 	}
 }
 
@@ -49,24 +55,27 @@ func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	defer a.lock.Unlock()
 
 	a.validators.Remove(nodeID)
-	delete(a.frontier, nodeID)
+	delete(a.lastAccepted, nodeID)
 }
 
 func (*accepted) OnValidatorWeightChanged(_ ids.NodeID, _, _ uint64) {}
 
-func (a *accepted) SetLastAccepted(nodeID ids.NodeID, frontier ids.ID) {
+func (a *accepted) SetLastAccepted(nodeID ids.NodeID, id ids.ID, height uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	if a.validators.Contains(nodeID) {
-		a.frontier[nodeID] = frontier
+		a.lastAccepted[nodeID] = idHeight{
+			id:     id,
+			height: height,
+		}
 	}
 }
 
-func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, bool) {
+func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, uint64, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	acceptedID, ok := a.frontier[nodeID]
-	return acceptedID, ok
+	acceptedAndHeight, ok := a.lastAccepted[nodeID]
+	return acceptedAndHeight.id, acceptedAndHeight.height, ok
 }
