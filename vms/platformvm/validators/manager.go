@@ -27,7 +27,7 @@ const (
 	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 64
 	minRecentlyAcceptedWindowSize = 0
-	recentlyAcceptedWindowTTL     = 15 * time.Second
+	recentlyAcceptedWindowTTL     = 30 * time.Second
 )
 
 var (
