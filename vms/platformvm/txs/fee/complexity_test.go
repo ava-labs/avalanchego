@@ -370,15 +370,15 @@ func TestInputComplexity(t *testing.T) {
 
 func TestConvertSubnetValidatorComplexity(t *testing.T) {
 	tests := []struct {
-		name        string
-		vdr         txs.ConvertSubnetValidator
-		expected    gas.Dimensions
-		expectedErr error
+		name     string
+		vdr      txs.ConvertSubnetValidator
+		expected gas.Dimensions
 	}{
 		{
 			name: "any can spend",
 			vdr: txs.ConvertSubnetValidator{
-				Signer:                &signer.ProofOfPossession{},
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner:     message.PChainOwner{},
 			},
@@ -388,12 +388,12 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "single remaining balance owner",
 			vdr: txs.ConvertSubnetValidator{
-				Signer: &signer.ProofOfPossession{},
+				NodeID: make([]byte, ids.NodeIDLen),
+				Signer: signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -408,12 +408,12 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "single deactivation owner",
 			vdr: txs.ConvertSubnetValidator{
-				Signer:                &signer.ProofOfPossession{},
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner: message.PChainOwner{
 					Threshold: 1,
@@ -428,30 +428,15 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 				gas.DBWrite:   4,
 				gas.Compute:   0, // TODO: implement
 			},
-			expectedErr: nil,
-		},
-		{
-			name: "invalid signer",
-			vdr: txs.ConvertSubnetValidator{
-				Signer:                nil,
-				RemainingBalanceOwner: message.PChainOwner{},
-				DeactivationOwner:     message.PChainOwner{},
-			},
-			expected:    gas.Dimensions{},
-			expectedErr: errUnsupportedSigner,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := ConvertSubnetValidatorComplexity(test.vdr)
-			require.ErrorIs(err, test.expectedErr)
+			actual, err := ConvertSubnetValidatorComplexity(&test.vdr)
+			require.NoError(err)
 			require.Equal(test.expected, actual)
-
-			if err != nil {
-				return
-			}
 
 			vdrBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.vdr)
 			require.NoError(err)

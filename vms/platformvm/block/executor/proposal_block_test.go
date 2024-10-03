@@ -219,6 +219,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		), nil
 	}).AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(iterator.Empty[state.SubnetOnlyValidator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()

@@ -13,7 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -63,38 +67,74 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 		require.NoError(err)
 
-		require.Equal(platformvm.GetSubnetClientResponse{
-			IsPermissioned: true,
-			ControlKeys: []ids.ShortID{
-				keychain.Keys[0].Address(),
+		require.Equal(
+			platformvm.GetSubnetClientResponse{
+				IsPermissioned: true,
+				ControlKeys: []ids.ShortID{
+					keychain.Keys[0].Address(),
+				},
+				Threshold: 1,
 			},
-			Threshold: 1,
-		}, res)
+			res,
+		)
 
-		chainID := ids.GenerateTestID()
-		address := []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
+		const weight = 100
+		var (
+			chainID = ids.GenerateTestID()
+			address = []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
+			nodeID  = ids.GenerateTestNodeID()
+		)
+
+		sk, err := bls.NewSecretKey()
+		require.NoError(err)
+		pop := signer.NewProofOfPossession(sk)
 
 		tc.By("issuing a ConvertSubnetTx")
 		_, err = pWallet.IssueConvertSubnetTx(
 			subnetID,
 			chainID,
 			address,
+			[]*txs.ConvertSubnetValidator{
+				{
+					NodeID: nodeID.Bytes(),
+					Weight: weight,
+					Signer: *pop,
+				},
+			},
 			tc.WithDefaultContext(),
 		)
+		require.NoError(err)
+
+		expectedConversionID, err := message.SubnetConversionID(message.SubnetConversionData{
+			SubnetID:       subnetID,
+			ManagerChainID: chainID,
+			ManagerAddress: address,
+			Validators: []message.SubnetConversionValidatorData{
+				{
+					NodeID:       nodeID.Bytes(),
+					BLSPublicKey: pop.PublicKey,
+					Weight:       weight,
+				},
+			},
+		})
 		require.NoError(err)
 
 		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1")
 		res, err = pClient.GetSubnet(tc.DefaultContext(), subnetID)
 		require.NoError(err)
 
-		require.Equal(platformvm.GetSubnetClientResponse{
-			IsPermissioned: false,
-			ControlKeys: []ids.ShortID{
-				keychain.Keys[0].Address(),
+		require.Equal(
+			platformvm.GetSubnetClientResponse{
+				IsPermissioned: false,
+				ControlKeys: []ids.ShortID{
+					keychain.Keys[0].Address(),
+				},
+				Threshold:      1,
+				ConversionID:   expectedConversionID,
+				ManagerChainID: chainID,
+				ManagerAddress: address,
 			},
-			Threshold:      1,
-			ManagerChainID: chainID,
-			ManagerAddress: address,
-		}, res)
+			res,
+		)
 	})
 })
