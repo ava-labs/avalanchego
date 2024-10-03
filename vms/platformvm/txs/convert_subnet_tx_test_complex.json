@@ -77,7 +77,7 @@
 	"address": "0x000000000000000000000000000000000000dead",
 	"validators": [
 		{
-			"nodeID": "NodeID-2ZbTY9GatRTrfinAoYiYLcf6CvrPAUYgo",
+			"nodeID": "0x1122334455667788112233445566778811223344",
 			"weight": 72623859790382856,
 			"balance": 1000000000,
 			"signer": {
@@ -85,11 +85,16 @@
 				"proofOfPossession": "0x8cfd7909d153b9604b62b143ba36207bb7e64867424480202a67dc68768346d95c90983c2d279c64c43c51136b2a05e01602d52aa6376fda17fa6e2a18a083e49d9c450eab7b89b1d5555da5c489872e02b7e5227b77550af1330e5a71f8c368"
 			},
 			"remainingBalanceOwner": {
+				"threshold": 1,
 				"addresses": [
 					"7EKFm18KvWqcxMCNgpBSN51pJnEr1cVUb"
-				],
-				"locktime": 0,
-				"threshold": 1
+				]
+			},
+			"deactivationOwner": {
+				"threshold": 1,
+				"addresses": [
+					"7EKFm18KvWqcxMCNgpBSN51pJnEr1cVUb"
+				]
 			}
 		}
 	],

@@ -178,17 +178,18 @@ func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.No
 	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID, requestedHeight)
 }
 
-func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) {
+func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("preferredID", preferredID),
 		attribute.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		attribute.Stringer("acceptedID", acceptedID),
+		attribute.Int("acceptedHeight", int(acceptedHeight)),
 	))
 	defer span.End()
 
-	s.sender.SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
+	s.sender.SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
 
 func (s *tracedSender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
