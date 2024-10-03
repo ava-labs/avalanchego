@@ -15,7 +15,7 @@ type DisableSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// ID corresponding to the validator
-	ValidationID ids.ID `json:"validationID"`
+	ValidationID ids.ID `serialize:"true" json:"validationID"`
 	// Authorizes this validator to be disabled
 	DisableAuth verify.Verifiable `serialize:"true" json:"disableAuthorization"`
 }

@@ -24,7 +24,7 @@ func main() {
 	uri := "http://localhost:9700"
 	kc := secp256k1fx.NewKeychain(key)
 	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
-	chainID := ids.FromStringOrPanic("E8nTR9TtRwfkS7XFjTYUYHENQ91mkPMtDUwwCeu7rNgBBtkqu")
+	chainID := ids.FromStringOrPanic("2BMFrJ9xeh5JdwZEx6uuFcjfZC2SV2hdbMT8ee5HrvjtfJb5br")
 	addressHex := ""
 	weight := units.Schmeckle
 

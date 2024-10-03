@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -108,7 +109,10 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Fetch validation disableOwners
+	for _, validationID := range config.ValidationIDs {
+		// TODO: Fetch validation disableOwners
+		subnetOwners[validationID] = &secp256k1fx.OutputOwners{}
+	}
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
 	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)

@@ -1004,7 +1004,7 @@ func (e *StandardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValid
 
 	sov, err := e.State.GetSubnetOnlyValidator(tx.ValidationID)
 	if err != nil {
-		return err
+		return fmt.Errorf("couldn't load SoV for %s: %w", tx.ValidationID, err)
 	}
 
 	var disableOwner message.PChainOwner

@@ -115,7 +115,7 @@ func main() {
 	validationID := registerSubnetValidator.ValidationID()
 	subnetValidatorRegistration, err := warpmessage.NewSubnetValidatorRegistration(
 		validationID,
-		true,
+		false,
 	)
 	if err != nil {
 		log.Fatalf("failed to create SubnetValidatorRegistration message: %s\n", err)
