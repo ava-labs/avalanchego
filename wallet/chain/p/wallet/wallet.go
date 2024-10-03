@@ -147,7 +147,7 @@ type Wallet interface {
 		subnetID ids.ID,
 		chainID ids.ID,
 		address []byte,
-		validators []txs.ConvertSubnetValidator,
+		validators []*txs.ConvertSubnetValidator,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -410,7 +410,7 @@ func (w *wallet) IssueConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []txs.ConvertSubnetValidator,
+	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewConvertSubnetTx(subnetID, chainID, address, validators, options...)
