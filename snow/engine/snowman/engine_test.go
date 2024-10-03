@@ -521,38 +521,28 @@ func TestEngineRespondsToGetRequest(t *testing.T) {
 func TestEnginePushQuery(t *testing.T) {
 	require := require.New(t)
 
-	conf := DefaultConfig(t)
-	vdr, _, sender, vm, te := setup(t, conf)
-
-	vm.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
-		[]*snowmantest.Block{{HeightV: 41}},
-	)
-	vm.GetBlockF = func(_ context.Context, _ ids.ID) (snowman.Block, error) {
-		return &snowmantest.Block{HeightV: 41}, nil
-	}
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
 
 	sender.Default(true)
 
 	blk := snowmantest.BuildChild(snowmantest.Genesis)
 
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
-
-	params := snowball.Parameters{
-		K:                     1,
-		AlphaPreference:       1,
-		AlphaConfidence:       1,
-		Beta:                  3,
-		ConcurrentRepolls:     1,
-		OptimalProcessing:     1,
-		MaxOutstandingItems:   1,
-		MaxItemProcessingTime: 1,
+	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		if bytes.Equal(b, blk.Bytes()) {
+			return blk, nil
+		}
+		return nil, errUnknownBytes
 	}
 
-	require.NoError(te.Consensus.Initialize(ctx, params, snowmantest.GenesisID, 41, time.Now()))
-
-	vm.ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return &snowmantest.Block{HeightV: 41}, nil
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case blk.ID():
+			return blk, nil
+		default:
+			return nil, errUnknownBlock
+		}
 	}
 
 	chitted := new(bool)
@@ -564,12 +554,23 @@ func TestEnginePushQuery(t *testing.T) {
 		require.Equal(snowmantest.GenesisID, preferredID)
 		require.Equal(snowmantest.GenesisID, preferredIDByHeight)
 		require.Equal(snowmantest.GenesisID, acceptedID)
-		require.Equal(uint64(41), acceptedHeight)
+		require.Equal(uint64(0), acceptedHeight)
 	}
 
-	require.NoError(te.PushQuery(context.Background(), vdr, 20, blk.Bytes(), blk.Height()))
+	queried := new(bool)
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkID ids.ID, requestedHeight uint64) {
+		require.False(*queried)
+		*queried = true
+		vdrSet := set.Of(vdr)
+		require.True(inVdrs.Equals(vdrSet))
+		require.Equal(blk.ID(), blkID)
+		require.Equal(uint64(1), requestedHeight)
+	}
+
+	require.NoError(te.PushQuery(context.Background(), vdr, 20, blk.Bytes(), 1))
 
 	require.True(*chitted)
+	require.True(*queried)
 }
 
 func TestEngineBuildBlock(t *testing.T) {
@@ -2892,7 +2893,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		acceptedChain[0].ID(),
 		acceptedChain[0].ID(),
 		snowmantest.GenesisID,
-		acceptedChain[0].Height(),
+		0,
 	))
 	// There are no processing blocks, so no new poll should be created.
 	require.Len(pollRequestIDs, 1)
@@ -2918,7 +2919,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		rejectedChain[1].ID(),
 		rejectedChain[1].ID(),
 		snowmantest.GenesisID,
-		rejectedChain[1].Height(),
+		0,
 	))
 	require.Len(pollRequestIDs, 3)
 
@@ -2938,7 +2939,7 @@ func TestEngineRegistersInvalidVoterDependencyRegression(t *testing.T) {
 		acceptedChain[1].ID(),
 		acceptedChain[1].ID(),
 		snowmantest.GenesisID,
-		acceptedChain[1].Height(),
+		0,
 	))
 	require.Len(pollRequestIDs, 3)
 	require.Equal(snowtest.Accepted, acceptedChain[1].Status)
@@ -3261,9 +3262,9 @@ func TestEngineAcceptedHeight(t *testing.T) {
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr0, nil, ids.Empty, 1))
 	require.NoError(vals.AddStaker(engCfg.Ctx.SubnetID, vdr1, nil, ids.Empty, 1))
 
-	blk1 := snowmantest.BuildChild(snowmantest.Genesis)
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
 
-	blk2 := snowmantest.BuildChild(blk1)
+	blk1, blk2 := chain[0], chain[1]
 
 	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		return blk1.ID(), nil
