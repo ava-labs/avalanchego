@@ -161,6 +161,7 @@ type QuerySender interface {
 		preferredID ids.ID,
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
+		acceptedHeight uint64,
 	)
 }
 
