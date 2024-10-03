@@ -160,7 +160,7 @@ func (b *builderWithOptions) NewConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []txs.ConvertSubnetValidator,
+	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
 	return b.builder.NewConvertSubnetTx(
