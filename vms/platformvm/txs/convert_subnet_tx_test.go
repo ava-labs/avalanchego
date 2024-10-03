@@ -125,7 +125,7 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				Subnet:     subnetID,
 				ChainID:    managerChainID,
 				Address:    managerAddress,
-				Validators: []ConvertSubnetValidator{},
+				Validators: []*ConvertSubnetValidator{},
 				SubnetAuth: &secp256k1fx.Input{
 					SigIndices: []uint32{3},
 				},
@@ -295,7 +295,7 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				Subnet:  subnetID,
 				ChainID: managerChainID,
 				Address: managerAddress,
-				Validators: []ConvertSubnetValidator{
+				Validators: []*ConvertSubnetValidator{
 					{
 						NodeID:  nodeID[:],
 						Weight:  0x0102030405060708,
@@ -471,6 +471,8 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				// number of validators
 				0x00, 0x00, 0x00, 0x01,
 				// Validators[0]
+				// node ID length
+				0x00, 0x00, 0x00, 0x14,
 				// node ID
 				0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 				0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
@@ -479,8 +481,6 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 				// balance
 				0x00, 0x00, 0x00, 0x00, 0x3b, 0x9a, 0xca, 0x00,
-				// signer type ID
-				0x00, 0x00, 0x00, 0x1c,
 				// BLS compressed public key
 				0xaf, 0xf4, 0xac, 0xb4, 0xc5, 0x43, 0x9b, 0x5d,
 				0x42, 0x6c, 0xad, 0xf9, 0xe9, 0x46, 0xd3, 0xa4,
@@ -501,15 +501,19 @@ func TestConvertSubnetTxSerialization(t *testing.T) {
 				0xd5, 0x55, 0x5d, 0xa5, 0xc4, 0x89, 0x87, 0x2e,
 				0x02, 0xb7, 0xe5, 0x22, 0x7b, 0x77, 0x55, 0x0a,
 				0xf1, 0x33, 0x0e, 0x5a, 0x71, 0xf8, 0xc3, 0x68,
-				// RemainingBalanceOwner type ID
-				0x00, 0x00, 0x00, 0x0b,
-				// locktime
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// threshold
+				// RemainingBalanceOwner threshold
 				0x00, 0x00, 0x00, 0x01,
-				// number of addresses
+				// RemainingBalanceOwner number of addresses
 				0x00, 0x00, 0x00, 0x01,
-				// Addrs[0]
+				// RemainingBalanceOwner Addrs[0]
+				0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+				0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
+				0x44, 0x55, 0x66, 0x77,
+				// DeactivationOwner threshold
+				0x00, 0x00, 0x00, 0x01,
+				// DeactivationOwner number of addresses
+				0x00, 0x00, 0x00, 0x01,
+				// DeactivationOwner Addrs[0]
 				0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
 				0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
 				0x44, 0x55, 0x66, 0x77,
@@ -558,7 +562,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 		}
 		validSubnetID   = ids.GenerateTestID()
 		invalidAddress  = make(types.JSONByteSlice, MaxSubnetAddressLength+1)
-		validValidators = []ConvertSubnetValidator{
+		validValidators = []*ConvertSubnetValidator{
 			{
 				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                1,
@@ -635,7 +639,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx: validBaseTx,
 				Subnet: validSubnetID,
-				Validators: []ConvertSubnetValidator{
+				Validators: []*ConvertSubnetValidator{
 					{
 						NodeID: []byte{
 							0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -660,7 +664,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx: validBaseTx,
 				Subnet: validSubnetID,
-				Validators: []ConvertSubnetValidator{
+				Validators: []*ConvertSubnetValidator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                0,
@@ -678,7 +682,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx: validBaseTx,
 				Subnet: validSubnetID,
-				Validators: []ConvertSubnetValidator{
+				Validators: []*ConvertSubnetValidator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,
@@ -696,7 +700,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx: validBaseTx,
 				Subnet: validSubnetID,
-				Validators: []ConvertSubnetValidator{
+				Validators: []*ConvertSubnetValidator{
 					{
 						NodeID: utils.RandomBytes(ids.NodeIDLen),
 						Weight: 1,
@@ -716,7 +720,7 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 			tx: &ConvertSubnetTx{
 				BaseTx: validBaseTx,
 				Subnet: validSubnetID,
-				Validators: []ConvertSubnetValidator{
+				Validators: []*ConvertSubnetValidator{
 					{
 						NodeID:                utils.RandomBytes(ids.NodeIDLen),
 						Weight:                1,

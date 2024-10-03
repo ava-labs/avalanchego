@@ -678,12 +678,12 @@ func TestConvertSubnetTx(t *testing.T) {
 	var (
 		chainID    = ids.GenerateTestID()
 		address    = utils.RandomBytes(32)
-		validators = []txs.ConvertSubnetValidator{
+		validators = []*txs.ConvertSubnetValidator{
 			{
-				NodeID:  ids.GenerateTestNodeID(),
+				NodeID:  utils.RandomBytes(ids.NodeIDLen),
 				Weight:  rand.Uint64(), //#nosec G404
 				Balance: units.Avax,
-				Signer:  signer.NewProofOfPossession(sk0),
+				Signer:  *signer.NewProofOfPossession(sk0),
 				RemainingBalanceOwner: message.PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
@@ -698,10 +698,10 @@ func TestConvertSubnetTx(t *testing.T) {
 				},
 			},
 			{
-				NodeID:                ids.GenerateTestNodeID(),
+				NodeID:                utils.RandomBytes(ids.NodeIDLen),
 				Weight:                rand.Uint64(), //#nosec G404
 				Balance:               2 * units.Avax,
-				Signer:                signer.NewProofOfPossession(sk1),
+				Signer:                *signer.NewProofOfPossession(sk1),
 				RemainingBalanceOwner: message.PChainOwner{},
 				DeactivationOwner:     message.PChainOwner{},
 			},
