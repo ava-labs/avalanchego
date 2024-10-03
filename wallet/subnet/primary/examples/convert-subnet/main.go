@@ -23,13 +23,8 @@ func main() {
 	key := genesis.EWOQKey
 	uri := "http://localhost:9700"
 	kc := secp256k1fx.NewKeychain(key)
-<<<<<<< HEAD
-	subnetID := ids.FromStringOrPanic("2eZYSgCU738xN7aRw47NsBUPqnKkoqJMYUJexTsX19VdTNSZc9")
-	chainID := ids.FromStringOrPanic("2ko3NCPzHeneKWcYfy55pgAgU1LV9Q9XNrNv2sWG4W2XzE3ViV")
-=======
 	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
 	chainID := ids.FromStringOrPanic("E8nTR9TtRwfkS7XFjTYUYHENQ91mkPMtDUwwCeu7rNgBBtkqu")
->>>>>>> implement-acp-77-register-subnet-validator-tx
 	addressHex := ""
 	weight := units.Schmeckle
 
