@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -30,9 +29,9 @@ func main() {
 	uri := "http://localhost:9710"
 	kc := secp256k1fx.NewKeychain(key)
 	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
-	chainID := ids.FromStringOrPanic("21G9Uqg2R7hYa81kZK7oMCgstsHEiNGbkpB9kdBLUeWx3wWMsV")
+	chainID := ids.FromStringOrPanic("2BMFrJ9xeh5JdwZEx6uuFcjfZC2SV2hdbMT8ee5HrvjtfJb5br")
 	addressHex := ""
-	weight := units.Schmeckle
+	weight := uint64(1)
 
 	address, err := hex.DecodeString(addressHex)
 	if err != nil {
@@ -79,9 +78,11 @@ func main() {
 	addressedCallPayload, err := message.NewRegisterSubnetValidator(
 		subnetID,
 		nodeID,
-		weight,
 		nodePoP.PublicKey,
 		uint64(time.Now().Add(5*time.Minute).Unix()),
+		message.PChainOwner{},
+		message.PChainOwner{},
+		weight,
 	)
 	if err != nil {
 		log.Fatalf("failed to create RegisterSubnetValidator message: %s\n", err)
@@ -128,17 +129,16 @@ func main() {
 		log.Fatalf("failed to create Warp message: %s\n", err)
 	}
 
-	convertSubnetStartTime := time.Now()
-	addValidatorTx, err := pWallet.IssueRegisterSubnetValidatorTx(
+	registerSubnetValidatorStartTime := time.Now()
+	registerSubnetValidatorTx, err := pWallet.IssueRegisterSubnetValidatorTx(
 		units.Avax,
 		nodePoP.ProofOfPossession,
-		&secp256k1fx.OutputOwners{},
 		warp.Bytes(),
 	)
 	if err != nil {
-		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)
+		log.Fatalf("failed to issue register subnet validator transaction: %s\n", err)
 	}
 
-	var validationID ids.ID = hashing.ComputeHash256Array(addressedCallPayload.Bytes())
-	log.Printf("added new subnet validator %s to subnet %s with txID %s as validationID %s in %s\n", nodeID, subnetID, addValidatorTx.ID(), validationID, time.Since(convertSubnetStartTime))
+	validationID := addressedCallPayload.ValidationID()
+	log.Printf("registered new subnet validator %s to subnet %s with txID %s as validationID %s in %s\n", nodeID, subnetID, registerSubnetValidatorTx.ID(), validationID, time.Since(registerSubnetValidatorStartTime))
 }

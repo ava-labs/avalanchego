@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/netip"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -29,101 +29,24 @@ import (
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
-var registerSubnetValidatorJSON = []byte(`{
-        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
-        "nodeID": "0xb628ee3952a5de80fadd31ab030a67189edb1410",
-        "blsPublicKey": [
-                143,
-                167,
-                255,
-                128,
-                221,
-                92,
-                126,
-                190,
-                134,
-                189,
-                157,
-                166,
-                6,
-                55,
-                92,
-                125,
-                223,
-                231,
-                71,
-                85,
-                122,
-                110,
-                110,
-                49,
-                215,
-                14,
-                1,
-                226,
-                146,
-                140,
-                73,
-                75,
-                113,
-                163,
-                138,
-                158,
-                34,
-                207,
-                99,
-                36,
-                137,
-                55,
-                191,
-                28,
-                186,
-                24,
-                49,
-                199
-        ],
-        "expiry": 1727975059,
-        "remainingBalanceOwner": {
-                "threshold": 0,
-                "addresses": null
-        },
-        "disableOwner": {
-                "threshold": 0,
-                "addresses": null
-        },
-        "weight": 1
-}`)
-
 func main() {
 	uri := primary.LocalAPIURI
+	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
+	conversionID := ids.FromStringOrPanic("d84X4xQeXkAhnLQi2BqDyG6AEGbdJVGJCwx6a4c3UnBhD9vpZ")
 	infoClient := info.NewClient(uri)
 	networkID, err := infoClient.GetNetworkID(context.Background())
 	if err != nil {
 		log.Fatalf("failed to fetch network ID: %s\n", err)
 	}
 
-	var registerSubnetValidator warpmessage.RegisterSubnetValidator
-	err = json.Unmarshal(registerSubnetValidatorJSON, &registerSubnetValidator)
+	subnetConversion, err := warpmessage.NewSubnetConversion(conversionID)
 	if err != nil {
-		log.Fatalf("failed to unmarshal RegisterSubnetValidator message: %s\n", err)
-	}
-	err = warpmessage.Initialize(&registerSubnetValidator)
-	if err != nil {
-		log.Fatalf("failed to initialize RegisterSubnetValidator message: %s\n", err)
-	}
-
-	validationID := registerSubnetValidator.ValidationID()
-	subnetValidatorRegistration, err := warpmessage.NewSubnetValidatorRegistration(
-		validationID,
-		true,
-	)
-	if err != nil {
-		log.Fatalf("failed to create SubnetValidatorRegistration message: %s\n", err)
+		log.Fatalf("failed to create SubnetConversion message: %s\n", err)
 	}
 
 	addressedCall, err := payload.NewAddressedCall(
 		nil,
-		subnetValidatorRegistration.Bytes(),
+		subnetConversion.Bytes(),
 	)
 	if err != nil {
 		log.Fatalf("failed to create AddressedCall message: %s\n", err)
@@ -165,7 +88,7 @@ func main() {
 
 	appRequestPayload, err := proto.Marshal(&sdk.SignatureRequest{
 		Message:       unsignedWarp.Bytes(),
-		Justification: registerSubnetValidator.Bytes(),
+		Justification: subnetID[:],
 	})
 	if err != nil {
 		log.Fatalf("failed to marshal SignatureRequest: %s\n", err)
