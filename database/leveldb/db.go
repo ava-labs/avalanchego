@@ -90,6 +90,7 @@ type Database struct {
 }
 
 type config struct {
+	ReadOnly bool `json:"readOnly"`
 	// BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
 	// Use -1 for zero, this has same effect as specifying NoCacher to BlockCacher.
 	//
@@ -208,6 +209,7 @@ func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Reg
 
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
+		ReadOnly:                      parsedConfig.ReadOnly,
 		BlockCacheCapacity:            parsedConfig.BlockCacheCapacity,
 		BlockSize:                     parsedConfig.BlockSize,
 		CompactionExpandLimitFactor:   parsedConfig.CompactionExpandLimitFactor,
