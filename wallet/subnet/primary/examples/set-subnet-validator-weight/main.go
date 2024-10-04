@@ -6,11 +6,15 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"log"
+	"os"
 	"time"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -22,15 +26,25 @@ func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	chainID := ids.FromStringOrPanic("2ko3NCPzHeneKWcYfy55pgAgU1LV9Q9XNrNv2sWG4W2XzE3ViV")
+	chainID := ids.FromStringOrPanic("2BMFrJ9xeh5JdwZEx6uuFcjfZC2SV2hdbMT8ee5HrvjtfJb5br")
 	addressHex := ""
-	validationID := ids.FromStringOrPanic("225kHLzuaBd6rhxZ8aq91kmgLJyPTFtTFVAWJDaPyKRdDiTpQo")
+	validationID := ids.FromStringOrPanic("2Y3ZZZXxpzm46geqVuqFXeSFVbeKihgrfeXRDaiF4ds6R2N8M5")
 	nonce := uint64(1)
-	weight := uint64(0)
+	weight := uint64(2)
 
 	address, err := hex.DecodeString(addressHex)
 	if err != nil {
 		log.Fatalf("failed to decode address %q: %s\n", addressHex, err)
+	}
+
+	skBytes, err := os.ReadFile("/Users/stephen/.avalanchego/staking/signer.key")
+	if err != nil {
+		log.Fatalf("failed to read signer key: %s\n", err)
+	}
+
+	sk, err := bls.SecretKeyFromBytes(skBytes)
+	if err != nil {
+		log.Fatalf("failed to parse secret key: %s\n", err)
 	}
 
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
@@ -51,14 +65,19 @@ func main() {
 	pWallet := wallet.P()
 	context := pWallet.Builder().Context()
 
-	addressedCallPayload, err := message.NewSetSubnetValidatorWeight(
+	addressedCallPayload, err := message.NewSubnetValidatorWeight(
 		validationID,
 		nonce,
 		weight,
 	)
 	if err != nil {
-		log.Fatalf("failed to create SetSubnetValidatorWeight message: %s\n", err)
+		log.Fatalf("failed to create SubnetValidatorWeight message: %s\n", err)
 	}
+	addressedCallPayloadJSON, err := json.MarshalIndent(addressedCallPayload, "", "\t")
+	if err != nil {
+		log.Fatalf("failed to marshal SubnetValidatorWeight message: %s\n", err)
+	}
+	log.Println(string(addressedCallPayloadJSON))
 
 	addressedCall, err := payload.NewAddressedCall(
 		address,
@@ -77,9 +96,20 @@ func main() {
 		log.Fatalf("failed to create unsigned Warp message: %s\n", err)
 	}
 
+	signers := set.NewBits()
+	signers.Add(0) // [signers] has weight from [vdr[0]]
+
+	unsignedBytes := unsignedWarp.Bytes()
+	sig := bls.Sign(sk, unsignedBytes)
+	sigBytes := [bls.SignatureLen]byte{}
+	copy(sigBytes[:], bls.SignatureToBytes(sig))
+
 	warp, err := warp.NewMessage(
 		unsignedWarp,
-		&warp.BitSetSignature{},
+		&warp.BitSetSignature{
+			Signers:   signers.Bytes(),
+			Signature: sigBytes,
+		},
 	)
 	if err != nil {
 		log.Fatalf("failed to create Warp message: %s\n", err)
