@@ -1066,9 +1066,10 @@ func (e *StandardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValid
 
 	accruedFees := e.State.GetAccruedFees()
 	if sov.EndAccumulatedFee <= accruedFees {
-		// This should never happen as the validator should have been
-		// evicted.
-		return fmt.Errorf("validator has insufficient funds to cover accrued fees")
+		// This check should be unreachable. However, including it ensures
+		// that AVAX can't get minted out of thin air due to state
+		// corruption.
+		return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 	}
 	remainingBalance := sov.EndAccumulatedFee - accruedFees
 
