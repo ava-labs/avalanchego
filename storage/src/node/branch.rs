@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use serde::{ser::SerializeStruct as _, Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use crate::{LeafNode, LinearAddress, Node, Path, TrieHash};
 use std::fmt::{Debug, Error as FmtError, Formatter};
@@ -41,22 +42,20 @@ impl Serialize for BranchNode {
         state.serialize_field("partial_path", &self.partial_path)?;
         state.serialize_field("value", &self.value)?;
 
-        let mut children: [Option<(LinearAddress, TrieHash)>; BranchNode::MAX_CHILDREN] =
-            Default::default();
-
-        for (i, c) in self.children.iter().enumerate() {
-            match c {
-                None => {}
+        let children: SmallVec<[(u8, LinearAddress, TrieHash); 16]> = self
+            .children
+            .iter()
+            .enumerate()
+            .filter_map(|(offset, child)| match child {
+                None => None,
                 Some(Child::Node(_)) => {
-                    return Err(serde::ser::Error::custom(
-                        "node has children in memory. TODO make this impossible.",
-                    ))
+                    panic!("serializing in-memory node for disk storage")
                 }
                 Some(Child::AddressWithHash(addr, hash)) => {
-                    children[i] = Some((*addr, (*hash).clone()))
+                    Some((offset as u8, *addr, (*hash).clone()))
                 }
-            }
-        }
+            })
+            .collect();
 
         state.serialize_field("children", &children)?;
         state.end()
@@ -72,16 +71,14 @@ impl<'de> Deserialize<'de> for BranchNode {
         struct SerializedBranchNode {
             partial_path: Path,
             value: Option<Box<[u8]>>,
-            children: [Option<(LinearAddress, TrieHash)>; BranchNode::MAX_CHILDREN],
+            children: SmallVec<[(u8, LinearAddress, TrieHash); 16]>,
         }
 
         let s: SerializedBranchNode = Deserialize::deserialize(deserializer)?;
 
         let mut children: [Option<Child>; BranchNode::MAX_CHILDREN] = Default::default();
-        for (i, c) in s.children.iter().enumerate() {
-            if let Some((addr, hash)) = c {
-                children[i] = Some(Child::AddressWithHash(*addr, hash.clone()));
-            }
+        for (offset, addr, hash) in s.children.iter() {
+            children[*offset as usize] = Some(Child::AddressWithHash(*addr, hash.clone()));
         }
 
         Ok(BranchNode {
@@ -91,12 +88,6 @@ impl<'de> Deserialize<'de> for BranchNode {
         })
     }
 }
-
-// struct SerializedBranchNode<'a> {
-//     partial_path: &'a Path,
-//     value: Option<&'a [u8]>,
-//     children: [Option<(LinearAddress, TrieHash)>; BranchNode::MAX_CHILDREN],
-// }
 
 impl Debug for BranchNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
