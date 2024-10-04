@@ -872,7 +872,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
 impl<T, S: WritableStorage> NodeStore<T, S> {
     /// Persist the header from this proposal to storage.
     pub fn flush_header(&self) -> Result<(), Error> {
-        let header_bytes = DefaultOptions::new()
+        let header_bytes = DefaultOptions::new().with_varint_encoding()
             .serialize(&self.header)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
         self.storage.write(0, header_bytes.as_slice())?;
@@ -885,7 +885,7 @@ impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
     /// Persist the freelist from this proposal to storage.
     pub fn flush_freelist(&self) -> Result<(), Error> {
         // Write the free lists to storage
-        let free_list_bytes = DefaultOptions::new()
+        let free_list_bytes = DefaultOptions::new().with_varint_encoding()
             .serialize(&self.header.free_lists)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
         let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
@@ -902,7 +902,7 @@ impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
                 area: Area::<_, FreeArea>::Node(node.as_ref()),
             };
 
-            let stored_area_bytes = DefaultOptions::new()
+            let stored_area_bytes = DefaultOptions::new().with_varint_encoding()
                 .serialize(&stored_area)
                 .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
@@ -935,7 +935,7 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Persist the freelist from this proposal to storage.
     pub fn flush_freelist(&self) -> Result<(), Error> {
         // Write the free lists to storage
-        let free_list_bytes = DefaultOptions::new()
+        let free_list_bytes = DefaultOptions::new().with_varint_encoding()
             .serialize(&self.header.free_lists)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
         let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
@@ -952,7 +952,7 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 area: Area::<_, FreeArea>::Node(node.as_ref()),
             };
 
-            let stored_area_bytes = DefaultOptions::new()
+            let stored_area_bytes = DefaultOptions::new().with_varint_encoding()
                 .serialize(&stored_area)
                 .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
@@ -1179,7 +1179,7 @@ mod tests {
 
         // Check the empty header is written at the start of the ReadableStorage.
         let mut header_bytes = node_store.storage.stream_from(0).unwrap();
-        let header: NodeStoreHeader = DefaultOptions::new()
+        let header: NodeStoreHeader = DefaultOptions::new().with_varint_encoding()
             .deserialize_from(&mut header_bytes)
             .unwrap();
         assert_eq!(header.version, Version::new());
