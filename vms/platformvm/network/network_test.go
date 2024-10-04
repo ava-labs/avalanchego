@@ -176,6 +176,9 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
+				nil, // TODO: Populate and test
+				nil,
+				nil,
 				prometheus.NewRegistry(),
 				testConfig,
 			)
