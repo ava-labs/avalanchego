@@ -106,7 +106,7 @@ func (*WarpVerifier) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return nil
 }
 
-func (w *WarpVerifier) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
+func (*WarpVerifier) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
 	return nil
 }
 
