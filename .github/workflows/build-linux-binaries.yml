@@ -28,9 +28,7 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -74,15 +72,13 @@ jobs:
           rm -rf /tmp/avalanchego
 
   build-arm64-binaries-tarball:
-    runs-on: custom-arm64-focal
+    runs-on: custom-arm64-jammy
     permissions:
       id-token: write
       contents: read
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/install-focal-deps
 
       - uses: ./.github/actions/setup-go-for-project
 
@@ -92,9 +88,7 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -124,7 +118,7 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "arm64"
-          RELEASE: "focal"
+          RELEASE: "jammy"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4

@@ -68,7 +68,7 @@ var (
 // called, so it must be guaranteed the VM is not used until after Start.
 type Bootstrapper struct {
 	Config
-	common.Halter
+	shouldHalt func() bool
 	*metrics
 
 	// list of NoOpsHandler for messages dropped by bootstrapper
@@ -120,6 +120,7 @@ type Bootstrapper struct {
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
 	return &Bootstrapper{
+		shouldHalt:                  config.ShouldHalt,
 		nonVerifyingParser:          config.NonVerifyingParse,
 		Config:                      config,
 		metrics:                     metrics,
@@ -649,7 +650,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	numToExecute := b.tree.Len()
 	err = execute(
 		ctx,
-		b,
+		b.ShouldHalt,
 		log,
 		b.DB,
 		&parseAcceptor{
@@ -673,7 +674,7 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 			lastAccepted.Height(),
 		)
 	}
-	if b.Halted() {
+	if b.shouldHalt() {
 		return nil
 	}
 

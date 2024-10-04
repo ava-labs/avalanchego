@@ -68,7 +68,7 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 		EthKeychain:  keychain,
 	})
 	require.NoError(tc, err)
-	return primary.NewWalletWithOptions(
+	wallet := primary.NewWalletWithOptions(
 		baseWallet,
 		common.WithPostIssuanceFunc(
 			func(id ids.ID) {
@@ -76,6 +76,37 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 			},
 		),
 	)
+	xAVAX, pAVAX := GetWalletBalances(tc, wallet)
+	tc.Outf("{{blue}}  wallet starting with %d X-chain nAVAX and %d P-chain nAVAX{{/}}\n", xAVAX, pAVAX)
+	return wallet
+}
+
+// OutputWalletBalances outputs the X-Chain and P-Chain balances of the provided wallet.
+func OutputWalletBalances(tc tests.TestContext, wallet primary.Wallet) {
+	xAVAX, pAVAX := GetWalletBalances(tc, wallet)
+	tc.Outf("{{blue}}  wallet has %d X-chain nAVAX and %d P-chain nAVAX{{/}}\n", xAVAX, pAVAX)
+}
+
+// GetWalletBalances retrieves the X-Chain and P-Chain balances of the provided wallet.
+func GetWalletBalances(tc tests.TestContext, wallet primary.Wallet) (uint64, uint64) {
+	require := require.New(tc)
+	var (
+		xWallet  = wallet.X()
+		xBuilder = xWallet.Builder()
+		pWallet  = wallet.P()
+		pBuilder = pWallet.Builder()
+	)
+	xBalances, err := xBuilder.GetFTBalance()
+	require.NoError(err, "failed to fetch X-chain balances")
+	pBalances, err := pBuilder.GetBalance()
+	require.NoError(err, "failed to fetch P-chain balances")
+	var (
+		xContext    = xBuilder.Context()
+		avaxAssetID = xContext.AVAXAssetID
+		xAVAX       = xBalances[avaxAssetID]
+		pAVAX       = pBalances[avaxAssetID]
+	)
+	return xAVAX, pAVAX
 }
 
 // Create a new eth client targeting the specified node URI.
@@ -258,4 +289,23 @@ func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator 
 		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
 	}
 	return fee.NewStaticCalculator(context.StaticFeeConfig)
+}
+
+// GetRepoRootPath strips the provided suffix from the current working
+// directory. If the test binary is executed from the root of the repo, the
+// result will be the repo root.
+func GetRepoRootPath(suffix string) (string, error) {
+	// - When executed via a test binary, the working directory will be wherever
+	// the binary is executed from, but scripts should require execution from
+	// the repo root.
+	//
+	// - When executed via ginkgo (nicer for development + supports
+	// parallel execution) the working directory will always be the
+	// target path (e.g. [repo root]./tests/bootstrap/e2e) and getting the repo
+	// root will require stripping the target path suffix.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(cwd, suffix), nil
 }

@@ -55,12 +55,12 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 	flag.Parse()
 
 	// Env vars take priority over flags
-	envURIs := os.Getenv(envVarName(EnvPrefix, URIsKey))
+	envURIs := os.Getenv(config.EnvVarName(EnvPrefix, URIsKey))
 	if len(envURIs) > 0 {
 		//nolint:errcheck // CSV.Set doesn't actually return an error
 		uris.Set(envURIs)
 	}
-	envChainIDs := os.Getenv(envVarName(EnvPrefix, ChainIDsKey))
+	envChainIDs := os.Getenv(config.EnvVarName(EnvPrefix, ChainIDsKey))
 	if len(envChainIDs) > 0 {
 		//nolint:errcheck // CSV.Set doesn't actually return an error
 		chainIDs.Set(envChainIDs)
@@ -125,9 +125,4 @@ func (c *CSV) String() string {
 func (c *CSV) Set(value string) error {
 	*c = strings.Split(value, ",")
 	return nil
-}
-
-func envVarName(prefix string, key string) string {
-	// e.g. MY_PREFIX, network-id -> MY_PREFIX_NETWORK_ID
-	return strings.ToUpper(prefix + "_" + config.DashesToUnderscores.Replace(key))
 }

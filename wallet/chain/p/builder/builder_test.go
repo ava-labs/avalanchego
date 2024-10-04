@@ -5,13 +5,13 @@ package builder
 
 import (
 	"math/rand"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -58,16 +58,16 @@ func TestSplitByLocktime(t *testing.T) {
 		require = require.New(t)
 
 		unlockedTime     uint64 = 100
-		expectedUnlocked        = utils.Join(
+		expectedUnlocked        = slices.Concat(
 			generateUTXOs(random, ids.GenerateTestID(), 0),
 			generateUTXOs(random, ids.GenerateTestID(), unlockedTime-1),
 			generateUTXOs(random, ids.GenerateTestID(), unlockedTime),
 		)
-		expectedLocked = utils.Join(
+		expectedLocked = slices.Concat(
 			generateUTXOs(random, ids.GenerateTestID(), unlockedTime+100),
 			generateUTXOs(random, ids.GenerateTestID(), unlockedTime+1),
 		)
-		utxos = utils.Join(
+		utxos = slices.Concat(
 			expectedUnlocked,
 			expectedLocked,
 		)
@@ -92,7 +92,7 @@ func TestByAssetID(t *testing.T) {
 		assetID           = ids.GenerateTestID()
 		expectedRequested = generateUTXOs(random, assetID, random.Uint64())
 		expectedOther     = generateUTXOs(random, ids.GenerateTestID(), random.Uint64())
-		utxos             = utils.Join(
+		utxos             = slices.Concat(
 			expectedRequested,
 			expectedOther,
 		)

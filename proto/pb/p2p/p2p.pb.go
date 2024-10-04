@@ -2132,13 +2132,13 @@ type Chits struct {
 
 	// Chain being responded from
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	// Request id of the original PushQuery/PullQuery request
+	// Request ID of the original PushQuery/PullQuery request
 	RequestId uint32 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	// Currently preferred block
+	// ID of the currently preferred block
 	PreferredId []byte `protobuf:"bytes,3,opt,name=preferred_id,json=preferredId,proto3" json:"preferred_id,omitempty"`
-	// Last accepted block
+	// ID of the last accepted block
 	AcceptedId []byte `protobuf:"bytes,4,opt,name=accepted_id,json=acceptedId,proto3" json:"accepted_id,omitempty"`
-	// Currently preferred block at the requested height
+	// ID of the currently preferred block at the requested height
 	PreferredIdAtHeight []byte `protobuf:"bytes,5,opt,name=preferred_id_at_height,json=preferredIdAtHeight,proto3" json:"preferred_id_at_height,omitempty"`
 }
 

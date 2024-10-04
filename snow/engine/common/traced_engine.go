@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -344,13 +343,6 @@ func (e *tracedEngine) Gossip(ctx context.Context) error {
 	return e.engine.Gossip(ctx)
 }
 
-func (e *tracedEngine) Halt(ctx context.Context) {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.Halt")
-	defer span.End()
-
-	e.engine.Halt(ctx)
-}
-
 func (e *tracedEngine) Shutdown(ctx context.Context) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Shutdown")
 	defer span.End()
@@ -365,10 +357,6 @@ func (e *tracedEngine) Notify(ctx context.Context, msg Message) error {
 	defer span.End()
 
 	return e.engine.Notify(ctx, msg)
-}
-
-func (e *tracedEngine) Context() *snow.ConsensusContext {
-	return e.engine.Context()
 }
 
 func (e *tracedEngine) Start(ctx context.Context, startReqID uint32) error {

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -487,13 +487,8 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "no stakers",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
-				currentStakerIter.EXPECT().Next().Return(false)
-				currentStakerIter.EXPECT().Release()
-
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-
+				s.EXPECT().GetCurrentStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil)
 				return s
 			},
 		},
@@ -501,24 +496,21 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired subnet validator/delegator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
-
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
-					EndTime:  now,
-				})
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     txID,
-					Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
-					EndTime:  now,
-				})
-				currentStakerIter.EXPECT().Release()
-
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-
+				s.EXPECT().GetCurrentStakerIterator().Return(
+					iterator.FromSlice(
+						&state.Staker{
+							Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+							EndTime:  now,
+						},
+						&state.Staker{
+							TxID:     txID,
+							Priority: txs.SubnetPermissionlessDelegatorCurrentPriority,
+							EndTime:  now,
+						},
+					),
+					nil,
+				)
 				return s
 			},
 			expectedTxID:         txID,
@@ -528,24 +520,21 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network validator after subnet expired subnet validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
-
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
-					EndTime:  now,
-				})
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     txID,
-					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-					EndTime:  now,
-				})
-				currentStakerIter.EXPECT().Release()
-
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-
+				s.EXPECT().GetCurrentStakerIterator().Return(
+					iterator.FromSlice(
+						&state.Staker{
+							Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+							EndTime:  now,
+						},
+						&state.Staker{
+							TxID:     txID,
+							Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+							EndTime:  now,
+						},
+					),
+					nil,
+				)
 				return s
 			},
 			expectedTxID:         txID,
@@ -555,24 +544,21 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "expired primary network delegator after subnet expired subnet validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
-
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					Priority: txs.SubnetPermissionedValidatorCurrentPriority,
-					EndTime:  now,
-				})
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     txID,
-					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					EndTime:  now,
-				})
-				currentStakerIter.EXPECT().Release()
-
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-
+				s.EXPECT().GetCurrentStakerIterator().Return(
+					iterator.FromSlice(
+						&state.Staker{
+							Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+							EndTime:  now,
+						},
+						&state.Staker{
+							TxID:     txID,
+							Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+							EndTime:  now,
+						},
+					),
+					nil,
+				)
 				return s
 			},
 			expectedTxID:         txID,
@@ -582,19 +568,17 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network delegator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
-
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     txID,
-					Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
-					EndTime:  now.Add(time.Second),
-				})
-				currentStakerIter.EXPECT().Release()
-
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-
+				s.EXPECT().GetCurrentStakerIterator().Return(
+					iterator.FromSlice(
+						&state.Staker{
+							TxID:     txID,
+							Priority: txs.PrimaryNetworkDelegatorCurrentPriority,
+							EndTime:  now.Add(time.Second),
+						},
+					),
+					nil,
+				)
 				return s
 			},
 			expectedTxID:         txID,
@@ -604,19 +588,17 @@ func TestGetNextStakerToReward(t *testing.T) {
 			name:      "non-expired primary network validator",
 			timestamp: now,
 			stateF: func(ctrl *gomock.Controller) state.Chain {
-				currentStakerIter := iteratormock.NewIterator[*state.Staker](ctrl)
-
-				currentStakerIter.EXPECT().Next().Return(true)
-				currentStakerIter.EXPECT().Value().Return(&state.Staker{
-					TxID:     txID,
-					Priority: txs.PrimaryNetworkValidatorCurrentPriority,
-					EndTime:  now.Add(time.Second),
-				})
-				currentStakerIter.EXPECT().Release()
-
 				s := state.NewMockChain(ctrl)
-				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil)
-
+				s.EXPECT().GetCurrentStakerIterator().Return(
+					iterator.FromSlice(
+						&state.Staker{
+							TxID:     txID,
+							Priority: txs.PrimaryNetworkValidatorCurrentPriority,
+							EndTime:  now.Add(time.Second),
+						},
+					),
+					nil,
+				)
 				return s
 			},
 			expectedTxID:         txID,

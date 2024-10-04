@@ -155,9 +155,10 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		require := require.New(t)
 
 		if env.isBootstrapped.Get() {
-			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-
-			require.NoError(env.uptimes.StopTracking(validatorIDs))
+			if env.uptimes.StartedTracking() {
+				validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+				require.NoError(env.uptimes.StopTracking(validatorIDs))
+			}
 
 			env.state.SetHeight(math.MaxUint64)
 			require.NoError(env.state.Commit())

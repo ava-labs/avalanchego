@@ -46,10 +46,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
-
-	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 const (
@@ -166,7 +165,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 			metrics,
 			res.state,
 			res.backend,
-			pvalidators.TestManager,
+			validatorstest.Manager,
 		)
 		addSubnet(t, res)
 	} else {
@@ -175,7 +174,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 			metrics,
 			res.mockedState,
 			res.backend,
-			pvalidators.TestManager,
+			validatorstest.Manager,
 		)
 		// we do not add any subnet to state, since we can mock
 		// whatever we need
@@ -192,7 +191,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 
 		require := require.New(t)
 
-		if res.isBootstrapped.Get() {
+		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 			require.NoError(res.uptimes.StopTracking(validatorIDs))

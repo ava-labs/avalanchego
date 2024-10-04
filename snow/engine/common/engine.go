@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -22,9 +21,6 @@ import (
 // required.
 type Engine interface {
 	Handler
-
-	// Return the context of the chain this engine is working on
-	Context() *snow.ConsensusContext
 
 	// Start engine operations from given request ID
 	Start(ctx context.Context, startReqID uint32) error
@@ -424,14 +420,6 @@ type InternalHandler interface {
 
 	// Gossip to the network a container on the accepted frontier
 	Gossip(context.Context) error
-
-	// Halt this engine.
-	//
-	// This function will be called before the environment starts exiting. This
-	// function is special, in that it does not expect the chain's context lock
-	// to be held before calling this function. This function also does not
-	// require the engine to have been started.
-	Halt(context.Context)
 
 	// Shutdown this engine.
 	//
