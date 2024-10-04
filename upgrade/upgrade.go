@@ -72,7 +72,7 @@ var (
 		DurangoTime:                  InitiallyActiveTime,
 		// Etna is left unactivated by default on local networks. It can be configured to
 		// activate by overriding the activation time in the upgrade file.
-		EtnaTime: InitiallyActiveTime,
+		EtnaTime: UnscheduledActivationTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
