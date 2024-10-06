@@ -14,6 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/utils/logging"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -45,8 +48,8 @@ func newDefaultConfig() Config {
 		Hasher:                      DefaultHasher,
 		RootGenConcurrency:          0,
 		HistoryLength:               defaultHistoryLength,
-		ValueNodeCacheSize:          units.MiB,
-		IntermediateNodeCacheSize:   units.MiB,
+		ValueNodeCacheSize:          10 * units.MiB,
+		IntermediateNodeCacheSize:   10 * units.MiB,
 		IntermediateWriteBufferSize: units.KiB,
 		IntermediateWriteBatchSize:  256 * units.KiB,
 		Reg:                         prometheus.NewRegistry(),
@@ -1335,6 +1338,91 @@ func TestCrashRecovery(t *testing.T) {
 	rootAfterRecovery, err := newMerkleDB.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(expectedRoot, rootAfterRecovery)
+}
+
+func BenchmarkLevelDBCommitView(b *testing.B) {
+	b.Run("100k in 1", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			CommitToLevelDB(b, 100_000, 1)
+		}
+	})
+	b.Run("500k in 5", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			CommitToLevelDB(b, 100_000, 5)
+		}
+	})
+	b.Run("1m in 10", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			CommitToLevelDB(b, 100_000, 10)
+		}
+	})
+}
+
+func BenchmarkMemDBCommitView(b *testing.B) {
+	b.Run("100k in 1", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			CommitToMemDB(b, 100_000, 1)
+		}
+	})
+	b.Run("500k in 5", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			CommitToMemDB(b, 100_000, 5)
+		}
+	})
+	b.Run("1m in 10", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			CommitToMemDB(b, 100_000, 10)
+		}
+	})
+}
+
+func CommitToLevelDB(b *testing.B, batchSize int, batchCount int) {
+	baseDB, err := leveldb.New(
+		b.TempDir()+fmt.Sprintf("/%d/%d", batchSize, batchCount),
+		nil,
+		logging.NoLog{},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(b, err)
+	db, err := newDatabase(
+		context.Background(),
+		baseDB,
+		newDefaultConfig(),
+		&mockMetrics{},
+	)
+	require.NoError(b, err)
+	for batchNum := 0; batchNum < batchCount; batchNum++ {
+		CommitBatch(b, db, batchSize, int64(batchNum))
+	}
+	require.NoError(b, db.Close())
+}
+
+func CommitToMemDB(b *testing.B, batchSize int, batchCount int) {
+	db, err := getBasicDB()
+	require.NoError(b, err)
+	for batchNum := 0; batchNum < batchCount; batchNum++ {
+		CommitBatch(b, db, batchSize, int64(batchNum))
+	}
+	require.NoError(b, db.Close())
+}
+
+func CommitBatch(b *testing.B, db *merkleDB, batchSize int, seed int64) {
+	ops := make([]database.BatchOp, batchSize)
+	r := rand.New(rand.NewSource(seed)) // #nosec G404
+	for i := range ops {
+		size := r.Intn(64) + 1
+		ops[i] = database.BatchOp{
+			Key:   make([]byte, size),
+			Value: make([]byte, 32),
+		}
+		r.Read(ops[i].Key)
+		r.Read(ops[i].Value)
+	}
+
+	ctx := context.Background()
+	view, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+	require.NoError(b, err)
+	require.NoError(b, view.CommitToDB(ctx))
 }
 
 func BenchmarkCommitView(b *testing.B) {
