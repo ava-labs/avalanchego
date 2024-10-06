@@ -969,7 +969,7 @@ func (v *view) recordValueChange(key Key, value maybe.Maybe[[]byte]) error {
 // Retrieves a node with the given [key].
 // If the node is fetched from [v.parentTrie] and [id] isn't empty,
 // sets the node's ID to [id].
-// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
+// If the node is loaded from disk, [hasValue] determines which disk layer the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
 func (v *view) getNode(key Key, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes

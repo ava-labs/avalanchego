@@ -813,8 +813,7 @@ func TestMerkleDBClear(t *testing.T) {
 	require.True(db.root.IsNothing())
 
 	// Assert caches are empty.
-	require.Zero(db.valueNodeDB.nodeCache.Len())
-	require.Zero(db.intermediateNodeDB.writeBuffer.currentSize)
+	require.Zero(db.disk.cacheSize())
 
 	// Assert history has only the clearing change.
 	require.Len(db.history.lastChanges, 1)
@@ -1337,38 +1336,35 @@ func TestCrashRecovery(t *testing.T) {
 	require.Equal(expectedRoot, rootAfterRecovery)
 }
 
-func BenchmarkCommitView(b *testing.B) {
-	db, err := getBasicDB()
-	require.NoError(b, err)
+// func BenchmarkCommitView(b *testing.B) {
+// 	db, err := getBasicDB()
+// 	require.NoError(b, err)
 
-	ops := make([]database.BatchOp, 1_000)
-	for i := range ops {
-		k := binary.AppendUvarint(nil, uint64(i))
-		ops[i] = database.BatchOp{
-			Key:   k,
-			Value: hashing.ComputeHash256(k),
-		}
-	}
+// 	ops := make([]database.BatchOp, 1_000)
+// 	for i := range ops {
+// 		k := binary.AppendUvarint(nil, uint64(i))
+// 		ops[i] = database.BatchOp{
+// 			Key:   k,
+// 			Value: hashing.ComputeHash256(k),
+// 		}
+// 	}
 
-	ctx := context.Background()
-	viewIntf, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
-	require.NoError(b, err)
+// 	ctx := context.Background()
+// 	viewIntf, err := db.NewView(ctx, ViewChanges{BatchOps: ops})
+// 	require.NoError(b, err)
 
-	view := viewIntf.(*view)
-	require.NoError(b, view.applyValueChanges(ctx))
+// 	view := viewIntf.(*view)
+// 	require.NoError(b, view.applyValueChanges(ctx))
 
-	b.Run("apply and commit changes", func(b *testing.B) {
-		require := require.New(b)
+// 	b.Run("apply and commit changes", func(b *testing.B) {
+// 		require := require.New(b)
 
-		for i := 0; i < b.N; i++ {
-			db.baseDB = memdb.New() // Keep each iteration independent
-
-			valueNodeBatch := db.baseDB.NewBatch()
-			require.NoError(db.applyChanges(ctx, valueNodeBatch, view.changes))
-			require.NoError(db.commitValueChanges(ctx, valueNodeBatch))
-		}
-	})
-}
+// 		for i := 0; i < b.N; i++ {
+// 			db.disk.db = memdb.New() // Keep each iteration independent
+// 			require.NoError(db.disk.writeChanges(ctx, view.changes))
+// 		}
+// 	})
+// }
 
 func BenchmarkIteration(b *testing.B) {
 	db, err := getBasicDB()
