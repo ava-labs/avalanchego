@@ -12,7 +12,7 @@ fn leaf(c: &mut Criterion) {
     let mut group = c.benchmark_group("leaf");
     let input = Node::Leaf(LeafNode {
         partial_path: Path(SmallVec::from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])),
-        value: vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9].into_boxed_slice(),
+        value: SmallVec::from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
     });
     let serializer = bincode::DefaultOptions::new().with_varint_encoding();
     group.bench_with_input("leaf", &input, |b, input| {

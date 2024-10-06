@@ -1112,6 +1112,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 mod tests {
     use crate::{linear::memory::MemStore, BranchNode, LeafNode};
     use arc_swap::access::DynGuard;
+    use smallvec::SmallVec;
     use test_case::test_case;
 
     use super::*;
@@ -1201,7 +1202,7 @@ mod tests {
     #[test_case(
     Node::Leaf(LeafNode {
         partial_path: Path::from([0, 1, 2]),
-        value: Box::new([3, 4, 5]),
+        value: SmallVec::from_slice(&[3, 4, 5]),
     }); "leaf node")]
 
     fn test_serialized_len<N: Into<Node>>(node: N) {

@@ -7,6 +7,7 @@ use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
 use metrics::{counter, histogram};
+use smallvec::SmallVec;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future::ready;
@@ -419,7 +420,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             // it as the root.
             let root_node = Node::Leaf(LeafNode {
                 partial_path: key,
-                value,
+                value: SmallVec::from(&value[..]),
             });
             *root = root_node.into();
             return Ok(());
@@ -500,7 +501,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                 // There is no child at this index.
                                 // Create a new leaf and put it here.
                                 let new_leaf = Node::Leaf(LeafNode {
-                                    value,
+                                    value: SmallVec::from(&value[..]),
                                     partial_path,
                                 });
                                 branch.update_child(child_index, Some(Child::Node(new_leaf)));
@@ -526,7 +527,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         };
 
                         let new_leaf = Node::Leaf(LeafNode {
-                            value,
+                            value: SmallVec::from(&value[..]),
                             partial_path,
                         });
 
@@ -555,7 +556,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 branch.update_child(node_index, Some(Child::Node(node)));
 
                 let new_leaf = Node::Leaf(LeafNode {
-                    value,
+                    value: SmallVec::from(&value[..]),
                     partial_path: key_partial_path,
                 });
                 branch.update_child(key_index, Some(Child::Node(new_leaf)));
@@ -702,7 +703,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                     }
                     Node::Leaf(leaf) => {
                         let removed_value = std::mem::take(&mut leaf.value);
-                        Ok((None, Some(removed_value)))
+                        Ok((None, Some(removed_value.into_boxed_slice())))
                     }
                 }
             }

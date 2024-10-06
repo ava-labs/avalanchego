@@ -32,6 +32,7 @@ log = "0.4.20"
 test-case = "3.3.1"
 integer-encoding = "4.0.0"
 io-uring = {version = "0.7", optional = true }
+smallvec = "1.6.1"
 
 [features]
 default = []

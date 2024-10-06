@@ -157,7 +157,7 @@ impl From<&LeafNode> for BranchNode {
     fn from(leaf: &LeafNode) -> Self {
         BranchNode {
             partial_path: leaf.partial_path.clone(),
-            value: Some(leaf.value.clone()),
+            value: Some(Box::from(&leaf.value[..])),
             children: Default::default(),
         }
     }
