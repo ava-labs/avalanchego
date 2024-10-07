@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package platformvm;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/platformvm";
+
+message SubnetValidatorRegistrationJustification {
+  oneof preimage {
+    // Validator was added to the Subnet during the ConvertSubnetTx.
+    SubnetIDIndex convert_subnet_tx_data = 1;
+    // Validator was registered to the Subnet after the ConvertSubnetTx.
+    // The SubnetValidator is being removed from the Subnet
+    bytes register_subnet_validator_message = 2;
+  }
+  bytes filter = 3;
+}
+
+message SubnetIDIndex {
+  bytes subnet_id = 1;
+  uint32 index = 2;
+}
