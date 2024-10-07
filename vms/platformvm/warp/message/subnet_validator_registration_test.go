@@ -36,10 +36,10 @@ func TestSubnetValidatorRegistration(t *testing.T) {
 			jsonBytes, err := json.MarshalIndent(msg, "", "\t")
 			require.NoError(err)
 
-			var unmarshaledMsg SubnetValidatorRegistration
-			require.NoError(json.Unmarshal(jsonBytes, &unmarshaledMsg))
-			require.NoError(initialize(&unmarshaledMsg))
-			require.Equal(msg, &unmarshaledMsg)
+			var unmarshalledMsg SubnetValidatorRegistration
+			require.NoError(json.Unmarshal(jsonBytes, &unmarshalledMsg))
+			require.NoError(initialize(&unmarshalledMsg))
+			require.Equal(msg, &unmarshalledMsg)
 		})
 	}
 }
