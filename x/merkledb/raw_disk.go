@@ -17,7 +17,7 @@ import (
 
 const fileName = "merkle.db"
 
-// diskAddress specifies a byte array stored on disk
+// [offset:offset+size]
 type diskAddress struct {
 	offset int64
 	size   int64
@@ -39,9 +39,20 @@ func (r *diskAddress) decode(diskAddressBytes []byte) {
 	r.size = int64(binary.BigEndian.Uint64(diskAddressBytes[8:]))
 }
 
+type diskBranchNode struct {
+	value    maybe.Maybe[[]byte]
+	children map[byte]diskChild
+}
+
+type diskChild struct {
+	child
+	address diskAddress
+}
+
+// convert dbNode to disk format
 type rawDisk struct {
 	// [0] = shutdownType
-	// [1,17] = rootKey raw file offset
+	// [1,17] = diskAddress of root key
 	// [18,] = node store
 	file *os.File
 }
