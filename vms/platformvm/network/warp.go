@@ -9,9 +9,12 @@ import (
 	"math"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
+	"github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -129,9 +132,65 @@ func (s signatureRequestVerifier) verifySubnetConversion(
 
 func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	msg *message.SubnetValidatorRegistration,
-	justification []byte,
+	justificationBytes []byte,
 ) *common.AppError {
-	registerSubnetValidator, err := message.ParseRegisterSubnetValidator(justification)
+	if msg.Registered {
+		return s.verifySubnetValidatorRegistered(msg.ValidationID)
+	}
+
+	var justification platformvm.SubnetValidatorRegistrationJustification
+	if err := proto.Unmarshal(justificationBytes, &justification); err != nil {
+		return &common.AppError{
+			Code:    ErrFailedToParseJustification,
+			Message: "failed to parse justification: " + err.Error(),
+		}
+	}
+
+	switch preimage := justification.GetPreimage().(type) {
+	case *platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData:
+		return s.verifySubnetValidatorNotCurrentlyRegistered(msg.ValidationID, preimage.ConvertSubnetTxData)
+	case *platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage:
+		return s.verifySubnetValidatorCanNotValidate(msg.ValidationID, preimage.RegisterSubnetValidatorMessage)
+	default:
+		return &common.AppError{
+			Code:    ErrFailedToParseJustification,
+			Message: fmt.Sprintf("failed to parse justification: unsupported justification type %T", justification.Preimage),
+		}
+	}
+}
+
+// verifySubnetValidatorCanNotValidate verifies that the validationID is
+// currently a validator.
+func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
+	validationID ids.ID,
+) *common.AppError {
+	s.stateLock.Lock()
+	defer s.stateLock.Unlock()
+
+	// Verify that the validator exists
+	_, err := s.state.GetSubnetOnlyValidator(validationID)
+	if err == database.ErrNotFound {
+		return &common.AppError{
+			Code:    ErrValidationDoesNotExist,
+			Message: fmt.Sprintf("validation %q does not exist", validationID),
+		}
+	}
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get subnet only validator: " + err.Error(),
+		}
+	}
+	return nil
+}
+
+// verifySubnetValidatorCanNotValidate verifies that the validationID is not
+// currently a validator.
+func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
+	validationID ids.ID,
+	justification *platformvm.SubnetIDIndex,
+) *common.AppError {
+	subnetID, err := ids.ToID(justification.GetSubnetId())
 	if err != nil {
 		return &common.AppError{
 			Code:    ErrFailedToParseJustification,
@@ -139,41 +198,65 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 		}
 	}
 
-	justificationID := registerSubnetValidator.ValidationID()
-	if msg.ValidationID != justificationID {
+	justificationID := subnetID.Append(justification.GetIndex())
+	if validationID != justificationID {
 		return &common.AppError{
 			Code:    ErrMismatchedValidationID,
-			Message: fmt.Sprintf("validationID %q != justificationID %q", msg.ValidationID, justificationID),
+			Message: fmt.Sprintf("validationID %q != justificationID %q", validationID, justificationID),
 		}
 	}
 
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	if msg.Registered {
-		// Verify that the validator exists
-		_, err := s.state.GetSubnetOnlyValidator(msg.ValidationID)
-		if err == database.ErrNotFound {
-			return &common.AppError{
-				Code:    ErrValidationDoesNotExist,
-				Message: fmt.Sprintf("validation %q does not exist", msg.ValidationID),
-			}
-		}
-		if err != nil {
-			return &common.AppError{
-				Code:    common.ErrUndefined.Code,
-				Message: "failed to get subnet only validator: " + err.Error(),
-			}
-		}
-		return nil
-	}
-
-	// Verify that the validator does not and can never exists
-	_, err = s.state.GetSubnetOnlyValidator(msg.ValidationID)
+	// Verify that the validator does not currently exist
+	_, err = s.state.GetSubnetOnlyValidator(validationID)
 	if err == nil {
 		return &common.AppError{
 			Code:    ErrValidationExists,
-			Message: fmt.Sprintf("validation %q exists", msg.ValidationID),
+			Message: fmt.Sprintf("validation %q exists", validationID),
+		}
+	}
+	if err != database.ErrNotFound {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to lookup subnet only validator: " + err.Error(),
+		}
+	}
+	return nil
+}
+
+// verifySubnetValidatorCanNotValidate verifies that the validationID does not
+// currently and can never become a validator.
+func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
+	validationID ids.ID,
+	justificationBytes []byte,
+) *common.AppError {
+	justification, err := message.ParseRegisterSubnetValidator(justificationBytes)
+	if err != nil {
+		return &common.AppError{
+			Code:    ErrFailedToParseJustification,
+			Message: "failed to parse justification: " + err.Error(),
+		}
+	}
+
+	justificationID := justification.ValidationID()
+	if validationID != justificationID {
+		return &common.AppError{
+			Code:    ErrMismatchedValidationID,
+			Message: fmt.Sprintf("validationID %q != justificationID %q", validationID, justificationID),
+		}
+	}
+
+	s.stateLock.Lock()
+	defer s.stateLock.Unlock()
+
+	// Verify that the validator does not and can never exists
+	_, err = s.state.GetSubnetOnlyValidator(validationID)
+	if err == nil {
+		return &common.AppError{
+			Code:    ErrValidationExists,
+			Message: fmt.Sprintf("validation %q exists", validationID),
 		}
 	}
 	if err != database.ErrNotFound {
@@ -184,14 +267,14 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	}
 
 	currentTimeUnix := uint64(s.state.GetTimestamp().Unix())
-	if registerSubnetValidator.Expiry <= currentTimeUnix {
+	if justification.Expiry <= currentTimeUnix {
 		// The validator is not registered and the expiry time has passed
 		return nil
 	}
 
 	hasExpiry, err := s.state.HasExpiry(state.ExpiryEntry{
-		Timestamp:    registerSubnetValidator.Expiry,
-		ValidationID: msg.ValidationID,
+		Timestamp:    justification.Expiry,
+		ValidationID: validationID,
 	})
 	if err != nil {
 		return &common.AppError{
@@ -202,7 +285,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	if !hasExpiry {
 		return &common.AppError{
 			Code:    ErrValidationCouldBeRegistered,
-			Message: fmt.Sprintf("validation %q can be registered until %d", msg.ValidationID, registerSubnetValidator.Expiry),
+			Message: fmt.Sprintf("validation %q can be registered until %d", validationID, justification.Expiry),
 		}
 	}
 
