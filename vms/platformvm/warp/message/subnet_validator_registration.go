@@ -47,6 +47,25 @@ func (s RegistrationStatus) String() string {
 	}
 }
 
+func (s RegistrationStatus) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + s.String() + `"`), nil
+}
+
+func (s *RegistrationStatus) UnmarshalJSON(b []byte) error {
+	switch string(b) {
+	case "null":
+	case `"CurrentlyValidating"`:
+		*s = CurrentlyValidating
+	case `"NotCurrentlyValidating"`:
+		*s = NotCurrentlyValidating
+	case `"WillNeverValidate"`:
+		*s = WillNeverValidate
+	default:
+		return fmt.Errorf("%w: %s", ErrInvalidRegistrationStatus, string(b))
+	}
+	return nil
+}
+
 // SubnetValidatorRegistration reports if a validator is registered on the
 // P-chain.
 type SubnetValidatorRegistration struct {

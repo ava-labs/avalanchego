@@ -4,6 +4,7 @@
 package message
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,14 @@ func TestSubnetValidatorRegistration(t *testing.T) {
 			parsed, err := ParseSubnetValidatorRegistration(msg.Bytes())
 			require.NoError(err)
 			require.Equal(msg, parsed)
+
+			jsonBytes, err := json.MarshalIndent(msg, "", "\t")
+			require.NoError(err)
+
+			var unmarshaledMsg SubnetValidatorRegistration
+			require.NoError(json.Unmarshal(jsonBytes, &unmarshaledMsg))
+			require.NoError(initialize(&unmarshaledMsg))
+			require.Equal(msg, &unmarshaledMsg)
 		})
 	}
 }
