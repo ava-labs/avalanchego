@@ -61,10 +61,10 @@ var (
 					gas.Compute:   1,
 				},
 				MaxCapacity:              1_000_000,
-				MaxPerSecond:             1_000,
-				TargetPerSecond:          500,
+				MaxPerSecond:             250_000,
+				TargetPerSecond:          100_000,
 				MinPrice:                 1,
-				ExcessConversionConstant: 5_000,
+				ExcessConversionConstant: 1_000_000,
 			},
 			ValidatorFeeCapacity: 20_000,
 			ValidatorFeeConfig: validatorfee.Config{
