@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/require"
@@ -179,13 +180,13 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		expected      bool
 	}{
 		{
-			name: "ValidNetworkUpgrades for custom network",
+			name: "ValidNetworkUpgrades for latest network",
 			upgrades: &NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.NewUint64(1607144400),
 				EtnaTimestamp:      utils.NewUint64(1607144400),
 			},
-			avagoUpgrades: upgrade.GetConfig(1111),
+			avagoUpgrades: upgradetest.GetConfig(upgradetest.Latest),
 			expected:      true,
 		},
 		{

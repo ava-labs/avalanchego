@@ -57,31 +57,10 @@ var (
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
-		NetworkUpgrades:     getDefaultNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)), // This can be changed to correct network (local, test) via VM.
-		GenesisPrecompiles:  Precompiles{},
-	}
-
-	TestChainConfig = &ChainConfig{
-		AvalancheContext:    AvalancheContext{utils.TestSnowContext()},
-		ChainID:             big.NewInt(1),
-		FeeConfig:           DefaultFeeConfig,
-		AllowFeeRecipients:  false,
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
-		ShanghaiTime:        utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).DurangoTime),
-		CancunTime:          utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).EtnaTime),
-		NetworkUpgrades:     getDefaultNetworkUpgrades(upgrade.GetConfig(constants.UnitTestID)), // This can be changed to correct network (local, test) via VM.
+		NetworkUpgrades:     getDefaultNetworkUpgrades(upgrade.GetConfig(constants.MainnetID)), // This can be changed to correct network (local, test) via VM.
 		GenesisPrecompiles:  Precompiles{},
-		UpgradeConfig:       UpgradeConfig{},
 	}
 
 	TestPreSubnetEVMChainConfig = &ChainConfig{
@@ -150,10 +129,10 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
-		ShanghaiTime:        utils.NewUint64(0),
+		ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
-			DurangoTimestamp:   utils.NewUint64(0),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.UnscheduledActivationTime),
 		},
 		GenesisPrecompiles: Precompiles{},
@@ -176,17 +155,19 @@ var (
 		MuirGlacierBlock:    big.NewInt(0),
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
-		ShanghaiTime:        utils.NewUint64(0),
-		CancunTime:          utils.NewUint64(0),
+		ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+		CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		NetworkUpgrades: NetworkUpgrades{
 			SubnetEVMTimestamp: utils.NewUint64(0),
-			DurangoTimestamp:   utils.NewUint64(0),
-			EtnaTimestamp:      utils.NewUint64(0),
+			DurangoTimestamp:   utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			EtnaTimestamp:      utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
 		},
 		GenesisPrecompiles: Precompiles{},
 		UpgradeConfig:      UpgradeConfig{},
 	}
-	TestRules = TestChainConfig.Rules(new(big.Int), 0)
+
+	TestChainConfig = TestEtnaChainConfig
+	TestRules       = TestChainConfig.Rules(new(big.Int), 0)
 )
 
 // ChainConfig is the core config which determines the blockchain settings.

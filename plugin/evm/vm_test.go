@@ -145,7 +145,6 @@ func NewContext() *snow.Context {
 	ctx.ChainID = testCChainID
 	ctx.AVAXAssetID = testAvaxAssetID
 	ctx.XChainID = testXChainID
-	ctx.NetworkUpgrades = upgrade.GetConfig(testNetworkID)
 	aliaser := ctx.BCLookup.(ids.Aliaser)
 	_ = aliaser.Alias(testCChainID, "C")
 	_ = aliaser.Alias(testCChainID, testCChainID.String())
