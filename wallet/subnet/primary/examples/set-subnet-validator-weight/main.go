@@ -26,11 +26,11 @@ func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	chainID := ids.FromStringOrPanic("2BMFrJ9xeh5JdwZEx6uuFcjfZC2SV2hdbMT8ee5HrvjtfJb5br")
+	chainID := ids.FromStringOrPanic("4R1dLAnG45P3rbdJB2dWuKdVRZF3dLMKgfJ8J6wKSQvYFVUhb")
 	addressHex := ""
-	validationID := ids.FromStringOrPanic("2Y3ZZZXxpzm46geqVuqFXeSFVbeKihgrfeXRDaiF4ds6R2N8M5")
+	validationID := ids.FromStringOrPanic("9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo")
 	nonce := uint64(1)
-	weight := uint64(2)
+	weight := uint64(0)
 
 	address, err := hex.DecodeString(addressHex)
 	if err != nil {
