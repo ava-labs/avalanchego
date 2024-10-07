@@ -4,7 +4,6 @@
 package message
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,16 +12,21 @@ import (
 )
 
 func TestSubnetValidatorRegistration(t *testing.T) {
-	booleans := []bool{true, false}
-	for _, registered := range booleans {
-		t.Run(strconv.FormatBool(registered), func(t *testing.T) {
+	statuses := []RegistrationStatus{
+		CurrentlyValidating,
+		NotCurrentlyValidating,
+		WillNeverValidate,
+	}
+	for _, status := range statuses {
+		t.Run(status.String(), func(t *testing.T) {
 			require := require.New(t)
 
 			msg, err := NewSubnetValidatorRegistration(
 				ids.GenerateTestID(),
-				registered,
+				status,
 			)
 			require.NoError(err)
+			require.NoError(msg.Verify())
 
 			parsed, err := ParseSubnetValidatorRegistration(msg.Bytes())
 			require.NoError(err)
