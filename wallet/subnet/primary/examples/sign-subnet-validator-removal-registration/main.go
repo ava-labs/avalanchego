@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/netip"
 	"time"
@@ -13,9 +14,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/peer"
+	"github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils/compression"
@@ -29,24 +30,101 @@ import (
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
+var registerSubnetValidatorJSON = []byte(`{
+        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
+        "nodeID": "0x550f3c8f2ebd89e6a69adca196bea38a1b4d65bc",
+        "blsPublicKey": [
+                178,
+                119,
+                51,
+                152,
+                247,
+                239,
+                52,
+                16,
+                89,
+                246,
+                6,
+                11,
+                76,
+                81,
+                114,
+                139,
+                141,
+                251,
+                127,
+                202,
+                205,
+                177,
+                62,
+                75,
+                152,
+                207,
+                170,
+                120,
+                86,
+                213,
+                226,
+                226,
+                104,
+                135,
+                245,
+                231,
+                226,
+                223,
+                64,
+                19,
+                242,
+                246,
+                227,
+                12,
+                223,
+                23,
+                193,
+                219
+        ],
+        "expiry": 1728331617,
+        "remainingBalanceOwner": {
+                "threshold": 0,
+                "addresses": null
+        },
+        "disableOwner": {
+                "threshold": 0,
+                "addresses": null
+        },
+        "weight": 1
+}`)
+
 func main() {
 	uri := primary.LocalAPIURI
-	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
-	conversionID := ids.FromStringOrPanic("28tfqwucuoH7oWxmVYDVQ2C1ehdYecF5mzwNmX2t1dTu1S5vHE")
 	infoClient := info.NewClient(uri)
 	networkID, err := infoClient.GetNetworkID(context.Background())
 	if err != nil {
 		log.Fatalf("failed to fetch network ID: %s\n", err)
 	}
 
-	subnetConversion, err := warpmessage.NewSubnetConversion(conversionID)
+	var registerSubnetValidator warpmessage.RegisterSubnetValidator
+	err = json.Unmarshal(registerSubnetValidatorJSON, &registerSubnetValidator)
 	if err != nil {
-		log.Fatalf("failed to create SubnetConversion message: %s\n", err)
+		log.Fatalf("failed to unmarshal RegisterSubnetValidator message: %s\n", err)
+	}
+	err = warpmessage.Initialize(&registerSubnetValidator)
+	if err != nil {
+		log.Fatalf("failed to initialize RegisterSubnetValidator message: %s\n", err)
+	}
+
+	validationID := registerSubnetValidator.ValidationID()
+	subnetValidatorRegistration, err := warpmessage.NewSubnetValidatorRegistration(
+		validationID,
+		false,
+	)
+	if err != nil {
+		log.Fatalf("failed to create SubnetValidatorRegistration message: %s\n", err)
 	}
 
 	addressedCall, err := payload.NewAddressedCall(
 		nil,
-		subnetConversion.Bytes(),
+		subnetValidatorRegistration.Bytes(),
 	)
 	if err != nil {
 		log.Fatalf("failed to create AddressedCall message: %s\n", err)
@@ -59,6 +137,16 @@ func main() {
 	)
 	if err != nil {
 		log.Fatalf("failed to create unsigned Warp message: %s\n", err)
+	}
+
+	justification := platformvm.SubnetValidatorRegistrationJustification{
+		Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
+			RegisterSubnetValidatorMessage: registerSubnetValidator.Bytes(),
+		},
+	}
+	justificationBytes, err := proto.Marshal(&justification)
+	if err != nil {
+		log.Fatalf("failed to create justification: %s\n", err)
 	}
 
 	p, err := peer.StartTestPeer(
@@ -88,7 +176,7 @@ func main() {
 
 	appRequestPayload, err := proto.Marshal(&sdk.SignatureRequest{
 		Message:       unsignedWarp.Bytes(),
-		Justification: subnetID[:],
+		Justification: justificationBytes,
 	})
 	if err != nil {
 		log.Fatalf("failed to marshal SignatureRequest: %s\n", err)

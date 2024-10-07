@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/netip"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -29,90 +29,15 @@ import (
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
-var registerSubnetValidatorJSON = []byte(`{
-        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
-        "nodeID": "0xb628ee3952a5de80fadd31ab030a67189edb1410",
-        "blsPublicKey": [
-                143,
-                167,
-                255,
-                128,
-                221,
-                92,
-                126,
-                190,
-                134,
-                189,
-                157,
-                166,
-                6,
-                55,
-                92,
-                125,
-                223,
-                231,
-                71,
-                85,
-                122,
-                110,
-                110,
-                49,
-                215,
-                14,
-                1,
-                226,
-                146,
-                140,
-                73,
-                75,
-                113,
-                163,
-                138,
-                158,
-                34,
-                207,
-                99,
-                36,
-                137,
-                55,
-                191,
-                28,
-                186,
-                24,
-                49,
-                199
-        ],
-        "expiry": 1727975059,
-        "remainingBalanceOwner": {
-                "threshold": 0,
-                "addresses": null
-        },
-        "disableOwner": {
-                "threshold": 0,
-                "addresses": null
-        },
-        "weight": 1
-}`)
-
 func main() {
 	uri := primary.LocalAPIURI
+	validationID := ids.FromStringOrPanic("2DWCCiYb7xRTRHeKybkLY5ygRhZ1CWhtHgLuUCJBxktRnUYdCT")
 	infoClient := info.NewClient(uri)
 	networkID, err := infoClient.GetNetworkID(context.Background())
 	if err != nil {
 		log.Fatalf("failed to fetch network ID: %s\n", err)
 	}
 
-	var registerSubnetValidator warpmessage.RegisterSubnetValidator
-	err = json.Unmarshal(registerSubnetValidatorJSON, &registerSubnetValidator)
-	if err != nil {
-		log.Fatalf("failed to unmarshal RegisterSubnetValidator message: %s\n", err)
-	}
-	err = warpmessage.Initialize(&registerSubnetValidator)
-	if err != nil {
-		log.Fatalf("failed to initialize RegisterSubnetValidator message: %s\n", err)
-	}
-
-	validationID := registerSubnetValidator.ValidationID()
 	subnetValidatorRegistration, err := warpmessage.NewSubnetValidatorRegistration(
 		validationID,
 		true,
@@ -153,7 +78,7 @@ func main() {
 		log.Fatalf("failed to start peer: %s\n", err)
 	}
 
-	mesageBuilder, err := p2pmessage.NewCreator(
+	messageBuilder, err := p2pmessage.NewCreator(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		compression.TypeZstd,
@@ -164,14 +89,13 @@ func main() {
 	}
 
 	appRequestPayload, err := proto.Marshal(&sdk.SignatureRequest{
-		Message:       unsignedWarp.Bytes(),
-		Justification: registerSubnetValidator.Bytes(),
+		Message: unsignedWarp.Bytes(),
 	})
 	if err != nil {
 		log.Fatalf("failed to marshal SignatureRequest: %s\n", err)
 	}
 
-	appRequest, err := mesageBuilder.AppRequest(
+	appRequest, err := messageBuilder.AppRequest(
 		constants.PlatformChainID,
 		0,
 		time.Hour,
