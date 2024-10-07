@@ -49,6 +49,7 @@ var (
 	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators     = errors.New("already at the max number of active validators")
+	errRemovingLastValidator      = errors.New("attempting to remove the last SoV from a converted subnet")
 
 	errStateCorruption = errors.New("state corruption")
 )
@@ -879,40 +880,52 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	}
 
 	txID := e.Tx.ID()
-	if msg.Weight == 0 && sov.EndAccumulatedFee != 0 {
-		// If we are removing an active validator, we need to refund the
-		// remaining balance.
-		var remainingBalanceOwner message.PChainOwner
-		if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+
+	// We are removing the validator
+	if msg.Weight == 0 {
+		weight, err := e.State.WeightOfSubnetOnlyValidators(sov.SubnetID)
+		if err != nil {
 			return err
 		}
-
-		accruedFees := e.State.GetAccruedFees()
-		if sov.EndAccumulatedFee <= accruedFees {
-			// This check should be unreachable. However, including it ensures
-			// that AVAX can't get minted out of thin air due to state
-			// corruption.
-			return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
+		if weight == sov.Weight {
+			return errRemovingLastValidator
 		}
-		remainingBalance := sov.EndAccumulatedFee - accruedFees
 
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(tx.Outs)),
-			},
-			Asset: avax.Asset{
-				ID: e.Ctx.AVAXAssetID,
-			},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: remainingBalance,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: remainingBalanceOwner.Threshold,
-					Addrs:     remainingBalanceOwner.Addresses,
+		// The validator is currently active, we need to refund the remaining
+		// balance.
+		if sov.EndAccumulatedFee != 0 {
+			var remainingBalanceOwner message.PChainOwner
+			if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+				return err
+			}
+
+			accruedFees := e.State.GetAccruedFees()
+			if sov.EndAccumulatedFee <= accruedFees {
+				// This check should be unreachable. However, including it ensures
+				// that AVAX can't get minted out of thin air due to state
+				// corruption.
+				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
+			}
+			remainingBalance := sov.EndAccumulatedFee - accruedFees
+
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: uint32(len(tx.Outs)),
 				},
-			},
+				Asset: avax.Asset{
+					ID: e.Ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: remainingBalance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: remainingBalanceOwner.Threshold,
+						Addrs:     remainingBalanceOwner.Addresses,
+					},
+				},
+			}
+			e.State.AddUTXO(utxo)
 		}
-		e.State.AddUTXO(utxo)
 	}
 
 	// If the weight is being set to 0, the validator is being removed and the
