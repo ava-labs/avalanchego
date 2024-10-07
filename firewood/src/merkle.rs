@@ -522,7 +522,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         // Turn this node into a branch node and put a new leaf as a child.
                         let mut branch = BranchNode {
                             partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
-                            value: Some(std::mem::take(&mut leaf.value)),
+                            value: Some(std::mem::take(&mut leaf.value).into_boxed_slice()),
                             children: Default::default(),
                         };
 
@@ -710,7 +710,10 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             (Some((child_index, child_partial_path)), None) => {
                 // 3. The key is below the node (i.e. its descendant)
                 match node {
-                    Node::Leaf(ref mut leaf) => Ok((None, Some(std::mem::take(&mut leaf.value)))),
+                    Node::Leaf(ref mut leaf) => Ok((
+                        None,
+                        Some(std::mem::take(&mut leaf.value).into_boxed_slice()),
+                    )),
                     Node::Branch(ref mut branch) => {
                         #[allow(clippy::indexing_slicing)]
                         let child = match std::mem::take(&mut branch.children[child_index as usize])
@@ -745,9 +748,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         let Some((child_index, child)) = children_iter.next() else {
                             // The branch has no children. Turn it into a leaf.
                             let leaf = Node::Leaf(LeafNode {
-                                    value: branch.value.take().expect(
+                                    value: SmallVec::from(&(*branch.value.take().expect(
                                         "branch node must have a value if it previously had only 1 child",
-                                    ),
+                                    ))[..]),
                                     partial_path: branch.partial_path.clone(), // TODO remove clone
                                 });
                             return Ok((Some(leaf), removed_value));
@@ -763,7 +766,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             Child::Node(child_node) => std::mem::replace(
                                 child_node,
                                 Node::Leaf(LeafNode {
-                                    value: Box::from([]),
+                                    value: SmallVec::default(),
                                     partial_path: Path::new(),
                                 }),
                             ),
@@ -837,7 +840,8 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
+    use rand::rngs::StdRng;
+    use rand::{thread_rng, Rng, SeedableRng};
     use storage::{MemStore, MutableProposal, NodeStore, RootReader};
     use test_case::test_case;
 

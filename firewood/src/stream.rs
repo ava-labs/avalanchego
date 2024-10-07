@@ -1,14 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::{
-    merkle::{Key, MerkleError, Value},
-    v2::api,
-};
+use crate::merkle::{Key, MerkleError, Value};
+use crate::v2::api;
 
-use futures::{stream::FusedStream, Stream, StreamExt};
-use std::{cmp::Ordering, iter::once};
-use std::{sync::Arc, task::Poll};
+use futures::stream::FusedStream;
+use futures::{Stream, StreamExt};
+use std::cmp::Ordering;
+use std::iter::once;
+use std::sync::Arc;
+use std::task::Poll;
 use storage::{BranchNode, Child, NibblesIterator, Node, PathIterItem, TrieReader};
 
 /// Represents an ongoing iteration over a node and its children.
@@ -573,6 +574,7 @@ fn key_from_nibble_iter<Iter: Iterator<Item = u8>>(mut nibbles: Iter) -> Key {
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
+    use smallvec::SmallVec;
     use storage::{MemStore, MutableProposal, NodeStore};
 
     use crate::merkle::Merkle;
@@ -622,7 +624,7 @@ mod tests {
             node.key_nibbles,
             vec![0x0B, 0x0E, 0x0E, 0x0F].into_boxed_slice()
         );
-        assert_eq!(node.node.as_leaf().unwrap().value, Box::from([0x42]));
+        assert_eq!(node.node.as_leaf().unwrap().value, SmallVec::from([0x42]));
         assert_eq!(node.next_nibble, None);
 
         assert!(stream.next().is_none());
@@ -672,7 +674,7 @@ mod tests {
         assert_eq!(node.next_nibble, None);
         assert_eq!(
             node.node.as_leaf().unwrap().value,
-            Box::from([0x00, 0x00, 0x00, 0x0FF])
+            SmallVec::from([0x00, 0x00, 0x00, 0x0FF])
         );
 
         assert!(stream.next().is_none());
