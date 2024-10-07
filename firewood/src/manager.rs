@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{collections::VecDeque, io::Error};
 
+use storage::logger::warn;
 use typed_builder::TypedBuilder;
 
 use crate::v2::api::HashKey;
@@ -23,6 +24,9 @@ pub struct RevisionManagerConfig {
 
     #[builder(default_code = "NonZero::new(20480).expect(\"non-zero\")")]
     node_cache_size: NonZero<usize>,
+
+    #[builder(default_code = "NonZero::new(10000).expect(\"non-zero\")")]
+    free_list_cache_size: NonZero<usize>,
 }
 
 type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
@@ -62,7 +66,12 @@ impl RevisionManager {
         truncate: bool,
         config: RevisionManagerConfig,
     ) -> Result<Self, Error> {
-        let storage = Arc::new(FileBacked::new(filename, config.node_cache_size, truncate)?);
+        let storage = Arc::new(FileBacked::new(
+            filename,
+            config.node_cache_size,
+            config.free_list_cache_size,
+            truncate,
+        )?);
         let nodestore = match truncate {
             true => Arc::new(NodeStore::new_empty_committed(storage.clone())?),
             false => Arc::new(NodeStore::open(storage.clone())?),
@@ -81,7 +90,20 @@ impl RevisionManager {
                 nodestore.clone(),
             );
         }
+
+        if truncate {
+            nodestore.flush_header()?;
+        }
+
         Ok(manager)
+    }
+
+    pub fn all_hashes(&self) -> Vec<TrieHash> {
+        self.historical
+            .iter()
+            .filter_map(|r| r.kind.root_hash())
+            .chain(self.proposals.iter().filter_map(|p| p.kind.root_hash()))
+            .collect()
     }
 
     /// Commit a proposal
@@ -93,24 +115,24 @@ impl RevisionManager {
     ///    The address of the root node and the root hash is also persisted.
     ///    Note that this is *not* a write ahead log.
     ///    It only contains the address of the nodes that are deleted, which should be very small.
-    /// 3. Set last committed revision.
+    /// 3. Revision reaping. If more than the maximum number of revisions are kept in memory, the
+    ///    oldest revision is reaped.
+    /// 4. Set last committed revision.
     ///    Set last committed revision in memory.
     ///    Another commit can start after this but before the node flush is completed.
-    /// 4. Free list flush.
+    /// 5. Free list flush.
     ///    Persist/write the free list header.
     ///    The free list is flushed first to prevent future allocations from using the space allocated to this proposal.
     ///    This should be done in a single write since the free list headers are small, and must be persisted to disk before starting the next step.
-    /// 5. Node flush.
+    /// 6. Node flush.
     ///    Persist/write all the nodes to disk.
     ///    Note that since these are all freshly allocated nodes, they will never be referred to by any prior commit.
     ///    After flushing all nodes, the file should be flushed to disk (fsync) before performing the next step.
-    /// 6. Root move.
+    /// 7. Root move.
     ///    The root address on disk must be updated.
     ///    This write can be delayed, but would mean that recovery will not roll forward to this revision.
-    /// 7. Proposal Cleanup.
+    /// 8. Proposal Cleanup.
     ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
-    /// 8. Revision reaping.
-    ///    If more than the configurable number of revisions is available, the oldest revision can be forgotten.
     pub fn commit(&mut self, proposal: ProposedRevision) -> Result<(), RevisionManagerError> {
         // 1. Commit check
         let current_revision = self.current_revision();
@@ -125,21 +147,31 @@ impl RevisionManager {
 
         // 2. Persist delete list for this committed revision to disk for recovery
 
-        // 2.5 Take the deleted entries from the oldest revision and mark them as free for this revision
+        // 3 Take the deleted entries from the oldest revision and mark them as free for this revision
         // If you crash after freeing some of these, then the free list will point to nodes that are not actually free.
         // TODO: Handle the case where we get something off the free list that is not free
-        if self.historical.len() > self.max_revisions {
+        while self.historical.len() > self.max_revisions {
             let oldest = self.historical.pop_front().expect("must be present");
             if let Some(oldest_hash) = oldest.kind.root_hash() {
                 self.by_hash.remove(&oldest_hash);
             }
 
-            if let Some(oldest) = Arc::into_inner(oldest) {
-                committed.reap_deleted(&oldest)?;
+            // This `try_unwrap` is safe because nobody else will call `try_unwrap` on this Arc
+            // in a different thread, so we don't have to worry about the race condition where
+            // the Arc we get back is not usable as indicated in the docs for `try_unwrap`.
+            // This guarantee is there because we have a `&mut self` reference to the manager, so
+            // the compiler guarantees we are the only one using this manager.
+            match Arc::try_unwrap(oldest) {
+                Ok(oldest) => committed.reap_deleted(&oldest)?,
+                Err(original) => {
+                    // TODO: try reaping the next revision
+                    warn!("Oldest revision could not be reaped; still referenced");
+                    self.historical.push_front(original);
+                }
             }
         }
 
-        // 3. Set last committed revision
+        // 4. Set last committed revision
         let committed: CommittedRevision = committed.into();
         self.historical.push_back(committed.clone());
         if let Some(hash) = committed.kind.root_hash() {
@@ -147,16 +179,16 @@ impl RevisionManager {
         }
         // TODO: We could allow other commits to start here using the pending list
 
-        // 4. Free list flush, which will prevent allocating on top of the nodes we are about to write
+        // 5. Free list flush, which will prevent allocating on top of the nodes we are about to write
         proposal.flush_freelist()?;
 
-        // 5. Node flush
+        // 6. Node flush
         proposal.flush_nodes()?;
 
-        // 6. Root move
+        // 7. Root move
         proposal.flush_header()?;
 
-        // 7. Proposal Cleanup
+        // 8. Proposal Cleanup
         // first remove the committing proposal from the list of outstanding proposals
         self.proposals.retain(|p| !Arc::ptr_eq(&proposal, p));
 

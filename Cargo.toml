@@ -3,9 +3,16 @@ members = [
   "firewood",
   "fwdctl",
   "storage",
-  "grpc-testtool",
+  "grpc-testtool", "benchmark",
 ]
 resolver = "2"
 
 [profile.release]
 debug = true
+
+[profile.maxperf]
+panic = "abort"
+codegen-units = 1
+lto = "fat"
+debug = false
+inherits = "release"

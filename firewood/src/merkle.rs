@@ -6,6 +6,8 @@ use crate::range_proof::RangeProof;
 use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
+use metrics::{counter, histogram};
+use smallvec::SmallVec;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future::ready;
@@ -15,8 +17,8 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use storage::{
     BranchNode, Child, Hashable, HashedNodeReader, ImmutableProposal, LeafNode, LinearAddress,
-    MutableProposal, NibblesIterator, Node, NodeReader, NodeStore, Path, ReadableStorage, TrieHash,
-    TrieReader, ValueDigest,
+    MutableProposal, NibblesIterator, Node, NodeStore, Path, ReadableStorage, TrieHash, TrieReader,
+    ValueDigest,
 };
 
 use thiserror::Error;
@@ -152,7 +154,7 @@ impl<T: TrieReader> Merkle<T> {
         &self.nodestore
     }
 
-    pub(crate) fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, MerkleError> {
+    fn read_node(&self, addr: LinearAddress) -> Result<Arc<Node>, MerkleError> {
         self.nodestore.read_node(addr).map_err(Into::into)
     }
 
@@ -211,16 +213,20 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    pub(crate) fn _key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
+    pub(super) fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
         MerkleKeyValueStream::from(&self.nodestore)
     }
 
-    pub(crate) fn _key_value_iter_from_key(&self, key: Key) -> MerkleKeyValueStream<'_, T> {
+    pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(
+        &self,
+        key: K,
+    ) -> MerkleKeyValueStream<'_, T> {
         // TODO danlaine: change key to &[u8]
-        MerkleKeyValueStream::_from_key(&self.nodestore, key)
+        MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
     }
 
-    pub(super) async fn _range_proof(
+    #[allow(dead_code)]
+    pub(super) async fn range_proof(
         &self,
         start_key: Option<&[u8]>,
         end_key: Option<&[u8]>,
@@ -237,8 +243,8 @@ impl<T: TrieReader> Merkle<T> {
 
         let mut stream = match start_key {
             // TODO: fix the call-site to force the caller to do the allocation
-            Some(key) => self._key_value_iter_from_key(key.to_vec().into_boxed_slice()),
-            None => self._key_value_iter(),
+            Some(key) => self.key_value_iter_from_key(key.to_vec().into_boxed_slice()),
+            None => self.key_value_iter(),
         };
 
         // fetch the first key from the stream
@@ -402,6 +408,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
     pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
+        histogram!("firewood.insert.key.length").record(key.len() as f64);
+        histogram!("firewood.insert.data.length").record(value.len() as f64);
+
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();
@@ -411,7 +420,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             // it as the root.
             let root_node = Node::Leaf(LeafNode {
                 partial_path: key,
-                value,
+                value: SmallVec::from(&value[..]),
             });
             *root = root_node.into();
             return Ok(());
@@ -452,6 +461,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             (None, None) => {
                 // 1. The node is at `key`
                 node.update_value(value);
+                counter!("firewood.insert", "merkle" => "update").increment(1);
                 Ok(node)
             }
             (None, Some((child_index, partial_path))) => {
@@ -471,6 +481,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 // Shorten the node's partial path since it has a new parent.
                 node.update_partial_path(partial_path);
                 branch.update_child(child_index, Some(Child::Node(node)));
+                counter!("firewood.insert", "merkle"=>"above").increment(1);
 
                 Ok(Node::Branch(Box::new(branch)))
             }
@@ -490,17 +501,16 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                                 // There is no child at this index.
                                 // Create a new leaf and put it here.
                                 let new_leaf = Node::Leaf(LeafNode {
-                                    value,
+                                    value: SmallVec::from(&value[..]),
                                     partial_path,
                                 });
                                 branch.update_child(child_index, Some(Child::Node(new_leaf)));
+                                counter!("firewood.insert", "merkle"=>"below").increment(1);
                                 return Ok(node);
                             }
                             Some(Child::Node(child)) => child,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                let node = self.nodestore.read_node(addr)?;
-                                self.nodestore.delete_node(addr);
-                                (*node).clone()
+                                self.nodestore.read_for_update(addr)?
                             }
                         };
 
@@ -512,17 +522,18 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         // Turn this node into a branch node and put a new leaf as a child.
                         let mut branch = BranchNode {
                             partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
-                            value: Some(std::mem::take(&mut leaf.value)),
+                            value: Some(std::mem::take(&mut leaf.value).into_boxed_slice()),
                             children: Default::default(),
                         };
 
                         let new_leaf = Node::Leaf(LeafNode {
-                            value,
+                            value: SmallVec::from(&value[..]),
                             partial_path,
                         });
 
                         branch.update_child(child_index, Some(Child::Node(new_leaf)));
 
+                        counter!("firewood.insert", "merkle"=>"split").increment(1);
                         Ok(Node::Branch(Box::new(branch)))
                     }
                 }
@@ -545,11 +556,12 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 branch.update_child(node_index, Some(Child::Node(node)));
 
                 let new_leaf = Node::Leaf(LeafNode {
-                    value,
+                    value: SmallVec::from(&value[..]),
                     partial_path: key_partial_path,
                 });
                 branch.update_child(key_index, Some(Child::Node(new_leaf)));
 
+                counter!("firewood.insert", "merkle" => "split").increment(1);
                 Ok(Node::Branch(Box::new(branch)))
             }
         }
@@ -565,11 +577,17 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         let root = self.nodestore.mut_root();
         let Some(root_node) = std::mem::take(root) else {
             // The trie is empty. There is nothing to remove.
+            counter!("firewood.remove", "result" => "nonexistent").increment(1);
             return Ok(None);
         };
 
         let (root_node, removed_value) = self.remove_helper(root_node, &key)?;
         *self.nodestore.mut_root() = root_node;
+        if removed_value.is_some() {
+            counter!("firewood.remove", "result" => "success").increment(1);
+        } else {
+            counter!("firewood.remove", "result" => "nonexistent").increment(1);
+        }
         Ok(removed_value)
     }
 
@@ -635,9 +653,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             let mut child = match child {
                                 Child::Node(ref mut child_node) => std::mem::take(child_node),
                                 Child::AddressWithHash(addr, _) => {
-                                    let node = self.nodestore.read_node(*addr)?;
-                                    self.nodestore.delete_node(*addr);
-                                    (*node).clone()
+                                    self.nodestore.read_for_update(*addr)?
                                 }
                             };
 
@@ -687,14 +703,17 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                     }
                     Node::Leaf(leaf) => {
                         let removed_value = std::mem::take(&mut leaf.value);
-                        Ok((None, Some(removed_value)))
+                        Ok((None, Some(removed_value.into_boxed_slice())))
                     }
                 }
             }
             (Some((child_index, child_partial_path)), None) => {
                 // 3. The key is below the node (i.e. its descendant)
                 match node {
-                    Node::Leaf(ref mut leaf) => Ok((None, Some(std::mem::take(&mut leaf.value)))),
+                    Node::Leaf(ref mut leaf) => Ok((
+                        None,
+                        Some(std::mem::take(&mut leaf.value).into_boxed_slice()),
+                    )),
                     Node::Branch(ref mut branch) => {
                         #[allow(clippy::indexing_slicing)]
                         let child = match std::mem::take(&mut branch.children[child_index as usize])
@@ -704,9 +723,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             }
                             Some(Child::Node(node)) => node,
                             Some(Child::AddressWithHash(addr, _)) => {
-                                let node = self.nodestore.read_node(addr)?;
-                                self.nodestore.delete_node(addr);
-                                (*node).clone()
+                                self.nodestore.read_for_update(addr)?
                             }
                         };
 
@@ -731,9 +748,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         let Some((child_index, child)) = children_iter.next() else {
                             // The branch has no children. Turn it into a leaf.
                             let leaf = Node::Leaf(LeafNode {
-                                    value: branch.value.take().expect(
+                                    value: SmallVec::from(&(*branch.value.take().expect(
                                         "branch node must have a value if it previously had only 1 child",
-                                    ),
+                                    ))[..]),
                                     partial_path: branch.partial_path.clone(), // TODO remove clone
                                 });
                             return Ok((Some(leaf), removed_value));
@@ -749,14 +766,12 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             Child::Node(child_node) => std::mem::replace(
                                 child_node,
                                 Node::Leaf(LeafNode {
-                                    value: Box::from([]),
+                                    value: SmallVec::default(),
                                     partial_path: Path::new(),
                                 }),
                             ),
                             Child::AddressWithHash(addr, _) => {
-                                let node = self.nodestore.read_node(*addr)?;
-                                self.nodestore.delete_node(*addr);
-                                (*node).clone()
+                                self.nodestore.read_for_update(*addr)?
                             }
                         };
 
@@ -825,7 +840,8 @@ impl<'a, T: PartialEq> PrefixOverlap<'a, T> {
 #[allow(clippy::indexing_slicing, clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
+    use rand::rngs::StdRng;
+    use rand::{thread_rng, Rng, SeedableRng};
     use storage::{MemStore, MutableProposal, NodeStore, RootReader};
     use test_case::test_case;
 
@@ -886,100 +902,6 @@ mod tests {
 
         Merkle { nodestore }
     }
-
-    // use super::*;
-    // use test_case::test_case;
-
-    //     fn branch(path: &[u8], value: &[u8], encoded_child: Option<Vec<u8>>) -> Node {
-    //         let (path, value) = (path.to_vec(), value.to_vec());
-    //         let path = Nibbles::<0>::new(&path);
-    //         let path = Path(path.into_iter().collect());
-
-    //         let children = Default::default();
-    //         let value = if value.is_empty() { None } else { Some(value) };
-    //         let mut children_encoded = <[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>::default();
-
-    //         if let Some(child) = encoded_child {
-    //             children_encoded[0] = Some(child);
-    //         }
-
-    //         Node::from_branch(BranchNode {
-    //             partial_path: path,
-    //             children,
-    //             value,
-    //             children_encoded,
-    //         })
-    //     }
-
-    //     fn branch_without_value(path: &[u8], encoded_child: Option<Vec<u8>>) -> Node {
-    //         let path = path.to_vec();
-    //         let path = Nibbles::<0>::new(&path);
-    //         let path = Path(path.into_iter().collect());
-
-    //         let children = Default::default();
-    //         // TODO: Properly test empty value
-    //         let value = None;
-    //         let mut children_encoded = <[Option<Vec<u8>>; BranchNode::MAX_CHILDREN]>::default();
-
-    //         if let Some(child) = encoded_child {
-    //             children_encoded[0] = Some(child);
-    //         }
-
-    //         Node::from_branch(BranchNode {
-    //             partial_path: path,
-    //             children,
-    //             value,
-    //             children_encoded,
-    //         })
-    //     }
-
-    //     #[test_case(leaf(Vec::new(), Vec::new()) ; "empty leaf encoding")]
-    //     #[test_case(leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf encoding")]
-    //     #[test_case(branch(b"", b"value", vec![1, 2, 3].into()) ; "branch with chd")]
-    //     #[test_case(branch(b"", b"value", None); "branch without chd")]
-    //     #[test_case(branch_without_value(b"", None); "branch without value and chd")]
-    //     #[test_case(branch(b"", b"", None); "branch without path value or children")]
-    //     #[test_case(branch(b"", b"value", None) ; "branch with value")]
-    //     #[test_case(branch(&[2], b"", None); "branch with path")]
-    //     #[test_case(branch(b"", b"", vec![1, 2, 3].into()); "branch with children")]
-    //     #[test_case(branch(&[2], b"value", None); "branch with path and value")]
-    //     #[test_case(branch(b"", b"value", vec![1, 2, 3].into()); "branch with value and children")]
-    //     #[test_case(branch(&[2], b"", vec![1, 2, 3].into()); "branch with path and children")]
-    //     #[test_case(branch(&[2], b"value", vec![1, 2, 3].into()); "branch with path value and children")]
-    //     fn encode(node: Node) {
-    //         let merkle = create_in_memory_merkle();
-
-    //         let node_ref = merkle.put_node(node).unwrap();
-    //         let encoded = node_ref.get_encoded(&merkle.store);
-    //         let new_node = Node::from(NodeType::decode(encoded).unwrap());
-    //         let new_node_encoded = new_node.get_encoded(&merkle.store);
-
-    //         assert_eq!(encoded, new_node_encoded);
-    //     }
-
-    //     #[test_case(Bincode::new(), leaf(vec![], vec![4, 5]) ; "leaf without partial path encoding with Bincode")]
-    //     #[test_case(Bincode::new(), leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf with partial path encoding with Bincode")]
-    //     #[test_case(Bincode::new(), branch(b"abcd", b"value", vec![1, 2, 3].into()) ; "branch with partial path and value with Bincode")]
-    //     #[test_case(Bincode::new(), branch(b"abcd", &[], vec![1, 2, 3].into()) ; "branch with partial path and no value with Bincode")]
-    //     #[test_case(Bincode::new(), branch(b"", &[1,3,3,7], vec![1, 2, 3].into()) ; "branch with no partial path and value with Bincode")]
-    //     #[test_case(PlainCodec::new(), leaf(Vec::new(), vec![4, 5]) ; "leaf without partial path encoding with PlainCodec")]
-    //     #[test_case(PlainCodec::new(), leaf(vec![1, 2, 3], vec![4, 5]) ; "leaf with partial path encoding with PlainCodec")]
-    //     #[test_case(PlainCodec::new(), branch(b"abcd", b"value", vec![1, 2, 3].into()) ; "branch with partial path and value with PlainCodec")]
-    //     #[test_case(PlainCodec::new(), branch(b"abcd", &[], vec![1, 2, 3].into()) ; "branch with partial path and no value with PlainCodec")]
-    //     #[test_case(PlainCodec::new(), branch(b"", &[1,3,3,7], vec![1, 2, 3].into()) ; "branch with no partial path and value with PlainCodec")]
-    //     fn node_encode_decode<T>(_codec: T, node: Node)
-    //     where
-    //         T: BinarySerde,
-    //         for<'de> EncodedNode<T>: serde::Serialize + serde::Deserialize<'de>,
-    //     {
-    //         let merkle = create_generic_test_merkle::<T>();
-    //         let node_ref = merkle.put_node(node.clone()).unwrap();
-
-    //         let encoded = merkle.encode(node_ref.inner()).unwrap();
-    //         let new_node = Node::from(merkle.decode(encoded.as_ref()).unwrap());
-
-    //         assert_eq!(node, new_node);
-    //     }
 
     #[test]
     fn test_insert_and_get() {
@@ -1158,7 +1080,7 @@ mod tests {
         let merkle = create_in_memory_merkle();
 
         assert!(matches!(
-            merkle._range_proof(None, None, None).await.unwrap_err(),
+            merkle.range_proof(None, None, None).await.unwrap_err(),
             api::Error::RangeProofOnEmptyTrie
         ));
     }

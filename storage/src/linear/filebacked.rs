@@ -1,9 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-// during development only
-#![allow(dead_code)]
-
 // This synchronous file layer is a simple implementation of what we
 // want to do for I/O. This uses a [Mutex] lock around a simple `File`
 // object. Instead, we probably should use an IO system that can perform multiple
@@ -17,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use lru::LruCache;
+use metrics::counter;
 
 use crate::{LinearAddress, Node};
 
@@ -27,6 +25,7 @@ use super::{ReadableStorage, WritableStorage};
 pub struct FileBacked {
     fd: Mutex<File>,
     cache: Mutex<LruCache<LinearAddress, Arc<Node>>>,
+    free_list_cache: Mutex<LruCache<LinearAddress, Option<LinearAddress>>>,
 }
 
 impl FileBacked {
@@ -34,6 +33,7 @@ impl FileBacked {
     pub fn new(
         path: PathBuf,
         node_cache_size: NonZero<usize>,
+        free_list_cache_size: NonZero<usize>,
         truncate: bool,
     ) -> Result<Self, Error> {
         let fd = OpenOptions::new()
@@ -46,6 +46,7 @@ impl FileBacked {
         Ok(Self {
             fd: Mutex::new(fd),
             cache: Mutex::new(LruCache::new(node_cache_size)),
+            free_list_cache: Mutex::new(LruCache::new(free_list_cache_size)),
         })
     }
 }
@@ -66,7 +67,17 @@ impl ReadableStorage for FileBacked {
 
     fn read_cached_node(&self, addr: LinearAddress) -> Option<Arc<Node>> {
         let mut guard = self.cache.lock().expect("poisoned lock");
-        guard.get(&addr).cloned()
+        let cached = guard.get(&addr).cloned();
+        counter!("firewood.cache.node", "type" => if cached.is_some() { "hit" } else { "miss" })
+            .increment(1);
+        cached
+    }
+
+    fn free_list_cache(&self, addr: LinearAddress) -> Option<Option<LinearAddress>> {
+        let mut guard = self.free_list_cache.lock().expect("poisoned lock");
+        let cached = guard.pop(&addr);
+        counter!("firewood.cache.freelist", "type" => if cached.is_some() { "hit" } else { "miss" }).increment(1);
+        cached
     }
 }
 
@@ -94,5 +105,10 @@ impl WritableStorage for FileBacked {
         for addr in addresses {
             guard.pop(addr);
         }
+    }
+
+    fn add_to_free_list_cache(&self, addr: LinearAddress, next: Option<LinearAddress>) {
+        let mut guard = self.free_list_cache.lock().expect("poisoned lock");
+        guard.put(addr, next);
     }
 }

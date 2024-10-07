@@ -20,10 +20,10 @@ pub struct Options {
         required = false,
         value_parser = value_parser!(bool),
         default_missing_value = "false",
-        default_value_t = false,
+        default_value_t = true,
         value_name = "TRUNCATE",
         help = "Whether to truncate the DB when opening it. If set, the DB will be reset and all its
-    existing contents will be lost. [default: false]"
+    existing contents will be lost"
     )]
     pub truncate: bool,
 

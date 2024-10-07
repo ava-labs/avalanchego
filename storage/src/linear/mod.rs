@@ -47,6 +47,11 @@ pub trait ReadableStorage: Debug + Sync + Send {
     fn read_cached_node(&self, _addr: LinearAddress) -> Option<Arc<Node>> {
         None
     }
+
+    /// Fetch the next pointer from the freelist cache
+    fn free_list_cache(&self, _addr: LinearAddress) -> Option<Option<LinearAddress>> {
+        None
+    }
 }
 
 /// Trait for writable storage.
@@ -73,4 +78,7 @@ pub trait WritableStorage: ReadableStorage {
 
     /// Invalidate all nodes that are part of a specific revision, as these will never be referenced again
     fn invalidate_cached_nodes<'a>(&self, _addresses: impl Iterator<Item = &'a LinearAddress>) {}
+
+    /// Add a new entry to the freelist cache
+    fn add_to_free_list_cache(&self, _addr: LinearAddress, _next: Option<LinearAddress>) {}
 }

@@ -1,11 +1,15 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::logger::trace;
 use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
+use bincode::{DefaultOptions, Options as _};
+use metrics::{counter, histogram};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
+
 /// The [NodeStore] handles the serialization of nodes and
 /// free space management of nodes in the page store. It lays out the format
 /// of the [PageStore]. More specifically, it places a [FileIdentifyingMagic]
@@ -149,7 +153,8 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
     fn area_index_and_size(&self, addr: LinearAddress) -> Result<(AreaIndex, u64), Error> {
         let mut area_stream = self.storage.stream_from(addr.get())?;
 
-        let index: AreaIndex = bincode::deserialize_from(&mut area_stream)
+        let index: AreaIndex = DefaultOptions::new()
+            .deserialize_from(&mut area_stream)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
         let size = *AREA_SIZES.get(index as usize).ok_or(Error::new(
@@ -172,7 +177,8 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
         let addr = addr.get() + 1; // Skip the index byte
 
         let area_stream = self.storage.stream_from(addr)?;
-        let area: Area<Node, FreeArea> = bincode::deserialize_from(area_stream)
+        let area: Area<Node, FreeArea> = DefaultOptions::new()
+            .deserialize_from(area_stream)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
         match area {
@@ -191,7 +197,8 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
     pub fn open(storage: Arc<S>) -> Result<Self, Error> {
         let mut stream = storage.stream_from(0)?;
 
-        let header: NodeStoreHeader = bincode::deserialize_from(&mut stream)
+        let header: NodeStoreHeader = DefaultOptions::new()
+            .deserialize_from(&mut stream)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
         drop(stream);
@@ -218,15 +225,6 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// the underlying store with an empty freelist and no root node
     pub fn new_empty_committed(storage: Arc<S>) -> Result<Self, Error> {
         let header = NodeStoreHeader::new();
-
-        // let header_bytes = bincode::serialize(&header).map_err(|e| {
-        //     Error::new(
-        //         ErrorKind::InvalidData,
-        //         format!("Failed to serialize header: {}", e),
-        //     )
-        // })?;
-
-        // storage.write(0, header_bytes.as_slice())?;
 
         Ok(Self {
             header,
@@ -318,7 +316,17 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
 
     /// Marks the node at `addr` as deleted in this proposal.
     pub fn delete_node(&mut self, addr: LinearAddress) {
+        trace!("Pending delete at {addr:?}");
         self.kind.deleted.push(addr);
+    }
+
+    /// Reads a node for update, marking it as deleted in this proposal.
+    /// We get an arc from cache (reading it from disk if necessary) then
+    /// copy/clone the node and return it.
+    pub fn read_for_update(&mut self, addr: LinearAddress) -> Result<Node, Error> {
+        self.delete_node(addr);
+        let arc_wrapped_node = self.read_node(addr)?;
+        Ok((*arc_wrapped_node).clone())
     }
 
     /// Returns the root of this proposal.
@@ -372,28 +380,58 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// TODO danlaine: If we return a larger area than requested, we should split it.
     fn allocate_from_freed(&mut self, n: u64) -> Result<Option<(LinearAddress, AreaIndex)>, Error> {
         // Find the smallest free list that can fit this size.
-        let index = area_size_to_index(n)?;
+        let index_wanted = area_size_to_index(n)?;
 
-        // rustify: rewrite using self.header.free_lists.iter_mut().find(...)
-        for index in index as usize..NUM_AREA_SIZES {
+        if let Some((index, free_stored_area_addr)) = self
+            .header
+            .free_lists
+            .iter_mut()
+            .enumerate()
+            .skip(index_wanted as usize)
+            .find(|item| item.1.is_some())
+        {
+            let address = free_stored_area_addr
+                .take()
+                .expect("impossible due to find earlier");
             // Get the first free block of sufficient size.
-            if let Some(free_stored_area_addr) = self.header.free_lists[index] {
-                // Update the free list head.
-                // Skip the index byte and Area discriminant byte
-                let free_area_addr = free_stored_area_addr.get() + 2;
+            if let Some(free_head) = self.storage.free_list_cache(address) {
+                trace!("free_head@{address}(cached): {free_head:?} size:{index}");
+                *free_stored_area_addr = free_head;
+            } else {
+                let free_area_addr = address.get();
                 let free_head_stream = self.storage.stream_from(free_area_addr)?;
-                let free_head: FreeArea = bincode::deserialize_from(free_head_stream)
+                let free_head: StoredArea<Area<Node, FreeArea>> = DefaultOptions::new()
+                    .deserialize_from(free_head_stream)
                     .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+                let StoredArea {
+                    area: Area::Free(free_head),
+                    area_size_index: read_index,
+                } = free_head
+                else {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "Attempted to read a non-free area",
+                    ));
+                };
+                debug_assert_eq!(read_index as usize, index);
 
                 // Update the free list to point to the next free block.
-                self.header.free_lists[index] = free_head.next_free_block;
-
-                // Return the address of the newly allocated block.
-                return Ok(Some((free_stored_area_addr, index as AreaIndex)));
+                *free_stored_area_addr = free_head.next_free_block;
             }
-            // No free blocks in this list, try the next size up.
+
+            counter!("firewood.space.reused").increment(AREA_SIZES[index]);
+            counter!("firewood.space.wasted").increment(AREA_SIZES[index] - n);
+
+            // Return the address of the newly allocated block.
+            trace!(
+                "Allocating from free list: addr: {address:?}, size: {}",
+                index
+            );
+            return Ok(Some((address, index as AreaIndex)));
         }
 
+        trace!("No free blocks of sufficient size {index} found");
+        counter!("firewood.space.notfree").increment(AREA_SIZES[index_wanted as usize]);
         Ok(None)
     }
 
@@ -403,22 +441,15 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         let addr = LinearAddress::new(self.header.size).expect("node store size can't be 0");
         self.header.size += area_size;
         debug_assert!(addr.get() % 8 == 0);
+        trace!("Allocating from end: addr: {:?}, size: {}", addr, index);
         Ok((addr, index))
     }
 
     /// Returns the length of the serialized area for a node.
     fn stored_len(node: &Node) -> u64 {
-        // TODO: calculate length without serializing!
         let area: Area<&Node, FreeArea> = Area::Node(node);
-        let area_bytes = bincode::serialize(&area)
-            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
-            .expect("fixme");
 
-        // +1 for the size index byte
-        // TODO: do a better job packing the boolean (freed) with the possible node sizes
-        // A reasonable option is use a i8 and negative values indicate it's freed whereas positive values are non-free
-        // This would still allow for 127 different sizes
-        area_bytes.len() as u64 + 1
+        DefaultOptions::new().serialized_size(&area).expect("fixme") + 1
     }
 
     /// Returns an address that can be used to store the given `node` and updates
@@ -426,6 +457,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Also returns the index of the free list the node was allocated from.
     pub fn allocate_node(&mut self, node: &Node) -> Result<(LinearAddress, AreaIndex), Error> {
         let stored_area_size = Self::stored_len(node);
+        histogram!("firewood.node_size").record(stored_area_size as f64);
 
         // Attempt to allocate from a free list.
         // If we can't allocate from a free list, allocate past the existing
@@ -447,6 +479,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         debug_assert!(addr.get() % 8 == 0);
 
         let (area_size_index, _) = self.area_index_and_size(addr)?;
+        trace!("Deleting node at {addr:?} of size {}", area_size_index);
+        counter!("firewood.delete_node").increment(1);
+        counter!("firewood.space.freed").increment(AREA_SIZES[area_size_index as usize]);
 
         // The area that contained the node is now free.
         let area: Area<Node, FreeArea> = Area::Free(FreeArea {
@@ -458,10 +493,14 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             area,
         };
 
-        let stored_area_bytes =
-            bincode::serialize(&stored_area).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        let stored_area_bytes = DefaultOptions::new()
+            .serialize(&stored_area)
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
         self.storage.write(addr.into(), &stored_area_bytes)?;
+
+        self.storage
+            .add_to_free_list_cache(addr, self.header.free_lists[area_size_index as usize]);
 
         // The newly freed block is now the head of the free list.
         self.header.free_lists[area_size_index as usize] = Some(addr);
@@ -563,16 +602,6 @@ pub trait HashedNodeReader: TrieReader {
     /// Gets the hash of the root node of an immutable merkle trie.
     fn root_hash(&self) -> Result<Option<TrieHash>, Error> {
         Ok(self.root_address_and_hash()?.map(|(_, hash)| hash))
-    }
-}
-
-impl<T> HashedNodeReader for T
-where
-    T: Deref,
-    T::Target: HashedNodeReader,
-{
-    fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
-        self.deref().root_address_and_hash()
     }
 }
 
@@ -804,9 +833,14 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
         match node {
             Node::Branch(ref mut b) => {
                 for (nibble, child) in b.children.iter_mut().enumerate() {
-                    // Take child from b.children
+                    // if this is already hashed, we're done
+                    if matches!(child, Some(Child::AddressWithHash(_, _))) {
+                        // We already know the hash of this child.
+                        continue;
+                    }
+
+                    // If this child is a node, hash it and update the child.
                     let Some(Child::Node(child_node)) = std::mem::take(child) else {
-                        // There is no child or we already know its hash.
                         continue;
                     };
 
@@ -835,29 +869,30 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     }
 }
 
+impl<T, S: WritableStorage> NodeStore<T, S> {
+    /// Persist the header from this proposal to storage.
+    pub fn flush_header(&self) -> Result<(), Error> {
+        let header_bytes = DefaultOptions::new()
+            .with_varint_encoding()
+            .serialize(&self.header)
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        self.storage.write(0, header_bytes.as_slice())?;
+
+        Ok(())
+    }
+}
+
 impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
     /// Persist the freelist from this proposal to storage.
     pub fn flush_freelist(&self) -> Result<(), Error> {
         // Write the free lists to storage
-        let free_list_bytes = bincode::serialize(&self.header.free_lists)
+        let free_list_bytes = DefaultOptions::new()
+            .with_varint_encoding()
+            .serialize(&self.header.free_lists)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
         let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
         self.storage
             .write(free_list_offset, free_list_bytes.as_slice())?;
-        Ok(())
-    }
-
-    /// Persist the header from this proposal to storage.
-    pub fn flush_header(&self) -> Result<(), Error> {
-        let header_bytes = bincode::serialize(&self.header).map_err(|e| {
-            Error::new(
-                ErrorKind::InvalidData,
-                format!("Failed to serialize header: {}", e),
-            )
-        })?;
-
-        self.storage.write(0, header_bytes.as_slice())?;
-
         Ok(())
     }
 
@@ -869,7 +904,9 @@ impl<S: WritableStorage> NodeStore<ImmutableProposal, S> {
                 area: Area::<_, FreeArea>::Node(node.as_ref()),
             };
 
-            let stored_area_bytes = bincode::serialize(&stored_area)
+            let stored_area_bytes = DefaultOptions::new()
+                .with_varint_encoding()
+                .serialize(&stored_area)
                 .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
             self.storage
@@ -901,25 +938,13 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Persist the freelist from this proposal to storage.
     pub fn flush_freelist(&self) -> Result<(), Error> {
         // Write the free lists to storage
-        let free_list_bytes = bincode::serialize(&self.header.free_lists)
+        let free_list_bytes = DefaultOptions::new()
+            .with_varint_encoding()
+            .serialize(&self.header.free_lists)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
         let free_list_offset = offset_of!(NodeStoreHeader, free_lists) as u64;
         self.storage
             .write(free_list_offset, free_list_bytes.as_slice())?;
-        Ok(())
-    }
-
-    /// Persist the header from this proposal to storage.
-    pub fn flush_header(&self) -> Result<(), Error> {
-        let header_bytes = bincode::serialize(&self.header).map_err(|e| {
-            Error::new(
-                ErrorKind::InvalidData,
-                format!("Failed to serialize header: {}", e),
-            )
-        })?;
-
-        self.storage.write(0, header_bytes.as_slice())?;
-
         Ok(())
     }
 
@@ -931,7 +956,9 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 area: Area::<_, FreeArea>::Node(node.as_ref()),
             };
 
-            let stored_area_bytes = bincode::serialize(&stored_area)
+            let stored_area_bytes = DefaultOptions::new()
+                .with_varint_encoding()
+                .serialize(&stored_area)
                 .map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
 
             self.storage
@@ -1033,9 +1060,28 @@ impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> RootReader for NodeStore<
     }
 }
 
-impl<T: ReadInMemoryNode + Hashed, S: ReadableStorage> HashedNodeReader for NodeStore<T, S>
+impl<T, S> HashedNodeReader for NodeStore<T, S>
 where
     NodeStore<T, S>: TrieReader,
+    T: ReadInMemoryNode,
+    S: ReadableStorage,
+{
+    fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
+        if let Some(root_addr) = self.header.root_address {
+            let root_node = self.read_node(root_addr)?;
+            let root_hash = hash_node(&root_node, &Path::new());
+            Ok(Some((root_addr, root_hash)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl<T, S> HashedNodeReader for Arc<NodeStore<T, S>>
+where
+    NodeStore<T, S>: TrieReader,
+    T: ReadInMemoryNode,
+    S: ReadableStorage,
 {
     fn root_address_and_hash(&self) -> Result<Option<(LinearAddress, TrieHash)>, Error> {
         if let Some(root_addr) = self.header.root_address {
@@ -1053,6 +1099,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     pub fn reap_deleted(&mut self, oldest: &NodeStore<Committed, S>) -> Result<(), Error> {
         self.storage
             .invalidate_cached_nodes(oldest.kind.deleted.iter());
+        trace!("There are {} nodes to reap", oldest.kind.deleted.len());
         for addr in oldest.kind.deleted.iter() {
             self.delete_node(*addr)?;
         }
@@ -1063,8 +1110,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::linear::memory::MemStore;
+    use crate::{linear::memory::MemStore, BranchNode, LeafNode};
     use arc_swap::access::DynGuard;
+    use smallvec::SmallVec;
+    use test_case::test_case;
 
     use super::*;
 
@@ -1129,84 +1178,6 @@ mod tests {
         }
     }
 
-    // TODO add new tests
-    // #[test]
-    // fn test_create() {
-    //     let memstore = Arc::new(MemStore::new(vec![]));
-    //     let mut node_store = NodeStore::new_empty_proposal(memstore);
-
-    //     let leaf = Node::Leaf(LeafNode {
-    //         partial_path: Path::from([0, 1, 2]),
-    //         value: Box::new([3, 4, 5]),
-    //     });
-
-    //     let leaf_addr = node_store.create_node(leaf.clone()).unwrap();
-    //     let got_leaf = node_store.kind.new.get(&leaf_addr).unwrap();
-    //     assert_eq!(**got_leaf, leaf);
-    //     let got_leaf = node_store.read_node(leaf_addr).unwrap();
-    //     assert_eq!(*got_leaf, leaf);
-
-    //     // The header should be unchanged in storage
-    //     {
-    //         let mut header_bytes = node_store.storage.stream_from(0).unwrap();
-    //         let header: NodeStoreHeader = bincode::deserialize_from(&mut header_bytes).unwrap();
-    //         assert_eq!(header.version, Version::new());
-    //         let empty_free_lists: FreeLists = Default::default();
-    //         assert_eq!(header.free_lists, empty_free_lists);
-    //         assert_eq!(header.root_address, None);
-    //     }
-
-    //     // Leaf should go right after the header
-    //     assert_eq!(leaf_addr.get(), NodeStoreHeader::SIZE);
-
-    //     // Create another node
-    //     let branch = Node::Branch(Box::new(BranchNode {
-    //         partial_path: Path::from([6, 7, 8]),
-    //         value: Some(vec![9, 10, 11].into_boxed_slice()),
-    //         children: Default::default(),
-    //     }));
-
-    //     let old_size = node_store.header.size;
-    //     let branch_addr = node_store.create_node(branch.clone()).unwrap();
-    //     assert!(node_store.header.size > old_size);
-
-    //     // branch should go after leaf
-    //     assert!(branch_addr.get() > leaf_addr.get());
-
-    //     // The header should be unchanged in storage
-    //     {
-    //         let mut header_bytes = node_store.storage.stream_from(0).unwrap();
-    //         let header: NodeStoreHeader = bincode::deserialize_from(&mut header_bytes).unwrap();
-    //         assert_eq!(header.version, Version::new());
-    //         let empty_free_lists: FreeLists = Default::default();
-    //         assert_eq!(header.free_lists, empty_free_lists);
-    //         assert_eq!(header.root_address, None);
-    //     }
-    // }
-
-    // #[test]
-    // fn test_delete() {
-    //     let memstore = Arc::new(MemStore::new(vec![]));
-    //     let mut node_store = NodeStore::new_empty_proposal(memstore);
-
-    //     // Create a leaf
-    //     let leaf = Node::Leaf(LeafNode {
-    //         partial_path: Path::new(),
-    //         value: Box::new([1]),
-    //     });
-    //     let leaf_addr = node_store.create_node(leaf.clone()).unwrap();
-
-    //     // Delete the node
-    //     node_store.delete_node(leaf_addr).unwrap();
-    //     assert!(node_store.kind.deleted.contains(&leaf_addr));
-
-    //     // Create a new node with the same size
-    //     let new_leaf_addr = node_store.create_node(leaf).unwrap();
-
-    //     // The new node shouldn't be at the same address
-    //     assert_ne!(new_leaf_addr, leaf_addr);
-    // }
-
     #[test]
     fn test_node_store_new() {
         let memstore = MemStore::new(vec![]);
@@ -1214,9 +1185,33 @@ mod tests {
 
         // Check the empty header is written at the start of the ReadableStorage.
         let mut header_bytes = node_store.storage.stream_from(0).unwrap();
-        let header: NodeStoreHeader = bincode::deserialize_from(&mut header_bytes).unwrap();
+        let header: NodeStoreHeader = DefaultOptions::new()
+            .with_varint_encoding()
+            .deserialize_from(&mut header_bytes)
+            .unwrap();
         assert_eq!(header.version, Version::new());
         let empty_free_list: FreeLists = Default::default();
         assert_eq!(header.free_lists, empty_free_list);
+    }
+
+    #[test_case(BranchNode {
+        partial_path: Path::from([6, 7, 8]),
+        value: Some(vec![9, 10, 11].into_boxed_slice()),
+        children: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))],
+    }; "branch node with 1 child")]
+    #[test_case(
+    Node::Leaf(LeafNode {
+        partial_path: Path::from([0, 1, 2]),
+        value: SmallVec::from_slice(&[3, 4, 5]),
+    }); "leaf node")]
+
+    fn test_serialized_len<N: Into<Node>>(node: N) {
+        let node = node.into();
+
+        let area_size = NodeStore::<std::sync::Arc<ImmutableProposal>, MemStore>::stored_len(&node);
+
+        let area: Area<&Node, FreeArea> = Area::Node(&node);
+        let actually_serialized = DefaultOptions::new().serialize(&area).unwrap().len() as u64;
+        assert_eq!(area_size, actually_serialized + 1);
     }
 }

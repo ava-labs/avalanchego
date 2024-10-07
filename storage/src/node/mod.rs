@@ -3,6 +3,7 @@
 
 use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use std::{fmt::Debug, sync::Arc};
 
 mod branch;
@@ -30,8 +31,20 @@ impl Default for Node {
     fn default() -> Self {
         Node::Leaf(LeafNode {
             partial_path: Path::new(),
-            value: Box::default(),
+            value: SmallVec::default(),
         })
+    }
+}
+
+impl From<BranchNode> for Node {
+    fn from(branch: BranchNode) -> Self {
+        Node::Branch(Box::new(branch))
+    }
+}
+
+impl From<LeafNode> for Node {
+    fn from(leaf: LeafNode) -> Self {
+        Node::Leaf(leaf)
     }
 }
 
@@ -56,7 +69,7 @@ impl Node {
     pub fn update_value(&mut self, value: Box<[u8]>) {
         match self {
             Node::Branch(b) => b.value = Some(value),
-            Node::Leaf(l) => l.value = value,
+            Node::Leaf(l) => l.value = SmallVec::from(&value[..]),
         }
     }
 

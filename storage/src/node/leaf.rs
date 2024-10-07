@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use std::fmt::{Debug, Error as FmtError, Formatter};
 
@@ -14,7 +15,7 @@ pub struct LeafNode {
     pub partial_path: Path,
 
     /// The value associated with this leaf
-    pub value: Box<[u8]>,
+    pub value: SmallVec<[u8; 16]>,
 }
 
 impl Debug for LeafNode {
