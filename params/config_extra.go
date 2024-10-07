@@ -68,6 +68,12 @@ type AvalancheContext struct {
 
 // SetEthUpgrades sets the mapped upgrades  Avalanche > EVM upgrades) for the chain config.
 func (c *ChainConfig) SetEthUpgrades(avalancheUpgrades NetworkUpgrades) {
+	if c.BerlinBlock == nil {
+		c.BerlinBlock = big.NewInt(0)
+	}
+	if c.LondonBlock == nil {
+		c.LondonBlock = big.NewInt(0)
+	}
 	if avalancheUpgrades.DurangoTimestamp != nil {
 		c.ShanghaiTime = utils.NewUint64(*avalancheUpgrades.DurangoTimestamp)
 	}
@@ -262,12 +268,6 @@ func (c *ChainConfig) SetNetworkUpgradeDefaults() {
 	}
 	if c.MuirGlacierBlock == nil {
 		c.MuirGlacierBlock = big.NewInt(0)
-	}
-	if c.BerlinBlock == nil {
-		c.BerlinBlock = big.NewInt(0)
-	}
-	if c.LondonBlock == nil {
-		c.LondonBlock = big.NewInt(0)
 	}
 
 	c.NetworkUpgrades.setDefaults(c.SnowCtx.NetworkUpgrades)
