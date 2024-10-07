@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,7 +80,7 @@ type Node struct {
 
 	// Runtime state, intended to be set by NodeRuntime
 	URI            string
-	StakingAddress string
+	StakingAddress netip.AddrPort
 
 	// Initialized on demand
 	runtime NodeRuntime
