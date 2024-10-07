@@ -4,18 +4,24 @@
 package p
 
 import (
+	"math"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -53,6 +59,20 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			},
 		}
 
+		genesisKey, err := secp256k1.NewPrivateKey()
+		require.NoError(err)
+
+		genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
+			Timestamp: time.Now().Unix(),
+			Allocations: []genesis.Allocation{
+				{
+					Address: genesisKey.Address(),
+					Balance: math.MaxUint64,
+				},
+			},
+		})
+		require.NoError(err)
+
 		tc.By("issuing a CreateSubnetTx")
 		subnetTx, err := pWallet.IssueCreateSubnetTx(
 			owner,
@@ -66,7 +86,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 		res, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 		require.NoError(err)
-
 		require.Equal(
 			platformvm.GetSubnetClientResponse{
 				IsPermissioned: true,
@@ -78,17 +97,34 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			res,
 		)
 
+		tc.By("issuing a CreateChainTx")
+		chainTx, err := pWallet.IssueCreateChainTx(
+			subnetID,
+			genesisBytes,
+			constants.XSVMID,
+			nil,
+			"No Permissions",
+			tc.WithDefaultContext(),
+		)
+		require.NoError(err)
+
+		tc.By("creating an ephemeral node")
+		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
+			config.TrackSubnetsKey: subnetID.String(),
+		})
+
+		subnetGenesisNodeInfoAPI := info.NewClient(subnetGenesisNode.URI)
+		nodeID, nodePoP, err := subnetGenesisNodeInfoAPI.GetNodeID(tc.DefaultContext())
+		require.NoError(err)
+
+		nodePK, err := bls.PublicKeyFromCompressedBytes(nodePoP.PublicKey[:])
+		require.NoError(err)
+
 		const weight = 100
 		var (
-			chainID = ids.GenerateTestID()
-			address = []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}
-			nodeID  = ids.GenerateTestNodeID()
+			chainID = chainTx.ID()
+			address = []byte{}
 		)
-
-		sk, err := bls.NewSecretKey()
-		require.NoError(err)
-		pop := signer.NewProofOfPossession(sk)
-
 		tc.By("issuing a ConvertSubnetTx")
 		_, err = pWallet.IssueConvertSubnetTx(
 			subnetID,
@@ -96,9 +132,10 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			address,
 			[]*txs.ConvertSubnetValidator{
 				{
-					NodeID: nodeID.Bytes(),
-					Weight: weight,
-					Signer: *pop,
+					NodeID:  nodeID.Bytes(),
+					Weight:  weight,
+					Balance: units.Avax,
+					Signer:  *nodePoP,
 				},
 			},
 			tc.WithDefaultContext(),
@@ -112,7 +149,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			Validators: []message.SubnetConversionValidatorData{
 				{
 					NodeID:       nodeID.Bytes(),
-					BLSPublicKey: pop.PublicKey,
+					BLSPublicKey: nodePoP.PublicKey,
 					Weight:       weight,
 				},
 			},
@@ -122,7 +159,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1")
 		res, err = pClient.GetSubnet(tc.DefaultContext(), subnetID)
 		require.NoError(err)
-
 		require.Equal(
 			platformvm.GetSubnetClientResponse{
 				IsPermissioned: false,
@@ -135,6 +171,23 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				ManagerAddress: address,
 			},
 			res,
+		)
+
+		tc.By("verifying the Permissionless L1 reports the correct validator set")
+		height, err := pClient.GetHeight(tc.DefaultContext())
+		require.NoError(err)
+
+		subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+		require.NoError(err)
+		require.Equal(
+			map[ids.NodeID]*validators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: nodePK,
+					Weight:    weight,
+				},
+			},
+			subnetValidators,
 		)
 	})
 })
