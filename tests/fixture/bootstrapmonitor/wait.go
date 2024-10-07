@@ -72,7 +72,7 @@ func WaitForCompletion(
 
 	// Avoid checking node health before it reports initial ready
 	log.Info("Waiting for pod readiness")
-	if err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
+	if err := tmpnet.WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
 		return fmt.Errorf("failed to wait for pod condition: %w", err)
 	}
 
