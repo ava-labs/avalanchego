@@ -26,8 +26,8 @@ import (
 const (
 	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 64
-	minRecentlyAcceptedWindowSize = 16
-	recentlyAcceptedWindowTTL     = 2 * time.Minute
+	minRecentlyAcceptedWindowSize = 0
+	recentlyAcceptedWindowTTL     = 30 * time.Second
 )
 
 var (

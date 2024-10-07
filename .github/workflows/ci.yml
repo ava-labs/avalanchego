@@ -238,3 +238,12 @@ jobs:
         run: bash -x scripts/tests.build_antithesis_images.sh
         env:
           TEST_SETUP: xsvm
+  e2e_bootstrap_monitor:
+    name: Run bootstrap monitor e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run e2e tests
+        shell: bash
+        run: bash -x ./scripts/tests.e2e.bootstrap_monitor.sh

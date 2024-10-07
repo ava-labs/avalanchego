@@ -13,11 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -356,7 +358,7 @@ func TestGenesis(t *testing.T) {
 		},
 		{
 			config:     &unmodifiedLocalConfig,
-			expectedID: "23DnViuN2kgePiBN4JxZXh1VrfXca2rwUp6XrKgNGdj3TSQjiN",
+			expectedID: "2nRRoR76HuEk1JjDpRdN8FKvZFvUXWxY3b9C5rZRPFjcgEh7S7",
 		},
 	}
 	for _, test := range tests {
@@ -416,7 +418,7 @@ func TestVMGenesis(t *testing.T) {
 				},
 				{
 					vmID:       constants.EVMID,
-					expectedID: "2CA6j5zYzasynPsFeNoqWkmTCt3VScMvXUZHbfDJ8k3oGzAPtU",
+					expectedID: "2owdGqyG6FFzTHy5qhenDXQcEghvr571KZE3gSfRJERSJinuwC",
 				},
 			},
 		},
@@ -481,6 +483,42 @@ func TestAVAXAssetID(t *testing.T) {
 				test.expectedID,
 				avaxAssetID.String(),
 				"AVAX assetID with networkID %d mismatch",
+				test.networkID,
+			)
+		})
+	}
+}
+
+func TestCChainGenesisTimestamp(t *testing.T) {
+	tests := []struct {
+		networkID           uint32
+		expectedGenesisTime uint64
+	}{
+		{
+			networkID:           constants.MainnetID,
+			expectedGenesisTime: 0,
+		},
+		{
+			networkID:           constants.FujiID,
+			expectedGenesisTime: 0,
+		},
+		{
+			networkID:           constants.LocalID,
+			expectedGenesisTime: uint64(upgrade.InitiallyActiveTime.Unix()),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(constants.NetworkIDToNetworkName[test.networkID], func(t *testing.T) {
+			require := require.New(t)
+
+			config := GetConfig(test.networkID)
+			var cChainGenesis core.Genesis
+			require.NoError(json.Unmarshal([]byte(config.CChainGenesis), &cChainGenesis))
+			require.Equal(
+				test.expectedGenesisTime,
+				cChainGenesis.Timestamp,
+				"C-Chain genesis time with networkID %d mismatch",
 				test.networkID,
 			)
 		})

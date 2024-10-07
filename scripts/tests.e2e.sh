@@ -6,6 +6,7 @@ set -euo pipefail
 # ./scripts/tests.e2e.sh
 # ./scripts/tests.e2e.sh --ginkgo.label-filter=x                                       # All arguments are supplied to ginkgo
 # E2E_SERIAL=1 ./scripts/tests.e2e.sh                                                  # Run tests serially
+# E2E_RANDOM_SEED=1234882 ./scripts/tests.e2e.sh                                       # Specify a specific seed to order test execution by
 # AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.sh                          # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
@@ -54,7 +55,15 @@ else
   echo "tests will be executed in parallel"
   GINKGO_ARGS="-p"
 fi
+# Reference: https://onsi.github.io/ginkgo/#spec-randomization
+if [[ -n "${E2E_RANDOM_SEED:-}" ]]; then
+  # Supply a specific seed to simplify reproduction of test failures
+  GINKGO_ARGS+=" --seed=${E2E_RANDOM_SEED}"
+else
+  # Execute in random order to identify unwanted dependency
+  GINKGO_ARGS+=" --randomize-all"
+fi
 
 #################################
-# - Execute in random order to identify unwanted dependency
-ginkgo ${GINKGO_ARGS} -v --randomize-all ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
+# shellcheck disable=SC2086
+ginkgo ${GINKGO_ARGS} -v ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"

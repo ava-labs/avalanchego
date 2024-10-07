@@ -16,7 +16,7 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 build_and_test() {
   local image_name=$1
 
-  DOCKER_IMAGE="$image_name" ./scripts/build_image.sh
+  BUILD_MULTI_ARCH=1 DOCKER_IMAGE="$image_name" ./scripts/build_image.sh
 
   echo "listing images"
   docker images

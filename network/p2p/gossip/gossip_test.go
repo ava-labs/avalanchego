@@ -209,7 +209,7 @@ func TestValidatorGossiper(t *testing.T) {
 
 	nodeID := ids.GenerateTestNodeID()
 
-	validators := testValidatorSet{
+	validators := &testValidatorSet{
 		validators: set.Of(nodeID),
 	}
 
@@ -232,7 +232,7 @@ func TestValidatorGossiper(t *testing.T) {
 	// we are not a validator, so we should not request gossip
 	validators.validators = set.Set[ids.NodeID]{}
 	require.NoError(gossiper.Gossip(context.Background()))
-	require.Equal(2, calls)
+	require.Equal(1, calls)
 }
 
 func TestPushGossiperNew(t *testing.T) {

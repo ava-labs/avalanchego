@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/iterator"
-	"github.com/ava-labs/avalanchego/utils/iterator/iteratormock"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -357,13 +356,10 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 	// Assert that we get the current delegator back
 	// Mock iterator for [state] returns no delegators.
-	stateCurrentDelegatorIter := iteratormock.NewIterator[*Staker](ctrl)
-	stateCurrentDelegatorIter.EXPECT().Next().Return(false).Times(2)
-	stateCurrentDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetCurrentDelegatorIterator(
 		currentDelegator.SubnetID,
 		currentDelegator.NodeID,
-	).Return(stateCurrentDelegatorIter, nil).Times(2)
+	).Return(iterator.Empty[*Staker]{}, nil).Times(2)
 	gotCurrentDelegatorIter, err := d.GetCurrentDelegatorIterator(currentDelegator.SubnetID, currentDelegator.NodeID)
 	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]
@@ -404,13 +400,10 @@ func TestDiffPendingDelegator(t *testing.T) {
 
 	// Assert that we get the pending delegator back
 	// Mock iterator for [state] returns no delegators.
-	statePendingDelegatorIter := iteratormock.NewIterator[*Staker](ctrl)
-	statePendingDelegatorIter.EXPECT().Next().Return(false).Times(2)
-	statePendingDelegatorIter.EXPECT().Release().Times(2)
 	state.EXPECT().GetPendingDelegatorIterator(
 		pendingDelegator.SubnetID,
 		pendingDelegator.NodeID,
-	).Return(statePendingDelegatorIter, nil).Times(2)
+	).Return(iterator.Empty[*Staker]{}, nil).Times(2)
 	gotPendingDelegatorIter, err := d.GetPendingDelegatorIterator(pendingDelegator.SubnetID, pendingDelegator.NodeID)
 	require.NoError(err)
 	// The iterator should have the 1 delegator we put in [d]

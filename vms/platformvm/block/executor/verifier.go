@@ -27,7 +27,6 @@ var (
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
 	errBanffStandardBlockWithoutChanges      = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                  = errors.New("incorrect block height")
-	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -278,26 +277,11 @@ func (v *verifier) banffNonOptionBlock(b block.BanffBlock) error {
 	}
 
 	newChainTime := b.Timestamp()
-	parentChainTime := parentState.GetTimestamp()
-	if newChainTime.Before(parentChainTime) {
-		return fmt.Errorf(
-			"%w: proposed timestamp (%s), chain time (%s)",
-			errChildBlockEarlierThanParent,
-			newChainTime,
-			parentChainTime,
-		)
-	}
-
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(parentState)
-	if err != nil {
-		return fmt.Errorf("could not verify block timestamp: %w", err)
-	}
-
 	now := v.txExecutorBackend.Clk.Time()
 	return executor.VerifyNewChainTime(
 		newChainTime,
-		nextStakerChangeTime,
 		now,
+		parentState,
 	)
 }
 

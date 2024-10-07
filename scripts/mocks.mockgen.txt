@@ -38,4 +38,3 @@ github.com/ava-labs/avalanchego/vms/registry=VMGetter=vms/registry/registrymock/
 github.com/ava-labs/avalanchego/vms/registry=VMRegistry=vms/registry/registrymock/vm_registry.go
 github.com/ava-labs/avalanchego/vms=Factory=vms/vmsmock/factory.go
 github.com/ava-labs/avalanchego/vms=Manager=vms/vmsmock/manager.go
-github.com/ava-labs/avalanchego/x/sync=NetworkClient=x/sync/syncmock/network_client.go
