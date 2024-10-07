@@ -32,9 +32,12 @@ const (
 	ErrConversionDoesNotExist
 	ErrMismatchedConversionID
 
+	ErrInvalidJustificationType
+	ErrFailedToParseSubnetID
 	ErrMismatchedValidationID
 	ErrValidationDoesNotExist
 	ErrValidationExists
+	ErrFailedToParseRegisterSubnetValidator
 	ErrValidationCouldBeRegistered
 
 	ErrImpossibleNonce
@@ -153,8 +156,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 		return s.verifySubnetValidatorCanNotValidate(msg.ValidationID, preimage.RegisterSubnetValidatorMessage)
 	default:
 		return &common.AppError{
-			Code:    ErrFailedToParseJustification,
-			Message: fmt.Sprintf("failed to parse justification: unsupported justification type %T", justification.Preimage),
+			Code:    ErrInvalidJustificationType,
+			Message: fmt.Sprintf("invalid justification type: %T", justification.Preimage),
 		}
 	}
 }
@@ -193,8 +196,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	subnetID, err := ids.ToID(justification.GetSubnetId())
 	if err != nil {
 		return &common.AppError{
-			Code:    ErrFailedToParseJustification,
-			Message: "failed to parse justification: " + err.Error(),
+			Code:    ErrFailedToParseSubnetID,
+			Message: "failed to parse subnetID: " + err.Error(),
 		}
 	}
 
@@ -235,8 +238,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	justification, err := message.ParseRegisterSubnetValidator(justificationBytes)
 	if err != nil {
 		return &common.AppError{
-			Code:    ErrFailedToParseJustification,
-			Message: "failed to parse justification: " + err.Error(),
+			Code:    ErrFailedToParseRegisterSubnetValidator,
+			Message: "failed to parse RegisterSubnetValidator justification: " + err.Error(),
 		}
 	}
 
