@@ -38,7 +38,7 @@ func TestSubnetValidatorRegistration(t *testing.T) {
 
 			var unmarshalledMsg SubnetValidatorRegistration
 			require.NoError(json.Unmarshal(jsonBytes, &unmarshalledMsg))
-			require.NoError(initialize(&unmarshalledMsg))
+			require.NoError(Initialize(&unmarshalledMsg))
 			require.Equal(msg, &unmarshalledMsg)
 		})
 	}
