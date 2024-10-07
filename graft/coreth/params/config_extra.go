@@ -40,6 +40,24 @@ type AvalancheContext struct {
 // code in place of their Ethereum counterparts. The original Ethereum names
 // should be restored for maintainability.
 func (c *ChainConfig) SetEthUpgrades() {
+	if c.ChainID != nil && AvalancheFujiChainID.Cmp(c.ChainID) == 0 {
+		c.BerlinBlock = big.NewInt(184985) // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
+		c.LondonBlock = big.NewInt(805078) // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
+	} else if c.ChainID != nil && AvalancheMainnetChainID.Cmp(c.ChainID) == 0 {
+		c.BerlinBlock = big.NewInt(1640340) // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
+		c.LondonBlock = big.NewInt(3308552) // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
+	} else {
+		// In testing or local networks, we only support enabling Berlin and London prior
+		// to the initially active time. This is likely to correspond to an intended block
+		// number of 0 as well.
+		initiallyActive := uint64(upgrade.InitiallyActiveTime.Unix())
+		if c.ApricotPhase2BlockTimestamp != nil && *c.ApricotPhase2BlockTimestamp <= initiallyActive && c.BerlinBlock == nil {
+			c.BerlinBlock = big.NewInt(0)
+		}
+		if c.ApricotPhase3BlockTimestamp != nil && *c.ApricotPhase3BlockTimestamp <= initiallyActive && c.LondonBlock == nil {
+			c.LondonBlock = big.NewInt(0)
+		}
+	}
 	if c.DurangoBlockTimestamp != nil {
 		c.ShanghaiTime = utils.NewUint64(*c.DurangoBlockTimestamp)
 	}
@@ -175,24 +193,6 @@ func GetChainConfig(agoUpgrade upgrade.Config, chainID *big.Int) *ChainConfig {
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
 		NetworkUpgrades:     getNetworkUpgrades(agoUpgrade),
-	}
-	if AvalancheFujiChainID.Cmp(c.ChainID) == 0 {
-		c.BerlinBlock = big.NewInt(184985) // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
-		c.LondonBlock = big.NewInt(805078) // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
-	} else if AvalancheMainnetChainID.Cmp(c.ChainID) == 0 {
-		c.BerlinBlock = big.NewInt(1640340) // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
-		c.LondonBlock = big.NewInt(3308552) // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
-	} else {
-		// In testing or local networks, we only support enabling Berlin and London prior
-		// to the initially active time. This is likely to correspond to an intended block
-		// number of 0 as well.
-		initiallyActive := uint64(upgrade.InitiallyActiveTime.Unix())
-		if c.ApricotPhase2BlockTimestamp != nil && *c.ApricotPhase2BlockTimestamp <= initiallyActive && c.BerlinBlock == nil {
-			c.BerlinBlock = big.NewInt(0)
-		}
-		if c.ApricotPhase3BlockTimestamp != nil && *c.ApricotPhase3BlockTimestamp <= initiallyActive && c.LondonBlock == nil {
-			c.LondonBlock = big.NewInt(0)
-		}
 	}
 	return c
 }

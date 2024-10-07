@@ -171,6 +171,7 @@ func SetupGenesisBlock(
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
+	storedcfg.SetEthUpgrades()
 	storedData, _ := json.Marshal(storedcfg)
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
