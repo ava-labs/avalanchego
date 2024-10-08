@@ -147,7 +147,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnetGenesisNode.StakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
-				tc.Outf("received %s %s from %s", m.Op(), m.Message(), m.NodeID())
+				tc.Outf("received %s %s from %s\n", m.Op(), m.Message(), m.NodeID())
 				genesisPeerMessages.PushRight(m)
 			}),
 		)
