@@ -301,6 +301,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
 		require.NoError(err)
 
+		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
+		require.NoError(err)
+
 		tc.By("ensuring the subnet nodes are healthy", func() {
 			e2e.WaitForHealthy(tc, subnetGenesisNode)
 			e2e.WaitForHealthy(tc, subnetRegisterNode)
@@ -423,6 +426,37 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
 				})
 			})
+		})
+
+		tc.By("issuing an IncreaseBalanceTx", func() {
+			_, err := pWallet.IssueIncreaseBalanceTx(
+				registerValidationID,
+				units.NanoAvax,
+			)
+			require.NoError(err)
+		})
+
+		tc.By("verifying the validator was activated", func() {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			require.NoError(err)
+			require.Equal(
+				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+					subnetRegisterNode.NodeID: {
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						Weight:    registerWeight,
+					},
+				},
+				subnetValidators,
+			)
 		})
 
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
