@@ -146,6 +146,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnetGenesisNode.StakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
+				tc.Outf("received %s %s from %s", m.Op(), m.Message(), m.NodeID())
 				genesisPeerMessages.PushRight(m)
 			}),
 		)
@@ -388,13 +389,8 @@ func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool) {
 		return nil, false
 	}
 
-	handlerID, responseBytes, ok := p2psdk.ParseMessage(appResponse.AppBytes)
-	if !ok || handlerID != p2psdk.SignatureRequestHandlerID {
-		return nil, false
-	}
-
 	var response sdk.SignatureResponse
-	err := proto.Unmarshal(responseBytes, &response)
+	err := proto.Unmarshal(appResponse.AppBytes, &response)
 	if err != nil {
 		return nil, false
 	}
