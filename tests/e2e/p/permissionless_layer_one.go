@@ -49,6 +49,7 @@ const (
 	genesisWeight   = units.Schmeckle
 	genesisBalance  = units.Avax
 	registerWeight  = genesisWeight / 10
+	updatedWeight   = 2 * registerWeight
 	registerBalance = 0
 )
 
@@ -226,22 +227,22 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			)
 		})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
+		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
 			height, err := pClient.GetHeight(tc.DefaultContext())
 			require.NoError(err)
 
 			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
 			require.NoError(err)
-			require.Equal(
-				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-					subnetGenesisNode.NodeID: {
-						NodeID:    subnetGenesisNode.NodeID,
-						PublicKey: genesisNodePK,
-						Weight:    genesisWeight,
-					},
+			require.Equal(expectedValidators, subnetValidators)
+		}
+		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
 				},
-				subnetValidators,
-			)
+			})
 		})
 
 		advanceProposerVMPChainHeight := func() {
@@ -339,30 +340,21 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		})
 
 		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
-
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(
-				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-					subnetGenesisNode.NodeID: {
-						NodeID:    subnetGenesisNode.NodeID,
-						PublicKey: genesisNodePK,
-						Weight:    genesisWeight,
-					},
-					ids.EmptyNodeID: { // The validator is not active
-						NodeID: ids.EmptyNodeID,
-						Weight: registerWeight,
-					},
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
 				},
-				subnetValidators,
-			)
+				ids.EmptyNodeID: { // The validator is not active
+					NodeID: ids.EmptyNodeID,
+					Weight: registerWeight,
+				},
+			})
 		})
 
-		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
-
-		tc.By("removing the registered validator", func() {
+		var nextNonce uint64
+		setWeight := func(validationID ids.ID, weight uint64) {
 			tc.By("creating the unsigned warp message")
 			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 				networkID,
@@ -370,9 +362,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
 					address,
 					must[*warpmessage.SubnetValidatorWeight](tc)(warpmessage.NewSubnetValidatorWeight(
-						registerValidationID,
-						0, // nonce can be anything here
-						0, // weight of 0 means the validator is removed
+						validationID,
+						nextNonce,
+						weight,
 					)).Bytes(),
 				)).Bytes(),
 			))
@@ -392,7 +384,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			setSubnetValidatorWeightSignature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
 			require.True(ok)
 
-			tc.By("creating the signed warp message to remove the validator")
+			tc.By("creating the signed warp message to increase the weight of the validator")
 			signers := set.NewBits()
 			signers.Add(0) // [signers] has weight from the genesis peer
 
@@ -413,24 +405,42 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				)
 				require.NoError(err)
 			})
+
+			nextNonce++
+		}
+
+		tc.By("increasing the weight of the validator", func() {
+			setWeight(registerValidationID, updatedWeight)
 		})
 
 		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
-
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(
-				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-					subnetGenesisNode.NodeID: {
-						NodeID:    subnetGenesisNode.NodeID,
-						PublicKey: genesisNodePK,
-						Weight:    genesisWeight,
-					},
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
 				},
-				subnetValidators,
-			)
+				ids.EmptyNodeID: { // The validator is not active
+					NodeID: ids.EmptyNodeID,
+					Weight: updatedWeight,
+				},
+			})
+		})
+
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+
+		tc.By("removing the registered validator", func() {
+			setWeight(registerValidationID, 0)
+		})
+
+		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+			})
 		})
 	})
 })
