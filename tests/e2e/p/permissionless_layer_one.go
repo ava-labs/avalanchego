@@ -47,8 +47,10 @@ import (
 )
 
 const (
-	genesisWeight  = units.Schmeckle
-	genesisBalance = units.Avax
+	genesisWeight   = units.Schmeckle
+	genesisBalance  = units.Avax
+	registerWeight  = genesisWeight / 10
+	registerBalance = 0
 )
 
 var _ = e2e.DescribePChain("[Permissionless L1]", func() {
