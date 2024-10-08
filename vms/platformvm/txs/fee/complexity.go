@@ -223,7 +223,8 @@ var (
 	IntrinsicDisableSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // validationID
-			wrappers.IntLen, // auth typeID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen, // authCredential typeID
 		gas.DBRead:  0, // TODO
 		gas.DBWrite: 0, // TODO
 		gas.Compute: 0,
