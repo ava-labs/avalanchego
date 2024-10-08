@@ -5,6 +5,7 @@ package p
 
 import (
 	"context"
+	"errors"
 	"math"
 	"slices"
 	"time"
@@ -279,7 +280,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetConversion.Bytes()))
 				})
@@ -352,7 +354,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 
 			tc.By("getting the signature response")
-			registerSubnetValidatorSignature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			registerSubnetValidatorSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
 			require.True(ok)
 
 			tc.By("creating the signed warp message to register the validator")
@@ -437,7 +440,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
 				})
@@ -473,7 +477,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 
 			tc.By("getting the signature response")
-			setSubnetValidatorWeightSignature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			setSubnetValidatorWeightSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
 			require.True(ok)
 
 			tc.By("creating the signed warp message to remove the validator")
@@ -560,7 +565,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				})
 
 				tc.By("getting the signature response", func() {
-					signature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
 					require.True(ok)
 					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
 				})
@@ -606,8 +612,8 @@ func wrapWarpSignatureRequest(
 
 func findMessage[T any](
 	q buffer.BlockingDeque[p2pmessage.InboundMessage],
-	parser func(p2pmessage.InboundMessage) (T, bool),
-) (T, bool) {
+	parser func(p2pmessage.InboundMessage) (T, bool, error),
+) (T, bool, error) {
 	var messagesToReprocess []p2pmessage.InboundMessage
 	defer func() {
 		slices.Reverse(messagesToReprocess)
@@ -619,35 +625,41 @@ func findMessage[T any](
 	for {
 		msg, ok := q.PopLeft()
 		if !ok {
-			return utils.Zero[T](), false
+			return utils.Zero[T](), false, nil
 		}
 
-		parsed, ok := parser(msg)
+		parsed, ok, err := parser(msg)
+		if err != nil {
+			return utils.Zero[T](), false, err
+		}
 		if ok {
-			return parsed, true
+			return parsed, true, nil
 		}
 
 		messagesToReprocess = append(messagesToReprocess, msg)
 	}
 }
 
-func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool) {
-	appResponse, ok := msg.Message().(*p2ppb.AppResponse)
-	if !ok {
-		return nil, false
+// unwrapWarpSignature assumes the only type of AppResponses that will be
+// received are ACP-118 compliant responses.
+func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
+	var appResponse *p2ppb.AppResponse
+	switch msg := msg.Message().(type) {
+	case *p2ppb.AppResponse:
+		appResponse = msg
+	case *p2ppb.AppError:
+		return nil, false, errors.New(msg.ErrorMessage)
+	default:
+		return nil, false, nil
 	}
 
 	var response sdk.SignatureResponse
-	err := proto.Unmarshal(appResponse.AppBytes, &response)
-	if err != nil {
-		return nil, false
+	if err := proto.Unmarshal(appResponse.AppBytes, &response); err != nil {
+		return nil, false, err
 	}
 
 	warpSignature, err := bls.SignatureFromBytes(response.Signature)
-	if err != nil {
-		return nil, false
-	}
-	return warpSignature, true
+	return warpSignature, true, err
 }
 
 func must[T any](t require.TestingT) func(T, error) T {
