@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils"
@@ -41,6 +40,8 @@ import (
 	p2pmessage "github.com/ava-labs/avalanchego/message"
 	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
+	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
@@ -192,6 +193,18 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		})
 		require.NoError(err)
 
+		tc.By("waiting to update the proposervm P-chain height")
+		time.Sleep((5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4)
+
+		tc.By("issuing random transactions to update the proposervm P-chain height")
+		for range 2 {
+			_, err = pWallet.IssueCreateSubnetTx(
+				owner,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+		}
+
 		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1")
 		res, err = pClient.GetSubnet(tc.DefaultContext(), subnetID)
 		require.NoError(err)
@@ -216,7 +229,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
 		require.NoError(err)
 		require.Equal(
-			map[ids.NodeID]*validators.GetValidatorOutput{
+			map[ids.NodeID]*snowvalidators.GetValidatorOutput{
 				subnetGenesisNode.NodeID: {
 					NodeID:    subnetGenesisNode.NodeID,
 					PublicKey: genesisNodePK,
@@ -304,7 +317,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		subnetValidators, err = pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
 		require.NoError(err)
 		require.Equal(
-			map[ids.NodeID]*validators.GetValidatorOutput{
+			map[ids.NodeID]*snowvalidators.GetValidatorOutput{
 				subnetGenesisNode.NodeID: {
 					NodeID:    subnetGenesisNode.NodeID,
 					PublicKey: genesisNodePK,
