@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -855,12 +856,12 @@ func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, 
 			continue
 		}
 
-		if len(node.StakingAddress) == 0 {
+		if node.StakingAddress == (netip.AddrPort{}) {
 			// Node is not running
 			continue
 		}
 
-		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
+		bootstrapIPs = append(bootstrapIPs, node.StakingAddress.String())
 		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 	}
 

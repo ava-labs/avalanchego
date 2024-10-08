@@ -9,17 +9,19 @@ import (
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
@@ -37,7 +39,7 @@ var (
 )
 
 type VM struct {
-	common.AppHandler
+	*p2p.Network
 
 	chainContext *snow.Context
 	db           database.Database
@@ -57,13 +59,37 @@ func (vm *VM) Initialize(
 	_ []byte,
 	engineChan chan<- common.Message,
 	_ []*common.Fx,
-	_ common.AppSender,
+	appSender common.AppSender,
 ) error {
-	vm.AppHandler = common.NewNoOpAppHandler(chainContext.Log)
-
 	chainContext.Log.Info("initializing xsvm",
 		zap.Stringer("version", Version),
 	)
+
+	metrics := prometheus.NewRegistry()
+	err := chainContext.Metrics.Register("p2p", metrics)
+	if err != nil {
+		return err
+	}
+
+	vm.Network, err = p2p.NewNetwork(
+		chainContext.Log,
+		appSender,
+		metrics,
+		"",
+	)
+	if err != nil {
+		return err
+	}
+
+	// Allow signing of all warp messages. This is not typically safe, but is
+	// allowed for this example.
+	acp118Handler := acp118.NewHandler(
+		acp118Verifier{},
+		chainContext.WarpSigner,
+	)
+	if err := vm.Network.AddHandler(p2p.SignatureRequestHandlerID, acp118Handler); err != nil {
+		return err
+	}
 
 	vm.chainContext = chainContext
 	vm.db = db
@@ -130,14 +156,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
 	return http.StatusOK, nil
-}
-
-func (*VM) Connected(context.Context, ids.NodeID, *version.Application) error {
-	return nil
-}
-
-func (*VM) Disconnected(context.Context, ids.NodeID) error {
-	return nil
 }
 
 func (vm *VM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, error) {

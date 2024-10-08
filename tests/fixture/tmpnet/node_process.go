@@ -44,7 +44,7 @@ type NodeProcess struct {
 	pid int
 }
 
-func (p *NodeProcess) setProcessContext(processContext node.NodeProcessContext) {
+func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
 	p.pid = processContext.PID
 	p.node.URI = processContext.URI
 	p.node.StakingAddress = processContext.StakingAddress
@@ -55,12 +55,12 @@ func (p *NodeProcess) readState() error {
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
-		p.setProcessContext(node.NodeProcessContext{})
+		p.setProcessContext(node.ProcessContext{})
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to read node process context: %w", err)
 	}
-	processContext := node.NodeProcessContext{}
+	processContext := node.ProcessContext{}
 	if err := json.Unmarshal(bytes, &processContext); err != nil {
 		return fmt.Errorf("failed to unmarshal node process context: %w", err)
 	}
