@@ -63,7 +63,10 @@ impl std::fmt::Debug for DbMetrics {
 
 #[async_trait]
 impl api::DbView for HistoricalRev {
-    type Stream<'a> = MerkleKeyValueStream<'a, Self> where Self: 'a;
+    type Stream<'a>
+        = MerkleKeyValueStream<'a, Self>
+    where
+        Self: 'a;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
         HashedNodeReader::root_hash(self).map_err(api::Error::IO)
@@ -125,7 +128,10 @@ where
 {
     type Historical = NodeStore<Committed, FileBacked>;
 
-    type Proposal<'p> = Proposal<'p> where Self: 'p;
+    type Proposal<'p>
+        = Proposal<'p>
+    where
+        Self: 'p;
 
     async fn revision(&self, root_hash: TrieHash) -> Result<Arc<Self::Historical>, api::Error> {
         let nodestore = self
@@ -230,7 +236,10 @@ pub struct Proposal<'p> {
 
 #[async_trait]
 impl<'a> api::DbView for Proposal<'a> {
-    type Stream<'b> = MerkleKeyValueStream<'b, NodeStore<Arc<ImmutableProposal>, FileBacked>> where Self: 'b;
+    type Stream<'b>
+        = MerkleKeyValueStream<'b, NodeStore<Arc<ImmutableProposal>, FileBacked>>
+    where
+        Self: 'b;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
         self.nodestore.root_hash().map_err(api::Error::from)
@@ -313,15 +322,11 @@ impl<'a> api::Proposal for Proposal<'a> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
-    use std::{
-        ops::{Deref, DerefMut},
-        path::PathBuf,
-    };
+    use std::ops::{Deref, DerefMut};
+    use std::path::PathBuf;
 
-    use crate::{
-        db::Db,
-        v2::api::{Db as _, DbView as _, Error, Proposal as _},
-    };
+    use crate::db::Db;
+    use crate::v2::api::{Db as _, DbView as _, Error, Proposal as _};
 
     use super::{BatchOp, DbConfig};
 

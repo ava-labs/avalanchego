@@ -18,6 +18,8 @@ arc-swap = "1.7.1"
 lru = "0.12.4"
 metrics = "0.23.0"
 log = { version = "0.4.20", optional = true }
+bytemuck = "1.7.0"
+bytemuck_derive = "1.7.0"
 
 [dev-dependencies]
 rand = "0.8.5"

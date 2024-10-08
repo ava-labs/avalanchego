@@ -3,11 +3,11 @@
 
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::io::Error;
 use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{collections::VecDeque, io::Error};
 
 use storage::logger::warn;
 use typed_builder::TypedBuilder;
@@ -92,7 +92,7 @@ impl RevisionManager {
         }
 
         if truncate {
-            nodestore.flush_header()?;
+            nodestore.flush_header_with_padding()?;
         }
 
         Ok(manager)
