@@ -199,11 +199,11 @@ var (
 	IntrinsicRegisterSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.LongLen + // balance
-			wrappers.IntLen + // signer typeID
+			bls.SignatureLen + // proof of possession
 			wrappers.IntLen, // message length
 		gas.DBRead:  0, // TODO
 		gas.DBWrite: 0, // TODO
-		gas.Compute: 0,
+		gas.Compute: 0, // TODO: Include PoP verification time
 	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
@@ -712,7 +712,7 @@ func (c *complexityVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVali
 	if err != nil {
 		return err
 	}
-	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
+	c.output, err = IntrinsicRegisterSubnetValidatorTxComplexities.Add(
 		&baseTxComplexity,
 		&warpComplexity,
 	)
