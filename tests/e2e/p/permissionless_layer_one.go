@@ -5,6 +5,7 @@ package p
 
 import (
 	"context"
+	"errors"
 	"math"
 	"slices"
 	"time"
@@ -31,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -41,6 +41,7 @@ import (
 	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
+	platformvmsdk "github.com/ava-labs/avalanchego/vms/platformvm"
 	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
@@ -77,7 +78,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			keychain   = env.NewKeychain()
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet    = baseWallet.P()
-			pClient    = platformvm.NewClient(nodeURI.URI)
+			pClient    = platformvmsdk.NewClient(nodeURI.URI)
 			owner      = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
@@ -118,7 +119,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 			require.Equal(
-				platformvm.GetSubnetClientResponse{
+				platformvmsdk.GetSubnetClientResponse{
 					IsPermissioned: true,
 					ControlKeys: []ids.ShortID{
 						keychain.Keys[0].Address(),
@@ -195,6 +196,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 		})
 
+		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			require.NoError(err)
+			require.Equal(expectedValidators, subnetValidators)
+		}
 		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
 				SubnetID:       subnetID,
@@ -210,38 +219,32 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 			require.NoError(err)
 
-			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
-			require.Equal(
-				platformvm.GetSubnetClientResponse{
-					IsPermissioned: false,
-					ControlKeys: []ids.ShortID{
-						keychain.Keys[0].Address(),
+			tc.By("verifying the subnet reports as being converted", func() {
+				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+				require.Equal(
+					platformvmsdk.GetSubnetClientResponse{
+						IsPermissioned: false,
+						ControlKeys: []ids.ShortID{
+							keychain.Keys[0].Address(),
+						},
+						Threshold:      1,
+						ConversionID:   expectedConversionID,
+						ManagerChainID: chainID,
+						ManagerAddress: address,
 					},
-					Threshold:      1,
-					ConversionID:   expectedConversionID,
-					ManagerChainID: chainID,
-					ManagerAddress: address,
-				},
-				subnet,
-			)
-		})
+					subnet,
+				)
+			})
 
-		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
-
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(expectedValidators, subnetValidators)
-		}
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-				subnetGenesisNode.NodeID: {
-					NodeID:    subnetGenesisNode.NodeID,
-					PublicKey: genesisNodePK,
-					Weight:    genesisWeight,
-				},
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+				})
 			})
 		})
 
@@ -301,7 +304,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 			tc.By("sending the request to sign the warp message", func() {
 				registerSubnetValidatorRequest, err := wrapWarpSignatureRequest(
-					chainID,
 					unsignedRegisterSubnetValidator,
 					nil,
 				)
@@ -311,7 +313,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 
 			tc.By("getting the signature response")
-			registerSubnetValidatorSignature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			registerSubnetValidatorSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
 			require.True(ok)
 
 			tc.By("creating the signed warp message to register the validator")
@@ -339,17 +342,19 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 		})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-				subnetGenesisNode.NodeID: {
-					NodeID:    subnetGenesisNode.NodeID,
-					PublicKey: genesisNodePK,
-					Weight:    genesisWeight,
-				},
-				ids.EmptyNodeID: { // The validator is not active
-					NodeID: ids.EmptyNodeID,
-					Weight: registerWeight,
-				},
+		tc.By("verifying the validator was registered", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+					ids.EmptyNodeID: { // The validator is not active
+						NodeID: ids.EmptyNodeID,
+						Weight: registerWeight,
+					},
+				})
 			})
 		})
 
@@ -371,7 +376,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 			tc.By("sending the request to sign the warp message", func() {
 				setSubnetValidatorWeightRequest, err := wrapWarpSignatureRequest(
-					chainID,
 					unsignedSubnetValidatorWeight,
 					nil,
 				)
@@ -381,7 +385,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 
 			tc.By("getting the signature response")
-			setSubnetValidatorWeightSignature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			setSubnetValidatorWeightSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
 			require.True(ok)
 
 			tc.By("creating the signed warp message to increase the weight of the validator")
@@ -413,17 +418,19 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			setWeight(registerValidationID, updatedWeight)
 		})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-				subnetGenesisNode.NodeID: {
-					NodeID:    subnetGenesisNode.NodeID,
-					PublicKey: genesisNodePK,
-					Weight:    genesisWeight,
-				},
-				ids.EmptyNodeID: { // The validator is not active
-					NodeID: ids.EmptyNodeID,
-					Weight: updatedWeight,
-				},
+		tc.By("verifying the validator weight was increased", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+					ids.EmptyNodeID: { // The validator is not active
+						NodeID: ids.EmptyNodeID,
+						Weight: updatedWeight,
+					},
+				})
 			})
 		})
 
@@ -433,20 +440,21 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			setWeight(registerValidationID, 0)
 		})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-				subnetGenesisNode.NodeID: {
-					NodeID:    subnetGenesisNode.NodeID,
-					PublicKey: genesisNodePK,
-					Weight:    genesisWeight,
-				},
+		tc.By("verifying the validator was removed", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+				})
 			})
 		})
 	})
 })
 
 func wrapWarpSignatureRequest(
-	chainID ids.ID,
 	msg *warp.UnsignedMessage,
 	justification []byte,
 ) (p2pmessage.OutboundMessage, error) {
@@ -470,7 +478,7 @@ func wrapWarpSignatureRequest(
 	}
 
 	return p2pMessageFactory.AppRequest(
-		chainID,
+		msg.SourceChainID,
 		0,
 		time.Hour,
 		p2psdk.PrefixMessage(
@@ -482,8 +490,8 @@ func wrapWarpSignatureRequest(
 
 func findMessage[T any](
 	q buffer.BlockingDeque[p2pmessage.InboundMessage],
-	parser func(p2pmessage.InboundMessage) (T, bool),
-) (T, bool) {
+	parser func(p2pmessage.InboundMessage) (T, bool, error),
+) (T, bool, error) {
 	var messagesToReprocess []p2pmessage.InboundMessage
 	defer func() {
 		slices.Reverse(messagesToReprocess)
@@ -495,35 +503,41 @@ func findMessage[T any](
 	for {
 		msg, ok := q.PopLeft()
 		if !ok {
-			return utils.Zero[T](), false
+			return utils.Zero[T](), false, nil
 		}
 
-		parsed, ok := parser(msg)
+		parsed, ok, err := parser(msg)
+		if err != nil {
+			return utils.Zero[T](), false, err
+		}
 		if ok {
-			return parsed, true
+			return parsed, true, nil
 		}
 
 		messagesToReprocess = append(messagesToReprocess, msg)
 	}
 }
 
-func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool) {
-	appResponse, ok := msg.Message().(*p2ppb.AppResponse)
-	if !ok {
-		return nil, false
+// unwrapWarpSignature assumes the only type of AppResponses that will be
+// received are ACP-118 compliant responses.
+func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
+	var appResponse *p2ppb.AppResponse
+	switch msg := msg.Message().(type) {
+	case *p2ppb.AppResponse:
+		appResponse = msg
+	case *p2ppb.AppError:
+		return nil, false, errors.New(msg.ErrorMessage)
+	default:
+		return nil, false, nil
 	}
 
 	var response sdk.SignatureResponse
-	err := proto.Unmarshal(appResponse.AppBytes, &response)
-	if err != nil {
-		return nil, false
+	if err := proto.Unmarshal(appResponse.AppBytes, &response); err != nil {
+		return nil, false, err
 	}
 
 	warpSignature, err := bls.SignatureFromBytes(response.Signature)
-	if err != nil {
-		return nil, false
-	}
-	return warpSignature, true
+	return warpSignature, true, err
 }
 
 func must[T any](t require.TestingT) func(T, error) T {
