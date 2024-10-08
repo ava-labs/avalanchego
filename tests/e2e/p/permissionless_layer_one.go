@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -168,7 +167,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnetGenesisNode.StakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
-				tc.Outf("received %s %s from %s", m.Op(), m.Message(), m.NodeID())
+				tc.Outf("received %s %s from %s\n", m.Op(), m.Message(), m.NodeID())
 				genesisPeerMessages.PushRight(m)
 			}),
 		)
@@ -197,14 +196,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			)
 			require.NoError(err)
 
-			tc.By("ensuring the genesis peer has accepted the tx", func() {
+			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
 				var (
 					client = platformvmsdk.NewClient(subnetGenesisNode.URI)
 					txID   = tx.ID()
 				)
 				require.Eventually(func() bool {
-					res, err := client.GetTxStatus(tc.DefaultContext(), txID)
-					return err != nil && res.Status == status.Committed
+					_, err := client.GetTx(tc.DefaultContext(), txID)
+					return err == nil
 				}, tests.DefaultTimeout, 100*time.Millisecond)
 			})
 		})
@@ -263,9 +262,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			tc.By("fetching the subnet conversion attestation", func() {
 				unsignedSubnetConversion := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
-					chainID,
+					constants.PlatformChainID,
 					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
-						address,
+						nil,
 						must[*warpmessage.SubnetConversion](tc)(warpmessage.NewSubnetConversion(
 							expectedConversionID,
 						)).Bytes(),
@@ -388,14 +387,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx", func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
 					var (
 						client = platformvmsdk.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
 					)
 					require.Eventually(func() bool {
-						res, err := client.GetTxStatus(tc.DefaultContext(), txID)
-						return err != nil && res.Status == status.Committed
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						return err == nil
 					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
 			})
@@ -427,9 +426,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			tc.By("fetching the validator registration attestation", func() {
 				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
-					chainID,
+					constants.PlatformChainID,
 					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
-						address,
+						nil,
 						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
 							registerValidationID,
 							true, // registered
@@ -542,14 +541,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx", func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
 					var (
 						client = platformvmsdk.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
 					)
 					require.Eventually(func() bool {
-						res, err := client.GetTxStatus(tc.DefaultContext(), txID)
-						return err != nil && res.Status == status.Committed
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						return err == nil
 					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
 			})
@@ -577,12 +576,12 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			tc.By("fetching the validator removal attestation", func() {
 				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
-					chainID,
+					constants.PlatformChainID,
 					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
-						address,
+						nil,
 						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
 							registerValidationID,
-							true, // removed
+							false, // removed
 						)).Bytes(),
 					)).Bytes(),
 				))
