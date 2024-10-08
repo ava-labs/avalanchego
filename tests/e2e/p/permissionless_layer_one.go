@@ -167,7 +167,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnetGenesisNode.StakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
-				tc.Outf("received %s %s from %s", m.Op(), m.Message(), m.NodeID())
+				tc.Outf("received %s %s from %s\n", m.Op(), m.Message(), m.NodeID())
 				genesisPeerMessages.PushRight(m)
 			}),
 		)
@@ -203,7 +203,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				)
 				require.Eventually(func() bool {
 					_, err := client.GetTx(tc.DefaultContext(), txID)
-					tc.Outf("err: %v", err)
 					return err == nil
 				}, tests.DefaultTimeout, 100*time.Millisecond)
 			})
@@ -263,9 +262,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			tc.By("fetching the subnet conversion attestation", func() {
 				unsignedSubnetConversion := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
-					chainID,
+					constants.PlatformChainID,
 					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
-						address,
+						nil,
 						must[*warpmessage.SubnetConversion](tc)(warpmessage.NewSubnetConversion(
 							expectedConversionID,
 						)).Bytes(),
@@ -392,7 +391,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					)
 					require.Eventually(func() bool {
 						_, err := client.GetTx(tc.DefaultContext(), txID)
-						tc.Outf("err: %v", err)
 						return err == nil
 					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
@@ -425,9 +423,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			tc.By("fetching the validator registration attestation", func() {
 				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
-					chainID,
+					constants.PlatformChainID,
 					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
-						address,
+						nil,
 						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
 							registerValidationID,
 							true, // registered
@@ -516,7 +514,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					)
 					require.Eventually(func() bool {
 						_, err := client.GetTx(tc.DefaultContext(), txID)
-						tc.Outf("err: %v", err)
 						return err == nil
 					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
@@ -545,9 +542,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			tc.By("fetching the validator removal attestation", func() {
 				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
-					chainID,
+					constants.PlatformChainID,
 					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
-						address,
+						nil,
 						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
 							registerValidationID,
 							true, // removed
