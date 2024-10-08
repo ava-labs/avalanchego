@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils"
@@ -32,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -196,12 +198,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 
 			tc.By("ensuring the genesis peer has accepted the tx", func() {
-				require.NoError(platformvmsdk.AwaitTxAccepted(
-					platformvmsdk.NewClient(subnetGenesisNode.URI),
-					tc.DefaultContext(),
-					tx.ID(),
-					time.Second,
-				))
+				var (
+					client = platformvmsdk.NewClient(subnetGenesisNode.URI)
+					txID   = tx.ID()
+				)
+				require.Eventually(func() bool {
+					res, err := client.GetTxStatus(tc.DefaultContext(), txID)
+					return err != nil && res.Status == status.Committed
+				}, tests.DefaultTimeout, 100*time.Millisecond)
 			})
 		})
 
@@ -382,12 +386,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				require.NoError(err)
 
 				tc.By("ensuring the genesis peer has accepted the tx", func() {
-					require.NoError(platformvmsdk.AwaitTxAccepted(
-						platformvmsdk.NewClient(subnetGenesisNode.URI),
-						tc.DefaultContext(),
-						tx.ID(),
-						time.Second,
-					))
+					var (
+						client = platformvmsdk.NewClient(subnetGenesisNode.URI)
+						txID   = tx.ID()
+					)
+					require.Eventually(func() bool {
+						res, err := client.GetTxStatus(tc.DefaultContext(), txID)
+						return err != nil && res.Status == status.Committed
+					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
 			})
 		})
@@ -503,12 +509,14 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				require.NoError(err)
 
 				tc.By("ensuring the genesis peer has accepted the tx", func() {
-					require.NoError(platformvmsdk.AwaitTxAccepted(
-						platformvmsdk.NewClient(subnetGenesisNode.URI),
-						tc.DefaultContext(),
-						tx.ID(),
-						time.Second,
-					))
+					var (
+						client = platformvmsdk.NewClient(subnetGenesisNode.URI)
+						txID   = tx.ID()
+					)
+					require.Eventually(func() bool {
+						res, err := client.GetTxStatus(tc.DefaultContext(), txID)
+						return err != nil && res.Status == status.Committed
+					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
 			})
 		})
