@@ -209,39 +209,71 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 			require.NoError(err)
 
-			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
-			require.NoError(err)
-			require.Equal(
-				platformvm.GetSubnetClientResponse{
-					IsPermissioned: false,
-					ControlKeys: []ids.ShortID{
-						keychain.Keys[0].Address(),
+			tc.By("verifying the subnet reports as being converted", func() {
+				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.GetSubnetClientResponse{
+						IsPermissioned: false,
+						ControlKeys: []ids.ShortID{
+							keychain.Keys[0].Address(),
+						},
+						Threshold:      1,
+						ConversionID:   expectedConversionID,
+						ManagerChainID: chainID,
+						ManagerAddress: address,
 					},
-					Threshold:      1,
-					ConversionID:   expectedConversionID,
-					ManagerChainID: chainID,
-					ManagerAddress: address,
-				},
-				subnet,
-			)
-		})
+					subnet,
+				)
+			})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
+			tc.By("verifying the validator set was updated", func() {
+				height, err := pClient.GetHeight(tc.DefaultContext())
+				require.NoError(err)
 
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(
-				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-					subnetGenesisNode.NodeID: {
-						NodeID:    subnetGenesisNode.NodeID,
-						PublicKey: genesisNodePK,
-						Weight:    genesisWeight,
+				subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+				require.NoError(err)
+				require.Equal(
+					map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+						subnetGenesisNode.NodeID: {
+							NodeID:    subnetGenesisNode.NodeID,
+							PublicKey: genesisNodePK,
+							Weight:    genesisWeight,
+						},
 					},
-				},
-				subnetValidators,
-			)
+					subnetValidators,
+				)
+			})
+
+			tc.By("fetching the subnet conversion attestation", func() {
+				unsignedSubnetConversion := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						address,
+						must[*warpmessage.SubnetConversion](tc)(warpmessage.NewSubnetConversion(
+							expectedConversionID,
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				tc.By("sending the request to sign the warp message", func() {
+					registerSubnetValidatorRequest, err := wrapWarpSignatureRequest(
+						constants.PlatformChainID,
+						unsignedSubnetConversion,
+						subnetID[:],
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), registerSubnetValidatorRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetConversion.Bytes()))
+				})
+			})
 		})
 
 		advanceProposerVMPChainHeight := func() {
@@ -341,27 +373,60 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 		})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
+		tc.By("verifying the validator was registered", func() {
+			tc.By("verifying the validator set was updated", func() {
+				height, err := pClient.GetHeight(tc.DefaultContext())
+				require.NoError(err)
 
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(
-				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-					subnetGenesisNode.NodeID: {
-						NodeID:    subnetGenesisNode.NodeID,
-						PublicKey: genesisNodePK,
-						Weight:    genesisWeight,
+				subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+				require.NoError(err)
+				require.Equal(
+					map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+						subnetGenesisNode.NodeID: {
+							NodeID:    subnetGenesisNode.NodeID,
+							PublicKey: genesisNodePK,
+							Weight:    genesisWeight,
+						},
+						subnetRegisterNode.NodeID: {
+							NodeID:    subnetRegisterNode.NodeID,
+							PublicKey: registerNodePK,
+							Weight:    registerWeight,
+						},
 					},
-					subnetRegisterNode.NodeID: {
-						NodeID:    subnetRegisterNode.NodeID,
-						PublicKey: registerNodePK,
-						Weight:    registerWeight,
-					},
-				},
-				subnetValidators,
-			)
+					subnetValidators,
+				)
+			})
+
+			tc.By("fetching the validator registration attestation", func() {
+				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						address,
+						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
+							registerValidationID,
+							true, // registered
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				tc.By("sending the request to sign the warp message", func() {
+					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
+						constants.PlatformChainID,
+						unsignedSubnetValidatorRegistration,
+						nil,
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), subnetValidatorRegistrationRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
+				})
+			})
 		})
 
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
@@ -419,22 +484,55 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 		})
 
-		tc.By("verifying the Permissionless L1 reports the correct validator set", func() {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
+		tc.By("verifying the validator was removed", func() {
+			tc.By("verifying the validator set was updated", func() {
+				height, err := pClient.GetHeight(tc.DefaultContext())
+				require.NoError(err)
 
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(
-				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
-					subnetGenesisNode.NodeID: {
-						NodeID:    subnetGenesisNode.NodeID,
-						PublicKey: genesisNodePK,
-						Weight:    genesisWeight,
+				subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+				require.NoError(err)
+				require.Equal(
+					map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+						subnetGenesisNode.NodeID: {
+							NodeID:    subnetGenesisNode.NodeID,
+							PublicKey: genesisNodePK,
+							Weight:    genesisWeight,
+						},
 					},
-				},
-				subnetValidators,
-			)
+					subnetValidators,
+				)
+			})
+
+			tc.By("fetching the validator removal attestation", func() {
+				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					chainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						address,
+						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
+							registerValidationID,
+							true, // removed
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				tc.By("sending the request to sign the warp message", func() {
+					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
+						constants.PlatformChainID,
+						unsignedSubnetValidatorRegistration,
+						registerSubnetValidatorMessage.Bytes(),
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), subnetValidatorRegistrationRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
+				})
+			})
 		})
 	})
 })
