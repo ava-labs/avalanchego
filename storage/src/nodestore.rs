@@ -53,7 +53,7 @@ use std::fmt::Debug;
 /// ```
 use std::io::{Error, ErrorKind, Write};
 use std::iter::once;
-use std::mem::offset_of;
+use std::mem::{offset_of, take};
 use std::num::NonZeroU64;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -1092,12 +1092,12 @@ where
 
 impl<S: WritableStorage> NodeStore<Committed, S> {
     /// adjust the freelist of this proposal to reflect the freed nodes in the oldest proposal
-    pub fn reap_deleted(&mut self, oldest: &NodeStore<Committed, S>) -> Result<(), Error> {
+    pub fn reap_deleted(mut self) -> Result<(), Error> {
         self.storage
-            .invalidate_cached_nodes(oldest.kind.deleted.iter());
-        trace!("There are {} nodes to reap", oldest.kind.deleted.len());
-        for addr in oldest.kind.deleted.iter() {
-            self.delete_node(*addr)?;
+            .invalidate_cached_nodes(self.kind.deleted.iter());
+        trace!("There are {} nodes to reap", self.kind.deleted.len());
+        for addr in take(&mut self.kind.deleted) {
+            self.delete_node(addr)?;
         }
         Ok(())
     }

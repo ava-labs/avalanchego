@@ -143,14 +143,14 @@ impl RevisionManager {
             return Err(RevisionManagerError::NotLatest);
         }
 
-        let mut committed = proposal.as_committed();
+        let committed = proposal.as_committed();
 
         // 2. Persist delete list for this committed revision to disk for recovery
 
         // 3 Take the deleted entries from the oldest revision and mark them as free for this revision
         // If you crash after freeing some of these, then the free list will point to nodes that are not actually free.
         // TODO: Handle the case where we get something off the free list that is not free
-        while self.historical.len() > self.max_revisions {
+        while self.historical.len() >= self.max_revisions {
             let oldest = self.historical.pop_front().expect("must be present");
             if let Some(oldest_hash) = oldest.kind.root_hash() {
                 self.by_hash.remove(&oldest_hash);
@@ -162,9 +162,8 @@ impl RevisionManager {
             // This guarantee is there because we have a `&mut self` reference to the manager, so
             // the compiler guarantees we are the only one using this manager.
             match Arc::try_unwrap(oldest) {
-                Ok(oldest) => committed.reap_deleted(&oldest)?,
+                Ok(oldest) => oldest.reap_deleted()?,
                 Err(original) => {
-                    // TODO: try reaping the next revision
                     warn!("Oldest revision could not be reaped; still referenced");
                     self.historical.push_front(original);
                 }
