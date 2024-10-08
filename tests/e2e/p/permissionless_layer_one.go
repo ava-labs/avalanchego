@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -40,7 +39,9 @@ import (
 	p2pmessage "github.com/ava-labs/avalanchego/message"
 	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	platformvmpb "github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
+	platformvmsdk "github.com/ava-labs/avalanchego/vms/platformvm"
 	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
@@ -76,7 +77,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			keychain   = env.NewKeychain()
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet    = baseWallet.P()
-			pClient    = platformvm.NewClient(nodeURI.URI)
+			pClient    = platformvmsdk.NewClient(nodeURI.URI)
 			owner      = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
@@ -117,7 +118,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 			require.Equal(
-				platformvm.GetSubnetClientResponse{
+				platformvmsdk.GetSubnetClientResponse{
 					IsPermissioned: true,
 					ControlKeys: []ids.ShortID{
 						keychain.Keys[0].Address(),
@@ -194,8 +195,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 
 			tc.By("ensuring the genesis peer has accepted the tx", func() {
-				require.NoError(platformvm.AwaitTxAccepted(
-					platformvm.NewClient(subnetGenesisNode.URI),
+				require.NoError(platformvmsdk.AwaitTxAccepted(
+					platformvmsdk.NewClient(subnetGenesisNode.URI),
 					tc.DefaultContext(),
 					tx.ID(),
 					time.Second,
@@ -222,7 +223,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
 				require.Equal(
-					platformvm.GetSubnetClientResponse{
+					platformvmsdk.GetSubnetClientResponse{
 						IsPermissioned: false,
 						ControlKeys: []ids.ShortID{
 							keychain.Keys[0].Address(),
@@ -378,8 +379,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				require.NoError(err)
 
 				tc.By("ensuring the genesis peer has accepted the tx", func() {
-					require.NoError(platformvm.AwaitTxAccepted(
-						platformvm.NewClient(subnetGenesisNode.URI),
+					require.NoError(platformvmsdk.AwaitTxAccepted(
+						platformvmsdk.NewClient(subnetGenesisNode.URI),
 						tc.DefaultContext(),
 						tx.ID(),
 						time.Second,
@@ -497,8 +498,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				require.NoError(err)
 
 				tc.By("ensuring the genesis peer has accepted the tx", func() {
-					require.NoError(platformvm.AwaitTxAccepted(
-						platformvm.NewClient(subnetGenesisNode.URI),
+					require.NoError(platformvmsdk.AwaitTxAccepted(
+						platformvmsdk.NewClient(subnetGenesisNode.URI),
 						tc.DefaultContext(),
 						tx.ID(),
 						time.Second,
@@ -539,11 +540,19 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					)).Bytes(),
 				))
 
+				justification := platformvmpb.SubnetValidatorRegistrationJustification{
+					Preimage: &platformvmpb.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
+						RegisterSubnetValidatorMessage: registerSubnetValidatorMessage.Bytes(),
+					},
+				}
+				justificationBytes, err := proto.Marshal(&justification)
+				require.NoError(err)
+
 				tc.By("sending the request to sign the warp message", func() {
 					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
 						constants.PlatformChainID,
 						unsignedSubnetValidatorRegistration,
-						registerSubnetValidatorMessage.Bytes(),
+						justificationBytes,
 					)
 					require.NoError(err)
 
