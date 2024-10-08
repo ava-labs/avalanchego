@@ -177,7 +177,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetTx", func() {
-			_, err := pWallet.IssueConvertSubnetTx(
+			tx, err := pWallet.IssueConvertSubnetTx(
 				subnetID,
 				chainID,
 				address,
@@ -192,6 +192,15 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
+
+			tc.By("ensuring the genesis peer has accepted the tx", func() {
+				require.NoError(platformvm.AwaitTxAccepted(
+					platformvm.NewClient(subnetGenesisNode.URI),
+					tc.DefaultContext(),
+					tx.ID(),
+					time.Second,
+				))
+			})
 		})
 
 		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1", func() {
@@ -361,12 +370,21 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 
 			tc.By("issuing a RegisterSubnetValidatorTx", func() {
-				_, err := pWallet.IssueRegisterSubnetValidatorTx(
+				tx, err := pWallet.IssueRegisterSubnetValidatorTx(
 					registerBalance,
 					registerNodePoP.ProofOfPossession,
 					registerSubnetValidator.Bytes(),
 				)
 				require.NoError(err)
+
+				tc.By("ensuring the genesis peer has accepted the tx", func() {
+					require.NoError(platformvm.AwaitTxAccepted(
+						platformvm.NewClient(subnetGenesisNode.URI),
+						tc.DefaultContext(),
+						tx.ID(),
+						time.Second,
+					))
+				})
 			})
 		})
 
@@ -473,10 +491,19 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 
 			tc.By("issuing a SetSubnetValidatorWeightTx", func() {
-				_, err := pWallet.IssueSetSubnetValidatorWeightTx(
+				tx, err := pWallet.IssueSetSubnetValidatorWeightTx(
 					registerSubnetValidator.Bytes(),
 				)
 				require.NoError(err)
+
+				tc.By("ensuring the genesis peer has accepted the tx", func() {
+					require.NoError(platformvm.AwaitTxAccepted(
+						platformvm.NewClient(subnetGenesisNode.URI),
+						tc.DefaultContext(),
+						tx.ID(),
+						time.Second,
+					))
+				})
 			})
 		})
 
