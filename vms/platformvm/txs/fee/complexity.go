@@ -63,7 +63,6 @@ const (
 		secp256k1.SignatureLen // signature length
 
 	intrinsicConvertSubnetValidatorBandwidth = wrappers.IntLen + // nodeID length
-		ids.NodeIDLen + // nodeID
 		wrappers.LongLen + // weight
 		wrappers.LongLen + // balance
 		wrappers.IntLen + // remaining balance owner threshold
@@ -191,20 +190,20 @@ var (
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
 			wrappers.IntLen + // validators length
-			bls.SignatureLen + // proofOfPossession
+			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
 		gas.DBRead:  2, // subnet auth + manager lookup
 		gas.DBWrite: 2, // manager + weight
-		gas.Compute: 0, // TODO: Add compute complexity (and include the PoP compute)
+		gas.Compute: 0,
 	}
 	IntrinsicRegisterSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.LongLen + // balance
-			wrappers.IntLen + // signer typeID
+			bls.SignatureLen + // proof of possession
 			wrappers.IntLen, // message length
 		gas.DBRead:  0, // TODO
 		gas.DBWrite: 0, // TODO
-		gas.Compute: 0,
+		gas.Compute: 0, // TODO: Include PoP verification time
 	}
 	IntrinsicSetSubnetValidatorWeightTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -369,6 +368,9 @@ func convertSubnetValidatorComplexity(sov *txs.ConvertSubnetValidator) (gas.Dime
 		return gas.Dimensions{}, err
 	}
 	return complexity.Add(
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(sov.NodeID)),
+		},
 		&signerComplexity,
 		&gas.Dimensions{
 			gas.Bandwidth: addressBandwidth,
@@ -717,7 +719,7 @@ func (c *complexityVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVali
 	if err != nil {
 		return err
 	}
-	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
+	c.output, err = IntrinsicRegisterSubnetValidatorTxComplexities.Add(
 		&baseTxComplexity,
 		&warpComplexity,
 	)
