@@ -354,10 +354,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 						PublicKey: genesisNodePK,
 						Weight:    genesisWeight,
 					},
-					subnetRegisterNode.NodeID: {
-						NodeID:    subnetRegisterNode.NodeID,
-						PublicKey: registerNodePK,
-						Weight:    registerWeight,
+					ids.EmptyNodeID: { // The validator is not active
+						NodeID: ids.EmptyNodeID,
+						Weight: registerWeight,
 					},
 				},
 				subnetValidators,
