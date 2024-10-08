@@ -45,6 +45,8 @@ import (
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
+const genesisWeight = 100
+
 var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
@@ -157,7 +159,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(genesisPeer.AwaitClosed(tc.DefaultContext()))
 		}()
 
-		const genesisWeight = 100
 		var (
 			chainID = chainTx.ID()
 			address = []byte{}
