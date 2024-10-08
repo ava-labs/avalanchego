@@ -197,7 +197,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			)
 			require.NoError(err)
 
-			tc.By("ensuring the genesis peer has accepted the tx", func() {
+			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
 				var (
 					client = platformvmsdk.NewClient(subnetGenesisNode.URI)
 					txID   = tx.ID()
@@ -385,7 +385,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx", func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
 					var (
 						client = platformvmsdk.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
