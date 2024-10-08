@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -203,8 +202,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					txID   = tx.ID()
 				)
 				require.Eventually(func() bool {
-					res, err := client.GetTxStatus(tc.DefaultContext(), txID)
-					return err != nil && res.Status == status.Committed
+					_, err := client.GetTx(tc.DefaultContext(), txID)
+					tc.Outf("err: %v", err)
+					return err == nil
 				}, tests.DefaultTimeout, 100*time.Millisecond)
 			})
 		})
@@ -391,8 +391,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 						txID   = tx.ID()
 					)
 					require.Eventually(func() bool {
-						res, err := client.GetTxStatus(tc.DefaultContext(), txID)
-						return err != nil && res.Status == status.Committed
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						tc.Outf("err: %v", err)
+						return err == nil
 					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
 			})
@@ -514,8 +515,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 						txID   = tx.ID()
 					)
 					require.Eventually(func() bool {
-						res, err := client.GetTxStatus(tc.DefaultContext(), txID)
-						return err != nil && res.Status == status.Committed
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						tc.Outf("err: %v", err)
+						return err == nil
 					}, tests.DefaultTimeout, 100*time.Millisecond)
 				})
 			})
