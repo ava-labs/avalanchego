@@ -301,9 +301,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
 		require.NoError(err)
 
-		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
-		require.NoError(err)
-
 		tc.By("ensuring the subnet nodes are healthy", func() {
 			e2e.WaitForHealthy(tc, subnetGenesisNode)
 			e2e.WaitForHealthy(tc, subnetRegisterNode)
