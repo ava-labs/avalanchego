@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const genesisWeight = 100
+
 var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
@@ -108,19 +110,17 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		)
 		require.NoError(err)
 
-		tc.By("creating an ephemeral node")
+		tc.By("creating the genesis validator")
 		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
 		})
 
-		subnetGenesisNodeInfoAPI := info.NewClient(subnetGenesisNode.URI)
-		nodeID, nodePoP, err := subnetGenesisNodeInfoAPI.GetNodeID(tc.DefaultContext())
+		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
 		require.NoError(err)
 
-		nodePK, err := bls.PublicKeyFromCompressedBytes(nodePoP.PublicKey[:])
+		genesisNodePK, err := bls.PublicKeyFromCompressedBytes(genesisNodePoP.PublicKey[:])
 		require.NoError(err)
 
-		const weight = 100
 		var (
 			chainID = chainTx.ID()
 			address = []byte{}
@@ -132,10 +132,10 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			address,
 			[]*txs.ConvertSubnetValidator{
 				{
-					NodeID:  nodeID.Bytes(),
-					Weight:  weight,
+					NodeID:  subnetGenesisNode.NodeID.Bytes(),
+					Weight:  genesisWeight,
 					Balance: units.Avax,
-					Signer:  *nodePoP,
+					Signer:  *genesisNodePoP,
 				},
 			},
 			tc.WithDefaultContext(),
@@ -148,9 +148,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			ManagerAddress: address,
 			Validators: []message.SubnetConversionValidatorData{
 				{
-					NodeID:       nodeID.Bytes(),
-					BLSPublicKey: nodePoP.PublicKey,
-					Weight:       weight,
+					NodeID:       subnetGenesisNode.NodeID.Bytes(),
+					BLSPublicKey: genesisNodePoP.PublicKey,
+					Weight:       genesisWeight,
 				},
 			},
 		})
@@ -183,8 +183,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			map[ids.NodeID]*validators.GetValidatorOutput{
 				subnetGenesisNode.NodeID: {
 					NodeID:    subnetGenesisNode.NodeID,
-					PublicKey: nodePK,
-					Weight:    weight,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
 				},
 			},
 			subnetValidators,
