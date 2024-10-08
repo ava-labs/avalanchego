@@ -514,7 +514,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			setWeight(registerValidationID, updatedWeight)
 		})
 
-		tc.By("verifying the validator weight was increase", func() {
+		tc.By("verifying the validator weight was increased", func() {
 			tc.By("verifying the validator set was updated", func() {
 				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
 					subnetGenesisNode.NodeID: {
