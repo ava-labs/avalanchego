@@ -194,7 +194,7 @@ var (
 			wrappers.IntLen, // subnetAuthCredential typeID
 		gas.DBRead:  2, // subnet auth + manager lookup
 		gas.DBWrite: 2, // manager + weight
-		gas.Compute: 0, // TODO: Add compute complexity (and include the PoP compute)
+		gas.Compute: 0,
 	}
 	IntrinsicRegisterSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
