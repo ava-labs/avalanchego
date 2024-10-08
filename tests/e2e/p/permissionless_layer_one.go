@@ -138,7 +138,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 		tc.By("connecting to the genesis validator")
 		var (
-			networkID           = env.GetNetwork().NetworkID
+			networkID           = env.GetNetwork().GetNetworkID()
 			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
 		)
 		genesisPeer, err := peer.StartTestPeer(
