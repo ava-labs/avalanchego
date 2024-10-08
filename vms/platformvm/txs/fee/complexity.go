@@ -190,7 +190,7 @@ var (
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
 			wrappers.IntLen + // validators length
-			bls.SignatureLen + // proofOfPossession
+			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
 		gas.DBRead:  2, // subnet auth + manager lookup
 		gas.DBWrite: 2, // manager + weight
