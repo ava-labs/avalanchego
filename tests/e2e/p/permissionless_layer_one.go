@@ -274,7 +274,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 				tc.By("sending the request to sign the warp message", func() {
 					registerSubnetValidatorRequest, err := wrapWarpSignatureRequest(
-						constants.PlatformChainID,
 						unsignedSubnetConversion,
 						subnetID[:],
 					)
@@ -348,7 +347,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 			tc.By("sending the request to sign the warp message", func() {
 				registerSubnetValidatorRequest, err := wrapWarpSignatureRequest(
-					chainID,
 					unsignedRegisterSubnetValidator,
 					nil,
 				)
@@ -428,7 +426,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 				tc.By("sending the request to sign the warp message", func() {
 					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
-						constants.PlatformChainID,
 						unsignedSubnetValidatorRegistration,
 						nil,
 					)
@@ -464,7 +461,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 			tc.By("sending the request to sign the warp message", func() {
 				setSubnetValidatorWeightRequest, err := wrapWarpSignatureRequest(
-					chainID,
 					unsignedSubnetValidatorWeight,
 					nil,
 				)
@@ -549,7 +545,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 				tc.By("sending the request to sign the warp message", func() {
 					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
-						constants.PlatformChainID,
 						unsignedSubnetValidatorWeight,
 						nil,
 					)
@@ -607,7 +602,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 				tc.By("sending the request to sign the warp message", func() {
 					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
-						constants.PlatformChainID,
 						unsignedSubnetValidatorRegistration,
 						justificationBytes,
 					)
@@ -628,7 +622,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 })
 
 func wrapWarpSignatureRequest(
-	chainID ids.ID,
 	msg *warp.UnsignedMessage,
 	justification []byte,
 ) (p2pmessage.OutboundMessage, error) {
@@ -652,7 +645,7 @@ func wrapWarpSignatureRequest(
 	}
 
 	return p2pMessageFactory.AppRequest(
-		chainID,
+		msg.SourceChainID,
 		0,
 		time.Hour,
 		p2psdk.PrefixMessage(
