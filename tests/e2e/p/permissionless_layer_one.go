@@ -547,7 +547,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 						nil,
 						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
 							registerValidationID,
-							true, // removed
+							false, // removed
 						)).Bytes(),
 					)).Bytes(),
 				))
