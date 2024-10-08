@@ -431,7 +431,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		tc.By("issuing an IncreaseBalanceTx", func() {
 			_, err := pWallet.IssueIncreaseBalanceTx(
 				registerValidationID,
-				units.NanoAvax,
+				units.Avax,
 			)
 			require.NoError(err)
 		})
@@ -453,6 +453,35 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 						NodeID:    subnetRegisterNode.NodeID,
 						PublicKey: registerNodePK,
 						Weight:    registerWeight,
+					},
+				},
+				subnetValidators,
+			)
+		})
+
+		tc.By("issuing an DisableSubnetValidatorTx", func() {
+			_, err := pWallet.IssueDisableSubnetValidatorTx(
+				registerValidationID,
+			)
+			require.NoError(err)
+		})
+
+		tc.By("verifying the validator was deactivated", func() {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			require.NoError(err)
+			require.Equal(
+				map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+					ids.EmptyNodeID: {
+						NodeID: ids.EmptyNodeID,
+						Weight: registerWeight,
 					},
 				},
 				subnetValidators,
