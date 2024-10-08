@@ -255,5 +255,17 @@ var (
 			},
 			expectedDynamicFee: 131_800,
 		},
+		{
+			name:                 "IncreaseBalanceTx",
+			tx:                   "00000000002600003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f1f88b4e52000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001f61ea7e3bb6d33da9901644f3c623e4537b7d1c276e9ef23bcc8e4150e494d6600000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f1f88b510000000001000000000000000038e6e9fe31c6d070a8c792dbacf6d0aefb8eac2aded49cc0aa9f422d1fdd9ecd0000000000000002000000010000000900000001cb56b56387be9186d86430fad5418db4d13e991b6805b6ba178b719e3f47ce001da52d6ed3173bfdd8b69940a135432abce493a10332e881f6c34cea3617595e00",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 339, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicIncreaseBalanceTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicIncreaseBalanceTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   0, // TODO: implement
+			},
+			expectedDynamicFee: 113_900,
+		},
 	}
 )
