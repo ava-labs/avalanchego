@@ -724,7 +724,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 	if msg.Expiry > maxAllowedExpiry {
-		return fmt.Errorf("expected expiry to be before %d but got %d", maxAllowedExpiry, msg.Expiry)
+		return fmt.Errorf("expected expiry not to be after %d but got %d", maxAllowedExpiry, msg.Expiry)
 	}
 
 	pop := signer.ProofOfPossession{
