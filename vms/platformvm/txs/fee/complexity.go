@@ -63,7 +63,6 @@ const (
 		secp256k1.SignatureLen // signature length
 
 	intrinsicConvertSubnetValidatorBandwidth = wrappers.IntLen + // nodeID length
-		ids.NodeIDLen + // nodeID
 		wrappers.LongLen + // weight
 		wrappers.LongLen + // balance
 		wrappers.IntLen + // remaining balance owner threshold
@@ -362,6 +361,9 @@ func convertSubnetValidatorComplexity(sov *txs.ConvertSubnetValidator) (gas.Dime
 		return gas.Dimensions{}, err
 	}
 	return complexity.Add(
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(sov.NodeID)),
+		},
 		&signerComplexity,
 		&gas.Dimensions{
 			gas.Bandwidth: addressBandwidth,
