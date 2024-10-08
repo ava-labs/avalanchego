@@ -50,6 +50,7 @@ const (
 	genesisWeight   = units.Schmeckle
 	genesisBalance  = units.Avax
 	registerWeight  = genesisWeight / 10
+	updatedWeight   = 2 * registerWeight
 	registerBalance = 0
 )
 
