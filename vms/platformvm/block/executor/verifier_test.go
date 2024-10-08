@@ -1139,6 +1139,11 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 	require.NoError(t, err)
 
+	initialFeeState := gas.State{}
+	must := func(s gas.State, err error) gas.State {
+		require.NoError(t, err)
+		return s
+	}
 	tests := []struct {
 		name             string
 		timestamp        time.Time
@@ -1153,10 +1158,12 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 		{
 			name:      "updates fee state",
 			timestamp: genesistest.DefaultValidatorStartTime.Add(10 * time.Second),
-			expectedFeeState: gas.State{
-				Capacity: gas.Gas(0).AddPerSecond(verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond, 10) - blockGas,
-				Excess:   blockGas,
-			},
+			expectedFeeState: must(initialFeeState.AdvanceTime(
+				verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity,
+				verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond,
+				verifier.txExecutorBackend.Config.DynamicFeeConfig.TargetPerSecond,
+				10,
+			).ConsumeGas(blockGas)),
 		},
 	}
 	for _, test := range tests {
