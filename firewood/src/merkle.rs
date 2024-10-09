@@ -76,7 +76,12 @@ macro_rules! write_attributes {
                     write!($writer, " val={}", string)?
                 }
                 _ => {
-                    write!($writer, " val={}", hex::encode($value))?;
+                    let hex = hex::encode($value);
+                    if hex.len() > 6 {
+                        write!($writer, " val={:.6}...", hex)?;
+                    } else {
+                        write!($writer, " val={}", hex)?;
+                    }
                 }
             }
         }
@@ -341,7 +346,10 @@ impl<T: HashedNodeReader> Merkle<T> {
         seen: &mut HashSet<LinearAddress>,
         writer: &mut dyn Write,
     ) -> Result<(), MerkleError> {
-        write!(writer, "  {addr}[label=\"addr:{addr:?} hash:{hash:?}")?;
+        write!(writer, "  {addr}[label=\"addr:{addr:?}")?;
+        if let Some(hash) = hash {
+            write!(writer, " hash:{hash:.6?}...")?;
+        }
 
         match &*self.read_node(addr)? {
             Node::Branch(b) => {
@@ -378,7 +386,7 @@ impl<T: HashedNodeReader> Merkle<T> {
 
     pub fn dump(&self) -> Result<String, MerkleError> {
         let mut result = vec![];
-        writeln!(result, "digraph Merkle {{")?;
+        writeln!(result, "digraph Merkle {{\n  rankdir=LR;")?;
         if let Some((root_addr, root_hash)) = self.nodestore.root_address_and_hash()? {
             writeln!(result, " root -> {root_addr}")?;
             let mut seen = HashSet::new();

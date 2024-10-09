@@ -424,7 +424,7 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
             return Ok(Some((address, index as AreaIndex)));
         }
 
-        trace!("No free blocks of sufficient size {index} found");
+        trace!("No free blocks of sufficient size {index_wanted} found");
         counter!("firewood.space.notfree").increment(AREA_SIZES[index_wanted as usize]);
         Ok(None)
     }

@@ -8,6 +8,7 @@ pub mod create;
 pub mod delete;
 pub mod dump;
 pub mod get;
+pub mod graph;
 pub mod insert;
 pub mod root;
 
@@ -44,6 +45,8 @@ enum Commands {
     Root(root::Options),
     /// Dump contents of key/value store
     Dump(dump::Options),
+    /// Produce a dot file of the database
+    Graph(graph::Options),
 }
 
 #[tokio::main]
@@ -62,5 +65,6 @@ async fn main() -> Result<(), api::Error> {
         Commands::Delete(opts) => delete::run(opts).await,
         Commands::Root(opts) => root::run(opts).await,
         Commands::Dump(opts) => dump::run(opts).await,
+        Commands::Graph(opts) => graph::run(opts).await,
     }
 }

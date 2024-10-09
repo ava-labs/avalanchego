@@ -32,7 +32,8 @@ impl AsRef<[u8]> for TrieHash {
 
 impl Debug for TrieHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{}", hex::encode(self.0))
+        let width = f.precision().unwrap_or_default();
+        write!(f, "{:.*}", width, hex::encode(self.0))
     }
 }
 
