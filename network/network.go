@@ -410,9 +410,6 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	}
 
 	var errorReasons []string
-	if !isConnected {
-		errorReasons = append(errorReasons, fmt.Sprintf("not connected to a minimum of %d peer(s) only %d", n.config.HealthConfig.MinConnectedPeers, connectedTo))
-	}
 	if !msgReceived {
 		errorReasons = append(errorReasons, "no messages received from network")
 	} else if !wasMsgReceivedRecently {
