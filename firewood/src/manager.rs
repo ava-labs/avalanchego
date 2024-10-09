@@ -166,6 +166,7 @@ impl RevisionManager {
                 Err(original) => {
                     warn!("Oldest revision could not be reaped; still referenced");
                     self.historical.push_front(original);
+                    break;
                 }
             }
         }
