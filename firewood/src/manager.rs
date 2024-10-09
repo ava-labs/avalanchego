@@ -143,7 +143,7 @@ impl RevisionManager {
             return Err(RevisionManagerError::NotLatest);
         }
 
-        let committed = proposal.as_committed();
+        let mut committed = proposal.as_committed();
 
         // 2. Persist delete list for this committed revision to disk for recovery
 
@@ -162,7 +162,7 @@ impl RevisionManager {
             // This guarantee is there because we have a `&mut self` reference to the manager, so
             // the compiler guarantees we are the only one using this manager.
             match Arc::try_unwrap(oldest) {
-                Ok(oldest) => oldest.reap_deleted()?,
+                Ok(oldest) => oldest.reap_deleted(&mut committed)?,
                 Err(original) => {
                     warn!("Oldest revision could not be reaped; still referenced");
                     self.historical.push_front(original);
