@@ -360,7 +360,7 @@ func (u *unaryNode) Add(newChoice ids.ID) node {
 	newChild := &unaryNode{
 		tree:          u.tree,
 		preference:    newChoice,
-		decidedPrefix: index + 1,   // The new child assumes this branch has decided in it's favor
+		decidedPrefix: index + 1,   // The new child assumes this branch has decided in its favor
 		commonPrefix:  ids.NumBits, // The new child has no conflicts under this branch
 		snow:          newChildSnow,
 	}
