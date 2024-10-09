@@ -19,7 +19,34 @@ import (
 var (
 	ErrRequestPending = errors.New("request pending")
 	ErrNoPeers        = errors.New("no peers")
+
+	_ ClientInterface = (*Client)(nil)
 )
+
+type ClientInterface interface {
+	// AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
+	// If a specific node needs to be requested, use AppRequest instead.
+	// See AppRequest for more docs.
+	AppRequestAny(
+		ctx context.Context,
+		appRequestBytes []byte,
+		onResponse AppResponseCallback,
+	) error
+	// AppRequest issues an arbitrary request to a node.
+	// [onResponse] is invoked upon an error or a response.
+	AppRequest(
+		ctx context.Context,
+		nodeIDs set.Set[ids.NodeID],
+		appRequestBytes []byte,
+		onResponse AppResponseCallback,
+	) error
+	// AppGossip sends a gossip message to a random set of peers.
+	AppGossip(
+		ctx context.Context,
+		config common.SendConfig,
+		appGossipBytes []byte,
+	) error
+}
 
 // AppResponseCallback is called upon receiving an AppResponse for an AppRequest
 // issued by Client.
@@ -40,9 +67,6 @@ type Client struct {
 	options       *clientOptions
 }
 
-// AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
-// If a specific node needs to be requested, use AppRequest instead.
-// See AppRequest for more docs.
 func (c *Client) AppRequestAny(
 	ctx context.Context,
 	appRequestBytes []byte,
@@ -57,8 +81,6 @@ func (c *Client) AppRequestAny(
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
-// AppRequest issues an arbitrary request to a node.
-// [onResponse] is invoked upon an error or a response.
 func (c *Client) AppRequest(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
@@ -112,7 +134,6 @@ func (c *Client) AppRequest(
 	return nil
 }
 
-// AppGossip sends a gossip message to a random set of peers.
 func (c *Client) AppGossip(
 	ctx context.Context,
 	config common.SendConfig,
