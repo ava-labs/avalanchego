@@ -14,6 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
+const (
+	ResourceLabel   = "resource"
+	ValidatorsLabel = "validators"
+	GasLabel        = "gas"
+)
+
 var _ Metrics = (*metrics)(nil)
 
 type Metrics interface {
@@ -64,6 +70,29 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Help: "Amount (in nAVAX) of AVAX staked on the Primary Network",
 		}),
 
+		activeSoVs: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "active_sovs",
+			Help: "Number of active Subnet only Validators",
+		}),
+		gasConsumed: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "gas_consumed",
+			Help: "Cumulative amount of gas consumed by transactions",
+		}),
+		excess: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "excess",
+				Help: "Excess usage of a resource over the target usage",
+			},
+			[]string{ResourceLabel},
+		),
+		price: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "price",
+				Help: "Price (in nAVAX) of a resource",
+			},
+			[]string{ResourceLabel},
+		),
+
 		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "validator_sets_cached",
 			Help: "Total number of validator sets cached",
@@ -92,6 +121,11 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.localStake),
 		registerer.Register(m.totalStake),
 
+		registerer.Register(m.activeSoVs),
+		registerer.Register(m.gasConsumed),
+		registerer.Register(m.excess),
+		registerer.Register(m.price),
+
 		registerer.Register(m.validatorSetsCreated),
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
@@ -106,11 +140,19 @@ type metrics struct {
 
 	blockMetrics *blockMetrics
 
+	// Staking metrics
 	timeUntilUnstake       prometheus.Gauge
 	timeUntilSubnetUnstake *prometheus.GaugeVec
 	localStake             prometheus.Gauge
 	totalStake             prometheus.Gauge
 
+	// Fee metrics
+	activeSoVs  prometheus.Gauge
+	gasConsumed prometheus.Counter
+	excess      *prometheus.GaugeVec
+	price       *prometheus.GaugeVec
+
+	// Validator set diff metrics
 	validatorSetsCached     prometheus.Counter
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
