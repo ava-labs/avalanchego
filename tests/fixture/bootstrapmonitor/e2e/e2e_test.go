@@ -251,9 +251,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 		"SKIP_BUILD_RACE=1",
 	)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		require.FailNow("Image build failed: %v\nWith output: %s", err, output)
-	}
+	require.NoError(err, "Image build failed: %s", output)
 }
 
 // newNodeStatefulSet returns a statefulset for an avalanchego node.
