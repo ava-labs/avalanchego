@@ -8,6 +8,7 @@ firewood = { path = "../firewood" }
 hex = "0.4.3"
 clap = { version = "4.5.0", features = ['derive'] }
 sha2 = "0.10.8"
+metrics = "0.23.0"
 metrics-util = "0.17.0"
 metrics-exporter-prometheus = "0.15.3"
 tokio = { version = "1.36.0", features = ["rt", "sync", "macros", "rt-multi-thread"] }

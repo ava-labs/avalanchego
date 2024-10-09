@@ -18,7 +18,7 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
 use std::error::Error;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{Ipv6Addr, SocketAddr};
 use std::num::NonZeroUsize;
 use std::time::Duration;
 
@@ -37,6 +37,8 @@ struct Args {
     revisions: usize,
     #[arg(short = 'p', long, default_value_t = 3000)]
     prometheus_port: u16,
+    #[arg(short = 's', long, default_value_t = false)]
+    stats_dump: bool,
 
     #[clap(flatten)]
     global_opts: GlobalOpts,
@@ -113,18 +115,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .init();
 
+    // Manually set up prometheus
     let builder = PrometheusBuilder::new();
-    builder
+    let (prometheus_recorder, listener_future) = builder
         .with_http_listener(SocketAddr::new(
-            Ipv4Addr::UNSPECIFIED.into(),
+            Ipv6Addr::UNSPECIFIED.into(),
             args.prometheus_port,
         ))
         .idle_timeout(
             MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
             Some(Duration::from_secs(10)),
         )
-        .install()
+        .build()
         .expect("unable in run prometheusbuilder");
+
+    // Clone the handle so we can dump the stats at the end
+    let prometheus_handle = prometheus_recorder.handle();
+    metrics::set_global_recorder(prometheus_recorder)?;
+    tokio::spawn(listener_future);
 
     let mgrcfg = RevisionManagerConfig::builder()
         .node_cache_size(args.cache_size)
@@ -160,5 +168,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             runner.run(&db, &args).await?;
         }
     }
+
+    if args.stats_dump {
+        println!("{}", prometheus_handle.render());
+    }
+
     Ok(())
 }
