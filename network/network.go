@@ -410,11 +410,6 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 	}
 
 	var errorReasons []string
-	if !msgSent {
-		errorReasons = append(errorReasons, "no messages sent to network")
-	} else if !wasMsgSentRecently {
-		errorReasons = append(errorReasons, fmt.Sprintf("no messages from network sent in %s > %s", timeSinceLastMsgSent, n.config.HealthConfig.MaxTimeSinceMsgSent))
-	}
 
 	if !isMsgFailRate {
 		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
