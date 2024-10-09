@@ -17,6 +17,9 @@ service ValidatorState {
   // GetValidatorSet returns the weights of the nodeIDs for the provided
   // subnet at the requested P-chain height.
   rpc GetValidatorSet(GetValidatorSetRequest) returns (GetValidatorSetResponse);
+  // GetCurrentValidatorSet returns the weights of the nodeIDs for the provided
+  // subnet at the current P-chain height.
+  rpc GetCurrentValidatorSet(GetCurrentValidatorSetRequest) returns (GetCurrentValidatorSetResponse);
 }
 
 message GetMinimumHeightResponse {
@@ -40,12 +43,31 @@ message GetValidatorSetRequest {
   bytes subnet_id = 2;
 }
 
+message GetCurrentValidatorSetRequest {
+  bytes subnet_id = 1;
+}
+
 message Validator {
   bytes node_id = 1;
   uint64 weight = 2;
   bytes public_key = 3;
 }
 
+message CurrentValidator {
+  bytes node_id = 1;
+  uint64 weight = 2;
+  bytes public_key = 3;
+  uint64 start_time = 4;
+  uint64 set_weight_nonce = 5;
+  bool is_active = 6;
+  bytes validation_id = 7;
+}
+
 message GetValidatorSetResponse {
   repeated Validator validators = 1;
+}
+
+message GetCurrentValidatorSetResponse {
+  repeated CurrentValidator validators = 1;
+  uint64 current_height = 2;
 }
