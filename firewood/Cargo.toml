@@ -16,7 +16,7 @@ homepage = "https://avalabs.org"
 readme = "../README.md"
 
 [dependencies]
-aquamarine = "0.5.0"
+aquamarine = "0.6.0"
 async-trait = "0.1.77"
 storage = { version = "0.0.4", path = "../storage" }
 futures = "0.3.30"
