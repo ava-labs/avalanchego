@@ -20,6 +20,7 @@ use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use firewood::db::{BatchOp, Db, DbConfig};
@@ -60,6 +61,15 @@ struct GlobalOpts {
         default_value_t = String::from("info"),
     )]
     log_level: String,
+    #[arg(
+        long,
+        short = 'd',
+        required = false,
+        help = "Use this database name instead of the default",
+        value_name = "TRUNCATE",
+        default_value = PathBuf::from("benchmark_db").into_os_string(),
+    )]
+    dbname: PathBuf,
 }
 
 mod create;
@@ -146,7 +156,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .manager(mgrcfg)
         .build();
 
-    let db = Db::new("rev_db", cfg)
+    let db = Db::new(args.global_opts.dbname.clone(), cfg)
         .await
         .expect("db initiation should succeed");
 

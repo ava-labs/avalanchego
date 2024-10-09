@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 firewood = { path = "../firewood" }
 hex = "0.4.3"
-clap = { version = "4.5.0", features = ['derive'] }
+clap = { version = "4.5.0", features = ['derive', 'string'] }
 sha2 = "0.10.8"
 metrics = "0.23.0"
 metrics-util = "0.17.0"
