@@ -431,10 +431,6 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 	return e.executeDeferredWork(ctx)
 }
 
-func (*Engine) Timeout(context.Context) error {
-	return nil
-}
-
 func (e *Engine) Shutdown(ctx context.Context) error {
 	e.Ctx.Log.Info("shutting down consensus engine")
 

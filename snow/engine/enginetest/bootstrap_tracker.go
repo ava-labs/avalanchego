@@ -54,7 +54,7 @@ func (s *BootstrapTracker) Bootstrapped(chainID ids.ID) {
 	}
 }
 
-func (s *BootstrapTracker) OnBootstrapCompleted() chan struct{} {
+func (s *BootstrapTracker) AllBootstrapped() <-chan struct{} {
 	if s.OnBootstrapCompletedF != nil {
 		return s.OnBootstrapCompletedF()
 	} else if s.CantOnBootstrapCompleted && s.T != nil {
