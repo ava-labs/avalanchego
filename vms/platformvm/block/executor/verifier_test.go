@@ -132,6 +132,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	}
 
 	blkTx := txsmock.NewUnsignedTx(ctrl)
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.WarpVerifier{})).Return(nil).Times(1)
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
 
 	// We can't serialize [blkTx] because it isn't
@@ -214,6 +215,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txsmock.NewUnsignedTx(ctrl)
 	inputs := set.Of(ids.GenerateTestID())
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.WarpVerifier{})).Return(nil).Times(1)
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
@@ -306,6 +308,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			},
 		},
 	}
+	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.WarpVerifier{})).Return(nil).Times(1)
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
 		func(e *executor.StandardTxExecutor) error {
 			e.OnAccept = func() {}
