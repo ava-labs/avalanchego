@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -28,6 +27,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -47,6 +49,9 @@ var (
 	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators     = errors.New("already at the max number of active validators")
+	errRemovingLastValidator      = errors.New("attempting to remove the last SoV from a converted subnet")
+
+	errStateCorruption = errors.New("state corruption")
 )
 
 type StandardTxExecutor struct {
@@ -585,12 +590,12 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 				return errMaxNumActiveValidators
 			}
 
-			sov.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			sov.EndAccumulatedFee, err = safemath.Add(vdr.Balance, currentFees)
 			if err != nil {
 				return err
 			}
 
-			fee, err = math.Add(fee, vdr.Balance)
+			fee, err = safemath.Add(fee, vdr.Balance)
 			if err != nil {
 				return err
 			}
@@ -657,7 +662,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
-	fee, err = math.Add(fee, tx.Balance)
+	fee, err = safemath.Add(fee, tx.Balance)
 	if err != nil {
 		return err
 	}
@@ -711,7 +716,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
 	}
-	maxAllowedExpiry, err := math.Add(currentTimestampUnix, RegisterSubnetValidatorTxExpiryWindow)
+	maxAllowedExpiry, err := safemath.Add(currentTimestampUnix, RegisterSubnetValidatorTxExpiryWindow)
 	if err != nil {
 		// This should never happen, as it would imply that either
 		// currentTimestampUnix or RegisterSubnetValidatorTxExpiryWindow is
@@ -777,7 +782,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		}
 
 		currentFees := e.State.GetAccruedFees()
-		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
+		sov.EndAccumulatedFee, err = safemath.Add(tx.Balance, currentFees)
 		if err != nil {
 			return err
 		}
@@ -795,6 +800,146 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	avax.Produce(e.State, txID, tx.Outs)
 	// Prevent this warp message from being replayed
 	e.State.PutExpiry(expiry)
+	return nil
+}
+
+func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	warpMessage, err := warp.ParseMessage(tx.Message)
+	if err != nil {
+		return err
+	}
+	if warpMessage.NetworkID != e.Ctx.NetworkID {
+		return fmt.Errorf("expected networkID %d but got %d", e.Ctx.NetworkID, warpMessage.NetworkID)
+	}
+
+	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
+	if err != nil {
+		return err
+	}
+
+	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
+	if err != nil {
+		return err
+	}
+	if err := msg.Verify(); err != nil {
+		return err
+	}
+
+	sov, err := e.State.GetSubnetOnlyValidator(msg.ValidationID)
+	if err != nil {
+		return err
+	}
+	if msg.Nonce < sov.MinNonce {
+		return fmt.Errorf("expected nonce to be at least %d but got %d", sov.MinNonce, msg.Nonce)
+	}
+
+	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(sov.SubnetID)
+	if err != nil {
+		return err
+	}
+	if warpMessage.SourceChainID != expectedChainID {
+		return fmt.Errorf("expected chainID %s but got %s", expectedChainID, warpMessage.SourceChainID)
+	}
+	if !bytes.Equal(addressedCall.SourceAddress, expectedAddress) {
+		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
+	}
+
+	txID := e.Tx.ID()
+
+	// We are removing the validator
+	if msg.Weight == 0 {
+		weight, err := e.State.WeightOfSubnetOnlyValidators(sov.SubnetID)
+		if err != nil {
+			return err
+		}
+		if weight == sov.Weight {
+			return errRemovingLastValidator
+		}
+
+		// The validator is currently active, we need to refund the remaining
+		// balance.
+		if sov.EndAccumulatedFee != 0 {
+			var remainingBalanceOwner message.PChainOwner
+			if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+				return err
+			}
+
+			accruedFees := e.State.GetAccruedFees()
+			if sov.EndAccumulatedFee <= accruedFees {
+				// This check should be unreachable. However, including it ensures
+				// that AVAX can't get minted out of thin air due to state
+				// corruption.
+				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
+			}
+			remainingBalance := sov.EndAccumulatedFee - accruedFees
+
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: uint32(len(tx.Outs)),
+				},
+				Asset: avax.Asset{
+					ID: e.Ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: remainingBalance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: remainingBalanceOwner.Threshold,
+						Addrs:     remainingBalanceOwner.Addresses,
+					},
+				},
+			}
+			e.State.AddUTXO(utxo)
+		}
+	}
+
+	// If the weight is being set to 0, the validator is being removed and the
+	// nonce doesn't matter.
+	sov.MinNonce = msg.Nonce + 1
+	sov.Weight = msg.Weight
+	if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
 	return nil
 }
 
