@@ -1198,8 +1198,9 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			}
 
 			require.Contains(verifier.blkIDToState, blkID)
-			onAcceptState := verifier.blkIDToState[blkID].onAcceptState
-			require.Equal(test.expectedFeeState, onAcceptState.GetFeeState())
+			blockState := verifier.blkIDToState[blkID]
+			require.Equal(blk, blockState.statelessBlock)
+			require.Equal(test.expectedFeeState, blockState.onAcceptState.GetFeeState())
 		})
 	}
 }
