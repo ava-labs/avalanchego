@@ -1167,7 +1167,11 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			clear(verifier.blkIDToState)
 
 			verifier.txExecutorBackend.Clk.Set(test.timestamp)
-			timestamp, _, err := state.NextBlockTime(s, verifier.txExecutorBackend.Clk)
+			timestamp, _, err := state.NextBlockTime(
+				verifier.txExecutorBackend.Config.ValidatorFeeConfig,
+				s,
+				verifier.txExecutorBackend.Clk,
+			)
 			require.NoError(err)
 
 			lastAcceptedID := s.GetLastAccepted()

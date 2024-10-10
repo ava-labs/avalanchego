@@ -10,9 +10,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 var (
@@ -30,6 +33,7 @@ var (
 //   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
 //     are skipped.
 func VerifyNewChainTime(
+	config fee.Config,
 	newChainTime time.Time,
 	now time.Time,
 	currentState state.Chain,
@@ -57,7 +61,11 @@ func VerifyNewChainTime(
 
 	// nextStakerChangeTime is calculated last to ensure that the function is
 	// able to be calculated efficiently.
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(currentState, newChainTime)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		config,
+		currentState,
+		newChainTime,
+	)
 	if err != nil {
 		return fmt.Errorf("could not verify block timestamp: %w", err)
 	}
@@ -213,20 +221,6 @@ func advanceTimeTo(
 		changed = true
 	}
 
-	if backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
-		previousChainTime := changes.GetTimestamp()
-		duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
-
-		feeState := changes.GetFeeState()
-		feeState = feeState.AdvanceTime(
-			backend.Config.DynamicFeeConfig.MaxCapacity,
-			backend.Config.DynamicFeeConfig.MaxPerSecond,
-			backend.Config.DynamicFeeConfig.TargetPerSecond,
-			duration,
-		)
-		changes.SetFeeState(feeState)
-	}
-
 	// Remove all expiries whose timestamp now implies they can never be
 	// re-issued.
 	//
@@ -257,6 +251,67 @@ func advanceTimeTo(
 		changes.DeleteExpiry(expiry)
 	}
 
+	if !backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
+		changes.SetTimestamp(newChainTime)
+		return changes, changed, nil
+	}
+
+	// Advance the dynamic fees state
+	previousChainTime := changes.GetTimestamp()
+	duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+	dynamicFeeState := changes.GetFeeState()
+	dynamicFeeState = dynamicFeeState.AdvanceTime(
+		backend.Config.DynamicFeeConfig.MaxCapacity,
+		backend.Config.DynamicFeeConfig.MaxPerSecond,
+		backend.Config.DynamicFeeConfig.TargetPerSecond,
+		duration,
+	)
+	changes.SetFeeState(dynamicFeeState)
+
+	validatorFeeState := fee.State{
+		Current: gas.Gas(changes.NumActiveSubnetOnlyValidators()),
+		Excess:  changes.GetSoVExcess(),
+	}
+	validatorCost := validatorFeeState.CostOf(
+		backend.Config.ValidatorFeeConfig,
+		duration,
+	)
+
+	accruedFees := changes.GetAccruedFees()
+	accruedFees, err = math.Add(accruedFees, validatorCost)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Invariant: It is not safe to modify the state while iterating over it,
+	// so we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
+	sovIterator, err := parentState.GetActiveSubnetOnlyValidatorsIterator()
+	if err != nil {
+		return nil, false, err
+	}
+	defer sovIterator.Release()
+
+	for sovIterator.Next() {
+		sov := sovIterator.Value()
+		if sov.EndAccumulatedFee > accruedFees {
+			break
+		}
+
+		sov.EndAccumulatedFee = 0 // Deactivate the validator
+		if err := changes.PutSubnetOnlyValidator(sov); err != nil {
+			return nil, false, err
+		}
+		changed = true
+	}
+
+	validatorFeeState = validatorFeeState.AdvanceTime(
+		backend.Config.ValidatorFeeConfig.Target,
+		duration,
+	)
+	changes.SetSoVExcess(validatorFeeState.Excess)
+	changes.SetAccruedFees(accruedFees)
 	changes.SetTimestamp(newChainTime)
 	return changes, changed, nil
 }

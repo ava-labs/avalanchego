@@ -129,9 +129,8 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		), nil
 	}).AnyTimes()
 
-	// no pending stakers
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-	// no expiries
+	onParentAccept.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(iterator.Empty[state.SubnetOnlyValidator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
