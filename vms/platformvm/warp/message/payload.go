@@ -43,7 +43,7 @@ func Parse(bytes []byte) (Payload, error) {
 	return p, nil
 }
 
-func initialize(p Payload) error {
+func Initialize(p Payload) error {
 	bytes, err := Codec.Marshal(CodecVersion, &p)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal %T payload: %w", p, err)

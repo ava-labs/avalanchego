@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/vms/platformvm/network"
 )
 
 // Requires all values in a struct to be initialized
@@ -62,7 +60,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		require := require.New(t)
 
 		expected := &ExecutionConfig{
-			Network: network.Config{
+			Network: NetworkConfig{
 				MaxValidatorSetStaleness:                    1,
 				TargetGossipSize:                            2,
 				PushGossipPercentStake:                      .3,
