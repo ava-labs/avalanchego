@@ -32,8 +32,9 @@ impl TestRunner for Zipf {
         let rows = (args.number_of_batches * args.batch_size) as usize;
         let zipf = zipf::ZipfDistribution::new(rows, exponent).unwrap();
         let start = Instant::now();
+        let mut batch_id = 0;
 
-        for batch_id in 0.. {
+        while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
             let batch: Vec<BatchOp<_, _>> =
                 generate_updates(batch_id, args.batch_size as usize, &zipf).collect();
             if log::log_enabled!(log::Level::Debug) {
@@ -62,8 +63,9 @@ impl TestRunner for Zipf {
                     pretty_duration(&start.elapsed(), None)
                 );
             }
+            batch_id += 1;
         }
-        unreachable!()
+        Ok(())
     }
 }
 fn generate_updates(

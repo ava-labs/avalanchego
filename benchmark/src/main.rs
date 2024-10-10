@@ -70,6 +70,15 @@ struct GlobalOpts {
         default_value = PathBuf::from("benchmark_db").into_os_string(),
     )]
     dbname: PathBuf,
+    #[arg(
+        long,
+        short = 't',
+        required = false,
+        help = "Terminate the test after this many minutes",
+        value_name = "TRUNCATE",
+        default_value_t = 65
+    )]
+    duration_minutes: u64,
 }
 
 mod create;

@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use std::error::Error;
+use std::time::Instant;
 
 use firewood::db::{BatchOp, Db};
 use firewood::logger::debug;
@@ -19,7 +20,9 @@ impl TestRunner for TenKRandom {
         let mut high = args.number_of_batches * args.batch_size;
         let twenty_five_pct = args.batch_size / 4;
 
-        loop {
+        let start = Instant::now();
+
+        while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
             let batch: Vec<BatchOp<_, _>> = Self::generate_inserts(high, twenty_five_pct)
                 .chain(generate_deletes(low, twenty_five_pct))
                 .chain(generate_updates(low + high / 2, twenty_five_pct * 2, low))
@@ -29,6 +32,7 @@ impl TestRunner for TenKRandom {
             low += twenty_five_pct;
             high += twenty_five_pct;
         }
+        Ok(())
     }
 }
 fn generate_updates(

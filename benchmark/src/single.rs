@@ -14,11 +14,12 @@ use std::time::Instant;
 pub struct Single;
 
 impl TestRunner for Single {
-    async fn run(&self, db: &Db, _args: &crate::Args) -> Result<(), Box<dyn Error>> {
+    async fn run(&self, db: &Db, args: &crate::Args) -> Result<(), Box<dyn Error>> {
         let start = Instant::now();
         let inner_key = Sha256::digest(0u64.to_ne_bytes()).to_vec();
+        let mut batch_id = 0;
 
-        for batch_id in 0.. {
+        while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
             let batch = vec![BatchOp::Put {
                 key: inner_key.clone(),
                 value: vec![batch_id as u8],
@@ -33,7 +34,8 @@ impl TestRunner for Single {
                     pretty_duration(&start.elapsed(), None)
                 );
             }
+            batch_id += 1;
         }
-        unreachable!()
+        Ok(())
     }
 }
