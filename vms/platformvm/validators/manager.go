@@ -24,10 +24,11 @@ import (
 )
 
 const (
-	validatorSetsCacheSize        = 64
-	maxRecentlyAcceptedWindowSize = 64
-	minRecentlyAcceptedWindowSize = 0
-	recentlyAcceptedWindowTTL     = 30 * time.Second
+	validatorSetsCacheSize         = 64
+	maxRecentlyAcceptedWindowSize  = 64
+	minRecentlyAcceptedWindowSize  = 0
+	recentlyAcceptedWindowTTL      = 30 * time.Second
+	recentlyAcceptedEvictFrequency = 1 * time.Second
 )
 
 var (
@@ -95,21 +96,24 @@ func NewManager(
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
+	recentlyAccepted := window.New[ids.ID](
+		window.Config{
+			Clock:   clk,
+			MaxSize: maxRecentlyAcceptedWindowSize,
+			MinSize: minRecentlyAcceptedWindowSize,
+			TTL:     recentlyAcceptedWindowTTL,
+		},
+	)
+	go recentlyAccepted.EvictEvery(context.Background(), recentlyAcceptedEvictFrequency)
+
 	return &manager{
-		log:     log,
-		cfg:     cfg,
-		state:   state,
-		metrics: metrics,
-		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
-		recentlyAccepted: window.New[ids.ID](
-			window.Config{
-				Clock:   clk,
-				MaxSize: maxRecentlyAcceptedWindowSize,
-				MinSize: minRecentlyAcceptedWindowSize,
-				TTL:     recentlyAcceptedWindowTTL,
-			},
-		),
+		log:              log,
+		cfg:              cfg,
+		state:            state,
+		metrics:          metrics,
+		clk:              clk,
+		caches:           make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		recentlyAccepted: recentlyAccepted,
 	}
 }
 

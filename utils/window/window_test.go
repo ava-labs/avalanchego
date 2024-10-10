@@ -4,6 +4,7 @@
 package window
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,8 +14,9 @@ import (
 )
 
 const (
-	testTTL     = 10 * time.Second
-	testMaxSize = 10
+	testTTL            = 10 * time.Second
+	testMaxSize        = 10
+	testEvictFrequency = 100 * time.Millisecond
 )
 
 // TestAdd tests that elements are populated as expected, ignoring
@@ -274,4 +276,68 @@ func TestMinCapacity(t *testing.T) {
 	oldest, ok := window.Oldest()
 	require.True(ok)
 	require.Equal(3, oldest)
+}
+
+// Tests timed eviction of elements using [EvictEvery] method
+func TestEvictEvery(t *testing.T) {
+	require := require.New(t)
+
+	clock := &mockable.Clock{}
+	start := time.Now()
+	clock.Set(start)
+
+	window := New[int](
+		Config{
+			Clock:   clock,
+			MaxSize: 3,
+			MinSize: 0,
+			TTL:     testTTL,
+		},
+	)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	go window.EvictEvery(ctx, testEvictFrequency)
+
+	// Now the window looks like this:
+	// [1, 2] at time 0
+	window.Add(1)
+	window.Add(2)
+
+	// Add 3 to the window with a later TTL
+	clock.Set(start.Add(testTTL - time.Second))
+	window.Add(3)
+
+	require.Equal(3, window.Length())
+
+	// Set the time to 1 second past the ttl of 10 seconds as defined in testTTL
+	// and sleep for twice the evict interval to ensure that it has ticked.
+	clock.Set(start.Add(testTTL + time.Second))
+	time.Sleep(2 * testEvictFrequency)
+
+	// Now the window should look like this:
+	// [3]
+	require.Equal(1, window.Length())
+	oldest, ok := window.Oldest()
+	require.True(ok)
+	require.Equal(3, oldest)
+
+	// Set the time to 20 seconds to expire the last element as well.
+	clock.Set(start.Add(2 * testTTL))
+	time.Sleep(2 * testEvictFrequency)
+	require.Equal(0, window.Length())
+	_, ok = window.Oldest()
+	require.False(ok)
+
+	// Cancel the context to stop the eviction goroutine
+	cancelFunc()
+
+	// Add 4 to the window and ensure that it is not evicted
+	window.Add(4)
+	clock.Set(start.Add(3*testTTL + time.Second))
+	time.Sleep(2 * testEvictFrequency)
+
+	require.Equal(1, window.Length())
+	oldest, ok = window.Oldest()
+	require.True(ok)
+	require.Equal(4, oldest)
 }

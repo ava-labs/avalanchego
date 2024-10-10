@@ -44,7 +44,7 @@ func (v *Validator) Compare(o *Validator) int {
 }
 
 // GetCanonicalValidatorSet returns the validator set of [subnetID] at
-// [pChcainHeight] in a canonical ordering. Also returns the total weight on
+// [pChainHeight] in a canonical ordering. Also returns the total weight on
 // [subnetID].
 func GetCanonicalValidatorSet(
 	ctx context.Context,
