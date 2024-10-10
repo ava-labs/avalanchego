@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -72,7 +74,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onDecisionState)
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+	inputs, atomicRequests, onAcceptFunc, gasConsumed, err := v.processStandardTxs(
 		b.Transactions,
 		feeCalculator,
 		onDecisionState,
@@ -96,6 +98,7 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		b,
 		b.Tx,
 		onDecisionState,
+		gasConsumed,
 		onCommitState,
 		onAbortState,
 		feeCalculator,
@@ -178,6 +181,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		b,
 		b.Tx,
 		nil,
+		0,
 		onCommitState,
 		onAbortState,
 		feeCalculator,
@@ -262,6 +266,12 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
 		atomicRequests:  atomicExecutor.AtomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
+		metrics: calculateBlockMetrics(
+			v.txExecutorBackend.Config,
+			b,
+			atomicExecutor.OnAccept,
+			0,
+		),
 	}
 	return nil
 }
@@ -361,6 +371,12 @@ func (v *verifier) abortBlock(b block.Block) error {
 		onAcceptState:   onAbortState,
 		timestamp:       onAbortState.GetTimestamp(),
 		verifiedHeights: set.Of(v.pChainHeight),
+		metrics: calculateBlockMetrics(
+			v.txExecutorBackend.Config,
+			b,
+			onAbortState,
+			0,
+		),
 	}
 	return nil
 }
@@ -379,6 +395,12 @@ func (v *verifier) commitBlock(b block.Block) error {
 		onAcceptState:   onCommitState,
 		timestamp:       onCommitState.GetTimestamp(),
 		verifiedHeights: set.Of(v.pChainHeight),
+		metrics: calculateBlockMetrics(
+			v.txExecutorBackend.Config,
+			b,
+			onCommitState,
+			0,
+		),
 	}
 	return nil
 }
@@ -388,6 +410,7 @@ func (v *verifier) proposalBlock(
 	b block.Block,
 	tx *txs.Tx,
 	onDecisionState state.Diff,
+	gasConsumed gas.Gas,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
 	feeCalculator fee.Calculator,
@@ -433,6 +456,12 @@ func (v *verifier) proposalBlock(
 		timestamp:       onAbortState.GetTimestamp(),
 		atomicRequests:  atomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
+		metrics: calculateBlockMetrics(
+			v.txExecutorBackend.Config,
+			b,
+			onCommitState,
+			gasConsumed,
+		),
 	}
 	return nil
 }
@@ -444,7 +473,7 @@ func (v *verifier) standardBlock(
 	feeCalculator fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+	inputs, atomicRequests, onAcceptFunc, gasConsumed, err := v.processStandardTxs(
 		txs,
 		feeCalculator,
 		onAcceptState,
@@ -467,6 +496,12 @@ func (v *verifier) standardBlock(
 		inputs:          inputs,
 		atomicRequests:  atomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
+		metrics: calculateBlockMetrics(
+			v.txExecutorBackend.Config,
+			b,
+			onAcceptState,
+			gasConsumed,
+		),
 	}
 	return nil
 }
@@ -475,11 +510,15 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
+	gas.Gas,
 	error,
 ) {
 	// Complexity is limited first to avoid processing too large of a block.
-	timestamp := diff.GetTimestamp()
-	isEtna := v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp)
+	var (
+		timestamp   = diff.GetTimestamp()
+		isEtna      = v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp)
+		gasConsumed gas.Gas
+	)
 	if isEtna {
 		var blockComplexity gas.Dimensions
 		for _, tx := range txs {
@@ -487,26 +526,27 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 			if err != nil {
 				txID := tx.ID()
 				v.MarkDropped(txID, err)
-				return nil, nil, nil, err
+				return nil, nil, nil, 0, err
 			}
 
 			blockComplexity, err = blockComplexity.Add(&txComplexity)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, 0, err
 			}
 		}
 
-		blockGas, err := blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		var err error
+		gasConsumed, err = blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, 0, err
 		}
 
 		// If this block exceeds the available capacity, ConsumeGas will return
 		// an error.
 		feeState := diff.GetFeeState()
-		feeState, err = feeState.ConsumeGas(blockGas)
+		feeState, err = feeState.ConsumeGas(gasConsumed)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, 0, err
 		}
 
 		// Updating the fee state prior to executing the transactions is fine
@@ -530,11 +570,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
-			return nil, nil, nil, err
+			return nil, nil, nil, 0, err
 		}
 		// ensure it doesn't overlap with current input batch
 		if inputs.Overlaps(txExecutor.Inputs) {
-			return nil, nil, nil, ErrConflictingBlockTxs
+			return nil, nil, nil, 0, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
 		inputs.Union(txExecutor.Inputs)
@@ -575,13 +615,13 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 		)
 		potentialAccruedFees, err := math.Add(accruedFees, potentialCost)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, 0, err
 		}
 
 		// Invariant: Proposal transactions do not impact SoV state.
 		sovIterator, err := diff.GetActiveSubnetOnlyValidatorsIterator()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, 0, err
 		}
 
 		var sovsToDeactivate []state.SubnetOnlyValidator
@@ -603,13 +643,13 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 		for _, sov := range sovsToDeactivate {
 			sov.EndAccumulatedFee = 0
 			if err := diff.PutSubnetOnlyValidator(sov); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, 0, err
 			}
 		}
 	}
 
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, 0, err
 	}
 
 	if numFuncs := len(funcs); numFuncs == 1 {
@@ -622,5 +662,36 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 		}
 	}
 
-	return inputs, atomicRequests, onAcceptFunc, nil
+	return inputs, atomicRequests, onAcceptFunc, gasConsumed, nil
+}
+
+func calculateBlockMetrics(
+	config *config.Config,
+	blk block.Block,
+	s state.Chain,
+	gasConsumed gas.Gas,
+) metrics.Block {
+	var (
+		gasState        = s.GetFeeState()
+		validatorExcess = s.GetSoVExcess()
+	)
+	return metrics.Block{
+		Block: blk,
+
+		GasConsumed: gasConsumed,
+		GasState:    gasState,
+		GasPrice: gas.CalculatePrice(
+			config.DynamicFeeConfig.MinPrice,
+			gasState.Excess,
+			config.DynamicFeeConfig.ExcessConversionConstant,
+		),
+
+		ActiveSoVs:      s.NumActiveSubnetOnlyValidators(),
+		ValidatorExcess: validatorExcess,
+		ValidatorPrice: gas.CalculatePrice(
+			config.ValidatorFeeConfig.MinPrice,
+			validatorExcess,
+			config.ValidatorFeeConfig.ExcessConversionConstant,
+		),
+	}
 }
