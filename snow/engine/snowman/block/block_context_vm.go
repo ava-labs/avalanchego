@@ -14,8 +14,10 @@ import (
 type Context struct {
 	// PChainHeight is the height that this block will use to verify it's state.
 	// In the proposervm, blocks verify the proposer based on the P-chain height
-	// recorded in the parent block. The P-chain height provided here is also
-	// the parent's P-chain height, not this block's P-chain height.
+	// recorded in the parent block. However, the P-chain height provided here
+	// is the P-chain height encoded into this block.
+	//
+	// Pre-Etna this value matched the parent block's P-chain height.
 	//
 	// Because PreForkBlocks and PostForkOptions do not verify their execution
 	// against the P-chain's state, this context is undefined for those blocks.
