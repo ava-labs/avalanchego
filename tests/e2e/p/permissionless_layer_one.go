@@ -588,6 +588,27 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 		})
 
+		tc.By("issuing an DisableSubnetValidatorTx", func() {
+			_, err := pWallet.IssueDisableSubnetValidatorTx(
+				registerValidationID,
+			)
+			require.NoError(err)
+		})
+
+		tc.By("verifying the validator was deactivated", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+				ids.EmptyNodeID: {
+					NodeID: ids.EmptyNodeID,
+					Weight: updatedWeight,
+				},
+			})
+		})
+
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("removing the registered validator", func() {
