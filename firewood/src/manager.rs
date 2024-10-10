@@ -25,7 +25,7 @@ pub struct RevisionManagerConfig {
     #[builder(default_code = "NonZero::new(1500000).expect(\"non-zero\")")]
     node_cache_size: NonZero<usize>,
 
-    #[builder(default_code = "NonZero::new(20000).expect(\"non-zero\")")]
+    #[builder(default_code = "NonZero::new(40000).expect(\"non-zero\")")]
     free_list_cache_size: NonZero<usize>,
 }
 

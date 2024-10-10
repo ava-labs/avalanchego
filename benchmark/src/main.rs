@@ -66,7 +66,6 @@ struct GlobalOpts {
         short = 'd',
         required = false,
         help = "Use this database name instead of the default",
-        value_name = "TRUNCATE",
         default_value = PathBuf::from("benchmark_db").into_os_string(),
     )]
     dbname: PathBuf,
@@ -75,7 +74,6 @@ struct GlobalOpts {
         short = 't',
         required = false,
         help = "Terminate the test after this many minutes",
-        value_name = "TRUNCATE",
         default_value_t = 65
     )]
     duration_minutes: u64,
@@ -156,7 +154,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mgrcfg = RevisionManagerConfig::builder()
         .node_cache_size(args.cache_size)
         .free_list_cache_size(
-            NonZeroUsize::new(2 * args.batch_size as usize).expect("batch size > 0"),
+            NonZeroUsize::new(4 * args.batch_size as usize).expect("batch size > 0"),
         )
         .max_revisions(args.revisions)
         .build();
