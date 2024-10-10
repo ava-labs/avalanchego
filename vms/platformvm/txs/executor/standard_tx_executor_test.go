@@ -913,7 +913,12 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	onAcceptState.SetSubnetManager(subnetID, ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'})
+	onAcceptState.SetSubnetConversion(
+		subnetID,
+		ids.GenerateTestID(),
+		ids.GenerateTestID(),
+		[]byte{'a', 'd', 'd', 'r', 'e', 's', 's'},
+	)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
@@ -1994,7 +1999,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			name: "attempted to remove subnet validator after subnet manager is set",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}, nil).AnyTimes()
+				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}, nil).AnyTimes()
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
 				cfg := &config.Config{
@@ -2245,7 +2250,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
-				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(1)
+				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(ids.Empty, ids.Empty, nil, database.ErrNotFound).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
 				env.flowChecker.EXPECT().VerifySpend(
@@ -2284,7 +2289,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), make([]byte, 20), nil)
+				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), ids.GenerateTestID(), make([]byte, 20), nil)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
@@ -2319,7 +2324,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetManager(env.unsignedTx.Subnet).Return(ids.Empty, nil, database.ErrNotFound).Times(1)
+				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(ids.Empty, ids.Empty, nil, database.ErrNotFound).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 				env.flowChecker.EXPECT().VerifySpend(
@@ -2478,7 +2483,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "invalid if subnet is converted",
 			updateExecutor: func(e *StandardTxExecutor) {
-				e.State.SetSubnetManager(subnetID, ids.GenerateTestID(), nil)
+				e.State.SetSubnetConversion(subnetID, ids.GenerateTestID(), ids.GenerateTestID(), nil)
 			},
 			expectedErr: errIsImmutable,
 		},
@@ -2566,8 +2571,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			stateChainID, stateAddress, err := diff.GetSubnetManager(subnetID)
+			// TODO: Populate the conversionID
+			stateConversionID, stateChainID, stateAddress, err := diff.GetSubnetConversion(subnetID)
 			require.NoError(err)
+			require.Zero(stateConversionID)
 			require.Equal(chainID, stateChainID)
 			require.Equal(address, stateAddress)
 		})

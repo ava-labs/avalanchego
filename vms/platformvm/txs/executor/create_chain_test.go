@@ -286,7 +286,12 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
-	stateDiff.SetSubnetManager(subnetID, ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'})
+	stateDiff.SetSubnetConversion(
+		subnetID,
+		ids.GenerateTestID(),
+		ids.GenerateTestID(),
+		[]byte{'a', 'd', 'd', 'r', 'e', 's', 's'},
+	)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
 	executor := StandardTxExecutor{

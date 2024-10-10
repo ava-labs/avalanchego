@@ -440,6 +440,7 @@ type GetSubnetResponse struct {
 	// subnet transformation tx ID for an elastic subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
 	// subnet manager information for a permissionless L1
+	ConversionID   ids.ID              `json:"conversionID"`
 	ManagerChainID ids.ID              `json:"managerChainID"`
 	ManagerAddress types.JSONByteSlice `json:"managerAddress"`
 }
@@ -490,12 +491,14 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return err
 	}
 
-	switch chainID, addr, err := s.vm.state.GetSubnetManager(args.SubnetID); err {
+	switch conversionID, chainID, addr, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
 	case nil:
 		response.IsPermissioned = false
+		response.ConversionID = conversionID
 		response.ManagerChainID = chainID
 		response.ManagerAddress = addr
 	case database.ErrNotFound:
+		response.ConversionID = ids.Empty
 		response.ManagerChainID = ids.Empty
 		response.ManagerAddress = []byte(nil)
 	default:
