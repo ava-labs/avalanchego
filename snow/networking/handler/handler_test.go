@@ -99,11 +99,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		called <- struct{}{}
 		return nil
 	}
-	handler.SetEngineManager(&EngineManager{
-		Snowman: &Engine{
-			Bootstrapper: bootstrapper,
-		},
-	})
+	handler.SetEngine(bootstrapper)
+
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
@@ -213,12 +210,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		return ctx
 	}
 
-	handler.SetEngineManager(&EngineManager{
-		Snowman: &Engine{
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	handler.SetEngine(bootstrapper)
 
 	// assume bootstrapping is ongoing so that InboundGetAcceptedFrontier
 	// should normally be handled
@@ -307,11 +299,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		closed <- struct{}{}
 		return nil
 	}
-	handler.SetEngineManager(&EngineManager{
-		Snowman: &Engine{
-			Bootstrapper: bootstrapper,
-		},
-	})
+
+	handler.SetEngine(bootstrapper)
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
@@ -401,12 +390,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 
-	handler.SetEngineManager(&EngineManager{
-		Snowman: &Engine{
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	handler.SetEngine(engine)
 
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
@@ -425,183 +409,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 
 // Tests that messages are routed to the correct engine type
 func TestDynamicEngineTypeDispatch(t *testing.T) {
-	tests := []struct {
-		name                string
-		currentEngineType   p2ppb.EngineType
-		requestedEngineType p2ppb.EngineType
-		setup               func(
-			h Handler,
-			b common.BootstrapableEngine,
-			e common.Engine,
-		)
-	}{
-		{
-			name:                "current - avalanche, requested - unspecified",
-			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
-			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
-				h.SetEngineManager(&EngineManager{
-					Avalanche: &Engine{
-						StateSyncer:  nil,
-						Bootstrapper: b,
-						Consensus:    e,
-					},
-					Snowman: nil,
-				})
-			},
-		},
-		{
-			name:                "current - avalanche, requested - avalanche",
-			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
-			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
-			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
-				h.SetEngineManager(&EngineManager{
-					Avalanche: &Engine{
-						StateSyncer:  nil,
-						Bootstrapper: b,
-						Consensus:    e,
-					},
-					Snowman: nil,
-				})
-			},
-		},
-		{
-			name:                "current - snowman, requested - unspecified",
-			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
-				h.SetEngineManager(&EngineManager{
-					Avalanche: nil,
-					Snowman: &Engine{
-						StateSyncer:  nil,
-						Bootstrapper: b,
-						Consensus:    e,
-					},
-				})
-			},
-		},
-		{
-			name:                "current - snowman, requested - avalanche",
-			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
-			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
-				h.SetEngineManager(&EngineManager{
-					Avalanche: &Engine{
-						StateSyncer:  nil,
-						Bootstrapper: nil,
-						Consensus:    e,
-					},
-					Snowman: &Engine{
-						StateSyncer:  nil,
-						Bootstrapper: b,
-						Consensus:    nil,
-					},
-				})
-			},
-		},
-		{
-			name:                "current - snowman, requested - snowman",
-			currentEngineType:   p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-			requestedEngineType: p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
-			setup: func(h Handler, b common.BootstrapableEngine, e common.Engine) {
-				h.SetEngineManager(&EngineManager{
-					Avalanche: nil,
-					Snowman: &Engine{
-						StateSyncer:  nil,
-						Bootstrapper: b,
-						Consensus:    e,
-					},
-				})
-			},
-		},
-	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			messageReceived := make(chan struct{})
-			snowCtx := snowtest.Context(t, snowtest.CChainID)
-			ctx := snowtest.ConsensusContext(snowCtx)
-			vdrs := validators.NewManager()
-			require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
-
-			resourceTracker, err := tracker.NewResourceTracker(
-				prometheus.NewRegistry(),
-				resource.NoUsage,
-				meter.ContinuousFactory{},
-				time.Second,
-			)
-			require.NoError(err)
-
-			peerTracker, err := p2p.NewPeerTracker(
-				logging.NoLog{},
-				"",
-				prometheus.NewRegistry(),
-				nil,
-				version.CurrentApp,
-			)
-			require.NoError(err)
-
-			handler, err := New(
-				ctx,
-				vdrs,
-				nil,
-				time.Second,
-				testThreadPoolSize,
-				resourceTracker,
-				subnets.New(ids.EmptyNodeID, subnets.Config{}),
-				commontracker.NewPeers(),
-				peerTracker,
-				prometheus.NewRegistry(),
-				func() {},
-			)
-			require.NoError(err)
-
-			bootstrapper := &enginetest.Bootstrapper{
-				Engine: enginetest.Engine{
-					T: t,
-				},
-			}
-			bootstrapper.Default(false)
-
-			engine := &enginetest.Engine{T: t}
-			engine.Default(false)
-			engine.ContextF = func() *snow.ConsensusContext {
-				return ctx
-			}
-			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
-				close(messageReceived)
-				return nil
-			}
-
-			test.setup(handler, bootstrapper, engine)
-
-			ctx.State.Set(snow.EngineState{
-				Type:  test.currentEngineType,
-				State: snow.NormalOp, // assumed bootstrap is done
-			})
-
-			bootstrapper.StartF = func(context.Context, uint32) error {
-				return nil
-			}
-
-			handler.Start(context.Background(), false)
-			handler.Push(context.Background(), Message{
-				InboundMessage: message.InboundChits(
-					ids.Empty,
-					uint32(0),
-					ids.Empty,
-					ids.Empty,
-					ids.Empty,
-					ids.EmptyNodeID,
-				),
-				EngineType: test.requestedEngineType,
-			})
-
-			<-messageReceived
-		})
-	}
 }
 
 func TestHandlerStartError(t *testing.T) {
@@ -643,7 +451,11 @@ func TestHandlerStartError(t *testing.T) {
 
 	// Starting a handler with an unprovided engine should immediately cause the
 	// handler to shutdown.
-	handler.SetEngineManager(&EngineManager{})
+
+	handler.SetEngine(&enginetest.Engine{StartF: func(_ context.Context, _ uint32) error {
+		return errors.New("oops")
+	}})
+
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Initializing,
