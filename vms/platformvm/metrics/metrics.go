@@ -190,7 +190,7 @@ type metrics struct {
 
 func (m *metrics) MarkAccepted(b Block) error {
 	m.gasConsumed.Add(float64(b.GasConsumed))
-	m.gasCapacity.Add(float64(b.GasState.Capacity))
+	m.gasCapacity.Set(float64(b.GasState.Capacity))
 	m.excess.With(gasLabels).Set(float64(b.GasState.Excess))
 	m.price.With(gasLabels).Set(float64(b.GasPrice))
 
