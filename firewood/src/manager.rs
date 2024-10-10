@@ -22,10 +22,10 @@ pub struct RevisionManagerConfig {
     #[builder(default = 128)]
     max_revisions: usize,
 
-    #[builder(default_code = "NonZero::new(20480).expect(\"non-zero\")")]
+    #[builder(default_code = "NonZero::new(1500000).expect(\"non-zero\")")]
     node_cache_size: NonZero<usize>,
 
-    #[builder(default_code = "NonZero::new(10000).expect(\"non-zero\")")]
+    #[builder(default_code = "NonZero::new(20000).expect(\"non-zero\")")]
     free_list_cache_size: NonZero<usize>,
 }
 
