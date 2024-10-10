@@ -18,11 +18,16 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+// subnetIDNodeID = [subnetID] + [nodeID]
+const subnetIDNodeIDEntryLength = ids.IDLen + ids.NodeIDLen
+
 var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
 
 	ErrMutatedSubnetOnlyValidator   = errors.New("subnet only validator contains mutated constant fields")
 	ErrDuplicateSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
+
+	errUnexpectedSubnetIDNodeIDLength = fmt.Errorf("expected subnetID+nodeID entry length %d", subnetIDNodeIDEntryLength)
 )
 
 type SubnetOnlyValidators interface {
@@ -170,6 +175,23 @@ func deleteSubnetOnlyValidator(db database.KeyValueDeleter, validationID ids.ID)
 type subnetIDNodeID struct {
 	subnetID ids.ID
 	nodeID   ids.NodeID
+}
+
+func (s *subnetIDNodeID) Marshal() []byte {
+	data := make([]byte, subnetIDNodeIDEntryLength)
+	copy(data, s.subnetID[:])
+	copy(data[ids.IDLen:], s.nodeID[:])
+	return data
+}
+
+func (s *subnetIDNodeID) Unmarshal(data []byte) error {
+	if len(data) != subnetIDNodeIDEntryLength {
+		return errUnexpectedSubnetIDNodeIDLength
+	}
+
+	copy(s.subnetID[:], data)
+	copy(s.nodeID[:], data[ids.IDLen:])
+	return nil
 }
 
 type subnetOnlyValidatorsDiff struct {

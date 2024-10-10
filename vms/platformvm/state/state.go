@@ -2261,9 +2261,11 @@ func (s *state) writeSubnetOnlyValidators(updateValidators bool, height uint64) 
 			return err
 		}
 
-		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
-		copy(subnetIDNodeIDKey, sov.SubnetID[:])
-		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
+		subnetIDNodeID := subnetIDNodeID{
+			subnetID: sov.SubnetID,
+			nodeID:   sov.NodeID,
+		}
+		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
 		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
 			return err
 		}
@@ -2375,9 +2377,11 @@ func (s *state) writeSubnetOnlyValidators(updateValidators bool, height uint64) 
 	for validationID, sov := range sovChanges {
 		validationID := validationID
 
-		subnetIDNodeIDKey := make([]byte, len(sov.SubnetID)+len(sov.NodeID))
-		copy(subnetIDNodeIDKey, sov.SubnetID[:])
-		copy(subnetIDNodeIDKey[len(sov.SubnetID):], sov.NodeID[:])
+		subnetIDNodeID := subnetIDNodeID{
+			subnetID: sov.SubnetID,
+			nodeID:   sov.NodeID,
+		}
+		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
 		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
 			return err
 		}
