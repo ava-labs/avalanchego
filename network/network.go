@@ -10,7 +10,6 @@ import (
 	"math"
 	"net"
 	"net/netip"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -409,12 +408,10 @@ func (n *network) HealthCheck(context.Context) (interface{}, error) {
 		return details, nil
 	}
 
-	var errorReasons []string
-
 	if !isMsgFailRate {
-		errorReasons = append(errorReasons, fmt.Sprintf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate))
+		return details, fmt.Errorf("messages failure send rate %g > %g", sendFailRate, n.config.HealthConfig.MaxSendFailRate)
 	}
-	return details, fmt.Errorf("network layer is unhealthy reason: %s", strings.Join(errorReasons, ", "))
+	return details, nil
 }
 
 // Connected is called after the peer finishes the handshake.
