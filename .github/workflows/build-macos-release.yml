@@ -18,7 +18,7 @@ jobs:
   # This workflow contains a single job called "build"
   build-mac:
     # The type of runner that the job will run on
-    runs-on: macos-14-arm64
+    runs-on: macos-14
     permissions:
       id-token: write
       contents: read
