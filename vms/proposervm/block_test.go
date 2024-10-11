@@ -434,3 +434,76 @@ func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
 		require.ErrorIs(err, errUnexpectedProposer)
 	}
 }
+
+// Confirm that prior to Etna activation, the P-chain height passed to the
+// VM building the inner block is P-Chain height of the parent block.
+func TestPreEtnaContextPChainHeight(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	var (
+		nodeID                 = ids.GenerateTestNodeID()
+		pChainHeight    uint64 = 1337
+		parentID               = ids.GenerateTestID()
+		parentTimestamp        = time.Now().Truncate(time.Second)
+		parentHeight    uint64 = 1234
+		blkID                  = ids.GenerateTestID()
+	)
+
+	innerBlk := snowmanmock.NewBlock(ctrl)
+	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
+	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
+
+	builtBlk := snowmanmock.NewBlock(ctrl)
+	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
+	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
+
+	innerVM := blockmock.NewChainVM(ctrl)
+	innerBlockBuilderVM := blockmock.NewBuildBlockWithContextChainVM(ctrl)
+	// Expect the that context passed in has parent's P-Chain height
+	parentPChainHeght := pChainHeight - 1
+	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &block.Context{
+		PChainHeight: parentPChainHeght,
+	}).Return(builtBlk, nil).AnyTimes()
+
+	vdrState := validatorsmock.NewState(ctrl)
+	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+
+	windower := proposermock.NewWindower(ctrl)
+	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
+
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(err)
+	vm := &VM{
+		Config: Config{
+			Upgrades:          upgradetest.GetConfig(upgradetest.Durango), // Use Durango for pre-Etna behavior
+			StakingCertLeaf:   &staking.Certificate{},
+			StakingLeafSigner: pk,
+			Registerer:        prometheus.NewRegistry(),
+		},
+		ChainVM:        innerVM,
+		blockBuilderVM: innerBlockBuilderVM,
+		ctx: &snow.Context{
+			NodeID:         nodeID,
+			ValidatorState: vdrState,
+			Log:            logging.NoLog{},
+		},
+		Windower: windower,
+	}
+
+	blk := &postForkCommonComponents{
+		innerBlk: innerBlk,
+		vm:       vm,
+	}
+
+	// Should call BuildBlockWithContext since proposervm is activated
+	gotChild, err := blk.buildChild(
+		context.Background(),
+		parentID,
+		parentTimestamp,
+		parentPChainHeght,
+	)
+	require.NoError(err)
+	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
+}
