@@ -283,15 +283,17 @@ func TestEvictEvery(t *testing.T) {
 	require := require.New(t)
 
 	clock := &mockable.Clock{}
-	start := time.Now()
-	clock.Set(start)
+	// Using sync clock for this test to avoid race conditions
+	// with the eviction goroutine
+	clock.Sync()
+	ttl := 10 * testEvictFrequency // 1 second
 
 	window := New[int](
 		Config{
 			Clock:   clock,
 			MaxSize: 3,
 			MinSize: 0,
-			TTL:     testTTL,
+			TTL:     ttl,
 		},
 	)
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -303,16 +305,14 @@ func TestEvictEvery(t *testing.T) {
 	window.Add(1)
 	window.Add(2)
 
-	// Add 3 to the window with a later TTL
-	clock.Set(start.Add(testTTL - time.Second))
+	// Add 3 to the window at t = 300ms
+	time.Sleep(3 * testEvictFrequency)
 	window.Add(3)
 
 	require.Equal(3, window.Length())
 
-	// Set the time to 1 second past the ttl of 10 seconds as defined in testTTL
-	// and sleep for twice the evict interval to ensure that it has ticked.
-	clock.Set(start.Add(testTTL + time.Second))
-	time.Sleep(2 * testEvictFrequency)
+	// Sleep until t = 1.1s to evict 1 and 2
+	time.Sleep(8 * testEvictFrequency)
 
 	// Now the window should look like this:
 	// [3]
@@ -321,9 +321,8 @@ func TestEvictEvery(t *testing.T) {
 	require.True(ok)
 	require.Equal(3, oldest)
 
-	// Set the time to 20 seconds to expire the last element as well.
-	clock.Set(start.Add(2 * testTTL))
-	time.Sleep(2 * testEvictFrequency)
+	// Sleep until 1.5s to evict 3 as well
+	time.Sleep(4 * testEvictFrequency)
 	require.Equal(0, window.Length())
 	_, ok = window.Oldest()
 	require.False(ok)
@@ -333,8 +332,7 @@ func TestEvictEvery(t *testing.T) {
 
 	// Add 4 to the window and ensure that it is not evicted
 	window.Add(4)
-	clock.Set(start.Add(3*testTTL + time.Second))
-	time.Sleep(2 * testEvictFrequency)
+	time.Sleep(ttl + 2*testEvictFrequency)
 
 	require.Equal(1, window.Length())
 	oldest, ok = window.Oldest()
