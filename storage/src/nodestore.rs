@@ -1249,4 +1249,22 @@ mod tests {
         let actually_serialized = serializer().serialize(&area).unwrap().len() as u64;
         assert_eq!(area_size, actually_serialized + 1);
     }
+    #[test]
+    #[should_panic(expected = "Node size 16777228 is too large")]
+    fn giant_node() {
+        let memstore = MemStore::new(vec![]);
+        let mut node_store = NodeStore::new_empty_proposal(memstore.into());
+
+        let huge_value = vec![0u8; *AREA_SIZES.last().unwrap() as usize];
+
+        let giant_leaf = Node::Leaf(LeafNode {
+            partial_path: Path::from([0, 1, 2]),
+            value: SmallVec::from_vec(huge_value),
+        });
+
+        node_store.mut_root().replace(giant_leaf);
+
+        let immutable = NodeStore::<Arc<ImmutableProposal>, _>::from(node_store);
+        println!("{:?}", immutable); // should not be reached, but need to consume immutable to avoid optimization removal
+    }
 }
