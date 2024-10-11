@@ -42,8 +42,7 @@ type Config struct {
 	DynamicFeeConfig gas.Config
 
 	// ACP-77 validator fees are active after Etna
-	ValidatorFeeCapacity gas.Gas
-	ValidatorFeeConfig   validatorfee.Config
+	ValidatorFeeConfig validatorfee.Config
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator

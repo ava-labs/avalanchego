@@ -1217,7 +1217,6 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
 				StaticFeeConfig:           n.Config.StaticFeeConfig,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
-				ValidatorFeeCapacity:      n.Config.ValidatorFeeCapacity,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
 				MinValidatorStake:         n.Config.MinValidatorStake,
