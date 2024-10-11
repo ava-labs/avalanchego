@@ -6,7 +6,7 @@ use crate::range_proof::RangeProof;
 use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api;
 use futures::{StreamExt, TryStreamExt};
-use metrics::{counter, histogram};
+use metrics::counter;
 use smallvec::SmallVec;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -416,9 +416,6 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
     pub fn insert(&mut self, key: &[u8], value: Box<[u8]>) -> Result<(), MerkleError> {
-        histogram!("firewood.insert.key.length").record(key.len() as f64);
-        histogram!("firewood.insert.data.length").record(value.len() as f64);
-
         let key = Path::from_nibbles_iterator(NibblesIterator::new(key));
 
         let root = self.nodestore.mut_root();

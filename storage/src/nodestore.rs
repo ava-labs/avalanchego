@@ -6,7 +6,7 @@ use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
 use bincode::{DefaultOptions, Options as _};
 use bytemuck_derive::{AnyBitPattern, NoUninit};
-use metrics::{counter, histogram};
+use metrics::counter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -492,7 +492,6 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Also returns the index of the free list the node was allocated from.
     pub fn allocate_node(&mut self, node: &Node) -> Result<(LinearAddress, AreaIndex), Error> {
         let stored_area_size = Self::stored_len(node);
-        histogram!("firewood.node_size").record(stored_area_size as f64);
 
         // Attempt to allocate from a free list.
         // If we can't allocate from a free list, allocate past the existing
