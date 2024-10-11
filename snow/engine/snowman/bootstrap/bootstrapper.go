@@ -149,7 +149,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
 		}
 	}
-	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped(), time.NewTimer)
+	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
 
 	return bs, err
 }

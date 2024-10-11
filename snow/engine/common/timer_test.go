@@ -19,15 +19,15 @@ func TestTimeoutScheduler(t *testing.T) {
 		advanceTime             func(chan time.Time)
 	}{
 		{
-			desc:                    "multiple pendingTimeout one after the other with preemption",
+			desc:                    "multiple pendingTimeoutToken one after the other with preemption",
 			expectedInvocationCount: 10,
 			shouldPreempt:           true,
 			clock:                   make(chan time.Time, 1),
-			initClock:               func(_ chan time.Time) {},
-			advanceTime:             func(_ chan time.Time) {},
+			initClock:               func(chan time.Time) {},
+			advanceTime:             func(chan time.Time) {},
 		},
 		{
-			desc:                    "multiple pendingTimeout one after the other",
+			desc:                    "multiple pendingTimeoutToken one after the other",
 			expectedInvocationCount: 10,
 			clock:                   make(chan time.Time, 1),
 			initClock: func(clock chan time.Time) {
@@ -57,14 +57,7 @@ func TestTimeoutScheduler(t *testing.T) {
 			// in order to make the tests deterministic.
 			order := make(chan struct{})
 
-			newTimer := func(_ time.Duration) *time.Timer {
-				// We use a duration of 0 to not leave a lingering timer
-				// after the test finishes.
-				// Then we replace the time channel to have control over the timer.
-				timer := time.NewTimer(0)
-				timer.C = testCase.clock
-				return timer
-			}
+			newTimer := makeMockedTimer(testCase.clock)
 
 			onTimeout := func() {
 				order <- struct{}{}
@@ -72,7 +65,8 @@ func TestTimeoutScheduler(t *testing.T) {
 				testCase.advanceTime(testCase.clock)
 			}
 
-			ts := NewTimeoutScheduler(onTimeout, ps, newTimer)
+			ts := NewTimeoutScheduler(onTimeout, ps)
+			ts.newTimer = newTimer
 
 			for i := 0; i < testCase.expectedInvocationCount; i++ {
 				ts.RegisterTimeout(time.Hour)
@@ -85,26 +79,19 @@ func TestTimeoutScheduler(t *testing.T) {
 }
 
 func TestTimeoutSchedulerConcurrentRegister(_ *testing.T) {
+	// Not enough invocations means the test would stall.
+	// Too many invocations means a negative counter panic.
+
 	clock := make(chan time.Time, 2)
-	newTimer := func(_ time.Duration) *time.Timer {
-		// We use a duration of 0 to not leave a lingering timer
-		// after the test finishes.
-		// Then we replace the time channel to have control over the timer.
-		timer := time.NewTimer(0)
-		timer.C = clock
-		return timer
-	}
+	newTimer := makeMockedTimer(clock)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	onTimeout := func() {
-		wg.Done()
-	}
+	preemptChan := make(<-chan struct{})
 
-	roChan := make(<-chan struct{})
-
-	ts := NewTimeoutScheduler(onTimeout, roChan, newTimer)
+	ts := NewTimeoutScheduler(wg.Done, preemptChan)
+	ts.newTimer = newTimer
 
 	ts.RegisterTimeout(time.Hour) // First timeout is registered
 	ts.RegisterTimeout(time.Hour) // Second should not
@@ -114,4 +101,16 @@ func TestTimeoutSchedulerConcurrentRegister(_ *testing.T) {
 	clock <- time.Now()
 
 	wg.Wait()
+}
+
+func makeMockedTimer(clock chan time.Time) func(_ time.Duration) *time.Timer {
+	newTimer := func(_ time.Duration) *time.Timer {
+		// We use a duration of 0 to not leave a lingering timer
+		// after the test finishes.
+		// Then we replace the time channel to have control over the timer.
+		timer := time.NewTimer(0)
+		timer.C = clock
+		return timer
+	}
+	return newTimer
 }
