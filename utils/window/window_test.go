@@ -4,7 +4,6 @@
 package window
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -14,9 +13,8 @@ import (
 )
 
 const (
-	testTTL            = 10 * time.Second
-	testMaxSize        = 10
-	testEvictFrequency = 100 * time.Millisecond
+	testTTL     = 10 * time.Second
+	testMaxSize = 10
 )
 
 // TestAdd tests that elements are populated as expected, ignoring
@@ -276,66 +274,4 @@ func TestMinCapacity(t *testing.T) {
 	oldest, ok := window.Oldest()
 	require.True(ok)
 	require.Equal(3, oldest)
-}
-
-// Tests timed eviction of elements using [EvictEvery] method
-func TestEvictEvery(t *testing.T) {
-	require := require.New(t)
-
-	clock := &mockable.Clock{}
-	// Using sync clock for this test to avoid race conditions
-	// with the eviction goroutine
-	clock.Sync()
-	ttl := 10 * testEvictFrequency // 1 second
-
-	window := New[int](
-		Config{
-			Clock:   clock,
-			MaxSize: 3,
-			MinSize: 0,
-			TTL:     ttl,
-		},
-	)
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	go window.EvictEvery(ctx, testEvictFrequency)
-
-	// Now the window looks like this:
-	// [1, 2] at time 0
-	window.Add(1)
-	window.Add(2)
-
-	// Add 3 to the window at t = 300ms
-	time.Sleep(3 * testEvictFrequency)
-	window.Add(3)
-
-	require.Equal(3, window.Length())
-
-	// Sleep until t = 1.1s to evict 1 and 2
-	time.Sleep(8 * testEvictFrequency)
-
-	// Now the window should look like this:
-	// [3]
-	require.Equal(1, window.Length())
-	oldest, ok := window.Oldest()
-	require.True(ok)
-	require.Equal(3, oldest)
-
-	// Sleep until 1.5s to evict 3 as well
-	time.Sleep(4 * testEvictFrequency)
-	require.Equal(0, window.Length())
-	_, ok = window.Oldest()
-	require.False(ok)
-
-	// Cancel the context to stop the eviction goroutine
-	cancelFunc()
-
-	// Add 4 to the window and ensure that it is not evicted
-	window.Add(4)
-	time.Sleep(ttl + 2*testEvictFrequency)
-
-	require.Equal(1, window.Length())
-	oldest, ok = window.Oldest()
-	require.True(ok)
-	require.Equal(4, oldest)
 }

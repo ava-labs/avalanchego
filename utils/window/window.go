@@ -4,7 +4,6 @@
 package window
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -20,7 +19,6 @@ type Window[T any] interface {
 	Add(value T)
 	Oldest() (T, bool)
 	Length() int
-	EvictEvery(ctx context.Context, freq time.Duration)
 }
 
 type window[T any] struct {
@@ -97,31 +95,18 @@ func (w *window[T]) Length() int {
 	return w.elements.Len()
 }
 
-// EvictEvery evicts stale nodes from the window at a regular interval.
-func (w *window[T]) EvictEvery(ctx context.Context, freq time.Duration) {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			w.lock.Lock()
-			w.removeStaleNodes()
-			w.lock.Unlock()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
 // removeStaleNodes removes any nodes beyond the configured ttl of a window node.
 func (w *window[T]) removeStaleNodes() {
 	// If we're beyond the expiry threshold, removeStaleNodes this node from our
 	// window. Nodes are guaranteed to be strictly increasing in entry time,
 	// so we can break this loop once we find the first non-stale one.
-	currentTime := w.clock.Time()
+	newest, ok := w.elements.PeekRight()
+	if !ok {
+		return
+	}
 	for w.elements.Len() > w.minSize {
 		oldest, ok := w.elements.PeekLeft()
-		if !ok || currentTime.Sub(oldest.entryTime) <= w.ttl {
+		if !ok || newest.entryTime.Sub(oldest.entryTime) <= w.ttl {
 			return
 		}
 		_, _ = w.elements.PopLeft()
