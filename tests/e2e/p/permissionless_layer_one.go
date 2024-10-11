@@ -4,7 +4,6 @@
 package p
 
 import (
-	"context"
 	"math"
 	"time"
 
@@ -14,11 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -27,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	p2pmessage "github.com/ava-labs/avalanchego/message"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
 	platformvmsdk "github.com/ava-labs/avalanchego/vms/platformvm"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -139,27 +134,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 		genesisNodePK, err := bls.PublicKeyFromCompressedBytes(genesisNodePoP.PublicKey[:])
 		require.NoError(err)
-
-		tc.By("connecting to the genesis validator")
-		var (
-			networkID           = env.GetNetwork().GetNetworkID()
-			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
-		)
-		genesisPeer, err := peer.StartTestPeer(
-			tc.DefaultContext(),
-			subnetGenesisNode.StakingAddress,
-			networkID,
-			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
-				tc.Outf("received %s %s from %s\n", m.Op(), m.Message(), m.NodeID())
-				genesisPeerMessages.PushRight(m)
-			}),
-		)
-		require.NoError(err)
-		defer func() {
-			genesisPeerMessages.Close()
-			genesisPeer.StartClose()
-			require.NoError(genesisPeer.AwaitClosed(tc.DefaultContext()))
-		}()
 
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetTx", func() {
