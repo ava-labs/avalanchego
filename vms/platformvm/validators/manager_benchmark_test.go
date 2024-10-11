@@ -58,7 +58,11 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		Validators: vdrs,
 	})
 
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
 	m := NewManager(
+		ctx,
 		logging.NoLog{},
 		config.Config{
 			Validators: vdrs,
@@ -88,7 +92,6 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(addSubnetDelegator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeIDs, currentHeight))
 	}
 
-	ctx := context.Background()
 	height, err := m.GetCurrentHeight(ctx)
 	require.NoError(err)
 	require.Equal(currentHeight, height)

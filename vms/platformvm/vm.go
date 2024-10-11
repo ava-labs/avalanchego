@@ -149,7 +149,9 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
+
+	validatorManager := pvalidators.NewManager(vm.onShutdownCtx, chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
@@ -199,7 +201,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize network: %w", err)
 	}
 
-	vm.onShutdownCtx, vm.onShutdownCtxCancel = context.WithCancel(context.Background())
 	// TODO: Wait for this goroutine to exit during Shutdown once the platformvm
 	// has better control of the context lock.
 	go vm.Network.PushGossip(vm.onShutdownCtx)

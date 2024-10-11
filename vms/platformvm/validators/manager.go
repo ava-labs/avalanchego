@@ -90,6 +90,7 @@ type State interface {
 }
 
 func NewManager(
+	ctx context.Context,
 	log logging.Logger,
 	cfg config.Config,
 	state State,
@@ -104,7 +105,7 @@ func NewManager(
 			TTL:     recentlyAcceptedWindowTTL,
 		},
 	)
-	go recentlyAccepted.EvictEvery(context.Background(), recentlyAcceptedEvictFrequency)
+	go recentlyAccepted.EvictEvery(ctx, recentlyAcceptedEvictFrequency)
 
 	return &manager{
 		log:              log,
