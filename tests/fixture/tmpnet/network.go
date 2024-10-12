@@ -139,16 +139,20 @@ func BootstrapNewNetwork(
 	log logging.Logger,
 	network *Network,
 	rootNetworkDir string,
-	avalancheGoExecPath string,
-	pluginDir string,
 ) error {
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
 	}
-	if err := checkVMBinaries(log, network.Subnets, avalancheGoExecPath, pluginDir); err != nil {
-		return err
+	if len(network.DefaultRuntimeConfig.AvalancheGoPath) > 0 {
+		pluginDir, err := network.GetPluginDir()
+		if err != nil {
+			return err
+		}
+		if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
+			return err
+		}
 	}
-	if err := network.EnsureDefaultConfig(log, avalancheGoExecPath, pluginDir); err != nil {
+	if err := network.EnsureDefaultConfig(log); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
@@ -191,10 +195,9 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string, pluginDir string) error {
-	log.Info("preparing configuration for new network",
-		zap.String("avalanchegoPath", avalancheGoPath),
-	)
+func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
+	log.Info("preparing configuration for new network")
+	// TODO(marun) Provide more detail about configuration of the new network?
 
 	// A UUID supports centralized metrics collection
 	if len(n.UUID) == 0 {
@@ -210,15 +213,6 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 	if len(n.Nodes) == 1 {
 		// Sybil protection needs to be disabled for a single node network to start
 		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
-	}
-
-	// Only configure the plugin dir with a non-empty value to ensure
-	// the use of the default value (`[datadir]/plugins`) when
-	// no plugin dir is configured.
-	if len(pluginDir) > 0 {
-		if _, ok := n.DefaultFlags[config.PluginDirKey]; !ok {
-			n.DefaultFlags[config.PluginDirKey] = pluginDir
-		}
 	}
 
 	// Ensure pre-funded keys if the genesis is not predefined
@@ -240,11 +234,6 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string
 			n.ChainConfigs[alias] = FlagsMap{}
 		}
 		n.ChainConfigs[alias].SetDefaults(chainConfig)
-	}
-
-	// Ensure runtime is configured
-	if len(n.DefaultRuntimeConfig.AvalancheGoPath) == 0 {
-		n.DefaultRuntimeConfig.AvalancheGoPath = avalancheGoPath
 	}
 
 	// Ensure nodes are configured
@@ -290,14 +279,17 @@ func (n *Network) Create(rootDir string) error {
 	}
 	n.Dir = canonicalDir
 
-	// Ensure the existence of the plugin directory or nodes won't be able to start.
-	pluginDir, err := n.getPluginDir()
-	if err != nil {
-		return err
-	}
-	if len(pluginDir) > 0 {
-		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create plugin dir: %w", err)
+	// TODO(marun) Make this part of the node process
+	if len(n.DefaultRuntimeConfig.AvalancheGoPath) > 0 {
+		// Ensure the existence of the plugin directory or nodes won't be able to start.
+		pluginDir, err := n.GetPluginDir()
+		if err != nil {
+			return err
+		}
+		if len(pluginDir) > 0 {
+			if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
+				return fmt.Errorf("failed to create plugin dir: %w", err)
+			}
 		}
 	}
 
@@ -463,14 +455,14 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
 	// This check is duplicative for a network that is starting, but ensures
 	// that individual node start/restart won't fail due to missing binaries.
-	pluginDir, err := n.getPluginDir()
+	pluginDir, err := n.GetPluginDir()
 	if err != nil {
 		return err
 	}
 
-	if err := n.EnsureNodeConfig(node); err != nil {
-		return err
-	}
+	// if err := n.EnsureNodeConfig(node); err != nil {
+	// 	return err
+	// }
 
 	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
 	if err := checkVMBinaries(log, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
@@ -627,7 +619,8 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Ensure the node runtime is configured
 	if node.RuntimeConfig == nil {
 		node.RuntimeConfig = &NodeRuntimeConfig{
-			AvalancheGoPath: n.DefaultRuntimeConfig.AvalancheGoPath,
+			AvalancheGoPath:   n.DefaultRuntimeConfig.AvalancheGoPath,
+			KubeRuntimeConfig: n.DefaultRuntimeConfig.KubeRuntimeConfig,
 		}
 	}
 
@@ -872,8 +865,18 @@ func (n *Network) GetNetworkID() uint32 {
 	return n.NetworkID
 }
 
-func (n *Network) getPluginDir() (string, error) {
+func (n *Network) GetPluginDir() (string, error) {
 	return n.DefaultFlags.GetStringVal(config.PluginDirKey)
+}
+
+// Sets the plugin dir for the network. If the provided plugin dir is
+// empty, the default plugin dir (`[datadir]/plugins`) will be used.
+func (n *Network) SetPluginDir(pluginDir string) {
+	if len(pluginDir) > 0 {
+		n.DefaultFlags[config.PluginDirKey] = pluginDir
+	} else {
+		delete(n.DefaultFlags, config.PluginDirKey)
+	}
 }
 
 // Waits until the provided nodes are healthy.

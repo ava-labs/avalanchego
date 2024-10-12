@@ -49,9 +49,24 @@ type NodeRuntime interface {
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
-// Configuration required to configure a node runtime.
+// Configuration required to configure a node runtime. Only one of the fields should be set.
 type NodeRuntimeConfig struct {
+	// Path to the AvalancheGo binary if the node is running as a process.
 	AvalancheGoPath string
+	// The kubernetes configuration if the node is running as a pod.
+	KubeRuntimeConfig KubeRuntimeConfig
+}
+
+// Configuration required to configure a node running as a pod.
+type KubeRuntimeConfig struct {
+	// Path to the kubeconfig file to use.
+	Kubeconfig string
+	// Namespace the node will be deployed to. For simplicity all
+	// nodes in the same network are deployed to the same namespace to
+	// ensure they can communicate freely.
+	Namespace string
+	// The name of the image the node should run.
+	ImageName string
 }
 
 // Node supports configuring and running a node participating in a temporary network.

@@ -37,7 +37,7 @@ func DefaultPodFlags(networkName string, dataDir string) map[string]string {
 	return map[string]string{
 		config.DataDirKey:                dataDir,
 		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: "false",
+		config.SybilProtectionEnabledKey: "false", // TODO(marun) This needs to be configurable
 		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
 		config.LogDisplayLevelKey:        logging.Debug.String(),
 		config.LogLevelKey:               logging.Debug.String(),
