@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -20,7 +19,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"go.uber.org/zap"
 )
 
 const (
@@ -73,7 +74,7 @@ func (p *NodeProcess) readState() error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(w io.Writer) error {
+func (p *NodeProcess) Start(log logging.Logger) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -98,18 +99,6 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return err
 	}
 
-	// Determine appropriate level of node description detail
-	dataDir := p.node.GetDataDir()
-	nodeDescription := fmt.Sprintf("node %q", p.node.NodeID)
-	if p.node.IsEphemeral {
-		nodeDescription = "ephemeral " + nodeDescription
-	}
-	nonDefaultNodeDir := filepath.Base(dataDir) != p.node.NodeID.String()
-	if nonDefaultNodeDir {
-		// Only include the data dir if its base is not the default (the node ID)
-		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, dataDir)
-	}
-
 	// A node writes a process context file on start. If the file is not
 	// found in a reasonable amount of time, the node is unlikely to have
 	// started successfully.
@@ -117,9 +106,11 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	if _, err = fmt.Fprintf(w, "Started %s\n", nodeDescription); err != nil {
-		return err
-	}
+	log.Info("started local node",
+		zap.Stringer("nodeID", p.node.NodeID),
+		zap.String("dataDir", p.node.GetDataDir()),
+		zap.Bool("isEphemeral", p.node.IsEphemeral),
+	)
 
 	// Configure collection of metrics and logs
 	return p.writeMonitoringConfig()

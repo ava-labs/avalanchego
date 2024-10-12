@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -20,11 +19,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -135,7 +136,7 @@ func toCanonicalDir(dir string) (string, error) {
 
 func BootstrapNewNetwork(
 	ctx context.Context,
-	w io.Writer,
+	log logging.Logger,
 	network *Network,
 	rootNetworkDir string,
 	avalancheGoExecPath string,
@@ -144,16 +145,16 @@ func BootstrapNewNetwork(
 	if len(network.Nodes) == 0 {
 		return errInsufficientNodes
 	}
-	if err := checkVMBinaries(w, network.Subnets, avalancheGoExecPath, pluginDir); err != nil {
+	if err := checkVMBinaries(log, network.Subnets, avalancheGoExecPath, pluginDir); err != nil {
 		return err
 	}
-	if err := network.EnsureDefaultConfig(w, avalancheGoExecPath, pluginDir); err != nil {
+	if err := network.EnsureDefaultConfig(log, avalancheGoExecPath, pluginDir); err != nil {
 		return err
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
 		return err
 	}
-	return network.Bootstrap(ctx, w)
+	return network.Bootstrap(ctx, log)
 }
 
 // Stops the nodes of the network configured in the provided directory.
@@ -166,12 +167,12 @@ func StopNetwork(ctx context.Context, dir string) error {
 }
 
 // Restarts the nodes of the network configured in the provided directory.
-func RestartNetwork(ctx context.Context, w io.Writer, dir string) error {
+func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 	network, err := ReadNetwork(dir)
 	if err != nil {
 		return err
 	}
-	return network.Restart(ctx, w)
+	return network.Restart(ctx, log)
 }
 
 // Reads a network from the provided directory.
@@ -190,10 +191,10 @@ func ReadNetwork(dir string) (*Network, error) {
 }
 
 // Initializes a new network with default configuration.
-func (n *Network) EnsureDefaultConfig(w io.Writer, avalancheGoPath string, pluginDir string) error {
-	if _, err := fmt.Fprintf(w, "Preparing configuration for new network with %s\n", avalancheGoPath); err != nil {
-		return err
-	}
+func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string, pluginDir string) error {
+	log.Info("preparing configuration for new network",
+		zap.String("avalanchegoPath", avalancheGoPath),
+	)
 
 	// A UUID supports centralized metrics collection
 	if len(n.UUID) == 0 {
@@ -336,7 +337,7 @@ func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
 }
 
 // Starts the specified nodes
-func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*Node) error {
+func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToStart ...*Node) error {
 	if len(nodesToStart) == 0 {
 		return errInsufficientNodes
 	}
@@ -349,9 +350,10 @@ func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*
 	} else {
 		// Simplify output by only logging network start when starting all nodes or when starting
 		// the first node by itself to bootstrap subnet creation.
-		if _, err := fmt.Fprintf(w, "Starting network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
-			return err
-		}
+		log.Info("starting network",
+			zap.String("networkDir", n.Dir),
+			zap.String("uuid", n.UUID),
+		)
 	}
 
 	// Record the time before nodes are started to ensure visibility of subsequently collected metrics via the emitted link
@@ -359,36 +361,35 @@ func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*
 
 	// Configure the networking for each node and start
 	for _, node := range nodesToStart {
-		if err := n.StartNode(ctx, w, node); err != nil {
+		if err := n.StartNode(ctx, log, node); err != nil {
 			return err
 		}
 	}
 
-	if _, err := fmt.Fprint(w, "Waiting for nodes to report healthy...\n\n"); err != nil {
+	log.Info("waiting for nodes to report healthy")
+	if err := waitForHealthy(ctx, log, nodesToWaitFor); err != nil {
 		return err
 	}
-	if err := waitForHealthy(ctx, w, nodesToWaitFor); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
-		return err
-	}
+	log.Info("started network",
+		zap.String("networkDir", n.Dir),
+		zap.String("uuid", n.UUID),
+	)
 	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
 	startTimeStr := strconv.FormatInt(startTime.UnixMilli(), 10)
 	metricsURL := MetricsLinkForNetwork(n.UUID, startTimeStr, "")
-	if _, err := fmt.Fprintf(w, "\nMetrics: %s\n", metricsURL); err != nil {
-		return err
-	}
+	log.Info("metrics",
+		zap.String("url", metricsURL),
+	)
 
 	return nil
 }
 
 // Start the network for the first time
-func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
+func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	if len(n.Subnets) == 0 {
 		// Without the need to coordinate subnet configuration,
 		// starting all nodes at once is the simplest option.
-		return n.StartNodes(ctx, w, n.Nodes...)
+		return n.StartNodes(ctx, log, n.Nodes...)
 	}
 
 	// The node that will be used to create subnets and bootstrap the network
@@ -403,9 +404,7 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 		// disabled. This allows the creation of initial subnet state without
 		// requiring coordination between multiple nodes.
 
-		if _, err := fmt.Fprintln(w, "Starting a single-node network with sybil protection disabled for quicker subnet creation"); err != nil {
-			return err
-		}
+		log.Info("starting a single-node network with sybil protection disabled for quicker subnet creation")
 
 		// If sybil protection is enabled, it should be re-enabled before the node is used to bootstrap the other nodes
 		var err error
@@ -418,29 +417,29 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 		bootstrapNode.Flags[config.SybilProtectionEnabledKey] = false
 	}
 
-	if err := n.StartNodes(ctx, w, bootstrapNode); err != nil {
+	if err := n.StartNodes(ctx, log, bootstrapNode); err != nil {
 		return err
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, w, bootstrapNode.URI, false /* restartRequired */); err != nil {
+	if err := n.CreateSubnets(ctx, log, bootstrapNode.URI, false /* restartRequired */); err != nil {
 		return err
 	}
 
 	if reEnableSybilProtection {
-		if _, err := fmt.Fprintf(w, "Re-enabling sybil protection for %s\n", bootstrapNode.NodeID); err != nil {
-			return err
-		}
+		log.Info("re-enabling sybil protection",
+			zap.Stringer("nodeID", bootstrapNode.NodeID),
+		)
 		delete(bootstrapNode.Flags, config.SybilProtectionEnabledKey)
 	}
 
-	if _, err := fmt.Fprintf(w, "Restarting bootstrap node %s\n", bootstrapNode.NodeID); err != nil {
-		return err
-	}
+	log.Info("restarting bootstrap node",
+		zap.Stringer("nodeID", bootstrapNode.NodeID),
+	)
 
 	if len(n.Nodes) == 1 {
 		// Ensure the node is restarted to pick up subnet and chain configuration
-		return n.RestartNode(ctx, w, bootstrapNode)
+		return n.RestartNode(ctx, log, bootstrapNode)
 	}
 
 	// TODO(marun) This last restart of the bootstrap node might be unnecessary if:
@@ -452,18 +451,16 @@ func (n *Network) Bootstrap(ctx context.Context, w io.Writer) error {
 	if err := bootstrapNode.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
 	}
-	if err := n.StartNode(ctx, w, bootstrapNode); err != nil {
+	if err := n.StartNode(ctx, log, bootstrapNode); err != nil {
 		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
 	}
 
-	if _, err := fmt.Fprintln(w, "Starting remaining nodes..."); err != nil {
-		return err
-	}
-	return n.StartNodes(ctx, w, n.Nodes[1:]...)
+	log.Info("starting remaining nodes")
+	return n.StartNodes(ctx, log, n.Nodes[1:]...)
 }
 
 // Starts the provided node after configuring it for the network.
-func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error {
+func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
 	// This check is duplicative for a network that is starting, but ensures
 	// that individual node start/restart won't fail due to missing binaries.
 	pluginDir, err := n.getPluginDir()
@@ -476,7 +473,7 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 	}
 
 	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
-	if err := checkVMBinaries(w, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
+	if err := checkVMBinaries(log, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
@@ -490,7 +487,7 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 		return err
 	}
 
-	if err := node.Start(w); err != nil {
+	if err := node.Start(log); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
 		err = errors.Join(err, node.Stop(ctx))
@@ -501,7 +498,7 @@ func (n *Network) StartNode(ctx context.Context, w io.Writer, node *Node) error 
 }
 
 // Restart a single node.
-func (n *Network) RestartNode(ctx context.Context, w io.Writer, node *Node) error {
+func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
 	// Ensure the node reuses the same API port across restarts to ensure
 	// consistent labeling of metrics. Otherwise prometheus's automatic
 	// addition of the `instance` label (host:port) results in
@@ -522,12 +519,12 @@ func (n *Network) RestartNode(ctx context.Context, w io.Writer, node *Node) erro
 	if err := node.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
 	}
-	if err := n.StartNode(ctx, w, node); err != nil {
+	if err := n.StartNode(ctx, log, node); err != nil {
 		return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
 	}
-	if _, err := fmt.Fprintf(w, " waiting for node %s to report healthy\n", node.NodeID); err != nil {
-		return err
-	}
+	log.Info(" waiting for node to report healthy",
+		zap.Stringer("nodeID", node.NodeID),
+	)
 	return WaitForHealthy(ctx, node)
 }
 
@@ -562,12 +559,10 @@ func (n *Network) Stop(ctx context.Context) error {
 }
 
 // Restarts all non-ephemeral nodes in the network.
-func (n *Network) Restart(ctx context.Context, w io.Writer) error {
-	if _, err := fmt.Fprintln(w, " restarting network"); err != nil {
-		return err
-	}
+func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
+	log.Info("restarting network")
 	for _, node := range n.Nodes {
-		if err := n.RestartNode(ctx, w, node); err != nil {
+		if err := n.RestartNode(ctx, log, node); err != nil {
 			return err
 		}
 	}
@@ -669,7 +664,7 @@ func (n *Network) GetSubnet(name string) *Subnet {
 
 // Ensure that each subnet on the network is created. If restartRequired is false, node restart
 // to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string, restartRequired bool) error {
+func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI string, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
@@ -680,9 +675,9 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 			continue
 		}
 
-		if _, err := fmt.Fprintf(w, "Creating subnet %q\n", subnet.Name); err != nil {
-			return err
-		}
+		log.Info("creating subnet",
+			zap.String("name", subnet.Name),
+		)
 
 		if subnet.OwningKey == nil {
 			// Allocate a pre-funded key and remove it from the network so it won't be used for
@@ -699,18 +694,19 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " created subnet %q as %q\n", subnet.Name, subnet.SubnetID); err != nil {
-			return err
-		}
+		log.Info(" created subnet",
+			zap.String("name", subnet.Name),
+			zap.Stringer("id", subnet.SubnetID),
+		)
 
 		// Persist the subnet configuration
 		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " wrote configuration for subnet %q\n", subnet.Name); err != nil {
-			return err
-		}
+		log.Info(" wrote subnet configuration",
+			zap.String("name", subnet.Name),
+		)
 
 		createdSubnets = append(createdSubnets, subnet)
 	}
@@ -739,16 +735,14 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 	}
 
 	if restartRequired {
-		if _, err := fmt.Fprintln(w, "Restarting node(s) to enable them to track the new subnet(s)"); err != nil {
-			return err
-		}
+		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
 		for _, node := range reconfiguredNodes {
 			if len(node.URI) == 0 {
 				// Only running nodes should be restarted
 				continue
 			}
-			if err := n.RestartNode(ctx, w, node); err != nil {
+			if err := n.RestartNode(ctx, log, node); err != nil {
 				return err
 			}
 		}
@@ -756,9 +750,9 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 
 	// Add validators for the subnet
 	for _, subnet := range createdSubnets {
-		if _, err := fmt.Fprintf(w, "Adding validators for subnet %q\n", subnet.Name); err != nil {
-			return err
-		}
+		log.Info("adding validators for subnet",
+			zap.String("name", subnet.Name),
+		)
 
 		// Collect the nodes intended to validate the subnet
 		validatorIDs := set.NewSet[ids.NodeID](len(subnet.ValidatorIDs))
@@ -771,7 +765,7 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 			validatorNodes = append(validatorNodes, node)
 		}
 
-		if err := subnet.AddValidators(ctx, w, apiURI, validatorNodes...); err != nil {
+		if err := subnet.AddValidators(ctx, log, apiURI, validatorNodes...); err != nil {
 			return err
 		}
 	}
@@ -780,12 +774,12 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
-		if err := WaitForActiveValidators(ctx, w, pChainClient, subnet); err != nil {
+		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
 			return err
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, w, n.Nodes[0].URI); err != nil {
+		if err := subnet.CreateChains(ctx, log, n.Nodes[0].URI); err != nil {
 			return err
 		}
 
@@ -793,9 +787,9 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 		if err := subnet.Write(n.GetSubnetDir(), n.GetChainConfigDir()); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(w, " wrote chain configuration for subnet %q\n", subnet.Name); err != nil {
-			return err
-		}
+		log.Info(" wrote chain configuration for subnet",
+			zap.String("name", subnet.Name),
+		)
 
 		// If one or more of the subnets chains have explicit configuration, the
 		// subnet's validator nodes will need to be restarted for those nodes to read
@@ -809,16 +803,14 @@ func (n *Network) CreateSubnets(ctx context.Context, w io.Writer, apiURI string,
 		return nil
 	}
 
-	if _, err := fmt.Fprintln(w, "Restarting node(s) to pick up chain configuration"); err != nil {
-		return err
-	}
+	log.Info("restarting node(s) to pick up chain configuration")
 
 	// Restart nodes to allow configuration for the new chains to take effect
 	for _, node := range n.Nodes {
 		if !validatorsToRestart.Contains(node.NodeID) {
 			continue
 		}
-		if err := n.RestartNode(ctx, w, node); err != nil {
+		if err := n.RestartNode(ctx, log, node); err != nil {
 			return err
 		}
 	}
@@ -885,7 +877,7 @@ func (n *Network) getPluginDir() (string, error) {
 }
 
 // Waits until the provided nodes are healthy.
-func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
+func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) error {
 	ticker := time.NewTicker(networkHealthCheckInterval)
 	defer ticker.Stop()
 
@@ -901,9 +893,10 @@ func waitForHealthy(ctx context.Context, w io.Writer, nodes []*Node) error {
 			}
 
 			unhealthyNodes.Remove(node)
-			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
-				return err
-			}
+			log.Info("node is healthy",
+				zap.Stringer("nodeID", node.NodeID),
+				zap.String("uri", node.URI),
+			)
 		}
 
 		if unhealthyNodes.Len() == 0 {
@@ -950,47 +943,60 @@ const invalidRPCVersion = 0
 
 // checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
 // binaries have the same rpcchainvm version as the indicated avalanchego binary.
-func checkVMBinaries(w io.Writer, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
+func checkVMBinaries(log logging.Logger, subnets []*Subnet, avalanchegoPath string, pluginDir string) error {
 	if len(subnets) == 0 {
 		return nil
 	}
 
-	expectedRPCVersion, err := getRPCVersion(avalanchegoPath, "--version-json")
+	avalanchegoRPCVersion, err := getRPCVersion(avalanchegoPath, "--version-json")
 	if err != nil {
-		// Only warn if the rpc version is not available to ensure backwards compatibility.
-		if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for avalanchego: %v\n", err); err != nil {
-			return err
-		}
+		log.Warn("unable to check rpcchainvm version for avalanchego", zap.Error(err))
+		return nil
 	}
 
-	errs := []error{}
+	var incompatibleChains bool
 	for _, subnet := range subnets {
 		for _, chain := range subnet.Chains {
-			pluginPath := filepath.Join(pluginDir, chain.VMID.String())
+			vmPath := filepath.Join(pluginDir, chain.VMID.String())
 
 			// Check that the path exists
-			if _, err := os.Stat(pluginPath); err != nil {
-				errs = append(errs, fmt.Errorf("failed to check VM binary for subnet %q: %w", subnet.Name, err))
+			if _, err := os.Stat(vmPath); err != nil {
+				log.Warn("unable to check rpcchainvm version for VM",
+					zap.String("vmPath", vmPath),
+					zap.Error(err),
+				)
+				continue
 			}
 
-			if len(chain.VersionArgs) == 0 || expectedRPCVersion == invalidRPCVersion {
+			if len(chain.VersionArgs) == 0 || avalanchegoRPCVersion == invalidRPCVersion {
 				// Not possible to check the rpcchainvm version
 				continue
 			}
 
 			// Check that the VM's rpcchainvm version matches avalanchego's version
-			rpcVersion, err := getRPCVersion(pluginPath, chain.VersionArgs...)
+			vmRPCVersion, err := getRPCVersion(vmPath, chain.VersionArgs...)
 			if err != nil {
-				if _, err := fmt.Fprintf(w, "Warning: Unable to check rpcchainvm version for VM Binary for subnet %q: %v\n", subnet.Name, err); err != nil {
-					return err
-				}
-			} else if expectedRPCVersion != rpcVersion {
-				errs = append(errs, fmt.Errorf("unexpected rpcchainvm version for VM binary of subnet %q: %q reports %d, but %q reports %d", subnet.Name, avalanchegoPath, expectedRPCVersion, pluginPath, rpcVersion))
+				log.Warn("unable to check rpcchainvm version for VM Binary",
+					zap.String("subnet", subnet.Name),
+					zap.Error(err),
+				)
+			} else if avalanchegoRPCVersion != vmRPCVersion {
+				log.Error("unexpected rpcchainvm version for VM binary",
+					zap.String("subnet", subnet.Name),
+					zap.String("avalanchegoPath", avalanchegoPath),
+					zap.Uint64("avalanchegoRPCVersion", avalanchegoRPCVersion),
+					zap.String("vmPath", vmPath),
+					zap.Uint64("vmRPCVersion", vmRPCVersion),
+				)
+				incompatibleChains = true
 			}
 		}
 	}
 
-	return errors.Join(errs...)
+	if incompatibleChains {
+		return errors.New("the rpcchainvm version of the VMs for one or more chains may not be compatible with the specified avalanchego binary")
+	}
+	return nil
 }
 
 type RPCChainVMVersion struct {
