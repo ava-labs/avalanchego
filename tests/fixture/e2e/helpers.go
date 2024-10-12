@@ -221,6 +221,17 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 
 	// Check that the node becomes healthy within timeout
 	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), node))
+
+	// Ensure that the primary validators are still healthy
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			continue
+		}
+		healthy, err := node.IsHealthy(tc.DefaultContext())
+		require.NoError(err)
+		require.True(healthy, "primary validator %s is not healthy", node.NodeID)
+	}
+
 	return node
 }
 
