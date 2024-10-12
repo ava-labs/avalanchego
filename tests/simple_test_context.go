@@ -6,14 +6,13 @@ package tests
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"time"
 
-	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -34,10 +33,6 @@ func (*SimpleTestContext) Errorf(format string, args ...interface{}) {
 
 func (*SimpleTestContext) FailNow() {
 	panic(failNowMessage)
-}
-
-func (*SimpleTestContext) GetWriter() io.Writer {
-	return os.Stdout
 }
 
 // Cleanup is intended to be deferred by the caller to ensure cleanup is performed even
@@ -92,10 +87,10 @@ func (tc *SimpleTestContext) By(_ string, _ ...func()) {
 	tc.FailNow()
 }
 
-// TODO(marun) Enable color output equivalent to GinkgoTestContext.Outf
-func (*SimpleTestContext) Outf(format string, args ...interface{}) {
-	s := formatter.F(format, args...)
-	log.Print(s)
+func (tc *SimpleTestContext) Log() logging.Logger {
+	tc.Errorf("SimpleTestContext.Log not yet implemented")
+	tc.FailNow()
+	return nil
 }
 
 // Helper simplifying use of a timed context by canceling the context on ginkgo teardown.

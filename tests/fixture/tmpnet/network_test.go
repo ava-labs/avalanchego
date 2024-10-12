@@ -4,9 +4,9 @@
 package tmpnet
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +16,7 @@ func TestNetworkSerialization(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	network := NewDefaultNetwork("testnet")
-	require.NoError(network.EnsureDefaultConfig(&bytes.Buffer{}, "/path/to/avalanche/go", ""))
+	require.NoError(network.EnsureDefaultConfig(tests.NewDefaultTestLogger(), "/path/to/avalanche/go", ""))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())

@@ -5,21 +5,36 @@ package e2e
 
 import (
 	"context"
-	"io"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-type GinkgoTestContext struct{}
+type ginkgoWriteCloser struct{}
+
+func (*ginkgoWriteCloser) Write(p []byte) (n int, err error) {
+	// Add a leading space to better differentiate from other ginkgo output
+	_, _ = ginkgo.GinkgoWriter.Write([]byte(" "))
+	return ginkgo.GinkgoWriter.Write(p)
+}
+
+func (*ginkgoWriteCloser) Close() error {
+	return nil
+}
+
+type GinkgoTestContext struct {
+	logger logging.Logger
+}
 
 func NewTestContext() *GinkgoTestContext {
-	return &GinkgoTestContext{}
+	return &GinkgoTestContext{
+		logger: tests.NewTestLogger(&ginkgoWriteCloser{}),
+	}
 }
 
 func (*GinkgoTestContext) Errorf(format string, args ...interface{}) {
@@ -30,8 +45,8 @@ func (*GinkgoTestContext) FailNow() {
 	ginkgo.GinkgoT().FailNow()
 }
 
-func (*GinkgoTestContext) GetWriter() io.Writer {
-	return ginkgo.GinkgoWriter
+func (tc *GinkgoTestContext) Log() logging.Logger {
+	return tc.logger
 }
 
 func (*GinkgoTestContext) Cleanup() {
@@ -44,26 +59,6 @@ func (*GinkgoTestContext) DeferCleanup(cleanup func()) {
 
 func (*GinkgoTestContext) By(text string, callback ...func()) {
 	ginkgo.By(text, callback...)
-}
-
-// Outputs to stdout.
-//
-// Examples:
-//
-//   - Out("{{green}}{{bold}}hi there %q{{/}}", "aa")
-//   - Out("{{magenta}}{{bold}}hi therea{{/}} {{cyan}}{{underline}}b{{/}}")
-//
-// See https://github.com/onsi/ginkgo/blob/v2.0.0/formatter/formatter.go#L52-L73
-// for an exhaustive list of color options.
-func (*GinkgoTestContext) Outf(format string, args ...interface{}) {
-	s := formatter.F(format, args...)
-	// Use GinkgoWriter to ensure that output from this function is
-	// printed sequentially within other test output produced with
-	// GinkgoWriter (e.g. `STEP:...`) when tests are run in
-	// parallel. ginkgo collects and writes stdout separately from
-	// GinkgoWriter during parallel execution and the resulting output
-	// can be confusing.
-	ginkgo.GinkgoWriter.Print(s)
 }
 
 // Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
