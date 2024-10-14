@@ -234,7 +234,10 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	repoRoot, err := e2e.GetRepoRootPath(repoRelativePath)
 	require.NoError(err)
 
-	var args []string
+	args := []string{
+		"-x", // Ensure script output to aid in debugging
+		filepath.Join(repoRoot, "scripts", scriptName),
+	}
 	if forceNewHash {
 		// Ensure the build results in a new image hash by preventing use of a cached final stage
 		args = append(args, "--no-cache-filter", "execution")
@@ -242,7 +245,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 
 	cmd := exec.CommandContext(
 		tc.DefaultContext(),
-		filepath.Join(repoRoot, "scripts", scriptName),
+		"bash",
 		args...,
 	) // #nosec G204
 	cmd.Env = append(os.Environ(),

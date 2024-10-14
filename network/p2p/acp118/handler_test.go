@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -23,20 +24,46 @@ var _ Verifier = (*testVerifier)(nil)
 
 func TestHandler(t *testing.T) {
 	tests := []struct {
-		name           string
-		verifier       Verifier
-		expectedErr    error
-		expectedVerify bool
+		name         string
+		cacher       cache.Cacher[ids.ID, []byte]
+		verifier     Verifier
+		expectedErrs []error
 	}{
 		{
-			name:        "signature fails verification",
-			verifier:    &testVerifier{Err: &common.AppError{Code: 123}},
-			expectedErr: &common.AppError{Code: 123},
+			name:   "signature fails verification",
+			cacher: &cache.Empty[ids.ID, []byte]{},
+			verifier: &testVerifier{
+				Errs: []*common.AppError{
+					{Code: 123},
+				},
+			},
+			expectedErrs: []error{
+				&common.AppError{Code: 123},
+			},
 		},
 		{
-			name:           "signature signed",
-			verifier:       &testVerifier{},
-			expectedVerify: true,
+			name:     "signature signed",
+			cacher:   &cache.Empty[ids.ID, []byte]{},
+			verifier: &testVerifier{},
+			expectedErrs: []error{
+				nil,
+			},
+		},
+		{
+			name: "signature is cached",
+			cacher: &cache.LRU[ids.ID, []byte]{
+				Size: 1,
+			},
+			verifier: &testVerifier{
+				Errs: []*common.AppError{
+					nil,
+					{Code: 123}, // The valid response should be cached
+				},
+			},
+			expectedErrs: []error{
+				nil,
+				nil,
+			},
 		},
 	}
 
@@ -51,7 +78,7 @@ func TestHandler(t *testing.T) {
 			networkID := uint32(123)
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
-			h := NewHandler(tt.verifier, signer)
+			h := NewCachedHandler(tt.cacher, tt.verifier, signer)
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
 			c := p2ptest.NewClient(
@@ -77,12 +104,17 @@ func TestHandler(t *testing.T) {
 			requestBytes, err := proto.Marshal(request)
 			require.NoError(err)
 
-			done := make(chan struct{})
+			var (
+				expectedErr error
+				handled     = make(chan struct{})
+			)
 			onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
-				defer close(done)
+				defer func() {
+					handled <- struct{}{}
+				}()
 
+				require.ErrorIs(appErr, expectedErr)
 				if appErr != nil {
-					require.ErrorIs(tt.expectedErr, appErr)
 					return
 				}
 
@@ -92,24 +124,31 @@ func TestHandler(t *testing.T) {
 				signature, err := bls.SignatureFromBytes(response.Signature)
 				require.NoError(err)
 
-				require.Equal(tt.expectedVerify, bls.Verify(pk, signature, request.Message))
+				require.True(bls.Verify(pk, signature, request.Message))
 			}
 
-			require.NoError(c.AppRequest(ctx, set.Of(clientNodeID), requestBytes, onResponse))
-			<-done
+			for _, expectedErr = range tt.expectedErrs {
+				require.NoError(c.AppRequest(ctx, set.Of(clientNodeID), requestBytes, onResponse))
+				<-handled
+			}
 		})
 	}
 }
 
 // The zero value of testVerifier allows signing
 type testVerifier struct {
-	Err *common.AppError
+	Errs []*common.AppError
 }
 
-func (t testVerifier) Verify(
+func (t *testVerifier) Verify(
 	context.Context,
 	*warp.UnsignedMessage,
 	[]byte,
 ) *common.AppError {
-	return t.Err
+	if len(t.Errs) == 0 {
+		return nil
+	}
+	err := t.Errs[0]
+	t.Errs = t.Errs[1:]
+	return err
 }
