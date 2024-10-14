@@ -196,7 +196,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install qemu (required for cross-platform builds)
         run: |
-          sudo add-apt-repository universe
           sudo apt update
           sudo apt -y install qemu-system qemu-user-static
       - name: Check image build
