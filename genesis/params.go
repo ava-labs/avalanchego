@@ -38,11 +38,10 @@ type StakingConfig struct {
 }
 
 type TxFeeConfig struct {
-	CreateAssetTxFee     uint64              `json:"createAssetTxFee"`
-	StaticFeeConfig      txfee.StaticConfig  `json:"staticFeeConfig"`
-	DynamicFeeConfig     gas.Config          `json:"dynamicFeeConfig"`
-	ValidatorFeeCapacity gas.Gas             `json:"validatorFeeCapacity"`
-	ValidatorFeeConfig   validatorfee.Config `json:"validatorFeeConfig"`
+	CreateAssetTxFee   uint64              `json:"createAssetTxFee"`
+	StaticFeeConfig    txfee.StaticConfig  `json:"staticFeeConfig"`
+	DynamicFeeConfig   gas.Config          `json:"dynamicFeeConfig"`
+	ValidatorFeeConfig validatorfee.Config `json:"validatorFeeConfig"`
 }
 
 type Params struct {
