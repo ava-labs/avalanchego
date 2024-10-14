@@ -31,7 +31,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.21.12"
+          go-version: "~1.22.8"
           check-latest: true
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -73,7 +73,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.21.12"
+          go-version: "~1.22.8"
           check-latest: true
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -112,7 +112,7 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.21.12"
+          go-version: "~1.22.8"
           check-latest: true
       - name: Run e2e tests
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
