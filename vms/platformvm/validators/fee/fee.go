@@ -13,6 +13,7 @@ import (
 
 // Config contains all the static parameters of the dynamic fee mechanism.
 type Config struct {
+	Capacity                 gas.Gas   `json:"capacity"`
 	Target                   gas.Gas   `json:"target"`
 	MinPrice                 gas.Price `json:"minPrice"`
 	ExcessConversionConstant gas.Gas   `json:"excessConversionConstant"`
