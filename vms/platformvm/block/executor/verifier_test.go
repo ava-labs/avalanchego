@@ -250,6 +250,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	onAccept.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	onAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	onAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
+	onAccept.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(context.Background()))
@@ -419,6 +420,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
 		parentOnCommitState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
 		parentOnCommitState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
@@ -490,6 +492,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
 		parentOnAbortState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
 		parentOnAbortState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
