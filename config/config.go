@@ -793,8 +793,8 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				MinPrice:                 gas.Price(v.GetUint64(DynamicFeesMinGasPriceKey)),
 				ExcessConversionConstant: gas.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
 			},
-			ValidatorFeeCapacity: gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
 			ValidatorFeeConfig: validatorfee.Config{
+				Capacity:                 gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
 				Target:                   gas.Gas(v.GetUint64(ValidatorFeesTargetKey)),
 				MinPrice:                 gas.Price(v.GetUint64(ValidatorFeesMinPriceKey)),
 				ExcessConversionConstant: gas.Gas(v.GetUint64(ValidatorFeesExcessConversionConstantKey)),
