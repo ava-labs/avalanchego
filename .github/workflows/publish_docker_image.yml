@@ -16,9 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install qemu (required for cross-platform builds)
         run: |
-          sudo add-apt-repository universe
           sudo apt update
-          sudo apt -y install qemu qemu-user-static
+          sudo apt -y install qemu-system qemu-user-static
           sudo systemctl restart docker
       - name: Create multiplatform docker builder
         run: docker buildx create --use
