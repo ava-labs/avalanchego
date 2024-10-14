@@ -17,7 +17,7 @@ jobs:
       - name: Install qemu (required for cross-platform builds)
         run: |
           sudo apt update
-          sudo apt -y install qemu qemu-user-static
+          sudo apt -y install qemu-system qemu-user-static
           sudo systemctl restart docker
       - name: Create multiplatform docker builder
         run: docker buildx create --use
