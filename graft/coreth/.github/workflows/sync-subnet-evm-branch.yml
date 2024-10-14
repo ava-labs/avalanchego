@@ -1,11 +1,11 @@
-name: "Sync Subnet EVM Branch" 
+name: "Sync Subnet EVM Branch"
 on:
   workflow_dispatch:
-      inputs:
-        remoteBranch:
-            description: "Subnet EVM Branch"
-            required: true
-            default: "master"
+    inputs:
+      remoteBranch:
+        description: "Subnet EVM Branch"
+        required: true
+        default: "master"
 
 jobs:
   sync_branch:
@@ -16,5 +16,5 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "~1.21.12"
+          go-version: "~1.22.8"
           check-latest: true

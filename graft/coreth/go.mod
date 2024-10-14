@@ -1,10 +1,10 @@
 module github.com/ava-labs/coreth
 
-go 1.21.12
+go 1.22.8
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.11.12-rc.2
+	github.com/ava-labs/avalanchego v1.11.12-rc.3
 	github.com/cespare/cp v0.1.0
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233
 	github.com/davecgh/go-spew v1.1.1
@@ -16,7 +16,7 @@ require (
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/rpc v1.2.0
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/go-bexpr v0.1.10
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/holiman/billy v0.0.0-20240216141850-2abb0c79d3c4
