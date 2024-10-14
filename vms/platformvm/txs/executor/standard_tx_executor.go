@@ -981,6 +981,10 @@ func (e *StandardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 
 	// If the validator is currently inactive, we are activating it.
 	if sov.EndAccumulatedFee == 0 {
+		if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeConfig.Capacity {
+			return errMaxNumActiveValidators
+		}
+
 		sov.EndAccumulatedFee = e.State.GetAccruedFees()
 	}
 	sov.EndAccumulatedFee, err = safemath.Add(sov.EndAccumulatedFee, tx.Balance)
