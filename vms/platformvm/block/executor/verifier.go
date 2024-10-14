@@ -693,5 +693,6 @@ func calculateBlockMetrics(
 			validatorExcess,
 			config.ValidatorFeeConfig.ExcessConversionConstant,
 		),
+		AccruedValidatorFees: s.GetAccruedFees(),
 	}
 }

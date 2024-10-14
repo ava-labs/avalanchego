@@ -39,9 +39,10 @@ type Block struct {
 	GasState    gas.State
 	GasPrice    gas.Price
 
-	ActiveSoVs      int
-	ValidatorExcess gas.Gas
-	ValidatorPrice  gas.Price
+	ActiveSoVs           int
+	ValidatorExcess      gas.Gas
+	ValidatorPrice       gas.Price
+	AccruedValidatorFees uint64
 }
 
 type Metrics interface {
@@ -120,6 +121,10 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			},
 			[]string{ResourceLabel},
 		),
+		accruedValidatorFees: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "accrued_validator_fees",
+			Help: "The total cost of running an active SoV since Etna activation",
+		}),
 
 		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "validator_sets_cached",
@@ -154,6 +159,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.activeSoVs),
 		registerer.Register(m.excess),
 		registerer.Register(m.price),
+		registerer.Register(m.accruedValidatorFees),
 
 		registerer.Register(m.validatorSetsCreated),
 		registerer.Register(m.validatorSetsCached),
@@ -175,11 +181,12 @@ type metrics struct {
 	localStake             prometheus.Gauge
 	totalStake             prometheus.Gauge
 
-	gasConsumed prometheus.Counter
-	gasCapacity prometheus.Gauge
-	activeSoVs  prometheus.Gauge
-	excess      *prometheus.GaugeVec
-	price       *prometheus.GaugeVec
+	gasConsumed          prometheus.Counter
+	gasCapacity          prometheus.Gauge
+	activeSoVs           prometheus.Gauge
+	excess               *prometheus.GaugeVec
+	price                *prometheus.GaugeVec
+	accruedValidatorFees prometheus.Gauge
 
 	// Validator set diff metrics
 	validatorSetsCached     prometheus.Counter
@@ -197,6 +204,7 @@ func (m *metrics) MarkAccepted(b Block) error {
 	m.activeSoVs.Set(float64(b.ActiveSoVs))
 	m.excess.With(validatorsLabels).Set(float64(b.ValidatorExcess))
 	m.price.With(validatorsLabels).Set(float64(b.ValidatorPrice))
+	m.accruedValidatorFees.Set(float64(b.AccruedValidatorFees))
 
 	return b.Block.Visit(m.blockMetrics)
 }
