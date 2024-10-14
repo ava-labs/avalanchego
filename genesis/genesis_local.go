@@ -70,8 +70,8 @@ var (
 				// hardcode the result.
 				ExcessConversionConstant: 5_410_106, // Double every 30s
 			},
-			ValidatorFeeCapacity: 20_000,
 			ValidatorFeeConfig: validatorfee.Config{
+				Capacity: 20_000,
 				Target:   10_000,
 				MinPrice: gas.Price(1 * units.NanoAvax),
 				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)

@@ -586,7 +586,7 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 		if vdr.Balance != 0 {
 			// We are attempting to add an active validator
-			if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
+			if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeConfig.Capacity {
 				return errMaxNumActiveValidators
 			}
 
@@ -772,7 +772,7 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	}
 	if tx.Balance != 0 {
 		// We are attempting to add an active validator
-		if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeCapacity {
+		if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
@@ -981,6 +981,10 @@ func (e *StandardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 
 	// If the validator is currently inactive, we are activating it.
 	if sov.EndAccumulatedFee == 0 {
+		if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeConfig.Capacity {
+			return errMaxNumActiveValidators
+		}
+
 		sov.EndAccumulatedFee = e.State.GetAccruedFees()
 	}
 	sov.EndAccumulatedFee, err = safemath.Add(sov.EndAccumulatedFee, tx.Balance)

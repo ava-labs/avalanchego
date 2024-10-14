@@ -37,13 +37,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // This tests that the math performed during TransformSubnetTx execution can
@@ -2388,10 +2390,9 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
 		defaultConfig = &config.Config{
-			DynamicFeeConfig:     genesis.LocalParams.DynamicFeeConfig,
-			ValidatorFeeCapacity: genesis.LocalParams.ValidatorFeeCapacity,
-			ValidatorFeeConfig:   genesis.LocalParams.ValidatorFeeConfig,
-			UpgradeConfig:        upgradetest.GetConfig(upgradetest.Latest),
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -2505,19 +2506,23 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "invalid fee calculation",
 			updateExecutor: func(e *StandardTxExecutor) error {
-				e.FeeCalculator = fee.NewStaticCalculator(e.Config.StaticFeeConfig)
+				e.FeeCalculator = txfee.NewStaticCalculator(e.Config.StaticFeeConfig)
 				return nil
 			},
-			expectedErr: fee.ErrUnsupportedTx,
+			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "too many active validators",
 			updateExecutor: func(e *StandardTxExecutor) error {
 				e.Backend.Config = &config.Config{
-					DynamicFeeConfig:     genesis.LocalParams.DynamicFeeConfig,
-					ValidatorFeeCapacity: 0,
-					ValidatorFeeConfig:   genesis.LocalParams.ValidatorFeeConfig,
-					UpgradeConfig:        upgradetest.GetConfig(upgradetest.Latest),
+					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
+					ValidatorFeeConfig: validatorfee.Config{
+						Capacity:                 0,
+						Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+						MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
+						ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+					},
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 				}
 				return nil
 			},
@@ -2538,7 +2543,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "insufficient fee",
 			updateExecutor: func(e *StandardTxExecutor) error {
-				e.FeeCalculator = fee.NewDynamicCalculator(
+				e.FeeCalculator = txfee.NewDynamicCalculator(
 					e.Config.DynamicFeeConfig.Weights,
 					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
 				)
