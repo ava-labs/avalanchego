@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -32,7 +33,22 @@ type Verifier interface {
 
 // NewHandler returns an instance of Handler
 func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
+	return NewCachedHandler(
+		&cache.Empty[ids.ID, []byte]{},
+		verifier,
+		signer,
+	)
+}
+
+// NewCachedHandler returns an instance of Handler that caches successful
+// requests.
+func NewCachedHandler(
+	cacher cache.Cacher[ids.ID, []byte],
+	verifier Verifier,
+	signer warp.Signer,
+) *Handler {
 	return &Handler{
+		cacher:   cacher,
 		verifier: verifier,
 		signer:   signer,
 	}
@@ -42,6 +58,7 @@ func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
 type Handler struct {
 	p2p.NoOpHandler
 
+	cacher   cache.Cacher[ids.ID, []byte]
 	verifier Verifier
 	signer   warp.Signer
 }
@@ -68,6 +85,11 @@ func (h *Handler) AppRequest(
 		}
 	}
 
+	msgID := msg.ID()
+	if responseBytes, ok := h.cacher.Get(msgID); ok {
+		return responseBytes, nil
+	}
+
 	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
 		return nil, err
 	}
@@ -92,5 +114,6 @@ func (h *Handler) AppRequest(
 		}
 	}
 
+	h.cacher.Put(msgID, responseBytes)
 	return responseBytes, nil
 }
