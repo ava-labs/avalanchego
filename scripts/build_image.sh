@@ -15,7 +15,7 @@ set -euo pipefail
 # default in the verson of docker included with Ubuntu 22.04, and qemu can be
 # installed as follows:
 #
-#  sudo apt-get install qemu qemu-user-static
+#  sudo apt-get install qemu-system qemu-user-static
 #
 # After installing qemu, it will also be necessary to start a new builder that can
 # support multiplatform builds:
