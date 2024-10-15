@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -20,10 +21,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+)
+
+const (
+	second                                = 1
+	minute                                = 60 * second
+	hour                                  = 60 * minute
+	day                                   = 24 * hour
+	RegisterSubnetValidatorTxExpiryWindow = day
 )
 
 var (
@@ -620,6 +632,169 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	avax.Produce(e.State, txID, tx.Outs)
 	// Set the new Subnet manager in the database
 	e.State.SetSubnetConversion(tx.Subnet, conversionID, tx.ChainID, tx.Address)
+	return nil
+}
+
+func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	fee, err = math.Add(fee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	warpMessage, err := warp.ParseMessage(tx.Message)
+	if err != nil {
+		return err
+	}
+	if warpMessage.NetworkID != e.Ctx.NetworkID {
+		return fmt.Errorf("expected networkID %d but got %d", e.Ctx.NetworkID, warpMessage.NetworkID)
+	}
+
+	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
+	if err != nil {
+		return err
+	}
+
+	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
+	if err != nil {
+		return err
+	}
+	if err := msg.Verify(); err != nil {
+		return err
+	}
+
+	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(msg.SubnetID)
+	if err != nil {
+		return err
+	}
+	if warpMessage.SourceChainID != expectedChainID {
+		return fmt.Errorf("expected chainID %s but got %s", expectedChainID, warpMessage.SourceChainID)
+	}
+	if !bytes.Equal(addressedCall.SourceAddress, expectedAddress) {
+		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
+	}
+
+	currentTimestampUnix := uint64(currentTimestamp.Unix())
+	if msg.Expiry <= currentTimestampUnix {
+		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
+	}
+	maxAllowedExpiry, err := math.Add(currentTimestampUnix, RegisterSubnetValidatorTxExpiryWindow)
+	if err != nil {
+		// This should never happen, as it would imply that either
+		// currentTimestampUnix or RegisterSubnetValidatorTxExpiryWindow is
+		// significantly larger than expected.
+		return err
+	}
+	if msg.Expiry > maxAllowedExpiry {
+		return fmt.Errorf("expected expiry not to be after %d but got %d", maxAllowedExpiry, msg.Expiry)
+	}
+
+	pop := signer.ProofOfPossession{
+		PublicKey:         msg.BLSPublicKey,
+		ProofOfPossession: tx.ProofOfPossession,
+	}
+	if err := pop.Verify(); err != nil {
+		return err
+	}
+
+	validationID := msg.ValidationID()
+	expiry := state.ExpiryEntry{
+		Timestamp:    msg.Expiry,
+		ValidationID: validationID,
+	}
+	isDuplicate, err := e.State.HasExpiry(expiry)
+	if err != nil {
+		return err
+	}
+	if isDuplicate {
+		return fmt.Errorf("expiry for %s already exists", validationID)
+	}
+
+	nodeID, err := ids.ToNodeID(msg.NodeID)
+	if err != nil {
+		return err
+	}
+
+	remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.RemainingBalanceOwner)
+	if err != nil {
+		return err
+	}
+
+	deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.DisableOwner)
+	if err != nil {
+		return err
+	}
+
+	sov := state.SubnetOnlyValidator{
+		ValidationID:          validationID,
+		SubnetID:              msg.SubnetID,
+		NodeID:                nodeID,
+		PublicKey:             bls.PublicKeyToUncompressedBytes(pop.Key()),
+		RemainingBalanceOwner: remainingBalanceOwner,
+		DeactivationOwner:     deactivationOwner,
+		StartTime:             currentTimestampUnix,
+		Weight:                msg.Weight,
+		MinNonce:              0,
+		EndAccumulatedFee:     0, // If Balance is 0, this is 0
+	}
+	if tx.Balance != 0 {
+		// We are attempting to add an active validator
+		if gas.Gas(e.State.NumActiveSubnetOnlyValidators()) >= e.Backend.Config.ValidatorFeeConfig.Capacity {
+			return errMaxNumActiveValidators
+		}
+
+		currentFees := e.State.GetAccruedFees()
+		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := e.State.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
+	// Prevent this warp message from being replayed
+	e.State.PutExpiry(expiry)
 	return nil
 }
 
