@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package config
 
 import (
 	"time"
@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-var DefaultConfig = Config{
+var DefaultNetworkConfig = NetworkConfig{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
 	PushGossipPercentStake:                      .9,
@@ -29,7 +29,7 @@ var DefaultConfig = Config{
 	MaxBloomFilterFalsePositiveProbability:      .05,
 }
 
-type Config struct {
+type NetworkConfig struct {
 	// MaxValidatorSetStaleness limits how old of a validator set the network
 	// will use for peer sampling and rate limiting.
 	MaxValidatorSetStaleness time.Duration `json:"max-validator-set-staleness"`

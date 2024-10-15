@@ -166,8 +166,11 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.mempool,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
+		&res.ctx.Lock,
+		res.state,
+		res.ctx.WarpSigner,
 		registerer,
-		network.DefaultConfig,
+		config.DefaultNetworkConfig,
 	)
 	require.NoError(err)
 
