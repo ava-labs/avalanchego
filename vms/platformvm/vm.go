@@ -52,9 +52,10 @@ import (
 )
 
 var (
-	_ snowmanblock.ChainVM = (*VM)(nil)
-	_ secp256k1fx.VM       = (*VM)(nil)
-	_ validators.State     = (*VM)(nil)
+	_ snowmanblock.ChainVM                      = (*VM)(nil)
+	_ snowmanblock.BuildBlockWithContextChainVM = (*VM)(nil)
+	_ secp256k1fx.VM                            = (*VM)(nil)
+	_ validators.State                          = (*VM)(nil)
 )
 
 type VM struct {
