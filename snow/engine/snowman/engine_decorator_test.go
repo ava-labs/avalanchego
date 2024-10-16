@@ -54,12 +54,12 @@ func TestEngineStragglerDetector(t *testing.T) {
 
 	now := time.Now()
 	fakeClock.Set(now)
-	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID()))
+	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID(), 100))
 	now = now.Add(minStragglerCheckInterval * 2)
 	fakeClock.Set(now)
-	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID()))
+	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID(), 100))
 	now = now.Add(minStragglerCheckInterval * 2)
 	fakeClock.Set(now)
-	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID()))
+	require.NoError(decoratedEngine.Chits(context.Background(), peerID, 0, parent.ID(), parent.ID(), parent.ID(), 100))
 	require.Empty(listenerShouldInvokeWith)
 }

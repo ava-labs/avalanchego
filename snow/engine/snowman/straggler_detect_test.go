@@ -4,7 +4,6 @@
 package snowman
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -42,9 +41,9 @@ func TestNodeWeightsOverflow(t *testing.T) {
 }
 
 func TestNodeWeights2Blocks(t *testing.T) {
-	nw2b := nodeWeightsToBlocks{
-		ids.NodeWeight{Weight: 5}:  ids.Empty,
-		ids.NodeWeight{Weight: 10}: ids.Empty,
+	nw2b := nodeWeightsToHeight{
+		ids.NodeWeight{Weight: 5}:  100,
+		ids.NodeWeight{Weight: 10}: 101,
 	}
 
 	total, err := nw2b.totalWeight()
@@ -68,10 +67,10 @@ func TestGetNetworkSnapshot(t *testing.T) {
 	}
 
 	for _, testCase := range []struct {
+		totalWeight           uint64
 		description           string
-		lastAccepted          ids.ID
-		lastAcceptedFromNodes map[ids.NodeID]ids.ID
-		processing            map[ids.ID]struct{}
+		lastAcceptedHeight    uint64
+		lastAcceptedFromNodes map[ids.NodeID]uint64
 		connectedValidators   func() set.Set[ids.NodeWeight]
 		expectedSnapshot      snapshot
 		expectedOK            bool
@@ -80,48 +79,53 @@ func TestGetNetworkSnapshot(t *testing.T) {
 		{
 			description:         "connected to zero weight",
 			connectedValidators: connectedValidators([]ids.NodeWeight{}),
-			expectedLogged:      "Connected to zero weight",
+			expectedLogged:      "connected to zero weight",
 		},
 		{
 			description:         "not enough info",
+			totalWeight:         9999999999,
 			connectedValidators: connectedValidators([]ids.NodeWeight{{Weight: 1, ID: n1}, {Weight: 999999, ID: n2}}),
-			lastAcceptedFromNodes: map[ids.NodeID]ids.ID{
-				n1: {0x1},
+			lastAcceptedFromNodes: map[ids.NodeID]uint64{
+				n1: 100,
 			},
-			expectedLogged: "Not collected enough information about last accepted blocks",
+			expectedLogged: "Not collected enough information about last accepted block",
 		},
 		{
 			description:         "we're in sync",
+			totalWeight:         999999,
 			connectedValidators: connectedValidators([]ids.NodeWeight{{Weight: 999999, ID: n1}}),
-			lastAcceptedFromNodes: map[ids.NodeID]ids.ID{
-				n1: {0x1},
+			lastAcceptedFromNodes: map[ids.NodeID]uint64{
+				n1: 100,
 			},
-			lastAccepted:   ids.ID{0x1},
-			expectedLogged: "Most stake we're connected to has the same height as we do",
+			lastAcceptedHeight: 100,
+			expectedOK:         true,
+			expectedSnapshot: snapshot{totalValidatorWeight: 999999, lastAcceptedBlockHeight: nodeWeightsToHeight{
+				{Weight: 999999, ID: n1}: 100,
+			}},
 		},
 		{
 			description:         "we're behind",
+			totalWeight:         999999,
 			connectedValidators: connectedValidators([]ids.NodeWeight{{Weight: 999999, ID: n1}}),
-			lastAcceptedFromNodes: map[ids.NodeID]ids.ID{
-				n1: {0x1},
+			lastAcceptedFromNodes: map[ids.NodeID]uint64{
+				n1: 120,
 			},
-			processing:   map[ids.ID]struct{}{{0x1}: {}},
-			lastAccepted: ids.ID{0x0},
-			expectedSnapshot: snapshot{totalValidatorWeight: 999999, lastAcceptedBlockID: nodeWeightsToBlocks{
-				ids.NodeWeight{ID: n1, Weight: 999999}: {0x1},
+			lastAcceptedHeight: 100,
+			expectedSnapshot: snapshot{totalValidatorWeight: 999999, lastAcceptedBlockHeight: nodeWeightsToHeight{
+				ids.NodeWeight{ID: n1, Weight: 999999}: 120,
 			}},
 			expectedOK: true,
 		},
 		{
 			description:         "we're not behind",
+			totalWeight:         999999,
 			connectedValidators: connectedValidators([]ids.NodeWeight{{Weight: 999999, ID: n1}}),
-			lastAcceptedFromNodes: map[ids.NodeID]ids.ID{
-				n1: {0x1},
+			lastAcceptedFromNodes: map[ids.NodeID]uint64{
+				n1: 100,
 			},
-			processing:   map[ids.ID]struct{}{{0x2}: {}},
-			lastAccepted: ids.ID{0x0},
-			expectedSnapshot: snapshot{totalValidatorWeight: 999999, lastAcceptedBlockID: nodeWeightsToBlocks{
-				ids.NodeWeight{ID: n1, Weight: 999999}: {0x1},
+			lastAcceptedHeight: 100,
+			expectedSnapshot: snapshot{totalValidatorWeight: 999999, lastAcceptedBlockHeight: nodeWeightsToHeight{
+				ids.NodeWeight{ID: n1, Weight: 999999}: 100,
 			}},
 			expectedOK: true,
 		},
@@ -131,15 +135,15 @@ func TestGetNetworkSnapshot(t *testing.T) {
 			log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, &buff, logging.Plain.ConsoleEncoder()))
 
 			s := &snapshotter{
+				totalWeight: func() (uint64, error) {
+					return testCase.totalWeight, nil
+				},
 				log:                      log,
 				connectedValidators:      testCase.connectedValidators,
 				minConfirmationThreshold: 0.75,
-				lastAccepted: func() ids.ID {
-					return testCase.lastAccepted
-				},
-				lastAcceptedByNodeID: func(vdr ids.NodeID) (ids.ID, bool) {
-					id, ok := testCase.lastAcceptedFromNodes[vdr]
-					return id, ok
+				lastAcceptedHeightByNodeID: func(vdr ids.NodeID) (ids.ID, uint64, bool) {
+					height, ok := testCase.lastAcceptedFromNodes[vdr]
+					return ids.Empty, height, ok
 				},
 			}
 
@@ -158,9 +162,8 @@ func TestFailedCatchingUp(t *testing.T) {
 
 	for _, testCase := range []struct {
 		description           string
-		lastAccepted          ids.ID
+		lastAccepted          uint64
 		lastAcceptedFromNodes map[ids.NodeID]ids.ID
-		processing            map[ids.ID]struct{}
 		connectedValidators   []ids.NodeWeight
 		input                 snapshot
 		expected              bool
@@ -170,56 +173,32 @@ func TestFailedCatchingUp(t *testing.T) {
 			description: "stake overflow",
 			input: snapshot{
 				totalValidatorWeight: 100,
-				lastAcceptedBlockID: nodeWeightsToBlocks{
-					ids.NodeWeight{ID: n1, Weight: math.MaxUint64 - 10}: ids.ID{0x1},
-					ids.NodeWeight{ID: n2, Weight: 11}:                  ids.ID{0x2},
+				lastAcceptedBlockHeight: nodeWeightsToHeight{
+					ids.NodeWeight{ID: n1, Weight: math.MaxUint64 - 10}: 100,
+					ids.NodeWeight{ID: n2, Weight: 11}:                  100,
 				},
-			},
-			processing: map[ids.ID]struct{}{
-				{0x1}: {},
-				{0x2}: {},
 			},
 			expectedLogged: "Failed computing total weight",
 		},
 		{
-			description: "Straggling behind stake minority",
-			input: snapshot{
-				totalValidatorWeight: 100, lastAcceptedBlockID: nodeWeightsToBlocks{
-					ids.NodeWeight{ID: n1, Weight: 25}: ids.ID{0x1},
-					ids.NodeWeight{ID: n2, Weight: 50}: ids.ID{0x2},
-				},
-			},
-			processing: map[ids.ID]struct{}{
-				{0x1}: {},
-				{0x2}: {},
-			},
-			expectedLogged: "Nodes ahead of us",
-		},
-		{
 			description: "Straggling behind stake majority",
 			input: snapshot{
-				totalValidatorWeight: 100, lastAcceptedBlockID: nodeWeightsToBlocks{
-					ids.NodeWeight{ID: n1, Weight: 26}: ids.ID{0x1},
-					ids.NodeWeight{ID: n2, Weight: 50}: ids.ID{0x2},
+				totalValidatorWeight: 100, lastAcceptedBlockHeight: nodeWeightsToHeight{
+					ids.NodeWeight{ID: n1, Weight: 26}: 100,
+					ids.NodeWeight{ID: n2, Weight: 50}: 100,
 				},
-			},
-			processing: map[ids.ID]struct{}{
-				{0x1}: {},
-				{0x2}: {},
 			},
 			expectedLogged: "We are straggling behind",
 			expected:       true,
 		},
 		{
-			description: "In sync with the majority",
+			description:  "In sync with the majority",
+			lastAccepted: 100,
 			input: snapshot{
-				totalValidatorWeight: 100, lastAcceptedBlockID: nodeWeightsToBlocks{
-					ids.NodeWeight{ID: n1, Weight: 75}: ids.ID{0x1},
-					ids.NodeWeight{ID: n2, Weight: 25}: ids.ID{0x2},
+				totalValidatorWeight: 100, lastAcceptedBlockHeight: nodeWeightsToHeight{
+					ids.NodeWeight{ID: n1, Weight: 75}: 100,
+					ids.NodeWeight{ID: n2, Weight: 25}: 100,
 				},
-			},
-			processing: map[ids.ID]struct{}{
-				{0x2}: {},
 			},
 			expectedLogged: "Nodes ahead of us",
 		},
@@ -229,11 +208,10 @@ func TestFailedCatchingUp(t *testing.T) {
 			log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, &buff, logging.Plain.ConsoleEncoder()))
 
 			sa := &snapshotAnalyzer{
-				log: log,
-				processing: func(id ids.ID) bool {
-					_, ok := testCase.processing[id]
-					return ok
+				lastAcceptedHeight: func() uint64 {
+					return testCase.lastAccepted
 				},
+				log: log,
 			}
 
 			require.Equal(t, testCase.expected, sa.areWeBehindTheRest(testCase.input))
@@ -255,12 +233,10 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 	}
 	nonEmptySnap := snapshot{
 		totalValidatorWeight: 100,
-		lastAcceptedBlockID: nodeWeightsToBlocks{
-			ids.NodeWeight{Weight: 100}: ids.Empty,
+		lastAcceptedBlockHeight: nodeWeightsToHeight{
+			ids.NodeWeight{Weight: 100}: 100,
 		},
 	}
-
-	var haveWeFailedCatchingUpReturns bool
 
 	var buff logBuffer
 	log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, &buff, logging.Plain.ConsoleEncoder()))
@@ -274,9 +250,6 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 				s := <-snapshots
 				return s, !s.isEmpty()
 			},
-			areWeBehindTheRest: func(_ snapshot) bool {
-				return haveWeFailedCatchingUpReturns
-			},
 		},
 	}
 
@@ -285,25 +258,25 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 	for _, testCase := range []struct {
 		description                   string
 		timeAdvanced                  time.Duration
-		evalExtraAssertions           func(t *testing.T)
+		evalExtraAssertions           func(*testing.T, *stragglerDetector)
 		expectedStragglingTime        time.Duration
 		snapshotsRead                 []snapshot
 		haveWeFailedCatchingUpReturns bool
 	}{
 		{
 			description:         "First invocation only sets the time",
-			evalExtraAssertions: func(_ *testing.T) {},
+			evalExtraAssertions: func(_ *testing.T, _ *stragglerDetector) {},
 		},
 		{
 			description:         "Should not check yet, as it is not time yet",
 			timeAdvanced:        time.Millisecond * 500,
-			evalExtraAssertions: func(_ *testing.T) {},
+			evalExtraAssertions: func(_ *testing.T, _ *stragglerDetector) {},
 		},
 		{
 			description:   "Advance time some more, so now we should check",
 			timeAdvanced:  time.Millisecond * 501,
 			snapshotsRead: []snapshot{{}},
-			evalExtraAssertions: func(t *testing.T) {
+			evalExtraAssertions: func(t *testing.T, _ *stragglerDetector) {
 				require.Contains(t, buff.String(), "No node snapshot obtained")
 			},
 		},
@@ -312,7 +285,7 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 			timeAdvanced:                  time.Second * 2,
 			snapshotsRead:                 []snapshot{nonEmptySnap},
 			haveWeFailedCatchingUpReturns: true,
-			evalExtraAssertions: func(t *testing.T) {
+			evalExtraAssertions: func(t *testing.T, _ *stragglerDetector) {
 				require.Empty(t, buff.String())
 			},
 		},
@@ -321,7 +294,7 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 			timeAdvanced:                  time.Second * 2,
 			expectedStragglingTime:        time.Second * 2,
 			haveWeFailedCatchingUpReturns: true,
-			evalExtraAssertions: func(t *testing.T) {
+			evalExtraAssertions: func(t *testing.T, sd *stragglerDetector) {
 				require.Empty(t, sd.prevSnapshot)
 			},
 		},
@@ -333,16 +306,15 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 			// We carry over the total straggling time from previous testCase to this check,
 			// as we expect the next check to nullify it.
 			expectedStragglingTime: time.Second * 2,
-			evalExtraAssertions:    func(_ *testing.T) {},
+			evalExtraAssertions:    func(_ *testing.T, _ *stragglerDetector) {},
 		},
 		{
 			description:         "The fourth check returns we have succeeded in catching up",
 			timeAdvanced:        time.Second * 2,
-			evalExtraAssertions: func(_ *testing.T) {},
+			evalExtraAssertions: func(_ *testing.T, _ *stragglerDetector) {},
 		},
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
-			fmt.Println(testCase.description)
 			fakeTime = fakeTime.Add(testCase.timeAdvanced)
 			fakeClock.Set(fakeTime)
 
@@ -351,14 +323,16 @@ func TestCheckIfWeAreStragglingBehind(t *testing.T) {
 				snapshots <- testCase.snapshotsRead[0]
 			}
 
-			haveWeFailedCatchingUpReturns = testCase.haveWeFailedCatchingUpReturns
+			sd.areWeBehindTheRest = func(_ snapshot) bool {
+				return testCase.haveWeFailedCatchingUpReturns
+			}
+
 			require.Equal(t, testCase.expectedStragglingTime, sd.CheckIfWeAreStragglingBehind())
-			testCase.evalExtraAssertions(t)
+			testCase.evalExtraAssertions(t, &sd)
 
 			// Cleanup the log buffer, and make sure no snapshots remain for next testCase.
 			buff.Reset()
 			assertNoSnapshotsRemain()
-			haveWeFailedCatchingUpReturns = false
 		})
 	}
 }

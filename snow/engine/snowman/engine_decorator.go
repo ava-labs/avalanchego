@@ -22,17 +22,21 @@ type decoratedEngineWithStragglerDetector struct {
 func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration)) common.Engine {
 	minConfRatio := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
 
+	subnet := e.Ctx.SubnetID
+
 	sa := &snapshotAnalyzer{
-		log:        e.Config.Ctx.Log,
-		processing: e.Consensus.Processing,
+		lastAcceptedHeight: onlyHeight(e.Consensus.LastAccepted),
+		log:                e.Config.Ctx.Log,
 	}
 
 	s := &snapshotter{
-		log:                      e.Config.Ctx.Log,
-		connectedValidators:      e.Config.ConnectedValidators.ConnectedValidators,
-		minConfirmationThreshold: minConfRatio,
-		lastAcceptedByNodeID:     e.acceptedFrontiers.LastAccepted,
-		lastAccepted:             dropHeight(e.Consensus.LastAccepted),
+		totalWeight: func() (uint64, error) {
+			return e.Validators.TotalWeight(subnet)
+		},
+		log:                        e.Config.Ctx.Log,
+		connectedValidators:        e.Config.ConnectedValidators.ConnectedValidators,
+		minConfirmationThreshold:   minConfRatio,
+		lastAcceptedHeightByNodeID: e.acceptedFrontiers.LastAccepted,
 	}
 
 	conf := stragglerDetectorConfig{
@@ -52,12 +56,12 @@ func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f
 	}
 }
 
-func (de *decoratedEngineWithStragglerDetector) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
+func (de *decoratedEngineWithStragglerDetector) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	behindDuration := de.sd.CheckIfWeAreStragglingBehind()
 	if behindDuration > 0 {
 		de.Engine.Config.Ctx.Log.Info("We are behind the rest of the network", zap.Float64("seconds", behindDuration.Seconds()))
 	}
 	de.Engine.metrics.stragglingDuration.Set(float64(behindDuration))
 	de.f(behindDuration)
-	return de.Engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
+	return de.Engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
