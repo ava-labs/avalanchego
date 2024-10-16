@@ -245,6 +245,9 @@ type VM struct {
 	ethTxGossipHandler p2p.Handler
 	ethTxPushGossiper  avalancheUtils.Atomic[*gossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper  gossip.Gossiper
+
+	// RPC handlers (should be stopped before closing chaindb)
+	rpcHandlers []interface{ Stop() }
 }
 
 // Initialize implements the snowman.ChainVM interface
@@ -826,6 +829,10 @@ func (vm *VM) Shutdown(context.Context) error {
 		log.Error("error stopping state syncer", "err", err)
 	}
 	close(vm.shutdownChan)
+	// Stop RPC handlers before eth.Stop which will close the database
+	for _, handler := range vm.rpcHandlers {
+		handler.Stop()
+	}
 	vm.eth.Stop()
 	log.Info("Ethereum backend stop completed")
 	vm.shutdownWg.Wait()
@@ -1040,6 +1047,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		vm.config.WSCPUMaxStored.Duration,
 	)
 
+	vm.rpcHandlers = append(vm.rpcHandlers, handler)
 	return apis, nil
 }
 
@@ -1053,6 +1061,7 @@ func (vm *VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, er
 		return nil, err
 	}
 
+	vm.rpcHandlers = append(vm.rpcHandlers, handler)
 	return map[string]http.Handler{
 		"/rpc": handler,
 	}, nil
