@@ -1,11 +1,5 @@
 # Release Notes
 
-## [v1.11.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.21)
-
-## Misc
-
-- Added reminder for documenting RELEASE.md in the pull request template
-
 ## [v1.11.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.11)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
