@@ -244,7 +244,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	}
 
 	cmd := exec.CommandContext(
-		tc.DefaultContext(),
+		tc.ContextWithTimeout(e2e.DefaultTimeout*2), // Double the timeout to account for CI being really slow
 		"bash",
 		args...,
 	) // #nosec G204
