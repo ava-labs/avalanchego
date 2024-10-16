@@ -15,7 +15,10 @@ regressions in compatibility.
 ### Types of bootstrap testing for C-Chain
 
 The X-Chain and P-Chain always synchronize all state, but the bulk of
-data for testnet and mainnet is on the C-Chain and there are 2 options:
+data for testnet and mainnet is on the C-Chain. There are 2 primary
+options ([as documented in the coreth
+repo](https://github.com/ava-labs/coreth/tree/master/sync)) for
+configuring synchronization of the C-Chain:
 
 #### State Sync
 
@@ -120,6 +123,33 @@ and initiates a new test when one is found.
    image is found, the managing `StatefulSet` is updated with the
    details of the image to trigger a new test. The process to detect a
    new image is the same as was described for the `init` command.
+
+### Configuration
+
+The simplest way to provide configuration to avalanchego running in a
+pod is via environment variables (env vars). Providing configuration
+via the filesystem to a pod (e.g. `--config-file-dir`) would require
+maintaining the configuration in a configmap - separate from the pod -
+and mapping the volume so the pod could read it. Simpler to define the
+configuration directly in the pod spec as an env var.
+
+In the interests of simplifying the maintenance of configuration
+intended to be supplied via env var, the `bootstrap-monitor` binary
+provides commands for outputting configuration in the marshaled and
+base64-encoded format expected by the following env vars:
+
+ - `AVAGO_CHAIN_CONFIG_CONTENT`
+   - `bootstrap-monitor chain-config --state-sync-enabled=true`
+     - Generates chain configuration for state sync bootstrap
+   - `bootstrap-monitor chain-config --state-sync-enabled=false`
+     - Generates chain configuration for full sync bootstrap
+ - `AVAGO_DB_CONFIG_FILE_CONTENT`
+   - `bootstrap-monitor db-config`
+     - Generates db configuration common to all bootstrap tests
+
+When the configuration for one of these vars needs to be changed, the
+relevant `bootstrap-monitor` command can be modified and its output
+applied to the appropriate env vars.
 
 ## Package details
 

@@ -4,6 +4,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,8 +14,10 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/tests/fixture/bootstrapmonitor"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -94,6 +98,36 @@ func main() {
 	waitCmd.PersistentFlags().DurationVar(&imageCheckInterval, "image-check-interval", defaultImageCheckInterval, "The interval at which to check for a new image")
 	rootCmd.AddCommand(waitCmd)
 
+	var stateSyncEnabled bool
+	chainConfigCmd := &cobra.Command{
+		Use:   "chain-config",
+		Short: "Output recommended base64-encoded chain configuration for use with --chain-config-content",
+		RunE: func(*cobra.Command, []string) error {
+			chainConfig, err := encodedChainConfig(stateSyncEnabled)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stdout, chainConfig+"\n")
+			return nil
+		},
+	}
+	chainConfigCmd.PersistentFlags().BoolVar(&stateSyncEnabled, "state-sync-enabled", true, "Whether the configuration will enable state sync")
+	rootCmd.AddCommand(chainConfigCmd)
+
+	dbConfigCmd := &cobra.Command{
+		Use:   "db-config",
+		Short: "Output recommended base64-encoded db configuration for use with --db-config-file-content",
+		RunE: func(*cobra.Command, []string) error {
+			dbConfig, err := encodedDBConfig()
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stdout, dbConfig+"\n")
+			return nil
+		},
+	}
+	rootCmd.AddCommand(dbConfigCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		log.Error(commandName+" failed", zap.Error(err))
 		os.Exit(1)
@@ -115,4 +149,40 @@ func checkArgs(namespace string, podName string, nodeContainerName string, dataD
 		return errors.New("--data-dir is required")
 	}
 	return nil
+}
+
+func encodedChainConfig(stateSyncEnabled bool) (string, error) {
+	flags := map[string]map[string]any{
+		"C": {
+			"state-sync-enabled": stateSyncEnabled,
+			"trie-clean-cache":   4096,
+			"trie-dirty-cache":   4096,
+		},
+	}
+	chainConfigs := map[string]chains.ChainConfig{}
+	for chainID, chainFlags := range flags {
+		marshaledFlags, err := json.Marshal(chainFlags)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal flags map for %s: %w", chainID, err)
+		}
+		chainConfigs[chainID] = chains.ChainConfig{
+			Config: marshaledFlags,
+		}
+	}
+	marshaledChainConfigs, err := json.Marshal(chainConfigs)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledChainConfigs), nil
+}
+
+func encodedDBConfig() (string, error) {
+	dbFlags := map[string]any{
+		"blockCacheCapacity": 3 * units.GiB / (2 * units.MiB),
+	}
+	marshaledDBFlags, err := json.Marshal(dbFlags)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal db flags: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledDBFlags), nil
 }
