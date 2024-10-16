@@ -467,6 +467,7 @@ func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset
 		"init",
 		"--node-container-name=" + nodeContainerName,
 		"--data-dir=" + dataDir,
+		"--log-format=json",
 	})
 	initContainer.VolumeMounts = []corev1.VolumeMount{
 		{
@@ -481,6 +482,7 @@ func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset
 		"--data-dir=" + dataDir,
 		"--health-check-interval=1s",
 		"--image-check-interval=1s",
+		"--log-format=json",
 	})
 	monitorContainer.VolumeMounts = []corev1.VolumeMount{
 		{
