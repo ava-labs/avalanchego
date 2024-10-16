@@ -54,6 +54,14 @@ func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
 	return ParseUInt64(b)
 }
 
+func GetOrDefaultUInt64(db KeyValueReader, key []byte, def uint64) (uint64, error) {
+	v, err := GetUInt64(db, key)
+	if err == ErrNotFound {
+		return def, nil
+	}
+	return v, err
+}
+
 func PackUInt64(val uint64) []byte {
 	bytes := make([]byte, Uint64Size)
 	binary.BigEndian.PutUint64(bytes, val)
