@@ -127,5 +127,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 
 				tc.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())
 			})
+
+			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 		})
 })
