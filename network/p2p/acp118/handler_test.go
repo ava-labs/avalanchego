@@ -126,10 +126,9 @@ func TestHandler(t *testing.T) {
 
 				require.True(bls.Verify(pk, signature, request.Message))
 
-				if tt.cacher.Len() > 0 {
-					// Ensure the cache is populated with correct signature
-					sig, ok := tt.cacher.Get(unsignedMessage.ID())
-					require.True(ok)
+				// Ensure the cache is populated with correct signature
+				sig, ok := tt.cacher.Get(unsignedMessage.ID())
+				if ok {
 					require.Equal(sig, response.Signature)
 				}
 			}

@@ -85,7 +85,7 @@ func (h *Handler) AppRequest(
 
 	msgID := msg.ID()
 	if signatureBytes, ok := h.signatureCache.Get(msgID); ok {
-		return responseBytesFromSignature(signatureBytes)
+		return signatureToResponse(signatureBytes)
 	}
 
 	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
@@ -101,10 +101,10 @@ func (h *Handler) AppRequest(
 	}
 
 	h.signatureCache.Put(msgID, signature)
-	return responseBytesFromSignature(signature)
+	return signatureToResponse(signature)
 }
 
-func responseBytesFromSignature(signature []byte) ([]byte, *common.AppError) {
+func signatureToResponse(signature []byte) ([]byte, *common.AppError) {
 	response := &sdk.SignatureResponse{
 		Signature: signature,
 	}
