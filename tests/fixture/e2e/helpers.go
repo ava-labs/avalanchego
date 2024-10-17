@@ -249,7 +249,7 @@ func StartNetwork(
 		if stopErr := network.Stop(tc.DefaultContext()); stopErr != nil {
 			tc.Outf("failed to stop network after bootstrap failure: %v", stopErr)
 		}
-		require.FailNow("failed to bootstrap network: %s", err)
+		require.FailNowf("network bootstrapping failed", "network bootstrapping error: %s", err)
 	}
 
 	tc.Outf("{{green}}Successfully started network{{/}}\n")
