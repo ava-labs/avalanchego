@@ -34,6 +34,6 @@ func DefaultConfig(t testing.TB) Config {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &snowman.Topological{},
+		Consensus: &snowman.Topological{Factory: snowball.SnowflakeFactory},
 	}
 }

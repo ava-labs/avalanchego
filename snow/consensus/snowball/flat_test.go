@@ -20,7 +20,7 @@ func TestFlat(t *testing.T) {
 		AlphaConfidence: 3,
 		Beta:            2,
 	}
-	f := NewFlat(SnowballFactory, params, Red)
+	f := NewFlat(SnowflakeFactory, params, Red)
 	f.Add(Green)
 	f.Add(Blue)
 
@@ -34,7 +34,7 @@ func TestFlat(t *testing.T) {
 
 	twoGreen := bag.Of(Green, Green)
 	require.True(f.RecordPoll(twoGreen))
-	require.Equal(Blue, f.Preference())
+	require.Equal(Green, f.Preference())
 	require.False(f.Finalized())
 
 	threeGreen := bag.Of(Green, Green, Green)
@@ -56,6 +56,6 @@ func TestFlat(t *testing.T) {
 	require.Equal(Green, f.Preference())
 	require.True(f.Finalized())
 
-	expected := "SB(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w, PreferenceStrength = 4, SF(Confidence = [2], Finalized = true, SL(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w)))"
+	expected := "SF(Confidence = [2], Finalized = true, SL(Preference = 2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w))"
 	require.Equal(expected, f.String())
 }
