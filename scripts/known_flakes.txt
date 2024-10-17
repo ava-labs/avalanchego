@@ -8,5 +8,6 @@ TestResumeSyncAccountsTrieInterrupted
 TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
 TestVMShutdownWhileSyncing
+TestWaitDeployedCornerCases
 TestWalletNotifications
 TestWebsocketLargeRead
