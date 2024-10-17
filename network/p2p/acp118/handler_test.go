@@ -125,6 +125,12 @@ func TestHandler(t *testing.T) {
 				require.NoError(err)
 
 				require.True(bls.Verify(pk, signature, request.Message))
+
+				// Ensure the cache is populated with correct signature
+				sig, ok := tt.cacher.Get(unsignedMessage.ID())
+				if ok {
+					require.Equal(sig, response.Signature)
+				}
 			}
 
 			for _, expectedErr = range tt.expectedErrs {
