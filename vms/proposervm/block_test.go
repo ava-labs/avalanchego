@@ -442,30 +442,21 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var (
-		nodeID                 = ids.GenerateTestNodeID()
-		pChainHeight    uint64 = 1337
-		parentID               = ids.GenerateTestID()
-		parentTimestamp        = time.Now().Truncate(time.Second)
-		parentHeight    uint64 = 1234
-		blkID                  = ids.GenerateTestID()
+		nodeID                   = ids.GenerateTestNodeID()
+		pChainHeight      uint64 = 1337
+		parentPChainHeght        = pChainHeight - 1
+		parentID                 = ids.GenerateTestID()
+		parentTimestamp          = time.Now().Truncate(time.Second)
 	)
 
-	innerBlk := snowmanmock.NewBlock(ctrl)
-	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
-	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
+	innerParentBlock := snowmantest.Genesis
+	innerChildBlock := snowmantest.BuildChild(innerParentBlock)
 
-	builtBlk := snowmanmock.NewBlock(ctrl)
-	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
-	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
-	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
-
-	innerVM := blockmock.NewChainVM(ctrl)
 	innerBlockBuilderVM := blockmock.NewBuildBlockWithContextChainVM(ctrl)
 	// Expect the that context passed in has parent's P-Chain height
-	parentPChainHeght := pChainHeight - 1
 	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &block.Context{
 		PChainHeight: parentPChainHeght,
-	}).Return(builtBlk, nil).AnyTimes()
+	}).Return(innerChildBlock, nil).AnyTimes()
 
 	vdrState := validatorsmock.NewState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
@@ -473,16 +464,13 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
 
-	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(err)
 	vm := &VM{
 		Config: Config{
 			Upgrades:          upgradetest.GetConfig(upgradetest.Durango), // Use Durango for pre-Etna behavior
-			StakingCertLeaf:   &staking.Certificate{},
-			StakingLeafSigner: pk,
+			StakingCertLeaf:   pTestCert,
+			StakingLeafSigner: pTestSigner,
 			Registerer:        prometheus.NewRegistry(),
 		},
-		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
 			NodeID:         nodeID,
@@ -493,7 +481,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	}
 
 	blk := &postForkCommonComponents{
-		innerBlk: innerBlk,
+		innerBlk: innerChildBlock,
 		vm:       vm,
 	}
 
@@ -505,5 +493,5 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentPChainHeght,
 	)
 	require.NoError(err)
-	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
+	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
 }
