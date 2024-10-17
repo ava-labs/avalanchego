@@ -5,6 +5,7 @@ package unified
 
 import (
 	"context"
+	"github.com/ava-labs/avalanchego/ids"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,6 +23,7 @@ import (
 )
 
 type EngineFactory struct {
+	Reset             func(chainID ids.ID)
 	TracingEnabled    bool
 	Tracer            trace.Tracer
 	StateSync         bool
@@ -37,6 +39,10 @@ type EngineFactory struct {
 
 func (ef *EngineFactory) ClearBootstrapDB() error {
 	return database.AtomicClear(ef.BootConfig.DB, ef.BootConfig.DB)
+}
+
+func (ef *EngineFactory) ResetChain(chainID ids.ID) {
+	ef.Reset(chainID)
 }
 
 func (ef *EngineFactory) NewAvalancheAncestorsGetter() common.GetAncestorsHandler {
@@ -88,17 +94,23 @@ func (ef *EngineFactory) NewAvalancheSyncer(f OnFinishedFunc) (common.AvalancheB
 	return avalancheBootstrapper, nil
 }
 
-func (ef *EngineFactory) NewSnowman() (common.ConsensusEngine, error) {
+func (ef *EngineFactory) NewSnowman(f OnFinishedFunc) (common.ConsensusEngine, error) {
 	snowmanEngine, err := snowman.New(ef.SnowmanConfig)
 	if err != nil {
 		ef.Logger.Fatal("error initializing snowman engine:", zap.Error(err))
 		return nil, err
 	}
 
-	engine := snowman.NewDecoratedEngineWithStragglerDetector(snowmanEngine, time.Now, func(duration time.Duration) {
+	engine := snowman.NewDecoratedEngineWithStragglerDetector(snowmanEngine, time.Now, func(duration time.Duration) bool {
 		if duration > 0 {
-			ef.Logger.Info("Straggling behind", zap.Duration("duration", duration))
+			ef.Logger.Warn("Straggling behind", zap.Duration("duration", duration))
+			if err := ef.ClearBootstrapDB(); err != nil {
+				ef.Logger.Error("Failed clearing bootstrap DB", zap.Error(err))
+			}
+			f(context.Background(), snowmanEngine.GetReqID())
+			return true
 		}
+		return false
 	})
 
 	return engine, nil
@@ -142,6 +154,13 @@ type tracedClearer struct {
 	common.AvalancheBootstrapableEngine
 	common.AcceptedFrontierHandler
 	common.AcceptedHandler
+}
+
+func (tc *tracedClearer) Restart(_ uint32, _ func(reqID uint32)) {
+
+}
+
+func (tc *tracedClearer) SetReqID(_ uint32) {
 }
 
 func (tc *tracedClearer) Clear(ctx context.Context) error {

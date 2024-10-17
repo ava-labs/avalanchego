@@ -46,6 +46,8 @@ type ConsensusEngine interface {
 	// Start engine operations from given request ID
 	Start(ctx context.Context, startReqID uint32) error
 
+	Restart(startReqID uint32)
+
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
 	health.Checker

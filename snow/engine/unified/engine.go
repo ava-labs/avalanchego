@@ -23,13 +23,15 @@ var _ common.Engine = (*Engine)(nil)
 type OnFinishedFunc func(ctx context.Context, lastReqID uint32) error
 
 type Factory interface {
+	ResetChain(chainID ids.ID)
+
 	ClearBootstrapDB() error
 
 	HasStateSync() bool
 
 	NewStateSyncer(OnFinishedFunc) (common.StateSyncer, error)
 
-	NewSnowman() (common.ConsensusEngine, error)
+	NewSnowman(OnFinishedFunc) (common.ConsensusEngine, error)
 
 	NewSnowBootstrapper(OnFinishedFunc) (common.BootstrapableEngine, error)
 
@@ -89,6 +91,9 @@ type Engine struct {
 	noopStateSyncer   common.StateSyncer
 	noopBootstrapper  common.BootstrapableEngine
 	noopSnowmanEngine common.ConsensusEngine
+
+	inactiveBootstrapper  common.BootstrapableEngine
+	inactiveSnowmanEngine common.ConsensusEngine
 }
 
 type noopStateSyncer struct {
@@ -120,6 +125,8 @@ type noopBootstrapper struct {
 	common.InternalHandler
 }
 
+func (b noopBootstrapper) Restart(uint32, func(reqID uint32)) {}
+
 func (noopBootstrapper) Clear(context.Context) error {
 	return nil
 }
@@ -131,6 +138,8 @@ type noopSnowmanEngine struct {
 	common.ChitsHandler
 	common.InternalHandler
 }
+
+func (n noopSnowmanEngine) Restart(uint32) {}
 
 func (e *Engine) GetAncestors(
 	ctx context.Context,
@@ -436,6 +445,7 @@ func (e *Engine) startSnowBootstrapper(ctx context.Context, lastReqID uint32) er
 		return err
 	}
 	e.bootstrapper = bs
+	e.inactiveBootstrapper = bs
 	return e.bootstrapper.Start(ctx, lastReqID)
 }
 
@@ -446,10 +456,34 @@ func (e *Engine) startSnowman(ctx context.Context, lastReqID uint32) error {
 	})
 	e.setNoOpEngines()
 
-	snowman, err := e.ef.NewSnowman()
+	snowman, err := e.ef.NewSnowman(e.switchToBootstrapping)
 	if err != nil {
 		return err
 	}
 	e.snowman = snowman
+	e.inactiveSnowmanEngine = snowman
 	return e.snowman.Start(ctx, lastReqID)
+}
+
+func (e *Engine) restartSnowman(lastReqID uint32) {
+	e.ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.NormalOp,
+	})
+	e.setNoOpEngines()
+
+	e.snowman = e.inactiveSnowmanEngine
+	e.snowman.Restart(lastReqID)
+}
+
+func (e *Engine) switchToBootstrapping(_ context.Context, startReqID uint32) error {
+	e.ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping,
+	})
+	e.ef.ResetChain(e.ctx.ChainID)
+	e.setNoOpEngines()
+	e.bootstrapper = e.inactiveBootstrapper
+	e.bootstrapper.Restart(startReqID, e.restartSnowman)
+	return nil
 }

@@ -30,6 +30,8 @@ type Subnet interface {
 	// Config returns config of this Subnet
 	Config() Config
 
+	ResetChain(chainID ids.ID)
+
 	Allower
 }
 
@@ -71,6 +73,18 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	s.once.Do(func() {
 		close(s.bootstrappedSema)
 	})
+}
+
+func (s *subnet) ResetChain(chainID ids.ID) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.bootstrapping.Len() == 0 {
+		s.bootstrappedSema = make(chan struct{})
+	}
+
+	s.bootstrapped.Remove(chainID)
+	s.bootstrapping.Add(chainID)
 }
 
 func (s *subnet) OnBootstrapCompleted() chan struct{} {

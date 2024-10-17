@@ -128,6 +128,25 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 	}, err
 }
 
+func (b *Bootstrapper) Restart(startReqID uint32, f func(reqID uint32)) {
+	b.requestID = startReqID
+	b.started = false
+	b.restarted = false
+	b.onFinished = func(ctx context.Context, lastReqID uint32) error {
+		f(lastReqID)
+		return nil
+	}
+
+	if err := b.Start(context.Background(), startReqID); err != nil {
+		b.Ctx.Log.Error("Failed restarting", zap.Error(err))
+	}
+
+}
+
+func (b *Bootstrapper) SetReqID(startReqID uint32) {
+	b.requestID = startReqID
+}
+
 func (b *Bootstrapper) Context() *snow.ConsensusContext {
 	return b.Ctx
 }

@@ -159,6 +159,18 @@ func newMetrics(
 	return m, errs.Err
 }
 
+func (m *metrics) deRegisterMetrics(reg prometheus.Registerer) {
+	reg.Unregister(m.maxVerifiedHeight)
+	reg.Register(m.lastAcceptedHeight)
+	reg.Register(m.lastAcceptedTimestamp)
+	reg.Register(m.numProcessing)
+	reg.Register(m.blockSizeAcceptedSum)
+	reg.Register(m.buildLatencyAccepted)
+	reg.Register(m.blockSizeRejectedSum)
+	reg.Register(m.numSuccessfulPolls)
+	reg.Register(m.numFailedPolls)
+}
+
 func (m *metrics) Issued(blkID ids.ID, pollNumber uint64) {
 	m.processingBlocks.Put(blkID, processingStart{
 		time:       time.Now(),

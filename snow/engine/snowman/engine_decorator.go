@@ -15,10 +15,10 @@ import (
 type decoratedEngineWithStragglerDetector struct {
 	*Engine
 	sd *stragglerDetector
-	f  func(time.Duration)
+	f  func(time.Duration) bool
 }
 
-func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration)) *decoratedEngineWithStragglerDetector {
+func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration) bool) *decoratedEngineWithStragglerDetector {
 	minConfRatio := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
 
 	subnet := e.Ctx.SubnetID
@@ -55,12 +55,20 @@ func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f
 	}
 }
 
+func (de *decoratedEngineWithStragglerDetector) clear() {
+	de.sd.continuousStragglingPeriod = 0
+	de.sd.previousStragglerCheckTime = time.Time{}
+	de.sd.prevSnapshot = snapshot{}
+}
+
 func (de *decoratedEngineWithStragglerDetector) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	behindDuration := de.sd.CheckIfWeAreStragglingBehind()
 	if behindDuration > 0 {
 		de.Engine.Config.Ctx.Log.Info("We are behind the rest of the network", zap.Float64("seconds", behindDuration.Seconds()))
 	}
 	de.Engine.metrics.stragglingDuration.Set(float64(behindDuration))
-	de.f(behindDuration)
+	if de.f(behindDuration) {
+		de.clear()
+	}
 	return de.Engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }

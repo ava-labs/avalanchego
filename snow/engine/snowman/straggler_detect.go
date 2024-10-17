@@ -216,7 +216,7 @@ func (s *snapshotter) getNetworkInfo() (uint64, nodeWeightsToHeight, error) {
 	if knownPercentageOfConnectedValidators < 100*minimumStakeThresholdRequiredForNetworkInfo {
 		s.log.Trace("Not collected enough information about last accepted block heights",
 			zap.Int("percentage", int(knownPercentageOfConnectedValidators)))
-		return 0, nil, errors.New("not connected to enough validators")
+		return 0, nil, errors.New("did not gather enough statistics")
 	}
 
 	return totalValidatorWeight, nodeWeightToLastAcceptedHeight, nil

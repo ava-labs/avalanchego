@@ -29,9 +29,10 @@ func TestEngineStragglerDetector(t *testing.T) {
 
 	listenerShouldInvokeWith := []time.Duration{0, 0, minStragglerCheckInterval * 2}
 
-	f := func(duration time.Duration) {
+	f := func(duration time.Duration) bool {
 		require.Equal(listenerShouldInvokeWith[0], duration)
 		listenerShouldInvokeWith = listenerShouldInvokeWith[1:]
+		return false
 	}
 
 	decoratedEngine := NewDecoratedEngineWithStragglerDetector(engine, fakeClock.Time, f)

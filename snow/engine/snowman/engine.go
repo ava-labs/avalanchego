@@ -51,6 +51,7 @@ type Engine struct {
 	validators.Connector
 
 	requestID uint32
+	started   bool
 
 	// track outstanding preference requests
 	polls poll.Set
@@ -138,6 +139,10 @@ func New(config Config) (*Engine, error) {
 		blkReqs:                bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:     make(map[common.Request]prometheus.Counter),
 	}, nil
+}
+
+func (e *Engine) GetReqID() uint32 {
+	return e.requestID
 }
 
 func (e *Engine) Gossip(ctx context.Context) error {
@@ -452,7 +457,18 @@ func (e *Engine) Context() *snow.ConsensusContext {
 	return e.Ctx
 }
 
+func (e *Engine) Restart(startReqID uint32) {
+	e.requestID = startReqID
+	if err := e.Start(context.Background(), startReqID); err != nil {
+		e.Ctx.Log.Error("Failed starting snowman engine", zap.Error(err))
+	}
+}
+
 func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
+	defer func() {
+		e.started = true
+	}()
+
 	e.requestID = startReqID
 	lastAcceptedID, err := e.VM.LastAccepted(ctx)
 	if err != nil {
@@ -469,7 +485,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 
 	// initialize consensus to the last accepted blockID
 	lastAcceptedHeight := lastAccepted.Height()
-	if err := e.Consensus.Initialize(e.Ctx, e.Params, lastAcceptedID, lastAcceptedHeight, lastAccepted.Timestamp()); err != nil {
+	if err := e.Consensus.Initialize(e.Ctx, e.Params, lastAcceptedID, lastAcceptedHeight, lastAccepted.Timestamp(), e.started); err != nil {
 		return err
 	}
 

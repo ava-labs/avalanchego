@@ -82,7 +82,7 @@ func TestGetNetworkSnapshot(t *testing.T) {
 			expectedLogged:      "connected to zero weight",
 		},
 		{
-			description:         "not connected to enough validators",
+			description:         "did not gather enough statistics",
 			totalWeight:         9999999999,
 			connectedValidators: connectedValidators([]ids.NodeWeight{{Weight: 1, ID: n1}, {Weight: 999999, ID: n2}}),
 			lastAcceptedFromNodes: map[ids.NodeID]uint64{

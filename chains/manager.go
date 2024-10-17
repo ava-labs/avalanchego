@@ -989,6 +989,7 @@ func (m *manager) createAvalancheChain(
 	}
 
 	ef := &unified.EngineFactory{
+		Reset:             sb.ResetChain,
 		TracingEnabled:    m.TracingEnabled,
 		GetServer:         snowGetHandler,
 		AvaAncestorGetter: avaGetHandler,
@@ -1345,6 +1346,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	ef := &unified.EngineFactory{
+		Reset:             sb.ResetChain,
 		TracingEnabled:    m.TracingEnabled,
 		GetServer:         snowGetHandler,
 		AvaAncestorGetter: invalidEngineAncestorsGetter{},

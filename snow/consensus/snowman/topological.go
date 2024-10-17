@@ -103,20 +103,25 @@ func (ts *Topological) Initialize(
 	lastAcceptedID ids.ID,
 	lastAcceptedHeight uint64,
 	lastAcceptedTime time.Time,
+	restarted bool,
 ) error {
 	err := params.Verify()
 	if err != nil {
 		return err
 	}
 
-	ts.metrics, err = newMetrics(
-		ctx.Log,
-		ctx.Registerer,
-		lastAcceptedHeight,
-		lastAcceptedTime,
-	)
-	if err != nil {
-		return err
+	if restarted {
+		ts.metrics.deRegisterMetrics(ctx.Registerer)
+	} else {
+		ts.metrics, err = newMetrics(
+			ctx.Log,
+			ctx.Registerer,
+			lastAcceptedHeight,
+			lastAcceptedTime,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	ts.leaves = set.Set[ids.ID]{}
@@ -124,6 +129,8 @@ func (ts *Topological) Initialize(
 	ts.ctx = ctx
 	ts.params = params
 	ts.lastAcceptedID = lastAcceptedID
+	ts.preferredIDs = set.Set[ids.ID]{}
+	ts.pollNumber = 0
 	ts.lastAcceptedHeight = lastAcceptedHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
 		lastAcceptedID: {t: ts},

@@ -26,6 +26,7 @@ type Consensus interface {
 		lastAcceptedID ids.ID,
 		lastAcceptedHeight uint64,
 		lastAcceptedTime time.Time,
+		restarted bool,
 	) error
 
 	// Returns the number of blocks processing
