@@ -151,18 +151,8 @@ func TestShutdown(t *testing.T) {
 		return nil
 	}
 	engine.HaltF = func(context.Context) {}
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	h.SetEngine(bootstrapper)
+
 	chainCtx.State.Set(snow.EngineState{
 		Type:  engineType,
 		State: snow.NormalOp, // assumed bootstrapping is done
@@ -268,18 +258,8 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 		CantClear: true,
 	}
 
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    &engine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    &engine,
-		},
-	})
+	h.SetEngine(bootstrapper)
+
 	chainCtx.State.Set(snow.EngineState{
 		Type:  engineType,
 		State: snow.NormalOp, // assumed bootstrapping is done
@@ -409,18 +389,8 @@ func TestShutdownTimesOut(t *testing.T) {
 		*closed++
 		return nil
 	}
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	h.SetEngine(engine)
+
 	ctx.State.Set(snow.EngineState{
 		Type:  engineType,
 		State: snow.NormalOp, // assumed bootstrapping is done
@@ -612,18 +582,8 @@ func TestRouterTimeout(t *testing.T) {
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    nil,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    nil,
-		},
-	})
+	h.SetEngine(bootstrapper)
+
 	h.Start(context.Background(), false)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -1102,18 +1062,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		return ctx
 	}
 	engine.Default(false)
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	h.SetEngine(bootstrapper)
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -1268,12 +1217,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	}
 	engine.Default(false)
 
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	h.SetEngine(bootstrapper)
 
 	chainRouter.AddChain(context.Background(), h)
 
@@ -1511,18 +1455,8 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
-	})
+	h.SetEngine(engine)
+
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp, // assumed bootstrapping is done
