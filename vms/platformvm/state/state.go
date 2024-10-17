@@ -1391,7 +1391,7 @@ func (s *state) loadMetadata() error {
 	s.persistedFeeState = feeState
 	s.SetFeeState(feeState)
 
-	accruedFees, err := getAccruedFees(s.singletonDB)
+	accruedFees, err := database.WithDefault(database.GetUInt64, s.singletonDB, AccruedFeesKey, 0)
 	if err != nil {
 		return err
 	}
@@ -2664,12 +2664,4 @@ func getFeeState(db database.KeyValueReader) (gas.State, error) {
 		return gas.State{}, err
 	}
 	return feeState, nil
-}
-
-func getAccruedFees(db database.KeyValueReader) (uint64, error) {
-	accruedFees, err := database.GetUInt64(db, AccruedFeesKey)
-	if err == database.ErrNotFound {
-		return 0, nil
-	}
-	return accruedFees, err
 }
