@@ -127,18 +127,6 @@ func (mr *HandlerMockRecorder) Push(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Push", reflect.TypeOf((*Handler)(nil).Push), arg0, arg1)
 }
 
-// RegisterTimeout mocks base method.
-func (m *Handler) RegisterTimeout(arg0 time.Duration) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "RegisterTimeout", arg0)
-}
-
-// RegisterTimeout indicates an expected call of RegisterTimeout.
-func (mr *HandlerMockRecorder) RegisterTimeout(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterTimeout", reflect.TypeOf((*Handler)(nil).RegisterTimeout), arg0)
-}
-
 // SetEngineManager mocks base method.
 func (m *Handler) SetEngineManager(arg0 *handler.EngineManager) {
 	m.ctrl.T.Helper()

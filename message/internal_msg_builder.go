@@ -16,7 +16,6 @@ import (
 var (
 	disconnected  = &Disconnected{}
 	gossipRequest = &GossipRequest{}
-	timeout       = &Timeout{}
 
 	_ fmt.Stringer    = (*GetStateSummaryFrontierFailed)(nil)
 	_ chainIDGetter   = (*GetStateSummaryFrontierFailed)(nil)
@@ -50,8 +49,6 @@ var (
 	_ fmt.Stringer = (*Disconnected)(nil)
 
 	_ fmt.Stringer = (*GossipRequest)(nil)
-
-	_ fmt.Stringer = (*Timeout)(nil)
 )
 
 type GetStateSummaryFrontierFailed struct {
@@ -388,21 +385,6 @@ func InternalGossipRequest(
 		nodeID:     nodeID,
 		op:         GossipRequestOp,
 		message:    gossipRequest,
-		expiration: mockable.MaxTime,
-	}
-}
-
-type Timeout struct{}
-
-func (Timeout) String() string {
-	return ""
-}
-
-func InternalTimeout(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessage{
-		nodeID:     nodeID,
-		op:         TimeoutOp,
-		message:    timeout,
 		expiration: mockable.MaxTime,
 	}
 }

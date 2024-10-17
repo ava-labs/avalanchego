@@ -8,11 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
-
-var _ common.Timer = (*Timer)(nil)
 
 // Timer is a test timer
 type Timer struct {
@@ -21,11 +17,6 @@ type Timer struct {
 	CantRegisterTimout bool
 
 	RegisterTimeoutF func(time.Duration)
-}
-
-// Default set the default callable value to [cant]
-func (t *Timer) Default(cant bool) {
-	t.CantRegisterTimout = cant
 }
 
 func (t *Timer) RegisterTimeout(delay time.Duration) {

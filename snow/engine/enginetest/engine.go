@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	errTimeout                       = errors.New("unexpectedly called Timeout")
 	errGossip                        = errors.New("unexpectedly called Gossip")
 	errNotify                        = errors.New("unexpectedly called Notify")
 	errGetStateSummaryFrontier       = errors.New("unexpectedly called GetStateSummaryFrontier")
@@ -187,19 +186,6 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 		require.FailNow(e.T, errStart.Error())
 	}
 	return errStart
-}
-
-func (e *Engine) Timeout(ctx context.Context) error {
-	if e.TimeoutF != nil {
-		return e.TimeoutF(ctx)
-	}
-	if !e.CantTimeout {
-		return nil
-	}
-	if e.T != nil {
-		require.FailNow(e.T, errTimeout.Error())
-	}
-	return errTimeout
 }
 
 func (e *Engine) Gossip(ctx context.Context) error {
