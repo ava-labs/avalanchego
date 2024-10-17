@@ -924,7 +924,8 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	var snowmanConsensus smcon.Consensus = &smcon.Topological{}
+	topological := &smcon.Topological{}
+	var snowmanConsensus smcon.Consensus = topological
 	if m.TracingEnabled {
 		snowmanConsensus = smcon.Trace(snowmanConsensus, m.Tracer)
 	}
@@ -940,6 +941,7 @@ func (m *manager) createAvalancheChain(
 		ConnectedValidators: connectedValidators,
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
+		BlockTraversal:      topological,
 	}
 	var snowmanEngine common.Engine
 	snowmanEngine, err = smeng.New(snowmanEngineConfig)
@@ -1318,7 +1320,8 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize snow base message handler: %w", err)
 	}
 
-	var consensus smcon.Consensus = &smcon.Topological{}
+	topological := &smcon.Topological{}
+	var consensus smcon.Consensus = topological
 	if m.TracingEnabled {
 		consensus = smcon.Trace(consensus, m.Tracer)
 	}
@@ -1326,6 +1329,7 @@ func (m *manager) createSnowmanChain(
 	// Create engine, bootstrapper and state-syncer in this order,
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
+		BlockTraversal:      topological,
 		Ctx:                 ctx,
 		AllGetsServer:       snowGetHandler,
 		VM:                  vm,
