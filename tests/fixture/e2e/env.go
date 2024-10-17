@@ -135,6 +135,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			flagVars.AvalancheGoExecPath(),
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
+			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
 
@@ -156,6 +157,10 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			}
 			return true
 		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
+	}
+
+	if flagVars.StartNetwork() {
+		os.Exit(0)
 	}
 
 	suiteConfig, _ := ginkgo.GinkgoConfiguration()
@@ -214,6 +219,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,
 		te.PrivateNetworkShutdownDelay,
+		false, /* skipShutdown */
 		false, /* reuseNetwork */
 	)
 }

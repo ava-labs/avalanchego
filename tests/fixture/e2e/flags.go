@@ -22,6 +22,7 @@ type FlagVars struct {
 	networkDir           string
 	reuseNetwork         bool
 	delayNetworkShutdown bool
+	startNetwork         bool
 	stopNetwork          bool
 	restartNetwork       bool
 	nodeCount            int
@@ -60,6 +61,10 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 		return networkShutdownDelay
 	}
 	return 0
+}
+
+func (v *FlagVars) StartNetwork() bool {
+	return v.startNetwork
 }
 
 func (v *FlagVars) StopNetwork() bool {
@@ -112,13 +117,13 @@ func RegisterFlags() *FlagVars {
 		&vars.reuseNetwork,
 		"reuse-network",
 		false,
-		"[optional] reuse an existing network. If an existing network is not already running, create a new one and leave it running for subsequent usage.",
+		"[optional] reuse an existing network previously started with --reuse-network. If a network is not already running, create a new one and leave it running for subsequent usage. Ignored if --stop-network is provided.",
 	)
 	flag.BoolVar(
 		&vars.restartNetwork,
 		"restart-network",
 		false,
-		"[optional] restarts an existing network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
+		"[optional] restart an existing network previously started with --reuse-network. Useful for ensuring a network is running with the current state of binaries on disk. Ignored if a network is not already running or --stop-network is provided.",
 	)
 	flag.BoolVar(
 		&vars.delayNetworkShutdown,
@@ -127,10 +132,16 @@ func RegisterFlags() *FlagVars {
 		"[optional] whether to delay network shutdown to allow a final metrics scrape.",
 	)
 	flag.BoolVar(
+		&vars.startNetwork,
+		"start-network",
+		false,
+		"[optional] start a new network and exit without executing any tests. The new network cannot be reused with --reuse-network. Ignored if either --reuse-network or --stop-network is provided.",
+	)
+	flag.BoolVar(
 		&vars.stopNetwork,
 		"stop-network",
 		false,
-		"[optional] stop an existing network and exit without executing any tests.",
+		"[optional] stop an existing network started with --reuse-network and exit without executing any tests.",
 	)
 	flag.IntVar(
 		&vars.nodeCount,
