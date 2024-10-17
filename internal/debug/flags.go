@@ -38,15 +38,12 @@ import (
 
 	"github.com/ava-labs/subnet-evm/internal/flags"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/fjl/memsize/memsizeui"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/exp/slog"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
-
-var Memsize memsizeui.Handler
 
 var (
 	verbosityFlag = &cli.IntFlag{
@@ -314,7 +311,6 @@ func Setup(ctx *cli.Context) error {
 }
 
 func StartPProf(address string) {
-	http.Handle("/memsize/", http.StripPrefix("/memsize", &Memsize))
 	log.Info("Starting pprof server", "addr", fmt.Sprintf("http://%s/debug/pprof", address))
 	go func() {
 		if err := http.ListenAndServe(address, nil); err != nil {
