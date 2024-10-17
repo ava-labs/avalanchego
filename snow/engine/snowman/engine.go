@@ -525,9 +525,12 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.NormalOp,
 	})
-	if err := e.VM.SetState(ctx, snow.NormalOp); err != nil {
-		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
-			err)
+
+	if !e.started {
+		if err := e.VM.SetState(ctx, snow.NormalOp); err != nil {
+			return fmt.Errorf("failed to notify VM that consensus is starting: %w",
+				err)
+		}
 	}
 	return e.executeDeferredWork(ctx)
 }

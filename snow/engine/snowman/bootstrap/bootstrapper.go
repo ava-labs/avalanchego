@@ -159,12 +159,15 @@ func (b *Bootstrapper) Clear(context.Context) error {
 }
 
 func (b *Bootstrapper) Start(ctx context.Context, startReqID uint32) error {
+	prevState := b.Ctx.State.Get()
 	b.Ctx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping,
 	})
-	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
-		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
+	if prevState.State != snow.NormalOp {
+		if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
+			return fmt.Errorf("failed to notify VM that bootstrapping has started: %w", err)
+		}
 	}
 
 	lastAccepted, err := b.getLastAccepted(ctx)
