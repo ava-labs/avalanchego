@@ -5,6 +5,7 @@ package unified
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -93,7 +94,14 @@ func (ef *EngineFactory) NewSnowman() (common.ConsensusEngine, error) {
 		ef.Logger.Fatal("error initializing snowman engine:", zap.Error(err))
 		return nil, err
 	}
-	return snowmanEngine, nil
+
+	engine := snowman.NewDecoratedEngineWithStragglerDetector(snowmanEngine, time.Now, func(duration time.Duration) {
+		if duration > 0 {
+			ef.Logger.Info("Straggling behind", zap.Duration("duration", duration))
+		}
+	})
+
+	return engine, nil
 }
 
 func (ef *EngineFactory) NewSnowBootstrapper(f OnFinishedFunc) (common.BootstrapableEngine, error) {

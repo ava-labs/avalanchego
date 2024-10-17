@@ -1309,21 +1309,6 @@ func (m *manager) createSnowmanChain(
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
 
-	sme, err := smeng.New(engineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
-	}
-
-	engine := smeng.NewDecoratedEngineWithStragglerDetector(sme, time.Now, func(stragglerDuration time.Duration) {
-		if stragglerDuration > 0 {
-			ctx.Log.Info("Straggling behind", zap.Duration("duration", stragglerDuration))
-		}
-	})
-
-	if m.TracingEnabled {
-		engine = common.TraceEngine(engine, m.Tracer)
-	}
-
 	// create bootstrap gear
 	bootstrapCfg := smbootstrap.Config{
 		ShouldHalt:                     halter.Halted,

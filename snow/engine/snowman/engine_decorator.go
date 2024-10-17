@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 type decoratedEngineWithStragglerDetector struct {
@@ -19,7 +18,7 @@ type decoratedEngineWithStragglerDetector struct {
 	f  func(time.Duration)
 }
 
-func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration)) common.Engine {
+func NewDecoratedEngineWithStragglerDetector(e *Engine, time func() time.Time, f func(time.Duration)) *decoratedEngineWithStragglerDetector {
 	minConfRatio := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
 
 	subnet := e.Ctx.SubnetID
