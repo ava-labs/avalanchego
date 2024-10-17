@@ -42,11 +42,10 @@ func TestMessageSignatureHandlerP2P(t *testing.T) {
 	require.NoError(t, err)
 	msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, offchainPayload.Bytes())
 	require.NoError(t, err)
-	messageID := msg.ID()
 	require.NoError(t, backend.AddMessage(msg))
-	signature, err := backend.GetMessageSignature(messageID)
+	signature, err := backend.GetMessageSignature(msg)
 	require.NoError(t, err)
-	offchainSignature, err := backend.GetMessageSignature(offchainMessage.ID())
+	offchainSignature, err := backend.GetMessageSignature(offchainMessage)
 	require.NoError(t, err)
 
 	unknownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("unknown message"))

@@ -45,13 +45,20 @@ func (s *SignatureRequestHandler) OnMessageSignatureRequest(ctx context.Context,
 		s.stats.UpdateMessageSignatureRequestTime(time.Since(startTime))
 	}()
 
-	signature, err := s.backend.GetMessageSignature(signatureRequest.MessageID)
+	var signature [bls.SignatureLen]byte
+	unsignedMessage, err := s.backend.GetMessage(signatureRequest.MessageID)
 	if err != nil {
-		log.Debug("Unknown warp signature requested", "messageID", signatureRequest.MessageID)
+		log.Debug("Unknown warp message requested", "messageID", signatureRequest.MessageID)
 		s.stats.IncMessageSignatureMiss()
-		signature = [bls.SignatureLen]byte{}
 	} else {
-		s.stats.IncMessageSignatureHit()
+		signature, err = s.backend.GetMessageSignature(unsignedMessage)
+		if err != nil {
+			log.Debug("Unknown warp signature requested", "messageID", signatureRequest.MessageID)
+			s.stats.IncMessageSignatureMiss()
+			signature = [bls.SignatureLen]byte{}
+		} else {
+			s.stats.IncMessageSignatureHit()
+		}
 	}
 
 	response := message.SignatureResponse{Signature: signature}

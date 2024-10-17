@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/warp/warptest"
@@ -49,18 +48,17 @@ func TestClearDB(t *testing.T) {
 
 	// use multiple messages to test that all messages get cleared
 	payloads := [][]byte{[]byte("test1"), []byte("test2"), []byte("test3"), []byte("test4"), []byte("test5")}
-	messageIDs := []ids.ID{}
+	messages := make([]*avalancheWarp.UnsignedMessage, 0, len(payloads))
 
 	// add all messages
 	for _, payload := range payloads {
 		unsignedMsg, err := avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, payload)
 		require.NoError(t, err)
-		messageID := hashing.ComputeHash256Array(unsignedMsg.Bytes())
-		messageIDs = append(messageIDs, messageID)
+		messages = append(messages, unsignedMsg)
 		err = backend.AddMessage(unsignedMsg)
 		require.NoError(t, err)
 		// ensure that the message was added
-		_, err = backend.GetMessageSignature(messageID)
+		_, err = backend.GetMessageSignature(unsignedMsg)
 		require.NoError(t, err)
 	}
 
@@ -74,9 +72,9 @@ func TestClearDB(t *testing.T) {
 	require.False(t, it.Next())
 
 	// ensure all messages have been deleted
-	for _, messageID := range messageIDs {
-		_, err := backend.GetMessageSignature(messageID)
-		require.ErrorContains(t, err, "failed to get warp message")
+	for _, message := range messages {
+		_, err := backend.GetMessageSignature(message)
+		require.ErrorContains(t, err, "failed to validate warp message")
 	}
 }
 
@@ -94,8 +92,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
-	messageID := testUnsignedMessage.ID()
-	signature, err := backend.GetMessageSignature(messageID)
+	signature, err := backend.GetMessageSignature(testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -113,8 +110,7 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try getting a signature for a message that was not added.
-	messageID := testUnsignedMessage.ID()
-	_, err = backend.GetMessageSignature(messageID)
+	_, err = backend.GetMessageSignature(testUnsignedMessage)
 	require.Error(t, err)
 }
 
@@ -162,8 +158,7 @@ func TestZeroSizedCache(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
-	messageID := testUnsignedMessage.ID()
-	signature, err := backend.GetMessageSignature(messageID)
+	signature, err := backend.GetMessageSignature(testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -192,7 +187,7 @@ func TestOffChainMessages(t *testing.T) {
 				require.NoError(err)
 				require.Equal(testUnsignedMessage.Bytes(), msg.Bytes())
 
-				signature, err := b.GetMessageSignature(testUnsignedMessage.ID())
+				signature, err := b.GetMessageSignature(testUnsignedMessage)
 				require.NoError(err)
 				expectedSignatureBytes, err := warpSigner.Sign(msg)
 				require.NoError(err)
