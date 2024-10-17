@@ -542,7 +542,8 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 	// Set the new Subnet manager in the database
-	e.State.SetSubnetManager(tx.Subnet, tx.ChainID, tx.Address)
+	// TODO: Populate the conversionID
+	e.State.SetSubnetConversion(tx.Subnet, ids.Empty, tx.ChainID, tx.Address)
 	return nil
 }
 
