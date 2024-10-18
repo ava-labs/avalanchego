@@ -362,3 +362,31 @@ func TestPackerUnpackBool(t *testing.T) {
 	require.True(p.Errored())
 	require.ErrorIs(p.Err, errBadBool)
 }
+
+func TestPackerPackVarInt(t *testing.T) {
+	require := require.New(t)
+
+	p := Packer{MaxSize: 2}
+	p.PackVarInt(-1784)
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0xef, 0x1b}, p.Bytes)
+
+	p.PackVarInt(-1784)
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, ErrInsufficientLength)
+}
+
+func TestPackerPackUvarInt(t *testing.T) {
+	require := require.New(t)
+
+	p := Packer{MaxSize: 2}
+	p.PackVarInt(1784)
+	require.False(p.Errored())
+	require.NoError(p.Err)
+	require.Equal([]byte{0xf0, 0x1b}, p.Bytes)
+
+	p.PackVarInt(1784)
+	require.True(p.Errored())
+	require.ErrorIs(p.Err, ErrInsufficientLength)
+}
