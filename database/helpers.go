@@ -137,6 +137,21 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 	return b[0] == BoolTrue, nil
 }
 
+// WithDefault returns the value at [key] in [db]. If the key doesn't exist, it
+// returns [def].
+func WithDefault[V any](
+	get func(KeyValueReader, []byte) (V, error),
+	db KeyValueReader,
+	key []byte,
+	def V,
+) (V, error) {
+	v, err := get(db, key)
+	if err == ErrNotFound {
+		return def, nil
+	}
+	return v, err
+}
+
 func Count(db Iteratee) (int, error) {
 	iterator := db.NewIterator()
 	defer iterator.Release()

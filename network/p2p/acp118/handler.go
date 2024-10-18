@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -30,9 +31,24 @@ type Verifier interface {
 
 // NewHandler returns an instance of Handler
 func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
+	return NewCachedHandler(
+		&cache.Empty[ids.ID, []byte]{},
+		verifier,
+		signer,
+	)
+}
+
+// NewCachedHandler returns an instance of Handler that caches successful
+// signatures.
+func NewCachedHandler(
+	cacher cache.Cacher[ids.ID, []byte],
+	verifier Verifier,
+	signer warp.Signer,
+) *Handler {
 	return &Handler{
-		verifier: verifier,
-		signer:   signer,
+		signatureCache: cacher,
+		verifier:       verifier,
+		signer:         signer,
 	}
 }
 
@@ -40,8 +56,9 @@ func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
 type Handler struct {
 	p2p.NoOpHandler
 
-	verifier Verifier
-	signer   warp.Signer
+	signatureCache cache.Cacher[ids.ID, []byte]
+	verifier       Verifier
+	signer         warp.Signer
 }
 
 func (h *Handler) AppRequest(
@@ -66,6 +83,11 @@ func (h *Handler) AppRequest(
 		}
 	}
 
+	msgID := msg.ID()
+	if signatureBytes, ok := h.signatureCache.Get(msgID); ok {
+		return signatureToResponse(signatureBytes)
+	}
+
 	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
 		return nil, err
 	}
@@ -78,6 +100,11 @@ func (h *Handler) AppRequest(
 		}
 	}
 
+	h.signatureCache.Put(msgID, signature)
+	return signatureToResponse(signature)
+}
+
+func signatureToResponse(signature []byte) ([]byte, *common.AppError) {
 	response := &sdk.SignatureResponse{
 		Signature: signature,
 	}
@@ -89,6 +116,5 @@ func (h *Handler) AppRequest(
 			Message: fmt.Sprintf("failed to marshal response: %s", err),
 		}
 	}
-
 	return responseBytes, nil
 }
