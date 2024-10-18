@@ -588,6 +588,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			vm,
 			chainFxs,
 			sb,
+			vmFactory,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new snowman vm %w", err)
@@ -1039,6 +1040,7 @@ func (m *manager) createSnowmanChain(
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	sb subnets.Subnet,
+	vmFactory vms.Factory,
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
@@ -1346,6 +1348,46 @@ func (m *manager) createSnowmanChain(
 	}
 
 	ef := &unified.EngineFactory{
+		VMFactory: func() (common.VM, error) {
+			vm, err := vmFactory.New(ctx.Log)
+			if err != nil {
+				return nil, err
+			}
+
+			if _, isChainVM := vm.(block.ChainVM); !isChainVM {
+				return nil, fmt.Errorf("VM for chain %s is not a chain VM", ctx.ChainID)
+			}
+
+			chainVM := vm.(block.ChainVM)
+
+			chainVM = proposervm.New(
+				chainVM,
+				proposervm.Config{
+					Upgrades:            m.Upgrades,
+					MinBlkDelay:         minBlockDelay,
+					NumHistoricalBlocks: numHistoricalBlocks,
+					StakingLeafSigner:   m.StakingTLSSigner,
+					StakingCertLeaf:     m.StakingTLSCert,
+					Registerer:          proposervmReg,
+				},
+			)
+
+			if err := chainVM.Initialize(
+				context.TODO(),
+				ctx.Context,
+				vmDB,
+				genesisData,
+				chainConfig.Upgrade,
+				chainConfig.Config,
+				msgChan,
+				fxs,
+				messageSender,
+			); err != nil {
+				return nil, err
+			}
+
+			return chainVM, nil
+		},
 		Reset:             sb.ResetChain,
 		TracingEnabled:    m.TracingEnabled,
 		GetServer:         snowGetHandler,

@@ -5,7 +5,9 @@ package unified
 
 import (
 	"context"
+	"errors"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,6 +25,7 @@ import (
 )
 
 type EngineFactory struct {
+	VMFactory         func() (common.VM, error)
 	Reset             func(chainID ids.ID)
 	TracingEnabled    bool
 	Tracer            trace.Tracer
@@ -94,6 +97,20 @@ func (ef *EngineFactory) NewAvalancheSyncer(f OnFinishedFunc) (common.AvalancheB
 	return avalancheBootstrapper, nil
 }
 
+func (ef *EngineFactory) NewVM() (block.ChainVM, error) {
+	vm, err := ef.VMFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	chainVM, isChainVM := vm.(block.ChainVM)
+	if !isChainVM {
+		return nil, errors.New("VM is not a chain VM")
+	}
+
+	return chainVM, err
+}
+
 func (ef *EngineFactory) NewSnowman(f OnFinishedFunc) (common.ConsensusEngine, error) {
 	snowmanEngine, err := snowman.New(ef.SnowmanConfig)
 	if err != nil {
@@ -156,7 +173,7 @@ type tracedClearer struct {
 	common.AcceptedHandler
 }
 
-func (tc *tracedClearer) Restart(_ uint32, _ func(reqID uint32)) {
+func (tc *tracedClearer) Restart(_ uint32, _ func(reqID uint32), _ common.VM) {
 
 }
 

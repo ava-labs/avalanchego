@@ -5,7 +5,6 @@ package common
 
 import (
 	"context"
-
 	"github.com/ava-labs/avalanchego/api/health"
 )
 
@@ -18,7 +17,7 @@ type BootstrapableEngine interface {
 	// Start engine operations from given request ID
 	Start(ctx context.Context, startReqID uint32) error
 
-	Restart(startReqID uint32, f func(reqID uint32))
+	Restart(startReqID uint32, f func(reqID uint32), vm VM)
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API

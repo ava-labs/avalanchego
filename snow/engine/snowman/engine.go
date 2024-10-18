@@ -6,6 +6,7 @@ package snowman
 import (
 	"context"
 	"fmt"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -457,7 +458,8 @@ func (e *Engine) Context() *snow.ConsensusContext {
 	return e.Ctx
 }
 
-func (e *Engine) Restart(startReqID uint32) {
+func (e *Engine) Restart(startReqID uint32, vm common.VM) {
+	e.VM = vm.(block.ChainVM)
 	e.requestID = startReqID
 	if err := e.Start(context.Background(), startReqID); err != nil {
 		e.Ctx.Log.Error("Failed starting snowman engine", zap.Error(err))

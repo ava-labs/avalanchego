@@ -128,7 +128,12 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 	}, err
 }
 
-func (b *Bootstrapper) Restart(startReqID uint32, f func(reqID uint32)) {
+func (b *Bootstrapper) Restart(startReqID uint32, f func(reqID uint32), vm common.VM) {
+	if _, isChainVM := vm.(block.ChainVM); !isChainVM {
+		panic("not a chain VM")
+	}
+	b.Config.VM = vm.(block.ChainVM)
+	b.VM = vm.(block.ChainVM)
 	b.requestID = startReqID
 	b.started = false
 	b.restarted = false

@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"go.uber.org/zap"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,6 +25,8 @@ var _ common.Engine = (*Engine)(nil)
 type OnFinishedFunc func(ctx context.Context, lastReqID uint32) error
 
 type Factory interface {
+	NewVM() (block.ChainVM, error)
+
 	ResetChain(chainID ids.ID)
 
 	ClearBootstrapDB() error
@@ -125,7 +129,7 @@ type noopBootstrapper struct {
 	common.InternalHandler
 }
 
-func (b noopBootstrapper) Restart(uint32, func(reqID uint32)) {}
+func (b noopBootstrapper) Restart(uint32, func(reqID uint32), common.VM) {}
 
 func (noopBootstrapper) Clear(context.Context) error {
 	return nil
@@ -139,7 +143,7 @@ type noopSnowmanEngine struct {
 	common.InternalHandler
 }
 
-func (n noopSnowmanEngine) Restart(uint32) {}
+func (n noopSnowmanEngine) Restart(uint32, common.VM) {}
 
 func (e *Engine) GetAncestors(
 	ctx context.Context,
@@ -473,7 +477,7 @@ func (e *Engine) restartSnowman(lastReqID uint32) {
 	e.setNoOpEngines()
 
 	e.snowman = e.inactiveSnowmanEngine
-	e.snowman.Restart(lastReqID)
+	e.snowman.Restart(lastReqID, e.vm.(block.ChainVM))
 }
 
 func (e *Engine) switchToBootstrapping(_ context.Context, startReqID uint32) error {
@@ -481,9 +485,19 @@ func (e *Engine) switchToBootstrapping(_ context.Context, startReqID uint32) err
 		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Bootstrapping,
 	})
+	if err := e.vm.Shutdown(context.Background()); err != nil {
+		e.Log.Error("Failed shutting down VM", zap.Error(err))
+		return err
+	}
+	vm, err := e.ef.NewVM()
+	if err != nil {
+		e.Log.Error("Failed re-creating VM", zap.Error(err))
+		return err
+	}
+	e.vm = vm
 	e.ef.ResetChain(e.ctx.ChainID)
 	e.setNoOpEngines()
 	e.bootstrapper = e.inactiveBootstrapper
-	e.bootstrapper.Restart(startReqID, e.restartSnowman)
+	e.bootstrapper.Restart(startReqID, e.restartSnowman, vm)
 	return nil
 }
