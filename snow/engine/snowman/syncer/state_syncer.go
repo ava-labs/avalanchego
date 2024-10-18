@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -38,15 +37,6 @@ type weightedSummary struct {
 
 type stateSyncer struct {
 	Config
-
-	// list of NoOpsHandler for messages dropped by state syncer
-	common.AcceptedFrontierHandler
-	common.AcceptedHandler
-	common.AncestorsHandler
-	common.PutHandler
-	common.QueryHandler
-	common.ChitsHandler
-	common.AppHandler
 
 	started bool
 
@@ -96,26 +86,15 @@ func New(
 ) common.StateSyncer {
 	ssVM, _ := cfg.VM.(block.StateSyncableVM)
 	return &stateSyncer{
-		Config:                  cfg,
-		AcceptedFrontierHandler: common.NewNoOpAcceptedFrontierHandler(cfg.Ctx.Log),
-		AcceptedHandler:         common.NewNoOpAcceptedHandler(cfg.Ctx.Log),
-		AncestorsHandler:        common.NewNoOpAncestorsHandler(cfg.Ctx.Log),
-		PutHandler:              common.NewNoOpPutHandler(cfg.Ctx.Log),
-		QueryHandler:            common.NewNoOpQueryHandler(cfg.Ctx.Log),
-		ChitsHandler:            common.NewNoOpChitsHandler(cfg.Ctx.Log),
-		AppHandler:              cfg.VM,
-		stateSyncVM:             ssVM,
-		onDoneStateSyncing:      onDoneStateSyncing,
+		Config:             cfg,
+		stateSyncVM:        ssVM,
+		onDoneStateSyncing: onDoneStateSyncing,
 	}
 }
 
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
-	ss.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
-		State: snow.StateSyncing,
-	})
 	if err := ss.VM.SetState(ctx, snow.StateSyncing); err != nil {
 		return fmt.Errorf("failed to notify VM that state syncing has started: %w", err)
 	}

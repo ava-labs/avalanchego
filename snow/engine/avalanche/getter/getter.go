@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -101,7 +102,7 @@ func (gh *getter) GetAccepted(_ context.Context, nodeID ids.NodeID, requestID ui
 	return nil
 }
 
-func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
+func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID, _ p2p.EngineType) error {
 	startTime := time.Now()
 	gh.log.Verbo("called GetAncestors",
 		zap.Stringer("nodeID", nodeID),
