@@ -28,10 +28,10 @@ func TestDualAlphaOptimization(t *testing.T) {
 		source        = prng.NewMT19937()
 	)
 
-	singleAlphaNetwork := NewNetwork(SnowballFactory, params, numColors, source)
+	singleAlphaNetwork := NewNetwork(SnowflakeFactory, params, numColors, source)
 
 	params.AlphaPreference = params.K/2 + 1
-	dualAlphaNetwork := NewNetwork(SnowballFactory, params, numColors, source)
+	dualAlphaNetwork := NewNetwork(SnowflakeFactory, params, numColors, source)
 
 	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
@@ -61,8 +61,8 @@ func TestTreeConvergenceOptimization(t *testing.T) {
 		source           = prng.NewMT19937()
 	)
 
-	treeNetwork := NewNetwork(SnowballFactory, params, numColors, source)
-	flatNetwork := NewNetwork(SnowballFactory, params, numColors, source)
+	treeNetwork := NewNetwork(SnowflakeFactory, params, numColors, source)
+	flatNetwork := NewNetwork(SnowflakeFactory, params, numColors, source)
 
 	source.Seed(seed)
 	for i := 0; i < numNodes; i++ {
