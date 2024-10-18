@@ -327,7 +327,7 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	state.StateDB.AddBalance(block.Coinbase(), new(uint256.Int))
 
 	// Commit state mutations into database.
-	root, _ = state.StateDB.Commit(block.NumberU64(), config.IsEIP158(block.Number()), false)
+	root, _ = state.StateDB.Commit(block.NumberU64(), config.IsEIP158(block.Number()))
 	return state, root, err
 }
 
@@ -475,7 +475,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 		}
 	}
 	// Commit and re-open to start with a clean state.
-	root, _ := statedb.Commit(0, false, false)
+	root, _ := statedb.Commit(0, false)
 
 	// If snapshot is requested, initialize the snapshotter and use it in state.
 	var snaps *snapshot.Tree

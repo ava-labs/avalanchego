@@ -583,7 +583,7 @@ func TestOpenDrops(t *testing.T) {
 	statedb.AddBalance(crypto.PubkeyToAddress(overcapper.PublicKey), uint256.NewInt(10000000))
 	statedb.AddBalance(crypto.PubkeyToAddress(duplicater.PublicKey), uint256.NewInt(1000000))
 	statedb.AddBalance(crypto.PubkeyToAddress(repeater.PublicKey), uint256.NewInt(1000000))
-	statedb.Commit(0, true, false)
+	statedb.Commit(0, true)
 
 	chain := &testBlockChain{
 		config:  testChainConfig,
@@ -702,7 +702,7 @@ func TestOpenIndex(t *testing.T) {
 	// Create a blob pool out of the pre-seeded data
 	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewDatabase(memorydb.New())), nil)
 	statedb.AddBalance(addr, uint256.NewInt(1_000_000_000))
-	statedb.Commit(0, true, false)
+	statedb.Commit(0, true)
 
 	chain := &testBlockChain{
 		config:  testChainConfig,
@@ -804,7 +804,7 @@ func TestOpenHeap(t *testing.T) {
 	statedb.AddBalance(addr1, uint256.NewInt(1_000_000_000))
 	statedb.AddBalance(addr2, uint256.NewInt(1_000_000_000))
 	statedb.AddBalance(addr3, uint256.NewInt(1_000_000_000))
-	statedb.Commit(0, true, false)
+	statedb.Commit(0, true)
 
 	chain := &testBlockChain{
 		config:  testChainConfig,
@@ -884,7 +884,7 @@ func TestOpenCap(t *testing.T) {
 		statedb.AddBalance(addr1, uint256.NewInt(1_000_000_000))
 		statedb.AddBalance(addr2, uint256.NewInt(1_000_000_000))
 		statedb.AddBalance(addr3, uint256.NewInt(1_000_000_000))
-		statedb.Commit(0, true, false)
+		statedb.Commit(0, true)
 
 		chain := &testBlockChain{
 			config:  testChainConfig,
@@ -1302,7 +1302,7 @@ func TestAdd(t *testing.T) {
 				store.Put(blob)
 			}
 		}
-		statedb.Commit(0, true, false)
+		statedb.Commit(0, true)
 		store.Close()
 
 		// Create a blob pool out of the pre-seeded dats
@@ -1375,7 +1375,7 @@ func benchmarkPoolPending(b *testing.B, datacap uint64) {
 		statedb.AddBalance(addr, uint256.NewInt(1_000_000_000))
 		pool.add(tx)
 	}
-	statedb.Commit(0, true, false)
+	statedb.Commit(0, true)
 	defer pool.Close()
 
 	// Benchmark assembling the pending
