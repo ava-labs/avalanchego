@@ -18,6 +18,8 @@ import (
 func DefaultConfig(t testing.TB) Config {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 
+	top := &snowman.Topological{}
+
 	return Config{
 		Ctx:                 snowtest.ConsensusContext(ctx),
 		VM:                  &blocktest.VM{},
@@ -34,6 +36,7 @@ func DefaultConfig(t testing.TB) Config {
 			MaxOutstandingItems:   1,
 			MaxItemProcessingTime: 1,
 		},
-		Consensus: &snowman.Topological{},
+		Consensus:      top,
+		BlockTraversal: top,
 	}
 }
