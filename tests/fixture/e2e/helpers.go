@@ -231,6 +231,7 @@ func StartNetwork(
 	avalancheGoExecPath string,
 	pluginDir string,
 	shutdownDelay time.Duration,
+	skipShutdown bool,
 	reuseNetwork bool,
 ) {
 	require := require.New(tc)
@@ -267,6 +268,11 @@ func StartNetwork(
 	tc.DeferCleanup(func() {
 		if reuseNetwork {
 			tc.Outf("{{yellow}}Skipping shutdown for network %s (symlinked to %s) to enable reuse{{/}}\n", network.Dir, symlinkPath)
+			return
+		}
+
+		if skipShutdown {
+			tc.Outf("{{yellow}}Skipping shutdown for network %s{{/}}\n", network.Dir)
 			return
 		}
 
