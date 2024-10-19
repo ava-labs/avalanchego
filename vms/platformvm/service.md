@@ -1204,7 +1204,7 @@ Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
 ### `platform.getSubnet`
 
-Get owners and elastic info about the Subnet.
+Get owners and elastic info about the Subnet or L1.
 
 **Signature:**
 
@@ -1217,7 +1217,10 @@ platform.getSubnet({
     controlKeys: []string,
     threshold: string,
     locktime: string,
-    subnetTransformationTxID: string
+    subnetTransformationTxID: string,
+    conversionID: string,
+    managerChainID: string,
+    managerAddress: string
 }
 ```
 
@@ -1226,8 +1229,10 @@ platform.getSubnet({
   a permissioned subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys`
   will be empty.
 - changes can not be made into the subnet until `locktime` is in the past.
-- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into a elastic one,
-  for when this change was performed.
+- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into an elastic one, if it exists.
+- `conversionID` is the ID of the conversion from a permissioned Subnet into an L1, if it exists.
+- `managerChainID` is the ChainID that has the ability to modify this L1s validator set, if it exists.
+- `managerAddress` is the address that has the ability to modify this L1s validator set, if it exists.
 
 **Example Call:**
 
@@ -1250,7 +1255,10 @@ curl -X POST --data '{
     "controlKeys": ["P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c","P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"],
     "threshold": "1",
     "locktime": "0",
-    "subnetTransformationTxID": "11111111111111111111111111111111LpoYY"
+    "subnetTransformationTxID": "11111111111111111111111111111111LpoYY",
+    "conversionID": "11111111111111111111111111111111LpoYY",
+    "managerChainID": "11111111111111111111111111111111LpoYY",
+    "managerAddress": null
   },
   "id": 1
 }
