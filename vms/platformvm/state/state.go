@@ -557,7 +557,7 @@ func New(
 
 	subnetConversionDB := prefixdb.New(SubnetConversionPrefix, baseDB)
 	subnetConversionCache, err := metercacher.New[ids.ID, subnetConversion](
-		"subnet_manager_cache",
+		"subnet_conversion_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, subnetConversion](execCfg.SubnetConversionCacheSize, func(_ ids.ID, c subnetConversion) int {
 			return 3*ids.IDLen + len(c.Addr)

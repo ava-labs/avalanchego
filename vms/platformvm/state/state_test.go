@@ -1346,7 +1346,7 @@ func TestStateSubnetConversion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				require            = require.New(t)
-				initializedState   = newTestState(t, memdb.New())
+				state              = newTestState(t, memdb.New())
 				subnetID           = ids.GenerateTestID()
 				expectedConversion = subnetConversion{
 					ConversionID: ids.GenerateTestID(),
@@ -1355,7 +1355,7 @@ func TestStateSubnetConversion(t *testing.T) {
 				}
 			)
 
-			conversionID, chainID, addr, err := initializedState.GetSubnetConversion(subnetID)
+			conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
 			require.ErrorIs(err, database.ErrNotFound)
 			require.Zero(subnetConversion{
 				ConversionID: conversionID,
@@ -1363,9 +1363,9 @@ func TestStateSubnetConversion(t *testing.T) {
 				Addr:         addr,
 			})
 
-			test.setup(initializedState, subnetID, expectedConversion)
+			test.setup(state, subnetID, expectedConversion)
 
-			conversionID, chainID, addr, err = initializedState.GetSubnetConversion(subnetID)
+			conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 			require.NoError(err)
 			require.Equal(
 				expectedConversion,
