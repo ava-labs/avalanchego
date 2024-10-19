@@ -776,12 +776,12 @@ func TestDiffSubnetConversion(t *testing.T) {
 	var (
 		require            = require.New(t)
 		state              = newTestState(t, memdb.New())
+		subnetID           = ids.GenerateTestID()
 		expectedConversion = subnetConversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte{1, 2, 3, 4},
 		}
-		subnetID = ids.GenerateTestID()
 	)
 
 	conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
