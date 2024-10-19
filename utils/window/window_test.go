@@ -127,7 +127,7 @@ func TestTTLAdd(t *testing.T) {
 	require.Equal(4, oldest)
 }
 
-// TestTTLLength tests that elements are not evicted on Length
+// TestTTLLength tests that elements are evicted on Length
 func TestTTLLength(t *testing.T) {
 	require := require.New(t)
 
@@ -156,10 +156,10 @@ func TestTTLLength(t *testing.T) {
 	clock.Set(start.Add(testTTL + time.Second))
 
 	// No more elements should be present in the window.
-	require.Equal(3, window.Length())
+	require.Equal(0, window.Length())
 }
 
-// TestTTLOldest tests that stale elements are not evicted on calling Oldest
+// TestTTLOldest tests that stale elements are evicted on calling Oldest
 func TestTTLOldest(t *testing.T) {
 	require := require.New(t)
 
@@ -188,15 +188,25 @@ func TestTTLOldest(t *testing.T) {
 	require.Equal(1, oldest)
 	require.Equal(3, window.elements.Len())
 
-	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
+	// Now we're one second before the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements shoud still exist.
-	clock.Set(start.Add(testTTL + time.Second))
+	// Add 4 to the window to make it:
+	// [1, 2, 3, 4]
+	clock.Set(start.Add(testTTL - time.Second))
+	window.Add(4)
 
-	// Now there should be three elements in the window
 	oldest, ok = window.Oldest()
 	require.True(ok)
 	require.Equal(1, oldest)
-	require.Equal(3, window.elements.Len())
+	require.Equal(4, window.elements.Len())
+
+	// Now we're one second past the ttl of the initial 3 elements
+	// call to oldest should now evict 1,2,3 and return 4.
+	clock.Set(start.Add(testTTL + time.Second))
+	oldest, ok = window.Oldest()
+	require.True(ok)
+	require.Equal(4, oldest)
+	require.Equal(1, window.elements.Len())
 }
 
 // Tests that we bound the amount of elements in the window
