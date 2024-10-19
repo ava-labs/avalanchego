@@ -774,44 +774,68 @@ func TestDiffSubnetOwner(t *testing.T) {
 
 func TestDiffSubnetManager(t *testing.T) {
 	var (
-		require    = require.New(t)
-		state      = newTestState(t, memdb.New())
-		newManager = chainIDAndAddr{ids.GenerateTestID(), []byte{1, 2, 3, 4}}
-		subnetID   = ids.GenerateTestID()
+		require            = require.New(t)
+		state              = newTestState(t, memdb.New())
+		expectedConversion = subnetConversion{
+			ConversionID: ids.GenerateTestID(),
+			ChainID:      ids.GenerateTestID(),
+			Addr:         []byte{1, 2, 3, 4},
+		}
+		subnetID = ids.GenerateTestID()
 	)
 
-	chainID, addr, err := state.GetSubnetManager(subnetID)
+	conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Equal(ids.Empty, chainID)
-	require.Nil(addr)
+	require.Zero(subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
+	})
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
 
-	chainID, addr, err = d.GetSubnetManager(subnetID)
+	conversionID, chainID, addr, err = d.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Equal(ids.Empty, chainID)
-	require.Nil(addr)
+	require.Zero(subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
+	})
 
-	// Setting a subnet manager should be reflected on diff not state
-	d.SetSubnetManager(subnetID, newManager.ChainID, newManager.Addr)
-	chainID, addr, err = d.GetSubnetManager(subnetID)
+	// Setting a subnet conversion should be reflected on diff not state
+	d.SetSubnetConversion(subnetID, expectedConversion.ConversionID, expectedConversion.ChainID, expectedConversion.Addr)
+	conversionID, chainID, addr, err = d.GetSubnetConversion(subnetID)
 	require.NoError(err)
-	require.Equal(newManager.ChainID, chainID)
-	require.Equal(newManager.Addr, addr)
+	require.Equal(
+		expectedConversion,
+		subnetConversion{
+			ConversionID: conversionID,
+			ChainID:      chainID,
+			Addr:         addr,
+		},
+	)
 
-	chainID, addr, err = state.GetSubnetManager(subnetID)
+	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Equal(ids.Empty, chainID)
-	require.Nil(addr)
+	require.Zero(subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
+	})
 
 	// State should reflect new subnet manager after diff is applied
 	require.NoError(d.Apply(state))
-
-	chainID, addr, err = state.GetSubnetManager(subnetID)
+	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 	require.NoError(err)
-	require.Equal(newManager.ChainID, chainID)
-	require.Equal(newManager.Addr, addr)
+	require.Equal(
+		expectedConversion,
+		subnetConversion{
+			ConversionID: conversionID,
+			ChainID:      chainID,
+			Addr:         addr,
+		},
+	)
 }
 
 func TestDiffStacking(t *testing.T) {
