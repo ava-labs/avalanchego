@@ -11,7 +11,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -74,7 +73,7 @@ type VMServer struct {
 
 	allowShutdown *utils.Atomic[bool]
 
-	metrics prometheus.Gatherer
+	metrics metrics.MultiGatherer
 	db      database.Database
 	log     logging.Logger
 
@@ -89,12 +88,14 @@ type VMServer struct {
 func NewServer(vm block.ChainVM, allowShutdown *utils.Atomic[bool]) *VMServer {
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
-	return &VMServer{
+	vmSrv := &VMServer{
+		metrics:       metrics.NewPrefixGatherer(),
 		vm:            vm,
 		bVM:           bVM,
 		ssVM:          ssVM,
 		allowShutdown: allowShutdown,
 	}
+	return vmSrv
 }
 
 func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest) (*vmpb.InitializeResponse, error) {
@@ -133,11 +134,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 
-	pluginMetrics := metrics.NewPrefixGatherer()
-	vm.metrics = pluginMetrics
-
 	processMetrics, err := metrics.MakeAndRegister(
-		pluginMetrics,
+		vm.metrics,
 		"process",
 	)
 	if err != nil {
@@ -157,7 +155,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 
 	grpcMetrics, err := metrics.MakeAndRegister(
-		pluginMetrics,
+		vm.metrics,
 		"grpc",
 	)
 	if err != nil {
@@ -171,7 +169,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 
 	vmMetrics := metrics.NewPrefixGatherer()
-	if err := pluginMetrics.Register("vm", vmMetrics); err != nil {
+	if err := vm.metrics.Register("vm", vmMetrics); err != nil {
 		return nil, err
 	}
 

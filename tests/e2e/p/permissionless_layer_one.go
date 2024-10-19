@@ -355,6 +355,8 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				})
 			})
 		})
+
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })
 
