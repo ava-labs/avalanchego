@@ -305,5 +305,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				runFunc(i)
 				time.Sleep(time.Second)
 			}
+
+			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 		})
 })
