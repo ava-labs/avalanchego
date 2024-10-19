@@ -824,7 +824,7 @@ func TestDiffSubnetConversion(t *testing.T) {
 		Addr:         addr,
 	})
 
-	// State should reflect new subnet manager after diff is applied
+	// State should reflect new subnet conversion after diff is applied
 	require.NoError(d.Apply(state))
 	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 	require.NoError(err)

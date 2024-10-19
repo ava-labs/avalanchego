@@ -2376,13 +2376,13 @@ func (s *state) writeSubnetConversions() error {
 
 		bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &c)
 		if err != nil {
-			return fmt.Errorf("failed to marshal subnet manager: %w", err)
+			return fmt.Errorf("failed to marshal subnet conversion: %w", err)
 		}
 
 		s.subnetConversionCache.Put(subnetID, c)
 
 		if err := s.subnetConversionDB.Put(subnetID[:], bytes); err != nil {
-			return fmt.Errorf("failed to write subnet manager: %w", err)
+			return fmt.Errorf("failed to write subnet conversion: %w", err)
 		}
 	}
 	return nil

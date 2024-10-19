@@ -362,7 +362,7 @@ func (d *diff) GetSubnetConversion(subnetID ids.ID) (ids.ID, ids.ID, []byte, err
 		return c.ConversionID, c.ChainID, c.Addr, nil
 	}
 
-	// If the subnet manager was not assigned in this diff, ask the parent state.
+	// If the subnet conversion was not assigned in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return ids.Empty, ids.Empty, nil, ErrMissingParentState
