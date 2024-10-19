@@ -2371,8 +2371,6 @@ func (s *state) writeSubnetOwners() error {
 
 func (s *state) writeSubnetConversions() error {
 	for subnetID, c := range s.subnetConversions {
-		subnetID := subnetID
-		c := c
 		delete(s.subnetConversions, subnetID)
 
 		bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &c)
