@@ -200,5 +200,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			require.Equal(initialAVAXBalance+toTransfer-xContext.BaseTxFee, finalAVAXBalance)
 		})
+
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

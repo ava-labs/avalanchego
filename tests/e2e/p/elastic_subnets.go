@@ -190,5 +190,7 @@ var _ = e2e.DescribePChain("[Elastic Subnets]", func() {
 				)
 				require.NoError(err)
 			})
+
+			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 		})
 })

@@ -358,6 +358,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 		})
 
+<<<<<<< HEAD
 		var nextNonce uint64
 		setWeight := func(validationID ids.ID, weight uint64) {
 			tc.By("creating the unsigned warp message")
@@ -451,6 +452,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				})
 			})
 		})
+=======
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
+>>>>>>> implement-acp-77-register-subnet-validator-tx
 	})
 })
 
