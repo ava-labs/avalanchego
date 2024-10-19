@@ -1795,6 +1795,7 @@ func (s *state) Close() error {
 		s.rewardUTXODB.Close(),
 		s.utxoDB.Close(),
 		s.subnetBaseDB.Close(),
+		s.subnetConversionDB.Close(),
 		s.transformedSubnetDB.Close(),
 		s.supplyDB.Close(),
 		s.chainDB.Close(),
