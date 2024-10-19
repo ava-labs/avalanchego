@@ -1996,7 +1996,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			expectedErr: ErrFlowCheckFailed,
 		},
 		{
-			name: "attempted to remove subnet validator after subnet manager is set",
+			name: "attempted to remove subnet validator after subnet conversion has occurred",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(ids.GenerateTestID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r', 'e', 's', 's'}, nil).AnyTimes()
@@ -2281,7 +2281,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 			err: ErrFlowCheckFailed,
 		},
 		{
-			name: "invalid if subnet manager is set",
+			name: "invalid after subnet conversion",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 
@@ -2571,9 +2571,9 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			// TODO: Populate the conversionID
 			stateConversionID, stateChainID, stateAddress, err := diff.GetSubnetConversion(subnetID)
 			require.NoError(err)
+			// TODO: Update this test when we populate the correct conversionID
 			require.Zero(stateConversionID)
 			require.Equal(chainID, stateChainID)
 			require.Equal(address, stateAddress)
