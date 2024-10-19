@@ -895,7 +895,7 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
-func TestDiffSubnetManager(t *testing.T) {
+func TestDiffSubnetConversion(t *testing.T) {
 	var (
 		require            = require.New(t)
 		state              = newTestState(t, memdb.New())
@@ -909,20 +909,24 @@ func TestDiffSubnetManager(t *testing.T) {
 
 	conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(conversionID)
-	require.Zero(chainID)
-	require.Zero(addr)
+	require.Zero(subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
+	})
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
 
-	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
+	conversionID, chainID, addr, err = d.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(conversionID)
-	require.Zero(chainID)
-	require.Zero(addr)
+	require.Zero(subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
+	})
 
-	// Setting a subnet manager should be reflected on diff not state
+	// Setting a subnet conversion should be reflected on diff not state
 	d.SetSubnetConversion(subnetID, expectedConversion.ConversionID, expectedConversion.ChainID, expectedConversion.Addr)
 	conversionID, chainID, addr, err = d.GetSubnetConversion(subnetID)
 	require.NoError(err)
@@ -937,13 +941,14 @@ func TestDiffSubnetManager(t *testing.T) {
 
 	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(conversionID)
-	require.Zero(chainID)
-	require.Zero(addr)
+	require.Zero(subnetConversion{
+		ConversionID: conversionID,
+		ChainID:      chainID,
+		Addr:         addr,
+	})
 
-	// State should reflect new subnet manager after diff is applied
+	// State should reflect new subnet conversion after diff is applied
 	require.NoError(d.Apply(state))
-
 	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
 	require.NoError(err)
 	require.Equal(
