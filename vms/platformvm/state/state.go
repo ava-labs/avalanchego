@@ -1497,14 +1497,14 @@ func (s *state) loadMetadata() error {
 	s.persistedFeeState = feeState
 	s.SetFeeState(feeState)
 
-	sovExcess, err := database.GetOrDefaultUInt64(s.singletonDB, SoVExcessKey, 0)
+	sovExcess, err := database.WithDefault(database.GetUInt64, s.singletonDB, SoVExcessKey, 0)
 	if err != nil {
 		return err
 	}
 	s.persistedSOVExcess = gas.Gas(sovExcess)
 	s.SetSoVExcess(gas.Gas(sovExcess))
 
-	accruedFees, err := database.GetOrDefaultUInt64(s.singletonDB, AccruedFeesKey, 0)
+	accruedFees, err := database.WithDefault(database.GetUInt64, s.singletonDB, AccruedFeesKey, 0)
 	if err != nil {
 		return err
 	}
