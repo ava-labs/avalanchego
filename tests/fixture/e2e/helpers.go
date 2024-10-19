@@ -221,6 +221,17 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 
 	// Check that the node becomes healthy within timeout
 	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), node))
+
+	// Ensure that the primary validators are still healthy
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			continue
+		}
+		healthy, err := node.IsHealthy(tc.DefaultContext())
+		require.NoError(err)
+		require.True(healthy, "primary validator %s is not healthy", node.NodeID)
+	}
+
 	return node
 }
 
@@ -231,6 +242,7 @@ func StartNetwork(
 	avalancheGoExecPath string,
 	pluginDir string,
 	shutdownDelay time.Duration,
+	skipShutdown bool,
 	reuseNetwork bool,
 ) {
 	require := require.New(tc)
@@ -249,7 +261,7 @@ func StartNetwork(
 		if stopErr := network.Stop(tc.DefaultContext()); stopErr != nil {
 			tc.Outf("failed to stop network after bootstrap failure: %v", stopErr)
 		}
-		require.FailNow("failed to bootstrap network: %s", err)
+		require.FailNowf("network bootstrapping failed", "network bootstrapping error: %s", err)
 	}
 
 	tc.Outf("{{green}}Successfully started network{{/}}\n")
@@ -267,6 +279,11 @@ func StartNetwork(
 	tc.DeferCleanup(func() {
 		if reuseNetwork {
 			tc.Outf("{{yellow}}Skipping shutdown for network %s (symlinked to %s) to enable reuse{{/}}\n", network.Dir, symlinkPath)
+			return
+		}
+
+		if skipShutdown {
+			tc.Outf("{{yellow}}Skipping shutdown for network %s{{/}}\n", network.Dir)
 			return
 		}
 
