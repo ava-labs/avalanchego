@@ -439,7 +439,7 @@ type GetSubnetResponse struct {
 	Locktime    avajson.Uint64 `json:"locktime"`
 	// subnet transformation tx ID for an elastic subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
-	// subnet conversion information for a permissionless L1
+	// subnet conversion information for an L1
 	ConversionID   ids.ID              `json:"conversionID"`
 	ManagerChainID ids.ID              `json:"managerChainID"`
 	ManagerAddress types.JSONByteSlice `json:"managerAddress"`
