@@ -212,7 +212,7 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Check that the avalanchego workload is sane
         shell: bash
-        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=60s
+        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=120s
       - name: Check image build for avalanchego test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
@@ -232,7 +232,7 @@ jobs:
         run: ./scripts/build_xsvm.sh
       - name: Check that the xsvm workload is sane
         shell: bash
-        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=60s
+        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=120s
       - name: Check image build for xsvm test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
