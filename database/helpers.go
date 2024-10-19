@@ -54,14 +54,6 @@ func GetUInt64(db KeyValueReader, key []byte) (uint64, error) {
 	return ParseUInt64(b)
 }
 
-func GetOrDefaultUInt64(db KeyValueReader, key []byte, def uint64) (uint64, error) {
-	v, err := GetUInt64(db, key)
-	if err == ErrNotFound {
-		return def, nil
-	}
-	return v, err
-}
-
 func PackUInt64(val uint64) []byte {
 	bytes := make([]byte, Uint64Size)
 	binary.BigEndian.PutUint64(bytes, val)
@@ -143,6 +135,21 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 		return false, fmt.Errorf("should be %d or %d but is %d", BoolFalse, BoolTrue, b[0])
 	}
 	return b[0] == BoolTrue, nil
+}
+
+// WithDefault returns the value at [key] in [db]. If the key doesn't exist, it
+// returns [def].
+func WithDefault[V any](
+	get func(KeyValueReader, []byte) (V, error),
+	db KeyValueReader,
+	key []byte,
+	def V,
+) (V, error) {
+	v, err := get(db, key)
+	if err == ErrNotFound {
+		return def, nil
+	}
+	return v, err
 }
 
 func Count(db Iteratee) (int, error) {
