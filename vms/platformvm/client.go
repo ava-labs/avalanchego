@@ -235,7 +235,7 @@ type GetSubnetClientResponse struct {
 	Locktime    uint64
 	// subnet transformation tx ID for a permissionless subnet
 	SubnetTransformationTxID ids.ID
-	// subnet conversion information for a permissionless L1
+	// subnet conversion information for an L1
 	ConversionID   ids.ID
 	ManagerChainID ids.ID
 	ManagerAddress []byte
