@@ -1106,18 +1106,17 @@ func TestStateSubnetOwner(t *testing.T) {
 func TestStateSubnetConversion(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(s *state, subnetID ids.ID, c subnetConversion)
+		setup func(s *state, subnetID ids.ID, c SubnetConversion)
 	}{
 		{
 			name: "in-memory",
-			setup: func(s *state, subnetID ids.ID, c subnetConversion) {
-				s.SetSubnetConversion(subnetID, c.ConversionID, c.ChainID, c.Addr)
+			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
+				s.SetSubnetConversion(subnetID, c)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(s *state, subnetID ids.ID, c subnetConversion) {
-				s.subnetConversionCache.Flush()
+			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
 				s.subnetConversionCache.Put(subnetID, c)
 			},
 		},
@@ -1128,33 +1127,22 @@ func TestStateSubnetConversion(t *testing.T) {
 				require            = require.New(t)
 				state              = newTestState(t, memdb.New())
 				subnetID           = ids.GenerateTestID()
-				expectedConversion = subnetConversion{
+				expectedConversion = SubnetConversion{
 					ConversionID: ids.GenerateTestID(),
 					ChainID:      ids.GenerateTestID(),
 					Addr:         []byte{'a', 'd', 'd', 'r'},
 				}
 			)
 
-			conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
+			actualConversion, err := state.GetSubnetConversion(subnetID)
 			require.ErrorIs(err, database.ErrNotFound)
-			require.Zero(subnetConversion{
-				ConversionID: conversionID,
-				ChainID:      chainID,
-				Addr:         addr,
-			})
+			require.Zero(actualConversion)
 
 			test.setup(state, subnetID, expectedConversion)
 
-			conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
+			actualConversion, err = state.GetSubnetConversion(subnetID)
 			require.NoError(err)
-			require.Equal(
-				expectedConversion,
-				subnetConversion{
-					ConversionID: conversionID,
-					ChainID:      chainID,
-					Addr:         addr,
-				},
-			)
+			require.Equal(expectedConversion, actualConversion)
 		})
 	}
 }
