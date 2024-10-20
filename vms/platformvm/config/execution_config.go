@@ -37,7 +37,6 @@ type ExecutionConfig struct {
 	BlockIDCacheSize             int           `json:"block-id-cache-size"`
 	FxOwnerCacheSize             int           `json:"fx-owner-cache-size"`
 	SubnetConversionCacheSize    int           `json:"subnet-conversion-cache-size"`
-	SubnetManagerCacheSize       int           `json:"subnet-manager-cache-size"`
 	ChecksumsEnabled             bool          `json:"checksums-enabled"`
 	MempoolPruneFrequency        time.Duration `json:"mempool-prune-frequency"`
 }
