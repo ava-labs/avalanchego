@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/iterator"
@@ -79,7 +80,11 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				mockable.MaxTime,
+			)
 			require.NoError(err)
 			require.False(nextTime.After(nextStakerChangeTime))
 
@@ -185,7 +190,11 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 
 			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				mockable.MaxTime,
+			)
 			require.NoError(err)
 			require.False(newTime.After(nextStakerChangeTime))
 
