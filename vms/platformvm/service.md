@@ -1204,7 +1204,7 @@ Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
 ### `platform.getSubnet`
 
-Get owners and elastic info about the Subnet or L1.
+Get owners and info about the Subnet or L1.
 
 **Signature:**
 

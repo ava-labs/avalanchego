@@ -123,8 +123,8 @@ type Chain interface {
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
 
-	GetSubnetConversion(subnetID ids.ID) (conversionID ids.ID, chainID ids.ID, addr []byte, err error)
-	SetSubnetConversion(subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte)
+	GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error)
+	SetSubnetConversion(subnetID ids.ID, c SubnetConversion)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -366,8 +366,8 @@ type state struct {
 	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner; if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
-	subnetConversions     map[ids.ID]subnetConversion            // map of subnetID -> conversion of the subnet
-	subnetConversionCache cache.Cacher[ids.ID, subnetConversion] // cache of subnetID -> conversion
+	subnetConversions     map[ids.ID]SubnetConversion            // map of subnetID -> conversion of the subnet
+	subnetConversionCache cache.Cacher[ids.ID, SubnetConversion] // cache of subnetID -> conversion
 	subnetConversionDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
@@ -441,7 +441,7 @@ type fxOwnerAndSize struct {
 	size  int
 }
 
-type subnetConversion struct {
+type SubnetConversion struct {
 	ConversionID ids.ID `serialize:"true"`
 	ChainID      ids.ID `serialize:"true"`
 	Addr         []byte `serialize:"true"`
@@ -556,10 +556,10 @@ func New(
 	}
 
 	subnetConversionDB := prefixdb.New(SubnetConversionPrefix, baseDB)
-	subnetConversionCache, err := metercacher.New[ids.ID, subnetConversion](
+	subnetConversionCache, err := metercacher.New[ids.ID, SubnetConversion](
 		"subnet_conversion_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, subnetConversion](execCfg.SubnetConversionCacheSize, func(_ ids.ID, c subnetConversion) int {
+		cache.NewSizedLRU[ids.ID, SubnetConversion](execCfg.SubnetConversionCacheSize, func(_ ids.ID, c SubnetConversion) int {
 			return 3*ids.IDLen + len(c.Addr)
 		}),
 	)
@@ -669,7 +669,7 @@ func New(
 		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
 
-		subnetConversions:     make(map[ids.ID]subnetConversion),
+		subnetConversions:     make(map[ids.ID]SubnetConversion),
 		subnetConversionDB:    subnetConversionDB,
 		subnetConversionCache: subnetConversionCache,
 
@@ -859,34 +859,30 @@ func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
 }
 
-func (s *state) GetSubnetConversion(subnetID ids.ID) (ids.ID, ids.ID, []byte, error) {
+func (s *state) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
 	if c, ok := s.subnetConversions[subnetID]; ok {
-		return c.ConversionID, c.ChainID, c.Addr, nil
+		return c, nil
 	}
 
 	if c, ok := s.subnetConversionCache.Get(subnetID); ok {
-		return c.ConversionID, c.ChainID, c.Addr, nil
+		return c, nil
 	}
 
 	bytes, err := s.subnetConversionDB.Get(subnetID[:])
 	if err != nil {
-		return ids.Empty, ids.Empty, nil, err
+		return SubnetConversion{}, err
 	}
 
-	var c subnetConversion
+	var c SubnetConversion
 	if _, err := block.GenesisCodec.Unmarshal(bytes, &c); err != nil {
-		return ids.Empty, ids.Empty, nil, err
+		return SubnetConversion{}, err
 	}
 	s.subnetConversionCache.Put(subnetID, c)
-	return c.ConversionID, c.ChainID, c.Addr, nil
+	return c, nil
 }
 
-func (s *state) SetSubnetConversion(subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
-	s.subnetConversions[subnetID] = subnetConversion{
-		ConversionID: conversionID,
-		ChainID:      chainID,
-		Addr:         addr,
-	}
+func (s *state) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
+	s.subnetConversions[subnetID] = c
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {

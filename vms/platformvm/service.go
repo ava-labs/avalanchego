@@ -491,12 +491,12 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return err
 	}
 
-	switch conversionID, chainID, addr, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
+	switch c, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
 	case nil:
 		response.IsPermissioned = false
-		response.ConversionID = conversionID
-		response.ManagerChainID = chainID
-		response.ManagerAddress = addr
+		response.ConversionID = c.ConversionID
+		response.ManagerChainID = c.ChainID
+		response.ManagerAddress = c.Addr
 	case database.ErrNotFound:
 		response.ConversionID = ids.Empty
 		response.ManagerChainID = ids.Empty
