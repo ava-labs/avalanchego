@@ -22,7 +22,7 @@ func runTenkrandomBenchmark(databaseEntries uint64) error {
 		return fmt.Errorf("unable to read root : %v", err)
 	}
 
-	ldb, err := rawdb.Open(rawdb.OpenOptions{
+	ldb, err := openLevelDBDatabaseNoCompression(rawdb.OpenOptions{
 		Type:              "leveldb",
 		Directory:         getRunningDatabaseDirectory(databaseEntries),
 		AncientsDirectory: "",

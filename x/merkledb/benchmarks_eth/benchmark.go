@@ -16,10 +16,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/ethdb/leveldb"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/trie/trienode"
 	"github.com/ethereum/go-ethereum/triedb"
@@ -155,7 +158,7 @@ func createGoldenDatabase(databaseEntries uint64) error {
 		return fmt.Errorf("unable to create golden staging directory : %v", err)
 	}
 
-	ldb, err := rawdb.NewLevelDBDatabase(stagingDirectory, levelDBCacheSizeMB, openFilesCacheCapacity, "metrics_prefix", false)
+	ldb, err := openRawDatabaseNoCompression(stagingDirectory, levelDBCacheSizeMB, openFilesCacheCapacity)
 	if err != nil {
 		return fmt.Errorf("unable to create level db database : %v", err)
 	}
@@ -423,4 +426,47 @@ func singleBenchmark() {
 		fmt.Fprintf(os.Stderr, "Unable to run benchmark: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func openRawDatabaseNoCompression(stagingDirectory string, cache int, handles int) (ethdb.Database, error) {
+	udb, err := leveldb.NewCustom(stagingDirectory, "metrics_prefix", func(options *opt.Options) {
+		// cache := levelDBCacheSizeMB
+		// handles := openFilesCacheCapacity
+		const minCache int = 16
+		const minHandles int = 16
+		// Ensure we have some minimal caching and file guarantees
+		if cache < minCache {
+			cache = minCache
+		}
+		if handles < minHandles {
+			handles = minHandles
+		}
+		// Set default options
+		options.OpenFilesCacheCapacity = handles
+		options.BlockCacheCapacity = cache / 2 * opt.MiB
+		options.WriteBuffer = cache / 4 * opt.MiB // Two of these are used internally
+		// disable compression
+		options.Compression = opt.NoCompression
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create level db database : %v", err)
+	}
+
+	return rawdb.NewDatabase(udb), nil
+}
+
+func openLevelDBDatabaseNoCompression(opt rawdb.OpenOptions) (ethdb.Database, error) {
+	ldb, err := openRawDatabaseNoCompression(opt.Directory, opt.Cache, opt.Handles)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open level db database : %v", err)
+	}
+	if len(opt.AncientsDirectory) == 0 {
+		return ldb, nil
+	}
+	frdb, err := rawdb.NewDatabaseWithFreezer(ldb, opt.AncientsDirectory, opt.Namespace, opt.ReadOnly)
+	if err != nil {
+		ldb.Close()
+		return nil, err
+	}
+	return frdb, nil
 }

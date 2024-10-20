@@ -23,7 +23,7 @@ func runZipfBenchmark(databaseEntries uint64, sZipf float64, vZipf float64) erro
 		return fmt.Errorf("unable to read root : %v", err)
 	}
 
-	ldb, err := rawdb.Open(rawdb.OpenOptions{
+	ldb, err := openLevelDBDatabaseNoCompression(rawdb.OpenOptions{
 		Type:              "leveldb",
 		Directory:         getRunningDatabaseDirectory(databaseEntries),
 		AncientsDirectory: "",
