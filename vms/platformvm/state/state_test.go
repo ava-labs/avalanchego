@@ -1103,29 +1103,21 @@ func TestStateSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
-func TestStateSubnetManager(t *testing.T) {
+func TestStateSubnetConversion(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(t *testing.T, s State, subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte)
+		setup func(s *state, subnetID ids.ID, c SubnetConversion)
 	}{
 		{
 			name: "in-memory",
-			setup: func(_ *testing.T, s State, subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
-				s.SetSubnetConversion(subnetID, conversionID, chainID, addr)
+			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
+				s.SetSubnetConversion(subnetID, c)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(t *testing.T, s State, subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
-				subnetManagerCache := s.(*state).subnetConversionCache
-
-				require.Zero(t, subnetManagerCache.Len())
-				subnetManagerCache.Put(subnetID, subnetConversion{
-					ConversionID: conversionID,
-					ChainID:      chainID,
-					Addr:         addr,
-				})
-				require.Equal(t, 1, subnetManagerCache.Len())
+			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
+				s.subnetConversionCache.Put(subnetID, c)
 			},
 		},
 	}
@@ -1135,31 +1127,22 @@ func TestStateSubnetManager(t *testing.T) {
 				require            = require.New(t)
 				state              = newTestState(t, memdb.New())
 				subnetID           = ids.GenerateTestID()
-				expectedConversion = subnetConversion{
+				expectedConversion = SubnetConversion{
 					ConversionID: ids.GenerateTestID(),
 					ChainID:      ids.GenerateTestID(),
 					Addr:         []byte{'a', 'd', 'd', 'r'},
 				}
 			)
 
-			conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
+			actualConversion, err := state.GetSubnetConversion(subnetID)
 			require.ErrorIs(err, database.ErrNotFound)
-			require.Zero(conversionID)
-			require.Zero(chainID)
-			require.Zero(addr)
+			require.Zero(actualConversion)
 
-			test.setup(t, state, subnetID, expectedConversion.ConversionID, expectedConversion.ChainID, expectedConversion.Addr)
+			test.setup(state, subnetID, expectedConversion)
 
-			conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
+			actualConversion, err = state.GetSubnetConversion(subnetID)
 			require.NoError(err)
-			require.Equal(
-				expectedConversion,
-				subnetConversion{
-					ConversionID: conversionID,
-					ChainID:      chainID,
-					Addr:         addr,
-				},
-			)
+			require.Equal(expectedConversion, actualConversion)
 		})
 	}
 }
@@ -1269,6 +1252,22 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 
 	s = newTestState(t, db)
 	require.Equal(expectedFeeState, s.GetFeeState())
+}
+
+// Verify that committing the state writes the sov excess to the database and
+// that loading the state fetches the sov excess from the database.
+func TestStateSoVExcessCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	const expectedSoVExcess gas.Gas = 10
+	s.SetSoVExcess(expectedSoVExcess)
+	require.NoError(s.Commit())
+
+	s = newTestState(t, db)
+	require.Equal(expectedSoVExcess, s.GetSoVExcess())
 }
 
 // Verify that committing the state writes the accrued fees to the database and
