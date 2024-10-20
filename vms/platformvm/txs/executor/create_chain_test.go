@@ -288,9 +288,11 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 
 	stateDiff.SetSubnetConversion(
 		subnetID,
-		ids.GenerateTestID(),
-		ids.GenerateTestID(),
-		[]byte{'a', 'd', 'd', 'r', 'e', 's', 's'},
+		state.SubnetConversion{
+			ConversionID: ids.GenerateTestID(),
+			ChainID:      ids.GenerateTestID(),
+			Addr:         []byte("address"),
+		},
 	)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
