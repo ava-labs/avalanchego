@@ -246,6 +246,11 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 	mempool.EXPECT().Remove([]*txs.Tx{apricotBlk.Tx}).Times(1)
 	onAccept.EXPECT().AddTx(apricotBlk.Tx, status.Committed).Times(1)
 	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	// Allow metrics to be calculated.
+	onAccept.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	onAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	onAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
+	onAccept.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	blk := manager.NewBlock(apricotBlk)
 	require.NoError(blk.Verify(context.Background()))
@@ -411,6 +416,11 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		// Allow metrics to be calculated.
+		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
+		parentOnCommitState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
+		parentOnCommitState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
@@ -478,6 +488,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		// Allow metrics to be calculated.
+		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
+		parentOnAbortState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
+		parentOnAbortState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
