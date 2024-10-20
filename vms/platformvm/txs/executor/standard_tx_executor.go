@@ -691,15 +691,10 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
-	if warpMessage.NetworkID != e.Ctx.NetworkID {
-		return fmt.Errorf("expected networkID %d but got %d", e.Ctx.NetworkID, warpMessage.NetworkID)
-	}
-
 	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
 	if err != nil {
 		return err
 	}
-
 	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
 	if err != nil {
 		return err
@@ -850,15 +845,10 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	if err != nil {
 		return err
 	}
-	if warpMessage.NetworkID != e.Ctx.NetworkID {
-		return fmt.Errorf("expected networkID %d but got %d", e.Ctx.NetworkID, warpMessage.NetworkID)
-	}
-
 	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
 	if err != nil {
 		return err
 	}
-
 	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
 	if err != nil {
 		return err

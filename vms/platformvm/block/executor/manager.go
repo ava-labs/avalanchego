@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"context"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -120,6 +121,21 @@ func (m *manager) Preferred() ids.ID {
 func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
 		return ErrChainNotSynced
+	}
+
+	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
+	if err != nil {
+		return err
+	}
+	err = executor.VerifyWarpMessages(
+		context.TODO(),
+		m.ctx.NetworkID,
+		m.ctx.ValidatorState,
+		recommendedPChainHeight,
+		tx.Unsigned,
+	)
+	if err != nil {
+		return err
 	}
 
 	stateDiff, err := state.NewDiff(m.preferred, m)
