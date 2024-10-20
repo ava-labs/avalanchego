@@ -635,8 +635,15 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
-	// Set the new Subnet manager in the database
-	e.State.SetSubnetConversion(tx.Subnet, conversionID, tx.ChainID, tx.Address)
+	// Track the subnet conversion in the database
+	e.State.SetSubnetConversion(
+		tx.Subnet,
+		state.SubnetConversion{
+			ConversionID: conversionID,
+			ChainID:      tx.ChainID,
+			Addr:         tx.Address,
+		},
+	)
 	return nil
 }
 
@@ -696,15 +703,15 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(msg.SubnetID)
+	subnetConversion, err := e.State.GetSubnetConversion(msg.SubnetID)
 	if err != nil {
 		return err
 	}
-	if warpMessage.SourceChainID != expectedChainID {
-		return fmt.Errorf("expected chainID %s but got %s", expectedChainID, warpMessage.SourceChainID)
+	if warpMessage.SourceChainID != subnetConversion.ChainID {
+		return fmt.Errorf("expected chainID %s but got %s", subnetConversion.ChainID, warpMessage.SourceChainID)
 	}
-	if !bytes.Equal(addressedCall.SourceAddress, expectedAddress) {
-		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
+	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
+		return fmt.Errorf("expected address %s but got %s", subnetConversion.Addr, addressedCall.SourceAddress)
 	}
 
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
@@ -858,15 +865,15 @@ func (e *StandardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return fmt.Errorf("expected nonce to be at least %d but got %d", sov.MinNonce, msg.Nonce)
 	}
 
-	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(sov.SubnetID)
+	subnetConversion, err := e.State.GetSubnetConversion(sov.SubnetID)
 	if err != nil {
 		return err
 	}
-	if warpMessage.SourceChainID != expectedChainID {
-		return fmt.Errorf("expected chainID %s but got %s", expectedChainID, warpMessage.SourceChainID)
+	if warpMessage.SourceChainID != subnetConversion.ChainID {
+		return fmt.Errorf("expected chainID %s but got %s", subnetConversion.ChainID, warpMessage.SourceChainID)
 	}
-	if !bytes.Equal(addressedCall.SourceAddress, expectedAddress) {
-		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
+	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
+		return fmt.Errorf("expected address %s but got %s", subnetConversion.Addr, addressedCall.SourceAddress)
 	}
 
 	txID := e.Tx.ID()
