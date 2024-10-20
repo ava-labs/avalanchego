@@ -56,7 +56,7 @@ type diff struct {
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
 	// Subnet ID --> Conversion of the subnet
-	subnetConversions map[ids.ID]subnetConversion
+	subnetConversions map[ids.ID]SubnetConversion
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 
@@ -89,7 +89,7 @@ func NewDiff(
 		expiryDiff:        newExpiryDiff(),
 		sovDiff:           newSubnetOnlyValidatorsDiff(),
 		subnetOwners:      make(map[ids.ID]fx.Owner),
-		subnetConversions: make(map[ids.ID]subnetConversion),
+		subnetConversions: make(map[ids.ID]SubnetConversion),
 	}, nil
 }
 
@@ -435,25 +435,21 @@ func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	d.subnetOwners[subnetID] = owner
 }
 
-func (d *diff) GetSubnetConversion(subnetID ids.ID) (ids.ID, ids.ID, []byte, error) {
-	if conversion, exists := d.subnetConversions[subnetID]; exists {
-		return conversion.ConversionID, conversion.ChainID, conversion.Addr, nil
+func (d *diff) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
+	if c, ok := d.subnetConversions[subnetID]; ok {
+		return c, nil
 	}
 
-	// If the subnet manager was not assigned in this diff, ask the parent state.
+	// If the subnet conversion was not assigned in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return ids.Empty, ids.Empty, nil, ErrMissingParentState
+		return SubnetConversion{}, ErrMissingParentState
 	}
 	return parentState.GetSubnetConversion(subnetID)
 }
 
-func (d *diff) SetSubnetConversion(subnetID ids.ID, conversionID ids.ID, chainID ids.ID, addr []byte) {
-	d.subnetConversions[subnetID] = subnetConversion{
-		ConversionID: conversionID,
-		ChainID:      chainID,
-		Addr:         addr,
-	}
+func (d *diff) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
+	d.subnetConversions[subnetID] = c
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -676,8 +672,8 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
 	}
-	for subnetID, conversion := range d.subnetConversions {
-		baseState.SetSubnetConversion(subnetID, conversion.ConversionID, conversion.ChainID, conversion.Addr)
+	for subnetID, c := range d.subnetConversions {
+		baseState.SetSubnetConversion(subnetID, c)
 	}
 	return nil
 }
