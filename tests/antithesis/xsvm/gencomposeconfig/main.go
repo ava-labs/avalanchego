@@ -12,11 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-const baseImageName = "antithesis-xsvm"
+const (
+	baseImageName = "antithesis-xsvm"
+	NumNodes      = 6
+)
 
 // Creates docker-compose.yml and its associated volumes in the target path.
 func main() {
-	network := tmpnet.LocalNetworkOrPanic()
+	network := antithesis.CreateNetwork(NumNodes)
 	network.Subnets = []*tmpnet.Subnet{
 		subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, network.Nodes...),
 	}
