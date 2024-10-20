@@ -63,6 +63,10 @@ func (*staticVisitor) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
 	return ErrUnsupportedTx
 }
 
+func (*staticVisitor) DisableSubnetValidatorTx(*txs.DisableSubnetValidatorTx) error {
+	return ErrUnsupportedTx
+}
+
 func (c *staticVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
 	c.fee = c.config.AddPrimaryNetworkValidatorFee
 	return nil

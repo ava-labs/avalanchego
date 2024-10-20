@@ -208,6 +208,16 @@ func (b *builderWithOptions) NewIncreaseBalanceTx(
 	)
 }
 
+func (b *builderWithOptions) NewDisableSubnetValidatorTx(
+	validationID ids.ID,
+	options ...common.Option,
+) (*txs.DisableSubnetValidatorTx, error) {
+	return b.builder.NewDisableSubnetValidatorTx(
+		validationID,
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
 func (b *builderWithOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
