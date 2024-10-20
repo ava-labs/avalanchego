@@ -708,15 +708,15 @@ func (e *StandardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	_, expectedChainID, expectedAddress, err := e.State.GetSubnetConversion(msg.SubnetID)
+	subnetConversion, err := e.State.GetSubnetConversion(msg.SubnetID)
 	if err != nil {
 		return err
 	}
-	if warpMessage.SourceChainID != expectedChainID {
-		return fmt.Errorf("expected chainID %s but got %s", expectedChainID, warpMessage.SourceChainID)
+	if warpMessage.SourceChainID != subnetConversion.ChainID {
+		return fmt.Errorf("expected chainID %s but got %s", subnetConversion.ChainID, warpMessage.SourceChainID)
 	}
-	if !bytes.Equal(addressedCall.SourceAddress, expectedAddress) {
-		return fmt.Errorf("expected address %s but got %s", expectedAddress, addressedCall.SourceAddress)
+	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
+		return fmt.Errorf("expected address %s but got %s", subnetConversion.Addr, addressedCall.SourceAddress)
 	}
 
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
