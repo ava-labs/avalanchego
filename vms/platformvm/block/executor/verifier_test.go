@@ -103,8 +103,8 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
 	parentOnAcceptState.EXPECT().GetFeeState().Return(gas.State{}).Times(2)
-	parentOnAcceptState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(2)
 	parentOnAcceptState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(2)
+	parentOnAcceptState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(2)
 	parentOnAcceptState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(2)
 
 	backend := &backend{
@@ -337,8 +337,8 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	timestamp := time.Now()
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
@@ -601,8 +601,8 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
 			s.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(3)
+			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
 			s.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
@@ -701,8 +701,8 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
 			s.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(3)
+			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
 			s.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
@@ -819,8 +819,8 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
 	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 

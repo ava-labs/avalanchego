@@ -369,8 +369,8 @@ func TestDiffCurrentValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -406,8 +406,8 @@ func TestDiffPendingValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -449,8 +449,8 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -495,8 +495,8 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -635,8 +635,8 @@ func TestDiffTx(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -735,8 +735,8 @@ func TestDiffUTXO(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
+	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -826,6 +826,7 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 	require.Equal(expected.GetFeeState(), actual.GetFeeState())
+	require.Equal(expected.GetSoVExcess(), actual.GetSoVExcess())
 	require.Equal(expected.GetAccruedFees(), actual.GetAccruedFees())
 
 	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)

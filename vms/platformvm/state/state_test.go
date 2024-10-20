@@ -1254,6 +1254,22 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	require.Equal(expectedFeeState, s.GetFeeState())
 }
 
+// Verify that committing the state writes the sov excess to the database and
+// that loading the state fetches the sov excess from the database.
+func TestStateSoVExcessCommitAndLoad(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	s := newTestState(t, db)
+
+	const expectedSoVExcess gas.Gas = 10
+	s.SetSoVExcess(expectedSoVExcess)
+	require.NoError(s.Commit())
+
+	s = newTestState(t, db)
+	require.Equal(expectedSoVExcess, s.GetSoVExcess())
+}
+
 // Verify that committing the state writes the accrued fees to the database and
 // that loading the state fetches the accrued fees from the database.
 func TestStateAccruedFeesCommitAndLoad(t *testing.T) {
