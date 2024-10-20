@@ -439,7 +439,7 @@ type GetSubnetResponse struct {
 	Locktime    avajson.Uint64 `json:"locktime"`
 	// subnet transformation tx ID for an elastic subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
-	// subnet manager information for a permissionless L1
+	// subnet conversion information for an L1
 	ConversionID   ids.ID              `json:"conversionID"`
 	ManagerChainID ids.ID              `json:"managerChainID"`
 	ManagerAddress types.JSONByteSlice `json:"managerAddress"`
@@ -491,12 +491,12 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return err
 	}
 
-	switch conversionID, chainID, addr, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
+	switch c, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
 	case nil:
 		response.IsPermissioned = false
-		response.ConversionID = conversionID
-		response.ManagerChainID = chainID
-		response.ManagerAddress = addr
+		response.ConversionID = c.ConversionID
+		response.ManagerChainID = c.ChainID
+		response.ManagerAddress = c.Addr
 	case database.ErrNotFound:
 		response.ConversionID = ids.Empty
 		response.ManagerChainID = ids.Empty
