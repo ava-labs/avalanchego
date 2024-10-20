@@ -159,3 +159,10 @@ func (m *txMetrics) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeightTx) 
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "increase_balance",
+	}).Inc()
+	return nil
+}
