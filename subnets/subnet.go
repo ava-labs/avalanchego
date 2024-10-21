@@ -34,21 +34,23 @@ type Subnet interface {
 }
 
 type subnet struct {
-	lock             sync.RWMutex
-	bootstrapping    set.Set[ids.ID]
-	bootstrapped     set.Set[ids.ID]
-	once             sync.Once
-	bootstrappedSema chan struct{}
-	config           Config
-	myNodeID         ids.NodeID
+	lock            sync.RWMutex
+	bootstrapping   set.Set[ids.ID]
+	bootstrapped    set.Set[ids.ID]
+	config          Config
+	myNodeID        ids.NodeID
+	bootstrapSignal common.PreemptionSignal
 }
 
 func New(myNodeID ids.NodeID, config Config) Subnet {
 	return &subnet{
-		bootstrappedSema: make(chan struct{}),
-		config:           config,
-		myNodeID:         myNodeID,
+		config:   config,
+		myNodeID: myNodeID,
 	}
+}
+
+func (s *subnet) AllBootstrapped() <-chan struct{} {
+	return s.bootstrapSignal.Listen()
 }
 
 func (s *subnet) IsBootstrapped() bool {
@@ -68,13 +70,7 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 		return
 	}
 
-	s.once.Do(func() {
-		close(s.bootstrappedSema)
-	})
-}
-
-func (s *subnet) OnBootstrapCompleted() chan struct{} {
-	return s.bootstrappedSema
+	s.bootstrapSignal.Preempt()
 }
 
 func (s *subnet) AddChain(chainID ids.ID) bool {
