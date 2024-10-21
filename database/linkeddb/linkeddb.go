@@ -281,7 +281,7 @@ func (ldb *linkedDB) getHeadKey() ([]byte, error) {
 func (ldb *linkedDB) putHeadKey(key []byte) error {
 	ldb.headKeyIsUpdated = true
 	ldb.updatedHeadKeyExists = true
-	ldb.updatedHeadKey = key
+	ldb.updatedHeadKey = slices.Clone(key)
 	return ldb.batch.Put(headKey, key)
 }
 
