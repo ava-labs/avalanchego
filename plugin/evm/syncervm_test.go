@@ -273,9 +273,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 }
 
 func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *syncVMSetup {
-	var (
-		require = require.New(t)
-	)
+	require := require.New(t)
 	// configure [serverVM]
 	_, serverVM, _, serverAppSender := GenesisVM(t, true, genesisJSONLatest, "", "")
 	t.Cleanup(func() {

@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -20,7 +21,7 @@ func TestSnowContext() *snow.Context {
 	}
 	pk := bls.PublicFromSecretKey(sk)
 	return &snow.Context{
-		NetworkID:       0,
+		NetworkID:       constants.UnitTestID,
 		SubnetID:        ids.Empty,
 		ChainID:         ids.Empty,
 		NodeID:          ids.EmptyNodeID,

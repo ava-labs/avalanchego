@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/subnet-evm/core/txpool/legacypool"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ethereum/go-ethereum/common"
@@ -60,7 +61,10 @@ const (
 	// - state sync time: ~6 hrs.
 	defaultStateSyncMinBlocks   = 300_000
 	defaultStateSyncRequestSize = 1024 // the number of key/values to ask peers for per request
+	defaultDBType               = pebbledb.Name
 )
+
+type PBool bool
 
 var (
 	defaultEnabledAPIs = []string{
@@ -225,6 +229,14 @@ type Config struct {
 
 	// RPC settings
 	HttpBodyLimit uint64 `json:"http-body-limit"`
+
+	// Database settings
+	UseStandaloneDatabase *PBool `json:"use-standalone-database"`
+	DatabaseConfigContent string `json:"database-config"`
+	DatabaseConfigFile    string `json:"database-config-file"`
+	DatabaseType          string `json:"database-type"`
+	DatabasePath          string `json:"database-path"`
+	DatabaseReadOnly      bool   `json:"database-read-only"`
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
@@ -284,6 +296,7 @@ func (c *Config) SetDefaults() {
 	c.StateSyncRequestSize = defaultStateSyncRequestSize
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
 	c.AcceptedCacheSize = defaultAcceptedCacheSize
+	c.DatabaseType = defaultDBType
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
@@ -337,4 +350,18 @@ func (c *Config) Deprecate() string {
 	}
 
 	return msg
+}
+
+func (p *PBool) String() string {
+	if p == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%t", *p)
+}
+
+func (p *PBool) Bool() bool {
+	if p == nil {
+		return false
+	}
+	return bool(*p)
 }
