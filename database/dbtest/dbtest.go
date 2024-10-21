@@ -25,13 +25,13 @@ import (
 // TestsBasic is a list of all basic database tests that require only
 // a KeyValueReaderWriter.
 var TestsBasic = map[string]func(t *testing.T, db database.KeyValueReaderWriterDeleter){
-	"SimpleKeyValue":       TestSimpleKeyValue,
-	"OverwriteKeyValue":    TestOverwriteKeyValue,
-	"EmptyKey":             TestEmptyKey,
-	"KeyEmptyValue":        TestKeyEmptyValue,
-	"MemorySafetyDatabase": TestMemorySafetyDatabase,
-	"ModifyValueAfterPut":  TestModifyKeyValueAfterPut,
-	"PutGetEmpty":          TestPutGetEmpty,
+	"SimpleKeyValue":         TestSimpleKeyValue,
+	"OverwriteKeyValue":      TestOverwriteKeyValue,
+	"EmptyKey":               TestEmptyKey,
+	"KeyEmptyValue":          TestKeyEmptyValue,
+	"MemorySafetyDatabase":   TestMemorySafetyDatabase,
+	"ModifyKeyValueAfterPut": TestModifyKeyValueAfterPut,
+	"PutGetEmpty":            TestPutGetEmpty,
 }
 
 // Tests is a list of all database tests
