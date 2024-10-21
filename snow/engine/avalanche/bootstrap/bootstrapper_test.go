@@ -617,7 +617,6 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 	require.Equal(vtxID1, requested)
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, *reqIDPtr, [][]byte{vtxBytes1})) // Provide vtx1; should request vtx0
-	require.Equal(snow.Bootstrapping, bs.Context().State.Get().State)
 	require.Equal(vtxID0, requested)
 
 	manager.StopVertexAcceptedF = func(context.Context) (bool, error) {

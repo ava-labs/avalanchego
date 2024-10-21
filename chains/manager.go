@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/syncer"
+	"github.com/ava-labs/avalanchego/snow/engine/unified"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
@@ -63,7 +64,6 @@ import (
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
 	avagetter "github.com/ava-labs/avalanchego/snow/engine/avalanche/getter"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -933,22 +933,12 @@ func (m *manager) createAvalancheChain(
 	// to make sure start callbacks are duly initialized
 	snowmanEngineConfig := smeng.Config{
 		Ctx:                 ctx,
-		AllGetsServer:       snowGetHandler,
 		VM:                  vmWrappingProposerVM,
 		Sender:              snowmanMessageSender,
 		Validators:          vdrs,
 		ConnectedValidators: connectedValidators,
 		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
-	}
-	var snowmanEngine common.Engine
-	snowmanEngine, err = smeng.New(snowmanEngineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
-	}
-
-	if m.TracingEnabled {
-		snowmanEngine = common.TraceEngine(snowmanEngine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -968,18 +958,6 @@ func (m *manager) createAvalancheChain(
 		DB:                             blockBootstrappingDB,
 		VM:                             vmWrappingProposerVM,
 	}
-	var snowmanBootstrapper common.BootstrapableEngine
-	snowmanBootstrapper, err = smbootstrap.New(
-		bootstrapCfg,
-		snowmanEngine.Start,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
-	}
-
-	if m.TracingEnabled {
-		snowmanBootstrapper = common.TraceBootstrapableEngine(snowmanBootstrapper, m.Tracer)
-	}
 
 	avaGetHandler, err := avagetter.New(
 		vtxManager,
@@ -991,12 +969,6 @@ func (m *manager) createAvalancheChain(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize avalanche base message handler: %w", err)
-	}
-
-	// create engine gear
-	avalancheEngine := aveng.New(ctx, avaGetHandler, linearizableVM)
-	if m.TracingEnabled {
-		avalancheEngine = common.TraceEngine(avalancheEngine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -1016,32 +988,33 @@ func (m *manager) createAvalancheChain(
 		avalancheBootstrapperConfig.StopVertexID = m.Upgrades.CortinaXChainStopVertexID
 	}
 
-	var avalancheBootstrapper common.BootstrapableEngine
-	avalancheBootstrapper, err = avbootstrap.New(
-		avalancheBootstrapperConfig,
-		snowmanBootstrapper.Start,
-		avalancheMetrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing avalanche bootstrapper: %w", err)
+	ef := &unified.EngineFactory{
+		TracingEnabled:    m.TracingEnabled,
+		GetServer:         snowGetHandler,
+		AvaAncestorGetter: avaGetHandler,
+		AvaMetrics:        avalancheMetrics,
+		Tracer:            m.Tracer,
+		BootConfig:        bootstrapCfg,
+		AvaBootConfig:     avalancheBootstrapperConfig,
+		SnowmanConfig:     snowmanEngineConfig,
+		Logger:            ctx.Log,
 	}
 
-	if m.TracingEnabled {
-		avalancheBootstrapper = common.TraceBootstrapableEngine(avalancheBootstrapper, m.Tracer)
-	}
-
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: avalancheBootstrapper,
-			Consensus:    avalancheEngine,
-		},
-		Snowman: &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: snowmanBootstrapper,
-			Consensus:    snowmanEngine,
-		},
+	ctx.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_AVALANCHE,
+		State: snow.Bootstrapping,
 	})
+
+	ue, err := unified.EngineFromEngines(ctx, ef, vm)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing unified engine: %w", err)
+	}
+
+	engine := common.Engine(ue)
+	if m.TracingEnabled {
+		engine = common.TraceEngine(ue, m.Tracer)
+	}
+	h.SetEngine(engine)
 
 	// Register health check for this chain
 	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
@@ -1327,7 +1300,6 @@ func (m *manager) createSnowmanChain(
 	// to make sure start callbacks are duly initialized
 	engineConfig := smeng.Config{
 		Ctx:                 ctx,
-		AllGetsServer:       snowGetHandler,
 		VM:                  vm,
 		Sender:              messageSender,
 		Validators:          vdrs,
@@ -1335,15 +1307,6 @@ func (m *manager) createSnowmanChain(
 		Params:              consensusParams,
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
-	}
-	var engine common.Engine
-	engine, err = smeng.New(engineConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
-	}
-
-	if m.TracingEnabled {
-		engine = common.TraceEngine(engine, m.Tracer)
 	}
 
 	// create bootstrap gear
@@ -1364,18 +1327,6 @@ func (m *manager) createSnowmanChain(
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
 	}
-	var bootstrapper common.BootstrapableEngine
-	bootstrapper, err = smbootstrap.New(
-		bootstrapCfg,
-		engine.Start,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing snowman bootstrapper: %w", err)
-	}
-
-	if m.TracingEnabled {
-		bootstrapper = common.TraceBootstrapableEngine(bootstrapper, m.Tracer)
-	}
 
 	// create state sync gear
 	stateSyncCfg, err := syncer.NewConfig(
@@ -1392,23 +1343,41 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize state syncer configuration: %w", err)
 	}
-	stateSyncer := syncer.New(
-		stateSyncCfg,
-		bootstrapper.Start,
-	)
 
-	if m.TracingEnabled {
-		stateSyncer = common.TraceStateSyncer(stateSyncer, m.Tracer)
+	ef := &unified.EngineFactory{
+		TracingEnabled:    m.TracingEnabled,
+		GetServer:         snowGetHandler,
+		AvaAncestorGetter: invalidEngineAncestorsGetter{},
+		StateSync:         hasStateSync(stateSyncCfg),
+		Tracer:            m.Tracer,
+		BootConfig:        bootstrapCfg,
+		SnowmanConfig:     engineConfig,
+		StateSyncConfig:   stateSyncCfg,
+		Logger:            ctx.Log,
 	}
 
-	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: nil,
-		Snowman: &handler.Engine{
-			StateSyncer:  stateSyncer,
-			Bootstrapper: bootstrapper,
-			Consensus:    engine,
-		},
+	ctx.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.StateSyncing,
 	})
+
+	if !ef.HasStateSync() {
+		ctx.State.Set(snow.EngineState{
+			Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+			State: snow.Bootstrapping,
+		})
+	}
+
+	ue, err := unified.EngineFromEngines(ctx, ef, vm)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing unified engine: %w", err)
+	}
+
+	engine := common.Engine(ue)
+	if m.TracingEnabled {
+		engine = common.TraceEngine(ue, m.Tracer)
+	}
+	h.SetEngine(engine)
 
 	// Register health checks
 	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
@@ -1421,6 +1390,17 @@ func (m *manager) createSnowmanChain(
 		VM:      vm,
 		Handler: h,
 	}, nil
+}
+
+func hasStateSync(stateSyncCfg syncer.Config) bool {
+	var hasStateSync bool
+	ssVM, isStateSyncable := stateSyncCfg.VM.(block.StateSyncableVM)
+	if isStateSyncable {
+		if enabled, err := ssVM.StateSyncEnabled(context.Background()); err == nil && enabled {
+			hasStateSync = true
+		}
+	}
+	return hasStateSync
 }
 
 func (m *manager) IsBootstrapped(id ids.ID) bool {
@@ -1580,4 +1560,10 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 		chainReg,
 	)
 	return chainReg, err
+}
+
+type invalidEngineAncestorsGetter struct{}
+
+func (invalidEngineAncestorsGetter) GetAncestors(_ context.Context, _ ids.NodeID, _ uint32, _ ids.ID, engineType p2ppb.EngineType) error {
+	return fmt.Errorf("this engine does not run %s", engineType)
 }

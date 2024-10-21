@@ -5,7 +5,6 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -20,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/version"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
@@ -41,12 +40,7 @@ const (
 	syncProcessingTimeWarnLimit = 30 * time.Second
 )
 
-var (
-	_ Handler = (*handler)(nil)
-
-	errMissingEngine  = errors.New("missing engine")
-	errNoStartingGear = errors.New("failed to select starting gear")
-)
+var _ Handler = (*handler)(nil)
 
 type Handler interface {
 	common.Timer
@@ -58,8 +52,7 @@ type Handler interface {
 	// this chain, the message should be dropped.
 	ShouldHandle(nodeID ids.NodeID) bool
 
-	SetEngineManager(engineManager *EngineManager)
-	GetEngineManager() *EngineManager
+	SetEngine(engine common.Engine)
 
 	SetOnStopped(onStopped func())
 	Start(ctx context.Context, recoverPanic bool)
@@ -93,7 +86,7 @@ type handler struct {
 	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
-	engineManager *EngineManager
+	engine common.Engine
 
 	// onStopped is called in a goroutine when this handler finishes shutting
 	// down. If it is nil then it is skipped.
@@ -124,7 +117,15 @@ type handler struct {
 
 	// Tracks the peers that are currently connected to this subnet
 	peerTracker commontracker.Peers
-	p2pTracker  *p2p.PeerTracker
+	p2pTracker  peerTracker
+}
+
+type peerTracker interface {
+	Connected(
+		nodeID ids.NodeID,
+		nodeVersion *version.Application,
+	)
+	Disconnected(nodeID ids.NodeID)
 }
 
 // Initialize this consensus handler
@@ -138,7 +139,7 @@ func New(
 	resourceTracker tracker.ResourceTracker,
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
-	p2pTracker *p2p.PeerTracker,
+	p2pTracker peerTracker,
 	reg prometheus.Registerer,
 	haltBootstrapping func(),
 ) (Handler, error) {
@@ -200,53 +201,17 @@ func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
 	return h.subnet.IsAllowed(nodeID, ok)
 }
 
-func (h *handler) SetEngineManager(engineManager *EngineManager) {
-	h.engineManager = engineManager
-}
-
-func (h *handler) GetEngineManager() *EngineManager {
-	return h.engineManager
+func (h *handler) SetEngine(engine common.Engine) {
+	h.engine = engine
 }
 
 func (h *handler) SetOnStopped(onStopped func()) {
 	h.onStopped = onStopped
 }
 
-func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
-	state := h.ctx.State.Get()
-	engines := h.engineManager.Get(state.Type)
-	if engines == nil {
-		return nil, errNoStartingGear
-	}
-	if engines.StateSyncer == nil {
-		return engines.Bootstrapper, nil
-	}
-
-	stateSyncEnabled, err := engines.StateSyncer.IsEnabled(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if !stateSyncEnabled {
-		return engines.Bootstrapper, nil
-	}
-
-	// drop bootstrap state from previous runs before starting state sync
-	return engines.StateSyncer, engines.Bootstrapper.Clear(ctx)
-}
-
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
-	gear, err := h.selectStartingGear(ctx)
-	if err != nil {
-		h.ctx.Log.Error("chain failed to select starting gear",
-			zap.Error(err),
-		)
-		h.shutdown(ctx, h.clock.Time())
-		return
-	}
-
 	h.ctx.Lock.Lock()
-	err = gear.Start(ctx, 0)
+	err := h.engine.Start(ctx, 0)
 	h.ctx.Lock.Unlock()
 	if err != nil {
 		h.ctx.Log.Error("chain failed to start",
@@ -511,37 +476,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return nil
 	}
 
-	var engineType p2ppb.EngineType
-	switch msg.EngineType {
-	case p2ppb.EngineType_ENGINE_TYPE_AVALANCHE, p2ppb.EngineType_ENGINE_TYPE_SNOWMAN:
-		// The peer is requesting an engine type that has been initialized, so
-		// we should attempt to honor the request.
-		engineType = msg.EngineType
-	default:
-		// Note: [msg.EngineType] may have been provided by the peer as an
-		// invalid option. I.E. not one of AVALANCHE, SNOWMAN, or UNSPECIFIED.
-		// In this case, we treat the value the same way as UNSPECIFIED.
-		//
-		// If the peer didn't request a specific engine type, we default to the
-		// current engine.
-		engineType = currentState.Type
-	}
-
-	engine, ok := h.engineManager.Get(engineType).Get(currentState.State)
-	if !ok {
-		// This should only happen if the peer is not following the protocol.
-		// This can happen if the chain only has a Snowman engine and the peer
-		// requested an Avalanche engine handle the message.
-		h.ctx.Log.Debug("dropping sync message",
-			zap.String("reason", "uninitialized engine state"),
-			zap.String("messageOp", op),
-			zap.Stringer("currentEngineType", currentState.Type),
-			zap.Stringer("requestedEngineType", msg.EngineType),
-			zap.Stringer("engineState", currentState.State),
-		)
-		return nil
-	}
-
 	// Invariant: Response messages can never be dropped here. This is because
 	//            the timeout has already been cleared. This means the engine
 	//            should be invoked with a failure message if parsing of the
@@ -549,16 +483,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 	switch msg := body.(type) {
 	// State messages should always be sent to the snowman engine
 	case *p2ppb.GetStateSummaryFrontier:
-		return engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
+		return h.engine.GetStateSummaryFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2ppb.StateSummaryFrontier:
-		return engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
+		return h.engine.StateSummaryFrontier(ctx, nodeID, msg.RequestId, msg.Summary)
 
 	case *message.GetStateSummaryFrontierFailed:
-		return engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.GetStateSummaryFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.GetAcceptedStateSummary:
-		return engine.GetAcceptedStateSummary(
+		return h.engine.GetAcceptedStateSummary(
 			ctx,
 			nodeID,
 			msg.RequestId,
@@ -575,18 +509,18 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "SummaryIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
+			return h.engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedStateSummary(ctx, nodeID, msg.RequestId, summaryIDs)
+		return h.engine.AcceptedStateSummary(ctx, nodeID, msg.RequestId, summaryIDs)
 
 	case *message.GetAcceptedStateSummaryFailed:
-		return engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.GetAcceptedStateSummaryFailed(ctx, nodeID, msg.RequestID)
 
 	// Bootstrapping messages may be forwarded to either avalanche or snowman
-	// engines, depending on the EngineType field
+	// h.engines, depending on the h.h.engineType field
 	case *p2ppb.GetAcceptedFrontier:
-		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
+		return h.engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2ppb.AcceptedFrontier:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -598,13 +532,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "ContainerID"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
+			return h.engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerID)
+		return h.engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetAcceptedFrontierFailed:
-		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.GetAccepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
@@ -619,7 +553,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
+		return h.engine.GetAccepted(ctx, nodeID, msg.RequestId, containerIDs)
 
 	case *p2ppb.Accepted:
 		containerIDs, err := getIDs(msg.ContainerIds)
@@ -631,13 +565,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "ContainerIDs"),
 				zap.Error(err),
 			)
-			return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestId)
+			return h.engine.GetAcceptedFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Accepted(ctx, nodeID, msg.RequestId, containerIDs)
+		return h.engine.Accepted(ctx, nodeID, msg.RequestId, containerIDs)
 
 	case *message.GetAcceptedFailed:
-		return engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.GetAcceptedFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.GetAncestors:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -652,13 +586,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.GetAncestors(ctx, nodeID, msg.RequestId, containerID)
+		return h.engine.GetAncestors(ctx, nodeID, msg.RequestId, containerID, msg.EngineType)
 
 	case *message.GetAncestorsFailed:
-		return engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.GetAncestorsFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.Ancestors:
-		return engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
+		return h.engine.Ancestors(ctx, nodeID, msg.RequestId, msg.Containers)
 
 	case *p2ppb.Get:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -673,16 +607,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.Get(ctx, nodeID, msg.RequestId, containerID)
+		return h.engine.Get(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetFailed:
-		return engine.GetFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.GetFailed(ctx, nodeID, msg.RequestID)
 
 	case *p2ppb.Put:
-		return engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
+		return h.engine.Put(ctx, nodeID, msg.RequestId, msg.Container)
 
 	case *p2ppb.PushQuery:
-		return engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container, msg.RequestedHeight)
+		return h.engine.PushQuery(ctx, nodeID, msg.RequestId, msg.Container, msg.RequestedHeight)
 
 	case *p2ppb.PullQuery:
 		containerID, err := ids.ToID(msg.ContainerId)
@@ -697,7 +631,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return nil
 		}
 
-		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID, msg.RequestedHeight)
+		return h.engine.PullQuery(ctx, nodeID, msg.RequestId, containerID, msg.RequestedHeight)
 
 	case *p2ppb.Chits:
 		preferredID, err := ids.ToID(msg.PreferredId)
@@ -709,7 +643,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "PreferredID"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+			return h.engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
 		preferredIDAtHeight, err := ids.ToID(msg.PreferredIdAtHeight)
@@ -721,7 +655,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "PreferredIDAtHeight"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+			return h.engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
 		acceptedID, err := ids.ToID(msg.AcceptedId)
@@ -733,13 +667,13 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.String("field", "AcceptedID"),
 				zap.Error(err),
 			)
-			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
+			return h.engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
+		return h.engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
 
 	case *message.QueryFailed:
-		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
+		return h.engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
@@ -748,7 +682,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return err
 		}
 		h.p2pTracker.Connected(nodeID, msg.NodeVersion)
-		return engine.Connected(ctx, nodeID, msg.NodeVersion)
+		return h.engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.Disconnected:
 		err := h.peerTracker.Disconnected(ctx, nodeID)
@@ -756,7 +690,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return err
 		}
 		h.p2pTracker.Disconnected(nodeID)
-		return engine.Disconnected(ctx, nodeID)
+		return h.engine.Disconnected(ctx, nodeID)
 
 	default:
 		return fmt.Errorf(
@@ -819,20 +753,9 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 	}()
 
-	state := h.ctx.State.Get()
-	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
-	if !ok {
-		return fmt.Errorf(
-			"%w %s running %s",
-			errMissingEngine,
-			state.State,
-			state.Type,
-		)
-	}
-
 	switch m := body.(type) {
 	case *p2ppb.AppRequest:
-		return engine.AppRequest(
+		return h.engine.AppRequest(
 			ctx,
 			nodeID,
 			m.RequestId,
@@ -841,7 +764,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 
 	case *p2ppb.AppResponse:
-		return engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
+		return h.engine.AppResponse(ctx, nodeID, m.RequestId, m.AppBytes)
 
 	case *p2ppb.AppError:
 		err := &common.AppError{
@@ -849,7 +772,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			Message: m.ErrorMessage,
 		}
 
-		return engine.AppRequestFailed(
+		return h.engine.AppRequestFailed(
 			ctx,
 			nodeID,
 			m.RequestId,
@@ -857,7 +780,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		)
 
 	case *p2ppb.AppGossip:
-		return engine.AppGossip(ctx, nodeID, m.AppBytes)
+		return h.engine.AppGossip(ctx, nodeID, m.AppBytes)
 
 	default:
 		return fmt.Errorf(
@@ -918,26 +841,15 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		}
 	}()
 
-	state := h.ctx.State.Get()
-	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
-	if !ok {
-		return fmt.Errorf(
-			"%w %s running %s",
-			errMissingEngine,
-			state.State,
-			state.Type,
-		)
-	}
-
 	switch msg := body.(type) {
 	case *message.VMMessage:
-		return engine.Notify(context.TODO(), common.Message(msg.Notification))
+		return h.engine.Notify(context.TODO(), common.Message(msg.Notification))
 
 	case *message.GossipRequest:
-		return engine.Gossip(context.TODO())
+		return h.engine.Gossip(context.TODO())
 
 	case *message.Timeout:
-		return engine.Timeout(context.TODO())
+		return h.engine.Timeout(context.TODO())
 
 	default:
 		return fmt.Errorf(
@@ -1000,17 +912,7 @@ func (h *handler) shutdown(ctx context.Context, startClosingTime time.Time) {
 		close(h.closed)
 	}()
 
-	state := h.ctx.State.Get()
-	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
-	if !ok {
-		h.ctx.Log.Error("failed fetching current engine during shutdown",
-			zap.Stringer("type", state.Type),
-			zap.Stringer("state", state.State),
-		)
-		return
-	}
-
-	if err := engine.Shutdown(ctx); err != nil {
+	if err := h.engine.Shutdown(ctx); err != nil {
 		h.ctx.Log.Error("failed while shutting down the chain",
 			zap.Error(err),
 		)
