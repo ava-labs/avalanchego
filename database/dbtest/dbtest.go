@@ -1073,7 +1073,6 @@ func TestModifyValueAfterPut(t *testing.T, db database.KeyValueReaderWriterDelet
 	// Modify the value that was Put into the database
 	// to see if the database copied the value correctly.
 	value[0] = 2
-
 	retrievedValue, err := db.Get(key)
 	require.NoError(err)
 	require.Equal(originalValue, retrievedValue)
