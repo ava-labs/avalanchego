@@ -38,7 +38,7 @@ func TestTimeoutScheduler(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(testCase.desc, func(_ *testing.T) {
+		t.Run(testCase.desc, func(*testing.T) {
 			// Not enough invocations means the test would stall.
 			// Too many invocations means a negative counter panic.
 			var wg sync.WaitGroup
@@ -78,7 +78,7 @@ func TestTimeoutScheduler(t *testing.T) {
 	}
 }
 
-func TestTimeoutSchedulerConcurrentRegister(_ *testing.T) {
+func TestTimeoutSchedulerConcurrentRegister(*testing.T) {
 	// Not enough invocations means the test would stall.
 	// Too many invocations means a negative counter panic.
 
@@ -104,7 +104,7 @@ func TestTimeoutSchedulerConcurrentRegister(_ *testing.T) {
 }
 
 func makeMockedTimer(clock chan time.Time) func(_ time.Duration) *time.Timer {
-	newTimer := func(_ time.Duration) *time.Timer {
+	newTimer := func(time.Duration) *time.Timer {
 		// We use a duration of 0 to not leave a lingering timer
 		// after the test finishes.
 		// Then we replace the time channel to have control over the timer.

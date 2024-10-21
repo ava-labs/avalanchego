@@ -73,8 +73,6 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	timer := th.newTimer(d)
 	defer timer.Stop()
 
-	defer th.onTimeout()
-
 	select {
 	case <-timer.C:
 	case <-th.preemptionSignal:
@@ -87,6 +85,8 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	// A subsequent timeout scheduling attempt that originates from the triggering of the current timeout
 	// will fail, as the pendingTimeoutToken is not yet available.
 	th.pendingTimeoutToken <- struct{}{}
+
+	th.onTimeout()
 }
 
 func (th *timeoutScheduler) acquirePendingTimeoutToken() bool {
