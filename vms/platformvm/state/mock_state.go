@@ -557,6 +557,21 @@ func (mr *MockStateMockRecorder) GetStatelessBlock(blockID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatelessBlock", reflect.TypeOf((*MockState)(nil).GetStatelessBlock), blockID)
 }
 
+// GetSubnetConversion mocks base method.
+func (m *MockState) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetConversion", subnetID)
+	ret0, _ := ret[0].(SubnetConversion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetConversion indicates an expected call of GetSubnetConversion.
+func (mr *MockStateMockRecorder) GetSubnetConversion(subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetConversion", reflect.TypeOf((*MockState)(nil).GetSubnetConversion), subnetID)
+}
+
 // GetSubnetIDs mocks base method.
 func (m *MockState) GetSubnetIDs() ([]ids.ID, error) {
 	m.ctrl.T.Helper()
@@ -570,22 +585,6 @@ func (m *MockState) GetSubnetIDs() ([]ids.ID, error) {
 func (mr *MockStateMockRecorder) GetSubnetIDs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDs", reflect.TypeOf((*MockState)(nil).GetSubnetIDs))
-}
-
-// GetSubnetManager mocks base method.
-func (m *MockState) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnetManager", subnetID)
-	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].([]byte)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// GetSubnetManager indicates an expected call of GetSubnetManager.
-func (mr *MockStateMockRecorder) GetSubnetManager(subnetID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockState)(nil).GetSubnetManager), subnetID)
 }
 
 // GetSubnetOwner mocks base method.
@@ -846,16 +845,16 @@ func (mr *MockStateMockRecorder) SetLastAccepted(blkID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*MockState)(nil).SetLastAccepted), blkID)
 }
 
-// SetSubnetManager mocks base method.
-func (m *MockState) SetSubnetManager(subnetID, chainID ids.ID, addr []byte) {
+// SetSubnetConversion mocks base method.
+func (m *MockState) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetSubnetManager", subnetID, chainID, addr)
+	m.ctrl.Call(m, "SetSubnetConversion", subnetID, c)
 }
 
-// SetSubnetManager indicates an expected call of SetSubnetManager.
-func (mr *MockStateMockRecorder) SetSubnetManager(subnetID, chainID, addr any) *gomock.Call {
+// SetSubnetConversion indicates an expected call of SetSubnetConversion.
+func (mr *MockStateMockRecorder) SetSubnetConversion(subnetID, c any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetManager", reflect.TypeOf((*MockState)(nil).SetSubnetManager), subnetID, chainID, addr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetConversion", reflect.TypeOf((*MockState)(nil).SetSubnetConversion), subnetID, c)
 }
 
 // SetSubnetOwner mocks base method.
