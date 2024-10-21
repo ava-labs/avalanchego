@@ -190,6 +190,7 @@ type State interface {
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
+		subnetID ids.ID,
 	) error
 
 	SetHeight(height uint64)
@@ -1244,10 +1245,11 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
+	subnetID ids.ID,
 ) error {
 	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
-		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
-		constants.PrimaryNetworkID[:],
+		marshalStartDiffKey(subnetID, startHeight),
+		subnetID[:],
 	)
 	defer diffIter.Release()
 
@@ -2101,8 +2103,10 @@ func (s *state) writeCurrentStakersSubnetDiff(
 					// writing.
 					pk = vdr.validator.PublicKey
 				} else {
-					// This should never happen.
-					return ErrMissingPrimaryNetworkValidator
+					// This should never happen as the primary network diffs are
+					// written last and subnet validator times must be a subset
+					// of the primary network validator times.
+					return errMissingPrimaryNetworkValidator
 				}
 			}
 
