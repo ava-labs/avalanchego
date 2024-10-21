@@ -18,11 +18,11 @@ func Test_Node_Marshal(t *testing.T) {
 
 	fullKey := ToKey([]byte("key"))
 	childNode := newNode(fullKey)
-	root.addChild(childNode, 4)
+	root.addChildWithID(childNode, 4, DefaultHasher.Empty())
 	childNode.setValue(DefaultHasher, maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
 
-	root.addChild(childNode, 4)
+	root.addChildWithID(childNode, 4, DefaultHasher.Empty())
 
 	data := root.bytes()
 	rootParsed, err := parseNode(DefaultHasher, ToKey([]byte("")), data)
@@ -42,19 +42,19 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	fullKey := ToKey([]byte{255})
 	childNode1 := newNode(fullKey)
-	root.addChild(childNode1, 4)
+	root.addChildWithID(childNode1, 4, DefaultHasher.Empty())
 	childNode1.setValue(DefaultHasher, maybe.Some([]byte("value1")))
 	require.NotNil(t, childNode1)
 
-	root.addChild(childNode1, 4)
+	root.addChildWithID(childNode1, 4, DefaultHasher.Empty())
 
 	fullKey = ToKey([]byte{237})
 	childNode2 := newNode(fullKey)
-	root.addChild(childNode2, 4)
+	root.addChildWithID(childNode2, 4, DefaultHasher.Empty())
 	childNode2.setValue(DefaultHasher, maybe.Some([]byte("value2")))
 	require.NotNil(t, childNode2)
 
-	root.addChild(childNode2, 4)
+	root.addChildWithID(childNode2, 4, DefaultHasher.Empty())
 
 	data := root.bytes()
 
