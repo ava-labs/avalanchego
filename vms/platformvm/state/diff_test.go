@@ -201,64 +201,66 @@ func TestDiffExpiry(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		require := require.New(t)
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-		state := newTestState(t, memdb.New())
-		for _, expiry := range test.initialExpiries {
-			state.PutExpiry(expiry)
-		}
-
-		d, err := NewDiffOn(state)
-		require.NoError(err)
-
-		var (
-			expectedExpiries   = set.Of(test.initialExpiries...)
-			unexpectedExpiries set.Set[ExpiryEntry]
-		)
-		for _, op := range test.ops {
-			if op.put {
-				d.PutExpiry(op.entry)
-				expectedExpiries.Add(op.entry)
-				unexpectedExpiries.Remove(op.entry)
-			} else {
-				d.DeleteExpiry(op.entry)
-				expectedExpiries.Remove(op.entry)
-				unexpectedExpiries.Add(op.entry)
+			state := newTestState(t, memdb.New())
+			for _, expiry := range test.initialExpiries {
+				state.PutExpiry(expiry)
 			}
-		}
 
-		// If expectedExpiries is empty, we want expectedExpiriesSlice to be
-		// nil.
-		var expectedExpiriesSlice []ExpiryEntry
-		if expectedExpiries.Len() > 0 {
-			expectedExpiriesSlice = expectedExpiries.List()
-			utils.Sort(expectedExpiriesSlice)
-		}
-
-		verifyChain := func(chain Chain) {
-			expiryIterator, err := chain.GetExpiryIterator()
+			d, err := NewDiffOn(state)
 			require.NoError(err)
-			require.Equal(
-				expectedExpiriesSlice,
-				iterator.ToSlice(expiryIterator),
+
+			var (
+				expectedExpiries   = set.Of(test.initialExpiries...)
+				unexpectedExpiries set.Set[ExpiryEntry]
 			)
-
-			for expiry := range expectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.True(has)
+			for _, op := range test.ops {
+				if op.put {
+					d.PutExpiry(op.entry)
+					expectedExpiries.Add(op.entry)
+					unexpectedExpiries.Remove(op.entry)
+				} else {
+					d.DeleteExpiry(op.entry)
+					expectedExpiries.Remove(op.entry)
+					unexpectedExpiries.Add(op.entry)
+				}
 			}
-			for expiry := range unexpectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.False(has)
-			}
-		}
 
-		verifyChain(d)
-		require.NoError(d.Apply(state))
-		verifyChain(state)
-		assertChainsEqual(t, d, state)
+			// If expectedExpiries is empty, we want expectedExpiriesSlice to be
+			// nil.
+			var expectedExpiriesSlice []ExpiryEntry
+			if expectedExpiries.Len() > 0 {
+				expectedExpiriesSlice = expectedExpiries.List()
+				utils.Sort(expectedExpiriesSlice)
+			}
+
+			verifyChain := func(chain Chain) {
+				expiryIterator, err := chain.GetExpiryIterator()
+				require.NoError(err)
+				require.Equal(
+					expectedExpiriesSlice,
+					iterator.ToSlice(expiryIterator),
+				)
+
+				for expiry := range expectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.True(has)
+				}
+				for expiry := range unexpectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.False(has)
+				}
+			}
+
+			verifyChain(d)
+			require.NoError(d.Apply(state))
+			verifyChain(state)
+			assertChainsEqual(t, d, state)
+		})
 	}
 }
 
