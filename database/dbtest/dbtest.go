@@ -25,13 +25,13 @@ import (
 // TestsBasic is a list of all basic database tests that require only
 // a KeyValueReaderWriter.
 var TestsBasic = map[string]func(t *testing.T, db database.KeyValueReaderWriterDeleter){
-	"SimpleKeyValue":         TestSimpleKeyValue,
-	"OverwriteKeyValue":      TestOverwriteKeyValue,
-	"EmptyKey":               TestEmptyKey,
-	"KeyEmptyValue":          TestKeyEmptyValue,
-	"MemorySafetyDatabase":   TestMemorySafetyDatabase,
-	"ModifyKeyValueAfterPut": TestModifyKeyValueAfterPut,
-	"PutGetEmpty":            TestPutGetEmpty,
+	"SimpleKeyValue":       TestSimpleKeyValue,
+	"OverwriteKeyValue":    TestOverwriteKeyValue,
+	"EmptyKey":             TestEmptyKey,
+	"KeyEmptyValue":        TestKeyEmptyValue,
+	"MemorySafetyDatabase": TestMemorySafetyDatabase,
+	"ModifyValueAfterPut":  TestModifyValueAfterPut,
+	"PutGetEmpty":          TestPutGetEmpty,
 }
 
 // Tests is a list of all database tests
@@ -225,9 +225,14 @@ func TestMemorySafetyDatabase(t *testing.T, db database.KeyValueReaderWriterDele
 	key2 := []byte("2key")
 	value2 := []byte("value2")
 
-	// Put both K/V pairs in the database
+	// Put key in the database directly
 	require.NoError(db.Put(key, value))
-	require.NoError(db.Put(key2, value2))
+
+	// Put key2 in the database by modifying key, which should be safe
+	// to modify after the Put call
+	key[0] = key2[0]
+	require.NoError(db.Put(key, value2))
+	key[0] = keyCopy[0]
 
 	// Get the value for [key]
 	gotVal, err := db.Get(key)
@@ -1056,29 +1061,22 @@ func testClearPrefix(t *testing.T, db database.Database, clearF func(database.Da
 	require.NoError(db.Close())
 }
 
-func TestModifyKeyValueAfterPut(t *testing.T, db database.KeyValueReaderWriterDeleter) {
+func TestModifyValueAfterPut(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte{1}
 	value := []byte{1, 2}
 	originalValue := slices.Clone(value)
-	originalKey := slices.Clone(key)
 
 	require.NoError(db.Put(key, value))
 
-	// Modify the key/value that was Put into the database
+	// Modify the value that was Put into the database
 	// to see if the database copied the value correctly.
-	key[0] = 2
 	value[0] = 2
-	require.NoError(db.Put(key, value))
 
-	retrievedValue, err := db.Get(originalKey)
+	retrievedValue, err := db.Get(key)
 	require.NoError(err)
 	require.Equal(originalValue, retrievedValue)
-
-	retrievedValue, err = db.Get(key)
-	require.NoError(err)
-	require.Equal(value, retrievedValue)
 }
 
 func TestModifyValueAfterBatchPut(t *testing.T, db database.Database) {
