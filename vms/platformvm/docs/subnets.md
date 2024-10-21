@@ -30,7 +30,11 @@ A permissioned subnet can be modified by a few different transactions.
   - After becoming a permissionless subnet, previously added permissioned
     validators will remain to finish their staking period.
   - No more chains will be able to be added to the subnet.
+- TransferSubnetOwnershipTx
+  - transfer permissioned subnet ownership to a new owner. Does not work with permissionless subnets.
 
 ### Permissionless Subnets
 
-Currently, nothing can be performed on a permissionless subnet.
+Every subnet is created permissioned. Any permissioned subnet can be turned permissionless by its owner via a TransformSubnetTx transaction.
+
+Once a subnet is made permissionless it won't have any owner able to modify its staking parameters. The P-chain will take care of carrying out rewarding of subnet' stakers, similarly to what happens with Primary Network stakers.
