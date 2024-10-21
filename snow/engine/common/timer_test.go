@@ -103,8 +103,8 @@ func TestTimeoutSchedulerConcurrentRegister(*testing.T) {
 	wg.Wait()
 }
 
-func makeMockedTimer(clock chan time.Time) func(_ time.Duration) *time.Timer {
-	newTimer := func(time.Duration) *time.Timer {
+func makeMockedTimer(clock chan time.Time) func(time.Duration) *time.Timer {
+	return func(time.Duration) *time.Timer {
 		// We use a duration of 0 to not leave a lingering timer
 		// after the test finishes.
 		// Then we replace the time channel to have control over the timer.
@@ -112,5 +112,4 @@ func makeMockedTimer(clock chan time.Time) func(_ time.Duration) *time.Timer {
 		timer.C = clock
 		return timer
 	}
-	return newTimer
 }
