@@ -52,8 +52,8 @@ type diff struct {
 	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
-	// Subnet ID --> Manager of the subnet
-	subnetManagers map[ids.ID]chainIDAndAddr
+	// Subnet ID --> Conversion of the subnet
+	subnetConversions map[ids.ID]SubnetConversion
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 
@@ -76,14 +76,14 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:       parentID,
-		stateVersions:  stateVersions,
-		timestamp:      parentState.GetTimestamp(),
-		feeState:       parentState.GetFeeState(),
-		accruedFees:    parentState.GetAccruedFees(),
-		expiryDiff:     newExpiryDiff(),
-		subnetOwners:   make(map[ids.ID]fx.Owner),
-		subnetManagers: make(map[ids.ID]chainIDAndAddr),
+		parentID:          parentID,
+		stateVersions:     stateVersions,
+		timestamp:         parentState.GetTimestamp(),
+		feeState:          parentState.GetFeeState(),
+		accruedFees:       parentState.GetAccruedFees(),
+		expiryDiff:        newExpiryDiff(),
+		subnetOwners:      make(map[ids.ID]fx.Owner),
+		subnetConversions: make(map[ids.ID]SubnetConversion),
 	}, nil
 }
 
@@ -357,24 +357,21 @@ func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	d.subnetOwners[subnetID] = owner
 }
 
-func (d *diff) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
-	if manager, exists := d.subnetManagers[subnetID]; exists {
-		return manager.ChainID, manager.Addr, nil
+func (d *diff) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
+	if c, ok := d.subnetConversions[subnetID]; ok {
+		return c, nil
 	}
 
-	// If the subnet manager was not assigned in this diff, ask the parent state.
+	// If the subnet conversion was not assigned in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return ids.Empty, nil, ErrMissingParentState
+		return SubnetConversion{}, ErrMissingParentState
 	}
-	return parentState.GetSubnetManager(subnetID)
+	return parentState.GetSubnetConversion(subnetID)
 }
 
-func (d *diff) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
-	d.subnetManagers[subnetID] = chainIDAndAddr{
-		ChainID: chainID,
-		Addr:    addr,
-	}
+func (d *diff) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
+	d.subnetConversions[subnetID] = c
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -576,8 +573,8 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
 	}
-	for subnetID, manager := range d.subnetManagers {
-		baseState.SetSubnetManager(subnetID, manager.ChainID, manager.Addr)
+	for subnetID, c := range d.subnetConversions {
+		baseState.SetSubnetConversion(subnetID, c)
 	}
 	return nil
 }

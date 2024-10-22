@@ -91,5 +91,7 @@ var _ = e2e.DescribePChain("[P-Chain Wallet]", func() {
 			require.Equal(newOwner.Threshold, subnetOwner.Threshold)
 			require.Equal(newOwner.Addrs, subnetOwner.Addrs)
 		})
+
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

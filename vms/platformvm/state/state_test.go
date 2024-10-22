@@ -1323,52 +1323,46 @@ func TestStateSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
-func TestStateSubnetManager(t *testing.T) {
+func TestStateSubnetConversion(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte)
+		setup func(s *state, subnetID ids.ID, c SubnetConversion)
 	}{
 		{
 			name: "in-memory",
-			setup: func(_ *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
-				s.SetSubnetManager(subnetID, chainID, addr)
+			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
+				s.SetSubnetConversion(subnetID, c)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(t *testing.T, s State, subnetID ids.ID, chainID ids.ID, addr []byte) {
-				subnetManagerCache := s.(*state).subnetManagerCache
-
-				require.Zero(t, subnetManagerCache.Len())
-				subnetManagerCache.Put(subnetID, chainIDAndAddr{
-					ChainID: chainID,
-					Addr:    addr,
-				})
-				require.Equal(t, 1, subnetManagerCache.Len())
+			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
+				s.subnetConversionCache.Put(subnetID, c)
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
+			var (
+				require            = require.New(t)
+				state              = newTestState(t, memdb.New())
+				subnetID           = ids.GenerateTestID()
+				expectedConversion = SubnetConversion{
+					ConversionID: ids.GenerateTestID(),
+					ChainID:      ids.GenerateTestID(),
+					Addr:         []byte{'a', 'd', 'd', 'r'},
+				}
+			)
 
-			initializedState := newTestState(t, memdb.New())
-
-			subnetID := ids.GenerateTestID()
-			chainID, addr, err := initializedState.GetSubnetManager(subnetID)
+			actualConversion, err := state.GetSubnetConversion(subnetID)
 			require.ErrorIs(err, database.ErrNotFound)
-			require.Equal(ids.Empty, chainID)
-			require.Nil(addr)
+			require.Zero(actualConversion)
 
-			expectedChainID := ids.GenerateTestID()
-			expectedAddr := []byte{'a', 'd', 'd', 'r'}
+			test.setup(state, subnetID, expectedConversion)
 
-			test.setup(t, initializedState, subnetID, expectedChainID, expectedAddr)
-
-			chainID, addr, err = initializedState.GetSubnetManager(subnetID)
+			actualConversion, err = state.GetSubnetConversion(subnetID)
 			require.NoError(err)
-			require.Equal(expectedChainID, chainID)
-			require.Equal(expectedAddr, addr)
+			require.Equal(expectedConversion, actualConversion)
 		})
 	}
 }

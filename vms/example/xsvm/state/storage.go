@@ -77,11 +77,7 @@ func AddBlock(db database.KeyValueWriter, height uint64, blkID ids.ID, blk []byt
 
 func GetNonce(db database.KeyValueReader, address ids.ShortID) (uint64, error) {
 	key := Flatten(addressPrefix, address[:])
-	nonce, err := database.GetUInt64(db, key)
-	if errors.Is(err, database.ErrNotFound) {
-		return 0, nil
-	}
-	return nonce, err
+	return database.WithDefault(database.GetUInt64, db, key, 0)
 }
 
 func SetNonce(db database.KeyValueWriter, address ids.ShortID, nonce uint64) error {
@@ -102,11 +98,7 @@ func IncrementNonce(db database.KeyValueReaderWriter, address ids.ShortID, nonce
 
 func GetBalance(db database.KeyValueReader, address ids.ShortID, chainID ids.ID) (uint64, error) {
 	key := Flatten(addressPrefix, address[:], chainID[:])
-	balance, err := database.GetUInt64(db, key)
-	if errors.Is(err, database.ErrNotFound) {
-		return 0, nil
-	}
-	return balance, err
+	return database.WithDefault(database.GetUInt64, db, key, 0)
 }
 
 func SetBalance(db database.KeyValueWriterDeleter, address ids.ShortID, chainID ids.ID, balance uint64) error {
@@ -154,11 +146,7 @@ func AddLoanID(db database.KeyValueWriter, chainID ids.ID, loanID ids.ID) error 
 
 func GetLoan(db database.KeyValueReader, chainID ids.ID) (uint64, error) {
 	key := Flatten(chainPrefix, chainID[:])
-	balance, err := database.GetUInt64(db, key)
-	if errors.Is(err, database.ErrNotFound) {
-		return 0, nil
-	}
-	return balance, err
+	return database.WithDefault(database.GetUInt64, db, key, 0)
 }
 
 func SetLoan(db database.KeyValueWriterDeleter, chainID ids.ID, balance uint64) error {

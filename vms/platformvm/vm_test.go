@@ -1386,6 +1386,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		engine.Start,
 	)
 	require.NoError(err)
+	bootstrapper.TimeoutRegistrar = &enginetest.Timer{}
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: &handler.Engine{
