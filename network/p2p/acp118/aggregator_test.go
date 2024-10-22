@@ -5,7 +5,6 @@ package acp118
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -54,8 +54,8 @@ func TestVerifier_Verify(t *testing.T) {
 		wantVerifyErr              error
 	}{
 		{
-			name:    "passes attestation and verification",
-			handler: NewHandler(&testAttestor{}, signer, networkID, chainID),
+			name:    "pass - gets signatures from sufficient stake",
+			handler: NewHandler(&testVerifier{}, signer),
 			ctx:     context.Background(),
 			validators: []Validator{
 				{
@@ -84,8 +84,8 @@ func TestVerifier_Verify(t *testing.T) {
 			quorumDen: 1,
 		},
 		{
-			name:    "passes attestation and fails verification - insufficient stake",
-			handler: NewHandler(&testAttestor{}, signer, networkID, chainID),
+			name:    "fail - gets signatures from insufficient stake",
+			handler: NewHandler(&testVerifier{}, signer),
 			ctx:     context.Background(),
 			validators: []Validator{
 				{
@@ -122,10 +122,8 @@ func TestVerifier_Verify(t *testing.T) {
 		{
 			name: "fails attestation",
 			handler: NewHandler(
-				&testAttestor{Err: errors.New("foobar")},
+				&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
 				signer,
-				networkID,
-				chainID,
 			),
 			ctx: context.Background(),
 			validators: []Validator{

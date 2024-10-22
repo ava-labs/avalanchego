@@ -23,7 +23,9 @@ import (
 )
 
 var (
-	ErrDuplicateValidator     = errors.New("duplicate validator")
+	ErrDuplicateValidator = errors.New("duplicate validator")
+	// ErrInsufficientSignatures is returned if it's not possible for us to
+	// generate a signature due to too many unsuccessful requests to peers
 	ErrInsufficientSignatures = errors.New("failed to aggregate sufficient stake weight of signatures")
 )
 
