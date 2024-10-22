@@ -1718,19 +1718,28 @@ func (s *state) loadPendingValidators() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (s *state) initValidatorSets() error {
-	for subnetID, validators := range s.currentStakers.validators {
+	primaryNetworkValidators := s.currentStakers.validators[constants.PrimaryNetworkID]
+	for subnetID, subnetValidators := range s.currentStakers.validators {
 		if s.validators.Count(subnetID) != 0 {
 			// Enforce the invariant that the validator set is empty here.
 			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
 		}
 
-		for nodeID, validator := range validators {
-			validatorStaker := validator.validator
-			if err := s.validators.AddStaker(subnetID, nodeID, validatorStaker.PublicKey, validatorStaker.TxID, validatorStaker.Weight); err != nil {
+		for nodeID, subnetValidator := range subnetValidators {
+			primaryValidator, ok := primaryNetworkValidators[nodeID]
+			if !ok {
+				return fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
+			}
+
+			var (
+				primaryStaker = primaryValidator.validator
+				subnetStaker  = subnetValidator.validator
+			)
+			if err := s.validators.AddStaker(subnetID, nodeID, primaryStaker.PublicKey, subnetStaker.TxID, subnetStaker.Weight); err != nil {
 				return err
 			}
 
-			delegatorIterator := iterator.FromTree(validator.delegators)
+			delegatorIterator := iterator.FromTree(subnetValidator.delegators)
 			for delegatorIterator.Next() {
 				delegatorStaker := delegatorIterator.Value()
 				if err := s.validators.AddWeight(subnetID, nodeID, delegatorStaker.Weight); err != nil {
@@ -2106,7 +2115,7 @@ func (s *state) writeCurrentStakersSubnetDiff(
 					// This should never happen as the primary network diffs are
 					// written last and subnet validator times must be a subset
 					// of the primary network validator times.
-					return errMissingPrimaryNetworkValidator
+					return fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 				}
 			}
 

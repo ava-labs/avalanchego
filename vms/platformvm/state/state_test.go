@@ -117,10 +117,10 @@ func TestPersistStakers(t *testing.T) {
 		primaryValidatorDuration = 28 * 24 * time.Hour
 		primaryDelegatorDuration = 14 * 24 * time.Hour
 		subnetValidatorDuration  = 21 * 24 * time.Hour
-		subnetDelegatorDuration  = 14 * 24 * time.Hour
 
 		primaryValidatorReward = iota
 		primaryDelegatorReward
+		subnetValidatorReward
 	)
 	var (
 		primaryValidatorStartTime   = time.Now().Truncate(time.Second)
@@ -130,6 +130,10 @@ func TestPersistStakers(t *testing.T) {
 		primaryDelegatorStartTime   = primaryValidatorStartTime
 		primaryDelegatorEndTime     = primaryDelegatorStartTime.Add(primaryDelegatorDuration)
 		primaryDelegatorEndTimeUnix = uint64(primaryDelegatorEndTime.Unix())
+
+		subnetValidatorStartTime   = primaryValidatorStartTime
+		subnetValidatorEndTime     = subnetValidatorStartTime.Add(subnetValidatorDuration)
+		subnetValidatorEndTimeUnix = uint64(subnetValidatorEndTime.Unix())
 
 		primaryValidatorData = txs.Validator{
 			NodeID: ids.GenerateTestNodeID(),
@@ -141,6 +145,13 @@ func TestPersistStakers(t *testing.T) {
 			End:    primaryDelegatorEndTimeUnix,
 			Wght:   6789,
 		}
+		subnetValidatorData = txs.Validator{
+			NodeID: primaryValidatorData.NodeID,
+			End:    subnetValidatorEndTimeUnix,
+			Wght:   9876,
+		}
+
+		subnetID = ids.GenerateTestID()
 	)
 
 	unsignedAddPrimaryNetworkValidator := createPermissionlessValidatorTx(t, constants.PrimaryNetworkID, primaryValidatorData)
@@ -176,6 +187,18 @@ func TestPersistStakers(t *testing.T) {
 		unsignedAddPrimaryNetworkDelegator,
 		primaryDelegatorStartTime,
 		primaryDelegatorReward,
+	)
+	require.NoError(t, err)
+
+	unsignedAddSubnetValidator := createPermissionlessValidatorTx(t, subnetID, subnetValidatorData)
+	addSubnetValidator := &txs.Tx{Unsigned: unsignedAddSubnetValidator}
+	require.NoError(t, addSubnetValidator.Initialize(txs.Codec))
+
+	subnetCurrentValidatorStaker, err := NewCurrentStaker(
+		addSubnetValidator.ID(),
+		unsignedAddSubnetValidator,
+		subnetValidatorStartTime,
+		subnetValidatorReward,
 	)
 	require.NoError(t, err)
 
@@ -246,6 +269,23 @@ func TestPersistStakers(t *testing.T) {
 			expectedPendingValidator:  primaryNetworkPendingValidatorStaker,
 			expectedPendingDelegators: []*Staker{primaryNetworkPendingDelegatorStaker},
 		},
+		"add current subnet validator": {
+			initialStakers:           []*Staker{primaryNetworkCurrentValidatorStaker},
+			initialTxs:               []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                   subnetCurrentValidatorStaker,
+			tx:                       addSubnetValidator,
+			expectedCurrentValidator: subnetCurrentValidatorStaker,
+			expectedValidatorSetOutput: &validators.GetValidatorOutput{
+				NodeID:    subnetCurrentValidatorStaker.NodeID,
+				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
+				Weight:    subnetCurrentValidatorStaker.Weight,
+			},
+			expectedWeightDiff: &ValidatorWeightDiff{
+				Decrease: false,
+				Amount:   subnetCurrentValidatorStaker.Weight,
+			},
+			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](nil),
+		},
 		"delete current primary network validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
 			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator},
@@ -293,6 +333,16 @@ func TestPersistStakers(t *testing.T) {
 			},
 			staker:                   primaryNetworkPendingDelegatorStaker,
 			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
+		},
+		"delete current subnet validator": {
+			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
+			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
+			staker:         subnetCurrentValidatorStaker,
+			expectedWeightDiff: &ValidatorWeightDiff{
+				Decrease: true,
+				Amount:   subnetCurrentValidatorStaker.Weight,
+			},
+			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](primaryNetworkCurrentValidatorStaker.PublicKey),
 		},
 	}
 
@@ -364,18 +414,22 @@ func TestPersistStakers(t *testing.T) {
 				if test.expectedCurrentValidator == nil {
 					require.ErrorIs(err, database.ErrNotFound)
 
-					// Only current validators should have uptimes
-					_, _, err := state.GetUptime(test.staker.NodeID)
-					require.ErrorIs(err, database.ErrNotFound)
+					if test.staker.SubnetID == constants.PrimaryNetworkID {
+						// Uptimes are only considered for primary network validators
+						_, _, err := state.GetUptime(test.staker.NodeID)
+						require.ErrorIs(err, database.ErrNotFound)
+					}
 				} else {
 					require.NoError(err)
 					require.Equal(test.expectedCurrentValidator, currentValidator)
 
-					// Current validators should also have uptimes
-					upDuration, lastUpdated, err := state.GetUptime(currentValidator.NodeID)
-					require.NoError(err)
-					require.Zero(upDuration)
-					require.Equal(currentValidator.StartTime, lastUpdated)
+					if test.staker.SubnetID == constants.PrimaryNetworkID {
+						// Uptimes are only considered for primary network validators
+						upDuration, lastUpdated, err := state.GetUptime(currentValidator.NodeID)
+						require.NoError(err)
+						require.Zero(upDuration)
+						require.Equal(currentValidator.StartTime, lastUpdated)
+					}
 				}
 
 				pendingValidator, err := state.GetPendingValidator(test.staker.SubnetID, test.staker.NodeID)
