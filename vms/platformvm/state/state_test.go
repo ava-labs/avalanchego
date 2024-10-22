@@ -428,7 +428,7 @@ func TestPersistStakers(t *testing.T) {
 					require.Equal(expectedPublicKeyDiff, bls.PublicKeyFromValidUncompressedBytes(publicKeyDiffBytes))
 				}
 
-				// re-load the state from disk
+				// re-load the state from disk for the second iteration
 				state = newTestState(t, db)
 			}
 		})
