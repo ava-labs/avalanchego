@@ -23,7 +23,7 @@ import (
 )
 
 // TestsBasic is a list of all basic database tests that require only
-// a KeyValueReaderWriter.
+// a KeyValueReaderWriterDeleter.
 var TestsBasic = map[string]func(t *testing.T, db database.KeyValueReaderWriterDeleter){
 	"SimpleKeyValue":       TestSimpleKeyValue,
 	"OverwriteKeyValue":    TestOverwriteKeyValue,
