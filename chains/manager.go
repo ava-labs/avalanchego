@@ -1573,13 +1573,3 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	m.vmGatherer[vmID] = vmGatherer
 	return vmGatherer, nil
 }
-
-func makeAndRegister(gatherer metrics.MultiGatherer, name string) (*prometheus.Registry, func() error) {
-	reg := prometheus.NewRegistry()
-	return reg, func() error {
-		if err := gatherer.Register(name, reg); err != nil {
-			return fmt.Errorf("couldn't register %q metrics: %w", name, err)
-		}
-		return nil
-	}
-}
