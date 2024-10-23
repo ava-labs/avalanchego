@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -490,7 +491,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	snowmanMetrics, err := metrics.MakeAndRegister(
+	snowmanMetrics, registerSnowmanMetrics := makeAndRegister(
 		m.snowmanGatherer,
 		primaryAlias,
 	)
@@ -498,7 +499,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	vmMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
+	vmMetrics, registerChainMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +602,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	return chain, nil
+	return chain, errors.Join(registerChainMetrics(), registerSnowmanMetrics())
 }
 
 func (m *manager) AddRegistrant(r Registrant) {
@@ -1558,7 +1559,7 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	return ChainConfig{}, nil
 }
 
-func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
+func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, func() error, error) {
 	vmGatherer, ok := m.vmGatherer[vmID]
 	if !ok {
 		vmName := constants.VMName(vmID)
@@ -1569,15 +1570,27 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 			vmGatherer,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		m.vmGatherer[vmID] = vmGatherer
 	}
 
 	chainReg := metrics.NewPrefixGatherer()
-	err := vmGatherer.Register(
-		chainAlias,
-		chainReg,
-	)
-	return chainReg, err
+
+	return chainReg, func() error {
+		return vmGatherer.Register(
+			chainAlias,
+			chainReg,
+		)
+	}, nil
+}
+
+func makeAndRegister(gatherer metrics.MultiGatherer, name string) (*prometheus.Registry, func() error) {
+	reg := prometheus.NewRegistry()
+	return reg, func() error {
+		if err := gatherer.Register(name, reg); err != nil {
+			return fmt.Errorf("couldn't register %q metrics: %w", name, err)
+		}
+		return nil
+	}
 }
