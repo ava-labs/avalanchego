@@ -61,8 +61,9 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errIsNotSubnet                  = errors.New("is not a subnet")
+	errValidatorSetAlreadyPopulated   = errors.New("validator set already populated")
+	errIsNotSubnet                    = errors.New("is not a subnet")
+	errMissingPrimaryNetworkValidator = errors.New("missing primary network validator")
 
 	BlockIDPrefix                 = []byte("blockID")
 	BlockPrefix                   = []byte("block")
@@ -1906,9 +1907,11 @@ func (s *state) initValidatorSets() error {
 		}
 
 		for nodeID, subnetValidator := range subnetValidators {
+			// The subnet validator's Public Key is inherited from the
+			// corresponding primary network validator.
 			primaryValidator, ok := primaryNetworkValidators[nodeID]
 			if !ok {
-				return errors.New("subnet validator without corresponding primary network validator")
+				return fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 			}
 
 			var (
@@ -2507,7 +2510,9 @@ func (s *state) makeSubnetOnlyValidatorHistoricalDiffs() (map[subnetIDNodeID]*va
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecVersion uint16) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
-		// Write the primary network diff last
+		// We must write the primary network stakers last because writing subnet
+		// validator diffs may depend on the primary network validator diffs to
+		// inherit the public keys.
 		if subnetID == constants.PrimaryNetworkID {
 			continue
 		}
@@ -2575,9 +2580,6 @@ func (s *state) writeCurrentStakersSubnetDiff(
 
 	// Record the change in weight and/or public key for each validator.
 	for nodeID, validatorDiff := range validatorDiffs {
-		// Copy [nodeID] so it doesn't get overwritten next iteration.
-		nodeID := nodeID
-
 		var (
 			staker     *Staker
 			pk         *bls.PublicKey
@@ -2601,8 +2603,10 @@ func (s *state) writeCurrentStakersSubnetDiff(
 					// writing.
 					pk = vdr.validator.PublicKey
 				} else {
-					// This should never happen.
-					return errors.New("missing primary network validator")
+					// This should never happen as the primary network diffs are
+					// written last and subnet validator times must be a subset
+					// of the primary network validator times.
+					return fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 				}
 			}
 
@@ -2612,9 +2616,8 @@ func (s *state) writeCurrentStakersSubnetDiff(
 		switch validatorDiff.validatorStatus {
 		case added:
 			if pk != nil {
-				// Record that the public key for the validator is being
-				// added. This means the prior value for the public key was
-				// nil.
+				// Record that the public key for the validator is being added.
+				// This means the prior value for the public key was nil.
 				err := s.validatorPublicKeyDiffsDB.Put(
 					marshalDiffKey(subnetID, height, nodeID),
 					nil,
@@ -2626,8 +2629,8 @@ func (s *state) writeCurrentStakersSubnetDiff(
 
 			// The validator is being added.
 			//
-			// Invariant: It's impossible for a delegator to have been
-			// rewarded in the same block that the validator was added.
+			// Invariant: It's impossible for a delegator to have been rewarded
+			// in the same block that the validator was added.
 			startTime := uint64(staker.StartTime.Unix())
 			metadata := &validatorMetadata{
 				txID:        staker.TxID,
@@ -2657,8 +2660,7 @@ func (s *state) writeCurrentStakersSubnetDiff(
 				// public key.
 				//
 				// Note: We store the uncompressed public key here as it is
-				// significantly more efficient to parse when applying
-				// diffs.
+				// significantly more efficient to parse when applying diffs.
 				err := s.validatorPublicKeyDiffsDB.Put(
 					marshalDiffKey(subnetID, height, nodeID),
 					bls.PublicKeyToUncompressedBytes(pk),
