@@ -59,7 +59,6 @@ const (
 	DisconnectedOp
 	NotifyOp
 	GossipRequestOp
-	TimeoutOp
 )
 
 var (
@@ -115,7 +114,6 @@ var (
 		DisconnectedOp,
 		NotifyOp,
 		GossipRequestOp,
-		TimeoutOp,
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
@@ -264,8 +262,6 @@ func (op Op) String() string {
 		return "notify"
 	case GossipRequestOp:
 		return "gossip_request"
-	case TimeoutOp:
-		return "timeout"
 	default:
 		return "unknown"
 	}
