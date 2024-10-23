@@ -498,7 +498,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	vmMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
+	vmMetrics, registerChainMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +601,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	return chain, nil
+	return chain, registerChainMetrics()
 }
 
 func (m *manager) AddRegistrant(r Registrant) {
@@ -1556,7 +1556,7 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	return ChainConfig{}, nil
 }
 
-func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
+func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, func() error, error) {
 	vmGatherer, ok := m.vmGatherer[vmID]
 	if !ok {
 		vmName := constants.VMName(vmID)
@@ -1567,15 +1567,16 @@ func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics
 			vmGatherer,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		m.vmGatherer[vmID] = vmGatherer
 	}
 
 	chainReg := metrics.NewPrefixGatherer()
-	err := vmGatherer.Register(
-		chainAlias,
-		chainReg,
-	)
-	return chainReg, err
+	return chainReg, func() error {
+		return vmGatherer.Register(
+			chainAlias,
+			chainReg,
+		)
+	}, nil
 }
