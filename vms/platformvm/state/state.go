@@ -1726,6 +1726,8 @@ func (s *state) initValidatorSets() error {
 		}
 
 		for nodeID, subnetValidator := range subnetValidators {
+			// The subnet validator's Public Key is inherited from the
+			// corresponding primary network validator.
 			primaryValidator, ok := primaryNetworkValidators[nodeID]
 			if !ok {
 				return fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
