@@ -12,11 +12,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
 var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
+	_ utils.Sortable[SubnetOnlyValidator] = (*SubnetOnlyValidator)(nil)
 
 	ErrMutatedSubnetOnlyValidator = errors.New("subnet only validator contains mutated constant fields")
 )
