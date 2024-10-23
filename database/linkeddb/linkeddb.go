@@ -108,6 +108,8 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	}
 
 	// The key isn't currently in the list, so we should add it as the head.
+	// Note we will copy the key so it's safe to store references to it.
+	key = slices.Clone(key)
 	newHead := node{Value: slices.Clone(value)}
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
