@@ -18,7 +18,7 @@ import (
 
 var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
-	_ utils.Sortable[SubnetOnlyValidator] = (*SubnetOnlyValidator)(nil)
+	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
 	ErrMutatedSubnetOnlyValidator = errors.New("subnet only validator contains mutated constant fields")
 )
