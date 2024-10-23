@@ -555,8 +555,7 @@ func (n *network) Peers(
 		}
 	}
 
-	_, areTheyAPrimaryNetworkValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, peerID)
-	if areWeAPrimaryNetworkValidator && requestAllPeers && areTheyAPrimaryNetworkValidator {
+	if areWeAPrimaryNetworkValidator && requestAllPeers {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
