@@ -9,6 +9,27 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+// prefixGroup represents a bunch of IDs (stored in the members field),
+// with a bit prefix.
+// Each time the prefixGroup is split, it is divided into one or more prefixGroups
+// according to the next bit index in the index field.
+// Successively splitting prefixGroups yields a graph, with the first prefixGroup as the root.
+type prefixGroup struct {
+	// the bit index this prefixGroup would be split on by the next invocation of split().
+	index int
+	// the bits of the members of this prefixGroup from the first bit to the bit index.
+	prefix []uint8
+	// the IDs of the prefixGroup
+	members []ids.ID
+	// prefixGroups that correspond to zero and one being the first bit of their members, respectively.
+	zg, og *prefixGroup
+	// the prefixGroup that this prefixGroup was split from.
+	parent *prefixGroup
+	// was this prefixGroup split before. Used to prevent a prefixGroup from being split more than once,
+	// otherwise longestSharedPrefixes() would run indefinitely.
+	wasSplit bool
+}
+
 // longestSharedPrefixes creates a prefixGroup that is the root of a graph
 // of prefixGroup vertices.
 // When iterating the graph, each prefixGroup vertex represents a shared bit prefix
@@ -74,27 +95,6 @@ func determineDescendant(pg *prefixGroup) *prefixGroup {
 		descendant = pg.og
 	}
 	return descendant
-}
-
-// prefixGroup represents a bunch of IDs (stored in the members field),
-// with a bit prefix.
-// Each time the prefixGroup is split, it is divided into one or more prefixGroups
-// according to the next bit index in the index field.
-// Successively splitting prefixGroups yields a graph, with the first prefixGroup as the root.
-type prefixGroup struct {
-	// the bit index this prefixGroup would be split on by the next invocation of split().
-	index int
-	// the bits of the members of this prefixGroup from the first bit to the bit index.
-	prefix []uint8
-	// the IDs of the prefixGroup
-	members []ids.ID
-	// prefixGroups that correspond to zero and one being the first bit of their members, respectively.
-	zg, og *prefixGroup
-	// the prefixGroup that this prefixGroup was split from.
-	parent *prefixGroup
-	// was this prefixGroup split before. Used to prevent a prefixGroup from being split more than once,
-	// otherwise longestSharedPrefixes() would run indefinitely.
-	wasSplit bool
 }
 
 // bifurcationsWithCommonPrefix invokes f() on this and descendant prefixGroups

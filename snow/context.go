@@ -97,5 +97,5 @@ type ConsensusContext struct {
 }
 
 type BlockTraversal interface {
-	GetParent(id ids.ID) ids.ID
+	GetParent(id ids.ID) (ids.ID, bool)
 }

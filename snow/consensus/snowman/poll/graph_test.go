@@ -74,8 +74,8 @@ func TestBuildVotesGraph(t *testing.T) {
 	require.True(t, children[ids.ID{11}].Equals(expected11))
 }
 
-func getParentFunc(g *voteVertex) func(id ids.ID) ids.ID {
-	return func(id ids.ID) ids.ID {
+func getParentFunc(g *voteVertex) func(id ids.ID) (ids.ID, bool) {
+	return func(id ids.ID) (ids.ID, bool) {
 		var result ids.ID
 		g.traverse(func(v *voteVertex) {
 			if v.id.Compare(id) == 0 {
@@ -86,7 +86,7 @@ func getParentFunc(g *voteVertex) func(id ids.ID) ids.ID {
 				}
 			}
 		})
-		return result
+		return result, result != ids.Empty
 	}
 }
 

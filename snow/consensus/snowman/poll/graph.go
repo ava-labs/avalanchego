@@ -31,6 +31,58 @@ type voteGraph struct {
 	roots       []*voteVertex
 }
 
+// buildVoteGraph receives as input a function that returns the ID of a block, or Empty if unknown,
+// as well as a bag of IDs (The bag is for enforcing uniqueness among the IDs in contrast to a list).
+// It returns a voteGraph where each vertex corresponds to an ID and is linked to vertices
+// according to what getParent() returns for each ID.
+func buildVoteGraph(getParent func(ids.ID) (ids.ID, bool), votes bag.Bag[ids.ID]) voteGraph {
+	idList := votes.List()
+
+	id2Vertex := make(map[ids.ID]*voteVertex, len(idList))
+	roots := make([]*voteVertex, 0, len(idList))
+
+	// Build a graph out of the vertices that correspond to the IDs of the votes.
+	for _, id := range idList {
+		_, ok := id2Vertex[id]
+		if ok || id == ids.Empty {
+			continue
+		}
+		v := &voteVertex{id: id, descendants: make([]*voteVertex, 0, 2)}
+		id2Vertex[id] = v
+	}
+
+	// Add the parents of the IDs to the graph, for those that are not already there.
+	for _, id := range idList {
+		parent, ok := getParent(id)
+		// If this parent isn't found, it must be already finalized, so don't add it to the graph.
+		if !ok {
+			continue
+		}
+		_, ok = id2Vertex[parent]
+		// If the parent is not finalized we can vote on it, so add it to the graph
+		if !ok {
+			v := &voteVertex{id: parent, descendants: make([]*voteVertex, 0, 2)}
+			id2Vertex[parent] = v
+		}
+	}
+
+	for id, v := range id2Vertex {
+		parent, _ := getParent(id)
+
+		u, ok := id2Vertex[parent]
+		if ok {
+			v.parent = u
+			u.descendants = append(u.descendants, v)
+		} else {
+			roots = append(roots, v)
+		}
+	}
+
+	leaves := findLeaves(id2Vertex)
+
+	return voteGraph{leaves: leaves, roots: roots, vertexCount: len(id2Vertex)}
+}
+
 // traverse traverses over all vertices in the voteGraph in pre-order traversal.
 func (vg *voteGraph) traverse(f func(*voteVertex)) {
 	for _, root := range vg.roots {
@@ -67,14 +119,6 @@ func (vg *voteGraph) topologicalSortTraversal(f func(*voteVertex)) {
 	}
 }
 
-func clone(votes bag.Bag[ids.ID]) bag.Bag[ids.ID] {
-	var votesClone bag.Bag[ids.ID]
-	for _, id := range votes.List() {
-		votesClone.AddCount(id, votes.Count(id))
-	}
-	return votesClone
-}
-
 func findLeaves(idToVertex map[ids.ID]*voteVertex) []*voteVertex {
 	leaves := make([]*voteVertex, 0, len(idToVertex))
 	for _, v := range idToVertex {
@@ -85,62 +129,10 @@ func findLeaves(idToVertex map[ids.ID]*voteVertex) []*voteVertex {
 	return leaves
 }
 
-// buildVoteGraph receives as input a function that returns the ID of a block, or Empty if unknown,
-// as well as a bag of IDs (The bag is for enforcing uniqueness among the IDs in contrast to a list).
-// It returns a voteGraph where each vertex corresponds to an ID and is linked to vertices
-// according to what getParent() returns for each ID.
-func buildVoteGraph(getParent func(ids.ID) ids.ID, votes bag.Bag[ids.ID]) voteGraph {
-	idList := votes.List()
-
-	id2Vertex := make(map[ids.ID]*voteVertex, len(idList))
-	roots := make([]*voteVertex, 0, len(idList))
-
-	// Build a graph out of the vertices that correspond to the IDs of the votes.
-	for _, id := range idList {
-		_, ok := id2Vertex[id]
-		if ok || id == ids.Empty {
-			continue
-		}
-		v := &voteVertex{id: id, descendants: make([]*voteVertex, 0, 2)}
-		id2Vertex[id] = v
-	}
-
-	// Add the parents of the IDs to the graph, for those that are not already there.
-	for _, id := range idList {
-		parent := getParent(id)
-		// If this parent isn't found, it must be already finalized, so don't add it to the graph.
-		if parent == ids.Empty {
-			continue
-		}
-		_, ok := id2Vertex[parent]
-		// If the parent is not finalized we can vote on it, so add it to the graph
-		if !ok {
-			v := &voteVertex{id: parent, descendants: make([]*voteVertex, 0, 2)}
-			id2Vertex[parent] = v
-		}
-	}
-
-	for id, v := range id2Vertex {
-		parent := getParent(id)
-
-		u, ok := id2Vertex[parent]
-		if ok {
-			v.parent = u
-			u.descendants = append(u.descendants, v)
-		} else {
-			roots = append(roots, v)
-		}
-	}
-
-	leaves := findLeaves(id2Vertex)
-
-	return voteGraph{leaves: leaves, roots: roots, vertexCount: len(id2Vertex)}
-}
-
 // computeTransitiveVoteCountGraph receives a vote graph and corresponding votes for each vertex ID.
 // Returns a new bag where element represents the number of votes for transitive descendents in the graph.
 func computeTransitiveVoteCountGraph(graph *voteGraph, votes bag.Bag[ids.ID]) bag.Bag[ids.ID] {
-	transitiveClosureVotes := clone(votes)
+	transitiveClosureVotes := votes.Clone()
 
 	// Traverse from the leaves to the roots and recursively add the number of votes of descendents to each parent.
 	graph.topologicalSortTraversal(func(v *voteVertex) {

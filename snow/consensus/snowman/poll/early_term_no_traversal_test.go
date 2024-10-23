@@ -13,20 +13,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
-type parentGetter func(id ids.ID) ids.ID
+type parentGetter func(id ids.ID) (ids.ID, bool)
 
-func (p parentGetter) GetParent(id ids.ID) ids.ID {
+func (p parentGetter) GetParent(id ids.ID) (ids.ID, bool) {
 	return p(id)
 }
 
 func newEarlyTermNoTraversalTestFactory(require *require.Assertions, alpha int) Factory {
-	factory, err := NewEarlyTermTraversalFactory(alpha, alpha, prometheus.NewRegistry(), parentGetter(returnSelfID))
+	factory, err := NewEarlyTermTraversalFactory(alpha, alpha, prometheus.NewRegistry(), parentGetter(returnEmpty))
 	require.NoError(err)
 	return factory
 }
 
-func returnSelfID(id ids.ID) ids.ID {
-	return id
+func returnEmpty(_ ids.ID) (ids.ID, bool) {
+	return ids.Empty, false
 }
 
 func TestEarlyTermNoTraversalResults(t *testing.T) {
@@ -110,7 +110,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaPreference(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 5
 
-	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnSelfID))
+	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnEmpty))
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
@@ -135,7 +135,7 @@ func TestEarlyTermNoTraversalTerminatesEarlyWithAlphaConfidence(t *testing.T) {
 	alphaPreference := 3
 	alphaConfidence := 3
 
-	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnSelfID))
+	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), parentGetter(returnEmpty))
 	require.NoError(err)
 	poll := factory.New(vdrs)
 
@@ -218,12 +218,12 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 
 type ancestryGraph map[ids.ID]ids.ID
 
-func (ag ancestryGraph) GetParent(id ids.ID) ids.ID {
+func (ag ancestryGraph) GetParent(id ids.ID) (ids.ID, bool) {
 	parent, ok := ag[id]
 	if !ok {
-		return ids.Empty
+		return ids.Empty, false
 	}
-	return parent
+	return parent, true
 }
 
 func TestTransitiveVotesForPrefixes(t *testing.T) {
