@@ -34,7 +34,7 @@ func NewSubnetValidatorRegistration(
 		ValidationID: validationID,
 		Registered:   registered,
 	}
-	return msg, initialize(msg)
+	return msg, Initialize(msg)
 }
 
 // ParseSubnetValidatorRegistration parses bytes into an initialized

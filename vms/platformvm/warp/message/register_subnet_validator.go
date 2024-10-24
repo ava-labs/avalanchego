@@ -99,7 +99,7 @@ func NewRegisterSubnetValidator(
 		DisableOwner:          disableOwner,
 		Weight:                weight,
 	}
-	return msg, initialize(msg)
+	return msg, Initialize(msg)
 }
 
 // ParseRegisterSubnetValidator parses bytes into an initialized
