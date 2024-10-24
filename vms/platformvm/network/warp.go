@@ -109,7 +109,7 @@ func (s signatureRequestVerifier) verifySubnetConversion(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	conversionID, _, _, err := s.state.GetSubnetConversion(subnetID)
+	conversion, err := s.state.GetSubnetConversion(subnetID)
 	if err == database.ErrNotFound {
 		return &common.AppError{
 			Code:    ErrConversionDoesNotExist,
@@ -123,10 +123,10 @@ func (s signatureRequestVerifier) verifySubnetConversion(
 		}
 	}
 
-	if msg.ID != conversionID {
+	if msg.ID != conversion.ConversionID {
 		return &common.AppError{
 			Code:    ErrMismatchedConversionID,
-			Message: fmt.Sprintf("provided conversionID %q != expected conversionID %q", msg.ID, conversionID),
+			Message: fmt.Sprintf("provided conversionID %q != expected conversionID %q", msg.ID, conversion.ConversionID),
 		}
 	}
 
