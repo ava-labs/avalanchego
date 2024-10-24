@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -73,9 +74,12 @@ type WalletConfig struct {
 	// Keys to use for signing all transactions.
 	AVAXKeychain keychain.Keychain // required
 	EthKeychain  c.EthKeychain     // required
-	// Subnet IDs that the wallet should know about to be able to
-	// generate transactions.
+	// Subnet IDs that the wallet should know about to be able to generate
+	// transactions.
 	SubnetIDs []ids.ID // optional
+	// Validation IDs that the wallet should know about to be able to generate
+	// transactions.
+	ValidationIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -105,6 +109,11 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, validationID := range config.ValidationIDs {
+		// TODO: Fetch validation disableOwners
+		subnetOwners[validationID] = &secp256k1fx.OutputOwners{}
+	}
+
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
 	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)

@@ -188,6 +188,16 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
+	// IssueDisableSubnetValidatorTx creates, signs, and issues a transaction
+	// that disables a validator and returns the continuous fee to the
+	// remaining balance owner.
+	//
+	// - [validationID] of the validator to disable
+	IssueDisableSubnetValidatorTx(
+		validationID ids.ID,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
 	// IssueImportTx creates, signs, and issues an import transaction that
 	// attempts to consume all the available UTXOs and import the funds to [to].
 	//
@@ -472,6 +482,17 @@ func (w *wallet) IssueIncreaseBalanceTx(
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	utx, err := w.builder.NewIncreaseBalanceTx(validationID, balance, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueDisableSubnetValidatorTx(
+	validationID ids.ID,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewDisableSubnetValidatorTx(validationID, options...)
 	if err != nil {
 		return nil, err
 	}
