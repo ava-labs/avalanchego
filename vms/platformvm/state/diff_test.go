@@ -4,6 +4,7 @@
 package state
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -282,6 +283,99 @@ func TestDiffExpiry(t *testing.T) {
 	}
 }
 
+func TestDiffSubnetOnlyValidatorsErrors(t *testing.T) {
+	sov := SubnetOnlyValidator{
+		ValidationID: ids.GenerateTestID(),
+		SubnetID:     ids.GenerateTestID(),
+		NodeID:       ids.GenerateTestNodeID(),
+		Weight:       1, // Not removed
+	}
+
+	tests := []struct {
+		name                     string
+		initialEndAccumulatedFee uint64
+		sov                      SubnetOnlyValidator
+		expectedErr              error
+	}{
+		{
+			name:                     "mutate active constants",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: sov.ValidationID,
+				NodeID:       ids.GenerateTestNodeID(),
+			},
+			expectedErr: ErrMutatedSubnetOnlyValidator,
+		},
+		{
+			name:                     "mutate inactive constants",
+			initialEndAccumulatedFee: 0,
+			sov: SubnetOnlyValidator{
+				ValidationID: sov.ValidationID,
+				NodeID:       ids.GenerateTestNodeID(),
+			},
+			expectedErr: ErrMutatedSubnetOnlyValidator,
+		},
+		{
+			name:                     "conflicting legacy subnetID and nodeID pair",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       defaultValidatorNodeID,
+			},
+			expectedErr: ErrConflictingSubnetOnlyValidator,
+		},
+		{
+			name:                     "duplicate active subnetID and nodeID pair",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       sov.NodeID,
+			},
+			expectedErr: ErrDuplicateSubnetOnlyValidator,
+		},
+		{
+			name:                     "duplicate inactive subnetID and nodeID pair",
+			initialEndAccumulatedFee: 0,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       sov.NodeID,
+			},
+			expectedErr: ErrDuplicateSubnetOnlyValidator,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+
+			require.NoError(state.PutCurrentValidator(&Staker{
+				TxID:     ids.GenerateTestID(),
+				SubnetID: sov.SubnetID,
+				NodeID:   defaultValidatorNodeID,
+			}))
+
+			sov.EndAccumulatedFee = test.initialEndAccumulatedFee
+			require.NoError(state.PutSubnetOnlyValidator(sov))
+
+			d, err := NewDiffOn(state)
+			require.NoError(err)
+
+			// Initialize subnetID, weight, and endAccumulatedFee as they are
+			// constant among all tests.
+			test.sov.SubnetID = sov.SubnetID
+			test.sov.Weight = 1                        // Not removed
+			test.sov.EndAccumulatedFee = rand.Uint64() //#nosec G404
+			err = d.PutSubnetOnlyValidator(test.sov)
+			require.ErrorIs(err, test.expectedErr)
+
+			// The invalid addition should not have modified the diff.
+			assertChainsEqual(t, state, d)
+		})
+	}
+}
+
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -292,6 +386,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -328,6 +423,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -370,6 +466,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -415,6 +512,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -554,6 +652,7 @@ func TestDiffTx(t *testing.T) {
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -653,6 +752,7 @@ func TestDiffUTXO(t *testing.T) {
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
+	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
@@ -706,6 +806,18 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 			iterator.ToSlice(actualExpiryIterator),
 		)
 	}
+
+	expectedActiveSOVsIterator, expectedErr := expected.GetActiveSubnetOnlyValidatorsIterator()
+	actualActiveSOVsIterator, actualErr := actual.GetActiveSubnetOnlyValidatorsIterator()
+	require.Equal(expectedErr, actualErr)
+	if expectedErr == nil {
+		require.Equal(
+			iterator.ToSlice(expectedActiveSOVsIterator),
+			iterator.ToSlice(actualActiveSOVsIterator),
+		)
+	}
+
+	require.Equal(expected.NumActiveSubnetOnlyValidators(), actual.NumActiveSubnetOnlyValidators())
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()

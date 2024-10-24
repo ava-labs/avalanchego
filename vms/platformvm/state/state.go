@@ -4,6 +4,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/btree"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -84,6 +86,11 @@ var (
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
 	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
+	SubnetOnlyValidatorsPrefix    = []byte("subnetOnlyValidators")
+	WeightsPrefix                 = []byte("weights")
+	SubnetIDNodeIDPrefix          = []byte("subnetIDNodeID")
+	ActivePrefix                  = []byte("active")
+	InactivePrefix                = []byte("inactive")
 	SingletonPrefix               = []byte("singleton")
 
 	TimestampKey       = []byte("timestamp")
@@ -101,6 +108,7 @@ var (
 // execution.
 type Chain interface {
 	Expiry
+	SubnetOnlyValidators
 	Stakers
 	avax.UTXOAdder
 	avax.UTXOGetter
@@ -316,6 +324,15 @@ type state struct {
 	expiryDiff *expiryDiff
 	expiryDB   database.Database
 
+	activeSOVLookup        map[ids.ID]SubnetOnlyValidator
+	activeSOVs             *btree.BTreeG[SubnetOnlyValidator]
+	sovDiff                *subnetOnlyValidatorsDiff
+	subnetOnlyValidatorsDB database.Database
+	weightsDB              database.Database
+	subnetIDNodeIDDB       database.Database
+	activeDB               database.Database
+	inactiveDB             database.Database
+
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
 
@@ -507,6 +524,8 @@ func New(
 
 	baseDB := versiondb.New(db)
 
+	subnetOnlyValidatorsDB := prefixdb.New(SubnetOnlyValidatorsPrefix, baseDB)
+
 	validatorsDB := prefixdb.New(ValidatorsPrefix, baseDB)
 
 	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
@@ -633,6 +652,15 @@ func New(
 		expiryDiff: newExpiryDiff(),
 		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, baseDB),
 
+		activeSOVLookup:        make(map[ids.ID]SubnetOnlyValidator),
+		activeSOVs:             btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
+		sovDiff:                newSubnetOnlyValidatorsDiff(),
+		subnetOnlyValidatorsDB: subnetOnlyValidatorsDB,
+		weightsDB:              prefixdb.New(WeightsPrefix, subnetOnlyValidatorsDB),
+		subnetIDNodeIDDB:       prefixdb.New(SubnetIDNodeIDPrefix, subnetOnlyValidatorsDB),
+		activeDB:               prefixdb.New(ActivePrefix, subnetOnlyValidatorsDB),
+		inactiveDB:             prefixdb.New(InactivePrefix, subnetOnlyValidatorsDB),
+
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
@@ -726,6 +754,65 @@ func (s *state) PutExpiry(entry ExpiryEntry) {
 
 func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
+}
+
+func (s *state) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error) {
+	return s.sovDiff.getActiveSubnetOnlyValidatorsIterator(
+		iterator.FromTree(s.activeSOVs),
+	), nil
+}
+
+func (s *state) NumActiveSubnetOnlyValidators() int {
+	return len(s.activeSOVLookup) + s.sovDiff.numAddedActive
+}
+
+func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
+	if weight, modified := s.sovDiff.modifiedTotalWeight[subnetID]; modified {
+		return weight, nil
+	}
+
+	// TODO: Add caching
+	weight, err := database.GetUInt64(s.weightsDB, subnetID[:])
+	if err == database.ErrNotFound {
+		return 0, nil
+	}
+	return weight, err
+}
+
+func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
+	if sov, modified := s.sovDiff.modified[validationID]; modified {
+		if sov.Weight == 0 {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return sov, nil
+	}
+
+	return s.getPersistedSubnetOnlyValidator(validationID)
+}
+
+func (s *state) getPersistedSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
+	if sov, ok := s.activeSOVLookup[validationID]; ok {
+		return sov, nil
+	}
+
+	// TODO: Add caching
+	return getSubnetOnlyValidator(s.inactiveDB, validationID)
+}
+
+func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+	if has, modified := s.sovDiff.hasSubnetOnlyValidator(subnetID, nodeID); modified {
+		return has, nil
+	}
+
+	// TODO: Add caching
+	key := make([]byte, len(subnetID)+len(nodeID))
+	copy(key, subnetID[:])
+	copy(key[len(subnetID):], nodeID[:])
+	return s.subnetIDNodeIDDB.Has(key)
+}
+
+func (s *state) PutSubnetOnlyValidator(sov SubnetOnlyValidator) error {
+	return s.sovDiff.putSubnetOnlyValidator(s, sov)
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -1387,6 +1474,7 @@ func (s *state) load() error {
 	return errors.Join(
 		s.loadMetadata(),
 		s.loadExpiry(),
+		s.loadActiveSubnetOnlyValidators(),
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
@@ -1477,6 +1565,34 @@ func (s *state) loadExpiry() error {
 			return fmt.Errorf("failed to unmarshal ExpiryEntry during load: %w", err)
 		}
 		s.expiry.ReplaceOrInsert(entry)
+	}
+
+	return nil
+}
+
+func (s *state) loadActiveSubnetOnlyValidators() error {
+	it := s.activeDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		key := it.Key()
+		validationID, err := ids.ToID(key)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal ValidationID during load: %w", err)
+		}
+
+		var (
+			value = it.Value()
+			sov   = SubnetOnlyValidator{
+				ValidationID: validationID,
+			}
+		)
+		if _, err := block.GenesisCodec.Unmarshal(value, &sov); err != nil {
+			return fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
+		}
+
+		s.activeSOVLookup[validationID] = sov
+		s.activeSOVs.ReplaceOrInsert(sov)
 	}
 
 	return nil
@@ -1736,9 +1852,53 @@ func (s *state) loadPendingValidators() error {
 	)
 }
 
-// Invariant: initValidatorSets requires loadCurrentValidators to have already
-// been called.
+// Invariant: initValidatorSets requires loadActiveSubnetOnlyValidators and
+// loadCurrentValidators to have already been called.
 func (s *state) initValidatorSets() error {
+	// Load ACP77 validators
+	for validationID, sov := range s.activeSOVLookup {
+		pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
+		if err := s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {
+			return err
+		}
+	}
+
+	// Load inactive weights
+	it := s.weightsDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		subnetID, err := ids.ToID(it.Key())
+		if err != nil {
+			return err
+		}
+
+		totalWeight, err := database.ParseUInt64(it.Value())
+		if err != nil {
+			return err
+		}
+
+		activeWeight, err := s.validators.TotalWeight(subnetID)
+		if err != nil {
+			return err
+		}
+
+		inactiveWeight, err := safemath.Sub(totalWeight, activeWeight)
+		if err != nil {
+			// This should never happen, as the total weight should always be at
+			// least the sum of the active weights.
+			return err
+		}
+		if inactiveWeight == 0 {
+			continue
+		}
+
+		if err := s.validators.AddStaker(subnetID, ids.EmptyNodeID, nil, ids.Empty, inactiveWeight); err != nil {
+			return err
+		}
+	}
+
+	// Load primary network and non-ACP77 validators
 	primaryNetworkValidators := s.currentStakers.validators[constants.PrimaryNetworkID]
 	for subnetID, subnetValidators := range s.currentStakers.validators {
 		if s.validators.Count(subnetID) != 0 {
@@ -1792,9 +1952,11 @@ func (s *state) write(updateValidators bool, height uint64) error {
 	return errors.Join(
 		s.writeBlocks(),
 		s.writeExpiry(),
-		s.writeCurrentStakers(updateValidators, height, codecVersion),
+		s.writeValidatorDiffs(height),
+		s.writeCurrentStakers(updateValidators, codecVersion),
 		s.writePendingStakers(),
 		s.WriteValidatorMetadata(s.currentValidatorList, s.currentSubnetValidatorList, codecVersion), // Must be called after writeCurrentStakers
+		s.writeSubnetOnlyValidators(updateValidators),
 		s.writeTXs(),
 		s.writeRewardUTXOs(),
 		s.writeUTXOs(),
@@ -1811,6 +1973,11 @@ func (s *state) write(updateValidators bool, height uint64) error {
 func (s *state) Close() error {
 	return errors.Join(
 		s.expiryDB.Close(),
+		s.weightsDB.Close(),
+		s.subnetIDNodeIDDB.Close(),
+		s.activeDB.Close(),
+		s.inactiveDB.Close(),
+		s.subnetOnlyValidatorsDB.Close(),
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -2040,7 +2207,170 @@ func (s *state) writeExpiry() error {
 	return nil
 }
 
-func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecVersion uint16) error {
+func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error) {
+	if vdr, ok := s.currentStakers.validators[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
+		// The primary network validator is still present.
+		return vdr.validator.PublicKey, nil
+	}
+	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
+		// The primary network validator is being removed.
+		return vdr.validator.PublicKey, nil
+	}
+
+	// This should never happen as the primary network diffs are
+	// written last and subnet validator times must be a subset
+	// of the primary network validator times.
+	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
+}
+
+func (s *state) writeValidatorDiffs(height uint64) error {
+	type validatorChanges struct {
+		weightDiff    ValidatorWeightDiff
+		prevPublicKey []byte
+		newPublicKey  []byte
+	}
+	changes := make(map[subnetIDNodeID]*validatorChanges, len(s.sovDiff.modified))
+
+	for subnetID, subnetDiffs := range s.currentStakers.validatorDiffs {
+		for nodeID, diff := range subnetDiffs {
+			change := &validatorChanges{
+				weightDiff: ValidatorWeightDiff{
+					Decrease: diff.validatorStatus == deleted,
+				},
+			}
+			if diff.validatorStatus != unmodified {
+				change.weightDiff.Amount = diff.validator.Weight
+			}
+
+			for _, staker := range diff.deletedDelegators {
+				if err := change.weightDiff.Add(true, staker.Weight); err != nil {
+					return fmt.Errorf("failed to decrease node weight diff: %w", err)
+				}
+			}
+
+			addedDelegatorIterator := iterator.FromTree(diff.addedDelegators)
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				if err := change.weightDiff.Add(false, staker.Weight); err != nil {
+					addedDelegatorIterator.Release()
+					return fmt.Errorf("failed to increase node weight diff: %w", err)
+				}
+			}
+			addedDelegatorIterator.Release()
+
+			pk, err := s.getInheritedPublicKey(nodeID)
+			if err != nil {
+				return err
+			}
+			if pk != nil {
+				switch diff.validatorStatus {
+				case added:
+					change.newPublicKey = bls.PublicKeyToUncompressedBytes(pk)
+				case deleted:
+					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(pk)
+				}
+			}
+
+			subnetIDNodeID := subnetIDNodeID{
+				subnetID: subnetID,
+				nodeID:   nodeID,
+			}
+			changes[subnetIDNodeID] = change
+		}
+	}
+
+	// Perform deletions:
+	for validationID := range s.sovDiff.modified {
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		var (
+			diff           *validatorChanges
+			subnetIDNodeID = subnetIDNodeID{
+				subnetID: priorSOV.SubnetID,
+			}
+		)
+		if priorSOV.isActive() {
+			subnetIDNodeID.nodeID = priorSOV.NodeID
+			diff = getOrDefault(changes, subnetIDNodeID)
+			diff.prevPublicKey = priorSOV.PublicKey
+		} else {
+			subnetIDNodeID.nodeID = ids.EmptyNodeID
+			diff = getOrDefault(changes, subnetIDNodeID)
+		}
+
+		if err := diff.weightDiff.Add(true, priorSOV.Weight); err != nil {
+			return err
+		}
+	}
+
+	// Perform additions:
+	for _, sov := range s.sovDiff.modified {
+		// If the validator is being removed, we shouldn't work to re-add it.
+		if sov.Weight == 0 {
+			continue
+		}
+
+		var (
+			diff           *validatorChanges
+			subnetIDNodeID = subnetIDNodeID{
+				subnetID: sov.SubnetID,
+			}
+		)
+		if sov.isActive() {
+			subnetIDNodeID.nodeID = sov.NodeID
+			diff = getOrDefault(changes, subnetIDNodeID)
+			diff.newPublicKey = sov.PublicKey
+		} else {
+			subnetIDNodeID.nodeID = ids.EmptyNodeID
+			diff = getOrDefault(changes, subnetIDNodeID)
+		}
+
+		if err := diff.weightDiff.Add(false, sov.Weight); err != nil {
+			return err
+		}
+	}
+
+	for subnetIDNodeID, diff := range changes {
+		diffKey := marshalDiffKey(subnetIDNodeID.subnetID, height, subnetIDNodeID.nodeID)
+		if diff.weightDiff.Amount != 0 {
+			err := s.validatorWeightDiffsDB.Put(
+				diffKey,
+				marshalWeightDiff(&diff.weightDiff),
+			)
+			if err != nil {
+				return err
+			}
+		}
+		if !bytes.Equal(diff.prevPublicKey, diff.newPublicKey) {
+			err := s.validatorPublicKeyDiffsDB.Put(
+				diffKey,
+				diff.prevPublicKey,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func getOrDefault[K comparable, V any](m map[K]*V, k K) *V {
+	if v, ok := m[k]; ok {
+		return v
+	}
+
+	v := new(V)
+	m[k] = v
+	return v
+}
+
+func (s *state) writeCurrentStakers(updateValidators bool, codecVersion uint16) error {
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		// We must write the primary network stakers last because writing subnet
 		// validator diffs may depend on the primary network validator diffs to
@@ -2049,33 +2379,31 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 			continue
 		}
 
-		delete(s.currentStakers.validatorDiffs, subnetID)
-
 		err := s.writeCurrentStakersSubnetDiff(
 			subnetID,
 			validatorDiffs,
 			updateValidators,
-			height,
 			codecVersion,
 		)
 		if err != nil {
 			return err
 		}
+
+		delete(s.currentStakers.validatorDiffs, subnetID)
 	}
 
 	if validatorDiffs, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID]; ok {
-		delete(s.currentStakers.validatorDiffs, constants.PrimaryNetworkID)
-
 		err := s.writeCurrentStakersSubnetDiff(
 			constants.PrimaryNetworkID,
 			validatorDiffs,
 			updateValidators,
-			height,
 			codecVersion,
 		)
 		if err != nil {
 			return err
 		}
+
+		delete(s.currentStakers.validatorDiffs, constants.PrimaryNetworkID)
 	}
 
 	// TODO: Move validator set management out of the state package
@@ -2098,7 +2426,6 @@ func (s *state) writeCurrentStakersSubnetDiff(
 	subnetID ids.ID,
 	validatorDiffs map[ids.NodeID]*diffValidator,
 	updateValidators bool,
-	height uint64,
 	codecVersion uint16,
 ) error {
 	// Select db to write to
@@ -2111,52 +2438,13 @@ func (s *state) writeCurrentStakersSubnetDiff(
 
 	// Record the change in weight and/or public key for each validator.
 	for nodeID, validatorDiff := range validatorDiffs {
-		var (
-			staker     *Staker
-			pk         *bls.PublicKey
-			weightDiff = &ValidatorWeightDiff{
-				Decrease: validatorDiff.validatorStatus == deleted,
-			}
-		)
-		if validatorDiff.validatorStatus != unmodified {
-			staker = validatorDiff.validator
-
-			pk = staker.PublicKey
-			// For non-primary network validators, the public key is inherited
-			// from the primary network.
-			if subnetID != constants.PrimaryNetworkID {
-				if vdr, ok := s.currentStakers.validators[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
-					// The primary network validator is still present after
-					// writing.
-					pk = vdr.validator.PublicKey
-				} else if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
-					// The primary network validator is being removed during
-					// writing.
-					pk = vdr.validator.PublicKey
-				} else {
-					// This should never happen as the primary network diffs are
-					// written last and subnet validator times must be a subset
-					// of the primary network validator times.
-					return fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
-				}
-			}
-
-			weightDiff.Amount = staker.Weight
-		}
-
+		weightDiff := &ValidatorWeightDiff{}
 		switch validatorDiff.validatorStatus {
 		case added:
-			if pk != nil {
-				// Record that the public key for the validator is being added.
-				// This means the prior value for the public key was nil.
-				err := s.validatorPublicKeyDiffsDB.Put(
-					marshalDiffKey(subnetID, height, nodeID),
-					nil,
-				)
-				if err != nil {
-					return err
-				}
-			}
+			staker := validatorDiff.validator
+
+			weightDiff.Decrease = false
+			weightDiff.Amount = staker.Weight
 
 			// The validator is being added.
 			//
@@ -2185,23 +2473,10 @@ func (s *state) writeCurrentStakersSubnetDiff(
 
 			s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
 		case deleted:
-			if pk != nil {
-				// Record that the public key for the validator is being
-				// removed. This means we must record the prior value of the
-				// public key.
-				//
-				// Note: We store the uncompressed public key here as it is
-				// significantly more efficient to parse when applying diffs.
-				err := s.validatorPublicKeyDiffsDB.Put(
-					marshalDiffKey(subnetID, height, nodeID),
-					bls.PublicKeyToUncompressedBytes(pk),
-				)
-				if err != nil {
-					return err
-				}
-			}
+			weightDiff.Decrease = true
+			weightDiff.Amount = validatorDiff.validator.Weight
 
-			if err := validatorDB.Delete(staker.TxID[:]); err != nil {
+			if err := validatorDB.Delete(validatorDiff.validator.TxID[:]); err != nil {
 				return fmt.Errorf("failed to delete current staker: %w", err)
 			}
 
@@ -2223,14 +2498,6 @@ func (s *state) writeCurrentStakersSubnetDiff(
 			continue
 		}
 
-		err = s.validatorWeightDiffsDB.Put(
-			marshalDiffKey(subnetID, height, nodeID),
-			marshalWeightDiff(weightDiff),
-		)
-		if err != nil {
-			return err
-		}
-
 		// TODO: Move the validator set management out of the state package
 		if !updateValidators {
 			continue
@@ -2240,11 +2507,17 @@ func (s *state) writeCurrentStakersSubnetDiff(
 			err = s.validators.RemoveWeight(subnetID, nodeID, weightDiff.Amount)
 		} else {
 			if validatorDiff.validatorStatus == added {
+				var pk *bls.PublicKey
+				pk, err = s.getInheritedPublicKey(nodeID)
+				if err != nil {
+					return err
+				}
+
 				err = s.validators.AddStaker(
 					subnetID,
 					nodeID,
 					pk,
-					staker.TxID,
+					validatorDiff.validator.TxID,
 					weightDiff.Amount,
 				)
 			} else {
@@ -2353,6 +2626,210 @@ func writePendingDiff(
 			return fmt.Errorf("failed to delete pending delegator: %w", err)
 		}
 	}
+	return nil
+}
+
+// TODO: Add caching
+//
+// writeSubnetOnlyValidators must be called after writeCurrentStakers to ensure
+// any legacy validators that were removed and then re-added as SoVs are
+// correctly written
+func (s *state) writeSubnetOnlyValidators(updateValidators bool) error {
+	// Write modified weights:
+	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
+		if err := database.PutUInt64(s.weightsDB, subnetID[:], weight); err != nil {
+			return err
+		}
+	}
+	maps.Clear(s.sovDiff.modifiedTotalWeight)
+
+	sovChanges := s.sovDiff.modified
+	// Perform deletions:
+	for validationID, sov := range sovChanges {
+		if sov.Weight != 0 {
+			// Additions and modifications are handled in the next loops.
+			continue
+		}
+
+		// The next loops shouldn't consider this change.
+		delete(sovChanges, validationID)
+
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// Deleting a non-existent validator is a noop. This can happen if
+			// the validator was added and then immediately removed.
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		subnetIDNodeID := subnetIDNodeID{
+			subnetID: sov.SubnetID,
+			nodeID:   sov.NodeID,
+		}
+		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
+		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
+			return err
+		}
+
+		if priorSOV.isActive() {
+			delete(s.activeSOVLookup, validationID)
+			s.activeSOVs.Delete(priorSOV)
+			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
+		} else {
+			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
+		}
+		if err != nil {
+			return err
+		}
+
+		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
+			continue
+		}
+
+		nodeID := ids.EmptyNodeID
+		if priorSOV.isActive() {
+			nodeID = priorSOV.NodeID
+		}
+		if err := s.validators.RemoveWeight(priorSOV.SubnetID, nodeID, priorSOV.Weight); err != nil {
+			return fmt.Errorf("failed to delete SoV validator: %w", err)
+		}
+	}
+
+	// Perform modifications:
+	for validationID, sov := range sovChanges {
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// New additions are handled in the next loop.
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		if priorSOV.isActive() {
+			delete(s.activeSOVLookup, validationID)
+			s.activeSOVs.Delete(priorSOV)
+			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
+		} else {
+			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
+		}
+		if err != nil {
+			return err
+		}
+
+		if sov.isActive() {
+			s.activeSOVLookup[validationID] = sov
+			s.activeSOVs.ReplaceOrInsert(sov)
+			err = putSubnetOnlyValidator(s.activeDB, sov)
+		} else {
+			err = putSubnetOnlyValidator(s.inactiveDB, sov)
+		}
+		if err != nil {
+			return err
+		}
+
+		// The next loop shouldn't consider this change.
+		delete(sovChanges, validationID)
+
+		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
+			continue
+		}
+
+		switch {
+		case !priorSOV.isActive() && sov.isActive():
+			// This validator is being activated.
+			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
+			err = errors.Join(
+				s.validators.RemoveWeight(sov.SubnetID, ids.EmptyNodeID, priorSOV.Weight),
+				s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight),
+			)
+		case priorSOV.isActive() && !sov.isActive():
+			// This validator is being deactivated.
+			inactiveWeight := s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
+			if inactiveWeight == 0 {
+				err = s.validators.AddStaker(sov.SubnetID, ids.EmptyNodeID, nil, ids.Empty, sov.Weight)
+			} else {
+				err = s.validators.AddWeight(sov.SubnetID, ids.EmptyNodeID, sov.Weight)
+			}
+			err = errors.Join(
+				err,
+				s.validators.RemoveWeight(sov.SubnetID, sov.NodeID, priorSOV.Weight),
+			)
+		default:
+			// This validator's active status isn't changing.
+			nodeID := ids.EmptyNodeID
+			if sov.isActive() {
+				nodeID = sov.NodeID
+			}
+			if priorSOV.Weight < sov.Weight {
+				err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
+			} else if priorSOV.Weight > sov.Weight {
+				err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	// Perform additions:
+	for validationID, sov := range sovChanges {
+		validationID := validationID
+
+		subnetIDNodeID := subnetIDNodeID{
+			subnetID: sov.SubnetID,
+			nodeID:   sov.NodeID,
+		}
+		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
+		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
+			return err
+		}
+
+		var (
+			isActive = sov.isActive()
+			err      error
+		)
+		if isActive {
+			s.activeSOVLookup[validationID] = sov
+			s.activeSOVs.ReplaceOrInsert(sov)
+			err = putSubnetOnlyValidator(s.activeDB, sov)
+		} else {
+			err = putSubnetOnlyValidator(s.inactiveDB, sov)
+		}
+		if err != nil {
+			return err
+		}
+
+		// TODO: Move the validator set management out of the state package
+		if !updateValidators {
+			continue
+		}
+
+		if isActive {
+			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
+			if err := s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {
+				return fmt.Errorf("failed to add SoV validator: %w", err)
+			}
+			continue
+		}
+
+		// This validator is inactive
+		inactiveWeight := s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
+		if inactiveWeight == 0 {
+			err = s.validators.AddStaker(sov.SubnetID, ids.EmptyNodeID, nil, ids.Empty, sov.Weight)
+		} else {
+			err = s.validators.AddWeight(sov.SubnetID, ids.EmptyNodeID, sov.Weight)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	s.sovDiff = newSubnetOnlyValidatorsDiff()
 	return nil
 }
 
