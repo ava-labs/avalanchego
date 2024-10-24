@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -345,6 +346,98 @@ func TestSend(t *testing.T) {
 
 	inboundGetMsg := <-received
 	require.Equal(message.GetOp, inboundGetMsg.Op())
+
+	for _, net := range networks {
+		net.StartClose()
+	}
+	wg.Wait()
+}
+
+func TestGetPeerList(t *testing.T) {
+	require := require.New(t)
+
+	// Create a non-validator peer
+	dialer, listeners, _, configs := newTestNetwork(t, 1)
+
+	configs[0].Beacons = validators.NewManager()
+	configs[0].Validators = validators.NewManager()
+	nonValidatorNetwork, err := NewNetwork(
+		configs[0],
+		upgrade.InitiallyActiveTime,
+		newMessageCreator(t),
+		prometheus.NewRegistry(),
+		logging.NoLog{},
+		listeners[0],
+		dialer,
+		&testHandler{
+			InboundHandler: nil,
+			ConnectedF:     nil,
+			DisconnectedF:  nil,
+		},
+	)
+	require.NoError(err)
+
+	receivedPeers := make(chan []*ips.ClaimedIPPort)
+	// Create a network of validators
+	// One validator returns the peer list consisting of all the validators
+	nodeIDs, networks, wg := newFullyConnectedTestNetwork(
+		t,
+		[]router.InboundHandler{
+			nil, // overwritten below
+			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+				require.FailNow("unexpected message received")
+			}),
+			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
+				require.FailNow("unexpected message received")
+			}),
+		},
+	)
+
+	// Overwrite the validator inbound message handler
+	handler := &testHandler{
+		InboundHandler: router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
+			p := networks[0].Peers(msg.NodeID(), nil, true, &bloom.ReadFilter{}, []byte{})
+			receivedPeers <- p
+		}),
+		ConnectedF:    nil,
+		DisconnectedF: nil,
+	}
+	networks[0].peerConfig.Router = handler
+	networks[0].router = handler
+
+	// Connect the non-validator peer to the validator network
+	wg.Add(1)
+	nonValidatorNetwork.ManuallyTrack(networks[0].config.MyNodeID, networks[0].config.MyIPPort.Get())
+	go func() {
+		defer wg.Done()
+
+		require.NoError(nonValidatorNetwork.Dispatch())
+	}()
+
+	mc := newMessageCreator(t)
+	outboundPeersMsg, err := mc.GetPeerList(nil, nil, true)
+	require.NoError(err)
+
+	toSend := set.Of(nodeIDs[0])
+	sentTo := nonValidatorNetwork.Send(
+		outboundPeersMsg,
+		common.SendConfig{
+			NodeIDs: toSend,
+		},
+		constants.PrimaryNetworkID,
+		subnets.NoOpAllower,
+	)
+	require.Equal(toSend, sentTo)
+
+	peersList := <-receivedPeers
+	require.Len(peersList, len(nodeIDs)-1)
+	peerNodes := set.NewSet[ids.NodeID](len(peersList))
+	for _, peer := range peersList {
+		peerNodes.Add(peer.NodeID)
+	}
+	for _, nodeID := range nodeIDs[1:] {
+		require.True(peerNodes.Contains(nodeID))
+	}
 
 	for _, net := range networks {
 		net.StartClose()
