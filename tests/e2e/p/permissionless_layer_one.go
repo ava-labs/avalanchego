@@ -50,6 +50,7 @@ const (
 	genesisWeight   = units.Schmeckle
 	genesisBalance  = units.Avax
 	registerWeight  = genesisWeight / 10
+	updatedWeight   = 2 * registerWeight
 	registerBalance = 0
 )
 
@@ -278,6 +279,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			registerWeight,
 		)
 		require.NoError(err)
+		registerValidationID := registerSubnetValidatorMessage.ValidationID()
 
 		tc.By("registering the validator", func() {
 			tc.By("creating the unsigned warp message")
@@ -341,6 +343,100 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 					ids.EmptyNodeID: { // The validator is not active
 						NodeID: ids.EmptyNodeID,
 						Weight: registerWeight,
+					},
+				})
+			})
+		})
+
+		var nextNonce uint64
+		setWeight := func(validationID ids.ID, weight uint64) {
+			tc.By("creating the unsigned warp message")
+			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+				networkID,
+				chainID,
+				must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+					address,
+					must[*warpmessage.SubnetValidatorWeight](tc)(warpmessage.NewSubnetValidatorWeight(
+						validationID,
+						nextNonce,
+						weight,
+					)).Bytes(),
+				)).Bytes(),
+			))
+
+			tc.By("sending the request to sign the warp message", func() {
+				setSubnetValidatorWeightRequest, err := wrapWarpSignatureRequest(
+					unsignedSubnetValidatorWeight,
+					nil,
+				)
+				require.NoError(err)
+
+				require.True(genesisPeer.Send(tc.DefaultContext(), setSubnetValidatorWeightRequest))
+			})
+
+			tc.By("getting the signature response")
+			setSubnetValidatorWeightSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
+			require.True(ok)
+
+			tc.By("creating the signed warp message to increase the weight of the validator")
+			signers := set.NewBits()
+			signers.Add(0) // [signers] has weight from the genesis peer
+
+			var sigBytes [bls.SignatureLen]byte
+			copy(sigBytes[:], bls.SignatureToBytes(setSubnetValidatorWeightSignature))
+			registerSubnetValidator, err := warp.NewMessage(
+				unsignedSubnetValidatorWeight,
+				&warp.BitSetSignature{
+					Signers:   signers.Bytes(),
+					Signature: sigBytes,
+				},
+			)
+			require.NoError(err)
+
+			tc.By("issuing a SetSubnetValidatorWeightTx", func() {
+				_, err := pWallet.IssueSetSubnetValidatorWeightTx(
+					registerSubnetValidator.Bytes(),
+				)
+				require.NoError(err)
+			})
+
+			nextNonce++
+		}
+
+		tc.By("increasing the weight of the validator", func() {
+			setWeight(registerValidationID, updatedWeight)
+		})
+
+		tc.By("verifying the validator weight was increased", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+					ids.EmptyNodeID: { // The validator is not active
+						NodeID: ids.EmptyNodeID,
+						Weight: updatedWeight,
+					},
+				})
+			})
+		})
+
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+
+		tc.By("removing the registered validator", func() {
+			setWeight(registerValidationID, 0)
+		})
+
+		tc.By("verifying the validator was removed", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
 					},
 				})
 			})
