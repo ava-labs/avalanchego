@@ -2547,12 +2547,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64, codecV
 	}
 
 	// TODO: Move validator set management out of the state package
-	//
-	// Attempt to update the stake metrics
 	if !updateValidators {
 		return nil
 	}
 
+	// Update the stake metrics
 	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network: %w", err)

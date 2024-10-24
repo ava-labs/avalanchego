@@ -112,9 +112,11 @@ func TestStateSyncGenesis(t *testing.T) {
 	)
 }
 
-// Whenever we store a staker, a whole bunch of data structures are updated
-// This test is meant to capture which updates are carried out
-func TestPersistStakers(t *testing.T) {
+// Whenever we add or remove a staker, a number of on-disk data structures
+// should be updated.
+//
+// This test verifies that the on-disk data structures are updated as expected.
+func TestState_writeStakers(t *testing.T) {
 	const (
 		primaryValidatorDuration = 28 * 24 * time.Hour
 		primaryDelegatorDuration = 14 * 24 * time.Hour
@@ -209,8 +211,8 @@ func TestPersistStakers(t *testing.T) {
 		initialTxs     []*txs.Tx
 
 		// Staker to insert or remove
-		staker *Staker
-		tx     *txs.Tx // If tx is nil, the staker is being removed
+		staker      *Staker
+		addStakerTx *txs.Tx // If tx is nil, the staker is being removed
 
 		// Check that the staker is duly stored/removed in P-chain state
 		expectedCurrentValidator  *Staker
@@ -228,7 +230,7 @@ func TestPersistStakers(t *testing.T) {
 	}{
 		"add current primary network validator": {
 			staker:                   primaryNetworkCurrentValidatorStaker,
-			tx:                       addPrimaryNetworkValidator,
+			addStakerTx:              addPrimaryNetworkValidator,
 			expectedCurrentValidator: primaryNetworkCurrentValidatorStaker,
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
 				NodeID:    primaryNetworkCurrentValidatorStaker.NodeID,
@@ -245,7 +247,7 @@ func TestPersistStakers(t *testing.T) {
 			initialStakers:            []*Staker{primaryNetworkCurrentValidatorStaker},
 			initialTxs:                []*txs.Tx{addPrimaryNetworkValidator},
 			staker:                    primaryNetworkCurrentDelegatorStaker,
-			tx:                        addPrimaryNetworkDelegator,
+			addStakerTx:               addPrimaryNetworkDelegator,
 			expectedCurrentValidator:  primaryNetworkCurrentValidatorStaker,
 			expectedCurrentDelegators: []*Staker{primaryNetworkCurrentDelegatorStaker},
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
@@ -260,14 +262,14 @@ func TestPersistStakers(t *testing.T) {
 		},
 		"add pending primary network validator": {
 			staker:                   primaryNetworkPendingValidatorStaker,
-			tx:                       addPrimaryNetworkValidator,
+			addStakerTx:              addPrimaryNetworkValidator,
 			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
 		},
 		"add pending primary network delegator": {
 			initialStakers:            []*Staker{primaryNetworkPendingValidatorStaker},
 			initialTxs:                []*txs.Tx{addPrimaryNetworkValidator},
 			staker:                    primaryNetworkPendingDelegatorStaker,
-			tx:                        addPrimaryNetworkDelegator,
+			addStakerTx:               addPrimaryNetworkDelegator,
 			expectedPendingValidator:  primaryNetworkPendingValidatorStaker,
 			expectedPendingDelegators: []*Staker{primaryNetworkPendingDelegatorStaker},
 		},
@@ -275,7 +277,7 @@ func TestPersistStakers(t *testing.T) {
 			initialStakers:           []*Staker{primaryNetworkCurrentValidatorStaker},
 			initialTxs:               []*txs.Tx{addPrimaryNetworkValidator},
 			staker:                   subnetCurrentValidatorStaker,
-			tx:                       addSubnetValidator,
+			addStakerTx:              addSubnetValidator,
 			expectedCurrentValidator: subnetCurrentValidatorStaker,
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
 				NodeID:    subnetCurrentValidatorStaker.NodeID,
@@ -355,18 +357,35 @@ func TestPersistStakers(t *testing.T) {
 			db := memdb.New()
 			state := newTestState(t, db)
 
+			addOrDeleteStaker := func(staker *Staker, add bool) {
+				if add {
+					switch {
+					case staker.Priority.IsCurrentValidator():
+						require.NoError(state.PutCurrentValidator(staker))
+					case staker.Priority.IsPendingValidator():
+						require.NoError(state.PutPendingValidator(staker))
+					case staker.Priority.IsCurrentDelegator():
+						state.PutCurrentDelegator(staker)
+					case staker.Priority.IsPendingDelegator():
+						state.PutPendingDelegator(staker)
+					}
+				} else {
+					switch {
+					case staker.Priority.IsCurrentValidator():
+						state.DeleteCurrentValidator(staker)
+					case staker.Priority.IsPendingValidator():
+						state.DeletePendingValidator(staker)
+					case staker.Priority.IsCurrentDelegator():
+						state.DeleteCurrentDelegator(staker)
+					case staker.Priority.IsPendingDelegator():
+						state.DeletePendingDelegator(staker)
+					}
+				}
+			}
+
 			// create and store the initial stakers
 			for _, staker := range test.initialStakers {
-				switch {
-				case staker.Priority.IsCurrentValidator():
-					require.NoError(state.PutCurrentValidator(staker))
-				case staker.Priority.IsPendingValidator():
-					require.NoError(state.PutPendingValidator(staker))
-				case staker.Priority.IsCurrentDelegator():
-					state.PutCurrentDelegator(staker)
-				case staker.Priority.IsPendingDelegator():
-					state.PutPendingDelegator(staker)
-				}
+				addOrDeleteStaker(staker, true)
 			}
 			for _, tx := range test.initialTxs {
 				state.AddTx(tx, status.Committed)
@@ -376,34 +395,9 @@ func TestPersistStakers(t *testing.T) {
 			require.NoError(state.Commit())
 
 			// create and store the staker under test
-			switch {
-			case test.staker.Priority.IsCurrentValidator():
-				if test.tx != nil {
-					require.NoError(state.PutCurrentValidator(test.staker))
-				} else {
-					state.DeleteCurrentValidator(test.staker)
-				}
-			case test.staker.Priority.IsPendingValidator():
-				if test.tx != nil {
-					require.NoError(state.PutPendingValidator(test.staker))
-				} else {
-					state.DeletePendingValidator(test.staker)
-				}
-			case test.staker.Priority.IsCurrentDelegator():
-				if test.tx != nil {
-					state.PutCurrentDelegator(test.staker)
-				} else {
-					state.DeleteCurrentDelegator(test.staker)
-				}
-			case test.staker.Priority.IsPendingDelegator():
-				if test.tx != nil {
-					state.PutPendingDelegator(test.staker)
-				} else {
-					state.DeletePendingDelegator(test.staker)
-				}
-			}
-			if test.tx != nil {
-				state.AddTx(test.tx, status.Committed)
+			addOrDeleteStaker(test.staker, test.addStakerTx != nil)
+			if test.addStakerTx != nil {
+				state.AddTx(test.addStakerTx, status.Committed)
 			}
 
 			state.SetHeight(1)
@@ -476,12 +470,15 @@ func TestPersistStakers(t *testing.T) {
 				publicKeyDiffBytes, err := state.validatorPublicKeyDiffsDB.Get(diffKey)
 				if test.expectedPublicKeyDiff.IsNothing() {
 					require.ErrorIs(err, database.ErrNotFound)
-				} else if expectedPublicKeyDiff := test.expectedPublicKeyDiff.Value(); expectedPublicKeyDiff == nil {
-					require.NoError(err)
-					require.Empty(publicKeyDiffBytes)
 				} else {
 					require.NoError(err)
-					require.Equal(expectedPublicKeyDiff, bls.PublicKeyFromValidUncompressedBytes(publicKeyDiffBytes))
+
+					expectedPublicKeyDiff := test.expectedPublicKeyDiff.Value()
+					if expectedPublicKeyDiff != nil {
+						require.Equal(expectedPublicKeyDiff, bls.PublicKeyFromValidUncompressedBytes(publicKeyDiffBytes))
+					} else {
+						require.Empty(publicKeyDiffBytes)
+					}
 				}
 
 				// re-load the state from disk for the second iteration
@@ -761,9 +758,7 @@ func TestValidatorWeightDiff(t *testing.T) {
 	}
 }
 
-// Tests PutCurrentValidator, DeleteCurrentValidator, GetCurrentValidator,
-// ApplyValidatorWeightDiffs, ApplyValidatorPublicKeyDiffs
-func TestStateAddRemoveValidator(t *testing.T) {
+func TestState_ApplyValidatorDiffs(t *testing.T) {
 	require := require.New(t)
 
 	state := newTestState(t, memdb.New())
@@ -975,6 +970,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 
 		require.NoError(state.Commit())
 
+		// Verify that the current state is as expected.
 		for _, added := range diff.addedValidators {
 			subnetNodeID := subnetIDNodeID{
 				subnetID: added.SubnetID,
@@ -1000,6 +996,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 
 		require.Equal(diff.expectedSubnetValidatorSet, state.validators.GetMap(subnetID))
 
+		// Verify that applying diffs against the current state results in the
+		// expected state.
 		for i := 0; i < currentIndex; i++ {
 			prevDiff := diffs[i]
 			prevHeight := uint64(i + 1)
