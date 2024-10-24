@@ -4,8 +4,12 @@
 package peer
 
 import (
+	"crypto/rsa"
 	"crypto/tls"
+	"errors"
 	"io"
+
+	"github.com/ava-labs/avalanchego/staking"
 )
 
 // TLSConfig returns the TLS config that will allow secure connections to other
@@ -26,5 +30,30 @@ func TLSConfig(cert tls.Certificate, keyLogWriter io.Writer) *tls.Config {
 		InsecureSkipVerify: true, //#nosec G402
 		MinVersion:         tls.VersionTLS13,
 		KeyLogWriter:       keyLogWriter,
+		VerifyConnection:   ValidateRSACertificate,
+	}
+}
+
+// ValidateRSACertificate validates TLS certificates
+// with RSA public keys in the leaf of the certificate chain of the given connection state.
+func ValidateRSACertificate(cs tls.ConnectionState) error {
+	if len(cs.PeerCertificates) == 0 {
+		return errors.New("no certificates sent by peer")
+	}
+
+	if cs.PeerCertificates[0] == nil {
+		return errors.New("certificate sent by peer is empty")
+	}
+
+	pk := cs.PeerCertificates[0].PublicKey
+	if pk == nil {
+		return errors.New("no public key sent by peer")
+	}
+
+	switch rsaKey := pk.(type) {
+	case *rsa.PublicKey:
+		return staking.ValidateRSAPublicKeyIsWellFormed(rsaKey)
+	default:
+		return nil
 	}
 }
