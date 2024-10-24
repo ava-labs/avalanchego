@@ -278,15 +278,13 @@ func TestState_writeStakers(t *testing.T) {
 			addStakerTx:              addSubnetValidator,
 			expectedCurrentValidator: subnetCurrentValidatorStaker,
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
-				NodeID:    subnetCurrentValidatorStaker.NodeID,
-				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
-				Weight:    subnetCurrentValidatorStaker.Weight,
+				NodeID: subnetCurrentValidatorStaker.NodeID,
+				Weight: subnetCurrentValidatorStaker.Weight,
 			},
 			expectedWeightDiff: &ValidatorWeightDiff{
 				Decrease: false,
 				Amount:   subnetCurrentValidatorStaker.Weight,
 			},
-			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](nil),
 		},
 		"delete current primary network validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
@@ -344,7 +342,6 @@ func TestState_writeStakers(t *testing.T) {
 				Decrease: true,
 				Amount:   subnetCurrentValidatorStaker.Weight,
 			},
-			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](primaryNetworkCurrentValidatorStaker.PublicKey),
 		},
 	}
 
