@@ -1780,6 +1780,33 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	return nil
 }
 
+type GetProposedValidatorsArgs struct {
+	SubnetID ids.ID `json:"subnetID"`
+}
+type GetProposedValidatorsReply struct {
+	GetValidatorsAtReply
+}
+
+func (s *Service) GetProposedValidators(r *http.Request, args *GetProposedValidatorsArgs, reply *GetProposedValidatorsReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getProposedValidators"),
+		zap.Stringer("subnetID", args.SubnetID),
+	)
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	ctx := r.Context()
+	proposerHeight, err := s.vm.GetMinimumHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get proposer height: %w", err)
+	}
+	if reply.Validators, err = s.vm.GetValidatorSet(ctx, proposerHeight, args.SubnetID); err != nil {
+		return fmt.Errorf("failed to get validator set: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *api.GetBlockResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),

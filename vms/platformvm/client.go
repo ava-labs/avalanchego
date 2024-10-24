@@ -506,6 +506,18 @@ func (c *client) GetValidatorsAt(
 	return res.Validators, err
 }
 
+func (c *client) GetProposedValidators(
+	ctx context.Context,
+	subnetID ids.ID,
+	options ...rpc.Option,
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	res := &GetProposedValidatorsReply{}
+	err := c.requester.SendRequest(ctx, "platform.getProposedValidators", &GetProposedValidatorsArgs{
+		SubnetID: subnetID,
+	}, res, options...)
+	return res.Validators, err
+}
+
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedBlock{}
 	if err := c.requester.SendRequest(ctx, "platform.getBlock", &api.GetBlockArgs{
