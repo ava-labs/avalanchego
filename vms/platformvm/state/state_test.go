@@ -249,9 +249,9 @@ func TestState_writeStakers(t *testing.T) {
 			expectedCurrentValidator:  primaryNetworkCurrentValidatorStaker,
 			expectedCurrentDelegators: []*Staker{primaryNetworkCurrentDelegatorStaker},
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
-				NodeID:    primaryNetworkCurrentDelegatorStaker.NodeID,
+				NodeID:    primaryNetworkCurrentValidatorStaker.NodeID,
 				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
-				Weight:    primaryNetworkCurrentDelegatorStaker.Weight + primaryNetworkCurrentValidatorStaker.Weight,
+				Weight:    primaryNetworkCurrentValidatorStaker.Weight + primaryNetworkCurrentDelegatorStaker.Weight,
 			},
 			expectedWeightDiff: &ValidatorWeightDiff{
 				Decrease: false,
