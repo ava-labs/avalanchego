@@ -26,8 +26,9 @@ var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
 	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
-	ErrMutatedSubnetOnlyValidator   = errors.New("subnet only validator contains mutated constant fields")
-	ErrDuplicateSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
+	ErrMutatedSubnetOnlyValidator     = errors.New("subnet only validator contains mutated constant fields")
+	ErrConflictingSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
+	ErrDuplicateSubnetOnlyValidator   = errors.New("subnet only validator contains duplicate subnetID + nodeID pair")
 
 	errUnexpectedSubnetIDNodeIDLength = fmt.Errorf("expected subnetID+nodeID entry length %d", subnetIDNodeIDEntryLength)
 )
@@ -233,7 +234,7 @@ func (d *subnetOnlyValidatorsDiff) hasSubnetOnlyValidator(subnetID ids.ID, nodeI
 	return has, modified
 }
 
-func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValidators, sov SubnetOnlyValidator) error {
+func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov SubnetOnlyValidator) error {
 	var (
 		prevWeight uint64
 		prevActive bool
@@ -248,6 +249,16 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValida
 		prevWeight = priorSOV.Weight
 		prevActive = priorSOV.EndAccumulatedFee != 0
 	case database.ErrNotFound:
+		// Verify that there is not a legacy subnet validator with the same
+		// subnetID+nodeID as this L1 validator.
+		_, err := state.GetCurrentValidator(sov.SubnetID, sov.NodeID)
+		if err == nil {
+			return ErrConflictingSubnetOnlyValidator
+		}
+		if err != database.ErrNotFound {
+			return err
+		}
+
 		has, err := state.HasSubnetOnlyValidator(sov.SubnetID, sov.NodeID)
 		if err != nil {
 			return err
