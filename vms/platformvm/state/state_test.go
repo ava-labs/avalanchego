@@ -249,9 +249,9 @@ func TestState_writeStakers(t *testing.T) {
 			expectedCurrentValidator:  primaryNetworkCurrentValidatorStaker,
 			expectedCurrentDelegators: []*Staker{primaryNetworkCurrentDelegatorStaker},
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
-				NodeID:    primaryNetworkCurrentDelegatorStaker.NodeID,
+				NodeID:    primaryNetworkCurrentValidatorStaker.NodeID,
 				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
-				Weight:    primaryNetworkCurrentDelegatorStaker.Weight + primaryNetworkCurrentValidatorStaker.Weight,
+				Weight:    primaryNetworkCurrentValidatorStaker.Weight + primaryNetworkCurrentDelegatorStaker.Weight,
 			},
 			expectedWeightDiff: &ValidatorWeightDiff{
 				Decrease: false,
@@ -773,14 +773,15 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		sk, err := bls.NewSecretKey()
 		require.NoError(err)
 
+		timeOffset := time.Duration(i) * time.Second
 		primaryStakers[i] = Staker{
 			TxID:            ids.GenerateTestID(),
 			NodeID:          ids.GenerateTestNodeID(),
 			PublicKey:       bls.PublicFromSecretKey(sk),
 			SubnetID:        constants.PrimaryNetworkID,
 			Weight:          uint64(i + 1),
-			StartTime:       startTime.Add(time.Duration(i) * time.Second),
-			EndTime:         endTime.Add(time.Duration(i) * time.Second),
+			StartTime:       startTime.Add(timeOffset),
+			EndTime:         endTime.Add(timeOffset),
 			PotentialReward: uint64(i + 1),
 		}
 	}
