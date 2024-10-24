@@ -75,30 +75,10 @@ func TestSubnetOnlyValidator_Compare(t *testing.T) {
 	}
 }
 
-func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
-	sov := SubnetOnlyValidator{
-		ValidationID:          ids.GenerateTestID(),
-		SubnetID:              ids.GenerateTestID(),
-		NodeID:                ids.GenerateTestNodeID(),
-		PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
-		RemainingBalanceOwner: utils.RandomBytes(32),
-		DeactivationOwner:     utils.RandomBytes(32),
-		StartTime:             rand.Uint64(), // #nosec G404
-	}
-
-	tests := []struct {
-		name     string
-		v        SubnetOnlyValidator
-		expected bool
-	}{
-		{
-			name:     "equal",
-			v:        sov,
-			expected: true,
-		},
-		{
-			name: "everything is different",
-			v: SubnetOnlyValidator{
+func TestSubnetOnlyValidator_constantsAreUnmodified(t *testing.T) {
+	var (
+		randomSOV = func() SubnetOnlyValidator {
+			return SubnetOnlyValidator{
 				ValidationID:          ids.GenerateTestID(),
 				SubnetID:              ids.GenerateTestID(),
 				NodeID:                ids.GenerateTestNodeID(),
@@ -106,98 +86,56 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 				RemainingBalanceOwner: utils.RandomBytes(32),
 				DeactivationOwner:     utils.RandomBytes(32),
 				StartTime:             rand.Uint64(), // #nosec G404
-			},
-			expected: true,
-		},
-		{
-			name: "different subnetID",
-			v: SubnetOnlyValidator{
-				ValidationID:          sov.ValidationID,
-				SubnetID:              ids.GenerateTestID(),
-				NodeID:                sov.NodeID,
-				PublicKey:             sov.PublicKey,
-				RemainingBalanceOwner: sov.RemainingBalanceOwner,
-				DeactivationOwner:     sov.DeactivationOwner,
-				StartTime:             sov.StartTime,
-			},
-		},
-		{
-			name: "different nodeID",
-			v: SubnetOnlyValidator{
-				ValidationID:          sov.ValidationID,
-				SubnetID:              sov.SubnetID,
-				NodeID:                ids.GenerateTestNodeID(),
-				PublicKey:             sov.PublicKey,
-				RemainingBalanceOwner: sov.RemainingBalanceOwner,
-				DeactivationOwner:     sov.DeactivationOwner,
-				StartTime:             sov.StartTime,
-			},
-		},
-		{
-			name: "different publicKey",
-			v: SubnetOnlyValidator{
-				ValidationID:          sov.ValidationID,
-				SubnetID:              sov.SubnetID,
-				NodeID:                sov.NodeID,
-				PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
-				RemainingBalanceOwner: sov.RemainingBalanceOwner,
-				DeactivationOwner:     sov.DeactivationOwner,
-				StartTime:             sov.StartTime,
-			},
-		},
-		{
-			name: "different remainingBalanceOwner",
-			v: SubnetOnlyValidator{
-				ValidationID:          sov.ValidationID,
-				SubnetID:              sov.SubnetID,
-				NodeID:                sov.NodeID,
-				PublicKey:             sov.PublicKey,
-				RemainingBalanceOwner: utils.RandomBytes(32),
-				DeactivationOwner:     sov.DeactivationOwner,
-				StartTime:             sov.StartTime,
-			},
-		},
-		{
-			name: "different deactivationOwner",
-			v: SubnetOnlyValidator{
-				ValidationID:          sov.ValidationID,
-				SubnetID:              sov.SubnetID,
-				NodeID:                sov.NodeID,
-				PublicKey:             sov.PublicKey,
-				RemainingBalanceOwner: sov.RemainingBalanceOwner,
-				DeactivationOwner:     utils.RandomBytes(32),
-				StartTime:             sov.StartTime,
-			},
-		},
-		{
-			name: "different startTime",
-			v: SubnetOnlyValidator{
-				ValidationID:          sov.ValidationID,
-				SubnetID:              sov.SubnetID,
-				NodeID:                sov.NodeID,
-				PublicKey:             sov.PublicKey,
-				RemainingBalanceOwner: sov.RemainingBalanceOwner,
-				DeactivationOwner:     sov.DeactivationOwner,
-				StartTime:             rand.Uint64(), // #nosec G404
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			sov := sov
-			v := test.v
-
-			randomize := func(v *SubnetOnlyValidator) {
-				v.Weight = rand.Uint64()            // #nosec G404
-				v.MinNonce = rand.Uint64()          // #nosec G404
-				v.EndAccumulatedFee = rand.Uint64() // #nosec G404
 			}
-			randomize(&sov)
-			randomize(&v)
+		}
+		randomizeSOV = func(sov SubnetOnlyValidator) SubnetOnlyValidator {
+			// Randomize unrelated fields
+			sov.Weight = rand.Uint64()            // #nosec G404
+			sov.MinNonce = rand.Uint64()          // #nosec G404
+			sov.EndAccumulatedFee = rand.Uint64() // #nosec G404
+			return sov
+		}
+		sov = randomSOV()
+	)
 
-			require.Equal(t, test.expected, sov.validateConstants(v))
-		})
-	}
+	t.Run("equal", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		require.True(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("everything is different", func(t *testing.T) {
+		v := randomizeSOV(randomSOV())
+		require.True(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("different subnetID", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		v.SubnetID = ids.GenerateTestID()
+		require.False(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("different nodeID", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		v.NodeID = ids.GenerateTestNodeID()
+		require.False(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("different publicKey", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		v.PublicKey = utils.RandomBytes(bls.PublicKeyLen)
+		require.False(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("different remainingBalanceOwner", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		v.RemainingBalanceOwner = utils.RandomBytes(32)
+		require.False(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("different deactivationOwner", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		v.DeactivationOwner = utils.RandomBytes(32)
+		require.False(t, sov.constantsAreUnmodified(v))
+	})
+	t.Run("different startTime", func(t *testing.T) {
+		v := randomizeSOV(sov)
+		v.StartTime = rand.Uint64() // #nosec G404
+		require.False(t, sov.constantsAreUnmodified(v))
+	})
 }
 
 func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
