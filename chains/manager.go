@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/health"
@@ -490,19 +491,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
 
-	snowmanMetrics, err := metrics.MakeAndRegister(
-		m.snowmanGatherer,
-		primaryAlias,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	vmMetrics, err := m.getOrMakeVMRegisterer(chainParams.VMID, primaryAlias)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID:       m.NetworkID,
@@ -520,7 +508,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			Keystore:     m.Keystore.NewBlockchainKeyStore(chainParams.ID),
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
-			Metrics:      vmMetrics,
+			Metrics:      metrics.NewPrefixGatherer(),
 
 			WarpSigner: warp.NewSigner(m.StakingBLSKey, m.NetworkID, chainParams.ID),
 
@@ -528,7 +516,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ChainDataDir:   chainDataDir,
 		},
 		PrimaryAlias:   primaryAlias,
-		Registerer:     snowmanMetrics,
+		Registerer:     prometheus.NewRegistry(),
 		BlockAcceptor:  m.BlockAcceptorGroup,
 		TxAcceptor:     m.TxAcceptorGroup,
 		VertexAcceptor: m.VertexAcceptorGroup,
@@ -601,7 +589,15 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, err
 	}
 
-	return chain, nil
+	vmGatherer, err := m.getOrMakeVMGatherer(chainParams.VMID)
+	if err != nil {
+		return nil, err
+	}
+
+	return chain, errors.Join(
+		m.snowmanGatherer.Register(primaryAlias, ctx.Registerer),
+		vmGatherer.Register(primaryAlias, ctx.Metrics),
+	)
 }
 
 func (m *manager) AddRegistrant(r Registrant) {
@@ -962,7 +958,6 @@ func (m *manager) createAvalancheChain(
 		StartupTracker:                 startupTracker,
 		Sender:                         snowmanMessageSender,
 		BootstrapTracker:               sb,
-		Timer:                          h,
 		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		DB:                             blockBootstrappingDB,
@@ -1357,7 +1352,6 @@ func (m *manager) createSnowmanChain(
 		StartupTracker:                 startupTracker,
 		Sender:                         messageSender,
 		BootstrapTracker:               sb,
-		Timer:                          h,
 		PeerTracker:                    peerTracker,
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		DB:                             bootstrappingDB,
@@ -1558,26 +1552,22 @@ func (m *manager) getChainConfig(id ids.ID) (ChainConfig, error) {
 	return ChainConfig{}, nil
 }
 
-func (m *manager) getOrMakeVMRegisterer(vmID ids.ID, chainAlias string) (metrics.MultiGatherer, error) {
+func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error) {
 	vmGatherer, ok := m.vmGatherer[vmID]
-	if !ok {
-		vmName := constants.VMName(vmID)
-		vmNamespace := metric.AppendNamespace(constants.PlatformName, vmName)
-		vmGatherer = metrics.NewLabelGatherer(ChainLabel)
-		err := m.Metrics.Register(
-			vmNamespace,
-			vmGatherer,
-		)
-		if err != nil {
-			return nil, err
-		}
-		m.vmGatherer[vmID] = vmGatherer
+	if ok {
+		return vmGatherer, nil
 	}
 
-	chainReg := metrics.NewPrefixGatherer()
-	err := vmGatherer.Register(
-		chainAlias,
-		chainReg,
+	vmName := constants.VMName(vmID)
+	vmNamespace := metric.AppendNamespace(constants.PlatformName, vmName)
+	vmGatherer = metrics.NewLabelGatherer(ChainLabel)
+	err := m.Metrics.Register(
+		vmNamespace,
+		vmGatherer,
 	)
-	return chainReg, err
+	if err != nil {
+		return nil, err
+	}
+	m.vmGatherer[vmID] = vmGatherer
+	return vmGatherer, nil
 }

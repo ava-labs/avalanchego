@@ -292,19 +292,9 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		})
 
 		advanceProposerVMPChainHeight := func() {
-			// We first must wait at least [RecentlyAcceptedWindowTTL] to ensure
-			// the next block will evict the prior block from the windower.
+			// We must wait at least [RecentlyAcceptedWindowTTL] to ensure the
+			// next block will reference the last accepted P-chain height.
 			time.Sleep((5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4)
-
-			// Now we must:
-			// 1. issue a block which should include the old P-chain height.
-			// 2. issue a block which should include the new P-chain height.
-			for range 2 {
-				_, err = pWallet.IssueBaseTx(nil, tc.WithDefaultContext())
-				require.NoError(err)
-			}
-			// Now that a block has been issued with the new P-chain height, the
-			// next block will use that height for warp message verification.
 		}
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 

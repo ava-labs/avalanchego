@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -83,8 +82,6 @@ type VM struct {
 	connectedPeers map[ids.NodeID]*version.Application
 
 	parser block.Parser
-
-	pubsub *pubsub.Server
 
 	appSender common.AppSender
 
@@ -194,8 +191,6 @@ func (vm *VM) Initialize(
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
 	vm.assetToFxCache = &cache.LRU[ids.ID, set.Bits64]{Size: assetToFxCacheSize}
-
-	vm.pubsub = pubsub.New(ctx.Log)
 
 	typedFxs := make([]extensions.Fx, len(fxs))
 	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
@@ -353,7 +348,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return map[string]http.Handler{
 		"":        rpcServer,
 		"/wallet": walletServer,
-		"/events": vm.pubsub,
 	}, err
 }
 
@@ -681,7 +675,6 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 		return fmt.Errorf("error indexing tx: %w", err)
 	}
 
-	vm.pubsub.Publish(NewPubSubFilterer(tx))
 	vm.walletService.decided(txID)
 	return nil
 }
