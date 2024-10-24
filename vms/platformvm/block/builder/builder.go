@@ -182,7 +182,11 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 
 	now := b.txExecutorBackend.Clk.Time()
 	maxTimeToAwake := now.Add(maxTimeToSleep)
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(preferredState, maxTimeToAwake)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		maxTimeToAwake,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("%w of %s: %w", errCalculatingNextStakerTime, preferredID, err)
 	}
@@ -226,7 +230,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp, timeWasCapped, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -253,7 +261,11 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 		return nil, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	timestamp, _, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, _, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
