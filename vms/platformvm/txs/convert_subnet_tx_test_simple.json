@@ -20,6 +20,7 @@
 	"subnetID": "SkB92YpWm4UpburLz9tEKZw2i67H3FF6YkjaU4BkFUDTG9Xm",
 	"chainID": "NfebWJbJMmUpduqFCF8i1m5pstbVYLP1gGHbacrevXZMhpVMy",
 	"address": "0x000000000000000000000000000000000000dead",
+	"validators": [],
 	"subnetAuthorization": {
 		"signatureIndices": [
 			3
