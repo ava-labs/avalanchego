@@ -26,7 +26,7 @@ import (
 
 func main() {
 	key := genesis.EWOQKey
-	uri := "http://localhost:9710"
+	uri := "http://localhost:9650"
 	kc := secp256k1fx.NewKeychain(key)
 	subnetID := ids.FromStringOrPanic("2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof")
 	chainID := ids.FromStringOrPanic("2BMFrJ9xeh5JdwZEx6uuFcjfZC2SV2hdbMT8ee5HrvjtfJb5br")
