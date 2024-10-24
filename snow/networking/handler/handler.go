@@ -49,7 +49,6 @@ var (
 )
 
 type Handler interface {
-	common.Timer
 	health.Checker
 
 	Context() *snow.ConsensusContext
@@ -90,7 +89,6 @@ type handler struct {
 	validators validators.Manager
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
-	preemptTimeouts chan struct{}
 	gossipFrequency time.Duration
 
 	engineManager *EngineManager
@@ -110,7 +108,6 @@ type handler struct {
 	asyncMessageQueue MessageQueue
 	// Worker pool for handling asynchronous consensus messages
 	asyncMessagePool errgroup.Group
-	timeouts         chan struct{}
 
 	closeOnce            sync.Once
 	startClosingTime     time.Time
@@ -147,9 +144,7 @@ func New(
 		ctx:               ctx,
 		validators:        validators,
 		msgFromVMChan:     msgFromVMChan,
-		preemptTimeouts:   subnet.OnBootstrapCompleted(),
 		gossipFrequency:   gossipFrequency,
-		timeouts:          make(chan struct{}, 1),
 		closingChan:       make(chan struct{}),
 		closed:            make(chan struct{}),
 		resourceTracker:   resourceTracker,
@@ -297,26 +292,6 @@ func (h *handler) Len() int {
 	return h.syncMessageQueue.Len() + h.asyncMessageQueue.Len()
 }
 
-func (h *handler) RegisterTimeout(d time.Duration) {
-	go func() {
-		timer := time.NewTimer(d)
-		defer timer.Stop()
-
-		select {
-		case <-timer.C:
-		case <-h.preemptTimeouts:
-		}
-
-		// If there is already a timeout ready to fire - just drop the
-		// additional timeout. This ensures that all goroutines that are spawned
-		// here are able to close if the chain is shutdown.
-		select {
-		case h.timeouts <- struct{}{}:
-		default:
-		}
-	}()
-}
-
 // Note: It is possible for Stop to be called before/concurrently with Start.
 //
 // Invariant: Stop must never block.
@@ -421,9 +396,6 @@ func (h *handler) dispatchChans(ctx context.Context) {
 
 		case <-gossiper.C:
 			msg = message.InternalGossipRequest(h.ctx.NodeID)
-
-		case <-h.timeouts:
-			msg = message.InternalTimeout(h.ctx.NodeID)
 		}
 
 		if err := h.handleChanMsg(msg); err != nil {
@@ -935,9 +907,6 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 
 	case *message.GossipRequest:
 		return engine.Gossip(context.TODO())
-
-	case *message.Timeout:
-		return engine.Timeout(context.TODO())
 
 	default:
 		return fmt.Errorf(

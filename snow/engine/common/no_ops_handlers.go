@@ -340,14 +340,6 @@ func (nop *noOpInternalHandler) Disconnected(_ context.Context, nodeID ids.NodeI
 	return nil
 }
 
-func (nop *noOpInternalHandler) Timeout(context.Context) error {
-	nop.log.Debug("dropping request",
-		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.TimeoutOp),
-	)
-	return nil
-}
-
 func (nop *noOpInternalHandler) Gossip(context.Context) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
