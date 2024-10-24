@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
@@ -23,6 +24,7 @@ const subnetIDNodeIDEntryLength = ids.IDLen + ids.NodeIDLen
 
 var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
+	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
 	ErrMutatedSubnetOnlyValidator   = errors.New("subnet only validator contains mutated constant fields")
 	ErrDuplicateSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
@@ -113,7 +115,7 @@ func (v SubnetOnlyValidator) Less(o SubnetOnlyValidator) bool {
 	return v.Compare(o) == -1
 }
 
-// Compare determines a canonical ordering of *SubnetOnlyValidators based on
+// Compare determines a canonical ordering of SubnetOnlyValidators based on
 // their EndAccumulatedFees and ValidationIDs. Lower EndAccumulatedFees result
 // in an earlier ordering.
 func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
@@ -127,9 +129,9 @@ func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
 	}
 }
 
-// validateConstants returns true if the constants of this validator have not
-// been modified.
-func (v SubnetOnlyValidator) validateConstants(o SubnetOnlyValidator) bool {
+// constantsAreUnmodified returns true if the constants of this validator have
+// not been modified compared to the other validator.
+func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool {
 	if v.ValidationID != o.ValidationID {
 		return true
 	}
@@ -239,7 +241,7 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state SubnetOnlyValida
 	)
 	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
 	case nil:
-		if !priorSOV.validateConstants(sov) {
+		if !priorSOV.constantsAreUnmodified(sov) {
 			return ErrMutatedSubnetOnlyValidator
 		}
 
