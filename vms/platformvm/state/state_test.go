@@ -278,13 +278,15 @@ func TestState_writeStakers(t *testing.T) {
 			addStakerTx:              addSubnetValidator,
 			expectedCurrentValidator: subnetCurrentValidatorStaker,
 			expectedValidatorSetOutput: &validators.GetValidatorOutput{
-				NodeID: subnetCurrentValidatorStaker.NodeID,
-				Weight: subnetCurrentValidatorStaker.Weight,
+				NodeID:    subnetCurrentValidatorStaker.NodeID,
+				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
+				Weight:    subnetCurrentValidatorStaker.Weight,
 			},
 			expectedWeightDiff: &ValidatorWeightDiff{
 				Decrease: false,
 				Amount:   subnetCurrentValidatorStaker.Weight,
 			},
+			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](nil),
 		},
 		"delete current primary network validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
@@ -342,6 +344,7 @@ func TestState_writeStakers(t *testing.T) {
 				Decrease: true,
 				Amount:   subnetCurrentValidatorStaker.Weight,
 			},
+			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](primaryNetworkCurrentValidatorStaker.PublicKey),
 		},
 	}
 
@@ -832,8 +835,9 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			},
 			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				subnetStakers[0].NodeID: {
-					NodeID: subnetStakers[0].NodeID,
-					Weight: subnetStakers[0].Weight,
+					NodeID:    subnetStakers[0].NodeID,
+					PublicKey: primaryStakers[0].PublicKey,
+					Weight:    subnetStakers[0].Weight,
 				},
 			},
 		},
@@ -877,8 +881,9 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			},
 			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				subnetStakers[2].NodeID: {
-					NodeID: subnetStakers[2].NodeID,
-					Weight: subnetStakers[2].Weight,
+					NodeID:    subnetStakers[2].NodeID,
+					PublicKey: primaryStakers[2].PublicKey,
+					Weight:    subnetStakers[2].Weight,
 				},
 			},
 		},
@@ -904,16 +909,19 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			},
 			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				subnetStakers[2].NodeID: {
-					NodeID: subnetStakers[2].NodeID,
-					Weight: subnetStakers[2].Weight,
+					NodeID:    subnetStakers[2].NodeID,
+					PublicKey: primaryStakers[2].PublicKey,
+					Weight:    subnetStakers[2].Weight,
 				},
 				subnetStakers[3].NodeID: {
-					NodeID: subnetStakers[3].NodeID,
-					Weight: subnetStakers[3].Weight,
+					NodeID:    subnetStakers[3].NodeID,
+					PublicKey: primaryStakers[3].PublicKey,
+					Weight:    subnetStakers[3].Weight,
 				},
 				subnetStakers[4].NodeID: {
-					NodeID: subnetStakers[4].NodeID,
-					Weight: subnetStakers[4].Weight,
+					NodeID:    subnetStakers[4].NodeID,
+					PublicKey: primaryStakers[4].PublicKey,
+					Weight:    subnetStakers[4].Weight,
 				},
 			},
 		},
@@ -1011,13 +1019,52 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 					primaryValidatorSet,
 					currentHeight,
 					prevHeight+1,
+					constants.PrimaryNetworkID,
 				))
 				require.Equal(prevDiff.expectedPrimaryValidatorSet, primaryValidatorSet)
 			}
 
 			{
+				legacySubnetValidatorSet := copyValidatorSet(diff.expectedSubnetValidatorSet)
+				require.NoError(state.ApplyValidatorWeightDiffs(
+					context.Background(),
+					legacySubnetValidatorSet,
+					currentHeight,
+					prevHeight+1,
+					subnetID,
+				))
+
+				// Update the public keys of the subnet validators with the current
+				// primary network validator public keys
+				for nodeID, vdr := range legacySubnetValidatorSet {
+					if primaryVdr, ok := diff.expectedPrimaryValidatorSet[nodeID]; ok {
+						vdr.PublicKey = primaryVdr.PublicKey
+					} else {
+						vdr.PublicKey = nil
+					}
+				}
+
+				require.NoError(state.ApplyValidatorPublicKeyDiffs(
+					context.Background(),
+					legacySubnetValidatorSet,
+					currentHeight,
+					prevHeight+1,
+					constants.PrimaryNetworkID,
+				))
+				require.Equal(prevDiff.expectedSubnetValidatorSet, legacySubnetValidatorSet)
+			}
+
+			{
 				subnetValidatorSet := copyValidatorSet(diff.expectedSubnetValidatorSet)
 				require.NoError(state.ApplyValidatorWeightDiffs(
+					context.Background(),
+					subnetValidatorSet,
+					currentHeight,
+					prevHeight+1,
+					subnetID,
+				))
+
+				require.NoError(state.ApplyValidatorPublicKeyDiffs(
 					context.Background(),
 					subnetValidatorSet,
 					currentHeight,
