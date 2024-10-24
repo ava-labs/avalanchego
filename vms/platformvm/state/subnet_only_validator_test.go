@@ -75,7 +75,7 @@ func TestSubnetOnlyValidator_Compare(t *testing.T) {
 	}
 }
 
-func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
+func TestSubnetOnlyValidator_constantsAreUnmodified(t *testing.T) {
 	sov := SubnetOnlyValidator{
 		ValidationID:          ids.GenerateTestID(),
 		SubnetID:              ids.GenerateTestID(),
@@ -189,7 +189,7 @@ func TestSubnetOnlyValidator_validateConstants(t *testing.T) {
 			test.v.MinNonce = rand.Uint64()          // #nosec G404
 			test.v.EndAccumulatedFee = rand.Uint64() // #nosec G404
 
-			require.Equal(t, test.expected, sov.validateConstants(test.v))
+			require.Equal(t, test.expected, sov.constantsAreUnmodified(test.v))
 		})
 	}
 }

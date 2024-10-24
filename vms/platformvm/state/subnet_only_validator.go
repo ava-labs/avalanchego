@@ -88,9 +88,9 @@ func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
 	}
 }
 
-// validateConstants returns true if the constants of this validator have not
-// been modified.
-func (v SubnetOnlyValidator) validateConstants(o SubnetOnlyValidator) bool {
+// constantsAreUnmodified returns true if the constants of this validator have
+// not been modified compared to the other validator.
+func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool {
 	if v.ValidationID != o.ValidationID {
 		return true
 	}
