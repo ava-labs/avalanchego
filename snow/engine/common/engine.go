@@ -416,9 +416,6 @@ type InternalHandler interface {
 	// Notify this engine of peer changes.
 	validators.Connector
 
-	// Notify this engine that a registered timeout has fired.
-	Timeout(context.Context) error
-
 	// Gossip to the network a container on the accepted frontier
 	Gossip(context.Context) error
 
