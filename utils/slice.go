@@ -14,6 +14,5 @@ func DeleteIndex[S ~[]E, E any](s S, i int) S {
 	newSize := len(s) - 1
 	s[i] = s[newSize]
 	s[newSize] = Zero[E]()
-	s = s[:newSize]
-	return s
+	return s[:newSize]
 }
