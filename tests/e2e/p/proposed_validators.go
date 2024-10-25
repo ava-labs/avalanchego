@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -23,19 +22,13 @@ var _ = e2e.DescribePChain("[Proposed Validators]", func() {
 	)
 
 	ginkgo.It("should be able to fetch proposed validators", func() {
-		tc.By("creating a new private network to ensure isolation from other tests")
-		privateNetwork := tmpnet.NewDefaultNetwork("avalanchego-e2e-proposed-validators")
-		// Initialize config flags
-		privateNetwork.DefaultFlags = tmpnet.FlagsMap{}
-		// Ensure that the proposer uses the current height
-		privateNetwork.DefaultFlags.SetDefaults(tmpnet.FlagsMap{
-			config.ProposerVMUseCurrentHeightKey: true,
-		})
-
-		e2e.GetEnv(tc).StartPrivateNetwork(privateNetwork)
+		var (
+			env     = e2e.GetEnv(tc)
+			network = env.GetNetwork()
+		)
 
 		tc.By("fetching proposed validators", func() {
-			pvmClient := platformvm.NewClient(privateNetwork.GetNodeURIs()[0].URI)
+			pvmClient := platformvm.NewClient(env.URIs[0].URI)
 			proposedVdrs, err := pvmClient.GetProposedValidators(
 				tc.DefaultContext(),
 				constants.PrimaryNetworkID,
@@ -43,6 +36,11 @@ var _ = e2e.DescribePChain("[Proposed Validators]", func() {
 			require.NoError(err)
 
 			tc.By("confirming proposed validators are the same as current validators", func() {
+				// Ensure the network is configured to use the current height for the proposer
+				proposerVMUseCurrentHeight, err := network.DefaultFlags.GetBoolVal(config.ProposerVMUseCurrentHeightKey, true)
+				require.NoError(err)
+				require.True(proposerVMUseCurrentHeight)
+
 				proposedVdrNodes := set.NewSet[ids.NodeID](len(proposedVdrs))
 				for _, vdr := range proposedVdrs {
 					proposedVdrNodes.Add(vdr.NodeID)
@@ -60,6 +58,6 @@ var _ = e2e.DescribePChain("[Proposed Validators]", func() {
 				require.Equal(proposedVdrNodes, currentVdrNodes)
 			})
 		})
-		_ = e2e.CheckBootstrapIsPossible(tc, privateNetwork)
+		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
