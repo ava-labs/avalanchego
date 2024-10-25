@@ -120,6 +120,13 @@ type Client interface {
 		height uint64,
 		options ...rpc.Option,
 	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+	// GetProposedValidators returns the weights of the validator set of a provided
+	// subnet at the proposer's height.
+	GetProposedValidators(
+		ctx context.Context,
+		subnetID ids.ID,
+		options ...rpc.Option,
+	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetBlockByHeight returns the block at the given [height].
