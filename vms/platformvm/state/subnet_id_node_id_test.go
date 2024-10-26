@@ -42,7 +42,7 @@ func FuzzSubnetIDNodeIDUnmarshal(f *testing.F) {
 	})
 }
 
-func FuzzSubnetIDNodeIDMarshalOrdering(f *testing.F) {
+func FuzzSubnetIDNodeIDOrdering(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var (
 			v0 subnetIDNodeID
