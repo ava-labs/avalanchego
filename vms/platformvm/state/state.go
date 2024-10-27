@@ -2699,7 +2699,6 @@ func writePendingDiff(
 	return nil
 }
 
-// TODO: Add caching
 func (s *state) writeSubnetOnlyValidators() error {
 	// Write modified weights:
 	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
@@ -2756,9 +2755,6 @@ func (s *state) writeSubnetOnlyValidators() error {
 			} else {
 				err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
 			}
-			if err != nil {
-				return err
-			}
 		case database.ErrNotFound:
 			// This is a new validator
 			subnetIDNodeID := subnetIDNodeID{
@@ -2766,10 +2762,9 @@ func (s *state) writeSubnetOnlyValidators() error {
 				nodeID:   sov.NodeID,
 			}
 			subnetIDNodeIDKey := subnetIDNodeID.Marshal()
-			if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
-				return err
-			}
-		default:
+			err = s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:])
+		}
+		if err != nil {
 			return err
 		}
 
