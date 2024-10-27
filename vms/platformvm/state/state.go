@@ -2720,26 +2720,18 @@ func (s *state) writeSubnetOnlyValidators() error {
 		// The next loops shouldn't consider this change.
 		delete(sovChanges, validationID)
 
-		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		if err == database.ErrNotFound {
-			// Deleting a non-existent validator is a noop. This can happen if
-			// the validator was added and then immediately removed.
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
 		subnetIDNodeID := subnetIDNodeID{
 			subnetID: sov.SubnetID,
 			nodeID:   sov.NodeID,
 		}
 		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
-		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
+		err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey)
+		if err != nil {
 			return err
 		}
 
-		if priorSOV.isActive() {
+		priorSOV, wasActive := s.activeSOVLookup[validationID]
+		if wasActive {
 			delete(s.activeSOVLookup, validationID)
 			s.activeSOVs.Delete(priorSOV)
 			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
@@ -2751,55 +2743,36 @@ func (s *state) writeSubnetOnlyValidators() error {
 		}
 	}
 
-	// Perform modifications:
+	// Perform modifications and additions:
 	for validationID, sov := range sovChanges {
 		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		if err == database.ErrNotFound {
-			// New additions are handled in the next loop.
-			continue
-		}
-		if err != nil {
+		switch err {
+		case nil:
+			// This is modifying an existing validator
+			if priorSOV.isActive() {
+				delete(s.activeSOVLookup, validationID)
+				s.activeSOVs.Delete(priorSOV)
+				err = deleteSubnetOnlyValidator(s.activeDB, validationID)
+			} else {
+				err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
+			}
+			if err != nil {
+				return err
+			}
+		case database.ErrNotFound:
+			// This is a new validator
+			subnetIDNodeID := subnetIDNodeID{
+				subnetID: sov.SubnetID,
+				nodeID:   sov.NodeID,
+			}
+			subnetIDNodeIDKey := subnetIDNodeID.Marshal()
+			if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
+				return err
+			}
+		default:
 			return err
 		}
 
-		if priorSOV.isActive() {
-			delete(s.activeSOVLookup, validationID)
-			s.activeSOVs.Delete(priorSOV)
-			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
-		} else {
-			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
-		}
-		if err != nil {
-			return err
-		}
-
-		if sov.isActive() {
-			s.activeSOVLookup[validationID] = sov
-			s.activeSOVs.ReplaceOrInsert(sov)
-			err = putSubnetOnlyValidator(s.activeDB, sov)
-		} else {
-			err = putSubnetOnlyValidator(s.inactiveDB, sov)
-		}
-		if err != nil {
-			return err
-		}
-
-		// The next loop shouldn't consider this change.
-		delete(sovChanges, validationID)
-	}
-
-	// Perform additions:
-	for validationID, sov := range sovChanges {
-		subnetIDNodeID := subnetIDNodeID{
-			subnetID: sov.SubnetID,
-			nodeID:   sov.NodeID,
-		}
-		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
-		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
-			return err
-		}
-
-		var err error
 		if sov.isActive() {
 			s.activeSOVLookup[validationID] = sov
 			s.activeSOVs.ReplaceOrInsert(sov)
