@@ -195,6 +195,8 @@ func newSubnetOnlyValidatorsDiff() *subnetOnlyValidatorsDiff {
 	}
 }
 
+// getActiveSubnetOnlyValidatorsIterator takes in the parent iterator, removes
+// all modified validators, and then adds all modified active validators.
 func (d *subnetOnlyValidatorsDiff) getActiveSubnetOnlyValidatorsIterator(parentIterator iterator.Iterator[SubnetOnlyValidator]) iterator.Iterator[SubnetOnlyValidator] {
 	return iterator.Merge(
 		SubnetOnlyValidator.Less,
