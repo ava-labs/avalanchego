@@ -13,12 +13,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/staking"
 )
 
-func TestValidateRSACertificate(t *testing.T) {
+func TestValidateCertificate(t *testing.T) {
 	for _, testCase := range []struct {
 		description string
 		input       func(t *testing.T) tls.ConnectionState
@@ -86,9 +87,45 @@ func TestValidateRSACertificate(t *testing.T) {
 				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{ecCert}}
 			},
 		},
+		{
+			description: "EC cert with empty key",
+			expectedErr: peer.ErrEmptyPublicKey,
+			input: func(t *testing.T) tls.ConnectionState {
+				ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				require.NoError(t, err)
+
+				basicCert := basicCert()
+				certBytes, err := x509.CreateCertificate(rand.Reader, basicCert, basicCert, &ecKey.PublicKey, ecKey)
+				require.NoError(t, err)
+
+				ecCert, err := x509.ParseCertificate(certBytes)
+				require.NoError(t, err)
+
+				ecCert.PublicKey = nil
+
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{ecCert}}
+			},
+		},
+		{
+			description: "EC cert with ed25519 key",
+			expectedErr: peer.ErrForbidden25519Key,
+			input: func(t *testing.T) tls.ConnectionState {
+				pub, priv, err := ed25519.GenerateKey(rand.Reader)
+				require.NoError(t, err)
+
+				basicCert := basicCert()
+				certBytes, err := x509.CreateCertificate(rand.Reader, basicCert, basicCert, pub, priv)
+				require.NoError(t, err)
+
+				ecCert, err := x509.ParseCertificate(certBytes)
+				require.NoError(t, err)
+
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{ecCert}}
+			},
+		},
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
-			require.Equal(t, testCase.expectedErr, peer.ValidateRSACertificate(testCase.input(t)))
+			require.Equal(t, testCase.expectedErr, peer.ValidateCertificate(testCase.input(t)))
 		})
 	}
 }
