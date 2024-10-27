@@ -243,26 +243,17 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 		return err
 	}
 
-	switch {
-	case prevWeight < sov.Weight:
+	if prevWeight != sov.Weight {
 		weight, err := state.WeightOfSubnetOnlyValidators(sov.SubnetID)
 		if err != nil {
 			return err
 		}
 
-		weight, err = safemath.Add(weight, sov.Weight-prevWeight)
+		weight, err = safemath.Sub(weight, prevWeight)
 		if err != nil {
 			return err
 		}
-
-		d.modifiedTotalWeight[sov.SubnetID] = weight
-	case prevWeight > sov.Weight:
-		weight, err := state.WeightOfSubnetOnlyValidators(sov.SubnetID)
-		if err != nil {
-			return err
-		}
-
-		weight, err = safemath.Sub(weight, prevWeight-sov.Weight)
+		weight, err = safemath.Add(weight, sov.Weight)
 		if err != nil {
 			return err
 		}
@@ -278,11 +269,6 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 	}
 
 	if prevSOV, ok := d.modified[sov.ValidationID]; ok {
-		prevSubnetIDNodeID := subnetIDNodeID{
-			subnetID: prevSOV.SubnetID,
-			nodeID:   prevSOV.NodeID,
-		}
-		d.modifiedHasNodeIDs[prevSubnetIDNodeID] = false
 		d.active.Delete(prevSOV)
 	}
 	d.modified[sov.ValidationID] = sov

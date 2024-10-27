@@ -2228,7 +2228,8 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 // updateValidatorManager updates the validator manager with the pending
 // validator set changes.
 //
-// This function must be called prior to writeCurrentStakers.
+// This function must be called prior to writeCurrentStakers and
+// writeSubnetOnlyValidators.
 func (s *state) updateValidatorManager(updateValidators bool) error {
 	if !updateValidators {
 		return nil
@@ -2409,7 +2410,8 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 // writeValidatorDiffs writes the validator set diff contained by the pending
 // validator set changes to disk.
 //
-// This function must be called prior to writeCurrentStakers.
+// This function must be called prior to writeCurrentStakers and
+// writeSubnetOnlyValidators.
 func (s *state) writeValidatorDiffs(height uint64) error {
 	type validatorChanges struct {
 		weightDiff    ValidatorWeightDiff
