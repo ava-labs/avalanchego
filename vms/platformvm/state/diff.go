@@ -231,7 +231,7 @@ func (d *diff) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 
 func (d *diff) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
 	if sov, modified := d.sovDiff.modified[validationID]; modified {
-		if sov.Weight == 0 {
+		if sov.isDeleted() {
 			return SubnetOnlyValidator{}, database.ErrNotFound
 		}
 		return sov, nil
@@ -577,7 +577,7 @@ func (d *diff) Apply(baseState Chain) error {
 	// a single diff can't get reordered into the addition happening first;
 	// which would return an error.
 	for _, sov := range d.sovDiff.modified {
-		if sov.Weight != 0 {
+		if !sov.isDeleted() {
 			continue
 		}
 		if err := baseState.PutSubnetOnlyValidator(sov); err != nil {
@@ -585,7 +585,7 @@ func (d *diff) Apply(baseState Chain) error {
 		}
 	}
 	for _, sov := range d.sovDiff.modified {
-		if sov.Weight == 0 {
+		if sov.isDeleted() {
 			continue
 		}
 		if err := baseState.PutSubnetOnlyValidator(sov); err != nil {

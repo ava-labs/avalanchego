@@ -778,7 +778,7 @@ func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 
 func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
 	if sov, modified := s.sovDiff.modified[validationID]; modified {
-		if sov.Weight == 0 {
+		if sov.isDeleted() {
 			return SubnetOnlyValidator{}, database.ErrNotFound
 		}
 		return sov, nil
@@ -2283,7 +2283,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		sovChangesApplied set.Set[ids.ID]
 	)
 	for validationID, sov := range sovChanges {
-		if sov.Weight != 0 {
+		if !sov.isDeleted() {
 			// Additions and modifications are handled in the next loops.
 			continue
 		}
@@ -2327,14 +2327,14 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		sovChangesApplied.Add(validationID)
 
 		switch {
-		case !priorSOV.isActive() && sov.isActive():
+		case priorSOV.isInactive() && sov.isActive():
 			// This validator is being activated.
 			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
 			err = errors.Join(
 				s.validators.RemoveWeight(sov.SubnetID, ids.EmptyNodeID, priorSOV.Weight),
 				s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight),
 			)
-		case priorSOV.isActive() && !sov.isActive():
+		case priorSOV.isActive() && sov.isInactive():
 			// This validator is being deactivated.
 			inactiveWeight := s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
 			if inactiveWeight == 0 {
@@ -2484,7 +2484,7 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 	// Perform SoV additions:
 	for _, sov := range s.sovDiff.modified {
 		// If the validator is being removed, we shouldn't work to re-add it.
-		if sov.Weight == 0 {
+		if sov.isDeleted() {
 			continue
 		}
 
@@ -2709,7 +2709,7 @@ func (s *state) writeSubnetOnlyValidators() error {
 	sovChanges := s.sovDiff.modified
 	// Perform deletions:
 	for validationID, sov := range sovChanges {
-		if sov.Weight != 0 {
+		if !sov.isDeleted() {
 			// Additions and modifications are handled in the next loops.
 			continue
 		}

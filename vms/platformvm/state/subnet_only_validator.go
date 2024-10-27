@@ -139,8 +139,16 @@ func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool 
 		v.StartTime == o.StartTime
 }
 
+func (v SubnetOnlyValidator) isDeleted() bool {
+	return v.Weight == 0
+}
+
 func (v SubnetOnlyValidator) isActive() bool {
 	return v.Weight != 0 && v.EndAccumulatedFee != 0
+}
+
+func (v SubnetOnlyValidator) isInactive() bool {
+	return v.Weight != 0 && v.EndAccumulatedFee == 0
 }
 
 func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {
@@ -211,7 +219,7 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 	var (
 		prevWeight uint64
 		prevActive bool
-		newActive  = sov.Weight != 0 && sov.EndAccumulatedFee != 0
+		newActive  = sov.isActive()
 	)
 	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
 	case nil:
@@ -220,7 +228,7 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 		}
 
 		prevWeight = priorSOV.Weight
-		prevActive = priorSOV.EndAccumulatedFee != 0
+		prevActive = priorSOV.isActive()
 	case database.ErrNotFound:
 		// Verify that there is not a legacy subnet validator with the same
 		// subnetID+nodeID as this L1 validator.
@@ -277,12 +285,9 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 		subnetID: sov.SubnetID,
 		nodeID:   sov.NodeID,
 	}
-	isDeleted := sov.Weight == 0
-	d.modifiedHasNodeIDs[subnetIDNodeID] = !isDeleted
-	if isDeleted || sov.EndAccumulatedFee == 0 {
-		// Validator is being deleted or is inactive
-		return nil
+	d.modifiedHasNodeIDs[subnetIDNodeID] = !sov.isDeleted()
+	if sov.isActive() {
+		d.active.ReplaceOrInsert(sov)
 	}
-	d.active.ReplaceOrInsert(sov)
 	return nil
 }
