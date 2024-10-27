@@ -14,9 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -259,11 +258,11 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 			return err
 		}
 
-		weight, err = safemath.Sub(weight, prevWeight)
+		weight, err = math.Sub(weight, prevWeight)
 		if err != nil {
 			return err
 		}
-		weight, err = safemath.Add(weight, sov.Weight)
+		weight, err = math.Add(weight, sov.Weight)
 		if err != nil {
 			return err
 		}
