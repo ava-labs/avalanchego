@@ -200,7 +200,17 @@ func (m *manager) GetValidatorSet(
 
 	// get the start time to track metrics
 	startTime := m.clk.Time()
-	validatorSet, currentHeight, err := m.makeValidatorSet(ctx, targetHeight, subnetID)
+
+	var (
+		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
+		currentHeight uint64
+		err           error
+	)
+	if subnetID == constants.PrimaryNetworkID {
+		validatorSet, currentHeight, err = m.makePrimaryNetworkValidatorSet(ctx, targetHeight)
+	} else {
+		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -233,12 +243,65 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
-func (m *manager) makeValidatorSet(
+func (m *manager) makePrimaryNetworkValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if currentHeight < targetHeight {
+		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
+			constants.PrimaryNetworkID,
+			currentHeight,
+			targetHeight,
+		)
+	}
+
+	// Rebuild primary network validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyValidatorWeightDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		constants.PrimaryNetworkID,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		constants.PrimaryNetworkID,
+	)
+	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getCurrentPrimaryValidatorSet(
+	ctx context.Context,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return primaryMap, currentHeight, err
+}
+
+func (m *manager) makeSubnetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	subnetValidatorSet, currentHeight, err := m.getCurrentValidatorSet(ctx, subnetID)
+	subnetValidatorSet, primaryValidatorSet, currentHeight, err := m.getCurrentValidatorSets(ctx, subnetID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -269,23 +332,40 @@ func (m *manager) makeValidatorSet(
 		return nil, 0, err
 	}
 
+	// Update the subnet validator set to include the public keys at
+	// [currentHeight]. When we apply the public key diffs, we will convert
+	// these keys to represent the public keys at [targetHeight]. If the subnet
+	// validator is not currently a primary network validator, it doesn't have a
+	// key at [currentHeight].
+	for nodeID, vdr := range subnetValidatorSet {
+		if primaryVdr, ok := primaryValidatorSet[nodeID]; ok {
+			vdr.PublicKey = primaryVdr.PublicKey
+		} else {
+			vdr.PublicKey = nil
+		}
+	}
+
 	err = m.state.ApplyValidatorPublicKeyDiffs(
 		ctx,
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
-		subnetID,
+		// TODO: Etna introduces L1s whose validators specify their own public
+		// keys, rather than inheriting them from the primary network.
+		// Therefore, this will need to use the subnetID after Etna.
+		constants.PrimaryNetworkID,
 	)
 	return subnetValidatorSet, currentHeight, err
 }
 
-func (m *manager) getCurrentValidatorSet(
+func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	subnetMap := m.cfg.Validators.GetMap(subnetID)
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return subnetMap, currentHeight, err
+	return subnetMap, primaryMap, currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
