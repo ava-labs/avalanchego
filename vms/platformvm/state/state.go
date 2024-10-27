@@ -2054,7 +2054,7 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 		return vdr.validator.PublicKey, nil
 	}
 	if vdr, ok := s.currentStakers.validatorDiffs[constants.PrimaryNetworkID][nodeID]; ok && vdr.validator != nil {
-		// The primary network validator is being removed.
+		// The primary network validator is being modified.
 		return vdr.validator.PublicKey, nil
 	}
 	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
