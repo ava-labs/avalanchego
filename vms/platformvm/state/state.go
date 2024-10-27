@@ -2418,7 +2418,7 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 	}
 	changes := make(map[subnetIDNodeID]*validatorChanges, len(s.sovDiff.modified))
 
-	// Perform pre-ACP-77 validator set changes:
+	// Calculate the changes to the pre-ACP-77 validator set
 	for subnetID, subnetDiffs := range s.currentStakers.validatorDiffs {
 		for nodeID, diff := range subnetDiffs {
 			weightDiff, err := diff.WeightDiff()
@@ -2428,6 +2428,8 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 
 			pk, err := s.getInheritedPublicKey(nodeID)
 			if err != nil {
+				// This should never happen as there should always be a primary
+				// network validator corresponding to a subnet validator.
 				return err
 			}
 
