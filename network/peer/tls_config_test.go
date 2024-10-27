@@ -15,17 +15,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/network/peer"
+	"github.com/ava-labs/avalanchego/staking"
 )
 
 func TestValidateRSACertificate(t *testing.T) {
 	for _, testCase := range []struct {
 		description string
-		input       func() tls.ConnectionState
+		input       func(t *testing.T) tls.ConnectionState
 		expectedErr error
 	}{
 		{
 			description: "Valid TLS cert",
-			input: func() tls.ConnectionState {
+			input: func(t *testing.T) tls.ConnectionState {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 				x509Cert := makeRSACertAndKey(t, key)
@@ -34,21 +35,33 @@ func TestValidateRSACertificate(t *testing.T) {
 		},
 		{
 			description: "No TLS certs given",
-			input: func() tls.ConnectionState {
+			input: func(*testing.T) tls.ConnectionState {
 				return tls.ConnectionState{}
 			},
 			expectedErr: peer.ErrNoCertsSent,
 		},
 		{
 			description: "Empty certificate given by peer",
-			input: func() tls.ConnectionState {
+			input: func(*testing.T) tls.ConnectionState {
 				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{nil}}
 			},
 			expectedErr: peer.ErrEmptyCert,
 		},
 		{
+			description: "nil RSA key",
+			input: func(t *testing.T) tls.ConnectionState {
+				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				require.NoError(t, err)
+
+				x509CertWithNilPK := makeRSACertAndKey(t, key)
+				x509CertWithNilPK.cert.PublicKey = (*rsa.PublicKey)(nil)
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{&x509CertWithNilPK.cert}}
+			},
+			expectedErr: staking.ErrInvalidRSAPublicKey,
+		},
+		{
 			description: "No public key in the cert given",
-			input: func() tls.ConnectionState {
+			input: func(t *testing.T) tls.ConnectionState {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 
@@ -60,7 +73,7 @@ func TestValidateRSACertificate(t *testing.T) {
 		},
 		{
 			description: "EC cert",
-			input: func() tls.ConnectionState {
+			input: func(t *testing.T) tls.ConnectionState {
 				ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				require.NoError(t, err)
 
@@ -75,7 +88,7 @@ func TestValidateRSACertificate(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
-			require.Equal(t, testCase.expectedErr, peer.ValidateRSACertificate(testCase.input()))
+			require.Equal(t, testCase.expectedErr, peer.ValidateRSACertificate(testCase.input(t)))
 		})
 	}
 }

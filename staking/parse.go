@@ -158,6 +158,9 @@ func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto
 
 // ValidateRSAPublicKeyIsWellFormed validates the given RSA public key
 func ValidateRSAPublicKeyIsWellFormed(pub *rsa.PublicKey) error {
+	if pub == nil {
+		return ErrInvalidRSAPublicKey
+	}
 	if pub.N.Sign() <= 0 {
 		return ErrRSAModulusNotPositive
 	}
