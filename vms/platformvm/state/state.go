@@ -787,6 +787,9 @@ func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator
 	return s.getPersistedSubnetOnlyValidator(validationID)
 }
 
+// getPersistedSubnetOnlyValidator returns the currently persisted
+// SubnetOnlyValidator with the given validationID. It is guaranteed that any
+// returned validator is either active or inactive.
 func (s *state) getPersistedSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
 	if sov, ok := s.activeSOVLookup[validationID]; ok {
 		return sov, nil
@@ -2733,6 +2736,9 @@ func (s *state) writeSubnetOnlyValidators() error {
 			s.activeSOVs.Delete(priorSOV)
 			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
 		} else {
+			// It is technically possible for the validator not to exist on disk
+			// here, but that's fine as deleting an entry that doesn't exist is
+			// a noop.
 			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
 		}
 		if err != nil {
