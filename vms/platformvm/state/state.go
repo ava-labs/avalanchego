@@ -773,11 +773,7 @@ func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 	}
 
 	// TODO: Add caching
-	weight, err := database.GetUInt64(s.weightsDB, subnetID[:])
-	if err == database.ErrNotFound {
-		return 0, nil
-	}
-	return weight, err
+	return database.WithDefault(database.GetUInt64, s.weightsDB, subnetID[:], 0)
 }
 
 func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
