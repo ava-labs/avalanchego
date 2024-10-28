@@ -1834,7 +1834,7 @@ platform.getProposedValidators(
 ```bash
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getValidatorsAt",
+    "method": "platform.getProposedValidators",
     "params": {},
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
