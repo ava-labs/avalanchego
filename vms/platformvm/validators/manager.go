@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -48,6 +49,9 @@ type Manager interface {
 
 type State interface {
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
+
+	// TODO: Remove after Etna is activated
+	GetEtnaHeight() (uint64, error)
 
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
@@ -198,16 +202,20 @@ func (m *manager) GetValidatorSet(
 		return validatorSet, nil
 	}
 
+	etnaHeight, err := m.state.GetEtnaHeight()
+	if err != nil && err != database.ErrNotFound {
+		return nil, err
+	}
+
 	// get the start time to track metrics
 	startTime := m.clk.Time()
 
 	var (
 		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
 		currentHeight uint64
-		err           error
 	)
-	if subnetID == constants.PrimaryNetworkID {
-		validatorSet, currentHeight, err = m.makePrimaryNetworkValidatorSet(ctx, targetHeight)
+	if subnetID == constants.PrimaryNetworkID || (err == nil && targetHeight >= etnaHeight) {
+		validatorSet, currentHeight, err = m.makeValidatorSet(ctx, targetHeight, subnetID)
 	} else {
 		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
 	}
@@ -243,24 +251,25 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
-func (m *manager) makePrimaryNetworkValidatorSet(
+func (m *manager) makeValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
+	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
+	validatorSet, currentHeight, err := m.getCurrentValidatorSet(ctx, subnetID)
 	if err != nil {
 		return nil, 0, err
 	}
 	if currentHeight < targetHeight {
 		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
 			errUnfinalizedHeight,
-			constants.PrimaryNetworkID,
+			subnetID,
 			currentHeight,
 			targetHeight,
 		)
 	}
 
-	// Rebuild primary network validators at [targetHeight]
+	// Rebuild subnet validators at [targetHeight]
 	//
 	// Note: Since we are attempting to generate the validator set at
 	// [targetHeight], we want to apply the diffs from
@@ -272,7 +281,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
-		constants.PrimaryNetworkID,
+		subnetID,
 	)
 	if err != nil {
 		return nil, 0, err
@@ -283,19 +292,22 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
-		constants.PrimaryNetworkID,
+		subnetID,
 	)
 	return validatorSet, currentHeight, err
 }
 
-func (m *manager) getCurrentPrimaryValidatorSet(
+func (m *manager) getCurrentValidatorSet(
 	ctx context.Context,
+	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	subnetMap := m.cfg.Validators.GetMap(subnetID)
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return primaryMap, currentHeight, err
+	return subnetMap, currentHeight, err
 }
 
+// TODO: Once Etna has been activated, remove this function and use
+// makeValidatorSet for all validator set lookups.
 func (m *manager) makeSubnetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
