@@ -34,13 +34,6 @@ func TestVerify(t *testing.T) {
 			},
 			expectedErr: errMemoIsTooBig,
 		},
-		"Zero owners": {
-			alias: Alias{
-				ID:     ids.ShortEmpty,
-				Owners: &testOwners{isEmpty: true},
-			},
-			expectedErr: errEmptyAlias,
-		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {

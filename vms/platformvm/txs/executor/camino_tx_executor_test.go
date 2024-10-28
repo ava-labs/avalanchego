@@ -5514,8 +5514,8 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 	ownerKey, ownerAddr, owner := generate.KeyAndOwner(t, test.Keys[0])
 	msigKeys, msigAlias, msigAliasOwners, msigOwner := generate.MsigAliasAndKeys([]*secp256k1.PrivateKey{test.Keys[1], test.Keys[2]}, 2, true)
 
-	ownerUTXO := generate.UTXO(ids.GenerateTestID(), ctx.AVAXAssetID, test.TxFee, owner, ids.Empty, ids.Empty, true)
-	msigUTXO := generate.UTXO(ids.GenerateTestID(), ctx.AVAXAssetID, test.TxFee, *msigOwner, ids.Empty, ids.Empty, true)
+	ownerUTXO := generate.UTXO(ids.ID{1}, ctx.AVAXAssetID, test.TxFee, owner, ids.Empty, ids.Empty, true)
+	msigUTXO := generate.UTXO(ids.ID{3}, ctx.AVAXAssetID, test.TxFee, *msigOwner, ids.Empty, ids.Empty, true)
 
 	baseTx := txs.BaseTx{
 		BaseTx: avax.BaseTx{
@@ -5537,6 +5537,28 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
+		"BerlinPhase, Add empty alias": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseLast)
+				return s
+			},
+			phase: test.PhaseLast,
+			utx: &txs.MultisigAliasTx{
+				BaseTx: baseTx,
+				MultisigAlias: multisig.Alias{
+					Memo: msigAlias.Memo,
+					Owners: &secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				},
+				Auth: &secp256k1fx.Input{SigIndices: []uint32{}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{ownerKey},
+			},
+			expectedErr: errEmptyAlias,
+		},
 		"BerlinPhase, Add nested alias": {
 			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
@@ -5829,6 +5851,45 @@ func TestCaminoStandardTxExecutorMultisigAliasTx(t *testing.T) {
 			},
 			signers: [][]*secp256k1.PrivateKey{
 				{msigKeys[0], msigKeys[1]},
+			},
+		},
+		// we're not testing nested alias adding before Berlin,
+		// because pre-Berlin doesn't make difference between nested and non-nested aliases
+		// and test would look exactly the same as the "OK: add new alias"
+		"OK: add empty alias before Berlin": {
+			state: func(t *testing.T, c *gomock.Controller, utx *txs.MultisigAliasTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
+				s := state.NewMockDiff(c)
+				expect.PhaseTime(t, s, cfg, test.PhaseAthens)
+				s.EXPECT().GetBaseFee().Return(test.TxFee, nil)
+				expect.VerifyLock(t, s, utx.Ins, []*avax.UTXO{ownerUTXO}, []ids.ShortID{ownerAddr}, nil)
+				aliasID := multisig.ComputeAliasID(txID)
+				s.EXPECT().SetMultisigAlias(aliasID, &multisig.AliasWithNonce{
+					Alias: multisig.Alias{
+						Memo: msigAlias.Memo,
+						Owners: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						ID: aliasID,
+					},
+					Nonce: 0,
+				})
+				expect.ConsumeUTXOs(t, s, utx.Ins)
+				expect.ProduceUTXOs(t, s, utx.Outs, txID, 0)
+				return s
+			},
+			phase: test.PhaseAthens,
+			utx: &txs.MultisigAliasTx{
+				BaseTx: baseTx,
+				MultisigAlias: multisig.Alias{
+					Memo: msigAlias.Memo,
+					Owners: &secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				},
+				Auth: &secp256k1fx.Input{SigIndices: []uint32{}},
+			},
+			signers: [][]*secp256k1.PrivateKey{
+				{ownerKey},
 			},
 		},
 	}
