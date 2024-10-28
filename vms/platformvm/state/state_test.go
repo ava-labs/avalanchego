@@ -944,10 +944,6 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		d, err := NewDiffOn(state)
 		require.NoError(err)
 
-		type subnetIDNodeID struct {
-			subnetID ids.ID
-			nodeID   ids.NodeID
-		}
 		var expectedValidators set.Set[subnetIDNodeID]
 		for _, added := range diff.addedValidators {
 			require.NoError(d.PutCurrentValidator(&added))
