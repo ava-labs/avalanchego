@@ -1894,6 +1894,8 @@ func (s *state) initValidatorSets() error {
 			return err
 		}
 
+		// It is required for the SoVs to be loaded first so that the total
+		// weight is equal to the active weights here.
 		activeWeight, err := s.validators.TotalWeight(subnetID)
 		if err != nil {
 			return err
