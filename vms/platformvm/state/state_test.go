@@ -4,6 +4,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"maps"
 	"math"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -225,8 +225,7 @@ func TestState_writeStakers(t *testing.T) {
 		expectedValidatorSetOutput *validators.GetValidatorOutput
 
 		// Check whether weight/bls keys diffs are duly stored
-		expectedWeightDiff    *ValidatorWeightDiff
-		expectedPublicKeyDiff maybe.Maybe[*bls.PublicKey]
+		expectedValidatorDiffs map[subnetIDNodeID]*validatorDiff
 	}{
 		"add current primary network validator": {
 			staker:                   primaryNetworkCurrentValidatorStaker,
@@ -237,11 +236,19 @@ func TestState_writeStakers(t *testing.T) {
 				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
 				Weight:    primaryNetworkCurrentValidatorStaker.Weight,
 			},
-			expectedWeightDiff: &ValidatorWeightDiff{
-				Decrease: false,
-				Amount:   primaryNetworkCurrentValidatorStaker.Weight,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
+				{
+					subnetID: constants.PrimaryNetworkID,
+					nodeID:   primaryNetworkCurrentValidatorStaker.NodeID,
+				}: {
+					weightDiff: ValidatorWeightDiff{
+						Decrease: false,
+						Amount:   primaryNetworkCurrentValidatorStaker.Weight,
+					},
+					prevPublicKey: nil,
+					newPublicKey:  bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+				},
 			},
-			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](nil),
 		},
 		"add current primary network delegator": {
 			initialStakers:            []*Staker{primaryNetworkCurrentValidatorStaker},
@@ -255,15 +262,25 @@ func TestState_writeStakers(t *testing.T) {
 				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
 				Weight:    primaryNetworkCurrentValidatorStaker.Weight + primaryNetworkCurrentDelegatorStaker.Weight,
 			},
-			expectedWeightDiff: &ValidatorWeightDiff{
-				Decrease: false,
-				Amount:   primaryNetworkCurrentDelegatorStaker.Weight,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
+				{
+					subnetID: constants.PrimaryNetworkID,
+					nodeID:   primaryNetworkCurrentValidatorStaker.NodeID,
+				}: {
+					weightDiff: ValidatorWeightDiff{
+						Decrease: false,
+						Amount:   primaryNetworkCurrentDelegatorStaker.Weight,
+					},
+					prevPublicKey: bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+					newPublicKey:  bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+				},
 			},
 		},
 		"add pending primary network validator": {
 			staker:                   primaryNetworkPendingValidatorStaker,
 			addStakerTx:              addPrimaryNetworkValidator,
 			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
+			expectedValidatorDiffs:   map[subnetIDNodeID]*validatorDiff{},
 		},
 		"add pending primary network delegator": {
 			initialStakers:            []*Staker{primaryNetworkPendingValidatorStaker},
@@ -272,6 +289,7 @@ func TestState_writeStakers(t *testing.T) {
 			addStakerTx:               addPrimaryNetworkDelegator,
 			expectedPendingValidator:  primaryNetworkPendingValidatorStaker,
 			expectedPendingDelegators: []*Staker{primaryNetworkPendingDelegatorStaker},
+			expectedValidatorDiffs:    map[subnetIDNodeID]*validatorDiff{},
 		},
 		"add current subnet validator": {
 			initialStakers:           []*Staker{primaryNetworkCurrentValidatorStaker},
@@ -284,21 +302,37 @@ func TestState_writeStakers(t *testing.T) {
 				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
 				Weight:    subnetCurrentValidatorStaker.Weight,
 			},
-			expectedWeightDiff: &ValidatorWeightDiff{
-				Decrease: false,
-				Amount:   subnetCurrentValidatorStaker.Weight,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
+				{
+					subnetID: subnetID,
+					nodeID:   subnetCurrentValidatorStaker.NodeID,
+				}: {
+					weightDiff: ValidatorWeightDiff{
+						Decrease: false,
+						Amount:   subnetCurrentValidatorStaker.Weight,
+					},
+					prevPublicKey: nil,
+					newPublicKey:  bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+				},
 			},
-			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](nil),
 		},
 		"delete current primary network validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker},
 			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator},
 			staker:         primaryNetworkCurrentValidatorStaker,
-			expectedWeightDiff: &ValidatorWeightDiff{
-				Decrease: true,
-				Amount:   primaryNetworkCurrentValidatorStaker.Weight,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
+				{
+					subnetID: constants.PrimaryNetworkID,
+					nodeID:   primaryNetworkCurrentValidatorStaker.NodeID,
+				}: {
+					weightDiff: ValidatorWeightDiff{
+						Decrease: true,
+						Amount:   primaryNetworkCurrentValidatorStaker.Weight,
+					},
+					prevPublicKey: bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+					newPublicKey:  nil,
+				},
 			},
-			expectedPublicKeyDiff: maybe.Some(primaryNetworkCurrentValidatorStaker.PublicKey),
 		},
 		"delete current primary network delegator": {
 			initialStakers: []*Staker{
@@ -316,15 +350,25 @@ func TestState_writeStakers(t *testing.T) {
 				PublicKey: primaryNetworkCurrentValidatorStaker.PublicKey,
 				Weight:    primaryNetworkCurrentValidatorStaker.Weight,
 			},
-			expectedWeightDiff: &ValidatorWeightDiff{
-				Decrease: true,
-				Amount:   primaryNetworkCurrentDelegatorStaker.Weight,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
+				{
+					subnetID: constants.PrimaryNetworkID,
+					nodeID:   primaryNetworkCurrentValidatorStaker.NodeID,
+				}: {
+					weightDiff: ValidatorWeightDiff{
+						Decrease: true,
+						Amount:   primaryNetworkCurrentDelegatorStaker.Weight,
+					},
+					prevPublicKey: bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+					newPublicKey:  bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+				},
 			},
 		},
 		"delete pending primary network validator": {
-			initialStakers: []*Staker{primaryNetworkPendingValidatorStaker},
-			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator},
-			staker:         primaryNetworkPendingValidatorStaker,
+			initialStakers:         []*Staker{primaryNetworkPendingValidatorStaker},
+			initialTxs:             []*txs.Tx{addPrimaryNetworkValidator},
+			staker:                 primaryNetworkPendingValidatorStaker,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{},
 		},
 		"delete pending primary network delegator": {
 			initialStakers: []*Staker{
@@ -337,16 +381,25 @@ func TestState_writeStakers(t *testing.T) {
 			},
 			staker:                   primaryNetworkPendingDelegatorStaker,
 			expectedPendingValidator: primaryNetworkPendingValidatorStaker,
+			expectedValidatorDiffs:   map[subnetIDNodeID]*validatorDiff{},
 		},
 		"delete current subnet validator": {
 			initialStakers: []*Staker{primaryNetworkCurrentValidatorStaker, subnetCurrentValidatorStaker},
 			initialTxs:     []*txs.Tx{addPrimaryNetworkValidator, addSubnetValidator},
 			staker:         subnetCurrentValidatorStaker,
-			expectedWeightDiff: &ValidatorWeightDiff{
-				Decrease: true,
-				Amount:   subnetCurrentValidatorStaker.Weight,
+			expectedValidatorDiffs: map[subnetIDNodeID]*validatorDiff{
+				{
+					subnetID: subnetID,
+					nodeID:   subnetCurrentValidatorStaker.NodeID,
+				}: {
+					weightDiff: ValidatorWeightDiff{
+						Decrease: true,
+						Amount:   subnetCurrentValidatorStaker.Weight,
+					},
+					prevPublicKey: bls.PublicKeyToUncompressedBytes(primaryNetworkCurrentValidatorStaker.PublicKey),
+					newPublicKey:  nil,
+				},
 			},
-			expectedPublicKeyDiff: maybe.Some[*bls.PublicKey](primaryNetworkCurrentValidatorStaker.PublicKey),
 		},
 	}
 
@@ -399,6 +452,10 @@ func TestState_writeStakers(t *testing.T) {
 			if test.addStakerTx != nil {
 				state.AddTx(test.addStakerTx, status.Committed)
 			}
+
+			validatorDiffs, err := state.calculateValidatorDiffs()
+			require.NoError(err)
+			require.Equal(test.expectedValidatorDiffs, validatorDiffs)
 
 			state.SetHeight(1)
 			require.NoError(state.Commit())
@@ -455,29 +512,26 @@ func TestState_writeStakers(t *testing.T) {
 					state.validators.GetMap(test.staker.SubnetID)[test.staker.NodeID],
 				)
 
-				diffKey := marshalDiffKey(test.staker.SubnetID, 1, test.staker.NodeID)
-				weightDiffBytes, err := state.validatorWeightDiffsDB.Get(diffKey)
-				if test.expectedWeightDiff == nil {
-					require.ErrorIs(err, database.ErrNotFound)
-				} else {
-					require.NoError(err)
-
-					weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-					require.NoError(err)
-					require.Equal(test.expectedWeightDiff, weightDiff)
-				}
-
-				publicKeyDiffBytes, err := state.validatorPublicKeyDiffsDB.Get(diffKey)
-				if test.expectedPublicKeyDiff.IsNothing() {
-					require.ErrorIs(err, database.ErrNotFound)
-				} else {
-					require.NoError(err)
-
-					expectedPublicKeyDiff := test.expectedPublicKeyDiff.Value()
-					if expectedPublicKeyDiff != nil {
-						require.Equal(expectedPublicKeyDiff, bls.PublicKeyFromValidUncompressedBytes(publicKeyDiffBytes))
+				for subnetIDNodeID, expectedDiff := range test.expectedValidatorDiffs {
+					diffKey := marshalDiffKey(subnetIDNodeID.subnetID, 1, subnetIDNodeID.nodeID)
+					weightDiffBytes, err := state.validatorWeightDiffsDB.Get(diffKey)
+					if expectedDiff.weightDiff.Amount == 0 {
+						require.ErrorIs(err, database.ErrNotFound)
 					} else {
-						require.Empty(publicKeyDiffBytes)
+						require.NoError(err)
+
+						weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
+						require.NoError(err)
+						require.Equal(&expectedDiff.weightDiff, weightDiff)
+					}
+
+					publicKeyDiffBytes, err := state.validatorPublicKeyDiffsDB.Get(diffKey)
+					if bytes.Equal(expectedDiff.prevPublicKey, expectedDiff.newPublicKey) {
+						require.ErrorIs(err, database.ErrNotFound)
+					} else {
+						require.NoError(err)
+
+						require.Equal(expectedDiff.prevPublicKey, publicKeyDiffBytes)
 					}
 				}
 

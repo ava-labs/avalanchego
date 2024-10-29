@@ -439,6 +439,21 @@ func (mr *MockStateMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockState)(nil).GetDelegateeReward), subnetID, nodeID)
 }
 
+// GetEtnaHeight mocks base method.
+func (m *MockState) GetEtnaHeight() (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEtnaHeight")
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEtnaHeight indicates an expected call of GetEtnaHeight.
+func (mr *MockStateMockRecorder) GetEtnaHeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEtnaHeight", reflect.TypeOf((*MockState)(nil).GetEtnaHeight))
+}
+
 // GetExpiryIterator mocks base method.
 func (m *MockState) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	m.ctrl.T.Helper()
