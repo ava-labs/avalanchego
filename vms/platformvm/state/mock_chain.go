@@ -353,20 +353,33 @@ func (mr *MockChainMockRecorder) GetPendingValidator(subnetID, nodeID any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), subnetID, nodeID)
 }
 
-// GetSubnetManager mocks base method.
-func (m *MockChain) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
+// GetSoVExcess mocks base method.
+func (m *MockChain) GetSoVExcess() gas.Gas {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnetManager", subnetID)
-	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].([]byte)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "GetSoVExcess")
+	ret0, _ := ret[0].(gas.Gas)
+	return ret0
 }
 
-// GetSubnetManager indicates an expected call of GetSubnetManager.
-func (mr *MockChainMockRecorder) GetSubnetManager(subnetID any) *gomock.Call {
+// GetSoVExcess indicates an expected call of GetSoVExcess.
+func (mr *MockChainMockRecorder) GetSoVExcess() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockChain)(nil).GetSubnetManager), subnetID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSoVExcess", reflect.TypeOf((*MockChain)(nil).GetSoVExcess))
+}
+
+// GetSubnetConversion mocks base method.
+func (m *MockChain) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetConversion", subnetID)
+	ret0, _ := ret[0].(SubnetConversion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetConversion indicates an expected call of GetSubnetConversion.
+func (mr *MockChainMockRecorder) GetSubnetConversion(subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetConversion", reflect.TypeOf((*MockChain)(nil).GetSubnetConversion), subnetID)
 }
 
 // GetSubnetOwner mocks base method.
@@ -573,16 +586,28 @@ func (mr *MockChainMockRecorder) SetFeeState(f any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeState", reflect.TypeOf((*MockChain)(nil).SetFeeState), f)
 }
 
-// SetSubnetManager mocks base method.
-func (m *MockChain) SetSubnetManager(subnetID, chainID ids.ID, addr []byte) {
+// SetSoVExcess mocks base method.
+func (m *MockChain) SetSoVExcess(e gas.Gas) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetSubnetManager", subnetID, chainID, addr)
+	m.ctrl.Call(m, "SetSoVExcess", e)
 }
 
-// SetSubnetManager indicates an expected call of SetSubnetManager.
-func (mr *MockChainMockRecorder) SetSubnetManager(subnetID, chainID, addr any) *gomock.Call {
+// SetSoVExcess indicates an expected call of SetSoVExcess.
+func (mr *MockChainMockRecorder) SetSoVExcess(e any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetManager", reflect.TypeOf((*MockChain)(nil).SetSubnetManager), subnetID, chainID, addr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSoVExcess", reflect.TypeOf((*MockChain)(nil).SetSoVExcess), e)
+}
+
+// SetSubnetConversion mocks base method.
+func (m *MockChain) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetConversion", subnetID, c)
+}
+
+// SetSubnetConversion indicates an expected call of SetSubnetConversion.
+func (mr *MockChainMockRecorder) SetSubnetConversion(subnetID, c any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetConversion", reflect.TypeOf((*MockChain)(nil).SetSubnetConversion), subnetID, c)
 }
 
 // SetSubnetOwner mocks base method.
