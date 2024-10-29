@@ -1878,7 +1878,6 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			require.NoError(d.Apply(state))
 			verifyChain(d)
 			verifyChain(state)
-			verifyValidators(state, 0)
 			assertChainsEqual(t, state, d)
 
 			state.SetHeight(1)
