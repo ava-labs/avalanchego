@@ -17,7 +17,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -46,7 +49,6 @@ import (
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/client/stats"
 	"github.com/ava-labs/subnet-evm/warp"
-	"github.com/ava-labs/subnet-evm/warp/handlers"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -494,24 +496,30 @@ func (vm *VM) Initialize(
 	for i, hexMsg := range vm.config.WarpOffChainMessages {
 		offchainWarpMessages[i] = []byte(hexMsg)
 	}
+	warpSignatureCache := &cache.LRU[ids.ID, []byte]{Size: warpSignatureCacheSize}
+	meteredCache, err := metercacher.New("warp_signature_cache", vm.sdkMetrics, warpSignatureCache)
+	if err != nil {
+		return fmt.Errorf("failed to create warp signature cache: %w", err)
+	}
+
+	// clear warpdb on initialization if config enabled
+	if vm.config.PruneWarpDB {
+		if err := database.Clear(vm.warpDB, ethdb.IdealBatchSize); err != nil {
+			return fmt.Errorf("failed to prune warpDB: %w", err)
+		}
+	}
+
 	vm.warpBackend, err = warp.NewBackend(
 		vm.ctx.NetworkID,
 		vm.ctx.ChainID,
 		vm.ctx.WarpSigner,
 		vm,
 		vm.warpDB,
-		warpSignatureCacheSize,
+		meteredCache,
 		offchainWarpMessages,
 	)
 	if err != nil {
 		return err
-	}
-
-	// clear warpdb on initialization if config enabled
-	if vm.config.PruneWarpDB {
-		if err := vm.warpBackend.Clear(); err != nil {
-			return fmt.Errorf("failed to prune warpDB: %w", err)
-		}
 	}
 
 	if err := vm.initializeChain(lastAcceptedHash, vm.ethConfig); err != nil {
@@ -520,7 +528,16 @@ func (vm *VM) Initialize(
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
-	vm.initializeHandlers()
+	// Add p2p warp message warpHandler
+	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
+	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
+
+	vm.setAppRequestHandlers()
+
+	vm.StateSyncServer = NewStateSyncServer(&stateSyncServerConfig{
+		Chain:            vm.blockChain,
+		SyncableInterval: vm.config.StateSyncCommitInterval,
+	})
 	return vm.initializeStateSyncClient(lastAcceptedHeight)
 }
 
@@ -622,20 +639,6 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 	}
 
 	return nil
-}
-
-// initializeHandlers should be called after [vm.chain] is initialized.
-func (vm *VM) initializeHandlers() {
-	vm.StateSyncServer = NewStateSyncServer(&stateSyncServerConfig{
-		Chain:            vm.blockChain,
-		SyncableInterval: vm.config.StateSyncCommitInterval,
-	})
-
-	// Add p2p warp message warpHandler
-	warpHandler := handlers.NewSignatureRequestHandlerP2P(vm.warpBackend, vm.networkCodec)
-	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
-
-	vm.setAppRequestHandlers()
 }
 
 func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {

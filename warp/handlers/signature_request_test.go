@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -31,16 +32,17 @@ func TestMessageSignatureHandler(t *testing.T) {
 	offchainMessage, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedPayload.Bytes())
 	require.NoError(t, err)
 
-	backend, err := warp.NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, database, 100, [][]byte{offchainMessage.Bytes()})
+	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 100}
+	backend, err := warp.NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, database, messageSignatureCache, [][]byte{offchainMessage.Bytes()})
 	require.NoError(t, err)
 
 	msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, []byte("test"))
 	require.NoError(t, err)
 	messageID := msg.ID()
 	require.NoError(t, backend.AddMessage(msg))
-	signature, err := backend.GetMessageSignature(msg)
+	signature, err := backend.GetMessageSignature(context.TODO(), msg)
 	require.NoError(t, err)
-	offchainSignature, err := backend.GetMessageSignature(offchainMessage)
+	offchainSignature, err := backend.GetMessageSignature(context.TODO(), offchainMessage)
 	require.NoError(t, err)
 
 	unknownMessageID := ids.GenerateTestID()
@@ -101,7 +103,6 @@ func TestMessageSignatureHandler(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			handler := NewSignatureRequestHandler(backend, message.Codec)
-			handler.stats.Clear()
 
 			request, expectedResponse := test.setup()
 			responseBytes, err := handler.OnMessageSignatureRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
@@ -132,18 +133,19 @@ func TestBlockSignatureHandler(t *testing.T) {
 	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
 	blkID := ids.GenerateTestID()
 	blockClient := warptest.MakeBlockClient(blkID)
+	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 100}
 	backend, err := warp.NewBackend(
 		snowCtx.NetworkID,
 		snowCtx.ChainID,
 		warpSigner,
 		blockClient,
 		database,
-		100,
+		messageSignatureCache,
 		nil,
 	)
 	require.NoError(t, err)
 
-	signature, err := backend.GetBlockSignature(blkID)
+	signature, err := backend.GetBlockSignature(context.TODO(), blkID)
 	require.NoError(t, err)
 	unknownMessageID := ids.GenerateTestID()
 
@@ -188,7 +190,6 @@ func TestBlockSignatureHandler(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			handler := NewSignatureRequestHandler(backend, message.Codec)
-			handler.stats.Clear()
 
 			request, expectedResponse := test.setup()
 			responseBytes, err := handler.OnBlockSignatureRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
