@@ -116,7 +116,7 @@ directory will appear in the output of the script:
 
 ```
 ...
-using temporary directory /tmp/tmp.E6eHdDr4ln as the docker compose path"
+using temporary directory /tmp/tmp.E6eHdDr4ln as the docker compose path
 ...
 ```
 

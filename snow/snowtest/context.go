@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -84,7 +84,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		ChainID:         chainID,
 		NodeID:          ids.EmptyNodeID,
 		PublicKey:       publicKey,
-		NetworkUpgrades: upgrade.Default,
+		NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest),
 
 		XChainID:    XChainID,
 		CChainID:    CChainID,

@@ -109,10 +109,6 @@ func New(
 	}
 }
 
-func (ss *stateSyncer) Context() *snow.ConsensusContext {
-	return ss.Ctx
-}
-
 func (ss *stateSyncer) Start(ctx context.Context, startReqID uint32) error {
 	ss.Ctx.Log.Info("starting state sync")
 
@@ -603,8 +599,6 @@ func (ss *stateSyncer) Shutdown(ctx context.Context) error {
 
 	return ss.VM.Shutdown(ctx)
 }
-
-func (*stateSyncer) Halt(context.Context) {}
 
 func (*stateSyncer) Timeout(context.Context) error {
 	return nil

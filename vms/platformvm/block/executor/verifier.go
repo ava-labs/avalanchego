@@ -27,7 +27,6 @@ var (
 	errApricotBlockIssuedAfterFork           = errors.New("apricot block issued after fork")
 	errBanffStandardBlockWithoutChanges      = errors.New("BanffStandardBlock performs no state changes")
 	errIncorrectBlockHeight                  = errors.New("incorrect block height")
-	errChildBlockEarlierThanParent           = errors.New("proposed timestamp before current chain time")
 	errOptionBlockTimestampNotMatchingParent = errors.New("option block proposed timestamp not matching parent block one")
 )
 
@@ -91,7 +90,8 @@ func (v *verifier) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	}
 
 	return v.proposalBlock(
-		&b.ApricotProposalBlock,
+		b,
+		b.Tx,
 		onDecisionState,
 		onCommitState,
 		onAbortState,
@@ -130,7 +130,12 @@ func (v *verifier) BanffStandardBlock(b *block.BanffStandardBlock) error {
 	}
 
 	feeCalculator := state.PickFeeCalculator(v.txExecutorBackend.Config, onAcceptState)
-	return v.standardBlock(&b.ApricotStandardBlock, feeCalculator, onAcceptState)
+	return v.standardBlock(
+		b,
+		b.Transactions,
+		feeCalculator,
+		onAcceptState,
+	)
 }
 
 func (v *verifier) ApricotAbortBlock(b *block.ApricotAbortBlock) error {
@@ -166,7 +171,17 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		timestamp     = onCommitState.GetTimestamp() // Equal to parent timestamp
 		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
 	)
-	return v.proposalBlock(b, nil, onCommitState, onAbortState, feeCalculator, nil, nil, nil)
+	return v.proposalBlock(
+		b,
+		b.Tx,
+		nil,
+		onCommitState,
+		onAbortState,
+		feeCalculator,
+		nil,
+		nil,
+		nil,
+	)
 }
 
 func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -184,7 +199,12 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		timestamp     = onAcceptState.GetTimestamp() // Equal to parent timestamp
 		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
 	)
-	return v.standardBlock(b, feeCalculator, onAcceptState)
+	return v.standardBlock(
+		b,
+		b.Transactions,
+		feeCalculator,
+		onAcceptState,
+	)
 }
 
 func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
@@ -278,26 +298,11 @@ func (v *verifier) banffNonOptionBlock(b block.BanffBlock) error {
 	}
 
 	newChainTime := b.Timestamp()
-	parentChainTime := parentState.GetTimestamp()
-	if newChainTime.Before(parentChainTime) {
-		return fmt.Errorf(
-			"%w: proposed timestamp (%s), chain time (%s)",
-			errChildBlockEarlierThanParent,
-			newChainTime,
-			parentChainTime,
-		)
-	}
-
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(parentState)
-	if err != nil {
-		return fmt.Errorf("could not verify block timestamp: %w", err)
-	}
-
 	now := v.txExecutorBackend.Clk.Time()
 	return executor.VerifyNewChainTime(
 		newChainTime,
-		nextStakerChangeTime,
 		now,
+		parentState,
 	)
 }
 
@@ -376,7 +381,8 @@ func (v *verifier) commitBlock(b block.Block) error {
 
 // proposalBlock populates the state of this block if [nil] is returned
 func (v *verifier) proposalBlock(
-	b *block.ApricotProposalBlock,
+	b block.Block,
+	tx *txs.Tx,
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
@@ -390,19 +396,19 @@ func (v *verifier) proposalBlock(
 		OnAbortState:  onAbortState,
 		Backend:       v.txExecutorBackend,
 		FeeCalculator: feeCalculator,
-		Tx:            b.Tx,
+		Tx:            tx,
 	}
 
-	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
-		txID := b.Tx.ID()
+	if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+		txID := tx.ID()
 		v.MarkDropped(txID, err) // cache tx as dropped
 		return err
 	}
 
-	onCommitState.AddTx(b.Tx, status.Committed)
-	onAbortState.AddTx(b.Tx, status.Aborted)
+	onCommitState.AddTx(tx, status.Committed)
+	onAbortState.AddTx(tx, status.Aborted)
 
-	v.Mempool.Remove(b.Tx)
+	v.Mempool.Remove(tx)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{
@@ -429,16 +435,22 @@ func (v *verifier) proposalBlock(
 
 // standardBlock populates the state of this block if [nil] is returned
 func (v *verifier) standardBlock(
-	b *block.ApricotStandardBlock,
+	b block.Block,
+	txs []*txs.Tx,
 	feeCalculator fee.Calculator,
 	onAcceptState state.Diff,
 ) error {
-	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(b.Transactions, feeCalculator, onAcceptState, b.Parent())
+	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
+		txs,
+		feeCalculator,
+		onAcceptState,
+		b.Parent(),
+	)
 	if err != nil {
 		return err
 	}
 
-	v.Mempool.Remove(b.Transactions...)
+	v.Mempool.Remove(txs...)
 
 	blkID := b.ID()
 	v.blkIDToState[blkID] = &blockState{

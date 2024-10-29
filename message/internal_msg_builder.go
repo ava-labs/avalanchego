@@ -16,7 +16,6 @@ import (
 var (
 	disconnected  = &Disconnected{}
 	gossipRequest = &GossipRequest{}
-	timeout       = &Timeout{}
 
 	_ fmt.Stringer    = (*GetStateSummaryFrontierFailed)(nil)
 	_ chainIDGetter   = (*GetStateSummaryFrontierFailed)(nil)
@@ -50,8 +49,6 @@ var (
 	_ fmt.Stringer = (*Disconnected)(nil)
 
 	_ fmt.Stringer = (*GossipRequest)(nil)
-
-	_ fmt.Stringer = (*Timeout)(nil)
 )
 
 type GetStateSummaryFrontierFailed struct {
@@ -335,32 +332,6 @@ func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) Inbo
 	}
 }
 
-// ConnectedSubnet contains the subnet ID of the subnet that the node is
-// connected to.
-type ConnectedSubnet struct {
-	SubnetID ids.ID `json:"subnet_id,omitempty"`
-}
-
-func (m *ConnectedSubnet) String() string {
-	return fmt.Sprintf(
-		"SubnetID: %s",
-		m.SubnetID,
-	)
-}
-
-// InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
-// connected to the subnet with the given [subnetID].
-func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage {
-	return &inboundMessage{
-		nodeID: nodeID,
-		op:     ConnectedSubnetOp,
-		message: &ConnectedSubnet{
-			SubnetID: subnetID,
-		},
-		expiration: mockable.MaxTime,
-	}
-}
-
 type Disconnected struct{}
 
 func (Disconnected) String() string {
@@ -414,21 +385,6 @@ func InternalGossipRequest(
 		nodeID:     nodeID,
 		op:         GossipRequestOp,
 		message:    gossipRequest,
-		expiration: mockable.MaxTime,
-	}
-}
-
-type Timeout struct{}
-
-func (Timeout) String() string {
-	return ""
-}
-
-func InternalTimeout(nodeID ids.NodeID) InboundMessage {
-	return &inboundMessage{
-		nodeID:     nodeID,
-		op:         TimeoutOp,
-		message:    timeout,
 		expiration: mockable.MaxTime,
 	}
 }

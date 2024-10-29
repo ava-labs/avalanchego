@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -111,11 +110,11 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -237,11 +236,11 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -370,11 +369,11 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -539,11 +538,11 @@ func TestRouterTimeout(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -1071,11 +1070,11 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -1161,121 +1160,6 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require.True(calledF) // should be called since this is a validator request
 }
 
-func TestConnectedSubnet(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	tm, err := timeout.NewManager(
-		&timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     3 * time.Second,
-			MinimumTimeout:     3 * time.Second,
-			MaximumTimeout:     5 * time.Minute,
-			TimeoutCoefficient: 1,
-			TimeoutHalflife:    5 * time.Minute,
-		},
-		benchlist.NewNoBenchlist(),
-		prometheus.NewRegistry(),
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-
-	go tm.Dispatch()
-	defer tm.Stop()
-
-	// Create chain router
-	myNodeID := ids.GenerateTestNodeID()
-	peerNodeID := ids.GenerateTestNodeID()
-	subnetID0 := ids.GenerateTestID()
-	subnetID1 := ids.GenerateTestID()
-	trackedSubnets := set.Of(subnetID0, subnetID1)
-	chainRouter := ChainRouter{}
-	require.NoError(chainRouter.Initialize(
-		myNodeID,
-		logging.NoLog{},
-		tm,
-		time.Millisecond,
-		set.Set[ids.ID]{},
-		true,
-		trackedSubnets,
-		nil,
-		HealthConfig{},
-		prometheus.NewRegistry(),
-	))
-
-	// Create bootstrapper, engine and handler
-	snowCtx := snowtest.Context(t, snowtest.PChainID)
-	ctx := snowtest.ConsensusContext(snowCtx)
-	ctx.Executing.Set(false)
-	ctx.State.Set(snow.EngineState{
-		Type:  engineType,
-		State: snow.NormalOp,
-	})
-
-	myConnectedMsg := handler.Message{
-		InboundMessage: message.InternalConnected(myNodeID, version.CurrentApp),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-	mySubnetConnectedMsg0 := handler.Message{
-		InboundMessage: message.InternalConnectedSubnet(myNodeID, subnetID0),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-	mySubnetConnectedMsg1 := handler.Message{
-		InboundMessage: message.InternalConnectedSubnet(myNodeID, subnetID1),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-
-	platformHandler := handlermock.NewHandler(ctrl)
-	platformHandler.EXPECT().Context().Return(ctx).AnyTimes()
-	platformHandler.EXPECT().SetOnStopped(gomock.Any()).AnyTimes()
-	platformHandler.EXPECT().Push(gomock.Any(), myConnectedMsg).Times(1)
-	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg0).Times(1)
-	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg1).Times(1)
-
-	chainRouter.AddChain(context.Background(), platformHandler)
-
-	peerConnectedMsg := handler.Message{
-		InboundMessage: message.InternalConnected(peerNodeID, version.CurrentApp),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
-	chainRouter.Connected(peerNodeID, version.CurrentApp, constants.PrimaryNetworkID)
-
-	peerSubnetConnectedMsg0 := handler.Message{
-		InboundMessage: message.InternalConnectedSubnet(peerNodeID, subnetID0),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-	platformHandler.EXPECT().Push(gomock.Any(), peerSubnetConnectedMsg0).Times(1)
-	chainRouter.Connected(peerNodeID, version.CurrentApp, subnetID0)
-
-	myDisconnectedMsg := handler.Message{
-		InboundMessage: message.InternalDisconnected(myNodeID),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-	platformHandler.EXPECT().Push(gomock.Any(), myDisconnectedMsg).Times(1)
-	chainRouter.Benched(constants.PlatformChainID, myNodeID)
-
-	peerDisconnectedMsg := handler.Message{
-		InboundMessage: message.InternalDisconnected(peerNodeID),
-		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
-	}
-	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
-	chainRouter.Benched(constants.PlatformChainID, peerNodeID)
-
-	platformHandler.EXPECT().Push(gomock.Any(), myConnectedMsg).Times(1)
-	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg0).Times(1)
-	platformHandler.EXPECT().Push(gomock.Any(), mySubnetConnectedMsg1).Times(1)
-
-	chainRouter.Unbenched(constants.PlatformChainID, myNodeID)
-
-	platformHandler.EXPECT().Push(gomock.Any(), peerConnectedMsg).Times(1)
-	platformHandler.EXPECT().Push(gomock.Any(), peerSubnetConnectedMsg0).Times(1)
-
-	chainRouter.Unbenched(constants.PlatformChainID, peerNodeID)
-
-	platformHandler.EXPECT().Push(gomock.Any(), peerDisconnectedMsg).Times(1)
-	chainRouter.Disconnected(peerNodeID)
-}
-
 func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	require := require.New(t)
 
@@ -1352,11 +1236,11 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		sb,
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(err)
 
@@ -1604,11 +1488,11 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
+		func() {},
 	)
 	require.NoError(t, err)
 

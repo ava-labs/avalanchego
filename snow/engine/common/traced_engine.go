@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -246,7 +245,7 @@ func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.PushQuery(ctx, nodeID, requestID, container, requestedHeight)
 }
 
-func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
+func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Chits", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
@@ -256,7 +255,7 @@ func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID u
 	))
 	defer span.End()
 
-	return e.engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID)
+	return e.engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
 
 func (e *tracedEngine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -330,25 +329,11 @@ func (e *tracedEngine) Disconnected(ctx context.Context, nodeID ids.NodeID) erro
 	return e.engine.Disconnected(ctx, nodeID)
 }
 
-func (e *tracedEngine) Timeout(ctx context.Context) error {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.Timeout")
-	defer span.End()
-
-	return e.engine.Timeout(ctx)
-}
-
 func (e *tracedEngine) Gossip(ctx context.Context) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Gossip")
 	defer span.End()
 
 	return e.engine.Gossip(ctx)
-}
-
-func (e *tracedEngine) Halt(ctx context.Context) {
-	ctx, span := e.tracer.Start(ctx, "tracedEngine.Halt")
-	defer span.End()
-
-	e.engine.Halt(ctx)
 }
 
 func (e *tracedEngine) Shutdown(ctx context.Context) error {
@@ -365,10 +350,6 @@ func (e *tracedEngine) Notify(ctx context.Context, msg Message) error {
 	defer span.End()
 
 	return e.engine.Notify(ctx, msg)
-}
-
-func (e *tracedEngine) Context() *snow.ConsensusContext {
-	return e.engine.Context()
 }
 
 func (e *tracedEngine) Start(ctx context.Context, startReqID uint32) error {

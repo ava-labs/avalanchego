@@ -339,7 +339,7 @@ type Node struct {
 	// The staking address will optionally be written to a process context
 	// file to enable other nodes to be configured to use this node as a
 	// beacon.
-	stakingAddress string
+	stakingAddress netip.AddrPort
 
 	// tlsKeyLogWriterCloser is a debug file handle that writes all the TLS
 	// session keys. This value should only be non-nil during debugging.
@@ -440,15 +440,15 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	listener = throttling.NewThrottledListener(listener, n.Config.NetworkConfig.ThrottlerConfig.MaxInboundConnsPerSec)
 
 	// Record the bound address to enable inclusion in process context file.
-	n.stakingAddress = listener.Addr().String()
-	stakingAddrPort, err := ips.ParseAddrPort(n.stakingAddress)
+	n.stakingAddress, err = ips.ParseAddrPort(listener.Addr().String())
 	if err != nil {
 		return err
 	}
 
 	var (
-		publicAddr netip.Addr
-		atomicIP   *utils.Atomic[netip.AddrPort]
+		stakingPort = n.stakingAddress.Port()
+		publicAddr  netip.Addr
+		atomicIP    *utils.Atomic[netip.AddrPort]
 	)
 	switch {
 	case n.Config.PublicIP != "":
@@ -459,7 +459,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
 			publicAddr,
-			stakingAddrPort.Port(),
+			stakingPort,
 		))
 		n.ipUpdater = dynamicip.NewNoUpdater()
 	case n.Config.PublicIPResolutionService != "":
@@ -478,7 +478,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
 			publicAddr,
-			stakingAddrPort.Port(),
+			stakingPort,
 		))
 		n.ipUpdater = dynamicip.NewUpdater(atomicIP, resolver, n.Config.PublicIPResolutionFreq)
 	default:
@@ -488,7 +488,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		}
 		atomicIP = utils.NewAtomic(netip.AddrPortFrom(
 			publicAddr,
-			stakingAddrPort.Port(),
+			stakingPort,
 		))
 		n.ipUpdater = dynamicip.NewNoUpdater()
 	}
@@ -501,8 +501,8 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	// Regularly update our public IP and port mappings.
 	n.portMapper.Map(
-		stakingAddrPort.Port(),
-		stakingAddrPort.Port(),
+		stakingPort,
+		stakingPort,
 		stakingPortName,
 		atomicIP,
 		n.Config.PublicIPResolutionFreq,
@@ -644,24 +644,13 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	return err
 }
 
-type NodeProcessContext struct {
-	// The process id of the node
-	PID int `json:"pid"`
-	// URI to access the node API
-	// Format: [https|http]://[host]:[port]
-	URI string `json:"uri"`
-	// Address other nodes can use to communicate with this node
-	// Format: [host]:[port]
-	StakingAddress string `json:"stakingAddress"`
-}
-
 // Write process context to the configured path. Supports the use of
 // dynamically chosen network ports with local network orchestration.
 func (n *Node) writeProcessContext() error {
 	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
 
 	// Write the process context to disk
-	processContext := &NodeProcessContext{
+	processContext := &ProcessContext{
 		PID:            os.Getpid(),
 		URI:            n.apiURI,
 		StakingAddress: n.stakingAddress, // Set by network initialization
@@ -1228,6 +1217,7 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
 				StaticFeeConfig:           n.Config.StaticFeeConfig,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
+				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
 				MinValidatorStake:         n.Config.MinValidatorStake,
 				MaxValidatorStake:         n.Config.MaxValidatorStake,

@@ -11,8 +11,11 @@ on:
       - "*"
 
 jobs:
-  build-jammy-amd64-package:
-    runs-on: ubuntu-22.04
+  build-focal-amd64-package:
+    runs-on: ubuntu-20.04
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -23,15 +26,71 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Install aws cli
+        run: sudo snap install aws-cli --classic
+
+      - name: Try to get tag from git
+        if: "${{ github.event.inputs.tag == '' }}"
+        id: get_tag_from_git
         run: |
-          sudo apt update
-          sudo apt -y install awscli
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Try to get tag from workflow dispatch
+        if: "${{ github.event.inputs.tag != '' }}"
+        id: get_tag_from_workflow
+        run: |
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+        shell: bash
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
+          aws-region: us-east-1
+
+      - name: Create debian package
+        run: ./.github/workflows/build-deb-pkg.sh
+        env:
+          PKG_ROOT: /tmp/avalanchego
+          TAG: ${{ env.TAG }}
+          BUCKET: ${{ secrets.BUCKET }}
+          ARCH: "amd64"
+          RELEASE: "focal"
+
+      - name: Save as Github artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: focal
+          path:  /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
+
+      - name: Cleanup
+        run: |
+          rm -rf ./build
+          rm -rf /tmp/avalanchego
+
+  build-jammy-amd64-package:
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - run: go version
+
+      - name: Build the avalanchego binaries
+        run: ./scripts/build.sh
+
+      - name: Install aws cli
+        run: sudo snap install aws-cli --classic
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Try to get tag from git
@@ -68,8 +127,11 @@ jobs:
           rm -rf ./build
           rm -rf /tmp/avalanchego
 
-  build-focal-amd64-package:
-    runs-on: ubuntu-20.04
+  build-noble-amd64-package:
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -80,9 +142,7 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Install aws cli
-        run: |
-          sudo apt update
-          sudo apt -y install awscli
+        run: sudo snap install aws-cli --classic
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
@@ -101,8 +161,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Create debian package
@@ -112,12 +172,12 @@ jobs:
           TAG: ${{ env.TAG }}
           BUCKET: ${{ secrets.BUCKET }}
           ARCH: "amd64"
-          RELEASE: "focal"
+          RELEASE: "noble"
 
       - name: Save as Github artifact
         uses: actions/upload-artifact@v4
         with:
-          name: focal
+          name: noble
           path:  /tmp/avalanchego/avalanchego-${{ env.TAG }}-amd64.deb
 
       - name: Cleanup

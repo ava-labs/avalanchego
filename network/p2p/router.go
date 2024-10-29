@@ -33,12 +33,6 @@ type pendingAppRequest struct {
 	callback  AppResponseCallback
 }
 
-// meteredHandler emits metrics for a Handler
-type meteredHandler struct {
-	*responder
-	metrics
-}
-
 type metrics struct {
 	msgTime  *prometheus.GaugeVec
 	msgCount *prometheus.CounterVec
@@ -69,7 +63,7 @@ type router struct {
 	metrics metrics
 
 	lock               sync.RWMutex
-	handlers           map[uint64]*meteredHandler
+	handlers           map[uint64]*responder
 	pendingAppRequests map[uint32]pendingAppRequest
 	requestID          uint32
 }
@@ -84,7 +78,7 @@ func newRouter(
 		log:                log,
 		sender:             sender,
 		metrics:            metrics,
-		handlers:           make(map[uint64]*meteredHandler),
+		handlers:           make(map[uint64]*responder),
 		pendingAppRequests: make(map[uint32]pendingAppRequest),
 		// invariant: sdk uses odd-numbered requestIDs
 		requestID: 1,
@@ -99,14 +93,11 @@ func (r *router) addHandler(handlerID uint64, handler Handler) error {
 		return fmt.Errorf("failed to register handler id %d: %w", handlerID, ErrExistingAppProtocol)
 	}
 
-	r.handlers[handlerID] = &meteredHandler{
-		responder: &responder{
-			Handler:   handler,
-			handlerID: handlerID,
-			log:       r.log,
-			sender:    r.sender,
-		},
-		metrics: r.metrics,
+	r.handlers[handlerID] = &responder{
+		Handler:   handler,
+		handlerID: handlerID,
+		log:       r.log,
+		sender:    r.sender,
 	}
 
 	return nil
@@ -235,7 +226,7 @@ func (r *router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 // - A boolean indicating that parsing succeeded.
 //
 // Invariant: Assumes [r.lock] isn't held.
-func (r *router) parse(prefixedMsg []byte) ([]byte, *meteredHandler, string, bool) {
+func (r *router) parse(prefixedMsg []byte) ([]byte, *responder, string, bool) {
 	handlerID, msg, ok := ParseMessage(prefixedMsg)
 	if !ok {
 		return nil, nil, "", false

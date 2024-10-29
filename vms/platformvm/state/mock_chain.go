@@ -142,6 +142,18 @@ func (mr *MockChainMockRecorder) DeleteCurrentValidator(staker any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCurrentValidator", reflect.TypeOf((*MockChain)(nil).DeleteCurrentValidator), staker)
 }
 
+// DeleteExpiry mocks base method.
+func (m *MockChain) DeleteExpiry(arg0 ExpiryEntry) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeleteExpiry", arg0)
+}
+
+// DeleteExpiry indicates an expected call of DeleteExpiry.
+func (mr *MockChainMockRecorder) DeleteExpiry(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiry", reflect.TypeOf((*MockChain)(nil).DeleteExpiry), arg0)
+}
+
 // DeletePendingDelegator mocks base method.
 func (m *MockChain) DeletePendingDelegator(staker *Staker) {
 	m.ctrl.T.Helper()
@@ -176,6 +188,20 @@ func (m *MockChain) DeleteUTXO(utxoID ids.ID) {
 func (mr *MockChainMockRecorder) DeleteUTXO(utxoID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockChain)(nil).DeleteUTXO), utxoID)
+}
+
+// GetAccruedFees mocks base method.
+func (m *MockChain) GetAccruedFees() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccruedFees")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetAccruedFees indicates an expected call of GetAccruedFees.
+func (mr *MockChainMockRecorder) GetAccruedFees() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccruedFees", reflect.TypeOf((*MockChain)(nil).GetAccruedFees))
 }
 
 // GetCurrentDelegatorIterator mocks base method.
@@ -253,6 +279,21 @@ func (mr *MockChainMockRecorder) GetDelegateeReward(subnetID, nodeID any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDelegateeReward", reflect.TypeOf((*MockChain)(nil).GetDelegateeReward), subnetID, nodeID)
 }
 
+// GetExpiryIterator mocks base method.
+func (m *MockChain) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetExpiryIterator")
+	ret0, _ := ret[0].(iterator.Iterator[ExpiryEntry])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetExpiryIterator indicates an expected call of GetExpiryIterator.
+func (mr *MockChainMockRecorder) GetExpiryIterator() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExpiryIterator", reflect.TypeOf((*MockChain)(nil).GetExpiryIterator))
+}
+
 // GetFeeState mocks base method.
 func (m *MockChain) GetFeeState() gas.State {
 	m.ctrl.T.Helper()
@@ -312,20 +353,33 @@ func (mr *MockChainMockRecorder) GetPendingValidator(subnetID, nodeID any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockChain)(nil).GetPendingValidator), subnetID, nodeID)
 }
 
-// GetSubnetManager mocks base method.
-func (m *MockChain) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
+// GetSoVExcess mocks base method.
+func (m *MockChain) GetSoVExcess() gas.Gas {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnetManager", subnetID)
-	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].([]byte)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "GetSoVExcess")
+	ret0, _ := ret[0].(gas.Gas)
+	return ret0
 }
 
-// GetSubnetManager indicates an expected call of GetSubnetManager.
-func (mr *MockChainMockRecorder) GetSubnetManager(subnetID any) *gomock.Call {
+// GetSoVExcess indicates an expected call of GetSoVExcess.
+func (mr *MockChainMockRecorder) GetSoVExcess() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetManager", reflect.TypeOf((*MockChain)(nil).GetSubnetManager), subnetID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSoVExcess", reflect.TypeOf((*MockChain)(nil).GetSoVExcess))
+}
+
+// GetSubnetConversion mocks base method.
+func (m *MockChain) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetConversion", subnetID)
+	ret0, _ := ret[0].(SubnetConversion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetConversion indicates an expected call of GetSubnetConversion.
+func (mr *MockChainMockRecorder) GetSubnetConversion(subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetConversion", reflect.TypeOf((*MockChain)(nil).GetSubnetConversion), subnetID)
 }
 
 // GetSubnetOwner mocks base method.
@@ -403,6 +457,21 @@ func (mr *MockChainMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), utxoID)
 }
 
+// HasExpiry mocks base method.
+func (m *MockChain) HasExpiry(arg0 ExpiryEntry) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasExpiry", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HasExpiry indicates an expected call of HasExpiry.
+func (mr *MockChainMockRecorder) HasExpiry(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasExpiry", reflect.TypeOf((*MockChain)(nil).HasExpiry), arg0)
+}
+
 // PutCurrentDelegator mocks base method.
 func (m *MockChain) PutCurrentDelegator(staker *Staker) {
 	m.ctrl.T.Helper()
@@ -429,6 +498,18 @@ func (mr *MockChainMockRecorder) PutCurrentValidator(staker any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutCurrentValidator", reflect.TypeOf((*MockChain)(nil).PutCurrentValidator), staker)
 }
 
+// PutExpiry mocks base method.
+func (m *MockChain) PutExpiry(arg0 ExpiryEntry) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "PutExpiry", arg0)
+}
+
+// PutExpiry indicates an expected call of PutExpiry.
+func (mr *MockChainMockRecorder) PutExpiry(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutExpiry", reflect.TypeOf((*MockChain)(nil).PutExpiry), arg0)
+}
+
 // PutPendingDelegator mocks base method.
 func (m *MockChain) PutPendingDelegator(staker *Staker) {
 	m.ctrl.T.Helper()
@@ -453,6 +534,18 @@ func (m *MockChain) PutPendingValidator(staker *Staker) error {
 func (mr *MockChainMockRecorder) PutPendingValidator(staker any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPendingValidator", reflect.TypeOf((*MockChain)(nil).PutPendingValidator), staker)
+}
+
+// SetAccruedFees mocks base method.
+func (m *MockChain) SetAccruedFees(f uint64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetAccruedFees", f)
+}
+
+// SetAccruedFees indicates an expected call of SetAccruedFees.
+func (mr *MockChainMockRecorder) SetAccruedFees(f any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAccruedFees", reflect.TypeOf((*MockChain)(nil).SetAccruedFees), f)
 }
 
 // SetCurrentSupply mocks base method.
@@ -493,16 +586,28 @@ func (mr *MockChainMockRecorder) SetFeeState(f any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFeeState", reflect.TypeOf((*MockChain)(nil).SetFeeState), f)
 }
 
-// SetSubnetManager mocks base method.
-func (m *MockChain) SetSubnetManager(subnetID, chainID ids.ID, addr []byte) {
+// SetSoVExcess mocks base method.
+func (m *MockChain) SetSoVExcess(e gas.Gas) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetSubnetManager", subnetID, chainID, addr)
+	m.ctrl.Call(m, "SetSoVExcess", e)
 }
 
-// SetSubnetManager indicates an expected call of SetSubnetManager.
-func (mr *MockChainMockRecorder) SetSubnetManager(subnetID, chainID, addr any) *gomock.Call {
+// SetSoVExcess indicates an expected call of SetSoVExcess.
+func (mr *MockChainMockRecorder) SetSoVExcess(e any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetManager", reflect.TypeOf((*MockChain)(nil).SetSubnetManager), subnetID, chainID, addr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSoVExcess", reflect.TypeOf((*MockChain)(nil).SetSoVExcess), e)
+}
+
+// SetSubnetConversion mocks base method.
+func (m *MockChain) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetSubnetConversion", subnetID, c)
+}
+
+// SetSubnetConversion indicates an expected call of SetSubnetConversion.
+func (mr *MockChainMockRecorder) SetSubnetConversion(subnetID, c any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetConversion", reflect.TypeOf((*MockChain)(nil).SetSubnetConversion), subnetID, c)
 }
 
 // SetSubnetOwner mocks base method.

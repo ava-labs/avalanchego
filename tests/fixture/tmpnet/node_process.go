@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,7 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -37,29 +35,6 @@ var (
 	errNotRunning         = errors.New("node is not running")
 )
 
-func checkNodeHealth(ctx context.Context, uri string) (bool, error) {
-	// Check that the node is reporting healthy
-	health, err := health.NewClient(uri).Health(ctx, nil)
-	if err == nil {
-		return health.Healthy, nil
-	}
-
-	switch t := err.(type) {
-	case *net.OpError:
-		if t.Op == "read" {
-			// Connection refused - potentially recoverable
-			return false, nil
-		}
-	case syscall.Errno:
-		if t == syscall.ECONNREFUSED {
-			// Connection refused - potentially recoverable
-			return false, nil
-		}
-	}
-	// Assume all other errors are not recoverable
-	return false, fmt.Errorf("failed to query node health: %w", err)
-}
-
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
 type NodeProcess struct {
@@ -69,7 +44,7 @@ type NodeProcess struct {
 	pid int
 }
 
-func (p *NodeProcess) setProcessContext(processContext node.NodeProcessContext) {
+func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
 	p.pid = processContext.PID
 	p.node.URI = processContext.URI
 	p.node.StakingAddress = processContext.StakingAddress
@@ -80,12 +55,12 @@ func (p *NodeProcess) readState() error {
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
-		p.setProcessContext(node.NodeProcessContext{})
+		p.setProcessContext(node.ProcessContext{})
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to read node process context: %w", err)
 	}
-	processContext := node.NodeProcessContext{}
+	processContext := node.ProcessContext{}
 	if err := json.Unmarshal(bytes, &processContext); err != nil {
 		return fmt.Errorf("failed to unmarshal node process context: %w", err)
 	}
@@ -199,7 +174,11 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, errNotRunning
 	}
 
-	return checkNodeHealth(ctx, p.node.URI)
+	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
+	if err != nil {
+		return false, err
+	}
+	return healthReply.Healthy, nil
 }
 
 func (p *NodeProcess) getProcessContextPath() string {

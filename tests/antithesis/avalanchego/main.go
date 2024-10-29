@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -152,22 +153,7 @@ func (w *workload) run(ctx context.Context) {
 	defer tc.Cleanup()
 	require := require.New(tc)
 
-	var (
-		xWallet  = w.wallet.X()
-		xBuilder = xWallet.Builder()
-		pWallet  = w.wallet.P()
-		pBuilder = pWallet.Builder()
-	)
-	xBalances, err := xBuilder.GetFTBalance()
-	require.NoError(err, "failed to fetch X-chain balances")
-	pBalances, err := pBuilder.GetBalance()
-	require.NoError(err, "failed to fetch P-chain balances")
-	var (
-		xContext    = xBuilder.Context()
-		avaxAssetID = xContext.AVAXAssetID
-		xAVAX       = xBalances[avaxAssetID]
-		pAVAX       = pBalances[avaxAssetID]
-	)
+	xAVAX, pAVAX := e2e.GetWalletBalances(tc, w.wallet)
 	log.Printf("wallet starting with %d X-chain nAVAX and %d P-chain nAVAX", xAVAX, pAVAX)
 	assert.Reachable("wallet starting", map[string]any{
 		"worker":   w.id,

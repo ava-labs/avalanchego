@@ -10,8 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+
+	. "github.com/ava-labs/avalanchego/utils/iterator"
 )
 
 func TestFilter(t *testing.T) {
@@ -40,8 +41,8 @@ func TestFilter(t *testing.T) {
 		stakers[3].TxID: stakers[3],
 	}
 
-	it := iterator.Filter(
-		iterator.FromSlice(stakers[:3]...),
+	it := Filter(
+		FromSlice(stakers[:3]...),
 		func(staker *state.Staker) bool {
 			_, ok := maskedStakers[staker.TxID]
 			return ok
@@ -54,4 +55,12 @@ func TestFilter(t *testing.T) {
 	require.False(it.Next())
 	it.Release()
 	require.False(it.Next())
+}
+
+func TestDeduplicate(t *testing.T) {
+	require.Equal(
+		t,
+		[]int{0, 1, 2, 3},
+		ToSlice(Deduplicate(FromSlice(0, 1, 2, 1, 2, 0, 3))),
+	)
 }

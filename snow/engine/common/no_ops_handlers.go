@@ -237,7 +237,7 @@ func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
 	return &noOpChitsHandler{log: log}
 }
 
-func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID) error {
+func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, requestID uint32, preferredID, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.ChitsOp),
@@ -246,6 +246,7 @@ func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, request
 		zap.Stringer("preferredID", preferredID),
 		zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		zap.Stringer("acceptedID", acceptedID),
+		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
 	return nil
 }
@@ -339,27 +340,12 @@ func (nop *noOpInternalHandler) Disconnected(_ context.Context, nodeID ids.NodeI
 	return nil
 }
 
-func (nop *noOpInternalHandler) Timeout(context.Context) error {
-	nop.log.Debug("dropping request",
-		zap.String("reason", "unhandled by this gear"),
-		zap.Stringer("messageOp", message.TimeoutOp),
-	)
-	return nil
-}
-
 func (nop *noOpInternalHandler) Gossip(context.Context) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GossipRequestOp),
 	)
 	return nil
-}
-
-func (nop *noOpInternalHandler) Halt(context.Context) {
-	nop.log.Debug("dropping request",
-		zap.String("reason", "unhandled by this gear"),
-		zap.String("messageOp", "halt"),
-	)
 }
 
 func (nop *noOpInternalHandler) Shutdown(context.Context) error {

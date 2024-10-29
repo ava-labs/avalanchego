@@ -56,11 +56,9 @@ const (
 	AppGossipOp
 	// Internal:
 	ConnectedOp
-	ConnectedSubnetOp
 	DisconnectedOp
 	NotifyOp
 	GossipRequestOp
-	TimeoutOp
 )
 
 var (
@@ -113,11 +111,9 @@ var (
 		GetFailedOp,
 		QueryFailedOp,
 		ConnectedOp,
-		ConnectedSubnetOp,
 		DisconnectedOp,
 		NotifyOp,
 		GossipRequestOp,
-		TimeoutOp,
 	}
 	ConsensusOps = append(ConsensusExternalOps, ConsensusInternalOps...)
 
@@ -151,7 +147,6 @@ var (
 		ChitsOp,
 		// Internal
 		ConnectedOp,
-		ConnectedSubnetOp,
 		DisconnectedOp,
 	}
 
@@ -261,16 +256,12 @@ func (op Op) String() string {
 	// Internal
 	case ConnectedOp:
 		return "connected"
-	case ConnectedSubnetOp:
-		return "connected_subnet"
 	case DisconnectedOp:
 		return "disconnected"
 	case NotifyOp:
 		return "notify"
 	case GossipRequestOp:
 		return "gossip_request"
-	case TimeoutOp:
-		return "timeout"
 	default:
 		return "unknown"
 	}

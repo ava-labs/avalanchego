@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -210,122 +209,35 @@ func TestSend(t *testing.T) {
 }
 
 func TestPingUptimes(t *testing.T) {
-	trackedSubnetID := ids.GenerateTestID()
-	untrackedSubnetID := ids.GenerateTestID()
-
 	sharedConfig := newConfig(t)
-	sharedConfig.MySubnets = set.Of(trackedSubnetID)
-
-	testCases := []struct {
-		name        string
-		msg         message.OutboundMessage
-		shouldClose bool
-		assertFn    func(*require.Assertions, *testPeer)
-	}{
-		{
-			name: "primary network only",
-			msg: func() message.OutboundMessage {
-				pingMsg, err := sharedConfig.MessageCreator.Ping(1, nil)
-				require.NoError(t, err)
-				return pingMsg
-			}(),
-			shouldClose: false,
-			assertFn: func(require *require.Assertions, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(ok)
-				require.Equal(uint32(1), uptime)
-
-				uptime, ok = peer.ObservedUptime(trackedSubnetID)
-				require.False(ok)
-				require.Zero(uptime)
-			},
-		},
-		{
-			name: "primary network and subnet",
-			msg: func() message.OutboundMessage {
-				pingMsg, err := sharedConfig.MessageCreator.Ping(
-					1,
-					[]*p2p.SubnetUptime{
-						{
-							SubnetId: trackedSubnetID[:],
-							Uptime:   1,
-						},
-					},
-				)
-				require.NoError(t, err)
-				return pingMsg
-			}(),
-			shouldClose: false,
-			assertFn: func(require *require.Assertions, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(ok)
-				require.Equal(uint32(1), uptime)
-
-				uptime, ok = peer.ObservedUptime(trackedSubnetID)
-				require.True(ok)
-				require.Equal(uint32(1), uptime)
-			},
-		},
-		{
-			name: "primary network and non tracked subnet",
-			msg: func() message.OutboundMessage {
-				pingMsg, err := sharedConfig.MessageCreator.Ping(
-					1,
-					[]*p2p.SubnetUptime{
-						{
-							// Providing the untrackedSubnetID here should cause
-							// the remote peer to disconnect from us.
-							SubnetId: untrackedSubnetID[:],
-							Uptime:   1,
-						},
-						{
-							SubnetId: trackedSubnetID[:],
-							Uptime:   1,
-						},
-					},
-				)
-				require.NoError(t, err)
-				return pingMsg
-			}(),
-			shouldClose: true,
-			assertFn:    nil,
-		},
-	}
 
 	// The raw peers are generated outside of the test cases to avoid generating
 	// many TLS keys.
 	rawPeer0 := newRawTestPeer(t, sharedConfig)
 	rawPeer1 := newRawTestPeer(t, sharedConfig)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require := require.New(t)
+	require := require.New(t)
 
-			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
-			awaitReady(t, peer0, peer1)
-			defer func() {
-				peer1.StartClose()
-				peer0.StartClose()
-				require.NoError(peer0.AwaitClosed(context.Background()))
-				require.NoError(peer1.AwaitClosed(context.Background()))
-			}()
+	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	awaitReady(t, peer0, peer1)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(context.Background()))
+		require.NoError(peer1.AwaitClosed(context.Background()))
+	}()
+	pingMsg, err := sharedConfig.MessageCreator.Ping(1)
+	require.NoError(err)
+	require.True(peer0.Send(context.Background(), pingMsg))
 
-			require.True(peer0.Send(context.Background(), tc.msg))
+	// we send Get message after ping to ensure Ping is handled by the
+	// time Get is handled. This is because Get is routed to the handler
+	// whereas Ping is handled by the peer directly. We have no way to
+	// know when the peer has handled the Ping message.
+	sendAndFlush(t, peer0, peer1)
 
-			if tc.shouldClose {
-				require.NoError(peer1.AwaitClosed(context.Background()))
-				return
-			}
-
-			// we send Get message after ping to ensure Ping is handled by the
-			// time Get is handled. This is because Get is routed to the handler
-			// whereas Ping is handled by the peer directly. We have no way to
-			// know when the peer has handled the Ping message.
-			sendAndFlush(t, peer0, peer1)
-
-			tc.assertFn(require, peer1)
-		})
-	}
+	uptime := peer1.ObservedUptime()
+	require.Equal(uint32(1), uptime)
 }
 
 func TestTrackedSubnets(t *testing.T) {

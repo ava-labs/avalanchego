@@ -165,18 +165,18 @@ func (mr *OutboundMsgBuilderMockRecorder) AppResponse(arg0, arg1, arg2 any) *gom
 }
 
 // Chits mocks base method.
-func (m *OutboundMsgBuilder) Chits(arg0 ids.ID, arg1 uint32, arg2, arg3, arg4 ids.ID) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Chits(arg0 ids.ID, arg1 uint32, arg2, arg3, arg4 ids.ID, arg5 uint64) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Chits indicates an expected call of Chits.
-func (mr *OutboundMsgBuilderMockRecorder) Chits(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *OutboundMsgBuilderMockRecorder) Chits(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*OutboundMsgBuilder)(nil).Chits), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Chits", reflect.TypeOf((*OutboundMsgBuilder)(nil).Chits), arg0, arg1, arg2, arg3, arg4, arg5)
 }
 
 // Get mocks base method.
@@ -315,18 +315,18 @@ func (mr *OutboundMsgBuilderMockRecorder) PeerList(arg0, arg1 any) *gomock.Call 
 }
 
 // Ping mocks base method.
-func (m *OutboundMsgBuilder) Ping(arg0 uint32, arg1 []*p2p.SubnetUptime) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Ping(arg0 uint32) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ping", arg0, arg1)
+	ret := m.ctrl.Call(m, "Ping", arg0)
 	ret0, _ := ret[0].(message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Ping indicates an expected call of Ping.
-func (mr *OutboundMsgBuilderMockRecorder) Ping(arg0, arg1 any) *gomock.Call {
+func (mr *OutboundMsgBuilderMockRecorder) Ping(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*OutboundMsgBuilder)(nil).Ping), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*OutboundMsgBuilder)(nil).Ping), arg0)
 }
 
 // Pong mocks base method.

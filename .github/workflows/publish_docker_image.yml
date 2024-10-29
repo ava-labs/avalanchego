@@ -17,7 +17,7 @@ jobs:
       - name: Install qemu (required for cross-platform builds)
         run: |
           sudo apt update
-          sudo apt -y install qemu qemu-user-static
+          sudo apt -y install qemu-system qemu-user-static
           sudo systemctl restart docker
       - name: Create multiplatform docker builder
         run: docker buildx create --use
@@ -26,4 +26,12 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
           DOCKER_IMAGE: ${{ secrets.docker_repo }}
+          BUILD_MULTI_ARCH: 1
         run: scripts/build_image.sh
+      - name: Build and publish bootstrap-monitor image to DockerHub
+        env:
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+          DOCKER_IMAGE: avaplatform/bootstrap-monitor
+          BUILD_MULTI_ARCH: 1
+        run: scripts/build_bootstrap_monitor_image.sh

@@ -34,7 +34,6 @@ var (
 
 	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
-	ErrChildBlockNotAfterParent      = errors.New("proposed timestamp not after current chain time")
 	ErrInvalidState                  = errors.New("generated output isn't valid state")
 	ErrShouldBePermissionlessStaker  = errors.New("expected permissionless staker")
 	ErrWrongTxType                   = errors.New("wrong transaction type")
@@ -270,34 +269,17 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		)
 	}
 
-	parentChainTime := e.OnCommitState.GetTimestamp()
-	if !newChainTime.After(parentChainTime) {
-		return fmt.Errorf(
-			"%w, proposed timestamp (%s), chain time (%s)",
-			ErrChildBlockNotAfterParent,
-			parentChainTime,
-			parentChainTime,
-		)
-	}
-
-	// Only allow timestamp to move forward as far as the time of next staker
-	// set change time
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(e.OnCommitState)
-	if err != nil {
-		return err
-	}
-
 	now := e.Clk.Time()
 	if err := VerifyNewChainTime(
 		newChainTime,
-		nextStakerChangeTime,
 		now,
+		e.OnCommitState,
 	); err != nil {
 		return err
 	}
 
 	// Note that state doesn't change if this proposal is aborted
-	_, err = AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
+	_, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
 	return err
 }
 

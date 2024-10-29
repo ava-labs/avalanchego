@@ -26,8 +26,8 @@ import (
 const (
 	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 64
-	minRecentlyAcceptedWindowSize = 16
-	recentlyAcceptedWindowTTL     = 2 * time.Minute
+	minRecentlyAcceptedWindowSize = 0
+	recentlyAcceptedWindowTTL     = 30 * time.Second
 )
 
 var (
@@ -85,6 +85,7 @@ type State interface {
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
+		subnetID ids.ID,
 	) error
 }
 
@@ -271,7 +272,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
-		constants.PlatformChainID,
+		constants.PrimaryNetworkID,
 	)
 	if err != nil {
 		return nil, 0, err
@@ -282,6 +283,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
+		constants.PrimaryNetworkID,
 	)
 	return validatorSet, currentHeight, err
 }
@@ -348,6 +350,10 @@ func (m *manager) makeSubnetValidatorSet(
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
+		// TODO: Etna introduces L1s whose validators specify their own public
+		// keys, rather than inheriting them from the primary network.
+		// Therefore, this will need to use the subnetID after Etna.
+		constants.PrimaryNetworkID,
 	)
 	return subnetValidatorSet, currentHeight, err
 }

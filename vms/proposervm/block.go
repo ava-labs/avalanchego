@@ -162,10 +162,17 @@ func (p *postForkCommonComponents) Verify(
 		)
 	}
 
+	var contextPChainHeight uint64
+	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+		contextPChainHeight = childPChainHeight
+	} else {
+		contextPChainHeight = parentPChainHeight
+	}
+
 	return p.vm.verifyAndRecordInnerBlk(
 		ctx,
 		&smblock.Context{
-			PChainHeight: parentPChainHeight,
+			PChainHeight: contextPChainHeight,
 		},
 		child,
 	)
@@ -218,10 +225,17 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	var contextPChainHeight uint64
+	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+		contextPChainHeight = pChainHeight
+	} else {
+		contextPChainHeight = parentPChainHeight
+	}
+
 	var innerBlock snowman.Block
 	if p.vm.blockBuilderVM != nil {
 		innerBlock, err = p.vm.blockBuilderVM.BuildBlockWithContext(ctx, &smblock.Context{
-			PChainHeight: parentPChainHeight,
+			PChainHeight: contextPChainHeight,
 		})
 	} else {
 		innerBlock, err = p.vm.ChainVM.BuildBlock(ctx)
