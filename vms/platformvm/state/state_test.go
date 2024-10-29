@@ -1944,6 +1944,73 @@ func TestSubnetOnlyValidators(t *testing.T) {
 	}
 }
 
+// TestLoadSubnetOnlyValidatorAndLegacy tests that the state can be loaded when
+// there is a mix of legacy validators and subnet only validators in the same
+// subnet.
+func TestLoadSubnetOnlyValidatorAndLegacy(t *testing.T) {
+	var (
+		require         = require.New(t)
+		db              = memdb.New()
+		state           = newTestState(t, db)
+		subnetID        = ids.GenerateTestID()
+		weight   uint64 = 1
+	)
+
+	unsignedAddSubnetValidator := createPermissionlessValidatorTx(
+		t,
+		subnetID,
+		txs.Validator{
+			NodeID: defaultValidatorNodeID,
+			End:    genesistest.DefaultValidatorEndTimeUnix,
+			Wght:   weight,
+		},
+	)
+	addSubnetValidator := &txs.Tx{Unsigned: unsignedAddSubnetValidator}
+	require.NoError(addSubnetValidator.Initialize(txs.Codec))
+	state.AddTx(addSubnetValidator, status.Committed)
+
+	legacyStaker := &Staker{
+		TxID:            addSubnetValidator.ID(),
+		NodeID:          defaultValidatorNodeID,
+		PublicKey:       nil,
+		SubnetID:        subnetID,
+		Weight:          weight,
+		StartTime:       genesistest.DefaultValidatorStartTime,
+		EndTime:         genesistest.DefaultValidatorEndTime,
+		PotentialReward: 0,
+	}
+	require.NoError(state.PutCurrentValidator(legacyStaker))
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	pk := bls.PublicFromSecretKey(sk)
+	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+
+	sov := SubnetOnlyValidator{
+		ValidationID:          ids.GenerateTestID(),
+		SubnetID:              legacyStaker.SubnetID,
+		NodeID:                ids.GenerateTestNodeID(),
+		PublicKey:             pkBytes,
+		RemainingBalanceOwner: utils.RandomBytes(32),
+		DeactivationOwner:     utils.RandomBytes(32),
+		StartTime:             1,
+		Weight:                2,
+		MinNonce:              3,
+		EndAccumulatedFee:     4,
+	}
+	require.NoError(state.PutSubnetOnlyValidator(sov))
+
+	state.SetHeight(1)
+	require.NoError(state.Commit())
+
+	expectedValidatorSet := state.validators.GetMap(subnetID)
+
+	state = newTestState(t, db)
+
+	validatorSet := state.validators.GetMap(subnetID)
+	require.Equal(expectedValidatorSet, validatorSet)
+}
+
 func TestSubnetOnlyValidatorAfterLegacyRemoval(t *testing.T) {
 	require := require.New(t)
 
