@@ -1777,7 +1777,12 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			}
 
 			for subnetID := range subnetIDs {
-				state.SetSubnetConversion(subnetID, ids.GenerateTestID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r'})
+				SubnetConversion := SubnetConversion{
+					ConversionID: ids.GenerateTestID(),
+					ChainID:      ids.GenerateTestID(),
+					Addr:         []byte{'a', 'd', 'd', 'r'},
+				}
+				state.SetSubnetConversion(subnetID, SubnetConversion)
 			}
 
 			verifyChain := func(chain Chain) {
@@ -1933,4 +1938,45 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSubnetOnlyValidatorAfterLegacyRemoval(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	legacyStaker := &Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          defaultValidatorNodeID,
+		PublicKey:       nil,
+		SubnetID:        ids.GenerateTestID(),
+		Weight:          1,
+		StartTime:       genesistest.DefaultValidatorStartTime,
+		EndTime:         genesistest.DefaultValidatorEndTime,
+		PotentialReward: 0,
+	}
+	require.NoError(state.PutCurrentValidator(legacyStaker))
+
+	state.SetHeight(1)
+	require.NoError(state.Commit())
+
+	state.DeleteCurrentValidator(legacyStaker)
+
+	sov := SubnetOnlyValidator{
+		ValidationID:          ids.GenerateTestID(),
+		SubnetID:              legacyStaker.SubnetID,
+		NodeID:                legacyStaker.NodeID,
+		PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
+		RemainingBalanceOwner: utils.RandomBytes(32),
+		DeactivationOwner:     utils.RandomBytes(32),
+		StartTime:             1,
+		Weight:                2,
+		MinNonce:              3,
+		EndAccumulatedFee:     4,
+	}
+	require.NoError(state.PutSubnetOnlyValidator(sov))
+
+	state.SetHeight(2)
+	require.NoError(state.Commit())
 }
