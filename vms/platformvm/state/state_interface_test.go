@@ -37,13 +37,14 @@ func TestState_GetEtnaHeight_Activation(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Etna was just activated
-	state.SetHeight(2)
+	const expectedEtnaHeight uint64 = 2
+	state.SetHeight(expectedEtnaHeight)
 	state.SetTimestamp(genesistest.DefaultValidatorStartTime.Add(2 * time.Second))
 	require.NoError(state.Commit())
 
 	etnaHeight, err := state.GetEtnaHeight()
 	require.NoError(err)
-	require.Equal(uint64(2), etnaHeight)
+	require.Equal(expectedEtnaHeight, etnaHeight)
 
 	// Etna was previously activated
 	state.SetHeight(3)
@@ -52,7 +53,7 @@ func TestState_GetEtnaHeight_Activation(t *testing.T) {
 
 	etnaHeight, err = state.GetEtnaHeight()
 	require.NoError(err)
-	require.Equal(uint64(2), etnaHeight)
+	require.Equal(expectedEtnaHeight, etnaHeight)
 }
 
 func TestState_GetEtnaHeight_InitiallyActive(t *testing.T) {

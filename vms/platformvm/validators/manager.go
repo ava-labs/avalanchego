@@ -362,9 +362,6 @@ func (m *manager) makeSubnetValidatorSet(
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
-		// TODO: Etna introduces L1s whose validators specify their own public
-		// keys, rather than inheriting them from the primary network.
-		// Therefore, this will need to use the subnetID after Etna.
 		constants.PrimaryNetworkID,
 	)
 	return subnetValidatorSet, currentHeight, err
