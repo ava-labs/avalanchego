@@ -1940,20 +1940,12 @@ func TestSubnetOnlyValidators(t *testing.T) {
 						continue
 					}
 
-					nodeID := sov.NodeID
-					publicKey := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
-					// Inactive validators are combined into a single validator
-					// with the empty ID.
-					if sov.EndAccumulatedFee == 0 {
-						nodeID = ids.EmptyNodeID
-						publicKey = nil
-					}
-
+					nodeID := sov.effectiveNodeID()
 					vdr, ok := validatorSet[nodeID]
 					if !ok {
 						vdr = &validators.GetValidatorOutput{
 							NodeID:    nodeID,
-							PublicKey: publicKey,
+							PublicKey: sov.effectivePublicKey(),
 						}
 						validatorSet[nodeID] = vdr
 					}

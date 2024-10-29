@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -2236,6 +2235,20 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 }
 
+func (s *state) addSoVToValidatorManager(sov SubnetOnlyValidator) error {
+	nodeID := sov.effectiveNodeID()
+	if s.validators.GetWeight(sov.SubnetID, nodeID) != 0 {
+		return s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight)
+	}
+	return s.validators.AddStaker(
+		sov.SubnetID,
+		nodeID,
+		sov.effectivePublicKey(),
+		sov.effectiveValidationID(),
+		sov.Weight,
+	)
+}
+
 // updateValidatorManager updates the validator manager with the pending
 // validator set changes.
 //
@@ -2292,115 +2305,41 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		}
 	}
 
-	// Perform SoV deletions:
-	var (
-		sovChanges        = s.sovDiff.modified
-		sovChangesApplied set.Set[ids.ID]
-	)
-	for validationID, sov := range sovChanges {
-		if !sov.isDeleted() {
-			// Additions and modifications are handled in the next loops.
-			continue
-		}
-
-		sovChangesApplied.Add(validationID)
-
+	for validationID, sov := range s.sovDiff.modified {
 		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		if err == database.ErrNotFound {
-			// Deleting a non-existent validator is a noop. This can happen if
-			// the validator was added and then immediately removed.
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		nodeID := ids.EmptyNodeID
-		if priorSOV.isActive() {
-			nodeID = priorSOV.NodeID
-		}
-		if err := s.validators.RemoveWeight(priorSOV.SubnetID, nodeID, priorSOV.Weight); err != nil {
-			return fmt.Errorf("failed to delete SoV validator: %w", err)
-		}
-	}
-
-	// Perform modifications:
-	for validationID, sov := range sovChanges {
-		if sovChangesApplied.Contains(validationID) {
-			continue
-		}
-
-		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		if err == database.ErrNotFound {
-			// New additions are handled in the next loop.
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		sovChangesApplied.Add(validationID)
-
-		switch {
-		case priorSOV.isInactive() && sov.isActive():
-			// This validator is being activated.
-			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
-			err = errors.Join(
-				s.validators.RemoveWeight(sov.SubnetID, ids.EmptyNodeID, priorSOV.Weight),
-				s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight),
-			)
-		case priorSOV.isActive() && sov.isInactive():
-			// This validator is being deactivated.
-			inactiveWeight := s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
-			if inactiveWeight == 0 {
-				err = s.validators.AddStaker(sov.SubnetID, ids.EmptyNodeID, nil, ids.Empty, sov.Weight)
+		switch err {
+		case nil:
+			if sov.isDeleted() {
+				// Removing a validator
+				err = s.validators.RemoveWeight(priorSOV.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight)
 			} else {
-				err = s.validators.AddWeight(sov.SubnetID, ids.EmptyNodeID, sov.Weight)
+				// Modifying a validator
+				if priorSOV.isActive() == sov.isActive() {
+					// This validator's active status isn't changing. This means
+					// the effectiveNodeIDs are equal.
+					nodeID := sov.effectiveNodeID()
+					if priorSOV.Weight < sov.Weight {
+						err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
+					} else if priorSOV.Weight > sov.Weight {
+						err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
+					}
+				} else {
+					// This validator's active status is changing.
+					err = errors.Join(
+						s.validators.RemoveWeight(sov.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight),
+						s.addSoVToValidatorManager(sov),
+					)
+				}
 			}
-			err = errors.Join(
-				err,
-				s.validators.RemoveWeight(sov.SubnetID, sov.NodeID, priorSOV.Weight),
-			)
-		default:
-			// This validator's active status isn't changing.
-			nodeID := ids.EmptyNodeID
-			if sov.isActive() {
-				nodeID = sov.NodeID
+		case database.ErrNotFound:
+			if sov.isDeleted() {
+				// Deleting a non-existent validator is a noop. This can happen
+				// if the validator was added and then immediately removed.
+				continue
 			}
-			if priorSOV.Weight < sov.Weight {
-				err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
-			} else if priorSOV.Weight > sov.Weight {
-				err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
-			}
-		}
-		if err != nil {
-			return err
-		}
-	}
 
-	// Perform additions:
-	for validationID, sov := range sovChanges {
-		if sovChangesApplied.Contains(validationID) {
-			continue
-		}
-
-		if sov.isActive() {
-			pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
-			if err := s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {
-				return fmt.Errorf("failed to add SoV validator: %w", err)
-			}
-			continue
-		}
-
-		// This validator is inactive
-		var (
-			inactiveWeight = s.validators.GetWeight(sov.SubnetID, ids.EmptyNodeID)
-			err            error
-		)
-		if inactiveWeight == 0 {
-			err = s.validators.AddStaker(sov.SubnetID, ids.EmptyNodeID, nil, ids.Empty, sov.Weight)
-		} else {
-			err = s.validators.AddWeight(sov.SubnetID, ids.EmptyNodeID, sov.Weight)
+			// Adding a validator
+			err = s.addSoVToValidatorManager(sov)
 		}
 		if err != nil {
 			return err
@@ -2467,61 +2406,40 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 		}
 	}
 
-	// Perform SoV deletions:
-	for validationID := range s.sovDiff.modified {
+	// Calculate the changes to the ACP-77 validator set
+	for validationID, sov := range s.sovDiff.modified {
 		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		if err == database.ErrNotFound {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		var (
-			diff           *validatorDiff
-			subnetIDNodeID = subnetIDNodeID{
+		if err == nil {
+			// Delete the prior validator
+			subnetIDNodeID := subnetIDNodeID{
 				subnetID: priorSOV.SubnetID,
+				nodeID:   priorSOV.effectiveNodeID(),
 			}
-		)
-		if priorSOV.isActive() {
-			subnetIDNodeID.nodeID = priorSOV.NodeID
-			diff = getOrDefault(changes, subnetIDNodeID)
-			diff.prevPublicKey = priorSOV.PublicKey
-		} else {
-			subnetIDNodeID.nodeID = ids.EmptyNodeID
-			diff = getOrDefault(changes, subnetIDNodeID)
+			diff := getOrDefault(changes, subnetIDNodeID)
+			if err := diff.weightDiff.Add(true, priorSOV.Weight); err != nil {
+				return nil, err
+			}
+			diff.prevPublicKey = priorSOV.effectivePublicKeyBytes()
 		}
-
-		if err := diff.weightDiff.Add(true, priorSOV.Weight); err != nil {
+		if err != database.ErrNotFound && err != nil {
 			return nil, err
 		}
-	}
 
-	// Perform SoV additions:
-	for _, sov := range s.sovDiff.modified {
 		// If the validator is being removed, we shouldn't work to re-add it.
 		if sov.isDeleted() {
 			continue
 		}
 
-		var (
-			diff           *validatorDiff
-			subnetIDNodeID = subnetIDNodeID{
-				subnetID: sov.SubnetID,
-			}
-		)
-		if sov.isActive() {
-			subnetIDNodeID.nodeID = sov.NodeID
-			diff = getOrDefault(changes, subnetIDNodeID)
-			diff.newPublicKey = sov.PublicKey
-		} else {
-			subnetIDNodeID.nodeID = ids.EmptyNodeID
-			diff = getOrDefault(changes, subnetIDNodeID)
+		// Add the new validator
+		subnetIDNodeID := subnetIDNodeID{
+			subnetID: sov.SubnetID,
+			nodeID:   sov.effectiveNodeID(),
 		}
-
+		diff := getOrDefault(changes, subnetIDNodeID)
 		if err := diff.weightDiff.Add(false, sov.Weight); err != nil {
 			return nil, err
 		}
+		diff.newPublicKey = sov.effectivePublicKeyBytes()
 	}
 
 	return changes, nil
