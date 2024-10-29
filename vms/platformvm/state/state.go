@@ -2126,42 +2126,44 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 	return nil
 }
 
-// writeValidatorDiffs writes the validator set diff contained by the pending
-// validator set changes to disk.
+type validatorDiff struct {
+	weightDiff    ValidatorWeightDiff
+	prevPublicKey []byte
+	newPublicKey  []byte
+}
+
+// calculateValidatorDiffs calculates the validator set diff contained by the
+// pending validator set changes.
 //
 // This function must be called prior to writeCurrentStakers.
-func (s *state) writeValidatorDiffs(height uint64) error {
-	type validatorChanges struct {
-		weightDiff    ValidatorWeightDiff
-		prevPublicKey []byte
-		newPublicKey  []byte
-	}
-	changes := make(map[subnetIDNodeID]*validatorChanges)
+func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, error) {
+	changes := make(map[subnetIDNodeID]*validatorDiff)
 
 	// Calculate the changes to the pre-ACP-77 validator set
 	for subnetID, subnetDiffs := range s.currentStakers.validatorDiffs {
 		for nodeID, diff := range subnetDiffs {
 			weightDiff, err := diff.WeightDiff()
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			pk, err := s.getInheritedPublicKey(nodeID)
 			if err != nil {
 				// This should never happen as there should always be a primary
 				// network validator corresponding to a subnet validator.
-				return err
+				return nil, err
 			}
 
-			change := &validatorChanges{
+			change := &validatorDiff{
 				weightDiff: weightDiff,
 			}
 			if pk != nil {
-				switch diff.validatorStatus {
-				case added:
-					change.newPublicKey = bls.PublicKeyToUncompressedBytes(pk)
-				case deleted:
-					change.prevPublicKey = bls.PublicKeyToUncompressedBytes(pk)
+				pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+				if diff.validatorStatus != added {
+					change.prevPublicKey = pkBytes
+				}
+				if diff.validatorStatus != deleted {
+					change.newPublicKey = pkBytes
 				}
 			}
 
@@ -2171,6 +2173,19 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 			}
 			changes[subnetIDNodeID] = change
 		}
+	}
+
+	return changes, nil
+}
+
+// writeValidatorDiffs writes the validator set diff contained by the pending
+// validator set changes to disk.
+//
+// This function must be called prior to writeCurrentStakers.
+func (s *state) writeValidatorDiffs(height uint64) error {
+	changes, err := s.calculateValidatorDiffs()
+	if err != nil {
+		return err
 	}
 
 	// Write the changes to the database
