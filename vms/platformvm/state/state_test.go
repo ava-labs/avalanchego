@@ -1777,12 +1777,11 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			}
 
 			for subnetID := range subnetIDs {
-				SubnetConversion := SubnetConversion{
+				state.SetSubnetConversion(subnetID, SubnetConversion{
 					ConversionID: ids.GenerateTestID(),
 					ChainID:      ids.GenerateTestID(),
 					Addr:         []byte{'a', 'd', 'd', 'r'},
-				}
-				state.SetSubnetConversion(subnetID, SubnetConversion)
+				})
 			}
 
 			verifyChain := func(chain Chain) {
