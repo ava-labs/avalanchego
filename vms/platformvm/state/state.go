@@ -809,10 +809,11 @@ func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool
 		return has, nil
 	}
 
-	// TODO: Add caching
-	key := make([]byte, len(subnetID)+len(nodeID))
-	copy(key, subnetID[:])
-	copy(key[len(subnetID):], nodeID[:])
+	subnetIDNodeID := subnetIDNodeID{
+		subnetID: subnetID,
+		nodeID:   nodeID,
+	}
+	key := subnetIDNodeID.Marshal()
 	return s.subnetIDNodeIDDB.Has(key)
 }
 
