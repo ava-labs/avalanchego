@@ -1730,7 +1730,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					NodeID:            sov.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            2, // Not removed
-					EndAccumulatedFee: 1, // Inactive
+					EndAccumulatedFee: 1, // Active
 				},
 				{
 					ValidationID:      sov.ValidationID,
@@ -1738,7 +1738,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					NodeID:            sov.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            3, // Not removed
-					EndAccumulatedFee: 1, // Inactive
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
@@ -1768,7 +1768,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					NodeID:            sov.NodeID,
 					PublicKey:         otherPKBytes,
 					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Inactive
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
