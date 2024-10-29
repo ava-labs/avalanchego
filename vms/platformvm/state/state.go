@@ -206,7 +206,7 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, bool, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -755,26 +755,92 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+// TODO: consider changing this to GetCurrentL1ValidatorSet and returning err for non L1 subnets
+// TODO: add caching
+func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, bool, error) {
+	// first check if this is a L1 or subnet
+	isL1, err := s.IsL1(subnetID)
+	if err != nil {
+		return nil, 0, false, fmt.Errorf("failed to determine if subnet is L1: %w", err)
+	}
+
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
-	for _, staker := range s.currentStakers.validators[subnetID] {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
+	if !isL1 {
+		for _, staker := range s.currentStakers.validators[subnetID] {
+			if err := ctx.Err(); err != nil {
+				return nil, 0, false, err
+			}
+			validator := staker.validator
+			result[validator.TxID] = &validators.GetCurrentValidatorOutput{
+				ValidationID:   validator.TxID,
+				NodeID:         validator.NodeID,
+				PublicKey:      validator.PublicKey,
+				Weight:         validator.Weight,
+				StartTime:      uint64(validator.StartTime.Unix()),
+				SetWeightNonce: 0,
+				IsActive:       true,
+			}
 		}
-		validator := staker.validator
-		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			ValidationID: validator.TxID,
-			NodeID:       validator.NodeID,
-			PublicKey:    validator.PublicKey,
-			Weight:       validator.Weight,
-			StartTime:    uint64(validator.StartTime.Unix()),
-			// TODO: not implemented yet
-			SetWeightNonce: 0,
-			// TODO: not implemented yet
-			IsActive: true,
+		return result, s.currentHeight, isL1, nil
+	}
+
+	// this is L1 subnet, fetch all validation IDs from subnetIDNodeIDDB
+	// with subnetID as prefix
+	subnetIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
+		subnetID[:],
+	)
+	defer subnetIDIter.Release()
+
+	for subnetIDIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, 0, false, err
+		}
+
+		validationID, err := ids.ToID(subnetIDIter.Value())
+		if err != nil {
+			return nil, 0, false, fmt.Errorf("failed to parse validation ID: %w", err)
+		}
+
+		// TODO: consider optimizing this to avoid hitting the inactiveDB if
+		// all validators are active (inactive weight is 0)
+		vdr, err := s.GetSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// validator was deleted in modified
+			continue
+		}
+		if err != nil {
+			return nil, 0, false, fmt.Errorf("failed to get validator: %w", err)
+		}
+
+		result[validationID] = &validators.GetCurrentValidatorOutput{
+			ValidationID:   validationID,
+			NodeID:         vdr.NodeID,
+			PublicKey:      bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
+			Weight:         vdr.Weight,
+			StartTime:      vdr.StartTime,
+			IsActive:       vdr.isActive(),
+			SetWeightNonce: vdr.MinNonce,
 		}
 	}
-	return result, s.currentHeight, nil
+
+	return result, s.currentHeight, isL1, nil
+}
+
+func (s *state) IsL1(subnetID ids.ID) (bool, error) {
+	// short circuit if this is the primary network
+	if subnetID == constants.PrimaryNetworkID {
+		return false, nil
+	} else {
+		_, _, _, err := s.GetSubnetConversion(subnetID)
+		switch err {
+		case nil:
+			return true, nil
+		case database.ErrNotFound:
+			return false, nil
+		default:
+			return false, err
+		}
+	}
 }
 
 func (s *state) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error) {

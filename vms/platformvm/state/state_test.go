@@ -1589,7 +1589,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					NodeID:            sov.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            2, // Not removed
-					EndAccumulatedFee: 1, // Inactive
+					EndAccumulatedFee: 1, // Active
 				},
 				{
 					ValidationID:      sov.ValidationID,
@@ -1597,7 +1597,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					NodeID:            sov.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            3, // Not removed
-					EndAccumulatedFee: 1, // Inactive
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
@@ -1627,7 +1627,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					NodeID:            sov.NodeID,
 					PublicKey:         otherPKBytes,
 					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Inactive
+					EndAccumulatedFee: 1, // Active
 				},
 			},
 		},
@@ -1689,6 +1689,10 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				subnetIDs.Add(sov.SubnetID)
 			}
 
+			for subnetID := range subnetIDs {
+				state.SetSubnetConversion(subnetID, ids.GenerateTestID(), ids.GenerateTestID(), []byte{'a', 'd', 'd', 'r'})
+			}
+
 			verifyChain := func(chain Chain) {
 				for _, expectedSOV := range expectedSOVs {
 					if expectedSOV.Weight != 0 {
@@ -1704,6 +1708,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					weights        = make(map[ids.ID]uint64)
 					expectedActive []SubnetOnlyValidator
 				)
+
 				for _, expectedSOV := range expectedSOVs {
 					if expectedSOV.Weight == 0 {
 						continue
@@ -1740,16 +1745,56 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				}
 			}
 
+			verifyValidators := func(state State, expectedHeight uint64) {
+				nonZeroSovsBySubnetID := make(map[ids.ID][]SubnetOnlyValidator)
+				for _, expectedSOV := range expectedSOVs {
+					if expectedSOV.Weight != 0 {
+						nonZeroSovs := nonZeroSovsBySubnetID[expectedSOV.SubnetID]
+						nonZeroSovsBySubnetID[expectedSOV.SubnetID] = append(nonZeroSovs, expectedSOV)
+					}
+				}
+				for subnetID := range subnetIDs {
+					currentValidators, height, isL1, err := state.GetCurrentValidatorSet(context.Background(), subnetID)
+					require.NoError(err)
+					require.Equal(expectedHeight, height)
+					require.True(isL1)
+					nonZeroSovs, ok := nonZeroSovsBySubnetID[subnetID]
+					if !ok {
+						require.Empty(currentValidators)
+						continue
+					}
+					require.Len(currentValidators, len(nonZeroSovs))
+
+					for _, expectedSOV := range nonZeroSovs {
+						currentValidator, ok := currentValidators[expectedSOV.ValidationID]
+						if expectedSOV.Weight == 0 {
+							require.False(ok)
+							continue
+						}
+						require.True(ok)
+						require.Equal(expectedSOV.ValidationID, currentValidator.ValidationID)
+						require.Equal(expectedSOV.NodeID, currentValidator.NodeID)
+						require.Equal(expectedSOV.PublicKey, currentValidator.PublicKey.Serialize())
+						require.Equal(expectedSOV.Weight, currentValidator.Weight)
+						require.Equal(expectedSOV.StartTime, currentValidator.StartTime)
+						require.Equal(expectedSOV.MinNonce, currentValidator.SetWeightNonce)
+						require.Equal(expectedSOV.isActive(), currentValidator.IsActive)
+					}
+				}
+			}
+
 			verifyChain(d)
 			require.NoError(d.Apply(state))
 			verifyChain(d)
 			verifyChain(state)
+			verifyValidators(state, 0)
 			assertChainsEqual(t, state, d)
 
 			state.SetHeight(1)
 			require.NoError(state.Commit())
 			verifyChain(d)
 			verifyChain(state)
+			verifyValidators(state, 1)
 			assertChainsEqual(t, state, d)
 
 			sovsToValidatorSet := func(

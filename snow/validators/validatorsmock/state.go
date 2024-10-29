@@ -57,13 +57,14 @@ func (mr *StateMockRecorder) GetCurrentHeight(arg0 any) *gomock.Call {
 }
 
 // GetCurrentValidatorSet mocks base method.
-func (m *State) GetCurrentValidatorSet(arg0 context.Context, arg1 ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+func (m *State) GetCurrentValidatorSet(arg0 context.Context, arg1 ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentValidatorSet", arg0, arg1)
 	ret0, _ := ret[0].(map[ids.ID]*validators.GetCurrentValidatorOutput)
 	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret2, _ := ret[2].(bool)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
 }
 
 // GetCurrentValidatorSet indicates an expected call of GetCurrentValidatorSet.

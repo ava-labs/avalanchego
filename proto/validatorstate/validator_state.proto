@@ -70,4 +70,5 @@ message GetValidatorSetResponse {
 message GetCurrentValidatorSetResponse {
   repeated CurrentValidator validators = 1;
   uint64 current_height = 2;
+  bool is_l1 = 3;
 }

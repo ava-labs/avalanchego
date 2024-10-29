@@ -98,19 +98,19 @@ func (c *Client) GetValidatorSet(
 func (c *Client) GetCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
-) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, bool, error) {
 	resp, err := c.client.GetCurrentValidatorSet(ctx, &pb.GetCurrentValidatorSetRequest{
 		SubnetId: subnetID[:],
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
 	vdrs := make(map[ids.ID]*validators.GetCurrentValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
 		nodeID, err := ids.ToNodeID(validator.NodeId)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, false, err
 		}
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
@@ -121,12 +121,12 @@ func (c *Client) GetCurrentValidatorSet(
 			// served by the gRPC server.
 			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
 			if publicKey == nil {
-				return nil, 0, errFailedPublicKeyDeserialize
+				return nil, 0, false, errFailedPublicKeyDeserialize
 			}
 		}
 		validationID, err := ids.ToID(validator.ValidationId)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, false, err
 		}
 
 		vdrs[validationID] = &validators.GetCurrentValidatorOutput{
@@ -138,5 +138,5 @@ func (c *Client) GetCurrentValidatorSet(
 			IsActive:       validator.IsActive,
 		}
 	}
-	return vdrs, resp.GetCurrentHeight(), nil
+	return vdrs, resp.GetCurrentHeight(), resp.GetIsL1(), nil
 }
