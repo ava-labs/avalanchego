@@ -61,6 +61,7 @@ message CurrentValidator {
   uint64 set_weight_nonce = 5;
   bool is_active = 6;
   bytes validation_id = 7;
+  bool is_sov = 8;
 }
 
 message GetValidatorSetResponse {
@@ -70,5 +71,4 @@ message GetValidatorSetResponse {
 message GetCurrentValidatorSetResponse {
   repeated CurrentValidator validators = 1;
   uint64 current_height = 2;
-  bool is_l1 = 3;
 }

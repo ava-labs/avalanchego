@@ -76,7 +76,7 @@ func (s *tracedState) GetValidatorSet(
 func (s *tracedState) GetCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
-) (map[ids.ID]*GetCurrentValidatorOutput, uint64, bool, error) {
+) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
 	ctx, span := s.tracer.Start(ctx, s.getValidatorSetTag, oteltrace.WithAttributes(
 		attribute.Stringer("subnetID", subnetID),
 	))

@@ -40,7 +40,7 @@ type State interface {
 	GetCurrentValidatorSet(
 		ctx context.Context,
 		subnetID ids.ID,
-	) (map[ids.ID]*GetCurrentValidatorOutput, uint64, bool, error)
+	) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error)
 }
 
 type lockedState struct {
@@ -90,7 +90,7 @@ func (s *lockedState) GetValidatorSet(
 func (s *lockedState) GetCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
-) (map[ids.ID]*GetCurrentValidatorOutput, uint64, bool, error) {
+) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -111,7 +111,7 @@ func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.N
 	return nil, nil
 }
 
-func (*noValidators) GetCurrentValidatorSet(context.Context, ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, bool, error) {
+func (*noValidators) GetCurrentValidatorSet(context.Context, ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
 	// TODO: should we return the actual height?
-	return nil, 0, false, nil
+	return nil, 0, nil
 }

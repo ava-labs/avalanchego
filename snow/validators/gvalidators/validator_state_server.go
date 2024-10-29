@@ -86,7 +86,7 @@ func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentV
 		return nil, err
 	}
 
-	vdrs, currentHeight, isL1, err := s.state.GetCurrentValidatorSet(ctx, subnetID)
+	vdrs, currentHeight, err := s.state.GetCurrentValidatorSet(ctx, subnetID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,6 @@ func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentV
 	resp := &pb.GetCurrentValidatorSetResponse{
 		Validators:    make([]*pb.CurrentValidator, len(vdrs)),
 		CurrentHeight: currentHeight,
-		IsL1:          isL1,
 	}
 
 	i := 0
@@ -106,6 +105,7 @@ func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentV
 			ValidationId:   vdr.ValidationID[:],
 			Weight:         vdr.Weight,
 			SetWeightNonce: vdr.SetWeightNonce,
+			IsSov:          vdr.IsSoV,
 		}
 		if vdr.PublicKey != nil {
 			// This is a performance optimization to avoid the cost of compression

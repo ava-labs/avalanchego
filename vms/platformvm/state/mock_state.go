@@ -425,14 +425,13 @@ func (mr *MockStateMockRecorder) GetCurrentValidator(subnetID, nodeID any) *gomo
 }
 
 // GetCurrentValidatorSet mocks base method.
-func (m *MockState) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, bool, error) {
+func (m *MockState) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentValidatorSet", ctx, subnetID)
 	ret0, _ := ret[0].(map[ids.ID]*validators.GetCurrentValidatorOutput)
 	ret1, _ := ret[1].(uint64)
-	ret2, _ := ret[2].(bool)
-	ret3, _ := ret[3].(error)
-	return ret0, ret1, ret2, ret3
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // GetCurrentValidatorSet indicates an expected call of GetCurrentValidatorSet.
