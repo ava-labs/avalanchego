@@ -1832,7 +1832,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 
 			verifyChain := func(chain Chain) {
 				for _, expectedSOV := range expectedSOVs {
-					if expectedSOV.Weight != 0 {
+					if !expectedSOV.isDeleted() {
 						continue
 					}
 
@@ -1846,7 +1846,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 					expectedActive []SubnetOnlyValidator
 				)
 				for _, expectedSOV := range expectedSOVs {
-					if expectedSOV.Weight == 0 {
+					if expectedSOV.isDeleted() {
 						continue
 					}
 
@@ -1893,13 +1893,50 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			verifyChain(state)
 			assertChainsEqual(t, state, d)
 
+			// Verify that the subnetID+nodeID -> validationID mapping is correct.
+			var populatedSubnetIDNodeIDs set.Set[subnetIDNodeID]
+			for _, sov := range expectedSOVs {
+				if sov.isDeleted() {
+					continue
+				}
+
+				subnetIDNodeID := subnetIDNodeID{
+					subnetID: sov.SubnetID,
+					nodeID:   sov.NodeID,
+				}
+				populatedSubnetIDNodeIDs.Add(subnetIDNodeID)
+
+				subnetIDNodeIDKey := subnetIDNodeID.Marshal()
+				validatorID, err := database.GetID(state.subnetIDNodeIDDB, subnetIDNodeIDKey)
+				require.NoError(err)
+				require.Equal(sov.ValidationID, validatorID)
+			}
+			for _, sov := range expectedSOVs {
+				if !sov.isDeleted() {
+					continue
+				}
+
+				subnetIDNodeID := subnetIDNodeID{
+					subnetID: sov.SubnetID,
+					nodeID:   sov.NodeID,
+				}
+				if populatedSubnetIDNodeIDs.Contains(subnetIDNodeID) {
+					continue
+				}
+
+				subnetIDNodeIDKey := subnetIDNodeID.Marshal()
+				has, err := state.subnetIDNodeIDDB.Has(subnetIDNodeIDKey)
+				require.NoError(err)
+				require.False(has)
+			}
+
 			sovsToValidatorSet := func(
 				sovs map[ids.ID]SubnetOnlyValidator,
 				subnetID ids.ID,
 			) map[ids.NodeID]*validators.GetValidatorOutput {
 				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
 				for _, sov := range sovs {
-					if sov.SubnetID != subnetID || sov.Weight == 0 {
+					if sov.SubnetID != subnetID || sov.isDeleted() {
 						continue
 					}
 
