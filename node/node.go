@@ -823,8 +823,10 @@ func (n *Node) initVMs() error {
 				CortinaTime:                     version.GetCortinaTime(n.Config.NetworkID),
 				AthensPhaseTime:                 version.GetAthensPhaseTime(n.Config.NetworkID),
 				BerlinPhaseTime:                 version.GetBerlinPhaseTime(n.Config.NetworkID),
+				CairoPhaseTime:                  version.GetCairoPhaseTime(n.Config.NetworkID),
 				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
 				UseCurrentHeight:                n.Config.UseCurrentHeight,
+				CaminoConfig:                    n.Config.CaminoConfig,
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{

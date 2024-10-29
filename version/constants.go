@@ -205,6 +205,12 @@ var (
 		constants.CaminoID:     unreachableFutureTime,
 	}
 	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	CairoPhaseTimes = map[uint32]time.Time{
+		constants.KopernikusID: unreachableFutureTime,
+		constants.ColumbusID:   unreachableFutureTime,
+		constants.CaminoID:     unreachableFutureTime,
+	}
 )
 
 func init() {
@@ -256,13 +262,6 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return ApricotPhase5DefaultTime
 }
 
-func GetSunrisePhase0Time(networkID uint32) time.Time {
-	if upgradeTime, exists := SunrisePhase0Times[networkID]; exists {
-		return upgradeTime
-	}
-	return DefaultUpgradeTime
-}
-
 func GetApricotPhase6Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
 		return upgradeTime
@@ -275,6 +274,20 @@ func GetBanffTime(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return BanffDefaultTime
+}
+
+func GetCortinaTime(networkID uint32) time.Time {
+	if upgradeTime, exists := CortinaTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return CortinaDefaultTime
+}
+
+func GetSunrisePhase0Time(networkID uint32) time.Time {
+	if upgradeTime, exists := SunrisePhase0Times[networkID]; exists {
+		return upgradeTime
+	}
+	return DefaultUpgradeTime
 }
 
 func GetAthensPhaseTime(networkID uint32) time.Time {
@@ -291,11 +304,11 @@ func GetBerlinPhaseTime(networkID uint32) time.Time {
 	return DefaultUpgradeTime
 }
 
-func GetCortinaTime(networkID uint32) time.Time {
-	if upgradeTime, exists := CortinaTimes[networkID]; exists {
+func GetCairoPhaseTime(networkID uint32) time.Time {
+	if upgradeTime, exists := CairoPhaseTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return CortinaDefaultTime
+	return DefaultUpgradeTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
