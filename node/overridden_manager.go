@@ -56,7 +56,7 @@ func (o *overriddenManager) RemoveWeight(_ ids.ID, nodeID ids.NodeID, weight uin
 	return o.manager.RemoveWeight(o.subnetID, nodeID, weight)
 }
 
-func (o *overriddenManager) NumSubnets() int {
+func (*overriddenManager) NumSubnets() int {
 	return 1
 }
 
