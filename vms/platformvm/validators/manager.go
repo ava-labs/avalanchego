@@ -235,7 +235,60 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
-func (m *manager) makeValidatorSet(
+func (m *manager) makePrimaryNetworkValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if currentHeight < targetHeight {
+		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
+			constants.PrimaryNetworkID,
+			currentHeight,
+			targetHeight,
+		)
+	}
+
+	// Rebuild primary network validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyValidatorWeightDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		constants.PrimaryNetworkID,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		constants.PrimaryNetworkID,
+	)
+	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getCurrentPrimaryValidatorSet(
+	ctx context.Context,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return primaryMap, currentHeight, err
+}
+
+func (m *manager) makeSubnetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
@@ -276,7 +329,10 @@ func (m *manager) makeValidatorSet(
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
-		subnetID,
+		// TODO: Etna introduces L1s whose validators specify their own public
+		// keys, rather than inheriting them from the primary network.
+		// Therefore, this will need to use the subnetID after Etna.
+		constants.PrimaryNetworkID,
 	)
 	return subnetValidatorSet, currentHeight, err
 }

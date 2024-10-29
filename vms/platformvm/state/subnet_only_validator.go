@@ -12,55 +12,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// subnetIDNodeID = [subnetID] + [nodeID]
-const subnetIDNodeIDEntryLength = ids.IDLen + ids.NodeIDLen
-
 var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
+	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
-	ErrMutatedSubnetOnlyValidator   = errors.New("subnet only validator contains mutated constant fields")
-	ErrDuplicateSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
-
-	errUnexpectedSubnetIDNodeIDLength = fmt.Errorf("expected subnetID+nodeID entry length %d", subnetIDNodeIDEntryLength)
+	ErrMutatedSubnetOnlyValidator = errors.New("subnet only validator contains mutated constant fields")
 )
-
-type SubnetOnlyValidators interface {
-	// GetActiveSubnetOnlyValidatorsIterator returns an iterator of all the
-	// active subnet only validators in increasing order of EndAccumulatedFee.
-	GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error)
-
-	// NumActiveSubnetOnlyValidators returns the number of currently active
-	// subnet only validators.
-	NumActiveSubnetOnlyValidators() int
-
-	// WeightOfSubnetOnlyValidators returns the total active and inactive weight
-	// of subnet only validators on [subnetID].
-	WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error)
-
-	// GetSubnetOnlyValidator returns the validator with [validationID] if it
-	// exists. If the validator does not exist, [err] will equal
-	// [database.ErrNotFound].
-	GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error)
-
-	// HasSubnetOnlyValidator returns the validator with [validationID] if it
-	// exists.
-	HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
-
-	// PutSubnetOnlyValidator inserts [sov] as a validator.
-	//
-	// If inserting this validator attempts to modify any of the constant fields
-	// of the subnet only validator struct, an error will be returned.
-	//
-	// If inserting this validator would cause the mapping of subnetID+nodeID to
-	// validationID to be non-unique, an error will be returned.
-	PutSubnetOnlyValidator(sov SubnetOnlyValidator) error
-}
 
 // SubnetOnlyValidator defines an ACP-77 validator. For a given ValidationID, it
 // is expected for SubnetID, NodeID, PublicKey, RemainingBalanceOwner, and
@@ -113,7 +77,7 @@ func (v SubnetOnlyValidator) Less(o SubnetOnlyValidator) bool {
 	return v.Compare(o) == -1
 }
 
-// Compare determines a canonical ordering of *SubnetOnlyValidators based on
+// Compare determines a canonical ordering of SubnetOnlyValidators based on
 // their EndAccumulatedFees and ValidationIDs. Lower EndAccumulatedFees result
 // in an earlier ordering.
 func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
@@ -127,9 +91,9 @@ func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
 	}
 }
 
-// validateConstants returns true if the constants of this validator have not
-// been modified.
-func (v SubnetOnlyValidator) validateConstants(o SubnetOnlyValidator) bool {
+// constantsAreUnmodified returns true if the constants of this validator have
+// not been modified compared to the other validator.
+func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool {
 	if v.ValidationID != o.ValidationID {
 		return true
 	}
@@ -139,10 +103,6 @@ func (v SubnetOnlyValidator) validateConstants(o SubnetOnlyValidator) bool {
 		bytes.Equal(v.RemainingBalanceOwner, o.RemainingBalanceOwner) &&
 		bytes.Equal(v.DeactivationOwner, o.DeactivationOwner) &&
 		v.StartTime == o.StartTime
-}
-
-func (v SubnetOnlyValidator) isActive() bool {
-	return v.Weight != 0 && v.EndAccumulatedFee != 0
 }
 
 func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {

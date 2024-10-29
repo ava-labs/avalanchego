@@ -14,5 +14,7 @@ type BootstrapTracker interface {
 	// Bootstrapped marks the named chain as being bootstrapped
 	Bootstrapped(chainID ids.ID)
 
-	OnBootstrapCompleted() chan struct{}
+	// AllBootstrapped returns a channel that is closed when all chains in this
+	// subnet have been bootstrapped
+	AllBootstrapped() <-chan struct{}
 }

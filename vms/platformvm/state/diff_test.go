@@ -4,7 +4,6 @@
 package state
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
@@ -283,84 +282,6 @@ func TestDiffExpiry(t *testing.T) {
 	}
 }
 
-func TestDiffSubnetOnlyValidatorsErrors(t *testing.T) {
-	sov := SubnetOnlyValidator{
-		ValidationID: ids.GenerateTestID(),
-		SubnetID:     ids.GenerateTestID(),
-		NodeID:       ids.GenerateTestNodeID(),
-		Weight:       1, // Not removed
-	}
-
-	tests := []struct {
-		name                     string
-		initialEndAccumulatedFee uint64
-		sov                      SubnetOnlyValidator
-		expectedErr              error
-	}{
-		{
-			name:                     "mutate active constants",
-			initialEndAccumulatedFee: 1,
-			sov: SubnetOnlyValidator{
-				ValidationID: sov.ValidationID,
-				NodeID:       ids.GenerateTestNodeID(),
-			},
-			expectedErr: ErrMutatedSubnetOnlyValidator,
-		},
-		{
-			name:                     "mutate inactive constants",
-			initialEndAccumulatedFee: 0,
-			sov: SubnetOnlyValidator{
-				ValidationID: sov.ValidationID,
-				NodeID:       ids.GenerateTestNodeID(),
-			},
-			expectedErr: ErrMutatedSubnetOnlyValidator,
-		},
-		{
-			name:                     "duplicate active subnetID and nodeID pair",
-			initialEndAccumulatedFee: 1,
-			sov: SubnetOnlyValidator{
-				ValidationID: ids.GenerateTestID(),
-				NodeID:       sov.NodeID,
-			},
-			expectedErr: ErrDuplicateSubnetOnlyValidator,
-		},
-		{
-			name:                     "duplicate inactive subnetID and nodeID pair",
-			initialEndAccumulatedFee: 0,
-			sov: SubnetOnlyValidator{
-				ValidationID: ids.GenerateTestID(),
-				NodeID:       sov.NodeID,
-			},
-			expectedErr: ErrDuplicateSubnetOnlyValidator,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			state := newTestState(t, memdb.New())
-
-			sov.EndAccumulatedFee = test.initialEndAccumulatedFee
-			require.NoError(state.PutSubnetOnlyValidator(sov))
-
-			d, err := NewDiffOn(state)
-			require.NoError(err)
-
-			// Initialize subnetID, weight, and endAccumulatedFee as they are
-			// constant among all tests.
-			test.sov.SubnetID = sov.SubnetID
-			test.sov.Weight = 1                        // Not removed
-			test.sov.EndAccumulatedFee = rand.Uint64() //#nosec G404
-			err = d.PutSubnetOnlyValidator(test.sov)
-			require.ErrorIs(err, test.expectedErr)
-
-			// The invalid addition should not have modified the diff.
-			assertChainsEqual(t, state, d)
-		})
-	}
-}
-
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -369,6 +290,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
@@ -406,6 +328,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
@@ -449,6 +372,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
@@ -495,6 +419,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
@@ -635,6 +560,7 @@ func TestDiffTx(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
@@ -735,6 +661,7 @@ func TestDiffUTXO(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
@@ -826,6 +753,7 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 	require.Equal(expected.GetFeeState(), actual.GetFeeState())
+	require.Equal(expected.GetSoVExcess(), actual.GetSoVExcess())
 	require.Equal(expected.GetAccruedFees(), actual.GetAccruedFees())
 
 	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
@@ -895,65 +823,44 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
-func TestDiffSubnetManager(t *testing.T) {
+func TestDiffSubnetConversion(t *testing.T) {
 	var (
 		require            = require.New(t)
 		state              = newTestState(t, memdb.New())
 		subnetID           = ids.GenerateTestID()
-		expectedConversion = subnetConversion{
+		expectedConversion = SubnetConversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte{1, 2, 3, 4},
 		}
 	)
 
-	conversionID, chainID, addr, err := state.GetSubnetConversion(subnetID)
+	actualConversion, err := state.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(conversionID)
-	require.Zero(chainID)
-	require.Zero(addr)
+	require.Zero(actualConversion)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
 
-	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
+	actualConversion, err = d.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(conversionID)
-	require.Zero(chainID)
-	require.Zero(addr)
+	require.Zero(actualConversion)
 
-	// Setting a subnet manager should be reflected on diff not state
-	d.SetSubnetConversion(subnetID, expectedConversion.ConversionID, expectedConversion.ChainID, expectedConversion.Addr)
-	conversionID, chainID, addr, err = d.GetSubnetConversion(subnetID)
+	// Setting a subnet conversion should be reflected on diff not state
+	d.SetSubnetConversion(subnetID, expectedConversion)
+	actualConversion, err = d.GetSubnetConversion(subnetID)
 	require.NoError(err)
-	require.Equal(
-		expectedConversion,
-		subnetConversion{
-			ConversionID: conversionID,
-			ChainID:      chainID,
-			Addr:         addr,
-		},
-	)
+	require.Equal(expectedConversion, actualConversion)
 
-	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
+	actualConversion, err = state.GetSubnetConversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(conversionID)
-	require.Zero(chainID)
-	require.Zero(addr)
+	require.Zero(actualConversion)
 
-	// State should reflect new subnet manager after diff is applied
+	// State should reflect new subnet conversion after diff is applied
 	require.NoError(d.Apply(state))
-
-	conversionID, chainID, addr, err = state.GetSubnetConversion(subnetID)
+	actualConversion, err = state.GetSubnetConversion(subnetID)
 	require.NoError(err)
-	require.Equal(
-		expectedConversion,
-		subnetConversion{
-			ConversionID: conversionID,
-			ChainID:      chainID,
-			Addr:         addr,
-		},
-	)
+	require.Equal(expectedConversion, actualConversion)
 }
 
 func TestDiffStacking(t *testing.T) {
