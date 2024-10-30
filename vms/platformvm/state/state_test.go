@@ -2040,6 +2040,8 @@ func TestLoadSubnetOnlyValidatorAndLegacy(t *testing.T) {
 	require.Equal(expectedValidatorSet, validatorSet)
 }
 
+// TestSubnetOnlyValidatorAfterLegacyRemoval verifies that a legacy validator
+// can be replaced by an SoV in the same block.
 func TestSubnetOnlyValidatorAfterLegacyRemoval(t *testing.T) {
 	require := require.New(t)
 
