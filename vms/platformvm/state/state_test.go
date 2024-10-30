@@ -2165,6 +2165,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					require.Equal(uint64(expectedStaker.StartTime.Unix()), currentValidator.StartTime)
 					require.Equal(uint64(0), currentValidator.SetWeightNonce)
 					require.True(currentValidator.IsActive)
+					require.False(currentValidator.IsSoV)
 				}
 
 				for _, expectedSOV := range sovBySubnetID[subnetID] {
@@ -2177,6 +2178,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					require.Equal(expectedSOV.StartTime, currentValidator.StartTime)
 					require.Equal(expectedSOV.MinNonce, currentValidator.SetWeightNonce)
 					require.Equal(expectedSOV.isActive(), currentValidator.IsActive)
+					require.True(currentValidator.IsSoV)
 				}
 			}
 		})
