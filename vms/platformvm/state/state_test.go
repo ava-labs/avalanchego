@@ -1932,11 +1932,9 @@ func TestSubnetOnlyValidatorAfterLegacyRemoval(t *testing.T) {
 }
 
 func TestGetCurrentValidators(t *testing.T) {
-	sov := SubnetOnlyValidator{
-		ValidationID: ids.GenerateTestID(),
-		SubnetID:     ids.GenerateTestID(),
-		NodeID:       ids.GenerateTestNodeID(),
-	}
+	subnetID1 := ids.GenerateTestID()
+	subnetID2 := ids.GenerateTestID()
+	subnetIDs := []ids.ID{subnetID1, subnetID2}
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
@@ -1950,229 +1948,156 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		initial []SubnetOnlyValidator
+		initial []*Staker
 		sovs    []SubnetOnlyValidator
 	}{
 		{
 			name: "empty noop",
 		},
 		{
-			name: "initially active not modified",
-			initial: []SubnetOnlyValidator{
+			name: "initial stakers in same subnet",
+			initial: []*Staker{
 				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID1,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    1,
+					StartTime: time.Now(),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID1,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    1,
+					StartTime: time.Now(),
 				},
 			},
 		},
 		{
-			name: "initially inactive not modified",
-			initial: []SubnetOnlyValidator{
+			name: "initial stakers in different subnets",
+			initial: []*Staker{
 				{
-					ValidationID:      ids.GenerateTestID(),
-					SubnetID:          ids.GenerateTestID(),
-					NodeID:            ids.GenerateTestNodeID(),
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 0, // Inactive
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID1,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    1,
+					StartTime: time.Now(),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID2,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    1,
+					StartTime: time.Now(),
 				},
 			},
 		},
 		{
-			name: "initially active removed",
-			initial: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
+			name: "sovs only in same subnet",
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID: sov.ValidationID,
-					SubnetID:     sov.SubnetID,
-					NodeID:       sov.NodeID,
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID1,
+					NodeID:       ids.GenerateTestNodeID(),
+					StartTime:    uint64(time.Now().Unix()),
 					PublicKey:    pkBytes,
-					Weight:       0, // Removed
+					Weight:       1,
+				},
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID1,
+					NodeID:       ids.GenerateTestNodeID(),
+					PublicKey:    otherPKBytes,
+					StartTime:    uint64(time.Now().Unix()),
+					Weight:       1,
 				},
 			},
 		},
 		{
-			name: "initially inactive removed",
-			initial: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 0, // Inactive
-				},
-			},
+			name: "sovs only in different subnets",
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID: sov.ValidationID,
-					SubnetID:     sov.SubnetID,
-					NodeID:       sov.NodeID,
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID1,
+					NodeID:       ids.GenerateTestNodeID(),
+					StartTime:    uint64(time.Now().Unix()),
 					PublicKey:    pkBytes,
-					Weight:       0, // Removed
+					Weight:       1,
+				},
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID2,
+					NodeID:       ids.GenerateTestNodeID(),
+					PublicKey:    otherPKBytes,
+					StartTime:    uint64(time.Now().Unix()),
+					Weight:       1,
 				},
 			},
 		},
 		{
-			name: "increase active weight",
-			initial: []SubnetOnlyValidator{
+			name: "initial stakers and sovs mixed",
+			initial: []*Staker{
 				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID1,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    uint64(time.Now().Unix()),
+					StartTime: time.Now(),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID2,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: pk,
+					Weight:    1,
+					StartTime: time.Now(),
+				},
+				{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  subnetID1,
+					NodeID:    ids.GenerateTestNodeID(),
+					PublicKey: otherPK,
+					Weight:    0,
+					StartTime: time.Now(),
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            2, // Increased
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-		},
-		{
-			name: "deactivate",
-			initial: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-			sovs: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 0, // Inactive
-				},
-			},
-		},
-		{
-			name: "reactivate",
-			initial: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 0, // Inactive
-				},
-			},
-			sovs: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-		},
-		{
-			name: "update multiple times",
-			initial: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-			sovs: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            2, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            3, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-		},
-		{
-			name: "change validationID",
-			initial: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-			sovs: []SubnetOnlyValidator{
-				{
-					ValidationID: sov.ValidationID,
-					SubnetID:     sov.SubnetID,
-					NodeID:       sov.NodeID,
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID1,
+					NodeID:       ids.GenerateTestNodeID(),
+					StartTime:    uint64(time.Now().Unix()),
 					PublicKey:    pkBytes,
-					Weight:       0, // Removed
+					Weight:       1,
 				},
 				{
-					ValidationID:      ids.GenerateTestID(),
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         otherPKBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
-				},
-			},
-		},
-		{
-			name: "added and removed",
-			sovs: []SubnetOnlyValidator{
-				{
-					ValidationID:      sov.ValidationID,
-					SubnetID:          sov.SubnetID,
-					NodeID:            sov.NodeID,
-					PublicKey:         pkBytes,
-					Weight:            1, // Not removed
-					EndAccumulatedFee: 1, // Active
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID2,
+					NodeID:       ids.GenerateTestNodeID(),
+					PublicKey:    otherPKBytes,
+					StartTime:    uint64(time.Now().Unix()),
+					Weight:       1,
 				},
 				{
-					ValidationID: sov.ValidationID,
-					SubnetID:     sov.SubnetID,
-					NodeID:       sov.NodeID,
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID1,
+					NodeID:       ids.GenerateTestNodeID(),
 					PublicKey:    pkBytes,
-					Weight:       0, // Removed
+					StartTime:    uint64(time.Now().Unix()),
+					Weight:       1,
+				},
+				{
+					ValidationID: ids.GenerateTestID(),
+					SubnetID:     subnetID1,
+					NodeID:       ids.GenerateTestNodeID(),
+					PublicKey:    otherPKBytes,
+					StartTime:    uint64(time.Now().Unix()),
+					Weight:       0,
 				},
 			},
 		},
@@ -2185,191 +2110,74 @@ func TestGetCurrentValidators(t *testing.T) {
 			db := memdb.New()
 			state := newTestState(t, db)
 
-			var (
-				initialSOVs = make(map[ids.ID]SubnetOnlyValidator)
-				subnetIDs   set.Set[ids.ID]
-			)
-			for _, sov := range test.initial {
+			for _, staker := range test.initial {
+				primaryStaker := &Staker{
+					TxID:      ids.GenerateTestID(),
+					SubnetID:  constants.PrimaryNetworkID,
+					NodeID:    staker.NodeID,
+					PublicKey: staker.PublicKey,
+					Weight:    5,
+					StartTime: staker.StartTime.Add(-1 * time.Second),
+				}
+				require.NoError(state.PutCurrentValidator(primaryStaker))
+				require.NoError(state.PutCurrentValidator(staker))
+			}
+
+			for _, sov := range test.sovs {
 				sov.RemainingBalanceOwner = []byte{}
 				sov.DeactivationOwner = []byte{}
 
 				require.NoError(state.PutSubnetOnlyValidator(sov))
-				initialSOVs[sov.ValidationID] = sov
-				subnetIDs.Add(sov.SubnetID)
 			}
 
 			state.SetHeight(0)
 			require.NoError(state.Commit())
 
-			d, err := NewDiffOn(state)
-			require.NoError(err)
+			stakersBySubnetID := make(map[ids.ID][]*Staker)
+			for _, staker := range test.initial {
+				stakers := stakersBySubnetID[staker.SubnetID]
+				stakersBySubnetID[staker.SubnetID] = append(stakers, staker)
+			}
 
-			expectedSOVs := maps.Clone(initialSOVs)
+			sovBySubnetID := make(map[ids.ID][]SubnetOnlyValidator)
 			for _, sov := range test.sovs {
-				sov.RemainingBalanceOwner = []byte{}
-				sov.DeactivationOwner = []byte{}
-
-				require.NoError(d.PutSubnetOnlyValidator(sov))
-				expectedSOVs[sov.ValidationID] = sov
-				subnetIDs.Add(sov.SubnetID)
+				if sov.Weight == 0 {
+					continue
+				}
+				sovs := sovBySubnetID[sov.SubnetID]
+				sovBySubnetID[sov.SubnetID] = append(sovs, sov)
 			}
 
-			for subnetID := range subnetIDs {
-				state.SetSubnetConversion(subnetID, SubnetConversion{
-					ConversionID: ids.GenerateTestID(),
-					ChainID:      ids.GenerateTestID(),
-					Addr:         []byte{'a', 'd', 'd', 'r'},
-				})
-			}
-
-			verifyChain := func(chain Chain) {
-				for _, expectedSOV := range expectedSOVs {
-					if expectedSOV.Weight != 0 {
-						continue
-					}
-
-					sov, err := chain.GetSubnetOnlyValidator(expectedSOV.ValidationID)
-					require.ErrorIs(err, database.ErrNotFound)
-					require.Zero(sov)
-				}
-
-				var (
-					weights        = make(map[ids.ID]uint64)
-					expectedActive []SubnetOnlyValidator
-				)
-
-				for _, expectedSOV := range expectedSOVs {
-					if expectedSOV.Weight == 0 {
-						continue
-					}
-
-					sov, err := chain.GetSubnetOnlyValidator(expectedSOV.ValidationID)
-					require.NoError(err)
-					require.Equal(expectedSOV, sov)
-
-					has, err := chain.HasSubnetOnlyValidator(expectedSOV.SubnetID, expectedSOV.NodeID)
-					require.NoError(err)
-					require.True(has)
-
-					weights[sov.SubnetID] += sov.Weight
-					if expectedSOV.isActive() {
-						expectedActive = append(expectedActive, expectedSOV)
-					}
-				}
-				utils.Sort(expectedActive)
-
-				activeIterator, err := chain.GetActiveSubnetOnlyValidatorsIterator()
+			for _, subnetID := range subnetIDs {
+				currentValidators, height, err := state.GetCurrentValidatorSet(context.Background(), subnetID)
 				require.NoError(err)
-				require.Equal(
-					expectedActive,
-					iterator.ToSlice(activeIterator),
-				)
+				require.Equal(uint64(0), height)
+				totalLen := len(stakersBySubnetID[subnetID]) + len(sovBySubnetID[subnetID])
+				require.Len(currentValidators, totalLen)
 
-				require.Equal(len(expectedActive), chain.NumActiveSubnetOnlyValidators())
-
-				for subnetID, expectedWeight := range weights {
-					weight, err := chain.WeightOfSubnetOnlyValidators(subnetID)
-					require.NoError(err)
-					require.Equal(expectedWeight, weight)
+				for _, expectedStaker := range stakersBySubnetID[subnetID] {
+					currentValidator, ok := currentValidators[expectedStaker.TxID]
+					require.True(ok)
+					require.Equal(expectedStaker.TxID, currentValidator.ValidationID)
+					require.Equal(expectedStaker.NodeID, currentValidator.NodeID)
+					require.Equal(expectedStaker.PublicKey, currentValidator.PublicKey)
+					require.Equal(expectedStaker.Weight, currentValidator.Weight)
+					require.Equal(uint64(expectedStaker.StartTime.Unix()), currentValidator.StartTime)
+					require.Equal(uint64(0), currentValidator.SetWeightNonce)
+					require.True(currentValidator.IsActive)
 				}
-			}
 
-			verifyValidators := func(state State, expectedHeight uint64) {
-				nonZeroSovsBySubnetID := make(map[ids.ID][]SubnetOnlyValidator)
-				for _, expectedSOV := range expectedSOVs {
-					if expectedSOV.Weight != 0 {
-						nonZeroSovs := nonZeroSovsBySubnetID[expectedSOV.SubnetID]
-						nonZeroSovsBySubnetID[expectedSOV.SubnetID] = append(nonZeroSovs, expectedSOV)
-					}
+				for _, expectedSOV := range sovBySubnetID[subnetID] {
+					currentValidator, ok := currentValidators[expectedSOV.ValidationID]
+					require.True(ok)
+					require.Equal(expectedSOV.ValidationID, currentValidator.ValidationID)
+					require.Equal(expectedSOV.NodeID, currentValidator.NodeID)
+					require.Equal(expectedSOV.PublicKey, currentValidator.PublicKey.Serialize())
+					require.Equal(expectedSOV.Weight, currentValidator.Weight)
+					require.Equal(expectedSOV.StartTime, currentValidator.StartTime)
+					require.Equal(expectedSOV.MinNonce, currentValidator.SetWeightNonce)
+					require.Equal(expectedSOV.isActive(), currentValidator.IsActive)
 				}
-				for subnetID := range subnetIDs {
-					currentValidators, height, err := state.GetCurrentValidatorSet(context.Background(), subnetID)
-					require.NoError(err)
-					require.Equal(expectedHeight, height)
-					nonZeroSovs, ok := nonZeroSovsBySubnetID[subnetID]
-					if !ok {
-						require.Empty(currentValidators)
-						continue
-					}
-					require.Len(currentValidators, len(nonZeroSovs))
-
-					for _, expectedSOV := range nonZeroSovs {
-						currentValidator, ok := currentValidators[expectedSOV.ValidationID]
-						if expectedSOV.Weight == 0 {
-							require.False(ok)
-							continue
-						}
-						require.True(ok)
-						require.Equal(expectedSOV.ValidationID, currentValidator.ValidationID)
-						require.Equal(expectedSOV.NodeID, currentValidator.NodeID)
-						require.Equal(expectedSOV.PublicKey, currentValidator.PublicKey.Serialize())
-						require.Equal(expectedSOV.Weight, currentValidator.Weight)
-						require.Equal(expectedSOV.StartTime, currentValidator.StartTime)
-						require.Equal(expectedSOV.MinNonce, currentValidator.SetWeightNonce)
-						require.Equal(expectedSOV.isActive(), currentValidator.IsActive)
-					}
-				}
-			}
-
-			verifyChain(d)
-			require.NoError(d.Apply(state))
-			verifyChain(d)
-			verifyChain(state)
-			assertChainsEqual(t, state, d)
-
-			state.SetHeight(1)
-			require.NoError(state.Commit())
-			verifyChain(d)
-			verifyChain(state)
-			verifyValidators(state, 1)
-			assertChainsEqual(t, state, d)
-
-			sovsToValidatorSet := func(
-				sovs map[ids.ID]SubnetOnlyValidator,
-				subnetID ids.ID,
-			) map[ids.NodeID]*validators.GetValidatorOutput {
-				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
-				for _, sov := range sovs {
-					if sov.SubnetID != subnetID || sov.Weight == 0 {
-						continue
-					}
-
-					nodeID := sov.NodeID
-					publicKey := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
-					// Inactive validators are combined into a single validator
-					// with the empty ID.
-					if sov.EndAccumulatedFee == 0 {
-						nodeID = ids.EmptyNodeID
-						publicKey = nil
-					}
-
-					vdr, ok := validatorSet[nodeID]
-					if !ok {
-						vdr = &validators.GetValidatorOutput{
-							NodeID:    nodeID,
-							PublicKey: publicKey,
-						}
-						validatorSet[nodeID] = vdr
-					}
-					vdr.Weight += sov.Weight
-				}
-				return validatorSet
-			}
-
-			reloadedState := newTestState(t, db)
-			for subnetID := range subnetIDs {
-				expectedEndValidatorSet := sovsToValidatorSet(expectedSOVs, subnetID)
-				endValidatorSet := state.validators.GetMap(subnetID)
-				require.Equal(expectedEndValidatorSet, endValidatorSet)
-
-				reloadedEndValidatorSet := reloadedState.validators.GetMap(subnetID)
-				require.Equal(expectedEndValidatorSet, reloadedEndValidatorSet)
-
-				require.NoError(state.ApplyValidatorWeightDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
-				require.NoError(state.ApplyValidatorPublicKeyDiffs(context.Background(), endValidatorSet, 1, 1, subnetID))
-
-				initialValidatorSet := sovsToValidatorSet(initialSOVs, subnetID)
-				require.Equal(initialValidatorSet, endValidatorSet)
 			}
 		})
 	}
