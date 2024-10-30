@@ -283,7 +283,7 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
+	require.Len(genesisState.Validators, vm.Validators.NumValidators(constants.PrimaryNetworkID))
 
 	for _, nodeID := range genesistest.DefaultNodeIDs {
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
@@ -1326,7 +1326,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
-		SampleK:                        beacons.Count(ctx.SubnetID),
+		SampleK:                        beacons.NumValidators(ctx.SubnetID),
 		StartupTracker:                 startup,
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
@@ -1386,6 +1386,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		engine.Start,
 	)
 	require.NoError(err)
+	bootstrapper.TimeoutRegistrar = &enginetest.Timer{}
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: &handler.Engine{

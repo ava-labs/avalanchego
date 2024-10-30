@@ -68,6 +68,24 @@ func TestDiffFeeState(t *testing.T) {
 	assertChainsEqual(t, state, d)
 }
 
+func TestDiffSoVExcess(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	initialExcess := state.GetSoVExcess()
+	newExcess := initialExcess + 1
+	d.SetSoVExcess(newExcess)
+	require.Equal(newExcess, d.GetSoVExcess())
+	require.Equal(initialExcess, state.GetSoVExcess())
+
+	require.NoError(d.Apply(state))
+	assertChainsEqual(t, state, d)
+}
+
 func TestDiffAccruedFees(t *testing.T) {
 	require := require.New(t)
 
@@ -201,64 +219,66 @@ func TestDiffExpiry(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		require := require.New(t)
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-		state := newTestState(t, memdb.New())
-		for _, expiry := range test.initialExpiries {
-			state.PutExpiry(expiry)
-		}
-
-		d, err := NewDiffOn(state)
-		require.NoError(err)
-
-		var (
-			expectedExpiries   = set.Of(test.initialExpiries...)
-			unexpectedExpiries set.Set[ExpiryEntry]
-		)
-		for _, op := range test.ops {
-			if op.put {
-				d.PutExpiry(op.entry)
-				expectedExpiries.Add(op.entry)
-				unexpectedExpiries.Remove(op.entry)
-			} else {
-				d.DeleteExpiry(op.entry)
-				expectedExpiries.Remove(op.entry)
-				unexpectedExpiries.Add(op.entry)
+			state := newTestState(t, memdb.New())
+			for _, expiry := range test.initialExpiries {
+				state.PutExpiry(expiry)
 			}
-		}
 
-		// If expectedExpiries is empty, we want expectedExpiriesSlice to be
-		// nil.
-		var expectedExpiriesSlice []ExpiryEntry
-		if expectedExpiries.Len() > 0 {
-			expectedExpiriesSlice = expectedExpiries.List()
-			utils.Sort(expectedExpiriesSlice)
-		}
-
-		verifyChain := func(chain Chain) {
-			expiryIterator, err := chain.GetExpiryIterator()
+			d, err := NewDiffOn(state)
 			require.NoError(err)
-			require.Equal(
-				expectedExpiriesSlice,
-				iterator.ToSlice(expiryIterator),
+
+			var (
+				expectedExpiries   = set.Of(test.initialExpiries...)
+				unexpectedExpiries set.Set[ExpiryEntry]
 			)
-
-			for expiry := range expectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.True(has)
+			for _, op := range test.ops {
+				if op.put {
+					d.PutExpiry(op.entry)
+					expectedExpiries.Add(op.entry)
+					unexpectedExpiries.Remove(op.entry)
+				} else {
+					d.DeleteExpiry(op.entry)
+					expectedExpiries.Remove(op.entry)
+					unexpectedExpiries.Add(op.entry)
+				}
 			}
-			for expiry := range unexpectedExpiries {
-				has, err := chain.HasExpiry(expiry)
-				require.NoError(err)
-				require.False(has)
-			}
-		}
 
-		verifyChain(d)
-		require.NoError(d.Apply(state))
-		verifyChain(state)
-		assertChainsEqual(t, d, state)
+			// If expectedExpiries is empty, we want expectedExpiriesSlice to be
+			// nil.
+			var expectedExpiriesSlice []ExpiryEntry
+			if expectedExpiries.Len() > 0 {
+				expectedExpiriesSlice = expectedExpiries.List()
+				utils.Sort(expectedExpiriesSlice)
+			}
+
+			verifyChain := func(chain Chain) {
+				expiryIterator, err := chain.GetExpiryIterator()
+				require.NoError(err)
+				require.Equal(
+					expectedExpiriesSlice,
+					iterator.ToSlice(expiryIterator),
+				)
+
+				for expiry := range expectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.True(has)
+				}
+				for expiry := range unexpectedExpiries {
+					has, err := chain.HasExpiry(expiry)
+					require.NoError(err)
+					require.False(has)
+				}
+			}
+
+			verifyChain(d)
+			require.NoError(d.Apply(state))
+			verifyChain(state)
+			assertChainsEqual(t, d, state)
+		})
 	}
 }
 
@@ -270,6 +290,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -305,6 +326,7 @@ func TestDiffPendingValidator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -346,6 +368,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -390,6 +413,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -528,6 +552,7 @@ func TestDiffTx(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -626,6 +651,7 @@ func TestDiffUTXO(t *testing.T) {
 	// Called in NewDiffOn
 	state.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
 	state.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
+	state.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	state.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 
 	d, err := NewDiffOn(state)
@@ -703,6 +729,7 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 	require.Equal(expected.GetFeeState(), actual.GetFeeState())
+	require.Equal(expected.GetSoVExcess(), actual.GetSoVExcess())
 	require.Equal(expected.GetAccruedFees(), actual.GetAccruedFees())
 
 	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
