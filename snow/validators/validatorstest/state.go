@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	errMinimumHeight   = errors.New("unexpectedly called GetMinimumHeight")
-	errCurrentHeight   = errors.New("unexpectedly called GetCurrentHeight")
-	errSubnetID        = errors.New("unexpectedly called GetSubnetID")
-	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
+	errMinimumHeight          = errors.New("unexpectedly called GetMinimumHeight")
+	errCurrentHeight          = errors.New("unexpectedly called GetCurrentHeight")
+	errSubnetID               = errors.New("unexpectedly called GetSubnetID")
+	errGetValidatorSet        = errors.New("unexpectedly called GetValidatorSet")
+	errGetCurrentValidatorSet = errors.New("unexpectedly called GetCurrentValidatorSet")
 )
 
 var _ validators.State = (*State)(nil)
@@ -91,7 +92,7 @@ func (vm *State) GetCurrentValidatorSet(
 		return vm.GetCurrentValidatorSetF(ctx, subnetID)
 	}
 	if vm.CantGetCurrentValidatorSet && vm.T != nil {
-		require.FailNow(vm.T, "unexpectedly called GetCurrentValidatorSet")
+		require.FailNow(vm.T, errGetCurrentValidatorSet.Error())
 	}
-	return nil, 0, nil
+	return nil, 0, errGetCurrentValidatorSet
 }

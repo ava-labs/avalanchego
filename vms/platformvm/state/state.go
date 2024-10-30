@@ -801,7 +801,8 @@ func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (ma
 		// all validators are active (inactive weight is 0)
 		vdr, err := s.GetSubnetOnlyValidator(validationID)
 		if err == database.ErrNotFound {
-			// validator was deleted in modified
+			// if the validator is not found, it is removed from the validator set
+			// but not yet removed from the database
 			continue
 		}
 		if err != nil {
