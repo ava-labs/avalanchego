@@ -59,6 +59,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	chainTime := env.clk.Time().Truncate(time.Second)
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 
 	// wrong height
@@ -134,6 +135,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 
 	txID := ids.GenerateTestID()

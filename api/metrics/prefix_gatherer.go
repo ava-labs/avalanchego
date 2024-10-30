@@ -45,11 +45,13 @@ func (g *prefixGatherer) Register(prefix string, gatherer prometheus.Gatherer) e
 		}
 	}
 
-	g.names = append(g.names, prefix)
-	g.gatherers = append(g.gatherers, &prefixedGatherer{
-		prefix:   prefix,
-		gatherer: gatherer,
-	})
+	g.register(
+		prefix,
+		&prefixedGatherer{
+			prefix:   prefix,
+			gatherer: gatherer,
+		},
+	)
 	return nil
 }
 

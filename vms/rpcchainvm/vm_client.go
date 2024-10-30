@@ -156,10 +156,6 @@ func (vm *VMClient) Initialize(
 		return err
 	}
 
-	if err := chainCtx.Metrics.Register("", vm); err != nil {
-		return err
-	}
-
 	// Initialize the database
 	dbServerListener, err := grpcutils.NewListener()
 	if err != nil {
@@ -226,6 +222,10 @@ func (vm *VMClient) Initialize(
 		ServerAddr:      serverAddr,
 	})
 	if err != nil {
+		return err
+	}
+
+	if err := chainCtx.Metrics.Register("", vm); err != nil {
 		return err
 	}
 
