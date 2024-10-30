@@ -2641,7 +2641,7 @@ func writePendingDiff(
 }
 
 func (s *state) writeSubnetOnlyValidators() error {
-	// Write modified weights:
+	// Write modified weights
 	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
 		var err error
 		if weight == 0 {
