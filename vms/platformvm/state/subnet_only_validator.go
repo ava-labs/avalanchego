@@ -369,3 +369,17 @@ func (a *activeSubnetOnlyValidators) addStakers(vdrs validators.Manager) error {
 	}
 	return nil
 }
+
+func addSoVToValidatorManager(vdrs validators.Manager, sov SubnetOnlyValidator) error {
+	nodeID := sov.effectiveNodeID()
+	if vdrs.GetWeight(sov.SubnetID, nodeID) != 0 {
+		return vdrs.AddWeight(sov.SubnetID, nodeID, sov.Weight)
+	}
+	return vdrs.AddStaker(
+		sov.SubnetID,
+		nodeID,
+		sov.effectivePublicKey(),
+		sov.effectiveValidationID(),
+		sov.Weight,
+	)
+}

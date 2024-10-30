@@ -2231,20 +2231,6 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 }
 
-func (s *state) addSoVToValidatorManager(sov SubnetOnlyValidator) error {
-	nodeID := sov.effectiveNodeID()
-	if s.validators.GetWeight(sov.SubnetID, nodeID) != 0 {
-		return s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight)
-	}
-	return s.validators.AddStaker(
-		sov.SubnetID,
-		nodeID,
-		sov.effectivePublicKey(),
-		sov.effectiveValidationID(),
-		sov.Weight,
-	)
-}
-
 // updateValidatorManager updates the validator manager with the pending
 // validator set changes.
 //
@@ -2323,7 +2309,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 					// This validator's active status is changing.
 					err = errors.Join(
 						s.validators.RemoveWeight(sov.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight),
-						s.addSoVToValidatorManager(sov),
+						addSoVToValidatorManager(s.validators, sov),
 					)
 				}
 			}
@@ -2335,7 +2321,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 			}
 
 			// Adding a validator
-			err = s.addSoVToValidatorManager(sov)
+			err = addSoVToValidatorManager(s.validators, sov)
 		}
 		if err != nil {
 			return err
