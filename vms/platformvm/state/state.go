@@ -1750,13 +1750,13 @@ func (s *state) loadPendingValidators() error {
 // Invariant: initValidatorSets requires loadCurrentValidators to have already
 // been called.
 func (s *state) initValidatorSets() error {
+	if s.validators.NumSubnets() != 0 {
+		// Enforce the invariant that the validator set is empty here.
+		return errValidatorSetAlreadyPopulated
+	}
+
 	primaryNetworkValidators := s.currentStakers.validators[constants.PrimaryNetworkID]
 	for subnetID, subnetValidators := range s.currentStakers.validators {
-		if s.validators.Count(subnetID) != 0 {
-			// Enforce the invariant that the validator set is empty here.
-			return fmt.Errorf("%w: %s", errValidatorSetAlreadyPopulated, subnetID)
-		}
-
 		for nodeID, subnetValidator := range subnetValidators {
 			// The subnet validator's Public Key is inherited from the
 			// corresponding primary network validator.
