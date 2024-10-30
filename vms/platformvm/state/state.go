@@ -2649,7 +2649,13 @@ func writePendingDiff(
 func (s *state) writeSubnetOnlyValidators() error {
 	// Write modified weights:
 	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
-		if err := database.PutUInt64(s.weightsDB, subnetID[:], weight); err != nil {
+		var err error
+		if weight == 0 {
+			err = s.weightsDB.Delete(subnetID[:])
+		} else {
+			err = database.PutUInt64(s.weightsDB, subnetID[:], weight)
+		}
+		if err != nil {
 			return err
 		}
 	}
