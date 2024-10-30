@@ -123,6 +123,13 @@ func TestSharedPrefixes(t *testing.T) {
 				}
 			})
 
+			// bifurcationsWithCommonPrefix holds common prefixes of prefix groups as bifurcationsWithCommonPrefix()
+			// traverses starting from the top prefix group.
+			// It does not contain leaf nodes, as bifurcationsWithCommonPrefix() does not visit leaf nodes in its traversal.
+
+			// bifurcationsWithCommonPrefixMembers contains the IDs of the prefix group that corresponds to the prefix.
+			// The first bifurcationsWithCommonPrefixMembers corresponds to the input, as
+
 			bifurcationsWithCommonPrefixMembers := make([][]ids.ID, 0, len(tst.expectedBifurcationsWithCommonPrefixMembers))
 			bifurcationsWithCommonPrefix := make([][]uint8, 0, len(tst.expectedBifurcationsWithCommonPrefix))
 
