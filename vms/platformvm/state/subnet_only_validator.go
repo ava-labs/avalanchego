@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -146,8 +147,32 @@ func (v SubnetOnlyValidator) isActive() bool {
 	return v.Weight != 0 && v.EndAccumulatedFee != 0
 }
 
-func (v SubnetOnlyValidator) isInactive() bool {
-	return v.Weight != 0 && v.EndAccumulatedFee == 0
+func (v SubnetOnlyValidator) effectiveValidationID() ids.ID {
+	if v.isActive() {
+		return v.ValidationID
+	}
+	return ids.Empty
+}
+
+func (v SubnetOnlyValidator) effectiveNodeID() ids.NodeID {
+	if v.isActive() {
+		return v.NodeID
+	}
+	return ids.EmptyNodeID
+}
+
+func (v SubnetOnlyValidator) effectivePublicKey() *bls.PublicKey {
+	if v.isActive() {
+		return bls.PublicKeyFromValidUncompressedBytes(v.PublicKey)
+	}
+	return nil
+}
+
+func (v SubnetOnlyValidator) effectivePublicKeyBytes() []byte {
+	if v.isActive() {
+		return v.PublicKey
+	}
+	return nil
 }
 
 func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {
