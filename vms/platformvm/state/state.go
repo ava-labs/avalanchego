@@ -2653,7 +2653,6 @@ func (s *state) writeSubnetOnlyValidators() error {
 			return err
 		}
 	}
-	maps.Clear(s.sovDiff.modifiedTotalWeight)
 
 	sovChanges := s.sovDiff.modified
 	// Perform deletions:
