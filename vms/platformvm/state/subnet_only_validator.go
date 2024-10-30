@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
@@ -314,6 +315,57 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 	d.modifiedHasNodeIDs[subnetIDNodeID] = !sov.isDeleted()
 	if sov.isActive() {
 		d.active.ReplaceOrInsert(sov)
+	}
+	return nil
+}
+
+type activeSubnetOnlyValidators struct {
+	lookup map[ids.ID]SubnetOnlyValidator
+	tree   *btree.BTreeG[SubnetOnlyValidator]
+}
+
+func newActiveSubnetOnlyValidators() *activeSubnetOnlyValidators {
+	return &activeSubnetOnlyValidators{
+		lookup: make(map[ids.ID]SubnetOnlyValidator),
+		tree:   btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
+	}
+}
+
+func (a *activeSubnetOnlyValidators) get(validationID ids.ID) (SubnetOnlyValidator, bool) {
+	sov, ok := a.lookup[validationID]
+	return sov, ok
+}
+
+func (a *activeSubnetOnlyValidators) put(sov SubnetOnlyValidator) {
+	a.lookup[sov.ValidationID] = sov
+	a.tree.ReplaceOrInsert(sov)
+}
+
+func (a *activeSubnetOnlyValidators) delete(validationID ids.ID) bool {
+	sov, ok := a.lookup[validationID]
+	if !ok {
+		return false
+	}
+
+	delete(a.lookup, validationID)
+	a.tree.Delete(sov)
+	return true
+}
+
+func (a *activeSubnetOnlyValidators) len() int {
+	return len(a.lookup)
+}
+
+func (a *activeSubnetOnlyValidators) newIterator() iterator.Iterator[SubnetOnlyValidator] {
+	return iterator.FromTree(a.tree)
+}
+
+func (a *activeSubnetOnlyValidators) addStakers(vdrs validators.Manager) error {
+	for validationID, sov := range a.lookup {
+		pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
+		if err := vdrs.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {
+			return err
+		}
 	}
 	return nil
 }
