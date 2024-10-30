@@ -83,8 +83,8 @@ type Manager interface {
 	// NumSubnets returns the number of subnets with non-zero weight.
 	NumSubnets() int
 
-	// Count returns the number of validators currently in the subnet.
-	Count(subnetID ids.ID) int
+	// NumValidators returns the number of validators currently in the subnet.
+	NumValidators(subnetID ids.ID) int
 
 	// TotalWeight returns the cumulative weight of all validators in the subnet.
 	// Returns err if total weight overflows uint64.
@@ -237,7 +237,7 @@ func (m *manager) NumSubnets() int {
 	return len(m.subnetToVdrs)
 }
 
-func (m *manager) Count(subnetID ids.ID) int {
+func (m *manager) NumValidators(subnetID ids.ID) int {
 	m.lock.RLock()
 	set, exists := m.subnetToVdrs[subnetID]
 	m.lock.RUnlock()
