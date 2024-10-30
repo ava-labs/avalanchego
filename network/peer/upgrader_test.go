@@ -91,7 +91,6 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 			// Initialize upgrader with a mock that fails when it's incremented.
 			failOnIncrementCounter := &mockPrometheusCounter{
 				Counter: c,
-				t:       t,
 				onIncrement: func() {
 					require.FailNow(t, "should not have invoked")
 				},
@@ -168,10 +167,10 @@ func nonStandardRSAKey(t *testing.T) *rsa.PrivateKey {
 }
 
 func makeTLSCert(t *testing.T, privKey *rsa.PrivateKey) tls.Certificate {
-	x509Cert := makeRSACertAndKey(t, privKey)
+	x509Cert := makeCert(t, privKey, &privKey.PublicKey)
 
-	rawX509PEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: x509Cert.cert.Raw})
-	privateKeyInDER, err := x509.MarshalPKCS8PrivateKey(x509Cert.key)
+	rawX509PEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: x509Cert.Raw})
+	privateKeyInDER, err := x509.MarshalPKCS8PrivateKey(privKey)
 	require.NoError(t, err)
 
 	privateKeyInPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKeyInDER})
@@ -182,24 +181,16 @@ func makeTLSCert(t *testing.T, privKey *rsa.PrivateKey) tls.Certificate {
 	return tlsCertServer
 }
 
-type certAndKey struct {
-	cert x509.Certificate
-	key  *rsa.PrivateKey
-}
-
-func makeRSACertAndKey(t *testing.T, privKey *rsa.PrivateKey) certAndKey {
+func makeCert(t *testing.T, privateKey any, publicKey any) *x509.Certificate {
 	// Create a self-signed cert
 	basicCert := basicCert()
-	certBytes, err := x509.CreateCertificate(rand.Reader, basicCert, basicCert, &privKey.PublicKey, privKey)
+	certBytes, err := x509.CreateCertificate(rand.Reader, basicCert, basicCert, publicKey, privateKey)
 	require.NoError(t, err)
 
 	cert, err := x509.ParseCertificate(certBytes)
 	require.NoError(t, err)
 
-	return certAndKey{
-		cert: *cert,
-		key:  privKey,
-	}
+	return cert
 }
 
 func basicCert() *x509.Certificate {
@@ -212,7 +203,6 @@ func basicCert() *x509.Certificate {
 }
 
 type mockPrometheusCounter struct {
-	t *testing.T
 	prometheus.Counter
 	onIncrement func()
 }

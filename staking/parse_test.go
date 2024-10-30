@@ -52,6 +52,7 @@ func TestValidateRSAPublicKeyIsWellFormed(t *testing.T) {
 		},
 		{
 			description: "even modulus",
+			expectErr:   ErrRSAModulusIsEven,
 			getPK: func() rsa.PublicKey {
 				evenN := new(big.Int).Set(validKey.N)
 				evenN.Add(evenN, big.NewInt(1))
@@ -60,7 +61,6 @@ func TestValidateRSAPublicKeyIsWellFormed(t *testing.T) {
 					E: 65537,
 				}
 			},
-			expectErr: ErrRSAModulusIsEven,
 		},
 		{
 			description: "unsupported exponent",

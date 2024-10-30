@@ -30,8 +30,8 @@ func TestValidateCertificate(t *testing.T) {
 			input: func(t *testing.T) tls.ConnectionState {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
-				x509Cert := makeRSACertAndKey(t, key)
-				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{&x509Cert.cert}}
+				x509Cert := makeCert(t, key, &key.PublicKey)
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{x509Cert}}
 			},
 		},
 		{
@@ -54,9 +54,9 @@ func TestValidateCertificate(t *testing.T) {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 
-				x509CertWithNilPK := makeRSACertAndKey(t, key)
-				x509CertWithNilPK.cert.PublicKey = (*rsa.PublicKey)(nil)
-				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{&x509CertWithNilPK.cert}}
+				x509CertWithNilPK := makeCert(t, key, &key.PublicKey)
+				x509CertWithNilPK.PublicKey = (*rsa.PublicKey)(nil)
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{x509CertWithNilPK}}
 			},
 			expectedErr: staking.ErrInvalidRSAPublicKey,
 		},
@@ -66,11 +66,11 @@ func TestValidateCertificate(t *testing.T) {
 				key, err := rsa.GenerateKey(rand.Reader, 2048)
 				require.NoError(t, err)
 
-				x509CertWithNoPK := makeRSACertAndKey(t, key)
-				x509CertWithNoPK.cert.PublicKey = nil
-				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{&x509CertWithNoPK.cert}}
+				x509CertWithNoPK := makeCert(t, key, &key.PublicKey)
+				x509CertWithNoPK.PublicKey = nil
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{x509CertWithNoPK}}
 			},
-			expectedErr: peer.ErrEmptyPublicKey,
+			expectedErr: peer.ErrUnsupportedKeyType,
 		},
 		{
 			description: "EC cert",
@@ -78,11 +78,8 @@ func TestValidateCertificate(t *testing.T) {
 				ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				require.NoError(t, err)
 
-				basicCert := basicCert()
-				certBytes, err := x509.CreateCertificate(rand.Reader, basicCert, basicCert, &ecKey.PublicKey, ecKey)
-				require.NoError(t, err)
+				ecCert := makeCert(t, ecKey, &ecKey.PublicKey)
 
-				ecCert, err := x509.ParseCertificate(certBytes)
 				require.NoError(t, err)
 				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{ecCert}}
 			},
@@ -94,21 +91,27 @@ func TestValidateCertificate(t *testing.T) {
 				ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 				require.NoError(t, err)
 
-				basicCert := basicCert()
-				certBytes, err := x509.CreateCertificate(rand.Reader, basicCert, basicCert, &ecKey.PublicKey, ecKey)
-				require.NoError(t, err)
-
-				ecCert, err := x509.ParseCertificate(certBytes)
-				require.NoError(t, err)
-
-				ecCert.PublicKey = nil
+				ecCert := makeCert(t, ecKey, &ecKey.PublicKey)
+				ecCert.PublicKey = (*ecdsa.PublicKey)(nil)
 
 				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{ecCert}}
 			},
 		},
 		{
-			description: "EC cert with ed25519 key",
-			expectedErr: peer.ErrForbidden25519Key,
+			description: "EC cert with P384 curve",
+			expectedErr: peer.ErrCurveMismatch,
+			input: func(t *testing.T) tls.ConnectionState {
+				ecKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+				require.NoError(t, err)
+
+				ecCert := makeCert(t, ecKey, &ecKey.PublicKey)
+
+				return tls.ConnectionState{PeerCertificates: []*x509.Certificate{ecCert}}
+			},
+		},
+		{
+			description: "EC cert with ed25519 key not supported",
+			expectedErr: peer.ErrUnsupportedKeyType,
 			input: func(t *testing.T) tls.ConnectionState {
 				pub, priv, err := ed25519.GenerateKey(rand.Reader)
 				require.NoError(t, err)

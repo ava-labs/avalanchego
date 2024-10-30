@@ -11,17 +11,15 @@ import (
 	"errors"
 	"io"
 
-	"golang.org/x/crypto/ed25519"
-
 	"github.com/ava-labs/avalanchego/staking"
 )
 
 var (
-	ErrNoCertsSent       = errors.New("no certificates sent by peer")
-	ErrEmptyCert         = errors.New("certificate sent by peer is empty")
-	ErrEmptyPublicKey    = errors.New("no public key sent by peer")
-	ErrCurveMismatch     = errors.New("only P256 is allowed for ECDSA")
-	ErrForbidden25519Key = errors.New("ed25519 is not allowed in this version")
+	ErrNoCertsSent        = errors.New("no certificates sent by peer")
+	ErrEmptyCert          = errors.New("certificate sent by peer is empty")
+	ErrEmptyPublicKey     = errors.New("no public key sent by peer")
+	ErrCurveMismatch      = errors.New("only P256 is allowed for ECDSA")
+	ErrUnsupportedKeyType = errors.New("key type is not supported")
 )
 
 // TLSConfig returns the TLS config that will allow secure connections to other
@@ -59,8 +57,6 @@ func ValidateCertificate(cs tls.ConnectionState) error {
 	pk := cs.PeerCertificates[0].PublicKey
 
 	switch key := pk.(type) {
-	case ed25519.PublicKey:
-		return ErrForbidden25519Key
 	case *ecdsa.PublicKey:
 		if key == nil {
 			return ErrEmptyPublicKey
@@ -71,9 +67,7 @@ func ValidateCertificate(cs tls.ConnectionState) error {
 		return nil
 	case *rsa.PublicKey:
 		return staking.ValidateRSAPublicKeyIsWellFormed(key)
-	case nil:
-		return ErrEmptyPublicKey
 	default:
-		return nil
+		return ErrUnsupportedKeyType
 	}
 }
