@@ -25,12 +25,12 @@ func nameVertices(pg *prefixGroup) map[*prefixGroup]string {
 
 func TestSharedPrefixes(t *testing.T) {
 	for _, tst := range []struct {
-		name                                        string
-		input                                       []ids.ID
-		expectedEdges                               string
-		expectedMembers                             map[string][]ids.ID
-		expectedBifurcationsWithCommonPrefix        [][]uint8
-		expectedBifurcationsWithCommonPrefixMembers [][]ids.ID
+		name                        string
+		input                       []ids.ID
+		expectedEdges               string
+		expectedMembers             map[string][]ids.ID
+		expectedCommonPrefixes      [][]uint8
+		expectedCommonPrefixMembers [][]ids.ID
 	}{
 		{
 			name:          "no shared prefix",
@@ -41,8 +41,8 @@ func TestSharedPrefixes(t *testing.T) {
 				"b": {{0x00, 0x1f}},
 				"c": {{0xff, 0x0f}},
 			},
-			expectedBifurcationsWithCommonPrefix:        [][]uint8{},
-			expectedBifurcationsWithCommonPrefixMembers: [][]ids.ID{},
+			expectedCommonPrefixes:      [][]uint8{},
+			expectedCommonPrefixMembers: [][]ids.ID{},
 		},
 		{
 			name:          "shared prefix for simple pair",
@@ -53,8 +53,8 @@ func TestSharedPrefixes(t *testing.T) {
 				"b": {blkID4},
 				"c": {blkID2},
 			},
-			expectedBifurcationsWithCommonPrefix:        [][]uint8{{0x0}},
-			expectedBifurcationsWithCommonPrefixMembers: [][]ids.ID{{blkID2, blkID4}},
+			expectedCommonPrefixes:      [][]uint8{{0x0}},
+			expectedCommonPrefixMembers: [][]ids.ID{{blkID2, blkID4}},
 		},
 		{
 			name:          "shared prefix for pair",
@@ -65,8 +65,8 @@ func TestSharedPrefixes(t *testing.T) {
 				"b": {{0xf0, 0x0f}},
 				"c": {{0xf0, 0x1f}},
 			},
-			expectedBifurcationsWithCommonPrefix:        [][]uint8{{0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1}},
-			expectedBifurcationsWithCommonPrefixMembers: [][]ids.ID{{{0xf0, 0x0f}, {0xf0, 0x1f}}},
+			expectedCommonPrefixes:      [][]uint8{{0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1}},
+			expectedCommonPrefixMembers: [][]ids.ID{{{0xf0, 0x0f}, {0xf0, 0x1f}}},
 		},
 		{
 			name:          "shared prefix pair out of three descendants",
@@ -79,14 +79,14 @@ func TestSharedPrefixes(t *testing.T) {
 				"d": {{0x0f, 0xff}},
 				"e": {{0xff, 0xf0}},
 			},
-			expectedBifurcationsWithCommonPrefix:        [][]uint8{{1, 1, 1, 1}},
-			expectedBifurcationsWithCommonPrefixMembers: [][]ids.ID{{{0xff, 0xf0}, {0x0f, 0xff}}},
+			expectedCommonPrefixes:      [][]uint8{{1, 1, 1, 1}},
+			expectedCommonPrefixMembers: [][]ids.ID{{{0xff, 0xf0}, {0x0f, 0xff}}},
 		},
 		{
 			name:          "shared prefix for quad",
 			input:         []ids.ID{{0xff, 0xff}, {0xff, 0xf0}, {0x0f, 0xff}, {0x0f, 0xf0}},
 			expectedEdges: `(a,b)(a,e)(b,c)(b,d)(e,f)(e,g)`,
-			expectedBifurcationsWithCommonPrefixMembers: [][]ids.ID{
+			expectedCommonPrefixMembers: [][]ids.ID{
 				{{0xff, 0xff}, {0xff, 0xf0}, {0x0f, 0xff}, {0x0f, 0xf0}},
 				{{0x0f, 0xff}, {0x0f, 0xf0}},
 				{{0xff, 0xff}, {0xff, 0xf0}},
@@ -100,7 +100,7 @@ func TestSharedPrefixes(t *testing.T) {
 				"f": {{0xff, 0xf0}},
 				"g": {{0xff, 0xff}},
 			},
-			expectedBifurcationsWithCommonPrefix: [][]uint8{
+			expectedCommonPrefixes: [][]uint8{
 				{1, 1, 1, 1}, {1, 1, 1, 1, 0, 0, 0, 0}, {1, 1, 1, 1, 1, 1, 1, 1},
 			},
 		},
@@ -123,25 +123,27 @@ func TestSharedPrefixes(t *testing.T) {
 				}
 			})
 
-			// bifurcationsWithCommonPrefix holds common prefixes of prefix groups as bifurcationsWithCommonPrefix()
+			// commonPrefixMembers holds common prefixes of prefix groups as bifurcationsWithCommonPrefix()
 			// traverses starting from the top prefix group.
 			// It does not contain leaf nodes, as bifurcationsWithCommonPrefix() does not visit leaf nodes in its traversal.
 
-			// bifurcationsWithCommonPrefixMembers contains the IDs of the prefix group that corresponds to the prefix.
-			// The first bifurcationsWithCommonPrefixMembers corresponds to the input, as
+			// commonPrefixMembers contains the IDs of the prefix group that corresponds to the commonPrefixes.
+			// The intention of having it is showing how each bifurcation splits the members according to their common prefix.
+			// Had bifurcationsWithCommonPrefix() visited leaf prefix groups, the commonPrefixMembers would shrink down to a single ID.
+			// Since bifurcationsWithCommonPrefix() doesn't visit leaf prefix groups, commonPrefixMembers can contain sets of sets as small as two elements.
 
-			bifurcationsWithCommonPrefixMembers := make([][]ids.ID, 0, len(tst.expectedBifurcationsWithCommonPrefixMembers))
-			bifurcationsWithCommonPrefix := make([][]uint8, 0, len(tst.expectedBifurcationsWithCommonPrefix))
+			commonPrefixMembers := make([][]ids.ID, 0, len(tst.expectedCommonPrefixMembers))
+			commonPrefixes := make([][]uint8, 0, len(tst.expectedCommonPrefixes))
 
 			pg.bifurcationsWithCommonPrefix(func(members []ids.ID, prefix []uint8) {
-				bifurcationsWithCommonPrefixMembers = append(bifurcationsWithCommonPrefixMembers, members)
-				bifurcationsWithCommonPrefix = append(bifurcationsWithCommonPrefix, prefix)
+				commonPrefixMembers = append(commonPrefixMembers, members)
+				commonPrefixes = append(commonPrefixes, prefix)
 			})
 
 			require.Equal(t, tst.expectedEdges, edges.String())
 			require.Equal(t, tst.expectedMembers, members)
-			require.Equal(t, tst.expectedBifurcationsWithCommonPrefix, bifurcationsWithCommonPrefix)
-			require.Equal(t, tst.expectedBifurcationsWithCommonPrefixMembers, bifurcationsWithCommonPrefixMembers)
+			require.Equal(t, tst.expectedCommonPrefixes, commonPrefixes)
+			require.Equal(t, tst.expectedCommonPrefixMembers, commonPrefixMembers)
 		})
 	}
 }
