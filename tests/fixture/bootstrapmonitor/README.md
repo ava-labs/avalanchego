@@ -56,13 +56,13 @@ and initiates a new test when one is found.
    - The network targeted by the test is determined by the value of
      the `AVAGO_NETWORK_NAME` env var set for the avalanchego
      container.
-   - By default, the sync mode will be `full-sync`. The other sync
+   - By default, the sync mode will be `c-chain-state-sync`. The other sync
      modes require providing additional configuration:
      - The `only-p-chain-full-sync` mode is enabled by setting the
        `AVAGO_PARTIAL_SYNC_PRIMARY_NETWORK` env var to `"true"` for
        the avalanchego container. If this mode is enabled, the state
        sync configuration for the C-Chain will be ignored.
-     - The `c-chain-state-sync` mode is enabled by including
+     - The `full-sync` mode is enabled by including
        `state-sync-enabled:false` in the
        `AVAGO_CHAIN_CONFIG_CONTENT` env var set for the avalanchego
        container.
