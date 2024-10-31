@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -390,7 +390,7 @@ func (v *verifier) proposalBlock(
 	onDecisionState state.Diff,
 	onCommitState state.Diff,
 	onAbortState state.Diff,
-	feeCalculator fee.Calculator,
+	feeCalculator txfee.Calculator,
 	inputs set.Set[ids.ID],
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
@@ -441,7 +441,7 @@ func (v *verifier) proposalBlock(
 func (v *verifier) standardBlock(
 	b block.Block,
 	txs []*txs.Tx,
-	feeCalculator fee.Calculator,
+	feeCalculator txfee.Calculator,
 	onAcceptState state.Diff,
 ) error {
 	inputs, atomicRequests, onAcceptFunc, err := v.processStandardTxs(
@@ -471,7 +471,7 @@ func (v *verifier) standardBlock(
 	return nil
 }
 
-func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculator, diff state.Diff, parentID ids.ID) (
+func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calculator, diff state.Diff, parentID ids.ID) (
 	set.Set[ids.ID],
 	map[ids.ID]*atomic.Requests,
 	func(),
@@ -483,7 +483,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 	if isEtna {
 		var blockComplexity gas.Dimensions
 		for _, tx := range txs {
-			txComplexity, err := fee.TxComplexity(tx.Unsigned)
+			txComplexity, err := txfee.TxComplexity(tx.Unsigned)
 			if err != nil {
 				txID := tx.ID()
 				v.MarkDropped(txID, err)
