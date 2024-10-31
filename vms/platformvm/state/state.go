@@ -804,11 +804,6 @@ func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (ma
 		// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
 		// if all validators are active (inactive weight is 0)
 		vdr, err := s.GetSubnetOnlyValidator(validationID)
-		if err == database.ErrNotFound {
-			// if the validator is not found, it is removed from the validator set
-			// but not yet removed from the database
-			continue
-		}
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get validator: %w", err)
 		}
