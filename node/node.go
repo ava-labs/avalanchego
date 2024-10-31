@@ -600,7 +600,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	}
 
 	n.onSufficientlyConnected = make(chan struct{})
-	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
+	numBootstrappers := n.bootstrappers.NumValidators(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {

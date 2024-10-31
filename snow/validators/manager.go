@@ -80,8 +80,11 @@ type Manager interface {
 	// If an error is returned, the set will be unmodified.
 	RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
 
-	// Count returns the number of validators currently in the subnet.
-	Count(subnetID ids.ID) int
+	// NumSubnets returns the number of subnets with non-zero weight.
+	NumSubnets() int
+
+	// NumValidators returns the number of validators currently in the subnet.
+	NumValidators(subnetID ids.ID) int
 
 	// TotalWeight returns the cumulative weight of all validators in the subnet.
 	// Returns err if total weight overflows uint64.
@@ -227,7 +230,14 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 	return nil
 }
 
-func (m *manager) Count(subnetID ids.ID) int {
+func (m *manager) NumSubnets() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	return len(m.subnetToVdrs)
+}
+
+func (m *manager) NumValidators(subnetID ids.ID) int {
 	m.lock.RLock()
 	set, exists := m.subnetToVdrs[subnetID]
 	m.lock.RUnlock()
