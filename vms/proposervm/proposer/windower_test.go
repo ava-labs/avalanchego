@@ -26,28 +26,49 @@ var (
 )
 
 func TestWindowerNoValidators(t *testing.T) {
-	require := require.New(t)
+	tests := []struct {
+		name       string
+		validators []ids.NodeID
+	}{
+		{
+			name: "no validators",
+		},
+		{
+			name: "only inactive validators",
+			validators: []ids.NodeID{
+				ids.EmptyNodeID,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	_, vdrState := makeValidators(t, 0)
-	w := New(vdrState, subnetID, randomChainID)
+			w := New(
+				makeValidatorState(t, test.validators),
+				subnetID,
+				randomChainID,
+			)
 
-	var (
-		chainHeight  uint64 = 1
-		pChainHeight uint64 = 0
-		nodeID              = ids.GenerateTestNodeID()
-		slot         uint64 = 1
-	)
-	delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
-	require.NoError(err)
-	require.Zero(delay)
+			var (
+				chainHeight  uint64 = 1
+				pChainHeight uint64 = 0
+				nodeID              = ids.GenerateTestNodeID()
+				slot         uint64 = 1
+			)
+			delay, err := w.Delay(context.Background(), chainHeight, pChainHeight, nodeID, MaxVerifyWindows)
+			require.NoError(err)
+			require.Zero(delay)
 
-	proposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, slot)
-	require.ErrorIs(err, ErrAnyoneCanPropose)
-	require.Equal(ids.EmptyNodeID, proposer)
+			proposer, err := w.ExpectedProposer(context.Background(), chainHeight, pChainHeight, slot)
+			require.ErrorIs(err, ErrAnyoneCanPropose)
+			require.Equal(ids.EmptyNodeID, proposer)
 
-	delay, err = w.MinDelayForProposer(context.Background(), chainHeight, pChainHeight, nodeID, slot)
-	require.ErrorIs(err, ErrAnyoneCanPropose)
-	require.Zero(delay)
+			delay, err = w.MinDelayForProposer(context.Background(), chainHeight, pChainHeight, nodeID, slot)
+			require.ErrorIs(err, ErrAnyoneCanPropose)
+			require.Zero(delay)
+		})
+	}
 }
 
 func TestWindowerRepeatedValidator(t *testing.T) {
@@ -450,7 +471,10 @@ func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validatorstest.Stat
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.BuildTestNodeID([]byte{byte(i) + 1})
 	}
+	return validatorIDs, makeValidatorState(t, validatorIDs)
+}
 
+func makeValidatorState(t testing.TB, validatorIDs []ids.NodeID) *validatorstest.State {
 	vdrState := &validatorstest.State{
 		T: t,
 		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
@@ -464,5 +488,5 @@ func makeValidators(t testing.TB, count int) ([]ids.NodeID, *validatorstest.Stat
 			return vdrs, nil
 		},
 	}
-	return validatorIDs, vdrState
+	return vdrState
 }

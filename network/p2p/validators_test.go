@@ -296,6 +296,31 @@ func TestValidatorsTop(t *testing.T) {
 				nodeID1,
 			},
 		},
+		{
+			name: "top ignores inactive validators",
+			validators: []validator{
+				{
+					nodeID: ids.EmptyNodeID,
+					weight: 4,
+				},
+				{
+					nodeID: nodeID1,
+					weight: 2,
+				},
+				{
+					nodeID: nodeID2,
+					weight: 1,
+				},
+				{
+					nodeID: nodeID3,
+					weight: 1,
+				},
+			},
+			percentage: .5,
+			expected: []ids.NodeID{
+				nodeID1,
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
