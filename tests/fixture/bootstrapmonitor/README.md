@@ -65,7 +65,9 @@ and initiates a new test when one is found.
      - The `full-sync` mode is enabled by including
        `state-sync-enabled:false` in the
        `AVAGO_CHAIN_CONFIG_CONTENT` env var set for the avalanchego
-       container.
+       container and either not including a value for
+       `AVAGO_PARTIAL_SYNC_PRIMARY_NETWORK` or setting it to
+       `"false"`.
    - The image used by the test is determined by the image configured
      for the avalanchego container.
    - The versions of the avalanchego image used by the test is
