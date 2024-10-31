@@ -21,6 +21,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// The sync mode of a bootstrap configuration should be as explicit as possible to ensure
+// unambiguous names if/when new sync modes become supported.
+//
+// For example, at time of writing only the C-Chain supports state sync. The temptation
+// might be to call this mode that tests C-Chain state sync `state-sync`. But if the P-
+// or X-Chains start supporting state sync in the future, a name like
+// `c-chain-state-sync` ensures that logs and metrics for historical results can be
+// differentiated from new results that involve state sync of the other chains.
 type SyncMode string
 
 const (
