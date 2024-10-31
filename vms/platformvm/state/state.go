@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -86,7 +87,7 @@ var (
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
 	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
-	SubnetOnlyValidatorsPrefix    = []byte("subnetOnlyValidators")
+	SubnetOnlyPrefix              = []byte("subnetOnly")
 	WeightsPrefix                 = []byte("weights")
 	SubnetIDNodeIDPrefix          = []byte("subnetIDNodeID")
 	ActivePrefix                  = []byte("active")
@@ -273,6 +274,15 @@ type stateBlk struct {
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> nil
+ * | |-. subnetOnly
+ * | | |-. weights
+ * | | | '-- subnetID -> weight
+ * | | |-. subnetIDNodeID
+ * | | | '-- subnetID+nodeID -> validationID
+ * | | |-. active
+ * | | | '-- validationID -> subnetOnlyValidator
+ * | | '-. inactive
+ * | |   '-- validationID -> subnetOnlyValidator
  * | |-. weight diffs
  * | | '-- subnet+height+nodeID -> weightChange
  * | '-. pub key diffs
@@ -332,9 +342,12 @@ type state struct {
 	activeSOVs             *activeSubnetOnlyValidators
 	sovDiff                *subnetOnlyValidatorsDiff
 	subnetOnlyValidatorsDB database.Database
+	weightsCache           cache.Cacher[ids.ID, uint64] // subnetID -> total SoV weight
 	weightsDB              database.Database
+	subnetIDNodeIDCache    cache.Cacher[subnetIDNodeID, bool] // subnetID+nodeID -> is validator
 	subnetIDNodeIDDB       database.Database
 	activeDB               database.Database
+	inactiveCache          cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]] // validationID -> SubnetOnlyValidator
 	inactiveDB             database.Database
 
 	currentStakers *baseStakers
@@ -528,8 +541,6 @@ func New(
 
 	baseDB := versiondb.New(db)
 
-	subnetOnlyValidatorsDB := prefixdb.New(SubnetOnlyValidatorsPrefix, baseDB)
-
 	validatorsDB := prefixdb.New(ValidatorsPrefix, baseDB)
 
 	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
@@ -544,8 +555,54 @@ func New(
 	pendingSubnetValidatorBaseDB := prefixdb.New(SubnetValidatorPrefix, pendingValidatorsDB)
 	pendingSubnetDelegatorBaseDB := prefixdb.New(SubnetDelegatorPrefix, pendingValidatorsDB)
 
+	subnetOnlyValidatorsDB := prefixdb.New(SubnetOnlyPrefix, validatorsDB)
+
 	validatorWeightDiffsDB := prefixdb.New(ValidatorWeightDiffsPrefix, validatorsDB)
 	validatorPublicKeyDiffsDB := prefixdb.New(ValidatorPublicKeyDiffsPrefix, validatorsDB)
+
+	weightsCache, err := metercacher.New(
+		"sov_weights_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, uint64](execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
+			return ids.IDLen + wrappers.LongLen
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inactiveSOVsCache, err := metercacher.New(
+		"sov_inactive_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]](
+			execCfg.L1InactiveValidatorsCacheSize,
+			func(_ ids.ID, maybeSOV maybe.Maybe[SubnetOnlyValidator]) int {
+				const sovOverhead = ids.IDLen + ids.NodeIDLen + 4*wrappers.LongLen + 3*constants.PointerOverhead
+				const maybeSOVOverhead = wrappers.BoolLen + sovOverhead
+				const overhead = ids.IDLen + maybeSOVOverhead
+				if maybeSOV.IsNothing() {
+					return overhead
+				}
+
+				sov := maybeSOV.Value()
+				return overhead + len(sov.PublicKey) + len(sov.RemainingBalanceOwner) + len(sov.DeactivationOwner)
+			},
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	subnetIDNodeIDCache, err := metercacher.New(
+		"sov_subnet_id_node_id_cache",
+		metricsReg,
+		cache.NewSizedLRU[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
+			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	txCache, err := metercacher.New(
 		"tx_cache",
@@ -659,9 +716,12 @@ func New(
 		activeSOVs:             newActiveSubnetOnlyValidators(),
 		sovDiff:                newSubnetOnlyValidatorsDiff(),
 		subnetOnlyValidatorsDB: subnetOnlyValidatorsDB,
+		weightsCache:           weightsCache,
 		weightsDB:              prefixdb.New(WeightsPrefix, subnetOnlyValidatorsDB),
+		subnetIDNodeIDCache:    subnetIDNodeIDCache,
 		subnetIDNodeIDDB:       prefixdb.New(SubnetIDNodeIDPrefix, subnetOnlyValidatorsDB),
 		activeDB:               prefixdb.New(ActivePrefix, subnetOnlyValidatorsDB),
+		inactiveCache:          inactiveSOVsCache,
 		inactiveDB:             prefixdb.New(InactivePrefix, subnetOnlyValidatorsDB),
 
 		currentStakers: newBaseStakers(),
@@ -774,7 +834,10 @@ func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 		return weight, nil
 	}
 
-	// TODO: Add caching
+	if weight, ok := s.weightsCache.Get(subnetID); ok {
+		return weight, nil
+	}
+
 	return database.WithDefault(database.GetUInt64, s.weightsDB, subnetID[:], 0)
 }
 
@@ -797,7 +860,13 @@ func (s *state) getPersistedSubnetOnlyValidator(validationID ids.ID) (SubnetOnly
 		return sov, nil
 	}
 
-	// TODO: Add caching
+	if maybeSOV, ok := s.inactiveCache.Get(validationID); ok {
+		if maybeSOV.IsNothing() {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return maybeSOV.Value(), nil
+	}
+
 	return getSubnetOnlyValidator(s.inactiveDB, validationID)
 }
 
@@ -810,9 +879,11 @@ func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool
 		subnetID: subnetID,
 		nodeID:   nodeID,
 	}
-	key := subnetIDNodeID.Marshal()
+	if has, ok := s.subnetIDNodeIDCache.Get(subnetIDNodeID); ok {
+		return has, nil
+	}
 
-	// TODO: Add caching
+	key := subnetIDNodeID.Marshal()
 	return s.subnetIDNodeIDDB.Has(key)
 }
 
@@ -2638,6 +2709,8 @@ func (s *state) writeSubnetOnlyValidators() error {
 		if err != nil {
 			return err
 		}
+
+		s.weightsCache.Put(subnetID, weight)
 	}
 
 	for validationID, sov := range s.sovDiff.modified {
@@ -2646,6 +2719,7 @@ func (s *state) writeSubnetOnlyValidators() error {
 		if s.activeSOVs.delete(validationID) {
 			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
 		} else {
+			s.inactiveCache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
 			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
 		}
 		if err != nil {
@@ -2653,12 +2727,15 @@ func (s *state) writeSubnetOnlyValidators() error {
 		}
 
 		// Update the subnetIDNodeID mapping
-		subnetIDNodeID := subnetIDNodeID{
-			subnetID: sov.SubnetID,
-			nodeID:   sov.NodeID,
-		}
-		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
-		if sov.isDeleted() {
+		var (
+			isDeleted      = sov.isDeleted()
+			subnetIDNodeID = subnetIDNodeID{
+				subnetID: sov.SubnetID,
+				nodeID:   sov.NodeID,
+			}
+			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
+		)
+		if isDeleted {
 			err = s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey)
 		} else {
 			err = s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:])
@@ -2667,7 +2744,8 @@ func (s *state) writeSubnetOnlyValidators() error {
 			return err
 		}
 
-		if sov.isDeleted() {
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, !isDeleted)
+		if isDeleted {
 			continue
 		}
 
@@ -2676,6 +2754,7 @@ func (s *state) writeSubnetOnlyValidators() error {
 			s.activeSOVs.put(sov)
 			err = putSubnetOnlyValidator(s.activeDB, sov)
 		} else {
+			s.inactiveCache.Put(validationID, maybe.Some(sov))
 			err = putSubnetOnlyValidator(s.inactiveDB, sov)
 		}
 		if err != nil {
