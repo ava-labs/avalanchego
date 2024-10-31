@@ -577,9 +577,11 @@ func New(
 		cache.NewSizedLRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]](
 			execCfg.L1InactiveValidatorsCacheSize,
 			func(_ ids.ID, maybeSOV maybe.Maybe[SubnetOnlyValidator]) int {
-				const sovOverhead = ids.IDLen + ids.NodeIDLen + 4*wrappers.LongLen + 3*constants.PointerOverhead
-				const maybeSOVOverhead = wrappers.BoolLen + sovOverhead
-				const overhead = ids.IDLen + maybeSOVOverhead
+				const (
+					sovOverhead      = ids.IDLen + ids.NodeIDLen + 4*wrappers.LongLen + 3*constants.PointerOverhead
+					maybeSOVOverhead = wrappers.BoolLen + sovOverhead
+					overhead         = ids.IDLen + maybeSOVOverhead
+				)
 				if maybeSOV.IsNothing() {
 					return overhead
 				}
