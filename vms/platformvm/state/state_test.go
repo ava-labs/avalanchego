@@ -1666,6 +1666,29 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			},
 		},
 		{
+			name: "decrease active weight",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            2, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Decreased
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+		},
+		{
 			name: "deactivate",
 			initial: []SubnetOnlyValidator{
 				{
