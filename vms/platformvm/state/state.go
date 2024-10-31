@@ -1941,12 +1941,14 @@ func (s *state) initValidatorSets() error {
 		return errValidatorSetAlreadyPopulated
 	}
 
-	// Load ACP77 validators
+	// Load active ACP-77 validators
 	if err := s.activeSOVs.addStakers(s.validators); err != nil {
 		return err
 	}
 
-	// Load inactive weights
+	// Load inactive ACP-77 validator weights
+	//
+	// TODO: L1s with no active weight should not be held in memory.
 	it := s.weightsDB.NewIterator()
 	defer it.Release()
 
@@ -2309,6 +2311,8 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 //
 // This function must be called prior to writeCurrentStakers and
 // writeSubnetOnlyValidators.
+//
+// TODO: L1s with no active weight should not be held in memory.
 func (s *state) updateValidatorManager(updateValidators bool) error {
 	if !updateValidators {
 		return nil
