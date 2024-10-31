@@ -51,7 +51,7 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 			expectedErr: errInvalidNetworkEnvVar,
 		},
 		{
-			name: "valid configuration without versions and state sync disabled",
+			name: "valid configuration without versions",
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -63,20 +63,15 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 									Name:  networkEnvName,
 									Value: networkName,
 								},
-								{
-									Name: chainConfigContentEnvName,
-									// Sets state-sync-enabled:false for the C-Chain
-									Value: "eyJDIjp7IkNvbmZpZyI6ImV5SnpkR0YwWlMxemVXNWpMV1Z1WVdKc1pXUWlPbVpoYkhObGZRPT0iLCJVcGdyYWRlIjpudWxsfX0=",
-								},
 							},
 						},
 					},
 				},
 			},
 			expectedConfig: &BootstrapTestConfig{
-				Network:          networkName,
-				StateSyncEnabled: false,
-				Image:            imageName,
+				Network:  networkName,
+				SyncMode: CChainStateSync,
+				Image:    imageName,
 			},
 		},
 		{
@@ -103,9 +98,9 @@ func TestBootstrapTestConfigForPod(t *testing.T) {
 				},
 			},
 			expectedConfig: &BootstrapTestConfig{
-				Network:          networkName,
-				StateSyncEnabled: true,
-				Image:            imageName,
+				Network:  networkName,
+				SyncMode: CChainStateSync,
+				Image:    imageName,
 				Versions: &version.Versions{
 					Application: "avalanchego/1.11.11",
 					Database:    "v1.4.5",
@@ -156,6 +151,92 @@ func marshalAndEncode(t *testing.T, chainConfigs map[string]chains.ChainConfig) 
 	chainConfigContent, err := json.Marshal(chainConfigs)
 	require.NoError(t, err)
 	return base64.StdEncoding.EncodeToString(chainConfigContent)
+}
+
+func TestSyncModeFromEnvVars(t *testing.T) {
+	tests := []struct {
+		name         string
+		envVars      []corev1.EnvVar
+		expectedMode SyncMode
+	}{
+		{
+			name:         "default to state sync",
+			expectedMode: CChainStateSync,
+		},
+		{
+			name: "partial sync",
+			envVars: []corev1.EnvVar{
+				{
+					Name:  partialSyncPrimaryNetworkEnvName,
+					Value: "true",
+				},
+			},
+			expectedMode: OnlyPChainFullSync,
+		},
+		{
+			name: "full sync",
+			envVars: []corev1.EnvVar{
+				{
+					Name:  partialSyncPrimaryNetworkEnvName,
+					Value: "false",
+				},
+				{
+					Name: chainConfigContentEnvName,
+					// Sets state-sync-enabled:false for the C-Chain
+					Value: "eyJDIjp7IkNvbmZpZyI6ImV5SnpkR0YwWlMxemVXNWpMV1Z1WVdKc1pXUWlPbVpoYkhObGZRPT0iLCJVcGdyYWRlIjpudWxsfX0=",
+				},
+			},
+			expectedMode: FullSync,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			syncMode, err := syncModeFromEnvVars(test.envVars)
+			require.NoError(err)
+			require.Equal(test.expectedMode, syncMode)
+		})
+	}
+}
+
+func TestPartialSyncEnabledFromEnvVars(t *testing.T) {
+	tests := []struct {
+		name                      string
+		partialSyncPrimaryNetwork string
+		expectedEnabled           bool
+		expectedErr               error
+	}{
+		{
+			name:                      "env var not set",
+			partialSyncPrimaryNetwork: "",
+			expectedEnabled:           false,
+		},
+		{
+			name:                      "env var set to true",
+			partialSyncPrimaryNetwork: "true",
+			expectedEnabled:           true,
+		},
+		{
+			name:                      "env var set to invalid value",
+			partialSyncPrimaryNetwork: "not-a-bool",
+			expectedErr:               errFailedToCastToBool,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			env := []corev1.EnvVar{
+				{
+					Name:  partialSyncPrimaryNetworkEnvName,
+					Value: test.partialSyncPrimaryNetwork,
+				},
+			}
+			enabled, err := partialSyncEnabledFromEnvVars(env)
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expectedEnabled, enabled)
+		})
+	}
 }
 
 func TestStateSyncEnabledFromEnvVars(t *testing.T) {
