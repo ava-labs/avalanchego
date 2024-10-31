@@ -49,12 +49,12 @@ func NextBlockTime(
 }
 
 // GetNextStakerChangeTime returns the next time a staker will be either added
-// or removed to/from the current validator set. If the next staker change time
-// is further in the future than [defaultTime], then [defaultTime] is returned.
+// or removed to/from the validator set. If the next staker change time is
+// further in the future than [nextTime], then [nextTime] is returned.
 func GetNextStakerChangeTime(
 	config validatorfee.Config,
 	state Chain,
-	defaultTime time.Time,
+	nextTime time.Time,
 ) (time.Time, error) {
 	currentIterator, err := state.GetCurrentStakerIterator()
 	if err != nil {
@@ -75,8 +75,8 @@ func GetNextStakerChangeTime(
 		}
 
 		time := it.Value().NextTime
-		if time.Before(defaultTime) {
-			defaultTime = time
+		if time.Before(nextTime) {
+			nextTime = time
 		}
 	}
 
@@ -88,12 +88,11 @@ func GetNextStakerChangeTime(
 
 	// If there are no SoVs, return
 	if !sovIterator.Next() {
-		return defaultTime, nil
+		return nextTime, nil
 	}
 
+	// Calculate the remaining funds that the next validator to evict has.
 	var (
-		currentTime = state.GetTimestamp()
-		maxSeconds  = uint64(defaultTime.Sub(currentTime) / time.Second)
 		sov         = sovIterator.Value()
 		accruedFees = state.GetAccruedFees()
 	)
@@ -102,6 +101,11 @@ func GetNextStakerChangeTime(
 		return time.Time{}, err
 	}
 
+	// Calculate how many seconds the remaining funds can last for.
+	var (
+		currentTime = state.GetTimestamp()
+		maxSeconds  = uint64(nextTime.Sub(currentTime) / time.Second)
+	)
 	feeState := validatorfee.State{
 		Current: gas.Gas(state.NumActiveSubnetOnlyValidators()),
 		Excess:  state.GetSoVExcess(),
@@ -113,10 +117,10 @@ func GetNextStakerChangeTime(
 	)
 
 	deactivationTime := currentTime.Add(time.Duration(remainingSeconds) * time.Second)
-	if deactivationTime.Before(defaultTime) {
-		defaultTime = deactivationTime
+	if deactivationTime.Before(nextTime) {
+		nextTime = deactivationTime
 	}
-	return defaultTime, nil
+	return nextTime, nil
 }
 
 // PickFeeCalculator creates either a static or a dynamic fee calculator,
