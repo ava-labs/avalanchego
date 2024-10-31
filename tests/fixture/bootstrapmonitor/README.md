@@ -34,8 +34,8 @@ flag.
 #### Full Sync
 
 In this mode, the full history of the X-, P- and C-Chains will be
-processed. This is configured by including `state-sync-enabled:
-false` in the C-Chain configuration.
+processed. This is configured by including
+`state-sync-enabled:false` in the C-Chain configuration.
 
 ## Overview
 
