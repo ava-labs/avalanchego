@@ -580,14 +580,14 @@ func New(
 				const (
 					sovOverhead      = ids.IDLen + ids.NodeIDLen + 4*wrappers.LongLen + 3*constants.PointerOverhead
 					maybeSOVOverhead = wrappers.BoolLen + sovOverhead
-					overhead         = ids.IDLen + maybeSOVOverhead
+					entryOverhead    = ids.IDLen + maybeSOVOverhead
 				)
 				if maybeSOV.IsNothing() {
-					return overhead
+					return entryOverhead
 				}
 
 				sov := maybeSOV.Value()
-				return overhead + len(sov.PublicKey) + len(sov.RemainingBalanceOwner) + len(sov.DeactivationOwner)
+				return entryOverhead + len(sov.PublicKey) + len(sov.RemainingBalanceOwner) + len(sov.DeactivationOwner)
 			},
 		),
 	)
