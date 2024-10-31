@@ -2364,40 +2364,58 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		}
 	}
 
+	// Remove all deleted SoV validators. This must be done before adding new
+	// SoV validators to support the case where a validator is removed and then
+	// immediately re-added with a different validationID.
 	for validationID, sov := range s.sovDiff.modified {
+		if !sov.isDeleted() {
+			continue
+		}
+
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// Deleting a non-existent validator is a noop. This can happen if
+			// the validator was added and then immediately removed.
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		if err := s.validators.RemoveWeight(priorSOV.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight); err != nil {
+			return err
+		}
+	}
+
+	// Now the removed SoV validators have been deleted, perform additions and
+	// modifications.
+	for validationID, sov := range s.sovDiff.modified {
+		if sov.isDeleted() {
+			continue
+		}
+
 		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
 		switch err {
 		case nil:
-			if sov.isDeleted() {
-				// Removing a validator
-				err = s.validators.RemoveWeight(priorSOV.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight)
-			} else {
-				// Modifying a validator
-				if priorSOV.isActive() == sov.isActive() {
-					// This validator's active status isn't changing. This means
-					// the effectiveNodeIDs are equal.
-					nodeID := sov.effectiveNodeID()
-					if priorSOV.Weight < sov.Weight {
-						err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
-					} else if priorSOV.Weight > sov.Weight {
-						err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
-					}
-				} else {
-					// This validator's active status is changing.
-					err = errors.Join(
-						s.validators.RemoveWeight(sov.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight),
-						addSoVToValidatorManager(s.validators, sov),
-					)
+			// Modifying an existing validator
+			if priorSOV.isActive() == sov.isActive() {
+				// This validator's active status isn't changing. This means
+				// the effectiveNodeIDs are equal.
+				nodeID := sov.effectiveNodeID()
+				if priorSOV.Weight < sov.Weight {
+					err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
+				} else if priorSOV.Weight > sov.Weight {
+					err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
 				}
+			} else {
+				// This validator's active status is changing.
+				err = errors.Join(
+					s.validators.RemoveWeight(sov.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight),
+					addSoVToValidatorManager(s.validators, sov),
+				)
 			}
 		case database.ErrNotFound:
-			if sov.isDeleted() {
-				// Deleting a non-existent validator is a noop. This can happen
-				// if the validator was added and then immediately removed.
-				continue
-			}
-
-			// Adding a validator
+			// Adding a new validator
 			err = addSoVToValidatorManager(s.validators, sov)
 		}
 		if err != nil {
@@ -2719,6 +2737,10 @@ func (s *state) writeSubnetOnlyValidators() error {
 		s.weightsCache.Put(subnetID, weight)
 	}
 
+	// The SoV diff application is split into two loops to ensure that all
+	// deletions to the subnetIDNodeIDDB happen prior to any additions.
+	// Otherwise replacing an SoV by deleting it and then re-adding it with a
+	// different validationID could result in an inconsistent state.
 	for validationID, sov := range s.sovDiff.modified {
 		// Delete the prior validator if it exists
 		var err error
@@ -2732,30 +2754,45 @@ func (s *state) writeSubnetOnlyValidators() error {
 			return err
 		}
 
-		// Update the subnetIDNodeID mapping
+		if !sov.isDeleted() {
+			continue
+		}
+
 		var (
-			isDeleted      = sov.isDeleted()
 			subnetIDNodeID = subnetIDNodeID{
 				subnetID: sov.SubnetID,
 				nodeID:   sov.NodeID,
 			}
 			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
 		)
-		if isDeleted {
-			err = s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey)
-		} else {
-			err = s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:])
-		}
-		if err != nil {
+		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
 			return err
 		}
 
-		s.subnetIDNodeIDCache.Put(subnetIDNodeID, !isDeleted)
-		if isDeleted {
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, false)
+	}
+
+	for validationID, sov := range s.sovDiff.modified {
+		if sov.isDeleted() {
 			continue
 		}
 
+		// Update the subnetIDNodeID mapping
+		var (
+			subnetIDNodeID = subnetIDNodeID{
+				subnetID: sov.SubnetID,
+				nodeID:   sov.NodeID,
+			}
+			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
+		)
+		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
+			return err
+		}
+
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, true)
+
 		// Add the new validator
+		var err error
 		if sov.isActive() {
 			s.activeSOVs.put(sov)
 			err = putSubnetOnlyValidator(s.activeDB, sov)
