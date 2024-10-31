@@ -51,13 +51,21 @@ type SubnetOnlyValidators interface {
 	// exists.
 	HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
 
-	// PutSubnetOnlyValidator inserts [sov] as a validator.
+	// PutSubnetOnlyValidator inserts [sov] as a validator. If the weight of the
+	// validator is 0, the validator is removed.
 	//
 	// If inserting this validator attempts to modify any of the constant fields
 	// of the subnet only validator struct, an error will be returned.
 	//
-	// If inserting this validator would cause the mapping of subnetID+nodeID to
-	// validationID to be non-unique, an error will be returned.
+	// If inserting this validator would cause the total weight of subnet only
+	// validators on a subnet to overflow MaxUint64, an error will be returned.
+	//
+	// If inserting this validator would cause there to be multiple validators
+	// with the same subnetID and nodeID pair to exist at the same time, an
+	// error will be returned.
+	//
+	// If an SoV with the same validationID as a previously removed SoV is
+	// added, the behavior is undefined.
 	PutSubnetOnlyValidator(sov SubnetOnlyValidator) error
 }
 
