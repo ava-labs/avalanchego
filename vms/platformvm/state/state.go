@@ -2387,8 +2387,8 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		}
 	}
 
-	// Now the removed SoV validators have been deleted, perform additions and
-	// modifications.
+	// Now that the removed SoV validators have been deleted, perform additions
+	// and modifications.
 	for validationID, sov := range s.sovDiff.modified {
 		if sov.isDeleted() {
 			continue
