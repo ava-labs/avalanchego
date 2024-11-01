@@ -425,7 +425,15 @@ type ValidatorWeightDiff struct {
 	Amount   uint64 `serialize:"true"`
 }
 
-func (v *ValidatorWeightDiff) Add(negative bool, amount uint64) error {
+func (v *ValidatorWeightDiff) Add(amount uint64) error {
+	return v.add(false, amount)
+}
+
+func (v *ValidatorWeightDiff) Sub(amount uint64) error {
+	return v.add(true, amount)
+}
+
+func (v *ValidatorWeightDiff) add(negative bool, amount uint64) error {
 	if v.Decrease == negative {
 		var err error
 		v.Amount, err = safemath.Add(v.Amount, amount)

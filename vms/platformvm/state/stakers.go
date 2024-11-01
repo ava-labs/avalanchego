@@ -283,7 +283,7 @@ func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
 	}
 
 	for _, staker := range d.deletedDelegators {
-		if err := weightDiff.Add(true, staker.Weight); err != nil {
+		if err := weightDiff.Sub(staker.Weight); err != nil {
 			return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
 		}
 	}
@@ -294,7 +294,7 @@ func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
 	for addedDelegatorIterator.Next() {
 		staker := addedDelegatorIterator.Value()
 
-		if err := weightDiff.Add(false, staker.Weight); err != nil {
+		if err := weightDiff.Add(staker.Weight); err != nil {
 			return ValidatorWeightDiff{}, fmt.Errorf("failed to increase node weight diff: %w", err)
 		}
 	}
