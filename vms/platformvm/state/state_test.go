@@ -1997,7 +1997,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 }
 
 // TestLoadSubnetOnlyValidatorAndLegacy tests that the state can be loaded when
-// there is a mix of legacy validators and subnet only validators in the same
+// there is a mix of legacy validators and subnet-only validators in the same
 // subnet.
 func TestLoadSubnetOnlyValidatorAndLegacy(t *testing.T) {
 	var (

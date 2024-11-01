@@ -26,22 +26,22 @@ var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
 	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
-	ErrMutatedSubnetOnlyValidator     = errors.New("subnet only validator contains mutated constant fields")
-	ErrConflictingSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
-	ErrDuplicateSubnetOnlyValidator   = errors.New("subnet only validator contains duplicate subnetID + nodeID pair")
+	ErrMutatedSubnetOnlyValidator     = errors.New("subnet-only validator contains mutated constant fields")
+	ErrConflictingSubnetOnlyValidator = errors.New("subnet-only validator contains conflicting subnetID + nodeID pair")
+	ErrDuplicateSubnetOnlyValidator   = errors.New("subnet-only validator contains duplicate subnetID + nodeID pair")
 )
 
 type SubnetOnlyValidators interface {
 	// GetActiveSubnetOnlyValidatorsIterator returns an iterator of all the
-	// active subnet only validators in increasing order of EndAccumulatedFee.
+	// active subnet-only validators in increasing order of EndAccumulatedFee.
 	GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error)
 
 	// NumActiveSubnetOnlyValidators returns the number of currently active
-	// subnet only validators.
+	// subnet-only validators.
 	NumActiveSubnetOnlyValidators() int
 
 	// WeightOfSubnetOnlyValidators returns the total active and inactive weight
-	// of subnet only validators on [subnetID].
+	// of subnet-only validators on [subnetID].
 	WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error)
 
 	// GetSubnetOnlyValidator returns the validator with [validationID] if it
@@ -57,9 +57,9 @@ type SubnetOnlyValidators interface {
 	// validator is 0, the validator is removed.
 	//
 	// If inserting this validator attempts to modify any of the constant fields
-	// of the subnet only validator struct, an error will be returned.
+	// of the subnet-only validator struct, an error will be returned.
 	//
-	// If inserting this validator would cause the total weight of subnet only
+	// If inserting this validator would cause the total weight of subnet-only
 	// validators on a subnet to overflow MaxUint64, an error will be returned.
 	//
 	// If inserting this validator would cause there to be multiple validators
