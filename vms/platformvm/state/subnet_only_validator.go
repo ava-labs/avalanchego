@@ -290,7 +290,7 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 	)
 	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
 	case nil:
-		if !priorSOV.constantsAreUnmodified(sov) {
+		if !priorSOV.immutableFieldsAreUnmodified(sov) {
 			return ErrMutatedSubnetOnlyValidator
 		}
 
