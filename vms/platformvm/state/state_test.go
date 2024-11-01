@@ -688,9 +688,8 @@ func TestValidatorWeightDiff(t *testing.T) {
 	)
 	tests := []test{
 		{
-			name:        "no ops",
-			expected:    &ValidatorWeightDiff{},
-			expectedErr: nil,
+			name:     "no ops",
+			expected: &ValidatorWeightDiff{},
 		},
 		{
 			name: "simple decrease",
@@ -702,7 +701,6 @@ func TestValidatorWeightDiff(t *testing.T) {
 				Decrease: true,
 				Amount:   2,
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "decrease overflow",
@@ -722,7 +720,6 @@ func TestValidatorWeightDiff(t *testing.T) {
 				Decrease: false,
 				Amount:   2,
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "increase overflow",
@@ -749,7 +746,6 @@ func TestValidatorWeightDiff(t *testing.T) {
 				Decrease: true,
 				Amount:   2,
 			},
-			expectedErr: nil,
 		},
 	}
 
