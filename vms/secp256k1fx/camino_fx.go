@@ -123,12 +123,16 @@ func (fx *Fx) RecoverAddresses(msg []byte, verifies []verify.Verifiable) (Recove
 	return ret, nil
 }
 
-func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
+func (fx *Fx) VerifyMultisigOutputOwner(outIntf, msigIntf interface{}) error {
 	out, ok := outIntf.(Owned)
 	if !ok {
 		return errWrongOutputType
 	}
-	owners, ok := out.Owners().(*OutputOwners)
+	return fx.VerifyMultisigOwner(out.Owners(), msigIntf)
+}
+
+func (*Fx) VerifyMultisigOwner(ownerIntf, msigIntf interface{}) error {
+	owners, ok := ownerIntf.(*OutputOwners)
 	if !ok {
 		return ErrWrongOwnerType
 	}

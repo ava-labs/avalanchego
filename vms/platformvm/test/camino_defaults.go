@@ -47,7 +47,8 @@ const (
 )
 
 var (
-	avaxAssetID  = ids.ID{'C', 'A', 'M'}
+	AVAXAssetID  = ids.ID{'C', 'A', 'M'}
+	OtherAssetID = ids.ID{'O', 'T', 'H', 'E', 'R'}
 	cChainID     = ids.ID{'C', '-', 'C', 'H', 'A', 'I', 'N'}
 	xChainID     = ids.ID{'X', '-', 'C', 'H', 'A', 'I', 'N'}
 	rewardConfig = reward.Config{
@@ -210,7 +211,7 @@ func Context(t *testing.T) *snow.Context {
 	require.NoError(t, aliaser.Alias(constants.PlatformChainID, "P"))
 
 	ctx := snow.DefaultContextTest()
-	ctx.AVAXAssetID = avaxAssetID
+	ctx.AVAXAssetID = AVAXAssetID
 	ctx.ChainID = constants.PlatformChainID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID

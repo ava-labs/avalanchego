@@ -247,11 +247,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 			return errWrongOwnerType
 		}
 
-		if err := e.Fx.VerifyMultisigOwner(
-			&secp256k1fx.TransferOutput{
-				OutputOwners: *rewardOwner,
-			}, e.State,
-		); err != nil {
+		if err := e.Fx.VerifyMultisigOwner(rewardOwner, e.State); err != nil {
 			return err
 		}
 
@@ -741,11 +737,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return errWrongOwnerType
 	}
 
-	if err := e.Fx.VerifyMultisigOwner(
-		&secp256k1fx.TransferOutput{
-			OutputOwners: *rewardOwner,
-		}, e.State,
-	); err != nil {
+	if err := e.Fx.VerifyMultisigOwner(rewardOwner, e.State); err != nil {
 		return err
 	}
 

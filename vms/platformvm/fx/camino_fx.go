@@ -13,7 +13,10 @@ type CaminoFx interface {
 	RecoverAddresses(msg []byte, credentials []verify.Verifiable) (secp256k1fx.RecoverMap, error)
 
 	// Verifies that Multisig aliases are on inputs are only used in supported hierarchy
-	VerifyMultisigOwner(outIntf, msigIntf interface{}) error
+	VerifyMultisigOwner(ownerIntf, msigIntf interface{}) error
+
+	// Verifies that Multisig aliases are on inputs are only used in supported hierarchy
+	VerifyMultisigOutputOwner(outIntf, msigIntf interface{}) error
 
 	// VerifyMultisigTransfer verifies that the specified transaction can spend the
 	// provided utxo with no restrictions on the destination. If the transaction

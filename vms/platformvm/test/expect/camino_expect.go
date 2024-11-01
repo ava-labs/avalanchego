@@ -21,7 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/test"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/require"
 )
+
+// TODO @evlekht prefix all funcs with corresponding diff/state/chain
 
 func VerifyMultisigPermission(t *testing.T, s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
 	t.Helper()
@@ -139,6 +142,88 @@ func GetUTXOsFromInputs(t *testing.T, s *state.MockDiff, ins []*avax.Transferabl
 	}
 }
 
+func StateGetAllUTXOs(t *testing.T, s *state.MockState, addrs []ids.ShortID, utxos [][]*avax.UTXO) {
+	t.Helper()
+	require.Len(t, addrs, len(utxos))
+	seen := set.Set[ids.ID]{}
+	for i, addr := range addrs {
+		utxoIDs := []ids.ID{}
+		for _, utxo := range utxos[i] {
+			utxoID := utxo.InputID()
+			utxoIDs = append(utxoIDs, utxoID)
+			if seen.Contains(utxoID) {
+				continue
+			}
+			seen.Add(utxoID)
+			s.EXPECT().GetUTXO(utxoID).Return(utxo, nil)
+		}
+		s.EXPECT().UTXOIDs(addr.Bytes(), ids.Empty, math.MaxInt).Return(utxoIDs, nil)
+	}
+}
+
+// Doesn't support multisig alias yet
+func StateSpendMultisig(t *testing.T, s *state.MockState, utxo *avax.UTXO) {
+	t.Helper()
+
+	out := utxo.Out
+	if lockedOut, ok := utxo.Out.(*locked.Out); ok {
+		out = lockedOut.TransferableOut
+	}
+	secpOut, ok := out.(*secp256k1fx.TransferOutput)
+	require.True(t, ok)
+
+	addrs := secpOut.OutputOwners.Addrs
+	for _, addr := range addrs {
+		s.EXPECT().GetMultisigAlias(addr).Return(nil, database.ErrNotFound)
+	}
+}
+
+func StateVerifyMultisigOwner(
+	t *testing.T,
+	s *state.MockState,
+	owner *secp256k1fx.OutputOwners,
+	msigAliasAddresses []ids.ShortID,
+	msigAliases []*multisig.AliasWithNonce,
+	collectAddresses bool,
+) {
+	t.Helper()
+	if owner == nil {
+		return
+	}
+
+	aliases := make(map[ids.ShortID]*multisig.AliasWithNonce)
+	for i := range msigAliasAddresses {
+		aliases[msigAliasAddresses[i]] = msigAliases[i]
+	}
+
+	addresses := set.Set[ids.ShortID]{}
+
+	if collectAddresses {
+		for _, addr := range owner.Addrs {
+			addresses.Add(addr)
+		}
+		for _, alias := range msigAliases {
+			owner, ok := alias.Owners.(*secp256k1fx.OutputOwners)
+			require.True(t, ok)
+			for _, addr := range owner.Addrs {
+				addresses.Add(addr)
+			}
+		}
+	}
+
+	for _, msigAliasAddress := range msigAliasAddresses {
+		addresses.Add(msigAliasAddress)
+	}
+
+	for addr := range addresses {
+		if _, ok := aliases[addr]; ok {
+			s.EXPECT().GetMultisigAlias(addr).Return(aliases[addr], nil)
+		} else {
+			s.EXPECT().GetMultisigAlias(addr).Return(nil, database.ErrNotFound)
+		}
+	}
+}
+
 func ConsumeUTXOs(t *testing.T, s *state.MockDiff, ins []*avax.TransferableInput) {
 	t.Helper()
 	for _, in := range ins {
@@ -146,7 +231,13 @@ func ConsumeUTXOs(t *testing.T, s *state.MockDiff, ins []*avax.TransferableInput
 	}
 }
 
-func ProduceUTXOs(t *testing.T, s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int) {
+func ProduceUTXOs(
+	t *testing.T,
+	s *state.MockDiff,
+	outs []*avax.TransferableOutput,
+	txID ids.ID,
+	baseOutIndex int,
+) {
 	t.Helper()
 	for i := range outs {
 		s.EXPECT().AddUTXO(&avax.UTXO{
@@ -160,7 +251,14 @@ func ProduceUTXOs(t *testing.T, s *state.MockDiff, outs []*avax.TransferableOutp
 	}
 }
 
-func ProduceNewlyLockedUTXOs(t *testing.T, s *state.MockDiff, outs []*avax.TransferableOutput, txID ids.ID, baseOutIndex int, lockState locked.State) {
+func ProduceNewlyLockedUTXOs(
+	t *testing.T,
+	s *state.MockDiff,
+	outs []*avax.TransferableOutput,
+	txID ids.ID,
+	baseOutIndex int,
+	lockState locked.State,
+) {
 	t.Helper()
 	for i := range outs {
 		out := outs[i].Out
