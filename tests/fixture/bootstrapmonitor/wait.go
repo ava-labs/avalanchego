@@ -197,7 +197,7 @@ func getDiskUsage(log logging.Logger, dir string) uint64 {
 	usage, err := strconv.ParseUint(rawUsage, 10, 64)
 	if err != nil {
 		log.Error("Failed to parse disk usage",
-			zap.String("rawUsage", string(rawUsage)),
+			zap.String("rawUsage", rawUsage),
 		)
 	}
 
