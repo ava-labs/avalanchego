@@ -88,9 +88,10 @@ func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
 	}
 }
 
-// constantsAreUnmodified returns true if the constants of this validator have
-// not been modified compared to the other validator.
-func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool {
+// immutableFieldsAreUnmodified returns true if two versions of the same
+// validator are valid. Either because the validationID has changed or because
+// no unexpected fields have been modified.
+func (v SubnetOnlyValidator) immutableFieldsAreUnmodified(o SubnetOnlyValidator) bool {
 	if v.ValidationID != o.ValidationID {
 		return true
 	}

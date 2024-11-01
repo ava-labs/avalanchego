@@ -75,7 +75,7 @@ func TestSubnetOnlyValidator_Compare(t *testing.T) {
 	}
 }
 
-func TestSubnetOnlyValidator_constantsAreUnmodified(t *testing.T) {
+func TestSubnetOnlyValidator_immutableFieldsAreUnmodified(t *testing.T) {
 	var (
 		randomSOV = func() SubnetOnlyValidator {
 			return SubnetOnlyValidator{
@@ -100,41 +100,41 @@ func TestSubnetOnlyValidator_constantsAreUnmodified(t *testing.T) {
 
 	t.Run("equal", func(t *testing.T) {
 		v := randomizeSOV(sov)
-		require.True(t, sov.constantsAreUnmodified(v))
+		require.True(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("everything is different", func(t *testing.T) {
 		v := randomizeSOV(randomSOV())
-		require.True(t, sov.constantsAreUnmodified(v))
+		require.True(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different subnetID", func(t *testing.T) {
 		v := randomizeSOV(sov)
 		v.SubnetID = ids.GenerateTestID()
-		require.False(t, sov.constantsAreUnmodified(v))
+		require.False(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different nodeID", func(t *testing.T) {
 		v := randomizeSOV(sov)
 		v.NodeID = ids.GenerateTestNodeID()
-		require.False(t, sov.constantsAreUnmodified(v))
+		require.False(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different publicKey", func(t *testing.T) {
 		v := randomizeSOV(sov)
 		v.PublicKey = utils.RandomBytes(bls.PublicKeyLen)
-		require.False(t, sov.constantsAreUnmodified(v))
+		require.False(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different remainingBalanceOwner", func(t *testing.T) {
 		v := randomizeSOV(sov)
 		v.RemainingBalanceOwner = utils.RandomBytes(32)
-		require.False(t, sov.constantsAreUnmodified(v))
+		require.False(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different deactivationOwner", func(t *testing.T) {
 		v := randomizeSOV(sov)
 		v.DeactivationOwner = utils.RandomBytes(32)
-		require.False(t, sov.constantsAreUnmodified(v))
+		require.False(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different startTime", func(t *testing.T) {
 		v := randomizeSOV(sov)
 		v.StartTime = rand.Uint64() // #nosec G404
-		require.False(t, sov.constantsAreUnmodified(v))
+		require.False(t, sov.immutableFieldsAreUnmodified(v))
 	})
 }
 
