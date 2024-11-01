@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -86,7 +87,7 @@ var (
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
 	ExpiryReplayProtectionPrefix  = []byte("expiryReplayProtection")
-	SubnetOnlyValidatorsPrefix    = []byte("subnetOnlyValidators")
+	SubnetOnlyPrefix              = []byte("subnetOnly")
 	WeightsPrefix                 = []byte("weights")
 	SubnetIDNodeIDPrefix          = []byte("subnetIDNodeID")
 	ActivePrefix                  = []byte("active")
@@ -275,6 +276,15 @@ type stateBlk struct {
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> nil
+ * | |-. subnetOnly
+ * | | |-. weights
+ * | | | '-- subnetID -> weight
+ * | | |-. subnetIDNodeID
+ * | | | '-- subnetID+nodeID -> validationID
+ * | | |-. active
+ * | | | '-- validationID -> subnetOnlyValidator
+ * | | '-. inactive
+ * | |   '-- validationID -> subnetOnlyValidator
  * | |-. weight diffs
  * | | '-- subnet+height+nodeID -> weightChange
  * | '-. pub key diffs
@@ -331,13 +341,15 @@ type state struct {
 	expiryDiff *expiryDiff
 	expiryDB   database.Database
 
-	activeSOVLookup        map[ids.ID]SubnetOnlyValidator
-	activeSOVs             *btree.BTreeG[SubnetOnlyValidator]
+	activeSOVs             *activeSubnetOnlyValidators
 	sovDiff                *subnetOnlyValidatorsDiff
 	subnetOnlyValidatorsDB database.Database
+	weightsCache           cache.Cacher[ids.ID, uint64] // subnetID -> total SoV weight
 	weightsDB              database.Database
+	subnetIDNodeIDCache    cache.Cacher[subnetIDNodeID, bool] // subnetID+nodeID -> is validator
 	subnetIDNodeIDDB       database.Database
 	activeDB               database.Database
+	inactiveCache          cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]] // validationID -> SubnetOnlyValidator
 	inactiveDB             database.Database
 
 	currentStakers *baseStakers
@@ -531,8 +543,6 @@ func New(
 
 	baseDB := versiondb.New(db)
 
-	subnetOnlyValidatorsDB := prefixdb.New(SubnetOnlyValidatorsPrefix, baseDB)
-
 	validatorsDB := prefixdb.New(ValidatorsPrefix, baseDB)
 
 	currentValidatorsDB := prefixdb.New(CurrentPrefix, validatorsDB)
@@ -547,8 +557,56 @@ func New(
 	pendingSubnetValidatorBaseDB := prefixdb.New(SubnetValidatorPrefix, pendingValidatorsDB)
 	pendingSubnetDelegatorBaseDB := prefixdb.New(SubnetDelegatorPrefix, pendingValidatorsDB)
 
+	subnetOnlyValidatorsDB := prefixdb.New(SubnetOnlyPrefix, validatorsDB)
+
 	validatorWeightDiffsDB := prefixdb.New(ValidatorWeightDiffsPrefix, validatorsDB)
 	validatorPublicKeyDiffsDB := prefixdb.New(ValidatorPublicKeyDiffsPrefix, validatorsDB)
+
+	weightsCache, err := metercacher.New(
+		"sov_weights_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, uint64](execCfg.L1WeightsCacheSize, func(ids.ID, uint64) int {
+			return ids.IDLen + wrappers.LongLen
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inactiveSOVsCache, err := metercacher.New(
+		"sov_inactive_cache",
+		metricsReg,
+		cache.NewSizedLRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]](
+			execCfg.L1InactiveValidatorsCacheSize,
+			func(_ ids.ID, maybeSOV maybe.Maybe[SubnetOnlyValidator]) int {
+				const (
+					sovOverhead      = ids.IDLen + ids.NodeIDLen + 4*wrappers.LongLen + 3*constants.PointerOverhead
+					maybeSOVOverhead = wrappers.BoolLen + sovOverhead
+					entryOverhead    = ids.IDLen + maybeSOVOverhead
+				)
+				if maybeSOV.IsNothing() {
+					return entryOverhead
+				}
+
+				sov := maybeSOV.Value()
+				return entryOverhead + len(sov.PublicKey) + len(sov.RemainingBalanceOwner) + len(sov.DeactivationOwner)
+			},
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	subnetIDNodeIDCache, err := metercacher.New(
+		"sov_subnet_id_node_id_cache",
+		metricsReg,
+		cache.NewSizedLRU[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
+			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	txCache, err := metercacher.New(
 		"tx_cache",
@@ -659,13 +717,15 @@ func New(
 		expiryDiff: newExpiryDiff(),
 		expiryDB:   prefixdb.New(ExpiryReplayProtectionPrefix, baseDB),
 
-		activeSOVLookup:        make(map[ids.ID]SubnetOnlyValidator),
-		activeSOVs:             btree.NewG(defaultTreeDegree, SubnetOnlyValidator.Less),
+		activeSOVs:             newActiveSubnetOnlyValidators(),
 		sovDiff:                newSubnetOnlyValidatorsDiff(),
 		subnetOnlyValidatorsDB: subnetOnlyValidatorsDB,
+		weightsCache:           weightsCache,
 		weightsDB:              prefixdb.New(WeightsPrefix, subnetOnlyValidatorsDB),
+		subnetIDNodeIDCache:    subnetIDNodeIDCache,
 		subnetIDNodeIDDB:       prefixdb.New(SubnetIDNodeIDPrefix, subnetOnlyValidatorsDB),
 		activeDB:               prefixdb.New(ActivePrefix, subnetOnlyValidatorsDB),
+		inactiveCache:          inactiveSOVsCache,
 		inactiveDB:             prefixdb.New(InactivePrefix, subnetOnlyValidatorsDB),
 
 		currentStakers: newBaseStakers(),
@@ -825,12 +885,12 @@ func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (ma
 
 func (s *state) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error) {
 	return s.sovDiff.getActiveSubnetOnlyValidatorsIterator(
-		iterator.FromTree(s.activeSOVs),
+		s.activeSOVs.newIterator(),
 	), nil
 }
 
 func (s *state) NumActiveSubnetOnlyValidators() int {
-	return len(s.activeSOVLookup) + s.sovDiff.numAddedActive
+	return s.activeSOVs.len() + s.sovDiff.numAddedActive
 }
 
 func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
@@ -838,7 +898,10 @@ func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 		return weight, nil
 	}
 
-	// TODO: Add caching
+	if weight, ok := s.weightsCache.Get(subnetID); ok {
+		return weight, nil
+	}
+
 	return database.WithDefault(database.GetUInt64, s.weightsDB, subnetID[:], 0)
 }
 
@@ -857,11 +920,17 @@ func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator
 // SubnetOnlyValidator with the given validationID. It is guaranteed that any
 // returned validator is either active or inactive.
 func (s *state) getPersistedSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
-	if sov, ok := s.activeSOVLookup[validationID]; ok {
+	if sov, ok := s.activeSOVs.get(validationID); ok {
 		return sov, nil
 	}
 
-	// TODO: Add caching
+	if maybeSOV, ok := s.inactiveCache.Get(validationID); ok {
+		if maybeSOV.IsNothing() {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return maybeSOV.Value(), nil
+	}
+
 	return getSubnetOnlyValidator(s.inactiveDB, validationID)
 }
 
@@ -874,9 +943,11 @@ func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool
 		subnetID: subnetID,
 		nodeID:   nodeID,
 	}
-	key := subnetIDNodeID.Marshal()
+	if has, ok := s.subnetIDNodeIDCache.Get(subnetIDNodeID); ok {
+		return has, nil
+	}
 
-	// TODO: Add caching
+	key := subnetIDNodeID.Marshal()
 	return s.subnetIDNodeIDDB.Has(key)
 }
 
@@ -1664,8 +1735,7 @@ func (s *state) loadActiveSubnetOnlyValidators() error {
 			return fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
 		}
 
-		s.activeSOVLookup[validationID] = sov
-		s.activeSOVs.ReplaceOrInsert(sov)
+		s.activeSOVs.put(sov)
 	}
 
 	return nil
@@ -1933,15 +2003,14 @@ func (s *state) initValidatorSets() error {
 		return errValidatorSetAlreadyPopulated
 	}
 
-	// Load ACP77 validators
-	for validationID, sov := range s.activeSOVLookup {
-		pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
-		if err := s.validators.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {
-			return err
-		}
+	// Load active ACP-77 validators
+	if err := s.activeSOVs.addStakers(s.validators); err != nil {
+		return err
 	}
 
-	// Load inactive weights
+	// Load inactive ACP-77 validator weights
+	//
+	// TODO: L1s with no active weight should not be held in memory.
 	it := s.weightsDB.NewIterator()
 	defer it.Release()
 
@@ -2299,25 +2368,13 @@ func (s *state) getInheritedPublicKey(nodeID ids.NodeID) (*bls.PublicKey, error)
 	return nil, fmt.Errorf("%w: %s", errMissingPrimaryNetworkValidator, nodeID)
 }
 
-func (s *state) addSoVToValidatorManager(sov SubnetOnlyValidator) error {
-	nodeID := sov.effectiveNodeID()
-	if s.validators.GetWeight(sov.SubnetID, nodeID) != 0 {
-		return s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight)
-	}
-	return s.validators.AddStaker(
-		sov.SubnetID,
-		nodeID,
-		sov.effectivePublicKey(),
-		sov.effectiveValidationID(),
-		sov.Weight,
-	)
-}
-
 // updateValidatorManager updates the validator manager with the pending
 // validator set changes.
 //
 // This function must be called prior to writeCurrentStakers and
 // writeSubnetOnlyValidators.
+//
+// TODO: L1s with no active weight should not be held in memory.
 func (s *state) updateValidatorManager(updateValidators bool) error {
 	if !updateValidators {
 		return nil
@@ -2369,41 +2426,59 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		}
 	}
 
+	// Remove all deleted SoV validators. This must be done before adding new
+	// SoV validators to support the case where a validator is removed and then
+	// immediately re-added with a different validationID.
 	for validationID, sov := range s.sovDiff.modified {
+		if !sov.isDeleted() {
+			continue
+		}
+
+		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
+		if err == database.ErrNotFound {
+			// Deleting a non-existent validator is a noop. This can happen if
+			// the validator was added and then immediately removed.
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		if err := s.validators.RemoveWeight(priorSOV.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight); err != nil {
+			return err
+		}
+	}
+
+	// Now that the removed SoV validators have been deleted, perform additions
+	// and modifications.
+	for validationID, sov := range s.sovDiff.modified {
+		if sov.isDeleted() {
+			continue
+		}
+
 		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
 		switch err {
 		case nil:
-			if sov.isDeleted() {
-				// Removing a validator
-				err = s.validators.RemoveWeight(priorSOV.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight)
-			} else {
-				// Modifying a validator
-				if priorSOV.isActive() == sov.isActive() {
-					// This validator's active status isn't changing. This means
-					// the effectiveNodeIDs are equal.
-					nodeID := sov.effectiveNodeID()
-					if priorSOV.Weight < sov.Weight {
-						err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
-					} else if priorSOV.Weight > sov.Weight {
-						err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
-					}
-				} else {
-					// This validator's active status is changing.
-					err = errors.Join(
-						s.validators.RemoveWeight(sov.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight),
-						s.addSoVToValidatorManager(sov),
-					)
+			// Modifying an existing validator
+			if priorSOV.isActive() == sov.isActive() {
+				// This validator's active status isn't changing. This means
+				// the effectiveNodeIDs are equal.
+				nodeID := sov.effectiveNodeID()
+				if priorSOV.Weight < sov.Weight {
+					err = s.validators.AddWeight(sov.SubnetID, nodeID, sov.Weight-priorSOV.Weight)
+				} else if priorSOV.Weight > sov.Weight {
+					err = s.validators.RemoveWeight(sov.SubnetID, nodeID, priorSOV.Weight-sov.Weight)
 				}
+			} else {
+				// This validator's active status is changing.
+				err = errors.Join(
+					s.validators.RemoveWeight(sov.SubnetID, priorSOV.effectiveNodeID(), priorSOV.Weight),
+					addSoVToValidatorManager(s.validators, sov),
+				)
 			}
 		case database.ErrNotFound:
-			if sov.isDeleted() {
-				// Deleting a non-existent validator is a noop. This can happen
-				// if the validator was added and then immediately removed.
-				continue
-			}
-
-			// Adding a validator
-			err = s.addSoVToValidatorManager(sov)
+			// Adding a new validator
+			err = addSoVToValidatorManager(s.validators, sov)
 		}
 		if err != nil {
 			return err
@@ -2709,82 +2784,82 @@ func writePendingDiff(
 }
 
 func (s *state) writeSubnetOnlyValidators() error {
-	// Write modified weights:
+	// Write modified weights
 	for subnetID, weight := range s.sovDiff.modifiedTotalWeight {
-		if err := database.PutUInt64(s.weightsDB, subnetID[:], weight); err != nil {
-			return err
+		var err error
+		if weight == 0 {
+			err = s.weightsDB.Delete(subnetID[:])
+		} else {
+			err = database.PutUInt64(s.weightsDB, subnetID[:], weight)
 		}
-	}
-	maps.Clear(s.sovDiff.modifiedTotalWeight)
-
-	sovChanges := s.sovDiff.modified
-	// Perform deletions:
-	for validationID, sov := range sovChanges {
-		if !sov.isDeleted() {
-			// Additions and modifications are handled in the next loops.
-			continue
-		}
-
-		// The next loops shouldn't consider this change.
-		delete(sovChanges, validationID)
-
-		subnetIDNodeID := subnetIDNodeID{
-			subnetID: sov.SubnetID,
-			nodeID:   sov.NodeID,
-		}
-		subnetIDNodeIDKey := subnetIDNodeID.Marshal()
-		err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey)
 		if err != nil {
 			return err
 		}
 
-		priorSOV, wasActive := s.activeSOVLookup[validationID]
-		if wasActive {
-			delete(s.activeSOVLookup, validationID)
-			s.activeSOVs.Delete(priorSOV)
+		s.weightsCache.Put(subnetID, weight)
+	}
+
+	// The SoV diff application is split into two loops to ensure that all
+	// deletions to the subnetIDNodeIDDB happen prior to any additions.
+	// Otherwise replacing an SoV by deleting it and then re-adding it with a
+	// different validationID could result in an inconsistent state.
+	for validationID, sov := range s.sovDiff.modified {
+		// Delete the prior validator if it exists
+		var err error
+		if s.activeSOVs.delete(validationID) {
 			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
 		} else {
-			// It is technically possible for the validator not to exist on disk
-			// here, but that's fine as deleting an entry that doesn't exist is
-			// a noop.
+			s.inactiveCache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
 			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
 		}
 		if err != nil {
 			return err
 		}
-	}
 
-	// Perform modifications and additions:
-	for validationID, sov := range sovChanges {
-		priorSOV, err := s.getPersistedSubnetOnlyValidator(validationID)
-		switch err {
-		case nil:
-			// This is modifying an existing validator
-			if priorSOV.isActive() {
-				delete(s.activeSOVLookup, validationID)
-				s.activeSOVs.Delete(priorSOV)
-				err = deleteSubnetOnlyValidator(s.activeDB, validationID)
-			} else {
-				err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
-			}
-		case database.ErrNotFound:
-			// This is a new validator
-			subnetIDNodeID := subnetIDNodeID{
+		if !sov.isDeleted() {
+			continue
+		}
+
+		var (
+			subnetIDNodeID = subnetIDNodeID{
 				subnetID: sov.SubnetID,
 				nodeID:   sov.NodeID,
 			}
-			subnetIDNodeIDKey := subnetIDNodeID.Marshal()
-			err = s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:])
-		}
-		if err != nil {
+			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
+		)
+		if err := s.subnetIDNodeIDDB.Delete(subnetIDNodeIDKey); err != nil {
 			return err
 		}
 
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, false)
+	}
+
+	for validationID, sov := range s.sovDiff.modified {
+		if sov.isDeleted() {
+			continue
+		}
+
+		// Update the subnetIDNodeID mapping
+		var (
+			subnetIDNodeID = subnetIDNodeID{
+				subnetID: sov.SubnetID,
+				nodeID:   sov.NodeID,
+			}
+			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
+		)
+		if err := s.subnetIDNodeIDDB.Put(subnetIDNodeIDKey, validationID[:]); err != nil {
+			return err
+		}
+
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, true)
+
+		// Add the new validator
+		var err error
 		if sov.isActive() {
-			s.activeSOVLookup[validationID] = sov
-			s.activeSOVs.ReplaceOrInsert(sov)
+			s.activeSOVs.put(sov)
 			err = putSubnetOnlyValidator(s.activeDB, sov)
 		} else {
+			s.inactiveCache.Put(validationID, maybe.Some(sov))
 			err = putSubnetOnlyValidator(s.inactiveDB, sov)
 		}
 		if err != nil {

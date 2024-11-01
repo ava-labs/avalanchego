@@ -1666,6 +1666,29 @@ func TestSubnetOnlyValidators(t *testing.T) {
 			},
 		},
 		{
+			name: "decrease active weight",
+			initial: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            2, // Not removed
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Decreased
+					EndAccumulatedFee: 1, // Active
+				},
+			},
+		},
+		{
 			name: "deactivate",
 			initial: []SubnetOnlyValidator{
 				{
@@ -2040,6 +2063,8 @@ func TestLoadSubnetOnlyValidatorAndLegacy(t *testing.T) {
 	require.Equal(expectedValidatorSet, validatorSet)
 }
 
+// TestSubnetOnlyValidatorAfterLegacyRemoval verifies that a legacy validator
+// can be replaced by an SoV in the same block.
 func TestSubnetOnlyValidatorAfterLegacyRemoval(t *testing.T) {
 	require := require.New(t)
 
