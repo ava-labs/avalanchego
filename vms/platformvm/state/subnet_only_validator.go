@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
@@ -184,7 +186,18 @@ func (v SubnetOnlyValidator) effectivePublicKeyBytes() []byte {
 	return nil
 }
 
-func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {
+func getSubnetOnlyValidator(
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	db database.KeyValueReader,
+	validationID ids.ID,
+) (SubnetOnlyValidator, error) {
+	if maybeSOV, ok := cache.Get(validationID); ok {
+		if maybeSOV.IsNothing() {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return maybeSOV.Value(), nil
+	}
+
 	bytes, err := db.Get(validationID[:])
 	if err != nil {
 		return SubnetOnlyValidator{}, err
@@ -199,16 +212,34 @@ func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (Su
 	return vdr, nil
 }
 
-func putSubnetOnlyValidator(db database.KeyValueWriter, vdr SubnetOnlyValidator) error {
-	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, vdr)
+func putSubnetOnlyValidator(
+	db database.KeyValueWriter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	sov SubnetOnlyValidator,
+) error {
+	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, sov)
 	if err != nil {
 		return fmt.Errorf("failed to marshal SubnetOnlyValidator: %w", err)
 	}
-	return db.Put(vdr.ValidationID[:], bytes)
+	if err := db.Put(sov.ValidationID[:], bytes); err != nil {
+		return err
+	}
+
+	cache.Put(sov.ValidationID, maybe.Some(sov))
+	return nil
 }
 
-func deleteSubnetOnlyValidator(db database.KeyValueDeleter, validationID ids.ID) error {
-	return db.Delete(validationID[:])
+func deleteSubnetOnlyValidator(
+	db database.KeyValueDeleter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	validationID ids.ID,
+) error {
+	if err := db.Delete(validationID[:]); err != nil {
+		return err
+	}
+
+	cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+	return nil
 }
 
 type subnetOnlyValidatorsDiff struct {
@@ -368,7 +399,7 @@ func (a *activeSubnetOnlyValidators) newIterator() iterator.Iterator[SubnetOnlyV
 	return iterator.FromTree(a.tree)
 }
 
-func (a *activeSubnetOnlyValidators) addStakers(vdrs validators.Manager) error {
+func (a *activeSubnetOnlyValidators) addStakersToValidatorManager(vdrs validators.Manager) error {
 	for validationID, sov := range a.lookup {
 		pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
 		if err := vdrs.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {

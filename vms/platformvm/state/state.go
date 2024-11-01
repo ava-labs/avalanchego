@@ -104,6 +104,8 @@ var (
 	HeightsIndexedKey  = []byte("heights indexed")
 	InitializedKey     = []byte("initialized")
 	BlocksReindexedKey = []byte("blocks reindexed")
+
+	emptySoVCache = &cache.Empty[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{}
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -862,14 +864,7 @@ func (s *state) getPersistedSubnetOnlyValidator(validationID ids.ID) (SubnetOnly
 		return sov, nil
 	}
 
-	if maybeSOV, ok := s.inactiveCache.Get(validationID); ok {
-		if maybeSOV.IsNothing() {
-			return SubnetOnlyValidator{}, database.ErrNotFound
-		}
-		return maybeSOV.Value(), nil
-	}
-
-	return getSubnetOnlyValidator(s.inactiveDB, validationID)
+	return getSubnetOnlyValidator(s.inactiveCache, s.inactiveDB, validationID)
 }
 
 func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
@@ -1942,7 +1937,7 @@ func (s *state) initValidatorSets() error {
 	}
 
 	// Load active ACP-77 validators
-	if err := s.activeSOVs.addStakers(s.validators); err != nil {
+	if err := s.activeSOVs.addStakersToValidatorManager(s.validators); err != nil {
 		return err
 	}
 
@@ -2745,10 +2740,9 @@ func (s *state) writeSubnetOnlyValidators() error {
 		// Delete the prior validator if it exists
 		var err error
 		if s.activeSOVs.delete(validationID) {
-			err = deleteSubnetOnlyValidator(s.activeDB, validationID)
+			err = deleteSubnetOnlyValidator(s.activeDB, emptySoVCache, validationID)
 		} else {
-			s.inactiveCache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
-			err = deleteSubnetOnlyValidator(s.inactiveDB, validationID)
+			err = deleteSubnetOnlyValidator(s.inactiveDB, s.inactiveCache, validationID)
 		}
 		if err != nil {
 			return err
@@ -2795,10 +2789,9 @@ func (s *state) writeSubnetOnlyValidators() error {
 		var err error
 		if sov.isActive() {
 			s.activeSOVs.put(sov)
-			err = putSubnetOnlyValidator(s.activeDB, sov)
+			err = putSubnetOnlyValidator(s.activeDB, emptySoVCache, sov)
 		} else {
-			s.inactiveCache.Put(validationID, maybe.Some(sov))
-			err = putSubnetOnlyValidator(s.inactiveDB, sov)
+			err = putSubnetOnlyValidator(s.inactiveDB, s.inactiveCache, sov)
 		}
 		if err != nil {
 			return err
