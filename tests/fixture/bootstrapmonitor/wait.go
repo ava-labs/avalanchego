@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,7 +85,7 @@ func WaitForCompletion(
 		// Define common fields for logging
 		diskUsage := getDiskUsage(log, dataDir)
 		commonFields := []zap.Field{
-			zap.String("diskUsage", diskUsage),
+			zap.Uint64("diskUsage", diskUsage),
 			zap.Duration("duration", time.Since(testDetails.StartTime)),
 		}
 
@@ -148,9 +149,9 @@ func WaitForCompletion(
 	return nil
 }
 
-// Determines the current disk usage for the specified directory
-func getDiskUsage(log logging.Logger, dir string) string {
-	cmd := exec.Command("du", "-sh", dir)
+// Determines the current disk usage (in bytes) for the specified directory
+func getDiskUsage(log logging.Logger, dir string) uint64 {
+	cmd := exec.Command("du", "-sb", dir)
 
 	// Create a buffer to capture stderr in case an unexpected error occurs
 	var stderr bytes.Buffer
@@ -161,7 +162,7 @@ func getDiskUsage(log logging.Logger, dir string) string {
 		exitError, ok := err.(*exec.ExitError)
 		if !ok {
 			log.Error("Error executing du", zap.Error(err))
-			return ""
+			return 0
 		}
 		switch exitError.ExitCode() {
 		case 1:
@@ -174,14 +175,14 @@ func getDiskUsage(log logging.Logger, dir string) string {
 				zap.String("stderr", stderr.String()),
 				zap.Error(err),
 			)
-			return ""
+			return 0
 		default:
 			log.Error("du command failed for dir",
 				zap.String("dir", dir),
 				zap.String("stderr", stderr.String()),
 				zap.Error(err),
 			)
-			return ""
+			return 0
 		}
 	}
 
@@ -192,5 +193,13 @@ func getDiskUsage(log logging.Logger, dir string) string {
 		)
 	}
 
-	return usageParts[0]
+	rawUsage := usageParts[0]
+	usage, err := strconv.ParseUint(rawUsage, 10, 64)
+	if err != nil {
+		log.Error("Failed to parse disk usage",
+			zap.String("rawUsage", string(rawUsage)),
+		)
+	}
+
+	return usage
 }
