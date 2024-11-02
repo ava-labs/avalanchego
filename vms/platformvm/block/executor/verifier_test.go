@@ -1257,7 +1257,6 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 		name         string
 		initialSoVs  []state.SubnetOnlyValidator
 		timestamp    time.Time
-		expectedErr  error
 		expectedSoVs []state.SubnetOnlyValidator
 	}{
 		{
@@ -1357,14 +1356,9 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 			)
 			require.NoError(err)
 
-			blkID := blk.ID()
-			err = blk.Visit(verifier)
-			require.ErrorIs(err, test.expectedErr)
-			if err != nil {
-				require.NotContains(verifier.blkIDToState, blkID)
-				return
-			}
+			require.NoError(blk.Visit(verifier))
 
+			blkID := blk.ID()
 			require.Contains(verifier.blkIDToState, blkID)
 			blockState := verifier.blkIDToState[blkID]
 			require.Equal(blk, blockState.statelessBlock)
