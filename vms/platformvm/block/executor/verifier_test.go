@@ -1224,33 +1224,22 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 		pk      = bls.PublicFromSecretKey(sk)
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
-		fractionalTimeSoV0 = state.SubnetOnlyValidator{
-			ValidationID:      ids.GenerateTestID(),
-			SubnetID:          ids.GenerateTestID(),
-			NodeID:            ids.GenerateTestNodeID(),
-			PublicKey:         pkBytes,
-			Weight:            1,
-			EndAccumulatedFee: 5 * units.NanoAvax, // lasts 2.5 seconds
+		newSoV = func(endAccumulatedFee uint64) state.SubnetOnlyValidator {
+			return state.SubnetOnlyValidator{
+				ValidationID:      ids.GenerateTestID(),
+				SubnetID:          ids.GenerateTestID(),
+				NodeID:            ids.GenerateTestNodeID(),
+				PublicKey:         pkBytes,
+				Weight:            1,
+				EndAccumulatedFee: endAccumulatedFee,
+			}
 		}
-		fractionalTimeSoV1 = state.SubnetOnlyValidator{
-			ValidationID:      ids.GenerateTestID(),
-			SubnetID:          ids.GenerateTestID(),
-			NodeID:            ids.GenerateTestNodeID(),
-			PublicKey:         pkBytes,
-			Weight:            1,
-			EndAccumulatedFee: 5 * units.NanoAvax, // lasts 2.5 seconds
-		}
-		fractionalSoVEvictedTime = genesistest.DefaultValidatorStartTime.Add(2 * time.Second) // evicts early rather than late
+		fractionalTimeSoV0 = newSoV(5 * units.NanoAvax) // lasts 2.5 seconds
+		fractionalTimeSoV1 = newSoV(5 * units.NanoAvax) // lasts 2.5 seconds
+		wholeTimeSoV       = newSoV(8 * units.NanoAvax) // lasts 4 seconds
 
-		wholeTimeSoV = state.SubnetOnlyValidator{
-			ValidationID:      ids.GenerateTestID(),
-			SubnetID:          ids.GenerateTestID(),
-			NodeID:            ids.GenerateTestNodeID(),
-			PublicKey:         pkBytes,
-			Weight:            1,
-			EndAccumulatedFee: 8 * units.NanoAvax, // lasts 4 seconds
-		}
-		wholeSoVEvictedTime = genesistest.DefaultValidatorStartTime.Add(4 * time.Second) // evicts on time
+		fractionalSoVEvictedTime = genesistest.DefaultValidatorStartTime.Add(2 * time.Second) // evicts early rather than late
+		wholeSoVEvictedTime      = genesistest.DefaultValidatorStartTime.Add(4 * time.Second) // evicts on time
 	)
 
 	tests := []struct {

@@ -12,8 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -219,6 +221,124 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 			require.Equal(
 				test.expectedExpiries,
 				iterator.ToSlice(expiryIterator),
+			)
+		})
+	}
+}
+
+func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	var (
+		pk      = bls.PublicFromSecretKey(sk)
+		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
+
+		newSoV = func(endAccumulatedFee uint64) state.SubnetOnlyValidator {
+			return state.SubnetOnlyValidator{
+				ValidationID:      ids.GenerateTestID(),
+				SubnetID:          ids.GenerateTestID(),
+				NodeID:            ids.GenerateTestNodeID(),
+				PublicKey:         pkBytes,
+				Weight:            1,
+				EndAccumulatedFee: endAccumulatedFee,
+			}
+		}
+		sovToEvict0 = newSoV(3 * units.NanoAvax) // lasts 3 seconds
+		sovToEvict1 = newSoV(3 * units.NanoAvax) // lasts 3 seconds
+		sovToKeep   = newSoV(units.Avax)
+
+		currentTime = genesistest.DefaultValidatorStartTime
+		newTime     = currentTime.Add(3 * time.Second)
+	)
+
+	tests := []struct {
+		name             string
+		initialSoVs      []state.SubnetOnlyValidator
+		expectedModified bool
+		expectedSoVs     []state.SubnetOnlyValidator
+	}{
+		{
+			name:             "no SoVs",
+			expectedModified: false,
+		},
+		{
+			name: "evicted one",
+			initialSoVs: []state.SubnetOnlyValidator{
+				sovToEvict0,
+			},
+			expectedModified: true,
+		},
+		{
+			name: "evicted multiple",
+			initialSoVs: []state.SubnetOnlyValidator{
+				sovToEvict0,
+				sovToEvict1,
+			},
+			expectedModified: true,
+		},
+		{
+			name: "evicted only 2",
+			initialSoVs: []state.SubnetOnlyValidator{
+				sovToEvict0,
+				sovToEvict1,
+				sovToKeep,
+			},
+			expectedModified: true,
+			expectedSoVs: []state.SubnetOnlyValidator{
+				sovToKeep,
+			},
+		},
+		{
+			name: "chooses not to evict",
+			initialSoVs: []state.SubnetOnlyValidator{
+				sovToKeep,
+			},
+			expectedModified: false,
+			expectedSoVs: []state.SubnetOnlyValidator{
+				sovToKeep,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				require = require.New(t)
+				s       = statetest.New(t, statetest.Config{})
+			)
+
+			for _, sov := range test.initialSoVs {
+				require.NoError(s.PutSubnetOnlyValidator(sov))
+			}
+
+			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
+			// AdvanceTimeTo is maintained.
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				mockable.MaxTime,
+			)
+			require.NoError(err)
+			require.False(newTime.After(nextStakerChangeTime))
+
+			validatorsModified, err := AdvanceTimeTo(
+				&Backend{
+					Config: &config.Config{
+						ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+						UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+					},
+				},
+				s,
+				newTime,
+			)
+			require.NoError(err)
+			require.Equal(test.expectedModified, validatorsModified)
+
+			activeSoVs, err := s.GetActiveSubnetOnlyValidatorsIterator()
+			require.NoError(err)
+			require.Equal(
+				test.expectedSoVs,
+				iterator.ToSlice(activeSoVs),
 			)
 		})
 	}
