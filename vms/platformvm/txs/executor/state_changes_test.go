@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
@@ -226,9 +227,14 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 	}
 }
 
-func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
+func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
+
+	const (
+		secondsToAdvance = 3
+		timeToAdvance    = secondsToAdvance * time.Second
+	)
 
 	var (
 		pk      = bls.PublicFromSecretKey(sk)
@@ -249,7 +255,7 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 		sovToKeep   = newSoV(units.Avax)
 
 		currentTime = genesistest.DefaultValidatorStartTime
-		newTime     = currentTime.Add(3 * time.Second)
+		newTime     = currentTime.Add(timeToAdvance)
 	)
 
 	tests := []struct {
@@ -257,10 +263,12 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 		initialSoVs      []state.SubnetOnlyValidator
 		expectedModified bool
 		expectedSoVs     []state.SubnetOnlyValidator
+		expectedExcess   gas.Gas
 	}{
 		{
 			name:             "no SoVs",
 			expectedModified: false,
+			expectedExcess:   0,
 		},
 		{
 			name: "evicted one",
@@ -268,6 +276,7 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 				sovToEvict0,
 			},
 			expectedModified: true,
+			expectedExcess:   0,
 		},
 		{
 			name: "evicted multiple",
@@ -276,6 +285,7 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 				sovToEvict1,
 			},
 			expectedModified: true,
+			expectedExcess:   3,
 		},
 		{
 			name: "evicted only 2",
@@ -288,6 +298,7 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 			expectedSoVs: []state.SubnetOnlyValidator{
 				sovToKeep,
 			},
+			expectedExcess: 6,
 		},
 		{
 			name: "chooses not to evict",
@@ -298,6 +309,7 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 			expectedSoVs: []state.SubnetOnlyValidator{
 				sovToKeep,
 			},
+			expectedExcess: 0,
 		},
 	}
 	for _, test := range tests {
@@ -324,8 +336,14 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
 					Config: &config.Config{
-						ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-						UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+						// ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+						ValidatorFeeConfig: fee.Config{
+							Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+							Target:                   1,
+							MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
+							ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+						},
+						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 					},
 				},
 				s,
@@ -340,6 +358,9 @@ func TestAdvanceTimeTo_DeactivatesSoVs(t *testing.T) {
 				test.expectedSoVs,
 				iterator.ToSlice(activeSoVs),
 			)
+
+			require.Equal(test.expectedExcess, s.GetSoVExcess())
+			require.Equal(uint64(secondsToAdvance), s.GetAccruedFees())
 		})
 	}
 }
