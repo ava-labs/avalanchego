@@ -10,9 +10,11 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
@@ -21,6 +23,8 @@ var (
 	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
 	ErrMutatedSubnetOnlyValidator = errors.New("subnet only validator contains mutated constant fields")
+
+	emptySoVCache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]] = &cache.Empty[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{}
 )
 
 // SubnetOnlyValidator defines an ACP-77 validator. For a given ValidationID, it
@@ -103,7 +107,18 @@ func (v SubnetOnlyValidator) immutableFieldsAreUnmodified(o SubnetOnlyValidator)
 		v.StartTime == o.StartTime
 }
 
-func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {
+func getSubnetOnlyValidator(
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	db database.KeyValueReader,
+	validationID ids.ID,
+) (SubnetOnlyValidator, error) {
+	if maybeSOV, ok := cache.Get(validationID); ok {
+		if maybeSOV.IsNothing() {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return maybeSOV.Value(), nil
+	}
+
 	bytes, err := db.Get(validationID[:])
 	if err != nil {
 		return SubnetOnlyValidator{}, err
@@ -118,14 +133,32 @@ func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (Su
 	return vdr, nil
 }
 
-func putSubnetOnlyValidator(db database.KeyValueWriter, vdr SubnetOnlyValidator) error {
-	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, vdr)
+func putSubnetOnlyValidator(
+	db database.KeyValueWriter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	sov SubnetOnlyValidator,
+) error {
+	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, sov)
 	if err != nil {
 		return fmt.Errorf("failed to marshal SubnetOnlyValidator: %w", err)
 	}
-	return db.Put(vdr.ValidationID[:], bytes)
+	if err := db.Put(sov.ValidationID[:], bytes); err != nil {
+		return err
+	}
+
+	cache.Put(sov.ValidationID, maybe.Some(sov))
+	return nil
 }
 
-func deleteSubnetOnlyValidator(db database.KeyValueDeleter, validationID ids.ID) error {
-	return db.Delete(validationID[:])
+func deleteSubnetOnlyValidator(
+	db database.KeyValueDeleter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	validationID ids.ID,
+) error {
+	if err := db.Delete(validationID[:]); err != nil {
+		return err
+	}
+
+	cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+	return nil
 }

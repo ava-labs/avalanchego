@@ -9,11 +9,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -139,11 +141,8 @@ func TestSubnetOnlyValidator_immutableFieldsAreUnmodified(t *testing.T) {
 }
 
 func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
-	require := require.New(t)
-	db := memdb.New()
-
 	sk, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
@@ -154,7 +153,7 @@ func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
 		},
 	}
 	remainingBalanceOwnerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &remainingBalanceOwner)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	var deactivationOwner fx.Owner = &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -163,9 +162,9 @@ func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
 		},
 	}
 	deactivationOwnerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &deactivationOwner)
-	require.NoError(err)
+	require.NoError(t, err)
 
-	vdr := SubnetOnlyValidator{
+	sov := SubnetOnlyValidator{
 		ValidationID:          ids.GenerateTestID(),
 		SubnetID:              ids.GenerateTestID(),
 		NodeID:                ids.GenerateTestNodeID(),
@@ -178,24 +177,92 @@ func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
 		EndAccumulatedFee:     rand.Uint64(), // #nosec G404
 	}
 
-	// Validator hasn't been put on disk yet
-	gotVdr, err := getSubnetOnlyValidator(db, vdr.ValidationID)
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(gotVdr)
+	var (
+		addedDB                   = memdb.New()
+		removedDB                 = memdb.New()
+		addedAndRemovedDB         = memdb.New()
+		addedAndRemovedAndAddedDB = memdb.New()
+
+		addedCache                   = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+		removedCache                 = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+		addedAndRemovedCache         = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+		addedAndRemovedAndAddedCache = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+	)
 
 	// Place the validator on disk
-	require.NoError(putSubnetOnlyValidator(db, vdr))
+	require.NoError(t, putSubnetOnlyValidator(addedDB, addedCache, sov))
+	require.NoError(t, putSubnetOnlyValidator(addedAndRemovedDB, addedAndRemovedCache, sov))
+	require.NoError(t, putSubnetOnlyValidator(addedAndRemovedAndAddedDB, addedAndRemovedAndAddedCache, sov))
 
-	// Verify that the validator can be fetched from disk
-	gotVdr, err = getSubnetOnlyValidator(db, vdr.ValidationID)
-	require.NoError(err)
-	require.Equal(vdr, gotVdr)
+	// Remove the validator on disk
+	require.NoError(t, deleteSubnetOnlyValidator(removedDB, removedCache, sov.ValidationID))
+	require.NoError(t, deleteSubnetOnlyValidator(addedAndRemovedDB, addedAndRemovedCache, sov.ValidationID))
+	require.NoError(t, deleteSubnetOnlyValidator(addedAndRemovedAndAddedDB, addedAndRemovedAndAddedCache, sov.ValidationID))
 
-	// Remove the validator from disk
-	require.NoError(deleteSubnetOnlyValidator(db, vdr.ValidationID))
+	// Reintroduce the validator to disk
+	require.NoError(t, putSubnetOnlyValidator(addedAndRemovedAndAddedDB, addedAndRemovedAndAddedCache, sov))
 
-	// Verify that the validator has been removed from disk
-	gotVdr, err = getSubnetOnlyValidator(db, vdr.ValidationID)
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(gotVdr)
+	addedTests := []struct {
+		name  string
+		db    database.Database
+		cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]]
+	}{
+		{
+			name:  "added in cache",
+			db:    memdb.New(),
+			cache: addedCache,
+		},
+		{
+			name:  "added on disk",
+			db:    addedDB,
+			cache: emptySoVCache,
+		},
+		{
+			name:  "added and removed and added in cache",
+			db:    memdb.New(),
+			cache: addedAndRemovedAndAddedCache,
+		},
+		{
+			name:  "added and removed and added on disk",
+			db:    addedAndRemovedAndAddedDB,
+			cache: emptySoVCache,
+		},
+	}
+	for _, test := range addedTests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			gotSOV, err := getSubnetOnlyValidator(test.cache, test.db, sov.ValidationID)
+			require.NoError(err)
+			require.Equal(sov, gotSOV)
+		})
+	}
+
+	removedTests := []struct {
+		name  string
+		db    database.Database
+		cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]]
+	}{
+		{
+			name:  "empty",
+			db:    memdb.New(),
+			cache: emptySoVCache,
+		},
+		{
+			name:  "removed from cache",
+			db:    addedDB,
+			cache: removedCache,
+		},
+		{
+			name:  "removed from disk",
+			db:    removedDB,
+			cache: emptySoVCache,
+		},
+	}
+	for _, test := range removedTests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := getSubnetOnlyValidator(test.cache, test.db, sov.ValidationID)
+			require.ErrorIs(t, err, database.ErrNotFound)
+		})
+	}
 }
