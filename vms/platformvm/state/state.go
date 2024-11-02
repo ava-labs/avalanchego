@@ -2496,7 +2496,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				nodeID:   priorSOV.effectiveNodeID(),
 			}
 			diff := getOrDefault(changes, subnetIDNodeID)
-			if err := diff.weightDiff.Add(true, priorSOV.Weight); err != nil {
+			if err := diff.weightDiff.Sub(priorSOV.Weight); err != nil {
 				return nil, err
 			}
 			diff.prevPublicKey = priorSOV.effectivePublicKeyBytes()
@@ -2516,7 +2516,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 			nodeID:   sov.effectiveNodeID(),
 		}
 		diff := getOrDefault(changes, subnetIDNodeID)
-		if err := diff.weightDiff.Add(false, sov.Weight); err != nil {
+		if err := diff.weightDiff.Add(sov.Weight); err != nil {
 			return nil, err
 		}
 		diff.newPublicKey = sov.effectivePublicKeyBytes()
