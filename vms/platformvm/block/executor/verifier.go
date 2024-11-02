@@ -563,11 +563,11 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	// This ensures that SoVs are not undercharged for the next second.
 	if isEtna {
 		var (
+			accruedFees       = diff.GetAccruedFees()
 			validatorFeeState = validatorfee.State{
 				Current: gas.Gas(diff.NumActiveSubnetOnlyValidators()),
 				Excess:  diff.GetSoVExcess(),
 			}
-			accruedFees   = diff.GetAccruedFees()
 			potentialCost = validatorFeeState.CostOf(
 				v.txExecutorBackend.Config.ValidatorFeeConfig,
 				1, // 1 second

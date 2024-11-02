@@ -21,9 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -35,13 +38,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txsmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 func newTestVerifier(t testing.TB, s state.State) *verifier {
@@ -71,9 +76,15 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 		},
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
-				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
-				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
+				CreateAssetTxFee: genesis.LocalParams.CreateAssetTxFee,
+				StaticFeeConfig:  genesis.LocalParams.StaticFeeConfig,
+				DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig: validatorfee.Config{
+					Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+					Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+					MinPrice:                 gas.Price(2 * units.NanoAvax),
+					ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+				},
 				SybilProtectionEnabled: true,
 				UpgradeConfig:          upgrades,
 			},
@@ -1134,7 +1145,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	baseTx1, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
 	require.NoError(t, err)
 
-	blockComplexity, err := fee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
+	blockComplexity, err := txfee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
 	require.NoError(t, err)
 	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 	require.NoError(t, err)
@@ -1201,6 +1212,169 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			blockState := verifier.blkIDToState[blkID]
 			require.Equal(blk, blockState.statelessBlock)
 			require.Equal(test.expectedFeeState, blockState.onAcceptState.GetFeeState())
+		})
+	}
+}
+
+func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	var (
+		pk      = bls.PublicFromSecretKey(sk)
+		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
+
+		fractionalTimeSoV0 = state.SubnetOnlyValidator{
+			ValidationID:      ids.GenerateTestID(),
+			SubnetID:          ids.GenerateTestID(),
+			NodeID:            ids.GenerateTestNodeID(),
+			PublicKey:         pkBytes,
+			Weight:            1,
+			EndAccumulatedFee: 5 * units.NanoAvax, // lasts 2.5 seconds
+		}
+		fractionalTimeSoV1 = state.SubnetOnlyValidator{
+			ValidationID:      ids.GenerateTestID(),
+			SubnetID:          ids.GenerateTestID(),
+			NodeID:            ids.GenerateTestNodeID(),
+			PublicKey:         pkBytes,
+			Weight:            1,
+			EndAccumulatedFee: 5 * units.NanoAvax, // lasts 2.5 seconds
+		}
+		fractionalSoVEvictedTime = genesistest.DefaultValidatorStartTime.Add(2 * time.Second) // evicts early rather than late
+
+		wholeTimeSoV = state.SubnetOnlyValidator{
+			ValidationID:      ids.GenerateTestID(),
+			SubnetID:          ids.GenerateTestID(),
+			NodeID:            ids.GenerateTestNodeID(),
+			PublicKey:         pkBytes,
+			Weight:            1,
+			EndAccumulatedFee: 8 * units.NanoAvax, // lasts 4 seconds
+		}
+		wholeSoVEvictedTime = genesistest.DefaultValidatorStartTime.Add(4 * time.Second) // evicts on time
+	)
+
+	tests := []struct {
+		name         string
+		initialSoVs  []state.SubnetOnlyValidator
+		timestamp    time.Time
+		expectedErr  error
+		expectedSoVs []state.SubnetOnlyValidator
+	}{
+		{
+			name:      "no SoVs",
+			timestamp: genesistest.DefaultValidatorStartTime.Add(10 * time.Second),
+		},
+		{
+			name: "fractional SoVs are not overcharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+			},
+			timestamp: fractionalSoVEvictedTime.Add(-time.Second),
+			expectedSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+			},
+		},
+		{
+			name: "fractional SoVs are not undercharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+				fractionalTimeSoV1,
+			},
+			timestamp: fractionalSoVEvictedTime,
+		},
+		{
+			name: "whole SoVs are not overcharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+			timestamp: wholeSoVEvictedTime.Add(-time.Second),
+			expectedSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+		},
+		{
+			name: "whole SoVs are not undercharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+			timestamp: wholeSoVEvictedTime,
+		},
+		{
+			name: "partial eviction",
+			initialSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+				wholeTimeSoV,
+			},
+			timestamp: fractionalSoVEvictedTime,
+			expectedSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := statetest.New(t, statetest.Config{})
+			for _, sov := range test.initialSoVs {
+				require.NoError(s.PutSubnetOnlyValidator(sov))
+			}
+
+			verifier := newTestVerifier(t, s)
+			verifier.txExecutorBackend.Clk.Set(test.timestamp)
+
+			wallet := txstest.NewWallet(
+				t,
+				verifier.ctx,
+				verifier.txExecutorBackend.Config,
+				s,
+				secp256k1fx.NewKeychain(genesis.EWOQKey),
+				nil, // subnetIDs
+				nil, // chainIDs
+			)
+
+			baseTx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+			require.NoError(err)
+
+			timestamp, _, err := state.NextBlockTime(
+				verifier.txExecutorBackend.Config.ValidatorFeeConfig,
+				s,
+				verifier.txExecutorBackend.Clk,
+			)
+			require.NoError(err)
+
+			lastAcceptedID := s.GetLastAccepted()
+			lastAccepted, err := s.GetStatelessBlock(lastAcceptedID)
+			require.NoError(err)
+
+			blk, err := block.NewBanffStandardBlock(
+				timestamp,
+				lastAcceptedID,
+				lastAccepted.Height()+1,
+				[]*txs.Tx{
+					baseTx,
+				},
+			)
+			require.NoError(err)
+
+			blkID := blk.ID()
+			err = blk.Visit(verifier)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				require.NotContains(verifier.blkIDToState, blkID)
+				return
+			}
+
+			require.Contains(verifier.blkIDToState, blkID)
+			blockState := verifier.blkIDToState[blkID]
+			require.Equal(blk, blockState.statelessBlock)
+
+			sovs, err := blockState.onAcceptState.GetActiveSubnetOnlyValidatorsIterator()
+			require.NoError(err)
+			require.Equal(
+				test.expectedSoVs,
+				iterator.ToSlice(sovs),
+			)
 		})
 	}
 }
