@@ -673,135 +673,94 @@ func createPermissionlessDelegatorTx(subnetID ids.ID, delegatorData txs.Validato
 }
 
 func TestValidatorWeightDiff(t *testing.T) {
+	type op struct {
+		op     func(*ValidatorWeightDiff, uint64) error
+		amount uint64
+	}
 	type test struct {
 		name        string
-		ops         []func(*ValidatorWeightDiff) error
+		ops         []op
 		expected    *ValidatorWeightDiff
 		expectedErr error
 	}
 
+	var (
+		add = (*ValidatorWeightDiff).Add
+		sub = (*ValidatorWeightDiff).Sub
+	)
 	tests := []test{
 		{
-			name:        "no ops",
-			ops:         []func(*ValidatorWeightDiff) error{},
-			expected:    &ValidatorWeightDiff{},
-			expectedErr: nil,
+			name:     "no ops",
+			expected: &ValidatorWeightDiff{},
 		},
 		{
 			name: "simple decrease",
-			ops: []func(*ValidatorWeightDiff) error{
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 1)
-				},
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 1)
-				},
+			ops: []op{
+				{sub, 1},
+				{sub, 1},
 			},
 			expected: &ValidatorWeightDiff{
 				Decrease: true,
 				Amount:   2,
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "decrease overflow",
-			ops: []func(*ValidatorWeightDiff) error{
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, math.MaxUint64)
-				},
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 1)
-				},
+			ops: []op{
+				{sub, math.MaxUint64},
+				{sub, 1},
 			},
-			expected:    &ValidatorWeightDiff{},
 			expectedErr: safemath.ErrOverflow,
 		},
 		{
 			name: "simple increase",
-			ops: []func(*ValidatorWeightDiff) error{
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 1)
-				},
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 1)
-				},
+			ops: []op{
+				{add, 1},
+				{add, 1},
 			},
 			expected: &ValidatorWeightDiff{
 				Decrease: false,
 				Amount:   2,
 			},
-			expectedErr: nil,
 		},
 		{
 			name: "increase overflow",
-			ops: []func(*ValidatorWeightDiff) error{
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, math.MaxUint64)
-				},
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 1)
-				},
+			ops: []op{
+				{add, math.MaxUint64},
+				{add, 1},
 			},
-			expected:    &ValidatorWeightDiff{},
 			expectedErr: safemath.ErrOverflow,
 		},
 		{
 			name: "varied use",
-			ops: []func(*ValidatorWeightDiff) error{
-				// Add to 0
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 2) // Value 2
-				},
-				// Subtract from positive number
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 1) // Value 1
-				},
-				// Subtract from positive number
-				// to make it negative
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 3) // Value -2
-				},
-				// Subtract from a negative number
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 3) // Value -5
-				},
-				// Add to a negative number
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 1) // Value -4
-				},
-				// Add to a negative number
-				// to make it positive
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 5) // Value 1
-				},
-				// Add to a positive number
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(false, 1) // Value 2
-				},
-				// Get to zero
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 2) // Value 0
-				},
-				// Subtract from zero
-				func(d *ValidatorWeightDiff) error {
-					return d.Add(true, 2) // Value -2
-				},
+			ops: []op{
+				{add, 2}, // = 2
+				{sub, 1}, // = 1
+				{sub, 3}, // = -2
+				{sub, 3}, // = -5
+				{add, 1}, // = -4
+				{add, 5}, // = 1
+				{add, 1}, // = 2
+				{sub, 2}, // = 0
+				{sub, 2}, // = -2
 			},
 			expected: &ValidatorWeightDiff{
 				Decrease: true,
 				Amount:   2,
 			},
-			expectedErr: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			diff := &ValidatorWeightDiff{}
-			errs := wrappers.Errs{}
+
+			var (
+				diff = &ValidatorWeightDiff{}
+				errs = wrappers.Errs{}
+			)
 			for _, op := range tt.ops {
-				errs.Add(op(diff))
+				errs.Add(op.op(diff, op.amount))
 			}
 			require.ErrorIs(errs.Err, tt.expectedErr)
 			if tt.expectedErr != nil {
@@ -1997,7 +1956,7 @@ func TestSubnetOnlyValidators(t *testing.T) {
 }
 
 // TestLoadSubnetOnlyValidatorAndLegacy tests that the state can be loaded when
-// there is a mix of legacy validators and subnet only validators in the same
+// there is a mix of legacy validators and subnet-only validators in the same
 // subnet.
 func TestLoadSubnetOnlyValidatorAndLegacy(t *testing.T) {
 	var (
