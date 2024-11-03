@@ -71,7 +71,8 @@ impl Hashable for ProofNode {
 
 impl From<PathIterItem> for ProofNode {
     fn from(item: PathIterItem) -> Self {
-        let mut child_hashes: [Option<TrieHash>; BranchNode::MAX_CHILDREN] = Default::default();
+        let mut child_hashes: [Option<TrieHash>; BranchNode::MAX_CHILDREN] =
+            [const { None }; BranchNode::MAX_CHILDREN];
 
         if let Some(branch) = item.node.as_branch() {
             // TODO danlaine: can we avoid indexing?
@@ -170,6 +171,7 @@ impl<T: Hashable> Proof<T> {
 
             // Assert that only nodes whose keys are an even number of nibbles
             // have a `value_digest`.
+            #[cfg(not(feature = "branch_factor_256"))]
             if node.key().count() % 2 != 0 && node.value_digest().is_some() {
                 return Err(ProofError::ValueAtOddNibbleLength);
             }

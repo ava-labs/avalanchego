@@ -50,6 +50,7 @@ pub enum MerkleError {
 
 // convert a set of nibbles into a printable string
 // panics if there is a non-nibble byte in the set
+#[cfg(not(feature = "branch_factor_256"))]
 fn nibbles_formatter<X: IntoIterator<Item = u8>>(nib: X) -> String {
     nib.into_iter()
         .map(|c| {
@@ -58,6 +59,12 @@ fn nibbles_formatter<X: IntoIterator<Item = u8>>(nib: X) -> String {
                 .expect("requires nibbles") as char
         })
         .collect::<String>()
+}
+
+#[cfg(feature = "branch_factor_256")]
+fn nibbles_formatter<X: IntoIterator<Item = u8>>(nib: X) -> String {
+    let collected: Box<[u8]> = nib.into_iter().collect();
+    hex::encode(&collected)
 }
 
 macro_rules! write_attributes {
@@ -182,7 +189,8 @@ impl<T: TrieReader> Merkle<T> {
             // No nodes, even the root, are before `key`.
             // The root alone proves the non-existence of `key`.
             // TODO reduce duplicate code with ProofNode::from<PathIterItem>
-            let mut child_hashes: [Option<TrieHash>; BranchNode::MAX_CHILDREN] = Default::default();
+            let mut child_hashes: [Option<TrieHash>; BranchNode::MAX_CHILDREN] =
+                [const { None }; BranchNode::MAX_CHILDREN];
             if let Some(branch) = root.as_branch() {
                 // TODO danlaine: can we avoid indexing?
                 #[allow(clippy::indexing_slicing)]
@@ -480,7 +488,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 let mut branch = BranchNode {
                     partial_path: path_overlap.shared.into(),
                     value: Some(value),
-                    children: Default::default(),
+                    children: [const { None }; BranchNode::MAX_CHILDREN],
                 };
 
                 // Shorten the node's partial path since it has a new parent.
@@ -528,7 +536,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                         let mut branch = BranchNode {
                             partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
                             value: Some(std::mem::take(&mut leaf.value).into_boxed_slice()),
-                            children: Default::default(),
+                            children: [const { None }; BranchNode::MAX_CHILDREN],
                         };
 
                         let new_leaf = Node::Leaf(LeafNode {
@@ -554,7 +562,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 let mut branch = BranchNode {
                     partial_path: path_overlap.shared.into(),
                     value: None,
-                    children: Default::default(),
+                    children: [const { None }; BranchNode::MAX_CHILDREN],
                 };
 
                 node.update_partial_path(node_partial_path);
@@ -1464,19 +1472,24 @@ mod tests {
     #[test_case(vec![(&[0],&[0]),(&[0,1],&[0,1])], Some("c3bdc20aff5cba30f81ffd7689e94e1dbeece4a08e27f0104262431604cf45c6"); "root with leaf child")]
     #[test_case(vec![(&[0],&[0]),(&[0,1],&[0,1]),(&[0,1,2],&[0,1,2])], Some("229011c50ad4d5c2f4efe02b8db54f361ad295c4eee2bf76ea4ad1bb92676f97"); "root with branch child")]
     #[test_case(vec![(&[0],&[0]),(&[0,1],&[0,1]),(&[0,8],&[0,8]),(&[0,1,2],&[0,1,2])], Some("a683b4881cb540b969f885f538ba5904699d480152f350659475a962d6240ef9"); "root with branch child and leaf child")]
+    #[allow(unused_variables)]
     fn test_root_hash_merkledb_compatible(kvs: Vec<(&[u8], &[u8])>, expected_hash: Option<&str>) {
-        let merkle = merkle_build_test(kvs).unwrap().hash();
-        let Some(got_hash) = merkle.nodestore.root_hash().unwrap() else {
-            assert!(expected_hash.is_none());
-            return;
-        };
+        // TODO: get the hashes from merkledb and verify compatibility with branch factor 256
+        #[cfg(not(feature = "branch_factor_256"))]
+        {
+            let merkle = merkle_build_test(kvs).unwrap().hash();
+            let Some(got_hash) = merkle.nodestore.root_hash().unwrap() else {
+                assert!(expected_hash.is_none());
+                return;
+            };
 
-        let expected_hash = expected_hash.unwrap();
+            let expected_hash = expected_hash.unwrap();
 
-        // This hash is from merkledb
-        let expected_hash: [u8; 32] = hex::decode(expected_hash).unwrap().try_into().unwrap();
+            // This hash is from merkledb
+            let expected_hash: [u8; 32] = hex::decode(expected_hash).unwrap().try_into().unwrap();
 
-        assert_eq!(got_hash, TrieHash::from(expected_hash));
+            assert_eq!(got_hash, TrieHash::from(expected_hash));
+        }
     }
 
     #[test]

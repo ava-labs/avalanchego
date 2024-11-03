@@ -157,6 +157,17 @@ impl<'a> FusedIterator for NibblesIterator<'a> {}
 impl<'a> Iterator for NibblesIterator<'a> {
     type Item = u8;
 
+    #[cfg(feature = "branch_factor_256")]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_empty() {
+            return None;
+        }
+        let result = self.data[self.head];
+        self.head += 1;
+        Some(result)
+    }
+
+    #[cfg(not(feature = "branch_factor_256"))]
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_empty() {
             return None;
@@ -184,6 +195,11 @@ impl<'a> Iterator for NibblesIterator<'a> {
 }
 
 impl<'a> NibblesIterator<'a> {
+    #[cfg(not(feature = "branch_factor_256"))]
+    const BYTES_PER_NIBBLE: usize = 2;
+    #[cfg(feature = "branch_factor_256")]
+    const BYTES_PER_NIBBLE: usize = 1;
+
     #[inline(always)]
     const fn is_empty(&self) -> bool {
         self.head == self.tail
@@ -195,7 +211,7 @@ impl<'a> NibblesIterator<'a> {
         NibblesIterator {
             data,
             head: 0,
-            tail: 2 * data.len(),
+            tail: Self::BYTES_PER_NIBBLE * data.len(),
         }
     }
 }
@@ -231,9 +247,11 @@ mod test {
     use std::fmt::Debug;
     use test_case::test_case;
 
+    #[cfg(not(feature = "branch_factor_256"))]
     static TEST_BYTES: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
 
     #[test]
+    #[cfg(not(feature = "branch_factor_256"))]
     fn happy_regular_nibbles() {
         let iter = NibblesIterator::new(&TEST_BYTES);
         let expected = [0xd, 0xe, 0xa, 0xd, 0xb, 0xe, 0xe, 0xf];
@@ -242,6 +260,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(feature = "branch_factor_256"))]
     fn size_hint() {
         let mut iter = NibblesIterator::new(&TEST_BYTES);
         assert_eq!((8, Some(8)), iter.size_hint());
@@ -250,6 +269,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(feature = "branch_factor_256"))]
     fn backwards() {
         let iter = NibblesIterator::new(&TEST_BYTES).rev();
         let expected = [0xf, 0xe, 0xe, 0xb, 0xd, 0xa, 0xe, 0xd];
@@ -257,6 +277,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(feature = "branch_factor_256"))]
     fn nth_back() {
         let mut iter = NibblesIterator::new(&TEST_BYTES);
         assert_eq!(iter.nth_back(0), Some(0xf));
@@ -277,6 +298,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(feature = "branch_factor_256"))]
     fn not_empty_because_of_data() {
         let mut iter = NibblesIterator::new(&[1]);
         assert!(!iter.is_empty());

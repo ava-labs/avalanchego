@@ -42,7 +42,7 @@ impl Serialize for BranchNode {
         state.serialize_field("partial_path", &self.partial_path)?;
         state.serialize_field("value", &self.value)?;
 
-        let children: SmallVec<[(u8, LinearAddress, TrieHash); 16]> = self
+        let children: SmallVec<[(u8, LinearAddress, TrieHash); Self::MAX_CHILDREN]> = self
             .children
             .iter()
             .enumerate()
@@ -71,12 +71,13 @@ impl<'de> Deserialize<'de> for BranchNode {
         struct SerializedBranchNode {
             partial_path: Path,
             value: Option<Box<[u8]>>,
-            children: SmallVec<[(u8, LinearAddress, TrieHash); 16]>,
+            children: SmallVec<[(u8, LinearAddress, TrieHash); BranchNode::MAX_CHILDREN]>,
         }
 
         let s: SerializedBranchNode = Deserialize::deserialize(deserializer)?;
 
-        let mut children: [Option<Child>; BranchNode::MAX_CHILDREN] = Default::default();
+        let mut children: [Option<Child>; BranchNode::MAX_CHILDREN] =
+            [const { None }; BranchNode::MAX_CHILDREN];
         for (offset, addr, hash) in s.children.iter() {
             children[*offset as usize] = Some(Child::AddressWithHash(*addr, hash.clone()));
         }
@@ -119,6 +120,11 @@ impl Debug for BranchNode {
 
 impl BranchNode {
     /// The maximum number of children in a [BranchNode]
+    #[cfg(feature = "branch_factor_256")]
+    pub const MAX_CHILDREN: usize = 256;
+
+    /// The maximum number of children in a [BranchNode]
+    #[cfg(not(feature = "branch_factor_256"))]
     pub const MAX_CHILDREN: usize = 16;
 
     /// Returns the address of the child at the given index.
@@ -158,7 +164,7 @@ impl From<&LeafNode> for BranchNode {
         BranchNode {
             partial_path: leaf.partial_path.clone(),
             value: Some(Box::from(&leaf.value[..])),
-            children: Default::default(),
+            children: [const { None }; BranchNode::MAX_CHILDREN],
         }
     }
 }

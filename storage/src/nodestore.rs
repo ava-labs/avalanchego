@@ -1145,6 +1145,8 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use std::array::from_fn;
+
     use crate::linear::memory::MemStore;
     use crate::{BranchNode, LeafNode};
     use arc_swap::access::DynGuard;
@@ -1232,7 +1234,13 @@ mod tests {
     #[test_case(BranchNode {
         partial_path: Path::from([6, 7, 8]),
         value: Some(vec![9, 10, 11].into_boxed_slice()),
-        children: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))],
+        children: from_fn(|i| {
+            if i == 15 {
+                Some(Child::AddressWithHash(LinearAddress::new(1).unwrap(), std::array::from_fn::<u8, 32, _>(|i| i as u8).into()))
+            } else {
+                None
+            }
+        }),
     }; "branch node with 1 child")]
     #[test_case(
     Node::Leaf(LeafNode {

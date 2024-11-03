@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::num::NonZeroU64;
+use std::{array::from_fn, num::NonZeroU64};
 
 use bincode::Options;
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -27,27 +27,16 @@ fn branch(c: &mut Criterion) {
     let mut input = Node::Branch(Box::new(storage::BranchNode {
         partial_path: Path(SmallVec::from_slice(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])),
         value: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9].into_boxed_slice()),
-        children: [
-            Some(storage::Child::AddressWithHash(
-                NonZeroU64::new(1).unwrap(),
-                storage::TrieHash::from([0; 32]),
-            )),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
+        children: from_fn(|i| {
+            if i == 0 {
+                Some(storage::Child::AddressWithHash(
+                    NonZeroU64::new(1).unwrap(),
+                    storage::TrieHash::from([0; 32]),
+                ))
+            } else {
+                None
+            }
+        }),
     }));
     let serializer = bincode::DefaultOptions::new().with_varint_encoding();
     let benchfn = |b: &mut criterion::Bencher, input: &storage::Node| {

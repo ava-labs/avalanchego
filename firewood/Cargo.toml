@@ -39,6 +39,7 @@ default = []
 nightly = []
 iouring = ["io-uring"]
 logger = ["storage/logger"]
+branch_factor_256 = [ "storage/branch_factor_256" ]
 
 [dev-dependencies]
 criterion = {version = "0.5.1", features = ["async_tokio"]}
