@@ -62,6 +62,7 @@ enum NodeStreamState {
 }
 
 #[derive(Debug)]
+/// A stream of nodes in order starting from a specific point in the trie.
 pub struct MerkleNodeStream<'a, T> {
     state: NodeStreamState,
     merkle: &'a T,
@@ -284,6 +285,7 @@ impl<'a, T: TrieReader> MerkleKeyValueStreamState<'a, T> {
 }
 
 #[derive(Debug)]
+/// A stream of key-value pairs in order starting from a specific point in the trie.
 pub struct MerkleKeyValueStream<'a, T> {
     state: MerkleKeyValueStreamState<'a, T>,
     merkle: &'a T,
@@ -305,6 +307,8 @@ impl<'a, T: TrieReader> FusedStream for MerkleKeyValueStream<'a, T> {
 }
 
 impl<'a, T: TrieReader> MerkleKeyValueStream<'a, T> {
+    /// Construct a [MerkleKeyValueStream] that will iterate over all the key-value pairs in `merkle`
+    /// starting from a particular key
     pub fn from_key<K: AsRef<[u8]>>(merkle: &'a T, key: K) -> Self {
         Self {
             state: MerkleKeyValueStreamState::from(key.as_ref()),

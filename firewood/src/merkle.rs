@@ -23,29 +23,23 @@ use storage::{
 
 use thiserror::Error;
 
+/// Keys are boxed u8 slices
 pub type Key = Box<[u8]>;
+
+/// Values are vectors
+/// TODO: change to Box<[u8]>
 pub type Value = Vec<u8>;
 
 #[derive(Debug, Error)]
+/// Errors that can occur when interacting with the Merkle trie
 pub enum MerkleError {
+    /// Can't generate proof for empty node
     #[error("can't generate proof for empty node")]
     Empty,
-    #[error("read only")]
-    ReadOnly,
-    #[error("node not a branch node")]
-    NotBranchNode,
+
+    /// IO error
     #[error("IO error: {0:?}")]
     IO(#[from] std::io::Error),
-    #[error("parent should not be a leaf branch")]
-    ParentLeafBranch,
-    #[error("removing internal node references failed")]
-    UnsetInternal,
-    #[error("merkle serde error: {0}")]
-    BinarySerdeError(String),
-    #[error("invalid utf8")]
-    UTF8Error,
-    #[error("node not found")]
-    NodeNotFound,
 }
 
 // convert a set of nibbles into a printable string
@@ -141,12 +135,13 @@ fn get_helper<T: TrieReader>(
 }
 
 #[derive(Debug)]
+/// Merkle operations against a nodestore
 pub struct Merkle<T> {
     nodestore: T,
 }
 
 impl<T> Merkle<T> {
-    pub fn into_inner(self) -> T {
+    pub(crate) fn into_inner(self) -> T {
         self.nodestore
     }
 }
@@ -158,11 +153,12 @@ impl<T> From<T> for Merkle<T> {
 }
 
 impl<T: TrieReader> Merkle<T> {
-    pub fn root(&self) -> Option<Arc<Node>> {
+    pub(crate) fn root(&self) -> Option<Arc<Node>> {
         self.nodestore.root_node()
     }
 
-    pub const fn nodestore(&self) -> &T {
+    #[cfg(test)]
+    pub(crate) const fn nodestore(&self) -> &T {
         &self.nodestore
     }
 
@@ -211,6 +207,7 @@ impl<T: TrieReader> Merkle<T> {
         Ok(Proof(proof.into_boxed_slice()))
     }
 
+    /// Verify a proof that a key has a certain value, or that the key isn't in the trie.
     pub fn verify_range_proof<V: AsRef<[u8]>>(
         &self,
         _proof: &Proof<impl Hashable>,
@@ -222,7 +219,10 @@ impl<T: TrieReader> Merkle<T> {
         todo!()
     }
 
-    pub fn path_iter<'a>(&self, key: &'a [u8]) -> Result<PathIterator<'_, 'a, T>, MerkleError> {
+    pub(crate) fn path_iter<'a>(
+        &self,
+        key: &'a [u8],
+    ) -> Result<PathIterator<'_, 'a, T>, MerkleError> {
         PathIterator::new(&self.nodestore, key)
     }
 
@@ -329,14 +329,14 @@ impl<T: TrieReader> Merkle<T> {
         })
     }
 
-    pub fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, MerkleError> {
+    pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Box<[u8]>>, MerkleError> {
         let Some(node) = self.get_node(key)? else {
             return Ok(None);
         };
         Ok(node.value().map(|v| v.to_vec().into_boxed_slice()))
     }
 
-    pub fn get_node(&self, key: &[u8]) -> Result<Option<Arc<Node>>, MerkleError> {
+    pub(crate) fn get_node(&self, key: &[u8]) -> Result<Option<Arc<Node>>, MerkleError> {
         let Some(root) = self.root() else {
             return Ok(None);
         };
@@ -347,7 +347,7 @@ impl<T: TrieReader> Merkle<T> {
 }
 
 impl<T: HashedNodeReader> Merkle<T> {
-    pub fn dump_node(
+    pub(crate) fn dump_node(
         &self,
         addr: LinearAddress,
         hash: Option<&TrieHash>,
@@ -392,7 +392,7 @@ impl<T: HashedNodeReader> Merkle<T> {
         Ok(())
     }
 
-    pub fn dump(&self) -> Result<String, MerkleError> {
+    pub(crate) fn dump(&self) -> Result<String, MerkleError> {
         let mut result = vec![];
         writeln!(result, "digraph Merkle {{\n  rankdir=LR;")?;
         if let Some((root_addr, root_hash)) = self.nodestore.root_address_and_hash()? {
@@ -417,6 +417,8 @@ impl<S: ReadableStorage> From<Merkle<NodeStore<MutableProposal, S>>>
 }
 
 impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
+    /// Convert a merkle backed by an MutableProposal into an ImmutableProposal
+    /// TODO: We probably don't need this function
     pub fn hash(self) -> Merkle<NodeStore<Arc<ImmutableProposal>, S>> {
         self.into()
     }

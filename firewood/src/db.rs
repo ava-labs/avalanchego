@@ -15,28 +15,26 @@ use std::error::Error;
 use std::fmt;
 use std::io::Write;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use storage::{Committed, FileBacked, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash};
+use tokio::sync::RwLock;
 use typed_builder::TypedBuilder;
 
 #[derive(Debug)]
 #[non_exhaustive]
+/// Represents the different types of errors that can occur in the database.
 pub enum DbError {
-    InvalidParams,
+    /// Merkle error occurred.
     Merkle(MerkleError),
-    CreateError,
+    /// I/O error occurred.
     IO(std::io::Error),
-    InvalidProposal,
 }
 
 impl fmt::Display for DbError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DbError::InvalidParams => write!(f, "invalid parameters provided"),
             DbError::Merkle(e) => write!(f, "merkle error: {e:?}"),
-            DbError::CreateError => write!(f, "database create error"),
             DbError::IO(e) => write!(f, "I/O error: {e:?}"),
-            DbError::InvalidProposal => write!(f, "invalid proposal"),
         }
     }
 }
@@ -51,6 +49,8 @@ impl Error for DbError {}
 
 type HistoricalRev = NodeStore<Committed, FileBacked>;
 
+/// Metrics for the database.
+/// TODO: Add more metrics
 pub struct DbMetrics {
     proposals: metrics::Counter,
 }
@@ -109,11 +109,13 @@ pub struct DbConfig {
     /// existing contents will be lost.
     #[builder(default = false)]
     pub truncate: bool,
+    /// Revision manager configuration.
     #[builder(default = RevisionManagerConfig::builder().build())]
     pub manager: RevisionManagerConfig,
 }
 
 #[derive(Debug)]
+/// A database instance.
 pub struct Db {
     metrics: Arc<DbMetrics>,
     // TODO: consider using https://docs.rs/lock_api/latest/lock_api/struct.RwLock.html#method.upgradable_read
@@ -134,20 +136,16 @@ where
         Self: 'p;
 
     async fn revision(&self, root_hash: TrieHash) -> Result<Arc<Self::Historical>, api::Error> {
-        let nodestore = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .revision(root_hash)?;
+        let nodestore = self.manager.read().await.revision(root_hash)?;
         Ok(nodestore)
     }
 
     async fn root_hash(&self) -> Result<Option<TrieHash>, api::Error> {
-        Ok(self.manager.read().expect("poisoned lock").root_hash()?)
+        Ok(self.manager.read().await.root_hash()?)
     }
 
     async fn all_hashes(&self) -> Result<Vec<TrieHash>, api::Error> {
-        Ok(self.manager.read().expect("poisoned lock").all_hashes())
+        Ok(self.manager.read().await.all_hashes())
     }
 
     async fn propose<'p, K: KeyType, V: ValueType>(
@@ -157,11 +155,7 @@ where
     where
         Self: 'p,
     {
-        let parent = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .current_revision();
+        let parent = self.manager.read().await.current_revision();
         let proposal = NodeStore::new(parent)?;
         let mut merkle = Merkle::from(proposal);
         for op in batch {
@@ -177,10 +171,7 @@ where
         let nodestore = merkle.into_inner();
         let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
             Arc::new(nodestore.into());
-        self.manager
-            .write()
-            .expect("poisoned lock")
-            .add_proposal(immutable.clone());
+        self.manager.write().await.add_proposal(immutable.clone());
 
         self.metrics.proposals.increment(1);
 
@@ -193,6 +184,7 @@ where
 }
 
 impl Db {
+    /// Create a new database instance.
     pub async fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
         let metrics = Arc::new(DbMetrics {
             proposals: counter!("firewood.proposals"),
@@ -211,24 +203,22 @@ impl Db {
     }
 
     /// Dump the Trie of the latest revision.
-    pub fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
-        let latest_rev_nodestore = self
-            .manager
-            .read()
-            .expect("poisoned lock")
-            .current_revision();
+    pub async fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
+        let latest_rev_nodestore = self.manager.read().await.current_revision();
         let merkle = Merkle::from(latest_rev_nodestore);
         // TODO: This should be a stream
         let output = merkle.dump().map_err(DbError::Merkle)?;
         write!(w, "{}", output).map_err(DbError::IO)
     }
 
+    /// Get a copy of the database metrics
     pub fn metrics(&self) -> Arc<DbMetrics> {
         self.metrics.clone()
     }
 }
 
 #[derive(Debug)]
+/// A user-visible database proposal
 pub struct Proposal<'p> {
     nodestore: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>,
     db: &'p Db,
@@ -299,7 +289,7 @@ impl<'a> api::Proposal for Proposal<'a> {
         self.db
             .manager
             .write()
-            .expect("poisoned lock")
+            .await
             .add_proposal(immutable.clone());
 
         Ok(Self::Proposal {
@@ -312,7 +302,7 @@ impl<'a> api::Proposal for Proposal<'a> {
     async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
         match Arc::into_inner(self) {
             Some(proposal) => {
-                let mut manager = proposal.db.manager.write().expect("poisoned lock");
+                let mut manager = proposal.db.manager.write().await;
                 Ok(manager.commit(proposal.nodestore.clone())?)
             }
             None => Err(api::Error::CannotCommitClonedProposal),

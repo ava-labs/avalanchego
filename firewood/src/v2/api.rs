@@ -39,8 +39,19 @@ pub type HashKey = storage::TrieHash;
 /// supported
 #[derive(Debug)]
 pub enum BatchOp<K: KeyType, V: ValueType> {
-    Put { key: K, value: V },
-    Delete { key: K },
+    /// Upsert a key/value pair
+    Put {
+        /// the key
+        key: K,
+        /// the value
+        value: V,
+    },
+
+    /// Delete a key
+    Delete {
+        /// The key
+        key: K,
+    },
 }
 
 /// A list of operations to consist of a batch that
@@ -63,49 +74,66 @@ pub fn vec_into_batch<K: KeyType, V: ValueType>(value: Vec<(K, V)>) -> Batch<K, 
 pub enum Error {
     /// A given hash key is not available in the database
     #[error("Hash not found for key: {provided:?}")]
-    HashNotFound { provided: HashKey },
+    HashNotFound {
+        /// the provided hash key
+        provided: HashKey,
+    },
 
     /// Incorrect root hash for commit
     #[error("Incorrect root hash for commit: {provided:?} != {current:?}")]
-    IncorrectRootHash { provided: HashKey, current: HashKey },
+    IncorrectRootHash {
+        /// the provided root hash
+        provided: HashKey,
+        /// the current root hash
+        current: HashKey,
+    },
 
     /// Invalid range
     #[error("Invalid range: {start_key:?} > {end_key:?}")]
     InvalidRange {
+        /// The provided starting key
         start_key: Box<[u8]>,
+        /// The provided ending key
         end_key: Box<[u8]>,
     },
 
     #[error("IO error: {0}")]
+    /// An IO error occurred
     IO(#[from] std::io::Error),
 
-    #[error("Invalid proposal")]
-    InvalidProposal,
-
-    // Cloned proposals are problematic because if they are committed, then you could
-    // create another proposal from this committed proposal, so we error at commit time
-    // if there are outstanding clones
+    /// Cannot commit a cloned proposal
+    ///
+    /// Cloned proposals are problematic because if they are committed, then you could
+    /// create another proposal from this committed proposal, so we error at commit time
+    /// if there are outstanding clones
     #[error("Cannot commit a cloned proposal")]
     CannotCommitClonedProposal,
 
+    /// Internal error
     #[error("Internal error")]
     InternalError(Box<dyn std::error::Error + Send>),
 
+    /// Range too small
     #[error("Range too small")]
     RangeTooSmall,
 
+    /// Request RangeProof for empty trie
     #[error("request RangeProof for empty trie")]
     RangeProofOnEmptyTrie,
 
+    /// Request RangeProof for empty range
     #[error("the latest revision is empty and has no root hash")]
     LatestIsEmpty,
 
+    /// This is not the latest proposal
     #[error("commit the parents of this proposal first")]
     NotLatest,
 
+    /// Sibling already committed
     #[error("sibling already committed")]
     SiblingCommitted,
 
+    /// Generic merkle error
     #[error("merkle error: {0}")]
     Merkle(#[from] MerkleError),
 }
@@ -125,8 +153,10 @@ impl From<RevisionManagerError> for Error {
 /// is the api::DbView trait defined next.
 #[async_trait]
 pub trait Db {
+    /// The type of a historical revision
     type Historical: DbView;
 
+    /// The type of a proposal
     type Proposal<'p>: DbView + Proposal
     where
         Self: 'p;
@@ -173,6 +203,7 @@ pub trait Db {
 /// A [Proposal] requires implementing DbView
 #[async_trait]
 pub trait DbView {
+    /// The type of a stream of key/value pairs
     type Stream<'a>: Stream<Item = Result<(Box<[u8]>, Vec<u8>), Error>>
     where
         Self: 'a;
@@ -238,6 +269,7 @@ pub trait DbView {
 /// obtain proofs.
 #[async_trait]
 pub trait Proposal: DbView + Send + Sync {
+    /// The type of a proposal
     type Proposal: DbView + Proposal;
 
     /// Commit this revision

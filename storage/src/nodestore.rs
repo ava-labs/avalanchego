@@ -709,7 +709,7 @@ impl PartialEq for NodeStoreParent {
 
 impl Eq for NodeStoreParent {}
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 /// Contains state for a proposed revision of the trie.
 pub struct ImmutableProposal {
     /// Address --> Node for nodes created in this proposal.

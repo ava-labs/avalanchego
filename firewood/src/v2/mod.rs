@@ -1,9 +1,14 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+/// The public API
 pub mod api;
+
+/// The database
 pub mod db;
+
+/// The proposal
 pub mod propose;
 
-// #[cfg(test)]
+/// An empty database implementation for testing
 pub mod emptydb;

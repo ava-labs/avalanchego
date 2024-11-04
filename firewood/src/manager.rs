@@ -17,11 +17,13 @@ use crate::v2::api::HashKey;
 use storage::{Committed, FileBacked, ImmutableProposal, NodeStore, Parentable, TrieHash};
 
 #[derive(Clone, Debug, TypedBuilder)]
+/// Revision manager configuratoin
 pub struct RevisionManagerConfig {
     /// The number of historical revisions to keep in memory.
     #[builder(default = 128)]
     max_revisions: usize,
 
+    /// The size of the node cache
     #[builder(default_code = "NonZero::new(1500000).expect(\"non-zero\")")]
     node_cache_size: NonZero<usize>,
 

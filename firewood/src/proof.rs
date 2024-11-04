@@ -9,36 +9,64 @@ use storage::{
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+/// Reasons why a proof is invalid
 pub enum ProofError {
+    /// Non-monotonic range decrease
     #[error("non-monotonic range increase")]
     NonMonotonicIncreaseRange,
+
+    /// Unexpected hash
     #[error("unexpected hash")]
     UnexpectedHash,
+
+    /// Unexpected value
     #[error("unexpected value")]
     UnexpectedValue,
+
+    /// Value mismatch
     #[error("value mismatch")]
     ValueMismatch,
+
+    /// Expected value but got None
     #[error("expected value but got None")]
     ExpectedValue,
+
+    /// Proof is empty
     #[error("proof can't be empty")]
     Empty,
+
+    /// Each proof node key should be a prefix of the proven key
     #[error("each proof node key should be a prefix of the proven key")]
     ShouldBePrefixOfProvenKey,
+
+    /// Each proof node key should be a prefix of the next key
     #[error("each proof node key should be a prefix of the next key")]
     ShouldBePrefixOfNextKey,
+
+    /// Child index is out of bounds
     #[error("child index is out of bounds")]
     ChildIndexOutOfBounds,
+
+    /// Only nodes with even length key can have values
     #[error("only nodes with even length key can have values")]
     ValueAtOddNibbleLength,
+
+    /// Node not in trie
     #[error("node not in trie")]
     NodeNotInTrie,
+
+    /// Error from the merkle package
     #[error("{0:?}")]
     Merkle(#[from] MerkleError),
+
+    /// Empty range
     #[error("empty range")]
     EmptyRange,
 }
 
 #[derive(Clone, Debug)]
+
+/// A node in a proof.
 pub struct ProofNode {
     /// The key this node is at. Each byte is a nibble.
     pub key: Box<[u8]>,
@@ -104,6 +132,7 @@ impl From<&ProofNode> for TrieHash {
 pub struct Proof<T: Hashable>(pub Box<[T]>);
 
 impl<T: Hashable> Proof<T> {
+    /// Verify a proof
     pub fn verify<K: AsRef<[u8]>, V: AsRef<[u8]>>(
         &self,
         key: K,

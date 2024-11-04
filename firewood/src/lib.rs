@@ -105,13 +105,27 @@
 //! A commit involves simply writing the nodes and the freelist to disk. If the proposal is
 //! abandoned, nothing has actually been written to disk.
 //!
+#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
+/// Database module for Firewood.
 pub mod db;
+
+/// Database manager module
 pub mod manager;
+
+/// Merkle module, containing merkle operations
 pub mod merkle;
+
+/// Proof module
 pub mod proof;
+
+/// Range proof module
 pub mod range_proof;
+
+/// Stream module, for both node and key-value streams
 pub mod stream;
 
+/// Version 2 API
 pub mod v2;
 
+/// Expose the storage logger
 pub use storage::logger;

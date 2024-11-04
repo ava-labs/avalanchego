@@ -32,9 +32,7 @@ impl<T> IntoStatusResultExt<T> for Result<T, Error> {
             Error::IncorrectRootHash { .. } | Error::HashNotFound { .. } | Error::RangeTooSmall => {
                 Status::invalid_argument(err.to_string())
             }
-            Error::IO { .. } | Error::InternalError { .. } | Error::InvalidProposal => {
-                Status::internal(err.to_string())
-            }
+            Error::IO { .. } | Error::InternalError { .. } => Status::internal(err.to_string()),
             _ => Status::internal(err.to_string()),
         })
     }

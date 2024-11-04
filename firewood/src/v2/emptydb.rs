@@ -88,6 +88,8 @@ impl DbView for HistoricalImpl {
     }
 }
 
+#[derive(Debug)]
+/// An empty streamer that doesn't stream any data
 pub struct EmptyStreamer;
 
 impl Stream for EmptyStreamer {
