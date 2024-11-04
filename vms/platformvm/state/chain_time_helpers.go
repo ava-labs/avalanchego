@@ -80,9 +80,17 @@ func GetNextStakerChangeTime(
 		}
 	}
 
+	return getNextSoVEvictionTime(config, state, nextTime)
+}
+
+func getNextSoVEvictionTime(
+	config validatorfee.Config,
+	state Chain,
+	nextTime time.Time,
+) (time.Time, error) {
 	sovIterator, err := state.GetActiveSubnetOnlyValidatorsIterator()
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("could not iterate over active SoVs: %w", err)
 	}
 	defer sovIterator.Release()
 
@@ -98,7 +106,7 @@ func GetNextStakerChangeTime(
 	)
 	remainingFunds, err := math.Sub(sov.EndAccumulatedFee, accruedFees)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("could not calculate remaining funds: %w", err)
 	}
 
 	// Calculate how many seconds the remaining funds can last for.
