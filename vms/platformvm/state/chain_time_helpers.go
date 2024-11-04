@@ -49,7 +49,7 @@ func NextBlockTime(
 }
 
 // GetNextStakerChangeTime returns the next time a staker will be either added
-// or removed to/from the validator set. If the next staker change time is
+// to or removed from the validator set. If the next staker change time is
 // further in the future than [nextTime], then [nextTime] is returned.
 func GetNextStakerChangeTime(
 	config validatorfee.Config,
