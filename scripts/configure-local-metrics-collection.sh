@@ -4,9 +4,6 @@ set -euo pipefail
 
 # Configures prometheus and promtail to collect metrics and logs from
 # a local node.
-#
-# To start metrics collection: ./scripts/run_prometheus.sh
-# To start log collection: ./scripts/run_promtail.sh
 
 API_PORT="${API_PORT:-9650}"
 
@@ -45,4 +42,6 @@ cat >"${HOME}"/.tmpnet/promtail/file_sd_configs/local.json <<EOL
 EOL
 
 echo "Prometheus and Loki have been configured to collect metrics and logs from the local node."
+echo "Metrics collection by prometheus can be started with ./scripts/run_prometheus.sh"
+echo "Log collection by promtail can be started with ./scripts/run_promtail.sh"
 echo "Grafana link: https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?var-filter=network_uuid%7C%3D%7C${METRICS_UUID}"
