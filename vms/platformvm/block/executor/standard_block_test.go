@@ -57,7 +57,6 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	env.blkManager.(*manager).lastAccepted = parentID
 
 	chainTime := env.clk.Time().Truncate(time.Second)
-
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
