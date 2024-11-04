@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -199,7 +200,7 @@ func (m *manager) GetValidatorSet(
 
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
+		return maps.Clone(validatorSet), nil
 	}
 
 	etnaHeight, err := m.state.GetEtnaHeight()
@@ -230,7 +231,7 @@ func (m *manager) GetValidatorSet(
 	m.metrics.IncValidatorSetsCreated()
 	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
-	return validatorSet, nil
+	return maps.Clone(validatorSet), nil
 }
 
 func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
