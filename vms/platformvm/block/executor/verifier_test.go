@@ -1217,7 +1217,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	}
 }
 
-func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
+func TestDeactivateLowBalanceSoVs(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -1235,31 +1235,22 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 				EndAccumulatedFee: endAccumulatedFee,
 			}
 		}
-		fractionalTimeSoV0 = newSoV(5 * units.NanoAvax) // lasts 2.5 seconds
-		fractionalTimeSoV1 = newSoV(5 * units.NanoAvax) // lasts 2.5 seconds
-		wholeTimeSoV       = newSoV(8 * units.NanoAvax) // lasts 4 seconds
-
-		fractionalSoVEvictedTime = genesistest.DefaultValidatorStartTime.Add(2 * time.Second) // evicts early rather than late
-		wholeSoVEvictedTime      = genesistest.DefaultValidatorStartTime.Add(4 * time.Second) // evicts on time
+		fractionalTimeSoV0 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
+		fractionalTimeSoV1 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
+		wholeTimeSoV       = newSoV(2 * units.NanoAvax) // lasts 1 second
 	)
 
 	tests := []struct {
 		name         string
 		initialSoVs  []state.SubnetOnlyValidator
-		timestamp    time.Time
 		expectedSoVs []state.SubnetOnlyValidator
 	}{
 		{
-			name:      "no SoVs",
-			timestamp: genesistest.DefaultValidatorStartTime.Add(10 * time.Second),
+			name: "no SoVs",
 		},
 		{
-			name: "fractional SoVs are not overcharged",
+			name: "fractional SoV is not undercharged",
 			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
-			},
-			timestamp: fractionalSoVEvictedTime.Add(-time.Second),
-			expectedSoVs: []state.SubnetOnlyValidator{
 				fractionalTimeSoV0,
 			},
 		},
@@ -1269,24 +1260,15 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 				fractionalTimeSoV0,
 				fractionalTimeSoV1,
 			},
-			timestamp: fractionalSoVEvictedTime,
 		},
 		{
 			name: "whole SoVs are not overcharged",
 			initialSoVs: []state.SubnetOnlyValidator{
 				wholeTimeSoV,
 			},
-			timestamp: wholeSoVEvictedTime.Add(-time.Second),
 			expectedSoVs: []state.SubnetOnlyValidator{
 				wholeTimeSoV,
 			},
-		},
-		{
-			name: "whole SoVs are not undercharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
-			},
-			timestamp: wholeSoVEvictedTime,
 		},
 		{
 			name: "partial eviction",
@@ -1294,7 +1276,6 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 				fractionalTimeSoV0,
 				wholeTimeSoV,
 			},
-			timestamp: fractionalSoVEvictedTime,
 			expectedSoVs: []state.SubnetOnlyValidator{
 				wholeTimeSoV,
 			},
@@ -1309,51 +1290,18 @@ func TestBlockExecutionEvictsLowBalanceSoVs(t *testing.T) {
 				require.NoError(s.PutSubnetOnlyValidator(sov))
 			}
 
-			verifier := newTestVerifier(t, s)
-			verifier.txExecutorBackend.Clk.Set(test.timestamp)
-
-			wallet := txstest.NewWallet(
-				t,
-				verifier.ctx,
-				verifier.txExecutorBackend.Config,
-				s,
-				secp256k1fx.NewKeychain(genesis.EWOQKey),
-				nil, // subnetIDs
-				nil, // chainIDs
-			)
-
-			baseTx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+			diff, err := state.NewDiffOn(s)
 			require.NoError(err)
 
-			timestamp, _, err := state.NextBlockTime(
-				verifier.txExecutorBackend.Config.ValidatorFeeConfig,
-				s,
-				verifier.txExecutorBackend.Clk,
-			)
-			require.NoError(err)
+			config := validatorfee.Config{
+				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+				Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
+				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+			}
+			require.NoError(deactivateLowBalanceSoVs(config, diff))
 
-			lastAcceptedID := s.GetLastAccepted()
-			lastAccepted, err := s.GetStatelessBlock(lastAcceptedID)
-			require.NoError(err)
-
-			blk, err := block.NewBanffStandardBlock(
-				timestamp,
-				lastAcceptedID,
-				lastAccepted.Height()+1,
-				[]*txs.Tx{
-					baseTx,
-				},
-			)
-			require.NoError(err)
-
-			require.NoError(blk.Visit(verifier))
-
-			blkID := blk.ID()
-			require.Contains(verifier.blkIDToState, blkID)
-			blockState := verifier.blkIDToState[blkID]
-			require.Equal(blk, blockState.statelessBlock)
-
-			sovs, err := blockState.onAcceptState.GetActiveSubnetOnlyValidatorsIterator()
+			sovs, err := diff.GetActiveSubnetOnlyValidatorsIterator()
 			require.NoError(err)
 			require.Equal(
 				test.expectedSoVs,
