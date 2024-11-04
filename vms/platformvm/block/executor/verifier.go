@@ -478,9 +478,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 	error,
 ) {
 	// Complexity is limited first to avoid processing too large of a block.
-	timestamp := diff.GetTimestamp()
-	isEtna := v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp)
-	if isEtna {
+	if timestamp := diff.GetTimestamp(); v.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
 		var blockComplexity gas.Dimensions
 		for _, tx := range txs {
 			txComplexity, err := txfee.TxComplexity(tx.Unsigned)
@@ -557,57 +555,6 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		}
 	}
 
-	// After processing all the transactions, deactivate any SoVs that might not
-	// have sufficient fee to pay for the next second.
-	//
-	// This ensures that SoVs are not undercharged for the next second.
-	if isEtna {
-		var (
-			accruedFees       = diff.GetAccruedFees()
-			validatorFeeState = validatorfee.State{
-				Current: gas.Gas(diff.NumActiveSubnetOnlyValidators()),
-				Excess:  diff.GetSoVExcess(),
-			}
-			potentialCost = validatorFeeState.CostOf(
-				v.txExecutorBackend.Config.ValidatorFeeConfig,
-				1, // 1 second
-			)
-		)
-		potentialAccruedFees, err := math.Add(accruedFees, potentialCost)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		// Invariant: Proposal transactions do not impact SoV state.
-		sovIterator, err := diff.GetActiveSubnetOnlyValidatorsIterator()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		var sovsToDeactivate []state.SubnetOnlyValidator
-		for sovIterator.Next() {
-			sov := sovIterator.Value()
-			// If the validator has exactly the right amount of fee for the next
-			// second we should not remove them here.
-			if sov.EndAccumulatedFee >= potentialAccruedFees {
-				break
-			}
-
-			sovsToDeactivate = append(sovsToDeactivate, sov)
-		}
-
-		// The iterator must be released prior to attempting to write to the
-		// diff.
-		sovIterator.Release()
-
-		for _, sov := range sovsToDeactivate {
-			sov.EndAccumulatedFee = 0
-			if err := diff.PutSubnetOnlyValidator(sov); err != nil {
-				return nil, nil, nil, err
-			}
-		}
-	}
-
 	if err := v.verifyUniqueInputs(parentID, inputs); err != nil {
 		return nil, nil, nil, err
 	}
@@ -622,5 +569,70 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		}
 	}
 
+	// After processing all the transactions, deactivate any SoVs that might not
+	// have sufficient fee to pay for the next second.
+	//
+	// This ensures that SoVs are not undercharged for the next second.
+	err := deactivateLowBalanceSoVs(
+		v.txExecutorBackend.Config.ValidatorFeeConfig,
+		diff,
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to deactivate low balance SoVs: %w", err)
+	}
+
 	return inputs, atomicRequests, onAcceptFunc, nil
+}
+
+// deactivateLowBalanceSoVs deactivates any SoVs that might not have sufficient
+// fees to pay for the next second.
+func deactivateLowBalanceSoVs(
+	config validatorfee.Config,
+	diff state.Diff,
+) error {
+	var (
+		accruedFees       = diff.GetAccruedFees()
+		validatorFeeState = validatorfee.State{
+			Current: gas.Gas(diff.NumActiveSubnetOnlyValidators()),
+			Excess:  diff.GetSoVExcess(),
+		}
+		potentialCost = validatorFeeState.CostOf(
+			config,
+			1, // 1 second
+		)
+	)
+	potentialAccruedFees, err := math.Add(accruedFees, potentialCost)
+	if err != nil {
+		return fmt.Errorf("could not calculate potentially accrued fees: %w", err)
+	}
+
+	// Invariant: Proposal transactions do not impact SoV state.
+	sovIterator, err := diff.GetActiveSubnetOnlyValidatorsIterator()
+	if err != nil {
+		return fmt.Errorf("could not iterate over active SoVs: %w", err)
+	}
+
+	var sovsToDeactivate []state.SubnetOnlyValidator
+	for sovIterator.Next() {
+		sov := sovIterator.Value()
+		// If the validator has exactly the right amount of fee for the next
+		// second we should not remove them here.
+		if sov.EndAccumulatedFee >= potentialAccruedFees {
+			break
+		}
+
+		sovsToDeactivate = append(sovsToDeactivate, sov)
+	}
+
+	// The iterator must be released prior to attempting to write to the
+	// diff.
+	sovIterator.Release()
+
+	for _, sov := range sovsToDeactivate {
+		sov.EndAccumulatedFee = 0
+		if err := diff.PutSubnetOnlyValidator(sov); err != nil {
+			return fmt.Errorf("could not deactivate SoV %s: %w", sov.ValidationID, err)
+		}
+	}
+	return nil
 }

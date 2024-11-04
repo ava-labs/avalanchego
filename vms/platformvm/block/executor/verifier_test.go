@@ -351,6 +351,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
+	parentState.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(&iterator.Empty[state.SubnetOnlyValidator]{}, nil).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
