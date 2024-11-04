@@ -7,12 +7,12 @@ set -euo pipefail
 
 API_PORT="${API_PORT:-9650}"
 
-LOG_PATH="${LOG_PATH:-${HOME}/.avalanchego/logs}"
+LOGS_PATH="${LOGS_PATH:-${HOME}/.avalanchego/logs}"
 
 # Generate a uuid to uniquely identify the collected metrics
 METRICS_UUID="$(uuidgen)"
 
-echo "Configuring metrics and log collection for a local node"
+echo "Configuring metrics and log collection for a local node with API port ${API_PORT} and logs path ${LOGS_PATH}"
 
 PROMETHEUS_CONFIG_PATH="${HOME}/.tmpnet/prometheus/file_sd_configs"
 PROMETHEUS_CONFIG_FILE="${PROMETHEUS_CONFIG_PATH}/local.json"
@@ -38,7 +38,7 @@ cat > "${PROMTAIL_CONFIG_FILE}" <<EOL
 [
   {
     "labels": {
-      "__path__": "${LOG_PATH}/*.log",
+      "__path__": "${LOGS_PATH}/*.log",
       "network_uuid": "${METRICS_UUID}"
     },
     "targets": [
