@@ -9,14 +9,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestSubnetOnlyValidator_Compare(t *testing.T) {
@@ -77,17 +77,6 @@ func TestSubnetOnlyValidator_Compare(t *testing.T) {
 
 func TestSubnetOnlyValidator_immutableFieldsAreUnmodified(t *testing.T) {
 	var (
-		randomSOV = func() SubnetOnlyValidator {
-			return SubnetOnlyValidator{
-				ValidationID:          ids.GenerateTestID(),
-				SubnetID:              ids.GenerateTestID(),
-				NodeID:                ids.GenerateTestNodeID(),
-				PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
-				RemainingBalanceOwner: utils.RandomBytes(32),
-				DeactivationOwner:     utils.RandomBytes(32),
-				StartTime:             rand.Uint64(), // #nosec G404
-			}
-		}
 		randomizeSOV = func(sov SubnetOnlyValidator) SubnetOnlyValidator {
 			// Randomize unrelated fields
 			sov.Weight = rand.Uint64()            // #nosec G404
@@ -95,7 +84,7 @@ func TestSubnetOnlyValidator_immutableFieldsAreUnmodified(t *testing.T) {
 			sov.EndAccumulatedFee = rand.Uint64() // #nosec G404
 			return sov
 		}
-		sov = randomSOV()
+		sov = newSoV()
 	)
 
 	t.Run("equal", func(t *testing.T) {
@@ -103,7 +92,7 @@ func TestSubnetOnlyValidator_immutableFieldsAreUnmodified(t *testing.T) {
 		require.True(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("everything is different", func(t *testing.T) {
-		v := randomizeSOV(randomSOV())
+		v := randomizeSOV(newSoV())
 		require.True(t, sov.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different subnetID", func(t *testing.T) {
@@ -138,64 +127,120 @@ func TestSubnetOnlyValidator_immutableFieldsAreUnmodified(t *testing.T) {
 	})
 }
 
-func TestSubnetOnlyValidator_DatabaseHelpers(t *testing.T) {
-	require := require.New(t)
-	db := memdb.New()
+func TestGetSubnetOnlyValidator(t *testing.T) {
+	var (
+		sov             = newSoV()
+		dbWithSoV       = memdb.New()
+		dbWithoutSoV    = memdb.New()
+		cacheWithSoV    = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+		cacheWithoutSoV = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+	)
 
-	sk, err := bls.NewSecretKey()
-	require.NoError(err)
-	pk := bls.PublicFromSecretKey(sk)
-	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+	require.NoError(t, putSubnetOnlyValidator(dbWithSoV, cacheWithSoV, sov))
+	require.NoError(t, deleteSubnetOnlyValidator(dbWithoutSoV, cacheWithoutSoV, sov.ValidationID))
 
-	var remainingBalanceOwner fx.Owner = &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			ids.GenerateTestShortID(),
+	tests := []struct {
+		name          string
+		cache         cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]]
+		db            database.KeyValueReader
+		expectedSoV   SubnetOnlyValidator
+		expectedErr   error
+		expectedEntry maybe.Maybe[SubnetOnlyValidator]
+	}{
+		{
+			name:          "cached with validator",
+			cache:         cacheWithSoV,
+			db:            dbWithoutSoV,
+			expectedSoV:   sov,
+			expectedEntry: maybe.Some(sov),
+		},
+		{
+			name:          "from disk with validator",
+			cache:         &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10},
+			db:            dbWithSoV,
+			expectedSoV:   sov,
+			expectedEntry: maybe.Some(sov),
+		},
+		{
+			name:        "cached without validator",
+			cache:       cacheWithoutSoV,
+			db:          dbWithSoV,
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name:        "from disk without validator",
+			cache:       &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10},
+			db:          dbWithoutSoV,
+			expectedErr: database.ErrNotFound,
 		},
 	}
-	remainingBalanceOwnerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &remainingBalanceOwner)
-	require.NoError(err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	var deactivationOwner fx.Owner = &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			ids.GenerateTestShortID(),
-		},
+			gotSoV, err := getSubnetOnlyValidator(test.cache, test.db, sov.ValidationID)
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expectedSoV, gotSoV)
+
+			cachedSoV, ok := test.cache.Get(sov.ValidationID)
+			require.True(ok)
+			require.Equal(test.expectedEntry, cachedSoV)
+		})
 	}
-	deactivationOwnerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &deactivationOwner)
+}
+
+func TestPutSubnetOnlyValidator(t *testing.T) {
+	var (
+		require = require.New(t)
+		sov     = newSoV()
+		db      = memdb.New()
+		cache   = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+	)
+	expectedSoVBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, sov)
 	require.NoError(err)
 
-	vdr := SubnetOnlyValidator{
+	require.NoError(putSubnetOnlyValidator(db, cache, sov))
+
+	sovBytes, err := db.Get(sov.ValidationID[:])
+	require.NoError(err)
+	require.Equal(expectedSoVBytes, sovBytes)
+
+	sovFromCache, ok := cache.Get(sov.ValidationID)
+	require.True(ok)
+	require.Equal(maybe.Some(sov), sovFromCache)
+}
+
+func TestDeleteSubnetOnlyValidator(t *testing.T) {
+	var (
+		require      = require.New(t)
+		validationID = ids.GenerateTestID()
+		db           = memdb.New()
+		cache        = &cache.LRU[ids.ID, maybe.Maybe[SubnetOnlyValidator]]{Size: 10}
+	)
+	require.NoError(db.Put(validationID[:], nil))
+
+	require.NoError(deleteSubnetOnlyValidator(db, cache, validationID))
+
+	hasSoV, err := db.Has(validationID[:])
+	require.NoError(err)
+	require.False(hasSoV)
+
+	sovFromCache, ok := cache.Get(validationID)
+	require.True(ok)
+	require.Equal(maybe.Nothing[SubnetOnlyValidator](), sovFromCache)
+}
+
+func newSoV() SubnetOnlyValidator {
+	return SubnetOnlyValidator{
 		ValidationID:          ids.GenerateTestID(),
 		SubnetID:              ids.GenerateTestID(),
 		NodeID:                ids.GenerateTestNodeID(),
-		PublicKey:             pkBytes,
-		RemainingBalanceOwner: remainingBalanceOwnerBytes,
-		DeactivationOwner:     deactivationOwnerBytes,
+		PublicKey:             utils.RandomBytes(bls.PublicKeyLen),
+		RemainingBalanceOwner: utils.RandomBytes(32),
+		DeactivationOwner:     utils.RandomBytes(32),
 		StartTime:             rand.Uint64(), // #nosec G404
 		Weight:                rand.Uint64(), // #nosec G404
 		MinNonce:              rand.Uint64(), // #nosec G404
 		EndAccumulatedFee:     rand.Uint64(), // #nosec G404
 	}
-
-	// Validator hasn't been put on disk yet
-	gotVdr, err := getSubnetOnlyValidator(db, vdr.ValidationID)
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(gotVdr)
-
-	// Place the validator on disk
-	require.NoError(putSubnetOnlyValidator(db, vdr))
-
-	// Verify that the validator can be fetched from disk
-	gotVdr, err = getSubnetOnlyValidator(db, vdr.ValidationID)
-	require.NoError(err)
-	require.Equal(vdr, gotVdr)
-
-	// Remove the validator from disk
-	require.NoError(deleteSubnetOnlyValidator(db, vdr.ValidationID))
-
-	// Verify that the validator has been removed from disk
-	gotVdr, err = getSubnetOnlyValidator(db, vdr.ValidationID)
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Zero(gotVdr)
 }
