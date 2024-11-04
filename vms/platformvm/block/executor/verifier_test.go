@@ -76,15 +76,10 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 		},
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Config{
-				CreateAssetTxFee: genesis.LocalParams.CreateAssetTxFee,
-				StaticFeeConfig:  genesis.LocalParams.StaticFeeConfig,
-				DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
-				ValidatorFeeConfig: validatorfee.Config{
-					Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
-					Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
-					MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
-					ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
-				},
+				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
+				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
+				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,
 				UpgradeConfig:          upgrades,
 			},
