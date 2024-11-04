@@ -256,6 +256,16 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 
 		currentTime = genesistest.DefaultValidatorStartTime
 		newTime     = currentTime.Add(timeToAdvance)
+
+		config = config.Config{
+			ValidatorFeeConfig: fee.Config{
+				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+				Target:                   1,
+				MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
+				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+			},
+			UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+		}
 	)
 
 	tests := []struct {
@@ -335,16 +345,7 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
-						// ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-						ValidatorFeeConfig: fee.Config{
-							Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
-							Target:                   1,
-							MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
-							ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
-						},
-						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
-					},
+					Config: &config,
 				},
 				s,
 				newTime,

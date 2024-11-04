@@ -260,28 +260,56 @@ func advanceTimeTo(
 	previousChainTime := changes.GetTimestamp()
 	duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
 
-	dynamicFeeState := changes.GetFeeState()
-	dynamicFeeState = dynamicFeeState.AdvanceTime(
-		backend.Config.DynamicFeeConfig.MaxCapacity,
-		backend.Config.DynamicFeeConfig.MaxPerSecond,
-		backend.Config.DynamicFeeConfig.TargetPerSecond,
+	advanceDynamicFeeState(backend.Config.DynamicFeeConfig, changes, duration)
+	sovsChanged, err := advanceValidatorFeeState(
+		backend.Config.ValidatorFeeConfig,
+		parentState,
+		changes,
 		duration,
 	)
-	changes.SetFeeState(dynamicFeeState)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to advance validator fee state: %w", err)
+	}
+	changed = changed || sovsChanged
 
+	changes.SetTimestamp(newChainTime)
+	return changes, changed, nil
+}
+
+func advanceDynamicFeeState(
+	config gas.Config,
+	changes state.Diff,
+	seconds uint64,
+) {
+	dynamicFeeState := changes.GetFeeState()
+	dynamicFeeState = dynamicFeeState.AdvanceTime(
+		config.MaxCapacity,
+		config.MaxPerSecond,
+		config.TargetPerSecond,
+		seconds,
+	)
+	changes.SetFeeState(dynamicFeeState)
+}
+
+// advanceValidatorFeeState advances the validator fee state by [seconds]. SoVs
+// are read from [parentState] and written to [changes] to avoid modifying state
+// while an iterator is held.
+func advanceValidatorFeeState(
+	config fee.Config,
+	parentState state.Chain,
+	changes state.Diff,
+	seconds uint64,
+) (bool, error) {
 	validatorFeeState := fee.State{
 		Current: gas.Gas(changes.NumActiveSubnetOnlyValidators()),
 		Excess:  changes.GetSoVExcess(),
 	}
-	validatorCost := validatorFeeState.CostOf(
-		backend.Config.ValidatorFeeConfig,
-		duration,
-	)
+	validatorCost := validatorFeeState.CostOf(config, seconds)
 
 	accruedFees := changes.GetAccruedFees()
-	accruedFees, err = math.Add(accruedFees, validatorCost)
+	accruedFees, err := math.Add(accruedFees, validatorCost)
 	if err != nil {
-		return nil, false, err
+		return false, fmt.Errorf("could not calculate accrued fees: %w", err)
 	}
 
 	// Invariant: It is not safe to modify the state while iterating over it,
@@ -289,10 +317,11 @@ func advanceTimeTo(
 	// ParentState must not be modified before this iterator is released.
 	sovIterator, err := parentState.GetActiveSubnetOnlyValidatorsIterator()
 	if err != nil {
-		return nil, false, err
+		return false, fmt.Errorf("could not iterate over active SoVs: %w", err)
 	}
 	defer sovIterator.Release()
 
+	var changed bool
 	for sovIterator.Next() {
 		sov := sovIterator.Value()
 		if sov.EndAccumulatedFee > accruedFees {
@@ -301,19 +330,16 @@ func advanceTimeTo(
 
 		sov.EndAccumulatedFee = 0 // Deactivate the validator
 		if err := changes.PutSubnetOnlyValidator(sov); err != nil {
-			return nil, false, err
+			return false, fmt.Errorf("could not deactivate SoV %s: %w", sov.ValidationID, err)
 		}
 		changed = true
 	}
 
-	validatorFeeState = validatorFeeState.AdvanceTime(
-		backend.Config.ValidatorFeeConfig.Target,
-		duration,
-	)
+	//
+	validatorFeeState = validatorFeeState.AdvanceTime(config.Target, seconds)
 	changes.SetSoVExcess(validatorFeeState.Excess)
 	changes.SetAccruedFees(accruedFees)
-	changes.SetTimestamp(newChainTime)
-	return changes, changed, nil
+	return changed, nil
 }
 
 func GetRewardsCalculator(
