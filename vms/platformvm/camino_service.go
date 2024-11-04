@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -769,7 +770,7 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 }
 
 // GetLastAcceptedBlock returns the last accepted block
-func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.GetBlockResponse) error {
+func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, args *api.Encoding, reply *api.GetBlockResponse) error {
 	s.vm.ctx.Log.Debug("Platform: GetLastAcceptedBlock called")
 
 	ctx := r.Context()
@@ -782,18 +783,29 @@ func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply
 		return fmt.Errorf("couldn't get block with id %s: %w", lastAcceptedID, err)
 	}
 
-	block.InitCtx(s.vm.ctx)
-	reply.Encoding = formatting.JSON
-	reply.Block = block
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		reply.Block = block
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", block.ID(), err)
+	}
+
 	return nil
 }
 
-type GetBlockAtHeight struct {
-	Height uint32 `json:"height"`
+type GetBlockAtHeightArgs struct {
+	Encoding formatting.Encoding `json:"encoding"`
+	Height   uint32              `json:"height"`
 }
 
 // GetBlockAtHeight returns block at given height
-func (s *CaminoService) GetBlockAtHeight(r *http.Request, args *GetBlockAtHeight, reply *api.GetBlockResponse) error {
+func (s *CaminoService) GetBlockAtHeight(r *http.Request, args *GetBlockAtHeightArgs, reply *api.GetBlockResponse) error {
 	s.vm.ctx.Log.Debug("Platform: GetBlockAtHeight called")
 
 	ctx := r.Context()
@@ -802,18 +814,35 @@ func (s *CaminoService) GetBlockAtHeight(r *http.Request, args *GetBlockAtHeight
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
 
+	var desiredBlock blocks.Block
+
 	for {
 		block, err := s.vm.manager.GetStatelessBlock(blockID)
 		if err != nil {
 			return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
 		}
 		if block.Height() == uint64(args.Height) {
-			block.InitCtx(s.vm.ctx)
-			reply.Encoding = formatting.JSON
-			reply.Block = block
+			desiredBlock = block
 			break
 		}
 		blockID = block.Parent()
+	}
+
+	if desiredBlock == nil {
+		return fmt.Errorf("couldn't find block at height %d", args.Height)
+	}
+
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		desiredBlock.InitCtx(s.vm.ctx)
+		reply.Block = desiredBlock
+		return nil
+	}
+
+	reply.Block, err = formatting.Encode(args.Encoding, desiredBlock.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as string: %w", desiredBlock.ID(), err)
 	}
 
 	return nil
