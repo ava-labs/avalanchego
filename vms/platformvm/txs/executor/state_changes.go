@@ -256,16 +256,16 @@ func advanceTimeTo(
 		return changes, changed, nil
 	}
 
-	// Advance the dynamic fees state
+	// Calculate number of seconds the time is advancing
 	previousChainTime := changes.GetTimestamp()
-	duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+	seconds := uint64(newChainTime.Sub(previousChainTime) / time.Second)
 
-	advanceDynamicFeeState(backend.Config.DynamicFeeConfig, changes, duration)
+	advanceDynamicFeeState(backend.Config.DynamicFeeConfig, changes, seconds)
 	sovsChanged, err := advanceValidatorFeeState(
 		backend.Config.ValidatorFeeConfig,
 		parentState,
 		changes,
-		duration,
+		seconds,
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to advance validator fee state: %w", err)
