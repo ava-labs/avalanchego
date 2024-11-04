@@ -200,17 +200,23 @@ func getSubnetOnlyValidator(
 	}
 
 	bytes, err := db.Get(validationID[:])
+	if err == database.ErrNotFound {
+		cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+		return SubnetOnlyValidator{}, database.ErrNotFound
+	}
 	if err != nil {
 		return SubnetOnlyValidator{}, err
 	}
 
-	vdr := SubnetOnlyValidator{
+	sov := SubnetOnlyValidator{
 		ValidationID: validationID,
 	}
-	if _, err := block.GenesisCodec.Unmarshal(bytes, &vdr); err != nil {
+	if _, err := block.GenesisCodec.Unmarshal(bytes, &sov); err != nil {
 		return SubnetOnlyValidator{}, fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
 	}
-	return vdr, nil
+
+	cache.Put(validationID, maybe.Some(sov))
+	return sov, nil
 }
 
 func putSubnetOnlyValidator(

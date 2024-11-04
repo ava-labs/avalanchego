@@ -850,7 +850,13 @@ func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 		return weight, nil
 	}
 
-	return database.WithDefault(database.GetUInt64, s.weightsDB, subnetID[:], 0)
+	weight, err := database.WithDefault(database.GetUInt64, s.weightsDB, subnetID[:], 0)
+	if err != nil {
+		return 0, err
+	}
+
+	s.weightsCache.Put(subnetID, weight)
+	return weight, nil
 }
 
 func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
@@ -889,7 +895,13 @@ func (s *state) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool
 	}
 
 	key := subnetIDNodeID.Marshal()
-	return s.subnetIDNodeIDDB.Has(key)
+	has, err := s.subnetIDNodeIDDB.Has(key)
+	if err != nil {
+		return false, err
+	}
+
+	s.subnetIDNodeIDCache.Put(subnetIDNodeID, has)
+	return has, nil
 }
 
 func (s *state) PutSubnetOnlyValidator(sov SubnetOnlyValidator) error {
