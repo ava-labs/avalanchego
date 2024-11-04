@@ -9,6 +9,10 @@
   - `"l1-inactive-validators-cache-size"`
   - `"l1-subnet-id-node-id-cache-size"`
 
+### gRP
+
+- Added `GetCurrentValidatorSet` to the `validators.State` interface
+
 ## [v1.11.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.11)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
