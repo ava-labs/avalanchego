@@ -2602,23 +2602,24 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					[]ids.ID{subnetID},
 					nil, // chainIDs
 				)
-				chainID = ids.GenerateTestID()
-				address = utils.RandomBytes(32)
-				pop     = signer.NewProofOfPossession(sk)
+				chainID   = ids.GenerateTestID()
+				address   = utils.RandomBytes(32)
+				pop       = signer.NewProofOfPossession(sk)
+				validator = &txs.ConvertSubnetValidator{
+					NodeID:                nodeID.Bytes(),
+					Weight:                weight,
+					Balance:               balance,
+					Signer:                *pop,
+					RemainingBalanceOwner: message.PChainOwner{},
+					DeactivationOwner:     message.PChainOwner{},
+				}
 			)
 			convertSubnetTx, err := wallet.IssueConvertSubnetTx(
 				subnetID,
 				chainID,
 				address,
 				[]*txs.ConvertSubnetValidator{
-					{
-						NodeID:                nodeID.Bytes(),
-						Weight:                weight,
-						Balance:               balance,
-						Signer:                *pop,
-						RemainingBalanceOwner: message.PChainOwner{},
-						DeactivationOwner:     message.PChainOwner{},
-					},
+					validator,
 				},
 				test.builderOptions...,
 			)
@@ -2684,6 +2685,34 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					Addr:         address,
 				},
 				stateConversion,
+			)
+
+			var (
+				validationID = subnetID.Append(0)
+				pkBytes      = bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk))
+			)
+			remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.RemainingBalanceOwner)
+			require.NoError(err)
+
+			deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
+			require.NoError(err)
+
+			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			require.NoError(err)
+			require.Equal(
+				state.SubnetOnlyValidator{
+					ValidationID:          validationID,
+					SubnetID:              subnetID,
+					NodeID:                nodeID,
+					PublicKey:             pkBytes,
+					RemainingBalanceOwner: remainingBalanceOwner,
+					DeactivationOwner:     deactivationOwner,
+					StartTime:             uint64(diff.GetTimestamp().Unix()),
+					Weight:                validator.Weight,
+					MinNonce:              0,
+					EndAccumulatedFee:     validator.Balance + diff.GetAccruedFees(),
+				},
+				sov,
 			)
 		})
 	}

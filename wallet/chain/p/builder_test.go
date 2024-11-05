@@ -740,7 +740,7 @@ func TestConvertSubnetTx(t *testing.T) {
 				nil,
 				nil,
 				map[ids.ID]uint64{
-					e.context.AVAXAssetID: 3 * units.Avax,
+					e.context.AVAXAssetID: 3 * units.Avax, // Balance of the validators
 				},
 			)
 		})

@@ -142,7 +142,7 @@ type Wallet interface {
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
-	// - [validators] specifies the initial SoVs of the converted subnet
+	// - [validators] specifies the initial SoVs of the L1
 	IssueConvertSubnetTx(
 		subnetID ids.ID,
 		chainID ids.ID,

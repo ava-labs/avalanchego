@@ -247,7 +247,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// check that vdrs are reached out for frontiers
-	require.Len(contactedFrontiersProviders, min(beacons.Count(ctx.SubnetID), maxOutstandingBroadcastRequests))
+	require.Len(contactedFrontiersProviders, min(beacons.NumValidators(ctx.SubnetID), maxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
 		require.Contains(syncer.pendingSeeders, beaconID)
@@ -344,7 +344,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// other listed vdrs are reached for data
 	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == beacons.Count(ctx.SubnetID))
+			len(contactedFrontiersProviders) == beacons.NumValidators(ctx.SubnetID))
 }
 
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
@@ -413,7 +413,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// are reached for data
 	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == beacons.Count(ctx.SubnetID))
+			len(contactedFrontiersProviders) == beacons.NumValidators(ctx.SubnetID))
 }
 
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
@@ -475,7 +475,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// are reached for data
 	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
-			len(contactedFrontiersProviders) == beacons.Count(ctx.SubnetID))
+			len(contactedFrontiersProviders) == beacons.NumValidators(ctx.SubnetID))
 
 	// mock VM to simulate a valid but late summary is returned
 	fullVM.CantParseStateSummary = true
@@ -773,7 +773,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// other listed voters are reached out
 	require.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
-			len(contactedVoters) == beacons.Count(ctx.SubnetID))
+			len(contactedVoters) == beacons.NumValidators(ctx.SubnetID))
 }
 
 func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
@@ -876,7 +876,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// on unknown summary
 	require.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
-			len(contactedVoters) == beacons.Count(ctx.SubnetID))
+			len(contactedVoters) == beacons.NumValidators(ctx.SubnetID))
 }
 
 func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {

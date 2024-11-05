@@ -21,9 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -35,13 +38,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txsmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 func newTestVerifier(t testing.TB, s state.State) *verifier {
@@ -74,6 +79,7 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
 				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
+				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,
 				UpgradeConfig:          upgrades,
 			},
@@ -340,6 +346,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 	parentState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
 	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
 	parentState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
+	parentState.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(&iterator.Empty[state.SubnetOnlyValidator]{}, nil).Times(1)
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
 
@@ -1134,16 +1141,23 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	baseTx1, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
 	require.NoError(t, err)
 
-	blockComplexity, err := fee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
+	blockComplexity, err := txfee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
 	require.NoError(t, err)
 	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 	require.NoError(t, err)
 
+	const secondsToAdvance = 10
+
 	initialFeeState := gas.State{}
-	must := func(s gas.State, err error) gas.State {
-		require.NoError(t, err)
-		return s
-	}
+	feeStateAfterTimeAdvanced := initialFeeState.AdvanceTime(
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity,
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond,
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.TargetPerSecond,
+		secondsToAdvance,
+	)
+	feeStateAfterGasConsumed, err := feeStateAfterTimeAdvanced.ConsumeGas(blockGas)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name             string
 		timestamp        time.Time
@@ -1156,14 +1170,9 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			expectedErr: gas.ErrInsufficientCapacity,
 		},
 		{
-			name:      "updates fee state",
-			timestamp: genesistest.DefaultValidatorStartTime.Add(10 * time.Second),
-			expectedFeeState: must(initialFeeState.AdvanceTime(
-				verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity,
-				verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond,
-				verifier.txExecutorBackend.Config.DynamicFeeConfig.TargetPerSecond,
-				10,
-			).ConsumeGas(blockGas)),
+			name:             "updates fee state",
+			timestamp:        genesistest.DefaultValidatorStartTime.Add(secondsToAdvance * time.Second),
+			expectedFeeState: feeStateAfterGasConsumed,
 		},
 	}
 	for _, test := range tests {
@@ -1208,6 +1217,100 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			blockState := verifier.blkIDToState[blkID]
 			require.Equal(blk, blockState.statelessBlock)
 			require.Equal(test.expectedFeeState, blockState.onAcceptState.GetFeeState())
+		})
+	}
+}
+
+func TestDeactivateLowBalanceSoVs(t *testing.T) {
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	var (
+		pk      = bls.PublicFromSecretKey(sk)
+		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
+
+		newSoV = func(endAccumulatedFee uint64) state.SubnetOnlyValidator {
+			return state.SubnetOnlyValidator{
+				ValidationID:      ids.GenerateTestID(),
+				SubnetID:          ids.GenerateTestID(),
+				NodeID:            ids.GenerateTestNodeID(),
+				PublicKey:         pkBytes,
+				Weight:            1,
+				EndAccumulatedFee: endAccumulatedFee,
+			}
+		}
+		fractionalTimeSoV0 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
+		fractionalTimeSoV1 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
+		wholeTimeSoV       = newSoV(2 * units.NanoAvax) // lasts 1 second
+	)
+
+	tests := []struct {
+		name         string
+		initialSoVs  []state.SubnetOnlyValidator
+		expectedSoVs []state.SubnetOnlyValidator
+	}{
+		{
+			name: "no SoVs",
+		},
+		{
+			name: "fractional SoV is not undercharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+			},
+		},
+		{
+			name: "fractional SoVs are not undercharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+				fractionalTimeSoV1,
+			},
+		},
+		{
+			name: "whole SoVs are not overcharged",
+			initialSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+			expectedSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+		},
+		{
+			name: "partial eviction",
+			initialSoVs: []state.SubnetOnlyValidator{
+				fractionalTimeSoV0,
+				wholeTimeSoV,
+			},
+			expectedSoVs: []state.SubnetOnlyValidator{
+				wholeTimeSoV,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := statetest.New(t, statetest.Config{})
+			for _, sov := range test.initialSoVs {
+				require.NoError(s.PutSubnetOnlyValidator(sov))
+			}
+
+			diff, err := state.NewDiffOn(s)
+			require.NoError(err)
+
+			config := validatorfee.Config{
+				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+				Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
+				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+			}
+			require.NoError(deactivateLowBalanceSoVs(config, diff))
+
+			sovs, err := diff.GetActiveSubnetOnlyValidatorsIterator()
+			require.NoError(err)
+			require.Equal(
+				test.expectedSoVs,
+				iterator.ToSlice(sovs),
+			)
 		})
 	}
 }

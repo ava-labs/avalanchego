@@ -156,7 +156,7 @@ type Builder interface {
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
-	// - [validators] specifies the initial SoVs of the converted subnet
+	// - [validators] specifies the initial SoVs of the L1
 	NewConvertSubnetTx(
 		subnetID ids.ID,
 		chainID ids.ID,
@@ -802,20 +802,22 @@ func (b *builder) NewConvertSubnetTx(
 	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
-	var (
-		toBurn      = map[ids.ID]uint64{}
-		err         error
-		avaxAssetID = b.context.AVAXAssetID
-	)
+	var avaxToBurn uint64
 	for _, vdr := range validators {
-		toBurn[avaxAssetID], err = math.Add(toBurn[avaxAssetID], vdr.Balance)
+		var err error
+		avaxToBurn, err = math.Add(avaxToBurn, vdr.Balance)
 		if err != nil {
 			return nil, err
 		}
 	}
-	toStake := map[ids.ID]uint64{}
 
-	ops := common.NewOptions(options)
+	var (
+		toBurn = map[ids.ID]uint64{
+			b.context.AVAXAssetID: avaxToBurn,
+		}
+		toStake = map[ids.ID]uint64{}
+		ops     = common.NewOptions(options)
+	)
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err

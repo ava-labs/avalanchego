@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -41,7 +42,6 @@ import (
 	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
-	platformvmsdk "github.com/ava-labs/avalanchego/vms/platformvm"
 	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
@@ -53,11 +53,11 @@ const (
 	registerBalance = 0
 )
 
-var _ = e2e.DescribePChain("[Permissionless L1]", func() {
+var _ = e2e.DescribePChain("[L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("creates and updates Permissionless L1", func() {
+	ginkgo.It("creates and updates L1 validators", func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
 
@@ -68,7 +68,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 			now := time.Now()
 			if !upgrades.IsEtnaActivated(now) {
-				ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
+				ginkgo.Skip("Etna is not activated. L1s are enabled post-Etna, skipping test.")
 			}
 		})
 
@@ -77,7 +77,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			keychain   = env.NewKeychain()
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet    = baseWallet.P()
-			pClient    = platformvmsdk.NewClient(nodeURI.URI)
+			pClient    = platformvm.NewClient(nodeURI.URI)
 			owner      = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
@@ -118,7 +118,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 			require.Equal(
-				platformvmsdk.GetSubnetClientResponse{
+				platformvm.GetSubnetClientResponse{
 					IsPermissioned: true,
 					ControlKeys: []ids.ShortID{
 						keychain.Keys[0].Address(),
@@ -203,7 +203,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 			require.Equal(expectedValidators, subnetValidators)
 		}
-		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1", func() {
+		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
@@ -222,7 +222,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
 				require.Equal(
-					platformvmsdk.GetSubnetClientResponse{
+					platformvm.GetSubnetClientResponse{
 						IsPermissioned: false,
 						ControlKeys: []ids.ShortID{
 							keychain.Keys[0].Address(),
