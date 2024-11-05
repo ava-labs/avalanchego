@@ -6,7 +6,7 @@ package uptime
 import (
 	"errors"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
+	"github.com/ava-labs/subnet-evm/plugin/evm/uptime/interfaces"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -14,15 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ validators.StateCallbackListener = &pausableManager{}
-
 var errPausedDisconnect = errors.New("paused node cannot be disconnected")
-
-type PausableManager interface {
-	uptime.Manager
-	validators.StateCallbackListener
-	IsPaused(nodeID ids.NodeID) bool
-}
 
 type pausableManager struct {
 	uptime.Manager
@@ -33,7 +25,7 @@ type pausableManager struct {
 }
 
 // NewPausableManager takes an uptime.Manager and returns a PausableManager
-func NewPausableManager(manager uptime.Manager) PausableManager {
+func NewPausableManager(manager uptime.Manager) interfaces.PausableManager {
 	return &pausableManager{
 		pausedVdrs:    make(set.Set[ids.NodeID]),
 		connectedVdrs: make(set.Set[ids.NodeID]),

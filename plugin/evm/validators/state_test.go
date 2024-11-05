@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
 )
 
 func TestState(t *testing.T) {
@@ -223,7 +224,7 @@ func TestStateListener(t *testing.T) {
 	expectedvID := ids.GenerateTestID()
 	expectedNodeID := ids.GenerateTestNodeID()
 	expectedStartTime := time.Now()
-	mockListener := NewMockStateCallbackListener(ctrl)
+	mockListener := interfaces.NewMockStateCallbackListener(ctrl)
 	// add initial validator to test RegisterListener
 	initialvID := ids.GenerateTestID()
 	initialNodeID := ids.GenerateTestNodeID()

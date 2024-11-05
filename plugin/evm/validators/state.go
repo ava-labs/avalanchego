@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
 )
 
 var _ uptime.State = &state{}
@@ -23,39 +24,6 @@ const (
 	updated dbUpdateStatus = true
 	deleted dbUpdateStatus = false
 )
-
-type State interface {
-	uptime.State
-	// AddValidator adds a new validator to the state
-	AddValidator(vID ids.ID, nodeID ids.NodeID, startTimestamp uint64, isActive bool) error
-	// DeleteValidator deletes the validator from the state
-	DeleteValidator(vID ids.ID) error
-	// WriteState writes the validator state to the disk
-	WriteState() error
-
-	// SetStatus sets the active status of the validator with the given vID
-	SetStatus(vID ids.ID, isActive bool) error
-	// GetStatus returns the active status of the validator with the given vID
-	GetStatus(vID ids.ID) (bool, error)
-
-	// GetValidationIDs returns the validation IDs in the state
-	GetValidationIDs() set.Set[ids.ID]
-	// GetValidatorIDs returns the validator node IDs in the state
-	GetValidatorIDs() set.Set[ids.NodeID]
-
-	// RegisterListener registers a listener to the state
-	RegisterListener(StateCallbackListener)
-}
-
-// StateCallbackListener is a listener for the validator state
-type StateCallbackListener interface {
-	// OnValidatorAdded is called when a new validator is added
-	OnValidatorAdded(vID ids.ID, nodeID ids.NodeID, startTime uint64, isActive bool)
-	// OnValidatorRemoved is called when a validator is removed
-	OnValidatorRemoved(vID ids.ID, nodeID ids.NodeID)
-	// OnValidatorStatusUpdated is called when a validator status is updated
-	OnValidatorStatusUpdated(vID ids.ID, nodeID ids.NodeID, isActive bool)
-}
 
 type validatorData struct {
 	UpDuration  time.Duration `serialize:"true"`
@@ -74,11 +42,11 @@ type state struct {
 	updatedData map[ids.ID]dbUpdateStatus // vID -> updated status
 	db          database.Database
 
-	listeners []StateCallbackListener
+	listeners []interfaces.StateCallbackListener
 }
 
 // NewState creates a new State, it also loads the data from the disk
-func NewState(db database.Database) (State, error) {
+func NewState(db database.Database) (interfaces.State, error) {
 	s := &state{
 		index:       make(map[ids.NodeID]ids.ID),
 		data:        make(map[ids.ID]*validatorData),
@@ -243,7 +211,7 @@ func (s *state) GetValidatorIDs() set.Set[ids.NodeID] {
 
 // RegisterListener registers a listener to the state
 // OnValidatorAdded is called for all current validators on the provided listener before this function returns
-func (s *state) RegisterListener(listener StateCallbackListener) {
+func (s *state) RegisterListener(listener interfaces.StateCallbackListener) {
 	s.listeners = append(s.listeners, listener)
 
 	// notify the listener of the current state
