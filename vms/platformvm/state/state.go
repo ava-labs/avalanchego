@@ -1670,7 +1670,6 @@ func (s *state) loadExpiry() error {
 func (s *state) loadActiveSubnetOnlyValidators() error {
 	it := s.activeDB.NewIterator()
 	defer it.Release()
-
 	for it.Next() {
 		key := it.Key()
 		validationID, err := ids.ToID(key)
