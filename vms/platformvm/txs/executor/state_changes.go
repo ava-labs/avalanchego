@@ -258,8 +258,6 @@ func advanceTimeTo(
 // removed.
 //
 // Ref: https://github.com/avalanche-foundation/ACPs/tree/e333b335c34c8692d84259d21bd07b2bb849dc2c/ACPs/77-reinventing-subnets#registerl1validatortx
-//
-// The expiry iterator is sorted in order of increasing timestamp.
 func removeStaleExpiries(
 	parentState state.Chain,
 	changes state.Diff,
@@ -276,6 +274,8 @@ func removeStaleExpiries(
 
 	for expiryIterator.Next() {
 		expiry := expiryIterator.Value()
+		// The expiry iterator is sorted in order of increasing timestamp. Once
+		// we find a non-expired expiry, we can break.
 		if expiry.Timestamp > newChainTimeUnix {
 			break
 		}
