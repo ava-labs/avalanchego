@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -113,7 +114,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "current and subnet only validators",
+			name: "current and subnet only validator with low balance",
 			sovs: []SubnetOnlyValidator{
 				{
 					ValidationID:      ids.GenerateTestID(),
@@ -125,6 +126,20 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			},
 			maxTime:  mockable.MaxTime,
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
+		},
+		{
+			name: "current and subnet only validator with high balance",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1,
+					EndAccumulatedFee: units.Avax, // This validator won't be evicted soon.
+				},
+			},
+			maxTime:  mockable.MaxTime,
+			expected: genesistest.DefaultValidatorEndTime,
 		},
 		{
 			name:     "restricted timestamp",

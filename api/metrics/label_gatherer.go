@@ -45,12 +45,14 @@ func (g *labelGatherer) Register(labelValue string, gatherer prometheus.Gatherer
 		)
 	}
 
-	g.names = append(g.names, labelValue)
-	g.gatherers = append(g.gatherers, &labeledGatherer{
-		labelName:  g.labelName,
-		labelValue: labelValue,
-		gatherer:   gatherer,
-	})
+	g.register(
+		labelValue,
+		&labeledGatherer{
+			labelName:  g.labelName,
+			labelValue: labelValue,
+			gatherer:   gatherer,
+		},
+	)
 	return nil
 }
 

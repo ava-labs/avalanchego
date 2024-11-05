@@ -136,18 +136,8 @@ func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto
 			return nil, ErrInvalidRSAPublicExponent
 		}
 
-		if pub.N.Sign() <= 0 {
-			return nil, ErrRSAModulusNotPositive
-		}
-
-		if bitLen := pub.N.BitLen(); bitLen != allowedRSALargeModulusLen && bitLen != allowedRSASmallModulusLen {
-			return nil, fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
-		}
-		if pub.N.Bit(0) == 0 {
-			return nil, ErrRSAModulusIsEven
-		}
-		if pub.E != allowedRSAPublicExponentValue {
-			return nil, fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
+		if err := ValidateRSAPublicKeyIsWellFormed(pub); err != nil {
+			return nil, err
 		}
 		return pub, nil
 	case oid.Equal(oidPublicKeyECDSA):
@@ -164,4 +154,24 @@ func parsePublicKey(oid asn1.ObjectIdentifier, publicKey asn1.BitString) (crypto
 	default:
 		return nil, ErrUnknownPublicKeyAlgorithm
 	}
+}
+
+// ValidateRSAPublicKeyIsWellFormed validates the given RSA public key
+func ValidateRSAPublicKeyIsWellFormed(pub *rsa.PublicKey) error {
+	if pub == nil {
+		return ErrInvalidRSAPublicKey
+	}
+	if pub.N.Sign() <= 0 {
+		return ErrRSAModulusNotPositive
+	}
+	if bitLen := pub.N.BitLen(); bitLen != allowedRSALargeModulusLen && bitLen != allowedRSASmallModulusLen {
+		return fmt.Errorf("%w: %d", ErrUnsupportedRSAModulusBitLen, bitLen)
+	}
+	if pub.N.Bit(0) == 0 {
+		return ErrRSAModulusIsEven
+	}
+	if pub.E != allowedRSAPublicExponentValue {
+		return fmt.Errorf("%w: %d", ErrUnsupportedRSAPublicExponent, pub.E)
+	}
+	return nil
 }

@@ -68,7 +68,7 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 
 	// Collect the node ids of the new node's peers
 	infoClient := info.NewClient(newNode.URI)
-	peers, err := infoClient.Peers(tc.DefaultContext())
+	peers, err := infoClient.Peers(tc.DefaultContext(), nil)
 	require.NoError(err)
 	peerIDs := set.NewSet[ids.NodeID](len(existingNodes))
 	for _, peer := range peers {
@@ -81,7 +81,7 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 
 		// Check that the new node is a peer
 		infoClient := info.NewClient(existingNode.URI)
-		peers, err := infoClient.Peers(tc.DefaultContext())
+		peers, err := infoClient.Peers(tc.DefaultContext(), nil)
 		require.NoError(err)
 		isPeer := false
 		for _, peer := range peers {
