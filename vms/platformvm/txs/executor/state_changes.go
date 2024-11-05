@@ -346,7 +346,6 @@ func advanceValidatorFeeState(
 		changed = true
 	}
 
-	//
 	validatorFeeState = validatorFeeState.AdvanceTime(config.Target, seconds)
 	changes.SetSoVExcess(validatorFeeState.Excess)
 	changes.SetAccruedFees(accruedFees)
