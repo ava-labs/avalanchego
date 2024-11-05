@@ -16,9 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	platformvmsdk "github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
 var _ = e2e.DescribePChain("[L1]", func() {
@@ -45,7 +44,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			keychain   = env.NewKeychain()
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet    = baseWallet.P()
-			pClient    = platformvmsdk.NewClient(nodeURI.URI)
+			pClient    = platformvm.NewClient(nodeURI.URI)
 			owner      = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
@@ -86,7 +85,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 			require.Equal(
-				platformvmsdk.GetSubnetClientResponse{
+				platformvm.GetSubnetClientResponse{
 					IsPermissioned: true,
 					ControlKeys: []ids.ShortID{
 						keychain.Keys[0].Address(),
@@ -128,7 +127,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
 				require.Equal(
-					platformvmsdk.GetSubnetClientResponse{
+					platformvm.GetSubnetClientResponse{
 						IsPermissioned: false,
 						ControlKeys: []ids.ShortID{
 							keychain.Keys[0].Address(),
