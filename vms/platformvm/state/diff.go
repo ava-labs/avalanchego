@@ -35,11 +35,11 @@ type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
 
-	timestamp        time.Time
-	feeState         gas.State
-	sovExcess        gas.Gas
-	accruedFees      uint64
-	parentActiveSOVs int
+	timestamp           time.Time
+	feeState            gas.State
+	sovExcess           gas.Gas
+	accruedFees         uint64
+	parentNumActiveSOVs int
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
@@ -79,17 +79,17 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:          parentID,
-		stateVersions:     stateVersions,
-		timestamp:         parentState.GetTimestamp(),
-		feeState:          parentState.GetFeeState(),
-		sovExcess:         parentState.GetSoVExcess(),
-		accruedFees:       parentState.GetAccruedFees(),
-		parentActiveSOVs:  parentState.NumActiveSubnetOnlyValidators(),
-		expiryDiff:        newExpiryDiff(),
-		sovDiff:           newSubnetOnlyValidatorsDiff(),
-		subnetOwners:      make(map[ids.ID]fx.Owner),
-		subnetConversions: make(map[ids.ID]SubnetConversion),
+		parentID:            parentID,
+		stateVersions:       stateVersions,
+		timestamp:           parentState.GetTimestamp(),
+		feeState:            parentState.GetFeeState(),
+		sovExcess:           parentState.GetSoVExcess(),
+		accruedFees:         parentState.GetAccruedFees(),
+		parentNumActiveSOVs: parentState.NumActiveSubnetOnlyValidators(),
+		expiryDiff:          newExpiryDiff(),
+		sovDiff:             newSubnetOnlyValidatorsDiff(),
+		subnetOwners:        make(map[ids.ID]fx.Owner),
+		subnetConversions:   make(map[ids.ID]SubnetConversion),
 	}, nil
 }
 
@@ -213,7 +213,7 @@ func (d *diff) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[Subnet
 }
 
 func (d *diff) NumActiveSubnetOnlyValidators() int {
-	return d.parentActiveSOVs + d.sovDiff.netAddedActive
+	return d.parentNumActiveSOVs + d.sovDiff.netAddedActive
 }
 
 func (d *diff) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {

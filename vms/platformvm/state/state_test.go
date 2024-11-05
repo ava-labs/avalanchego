@@ -1774,6 +1774,27 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "add multiple inactive",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          sov.SubnetID,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+				{
+					ValidationID:      sov.ValidationID,
+					SubnetID:          sov.SubnetID,
+					NodeID:            sov.NodeID,
+					PublicKey:         pkBytes,
+					Weight:            1, // Not removed
+					EndAccumulatedFee: 0, // Inactive
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1788,6 +1809,9 @@ func TestSubnetOnlyValidators(t *testing.T) {
 				subnetIDs   set.Set[ids.ID]
 			)
 			for _, sov := range test.initial {
+				// The codec creates zero length slices rather than leaving them
+				// as nil, so we need to populate the slices for later reflect
+				// based equality checks.
 				sov.RemainingBalanceOwner = []byte{}
 				sov.DeactivationOwner = []byte{}
 

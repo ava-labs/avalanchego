@@ -872,7 +872,7 @@ func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator
 
 // getPersistedSubnetOnlyValidator returns the currently persisted
 // SubnetOnlyValidator with the given validationID. It is guaranteed that any
-// returned validator is either active or inactive.
+// returned validator is either active or inactive (not deleted).
 func (s *state) getPersistedSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
 	if sov, ok := s.activeSOVs.get(validationID); ok {
 		return sov, nil
@@ -2506,7 +2506,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 				subnetID: priorSOV.SubnetID,
 				nodeID:   priorSOV.effectiveNodeID(),
 			}
-			diff := getOrDefault(changes, subnetIDNodeID)
+			diff := getOrSetDefault(changes, subnetIDNodeID)
 			if err := diff.weightDiff.Sub(priorSOV.Weight); err != nil {
 				return nil, err
 			}
@@ -2526,7 +2526,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 			subnetID: sov.SubnetID,
 			nodeID:   sov.effectiveNodeID(),
 		}
-		diff := getOrDefault(changes, subnetIDNodeID)
+		diff := getOrSetDefault(changes, subnetIDNodeID)
 		if err := diff.weightDiff.Add(sov.Weight); err != nil {
 			return nil, err
 		}
@@ -2571,7 +2571,9 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 	return nil
 }
 
-func getOrDefault[K comparable, V any](m map[K]*V, k K) *V {
+// getOrSetDefault returns the value at k in m if it exists. If it doesn't
+// exist, it sets m[k] to a new value and returns that value.
+func getOrSetDefault[K comparable, V any](m map[K]*V, k K) *V {
 	if v, ok := m[k]; ok {
 		return v
 	}
