@@ -1279,8 +1279,8 @@ func (vm *VM) initializeDBs(avaDB database.Database) error {
 	// remains the same regardless of the provided baseDB type.
 	vm.chaindb = rawdb.NewDatabase(Database{prefixdb.NewNested(ethDBPrefix, db)})
 	vm.db = versiondb.New(db)
-	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, db)
-	vm.metadataDB = prefixdb.New(metadataPrefix, db)
+	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
+	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
 	// Note warpDB is not part of versiondb because it is not necessary
 	// that warp signatures are committed to the database atomically with
 	// the last accepted block.
