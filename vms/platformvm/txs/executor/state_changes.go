@@ -221,39 +221,14 @@ func advanceTimeTo(
 		changed = true
 	}
 
-	// Remove all expiries whose timestamp now implies they can never be
-	// re-issued.
-	//
-	// The expiry timestamp is the time at which it is no longer valid, so any
-	// expiry with a timestamp less than or equal to the new chain time can be
-	// removed.
-	//
-	// Ref: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/77-reinventing-subnets#registersubnetvalidatortx
-	//
-	// The expiry iterator is sorted in order of increasing timestamp.
-	//
-	// Invariant: It is not safe to modify the state while iterating over it,
-	// so we use the parentState's iterator rather than the changes iterator.
-	// ParentState must not be modified before this iterator is released.
-	expiryIterator, err := parentState.GetExpiryIterator()
-	if err != nil {
-		return nil, false, err
-	}
-	defer expiryIterator.Release()
-
-	newChainTimeUnix := uint64(newChainTime.Unix())
-	for expiryIterator.Next() {
-		expiry := expiryIterator.Value()
-		if expiry.Timestamp > newChainTimeUnix {
-			break
-		}
-
-		changes.DeleteExpiry(expiry)
-	}
-
 	if !backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
 		changes.SetTimestamp(newChainTime)
 		return changes, changed, nil
+	}
+
+	newChainTimeUnix := uint64(newChainTime.Unix())
+	if err := removeStaleExpiries(parentState, changes, newChainTimeUnix); err != nil {
+		return nil, false, fmt.Errorf("failed to remove stale expiries: %w", err)
 	}
 
 	// Calculate number of seconds the time is advancing
@@ -274,6 +249,40 @@ func advanceTimeTo(
 
 	changes.SetTimestamp(newChainTime)
 	return changes, changed, nil
+}
+
+// Remove all expiries whose timestamp now implies they can never be re-issued.
+//
+// The expiry timestamp is the time at which it is no longer valid, so any
+// expiry with a timestamp less than or equal to the new chain time can be
+// removed.
+//
+// Ref: https://github.com/avalanche-foundation/ACPs/tree/e333b335c34c8692d84259d21bd07b2bb849dc2c/ACPs/77-reinventing-subnets#registerl1validatortx
+//
+// The expiry iterator is sorted in order of increasing timestamp.
+func removeStaleExpiries(
+	parentState state.Chain,
+	changes state.Diff,
+	newChainTimeUnix uint64,
+) error {
+	// Invariant: It is not safe to modify the state while iterating over it, so
+	// we use the parentState's iterator rather than the changes iterator.
+	// ParentState must not be modified before this iterator is released.
+	expiryIterator, err := parentState.GetExpiryIterator()
+	if err != nil {
+		return fmt.Errorf("could not iterate over expiries: %w", err)
+	}
+	defer expiryIterator.Release()
+
+	for expiryIterator.Next() {
+		expiry := expiryIterator.Value()
+		if expiry.Timestamp > newChainTimeUnix {
+			break
+		}
+
+		changes.DeleteExpiry(expiry)
+	}
+	return nil
 }
 
 func advanceDynamicFeeState(
@@ -324,6 +333,8 @@ func advanceValidatorFeeState(
 	var changed bool
 	for sovIterator.Next() {
 		sov := sovIterator.Value()
+		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
+		// EndAccumulatedFee, so we can break early.
 		if sov.EndAccumulatedFee > accruedFees {
 			break
 		}

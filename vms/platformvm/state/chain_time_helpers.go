@@ -101,6 +101,8 @@ func getNextSoVEvictionTime(
 
 	// Calculate the remaining funds that the next validator to evict has.
 	var (
+		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
+		// EndAccumulatedFee, so the first SoV is the next SoV to evict.
 		sov         = sovIterator.Value()
 		accruedFees = state.GetAccruedFees()
 	)

@@ -617,6 +617,9 @@ func deactivateLowBalanceSoVs(
 		sov := sovIterator.Value()
 		// If the validator has exactly the right amount of fee for the next
 		// second we should not remove them here.
+		//
+		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
+		// EndAccumulatedFee, so we can break early.
 		if sov.EndAccumulatedFee >= potentialAccruedFees {
 			break
 		}
