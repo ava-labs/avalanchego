@@ -788,19 +788,23 @@ func (b *builder) NewConvertSubnetTx(
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
 	var (
-		toBurn      = map[ids.ID]uint64{}
-		err         error
-		avaxAssetID = b.context.AVAXAssetID
+		avaxToBurn uint64
+		err        error
 	)
 	for _, vdr := range validators {
-		toBurn[avaxAssetID], err = math.Add(toBurn[avaxAssetID], vdr.Balance)
+		avaxToBurn, err = math.Add(avaxToBurn, vdr.Balance)
 		if err != nil {
 			return nil, err
 		}
 	}
-	toStake := map[ids.ID]uint64{}
 
-	ops := common.NewOptions(options)
+	var (
+		toBurn = map[ids.ID]uint64{
+			b.context.AVAXAssetID: avaxToBurn,
+		}
+		toStake = map[ids.ID]uint64{}
+		ops     = common.NewOptions(options)
+	)
 	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
 	if err != nil {
 		return nil, err
