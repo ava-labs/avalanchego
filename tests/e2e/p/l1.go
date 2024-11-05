@@ -48,7 +48,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 			now := time.Now()
 			if !upgrades.IsEtnaActivated(now) {
-				ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
+				ginkgo.Skip("Etna is not activated. L1s are enabled post-Etna, skipping test.")
 			}
 		})
 
