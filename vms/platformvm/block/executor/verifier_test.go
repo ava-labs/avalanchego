@@ -1139,6 +1139,18 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 	require.NoError(t, err)
 
+	const secondsToAdvance = 10
+
+	initialFeeState := gas.State{}
+	feeStateAfterTimeAdvanced := initialFeeState.AdvanceTime(
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity,
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond,
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.TargetPerSecond,
+		secondsToAdvance,
+	)
+	feeStateAfterGasConsumed, err := feeStateAfterTimeAdvanced.ConsumeGas(blockGas)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name             string
 		timestamp        time.Time
@@ -1151,12 +1163,9 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			expectedErr: gas.ErrInsufficientCapacity,
 		},
 		{
-			name:      "updates fee state",
-			timestamp: genesistest.DefaultValidatorStartTime.Add(10 * time.Second),
-			expectedFeeState: gas.State{
-				Capacity: gas.Gas(0).AddPerSecond(verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond, 10) - blockGas,
-				Excess:   blockGas,
-			},
+			name:             "updates fee state",
+			timestamp:        genesistest.DefaultValidatorStartTime.Add(secondsToAdvance * time.Second),
+			expectedFeeState: feeStateAfterGasConsumed,
 		},
 	}
 	for _, test := range tests {
