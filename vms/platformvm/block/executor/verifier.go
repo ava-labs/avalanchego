@@ -513,6 +513,12 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator fee.Calculato
 	gas.Gas,
 	error,
 ) {
+	for _, tx := range txs {
+		fee, err := feeCalculator.CalculateFee(tx.Unsigned)
+		if err == nil {
+			fmt.Println("fee of tx", tx.TxID, "is", fee)
+		}
+	}
 	// Complexity is limited first to avoid processing too large of a block.
 	var (
 		timestamp   = diff.GetTimestamp()
