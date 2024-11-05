@@ -289,7 +289,7 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 			expectedExcess:   0,
 		},
 		{
-			name: "evicted multiple",
+			name: "evicted all",
 			initialSoVs: []state.SubnetOnlyValidator{
 				sovToEvict0,
 				sovToEvict1,
@@ -298,7 +298,7 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 			expectedExcess:   3,
 		},
 		{
-			name: "evicted only 2",
+			name: "evicted 2 of 3",
 			initialSoVs: []state.SubnetOnlyValidator{
 				sovToEvict0,
 				sovToEvict1,
@@ -311,7 +311,7 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 			expectedExcess: 6,
 		},
 		{
-			name: "chooses not to evict",
+			name: "no evictions",
 			initialSoVs: []state.SubnetOnlyValidator{
 				sovToKeep,
 			},
