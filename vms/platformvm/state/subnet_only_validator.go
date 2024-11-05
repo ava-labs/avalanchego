@@ -34,6 +34,12 @@ var (
 type SubnetOnlyValidators interface {
 	// GetActiveSubnetOnlyValidatorsIterator returns an iterator of all the
 	// active subnet-only validators in increasing order of EndAccumulatedFee.
+	//
+	// It is the caller's responsibility to call [Release] on the iterator after
+	// use.
+	//
+	// It is not guaranteed to be safe to modify the state while using the
+	// iterator. After releasing the iterator, the state may be safely modified.
 	GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error)
 
 	// NumActiveSubnetOnlyValidators returns the number of currently active
