@@ -10,9 +10,11 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
@@ -88,9 +90,10 @@ func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
 	}
 }
 
-// constantsAreUnmodified returns true if the constants of this validator have
-// not been modified compared to the other validator.
-func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool {
+// immutableFieldsAreUnmodified returns true if two versions of the same
+// validator are valid. Either because the validationID has changed or because
+// no unexpected fields have been modified.
+func (v SubnetOnlyValidator) immutableFieldsAreUnmodified(o SubnetOnlyValidator) bool {
 	if v.ValidationID != o.ValidationID {
 		return true
 	}
@@ -102,29 +105,64 @@ func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool 
 		v.StartTime == o.StartTime
 }
 
-func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {
+func getSubnetOnlyValidator(
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	db database.KeyValueReader,
+	validationID ids.ID,
+) (SubnetOnlyValidator, error) {
+	if maybeSOV, ok := cache.Get(validationID); ok {
+		if maybeSOV.IsNothing() {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return maybeSOV.Value(), nil
+	}
+
 	bytes, err := db.Get(validationID[:])
+	if err == database.ErrNotFound {
+		cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+		return SubnetOnlyValidator{}, database.ErrNotFound
+	}
 	if err != nil {
 		return SubnetOnlyValidator{}, err
 	}
 
-	vdr := SubnetOnlyValidator{
+	sov := SubnetOnlyValidator{
 		ValidationID: validationID,
 	}
-	if _, err := block.GenesisCodec.Unmarshal(bytes, &vdr); err != nil {
+	if _, err := block.GenesisCodec.Unmarshal(bytes, &sov); err != nil {
 		return SubnetOnlyValidator{}, fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
 	}
-	return vdr, nil
+
+	cache.Put(validationID, maybe.Some(sov))
+	return sov, nil
 }
 
-func putSubnetOnlyValidator(db database.KeyValueWriter, vdr SubnetOnlyValidator) error {
-	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, vdr)
+func putSubnetOnlyValidator(
+	db database.KeyValueWriter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	sov SubnetOnlyValidator,
+) error {
+	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, sov)
 	if err != nil {
 		return fmt.Errorf("failed to marshal SubnetOnlyValidator: %w", err)
 	}
-	return db.Put(vdr.ValidationID[:], bytes)
+	if err := db.Put(sov.ValidationID[:], bytes); err != nil {
+		return err
+	}
+
+	cache.Put(sov.ValidationID, maybe.Some(sov))
+	return nil
 }
 
-func deleteSubnetOnlyValidator(db database.KeyValueDeleter, validationID ids.ID) error {
-	return db.Delete(validationID[:])
+func deleteSubnetOnlyValidator(
+	db database.KeyValueDeleter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	validationID ids.ID,
+) error {
+	if err := db.Delete(validationID[:]); err != nil {
+		return err
+	}
+
+	cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+	return nil
 }
