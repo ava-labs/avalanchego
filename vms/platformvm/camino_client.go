@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	as "github.com/ava-labs/avalanchego/vms/platformvm/addrstate"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -31,6 +32,7 @@ type CaminoClient interface {
 	GetLastAcceptedBlock(ctx context.Context, encoding formatting.Encoding, options ...rpc.Option) (any, error)
 	GetBlockAtHeight(ctx context.Context, height uint32, encoding formatting.Encoding, options ...rpc.Option) (any, error)
 	GetClaimables(ctx context.Context, owners []*secp256k1fx.OutputOwners, options ...rpc.Option) ([]*state.Claimable, error)
+	GetAddressStates(ctx context.Context, addr ids.ShortID, options ...rpc.Option) (as.AddressState, error)
 }
 
 func (c *client) GetConfiguration(ctx context.Context, options ...rpc.Option) (*GetConfigurationReply, error) {
@@ -53,10 +55,10 @@ func (c *client) GetAllDepositOffers(ctx context.Context, getAllDepositOffersArg
 	return res, err
 }
 
-func (c *client) GetRegisteredShortIDLink(ctx context.Context, addrStr ids.ShortID, options ...rpc.Option) (string, error) {
+func (c *client) GetRegisteredShortIDLink(ctx context.Context, addr ids.ShortID, options ...rpc.Option) (string, error) {
 	res := &api.JSONAddress{}
-	err := c.requester.SendRequest(ctx, "platform.getMultisigAlias", &api.JSONAddress{
-		Address: addrStr.String(),
+	err := c.requester.SendRequest(ctx, "platform.getRegisteredShortIDLink", &api.JSONAddress{
+		Address: addr.String(),
 	}, res, options...)
 	return res.Address, err
 }
@@ -86,6 +88,14 @@ func (c *client) GetClaimables(ctx context.Context, owners []*secp256k1fx.Output
 		return nil, err
 	}
 	return claimablesFromAPI(res.Claimables)
+}
+
+func (c *client) GetAddressStates(ctx context.Context, addr ids.ShortID, options ...rpc.Option) (as.AddressState, error) {
+	res := new(json.Uint64)
+	err := c.requester.SendRequest(ctx, "platform.getAddressStates", &api.JSONAddress{
+		Address: addr.String(),
+	}, res, options...)
+	return as.AddressState(*res), err
 }
 
 func claimablesFromAPI(apiClaimables []APIClaimable) ([]*state.Claimable, error) {
