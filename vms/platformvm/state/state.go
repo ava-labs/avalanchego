@@ -838,7 +838,7 @@ func (s *state) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[Subne
 }
 
 func (s *state) NumActiveSubnetOnlyValidators() int {
-	return s.activeSOVs.len() + s.sovDiff.numAddedActive
+	return s.activeSOVs.len() + s.sovDiff.netAddedActive
 }
 
 func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
