@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -106,6 +105,7 @@ var (
 	errWrongAdminProposal                = errors.New("this type of proposal can't be admin-proposal")
 	errNotPermittedToCreateProposal      = errors.New("don't have permission to create proposal of this type")
 	errZeroDepositOfferLimits            = errors.New("deposit offer TotalMaxAmount and TotalMaxRewardAmount are zero")
+	errAddrStateNotChanged               = errors.New("address state wasn't changed")
 
 	ErrInvalidProposal = errors.New("proposal is semantically invalid")
 )
@@ -504,19 +504,21 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		return errWrongCredentialsNumber
 	}
 
-	ins, outs, err := e.FlowChecker.Unlock(e.OnCommitState, []ids.ID{tx.TxID}, locked.StateBonded)
+	expectedIns, expectedOuts, err := e.FlowChecker.Unlock(
+		e.OnCommitState,
+		[]ids.ID{tx.TxID},
+		locked.StateBonded,
+	)
 	if err != nil {
 		return err
 	}
 
-	expectedTx := &txs.CaminoRewardValidatorTx{
-		RewardValidatorTx: *tx,
-		Ins:               ins,
-		Outs:              outs,
+	if !inputsAreEqual(caminoTx.Ins, expectedIns) {
+		return fmt.Errorf("%w: invalid inputs", errInvalidSystemTxBody)
 	}
 
-	if !reflect.DeepEqual(caminoTx, expectedTx) {
-		return errInvalidSystemTxBody
+	if !outputsAreEqual(caminoTx.Outs, expectedOuts) {
+		return fmt.Errorf("%w: invalid outputs", errInvalidSystemTxBody)
 	}
 
 	var currentStakerToRemove *state.Staker
@@ -591,33 +593,33 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 	} else {
 		e.OnCommitState.DeleteDeferredValidator(stakerToRemove)
 		e.OnAbortState.DeleteDeferredValidator(stakerToRemove)
-		// Reset deferred bit on node owner address for onCommitState
-		nodeOwnerAddressOnCommit, err := e.OnCommitState.GetShortIDLink(
-			ids.ShortID(stakerToRemove.NodeID),
-			state.ShortLinkKeyRegisterNode,
-		)
-		if err != nil {
-			return err
-		}
-		nodeOwnerAddressStateOnCommit, err := e.OnCommitState.GetAddressStates(nodeOwnerAddressOnCommit)
-		if err != nil {
-			return err
-		}
-		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnCommit, nodeOwnerAddressStateOnCommit&^as.AddressStateNodeDeferred)
 
-		// Reset deferred bit on node owner address for onAbortState
-		nodeOwnerAddressOnAbort, err := e.OnAbortState.GetShortIDLink(
-			ids.ShortID(stakerToRemove.NodeID),
-			state.ShortLinkKeyRegisterNode,
-		)
-		if err != nil {
-			return err
+		if e.Config.IsBerlinPhaseActivated(currentChainTime) {
+			// Reset deferred bit on node owner address
+			nodeOwnerAddress, err := e.OnCommitState.GetShortIDLink(
+				ids.ShortID(stakerToRemove.NodeID),
+				state.ShortLinkKeyRegisterNode,
+			)
+			if err != nil {
+				return err
+			}
+			nodeOwnerAddressState, err := e.OnCommitState.GetAddressStates(nodeOwnerAddress)
+			if err != nil {
+				return err
+			}
+
+			// TODO @evlekht if after Berlin we don't have any txs that hit this if, we can move it up, before phase if block
+			// This is sanity check for consistency between address state
+			// and validator presence in deferred stakers
+			if nodeOwnerAddressState.IsNot(as.AddressStateNodeDeferred) {
+				// should never happen
+				return fmt.Errorf("deferred node owner address state doesn't have AddressStateNodeDeferred bit: %w", errAddrStateNotChanged)
+			}
+
+			addrState := nodeOwnerAddressState &^ as.AddressStateNodeDeferred
+			e.OnCommitState.SetAddressStates(nodeOwnerAddress, addrState)
+			e.OnAbortState.SetAddressStates(nodeOwnerAddress, addrState)
 		}
-		nodeOwnerAddressStateOnAbort, err := e.OnAbortState.GetAddressStates(nodeOwnerAddressOnAbort)
-		if err != nil {
-			return err
-		}
-		e.OnAbortState.SetAddressStates(nodeOwnerAddressOnAbort, nodeOwnerAddressStateOnAbort&^as.AddressStateNodeDeferred)
 	}
 
 	txID := e.Tx.ID()
@@ -2069,8 +2071,6 @@ func (e *CaminoStandardTxExecutor) FinishProposalsTx(tx *txs.FinishProposalsTx) 
 		return err
 	}
 
-	// TODO @evlekht change rewardValidator tx in the same manner
-
 	if !inputsAreEqual(tx.Ins, expectedIns) {
 		return fmt.Errorf("%w: invalid inputs", errInvalidSystemTxBody)
 	}
@@ -2354,6 +2354,8 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	// Set the new state if changed
 	if addrState != newAddrState {
 		e.State.SetAddressStates(tx.Address, newAddrState)
+	} else if isBerlinPhase {
+		return errAddrStateNotChanged
 	}
 
 	// Consume the UTXOS
