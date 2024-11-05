@@ -250,7 +250,7 @@ func deleteSubnetOnlyValidator(
 }
 
 type subnetOnlyValidatorsDiff struct {
-	numAddedActive      int               // May be negative
+	netAddedActive      int               // May be negative
 	modifiedTotalWeight map[ids.ID]uint64 // subnetID -> totalWeight
 	modified            map[ids.ID]SubnetOnlyValidator
 	modifiedHasNodeIDs  map[subnetIDNodeID]bool
@@ -344,9 +344,9 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 
 	switch {
 	case prevActive && !newActive:
-		d.numAddedActive--
+		d.netAddedActive--
 	case !prevActive && newActive:
-		d.numAddedActive++
+		d.netAddedActive++
 	}
 
 	if prevSOV, ok := d.modified[sov.ValidationID]; ok {
