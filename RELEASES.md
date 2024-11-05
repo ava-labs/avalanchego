@@ -1,5 +1,14 @@
 # Release Notes
 
+## Pending Release
+
+### Configs
+
+- Added P-chain configs
+  - `"l1-weights-cache-size"`
+  - `"l1-inactive-validators-cache-size"`
+  - `"l1-subnet-id-node-id-cache-size"`
+
 ## [v1.11.11](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.11)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
