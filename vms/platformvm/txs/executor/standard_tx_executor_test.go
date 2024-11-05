@@ -1755,10 +1755,22 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
+				// This isn't actually called, but is added here as a regression
+				// test to ensure that converted subnets can still remove
+				// permissioned validators.
+				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(
+					state.SubnetConversion{
+						ConversionID: ids.GenerateTestID(),
+						ChainID:      ids.GenerateTestID(),
+						Addr:         []byte("address"),
+					},
+					nil,
+				).AnyTimes()
+
 				cfg := &config.Config{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
+				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
 				e := &StandardTxExecutor{
 					Backend: &Backend{
 						Config:       cfg,
@@ -1996,39 +2008,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				return env.unsignedTx, e
 			},
 			expectedErr: ErrFlowCheckFailed,
-		},
-		{
-			name: "attempted to remove subnet validator after subnet conversion has occurred",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(
-					state.SubnetConversion{
-						ConversionID: ids.GenerateTestID(),
-						ChainID:      ids.GenerateTestID(),
-						Addr:         []byte("address"),
-					},
-					nil,
-				).AnyTimes()
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-
-				cfg := &config.Config{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-				}
-				e := &StandardTxExecutor{
-					Backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					Tx:    env.tx,
-					State: env.state,
-				}
-				e.Bootstrapped.Set(true)
-				return env.unsignedTx, e
-			},
-			expectedErr: ErrRemoveValidatorManagedSubnet,
 		},
 	}
 
