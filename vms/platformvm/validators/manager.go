@@ -405,7 +405,6 @@ func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 }
 
 func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	// TODO: consider expanding the cfg.Validators interface with GetCurrentValidatorOutput to avoid calling the state directly.
 	vdrs, currentHeight, err := m.state.GetCurrentValidatorSet(ctx, subnetID)
 	if err != nil {
 		return nil, 0, err
