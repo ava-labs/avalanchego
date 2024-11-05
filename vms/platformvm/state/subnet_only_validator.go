@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
@@ -24,22 +26,28 @@ var (
 	_ btree.LessFunc[SubnetOnlyValidator] = SubnetOnlyValidator.Less
 	_ utils.Sortable[SubnetOnlyValidator] = SubnetOnlyValidator{}
 
-	ErrMutatedSubnetOnlyValidator     = errors.New("subnet only validator contains mutated constant fields")
-	ErrConflictingSubnetOnlyValidator = errors.New("subnet only validator contains conflicting subnetID + nodeID pair")
-	ErrDuplicateSubnetOnlyValidator   = errors.New("subnet only validator contains duplicate subnetID + nodeID pair")
+	ErrMutatedSubnetOnlyValidator     = errors.New("subnet-only validator contains mutated constant fields")
+	ErrConflictingSubnetOnlyValidator = errors.New("subnet-only validator contains conflicting subnetID + nodeID pair")
+	ErrDuplicateSubnetOnlyValidator   = errors.New("subnet-only validator contains duplicate subnetID + nodeID pair")
 )
 
 type SubnetOnlyValidators interface {
 	// GetActiveSubnetOnlyValidatorsIterator returns an iterator of all the
-	// active subnet only validators in increasing order of EndAccumulatedFee.
+	// active subnet-only validators in increasing order of EndAccumulatedFee.
+	//
+	// It is the caller's responsibility to call [Release] on the iterator after
+	// use.
+	//
+	// It is not guaranteed to be safe to modify the state while using the
+	// iterator. After releasing the iterator, the state may be safely modified.
 	GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error)
 
 	// NumActiveSubnetOnlyValidators returns the number of currently active
-	// subnet only validators.
+	// subnet-only validators.
 	NumActiveSubnetOnlyValidators() int
 
 	// WeightOfSubnetOnlyValidators returns the total active and inactive weight
-	// of subnet only validators on [subnetID].
+	// of subnet-only validators on [subnetID].
 	WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error)
 
 	// GetSubnetOnlyValidator returns the validator with [validationID] if it
@@ -55,9 +63,9 @@ type SubnetOnlyValidators interface {
 	// validator is 0, the validator is removed.
 	//
 	// If inserting this validator attempts to modify any of the constant fields
-	// of the subnet only validator struct, an error will be returned.
+	// of the subnet-only validator struct, an error will be returned.
 	//
-	// If inserting this validator would cause the total weight of subnet only
+	// If inserting this validator would cause the total weight of subnet-only
 	// validators on a subnet to overflow MaxUint64, an error will be returned.
 	//
 	// If inserting this validator would cause there to be multiple validators
@@ -134,9 +142,10 @@ func (v SubnetOnlyValidator) Compare(o SubnetOnlyValidator) int {
 	}
 }
 
-// constantsAreUnmodified returns true if the constants of this validator have
-// not been modified compared to the other validator.
-func (v SubnetOnlyValidator) constantsAreUnmodified(o SubnetOnlyValidator) bool {
+// immutableFieldsAreUnmodified returns true if two versions of the same
+// validator are valid. Either because the validationID has changed or because
+// no unexpected fields have been modified.
+func (v SubnetOnlyValidator) immutableFieldsAreUnmodified(o SubnetOnlyValidator) bool {
 	if v.ValidationID != o.ValidationID {
 		return true
 	}
@@ -184,35 +193,70 @@ func (v SubnetOnlyValidator) effectivePublicKeyBytes() []byte {
 	return nil
 }
 
-func getSubnetOnlyValidator(db database.KeyValueReader, validationID ids.ID) (SubnetOnlyValidator, error) {
+func getSubnetOnlyValidator(
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	db database.KeyValueReader,
+	validationID ids.ID,
+) (SubnetOnlyValidator, error) {
+	if maybeSOV, ok := cache.Get(validationID); ok {
+		if maybeSOV.IsNothing() {
+			return SubnetOnlyValidator{}, database.ErrNotFound
+		}
+		return maybeSOV.Value(), nil
+	}
+
 	bytes, err := db.Get(validationID[:])
+	if err == database.ErrNotFound {
+		cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+		return SubnetOnlyValidator{}, database.ErrNotFound
+	}
 	if err != nil {
 		return SubnetOnlyValidator{}, err
 	}
 
-	vdr := SubnetOnlyValidator{
+	sov := SubnetOnlyValidator{
 		ValidationID: validationID,
 	}
-	if _, err := block.GenesisCodec.Unmarshal(bytes, &vdr); err != nil {
+	if _, err := block.GenesisCodec.Unmarshal(bytes, &sov); err != nil {
 		return SubnetOnlyValidator{}, fmt.Errorf("failed to unmarshal SubnetOnlyValidator: %w", err)
 	}
-	return vdr, nil
+
+	cache.Put(validationID, maybe.Some(sov))
+	return sov, nil
 }
 
-func putSubnetOnlyValidator(db database.KeyValueWriter, vdr SubnetOnlyValidator) error {
-	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, vdr)
+func putSubnetOnlyValidator(
+	db database.KeyValueWriter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	sov SubnetOnlyValidator,
+) error {
+	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, sov)
 	if err != nil {
 		return fmt.Errorf("failed to marshal SubnetOnlyValidator: %w", err)
 	}
-	return db.Put(vdr.ValidationID[:], bytes)
+	if err := db.Put(sov.ValidationID[:], bytes); err != nil {
+		return err
+	}
+
+	cache.Put(sov.ValidationID, maybe.Some(sov))
+	return nil
 }
 
-func deleteSubnetOnlyValidator(db database.KeyValueDeleter, validationID ids.ID) error {
-	return db.Delete(validationID[:])
+func deleteSubnetOnlyValidator(
+	db database.KeyValueDeleter,
+	cache cache.Cacher[ids.ID, maybe.Maybe[SubnetOnlyValidator]],
+	validationID ids.ID,
+) error {
+	if err := db.Delete(validationID[:]); err != nil {
+		return err
+	}
+
+	cache.Put(validationID, maybe.Nothing[SubnetOnlyValidator]())
+	return nil
 }
 
 type subnetOnlyValidatorsDiff struct {
-	numAddedActive      int               // May be negative
+	netAddedActive      int               // May be negative
 	modifiedTotalWeight map[ids.ID]uint64 // subnetID -> totalWeight
 	modified            map[ids.ID]SubnetOnlyValidator
 	modifiedHasNodeIDs  map[subnetIDNodeID]bool
@@ -258,7 +302,7 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 	)
 	switch priorSOV, err := state.GetSubnetOnlyValidator(sov.ValidationID); err {
 	case nil:
-		if !priorSOV.constantsAreUnmodified(sov) {
+		if !priorSOV.immutableFieldsAreUnmodified(sov) {
 			return ErrMutatedSubnetOnlyValidator
 		}
 
@@ -306,9 +350,9 @@ func (d *subnetOnlyValidatorsDiff) putSubnetOnlyValidator(state Chain, sov Subne
 
 	switch {
 	case prevActive && !newActive:
-		d.numAddedActive--
+		d.netAddedActive--
 	case !prevActive && newActive:
-		d.numAddedActive++
+		d.netAddedActive++
 	}
 
 	if prevSOV, ok := d.modified[sov.ValidationID]; ok {
@@ -368,7 +412,7 @@ func (a *activeSubnetOnlyValidators) newIterator() iterator.Iterator[SubnetOnlyV
 	return iterator.FromTree(a.tree)
 }
 
-func (a *activeSubnetOnlyValidators) addStakers(vdrs validators.Manager) error {
+func (a *activeSubnetOnlyValidators) addStakersToValidatorManager(vdrs validators.Manager) error {
 	for validationID, sov := range a.lookup {
 		pk := bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey)
 		if err := vdrs.AddStaker(sov.SubnetID, sov.NodeID, pk, validationID, sov.Weight); err != nil {

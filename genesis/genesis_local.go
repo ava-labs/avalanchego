@@ -60,11 +60,15 @@ var (
 					gas.DBWrite:   1,
 					gas.Compute:   1,
 				},
-				MaxCapacity:              1_000_000,
-				MaxPerSecond:             1_000,
-				TargetPerSecond:          500,
-				MinPrice:                 1,
-				ExcessConversionConstant: 5_000,
+				MaxCapacity:     1_000_000, // Max block size ~1MB
+				MaxPerSecond:    250_000,
+				TargetPerSecond: 125_000, // Target block size ~125KB
+				MinPrice:        1,
+				// ExcessConversionConstant = (MaxPerSecond - TargetPerSecond) * NumberOfSecondsPerDoubling / ln(2)
+				//
+				// ln(2) is a float and the result is consensus critical, so we
+				// hardcode the result.
+				ExcessConversionConstant: 5_410_106, // Double every 30s
 			},
 			ValidatorFeeConfig: validatorfee.Config{
 				Capacity: 20_000,

@@ -9,7 +9,7 @@
   - `"l1-inactive-validators-cache-size"`
   - `"l1-subnet-id-node-id-cache-size"`
 
-### gRP
+### gRPC Interface
 
 - Added `GetCurrentValidatorSet` to the `validators.State` interface
 
