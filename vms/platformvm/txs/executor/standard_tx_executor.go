@@ -539,8 +539,6 @@ func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 	)
 	for i, vdr := range tx.Validators {
-		vdr := vdr
-
 		nodeID, err := ids.ToNodeID(vdr.NodeID)
 		if err != nil {
 			return err
