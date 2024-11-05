@@ -787,11 +787,9 @@ func (b *builder) NewConvertSubnetTx(
 	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
-	var (
-		avaxToBurn uint64
-		err        error
-	)
+	var avaxToBurn uint64
 	for _, vdr := range validators {
+		var err error
 		avaxToBurn, err = math.Add(avaxToBurn, vdr.Balance)
 		if err != nil {
 			return nil, err
