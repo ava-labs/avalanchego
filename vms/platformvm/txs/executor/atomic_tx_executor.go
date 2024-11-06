@@ -16,8 +16,6 @@ import (
 
 var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 
-// atomicTxExecutor is used to execute atomic transactions pre-AP5. After AP5
-// the execution was moved to be performed inside of the standardTxExecutor.
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
@@ -32,6 +30,11 @@ type AtomicTxExecutor struct {
 	atomicRequests map[ids.ID]*atomic.Requests
 }
 
+// AtomicTx executes the atomic transaction [tx] and returns the resulting state
+// modifications.
+//
+// This is only used to execute atomic transactions pre-AP5. After AP5 the
+// execution was moved to be performed during standard transaction execution.
 func AtomicTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
