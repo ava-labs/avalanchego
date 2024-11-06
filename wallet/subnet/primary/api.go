@@ -27,7 +27,7 @@ import (
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
