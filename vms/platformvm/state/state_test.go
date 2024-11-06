@@ -2103,6 +2103,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(t, err)
 	otherPK := bls.PublicFromSecretKey(otherSK)
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
+	now := time.Now()
 
 	tests := []struct {
 		name    string
@@ -2121,7 +2122,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
 					Weight:    1,
-					StartTime: time.Now(),
+					StartTime: now,
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -2129,7 +2130,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    1,
-					StartTime: time.Now(),
+					StartTime: now,
 				},
 			},
 		},
@@ -2142,7 +2143,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
 					Weight:    1,
-					StartTime: time.Now(),
+					StartTime: now,
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -2150,7 +2151,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    1,
-					StartTime: time.Now(),
+					StartTime: now,
 				},
 			},
 		},
@@ -2161,7 +2162,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID1,
 					NodeID:       ids.GenerateTestNodeID(),
-					StartTime:    uint64(time.Now().Unix()),
+					StartTime:    uint64(now.Unix()),
 					PublicKey:    pkBytes,
 					Weight:       1,
 				},
@@ -2170,7 +2171,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:     subnetID1,
 					NodeID:       ids.GenerateTestNodeID(),
 					PublicKey:    otherPKBytes,
-					StartTime:    uint64(time.Now().Unix()),
+					StartTime:    uint64(now.Unix()),
 					Weight:       1,
 				},
 			},
@@ -2182,7 +2183,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID1,
 					NodeID:       ids.GenerateTestNodeID(),
-					StartTime:    uint64(time.Now().Unix()),
+					StartTime:    uint64(now.Unix()),
 					PublicKey:    pkBytes,
 					Weight:       1,
 				},
@@ -2191,7 +2192,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:     subnetID2,
 					NodeID:       ids.GenerateTestNodeID(),
 					PublicKey:    otherPKBytes,
-					StartTime:    uint64(time.Now().Unix()),
+					StartTime:    uint64(now.Unix()),
 					Weight:       1,
 				},
 			},
@@ -2204,8 +2205,8 @@ func TestGetCurrentValidators(t *testing.T) {
 					SubnetID:  subnetID1,
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
-					Weight:    uint64(time.Now().Unix()),
-					StartTime: time.Now(),
+					Weight:    uint64(now.Unix()),
+					StartTime: now,
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -2213,7 +2214,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: pk,
 					Weight:    1,
-					StartTime: time.Now(),
+					StartTime: now,
 				},
 				{
 					TxID:      ids.GenerateTestID(),
@@ -2221,41 +2222,46 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    ids.GenerateTestNodeID(),
 					PublicKey: otherPK,
 					Weight:    0,
-					StartTime: time.Now(),
+					StartTime: now,
 				},
 			},
 			sovs: []SubnetOnlyValidator{
 				{
-					ValidationID: ids.GenerateTestID(),
-					SubnetID:     subnetID1,
-					NodeID:       ids.GenerateTestNodeID(),
-					StartTime:    uint64(time.Now().Unix()),
-					PublicKey:    pkBytes,
-					Weight:       1,
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID1,
+					NodeID:            ids.GenerateTestNodeID(),
+					StartTime:         uint64(now.Unix()),
+					PublicKey:         pkBytes,
+					Weight:            1,
+					EndAccumulatedFee: 1,
+					MinNonce:          2,
 				},
 				{
-					ValidationID: ids.GenerateTestID(),
-					SubnetID:     subnetID2,
-					NodeID:       ids.GenerateTestNodeID(),
-					PublicKey:    otherPKBytes,
-					StartTime:    uint64(time.Now().Unix()),
-					Weight:       1,
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID2,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         otherPKBytes,
+					StartTime:         uint64(now.Unix()),
+					Weight:            1,
+					EndAccumulatedFee: 3,
 				},
 				{
-					ValidationID: ids.GenerateTestID(),
-					SubnetID:     subnetID1,
-					NodeID:       ids.GenerateTestNodeID(),
-					PublicKey:    pkBytes,
-					StartTime:    uint64(time.Now().Unix()),
-					Weight:       1,
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID1,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         pkBytes,
+					StartTime:         uint64(now.Unix()),
+					Weight:            1,
+					EndAccumulatedFee: 0,
 				},
 				{
-					ValidationID: ids.GenerateTestID(),
-					SubnetID:     subnetID1,
-					NodeID:       ids.GenerateTestNodeID(),
-					PublicKey:    otherPKBytes,
-					StartTime:    uint64(time.Now().Unix()),
-					Weight:       0,
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          subnetID1,
+					NodeID:            ids.GenerateTestNodeID(),
+					PublicKey:         otherPKBytes,
+					StartTime:         uint64(now.Unix()),
+					Weight:            0,
+					EndAccumulatedFee: 1,
 				},
 			},
 		},
@@ -2275,6 +2281,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:    staker.NodeID,
 					PublicKey: staker.PublicKey,
 					Weight:    5,
+					// start primary network staker 1 second before the subnet staker
 					StartTime: staker.StartTime.Add(-1 * time.Second),
 				}
 				require.NoError(state.PutCurrentValidator(primaryStaker))
@@ -2282,6 +2289,9 @@ func TestGetCurrentValidators(t *testing.T) {
 			}
 
 			for _, sov := range test.sovs {
+				// The codec creates zero length slices rather than leaving them
+				// as nil, so we need to populate the slices for later reflect
+				// based equality checks.
 				sov.RemainingBalanceOwner = []byte{}
 				sov.DeactivationOwner = []byte{}
 

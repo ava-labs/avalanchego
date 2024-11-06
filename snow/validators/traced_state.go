@@ -53,7 +53,7 @@ func (s *tracedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 }
 
 func (s *tracedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
-	ctx, span := s.tracer.Start(ctx, s.getValidatorSetTag, oteltrace.WithAttributes(
+	ctx, span := s.tracer.Start(ctx, s.getSubnetIDTag, oteltrace.WithAttributes(
 		attribute.Stringer("chainID", chainID),
 	))
 	defer span.End()
