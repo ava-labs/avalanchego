@@ -28,6 +28,8 @@ var _ Client = (*client)(nil)
 type Client interface {
 	// GetHeight returns the current block height of the P Chain
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
+	// GetProposedHeight returns the current height of this node's proposer VM.
+	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// ExportKey returns the private key corresponding to [address] from [user]'s account
 	//
 	// Deprecated: Keys should no longer be stored on the node.
@@ -145,6 +147,12 @@ func NewClient(uri string) Client {
 func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
 	err := c.requester.SendRequest(ctx, "platform.getHeight", struct{}{}, res, options...)
+	return uint64(res.Height), err
+}
+
+func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+	res := &api.GetHeightResponse{}
+	err := c.requester.SendRequest(ctx, "platform.getProposedHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }
 
