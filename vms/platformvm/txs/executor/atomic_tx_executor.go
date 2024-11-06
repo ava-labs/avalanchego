@@ -14,21 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
-var _ txs.Visitor = (*AtomicTxExecutor)(nil)
-
-type AtomicTxExecutor struct {
-	// inputs, to be filled before visitor methods are called
-	backend       *Backend
-	feeCalculator fee.Calculator
-	parentID      ids.ID
-	stateVersions state.Versions
-	tx            *txs.Tx
-
-	// outputs of visitor execution
-	OnAccept       state.Diff
-	Inputs         set.Set[ids.ID]
-	atomicRequests map[ids.ID]*atomic.Requests
-}
+var _ txs.Visitor = (*atomicTxVisitor)(nil)
 
 // AtomicTx executes the atomic transaction [tx] and returns the resulting state
 // modifications.
@@ -42,7 +28,7 @@ func AtomicTx(
 	stateVersions state.Versions,
 	tx *txs.Tx,
 ) (state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
-	atomicExecutor := AtomicTxExecutor{
+	atomicExecutor := atomicTxVisitor{
 		backend:       backend,
 		feeCalculator: feeCalculator,
 		parentID:      parentID,
@@ -53,74 +39,88 @@ func AtomicTx(
 		txID := tx.ID()
 		return nil, nil, nil, fmt.Errorf("atomic tx %s failed execution: %w", txID, err)
 	}
-	return atomicExecutor.OnAccept, atomicExecutor.Inputs, atomicExecutor.atomicRequests, nil
+	return atomicExecutor.onAccept, atomicExecutor.inputs, atomicExecutor.atomicRequests, nil
 }
 
-func (*AtomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error {
+type atomicTxVisitor struct {
+	// inputs, to be filled before visitor methods are called
+	backend       *Backend
+	feeCalculator fee.Calculator
+	parentID      ids.ID
+	stateVersions state.Versions
+	tx            *txs.Tx
+
+	// outputs of visitor execution
+	onAccept       state.Diff
+	inputs         set.Set[ids.ID]
+	atomicRequests map[ids.ID]*atomic.Requests
+}
+
+func (*atomicTxVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
+func (*atomicTxVisitor) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (*atomicTxVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
+func (*atomicTxVisitor) CreateChainTx(*txs.CreateChainTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (*atomicTxVisitor) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*atomicTxVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*atomicTxVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (*atomicTxVisitor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (*atomicTxVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+func (*atomicTxVisitor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+func (*atomicTxVisitor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (*atomicTxVisitor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) BaseTx(*txs.BaseTx) error {
+func (*atomicTxVisitor) BaseTx(*txs.BaseTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (*atomicTxVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (e *AtomicTxExecutor) ImportTx(tx *txs.ImportTx) error {
+func (e *atomicTxVisitor) ImportTx(tx *txs.ImportTx) error {
 	return e.atomicTx(tx)
 }
 
-func (e *AtomicTxExecutor) ExportTx(tx *txs.ExportTx) error {
+func (e *atomicTxVisitor) ExportTx(tx *txs.ExportTx) error {
 	return e.atomicTx(tx)
 }
 
-func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
+func (e *atomicTxVisitor) atomicTx(tx txs.UnsignedTx) error {
 	onAccept, err := state.NewDiff(
 		e.parentID,
 		e.stateVersions,
@@ -128,16 +128,16 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	if err != nil {
 		return err
 	}
-	e.OnAccept = onAccept
+	e.onAccept = onAccept
 
 	executor := StandardTxExecutor{
 		Backend:       e.backend,
-		State:         e.OnAccept,
+		State:         e.onAccept,
 		FeeCalculator: e.feeCalculator,
 		Tx:            e.tx,
 	}
 	err = tx.Visit(&executor)
-	e.Inputs = executor.Inputs
+	e.inputs = executor.Inputs
 	e.atomicRequests = executor.AtomicRequests
 	return err
 }
