@@ -333,8 +333,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.True(ok)
 
 			tc.By("creating the signed warp message to register the validator")
-			signers := set.NewBits()
-			signers.Add(0) // [signers] has weight from the genesis peer
+			signers := set.NewBits(0) // [signers] has weight from the genesis peer
 
 			var sigBytes [bls.SignatureLen]byte
 			copy(sigBytes[:], bls.SignatureToBytes(registerSubnetValidatorSignature))
