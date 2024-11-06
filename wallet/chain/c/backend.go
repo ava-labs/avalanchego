@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 var (
