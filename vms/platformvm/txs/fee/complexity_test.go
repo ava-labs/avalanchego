@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -362,6 +363,85 @@ func TestInputComplexity(t *testing.T) {
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(inputBytes) + len(credentialBytes) - 2*codec.VersionSize)
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
+		})
+	}
+}
+
+func TestConvertSubnetValidatorComplexity(t *testing.T) {
+	tests := []struct {
+		name     string
+		vdr      txs.ConvertSubnetValidator
+		expected gas.Dimensions
+	}{
+		{
+			name: "any can spend",
+			vdr: txs.ConvertSubnetValidator{
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 200,
+				gas.DBRead:    0,
+				gas.DBWrite:   4,
+				gas.Compute:   0, // TODO: implement
+			},
+		},
+		{
+			name: "single remaining balance owner",
+			vdr: txs.ConvertSubnetValidator{
+				NodeID: make([]byte, ids.NodeIDLen),
+				Signer: signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBRead:    0,
+				gas.DBWrite:   4,
+				gas.Compute:   0, // TODO: implement
+			},
+		},
+		{
+			name: "single deactivation owner",
+			vdr: txs.ConvertSubnetValidator{
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBRead:    0,
+				gas.DBWrite:   4,
+				gas.Compute:   0, // TODO: implement
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			actual, err := ConvertSubnetValidatorComplexity(&test.vdr)
+			require.NoError(err)
+			require.Equal(test.expected, actual)
+
+			vdrBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.vdr)
+			require.NoError(err)
+
+			numBytesWithoutCodecVersion := uint64(len(vdrBytes) - codec.VersionSize)
 			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
 		})
 	}
