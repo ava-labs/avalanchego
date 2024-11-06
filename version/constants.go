@@ -190,8 +190,8 @@ var (
 
 	// TODO @evlekht update this before release
 	BerlinPhaseTimes = map[uint32]time.Time{
-		constants.KopernikusID: unreachableFutureTime,
-		constants.ColumbusID:   unreachableFutureTime,
+		constants.KopernikusID: time.Date(2024, time.November, 14, 10, 0, 0, 0, time.UTC),
+		constants.ColumbusID:   time.Date(2024, time.November, 14, 10, 0, 0, 0, time.UTC),
 		constants.CaminoID:     unreachableFutureTime,
 	}
 
@@ -200,8 +200,8 @@ var (
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 
-		constants.KopernikusID: unreachableFutureTime,
-		constants.ColumbusID:   unreachableFutureTime,
+		constants.KopernikusID: time.Date(2024, time.November, 14, 10, 0, 0, 0, time.UTC),
+		constants.ColumbusID:   time.Date(2024, time.November, 14, 10, 0, 0, 0, time.UTC),
 		constants.CaminoID:     unreachableFutureTime,
 	}
 	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
