@@ -4,6 +4,7 @@
 package p
 
 import (
+	"math/rand"
 	"slices"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -668,9 +670,42 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetTx(t *testing.T) {
+	sk0, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	sk1, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
 	var (
-		chainID = ids.GenerateTestID()
-		address = utils.RandomBytes(32)
+		chainID    = ids.GenerateTestID()
+		address    = utils.RandomBytes(32)
+		validators = []*txs.ConvertSubnetValidator{
+			{
+				NodeID:  utils.RandomBytes(ids.NodeIDLen),
+				Weight:  rand.Uint64(), //#nosec G404
+				Balance: units.Avax,
+				Signer:  *signer.NewProofOfPossession(sk0),
+				RemainingBalanceOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			{
+				NodeID:                utils.RandomBytes(ids.NodeIDLen),
+				Weight:                rand.Uint64(), //#nosec G404
+				Balance:               2 * units.Avax,
+				Signer:                *signer.NewProofOfPossession(sk1),
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
+			},
+		}
 	)
 	for _, e := range testEnvironmentPostEtna {
 		t.Run(e.name, func(t *testing.T) {
@@ -687,6 +722,7 @@ func TestConvertSubnetTx(t *testing.T) {
 				subnetID,
 				chainID,
 				address,
+				validators,
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
@@ -694,6 +730,8 @@ func TestConvertSubnetTx(t *testing.T) {
 			require.Equal(chainID, utx.ChainID)
 			require.Equal(types.JSONByteSlice(address), utx.Address)
 			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			require.True(utils.IsSortedAndUnique(utx.Validators))
+			require.Equal(validators, utx.Validators)
 			requireFeeIsCorrect(
 				require,
 				e.feeCalculator,
@@ -701,7 +739,9 @@ func TestConvertSubnetTx(t *testing.T) {
 				&utx.BaseTx.BaseTx,
 				nil,
 				nil,
-				nil,
+				map[ids.ID]uint64{
+					e.context.AVAXAssetID: 3 * units.Avax, // Balance of the validators
+				},
 			)
 		})
 	}
