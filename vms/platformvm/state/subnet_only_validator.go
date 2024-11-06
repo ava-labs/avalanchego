@@ -119,7 +119,7 @@ type SubnetOnlyValidator struct {
 	// can accrue before this validator must be deactivated. It is equal to the
 	// amount of fees this validator is willing to pay plus the total amount of
 	// fees a validator would have needed to pay from the activation of the Etna
-	// upgrade until the validator was registered. Note that this relies on the
+	// upgrade until this validator was registered. Note that this relies on the
 	// fact that every validator is charged the same fee for each unit of time.
 	//
 	// If this value is 0, the validator is inactive.
