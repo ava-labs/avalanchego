@@ -4,6 +4,8 @@
 package executor
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -18,16 +20,37 @@ var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 // the execution was moved to be performed inside of the standardTxExecutor.
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
-	*Backend
-	FeeCalculator fee.Calculator
-	ParentID      ids.ID
-	StateVersions state.Versions
-	Tx            *txs.Tx
+	backend       *Backend
+	feeCalculator fee.Calculator
+	parentID      ids.ID
+	stateVersions state.Versions
+	tx            *txs.Tx
 
 	// outputs of visitor execution
 	OnAccept       state.Diff
 	Inputs         set.Set[ids.ID]
-	AtomicRequests map[ids.ID]*atomic.Requests
+	atomicRequests map[ids.ID]*atomic.Requests
+}
+
+func AtomicTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	parentID ids.ID,
+	stateVersions state.Versions,
+	tx *txs.Tx,
+) (state.Diff, set.Set[ids.ID], map[ids.ID]*atomic.Requests, error) {
+	atomicExecutor := AtomicTxExecutor{
+		backend:       backend,
+		feeCalculator: feeCalculator,
+		parentID:      parentID,
+		stateVersions: stateVersions,
+		tx:            tx,
+	}
+	if err := tx.Unsigned.Visit(&atomicExecutor); err != nil {
+		txID := tx.ID()
+		return nil, nil, nil, fmt.Errorf("atomic tx %s failed execution: %w", txID, err)
+	}
+	return atomicExecutor.OnAccept, atomicExecutor.Inputs, atomicExecutor.atomicRequests, nil
 }
 
 func (*AtomicTxExecutor) AddValidatorTx(*txs.AddValidatorTx) error {
@@ -66,15 +89,15 @@ func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*AtomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
-}
-
 func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*AtomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
 	return ErrWrongTxType
 }
 
@@ -96,8 +119,8 @@ func (e *AtomicTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	onAccept, err := state.NewDiff(
-		e.ParentID,
-		e.StateVersions,
+		e.parentID,
+		e.stateVersions,
 	)
 	if err != nil {
 		return err
@@ -105,13 +128,13 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	e.OnAccept = onAccept
 
 	executor := StandardTxExecutor{
-		Backend:       e.Backend,
+		Backend:       e.backend,
 		State:         e.OnAccept,
-		FeeCalculator: e.FeeCalculator,
-		Tx:            e.Tx,
+		FeeCalculator: e.feeCalculator,
+		Tx:            e.tx,
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs
-	e.AtomicRequests = executor.AtomicRequests
+	e.atomicRequests = executor.AtomicRequests
 	return err
 }

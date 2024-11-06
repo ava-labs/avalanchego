@@ -53,6 +53,82 @@ func (*StandardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
+func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+	if tx.Validator.NodeID == ids.EmptyNodeID {
+		return errEmptyNodeID
+	}
+
+	if _, err := verifyAddValidatorTx(
+		e.Backend,
+		e.FeeCalculator,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	if e.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
+		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", txID),
+			zap.String("txType", "addValidator"),
+			zap.Stringer("nodeID", tx.Validator.NodeID),
+		)
+	}
+	return nil
+}
+
+func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	if err := verifyAddSubnetValidatorTx(
+		e.Backend,
+		e.FeeCalculator,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
+func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	if _, err := verifyAddDelegatorTx(
+		e.Backend,
+		e.FeeCalculator,
+		e.State,
+		e.Tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
 func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
@@ -326,82 +402,6 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	return nil
 }
 
-func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if tx.Validator.NodeID == ids.EmptyNodeID {
-		return errEmptyNodeID
-	}
-
-	if _, err := verifyAddValidatorTx(
-		e.Backend,
-		e.FeeCalculator,
-		e.State,
-		e.Tx,
-		tx,
-	); err != nil {
-		return err
-	}
-
-	if err := e.putStaker(tx); err != nil {
-		return err
-	}
-
-	txID := e.Tx.ID()
-	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-
-	if e.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
-		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
-			zap.String("reason", "primary network is not being fully synced"),
-			zap.Stringer("txID", txID),
-			zap.String("txType", "addValidator"),
-			zap.Stringer("nodeID", tx.Validator.NodeID),
-		)
-	}
-	return nil
-}
-
-func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
-		e.Backend,
-		e.FeeCalculator,
-		e.State,
-		e.Tx,
-		tx,
-	); err != nil {
-		return err
-	}
-
-	if err := e.putStaker(tx); err != nil {
-		return err
-	}
-
-	txID := e.Tx.ID()
-	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-	return nil
-}
-
-func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if _, err := verifyAddDelegatorTx(
-		e.Backend,
-		e.FeeCalculator,
-		e.State,
-		e.Tx,
-		tx,
-	); err != nil {
-		return err
-	}
-
-	if err := e.putStaker(tx); err != nil {
-		return err
-	}
-
-	txID := e.Tx.ID()
-	avax.Consume(e.State, tx.Ins)
-	avax.Produce(e.State, txID, tx.Outs)
-	return nil
-}
-
 // Verifies a [*txs.RemoveSubnetValidatorTx] and, if it passes, executes it on
 // [e.State]. For verification rules, see [verifyRemoveSubnetValidatorTx]. This
 // transaction will result in [tx.NodeID] being removed as a validator of
@@ -492,65 +492,6 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 	// Transform the new subnet in the database
 	e.State.AddSubnetTransformation(e.Tx)
 	e.State.SetCurrentSupply(tx.Subnet, tx.InitialSupply)
-	return nil
-}
-
-func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
-	var (
-		currentTimestamp = e.State.GetTimestamp()
-		upgrades         = e.Backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
-	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
-		return err
-	}
-
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return err
-	}
-
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-
-	// Verify the flowcheck
-	fee, err := e.FeeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-	if err := e.Backend.FlowChecker.VerifySpend(
-		tx,
-		e.State,
-		tx.Ins,
-		tx.Outs,
-		baseTxCreds,
-		map[ids.ID]uint64{
-			e.Ctx.AVAXAssetID: fee,
-		},
-	); err != nil {
-		return err
-	}
-
-	txID := e.Tx.ID()
-
-	// Consume the UTXOS
-	avax.Consume(e.State, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.State, txID, tx.Outs)
-	// Track the subnet conversion in the database
-	e.State.SetSubnetConversion(
-		tx.Subnet,
-		state.SubnetConversion{
-			// TODO: Populate the conversionID
-			ConversionID: ids.Empty,
-			ChainID:      tx.ChainID,
-			Addr:         tx.Address,
-		},
-	)
 	return nil
 }
 
@@ -673,6 +614,65 @@ func (e *StandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
+func (e *StandardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	var (
+		currentTimestamp = e.State.GetTimestamp()
+		upgrades         = e.Backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.Backend, e.State, e.Tx, tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.FeeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	if err := e.Backend.FlowChecker.VerifySpend(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			e.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	txID := e.Tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.State, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.State, txID, tx.Outs)
+	// Track the subnet conversion in the database
+	e.State.SetSubnetConversion(
+		tx.Subnet,
+		state.SubnetConversion{
+			// TODO: Populate the conversionID
+			ConversionID: ids.Empty,
+			ChainID:      tx.ChainID,
+			Addr:         tx.Address,
+		},
+	)
 	return nil
 }
 

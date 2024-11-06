@@ -182,6 +182,104 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 	require.NoError(blk.Verify(context.Background()))
 }
 
+func TestVerifierVisitAtomicBlock2(t *testing.T) {
+	s := statetest.New(t, statetest.Config{})
+	verifier := newTestVerifier(t, s)
+	wallet := txstest.NewWallet(
+		t,
+		verifier.ctx,
+		verifier.txExecutorBackend.Config,
+		s,
+		secp256k1fx.NewKeychain(genesis.EWOQKey),
+		nil, // subnetIDs
+		nil, // chainIDs
+	)
+
+	baseTx0, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+	require.NoError(t, err)
+	baseTx1, err := wallet.IssueBaseTx([]*avax.TransferableOutput{})
+	require.NoError(t, err)
+
+	blockComplexity, err := txfee.TxComplexity(baseTx0.Unsigned, baseTx1.Unsigned)
+	require.NoError(t, err)
+	blockGas, err := blockComplexity.ToGas(verifier.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+	require.NoError(t, err)
+
+	const secondsToAdvance = 10
+
+	initialFeeState := gas.State{}
+	feeStateAfterTimeAdvanced := initialFeeState.AdvanceTime(
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity,
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.MaxPerSecond,
+		verifier.txExecutorBackend.Config.DynamicFeeConfig.TargetPerSecond,
+		secondsToAdvance,
+	)
+	feeStateAfterGasConsumed, err := feeStateAfterTimeAdvanced.ConsumeGas(blockGas)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name             string
+		timestamp        time.Time
+		expectedErr      error
+		expectedFeeState gas.State
+	}{
+		{
+			name:        "no capacity",
+			timestamp:   genesistest.DefaultValidatorStartTime,
+			expectedErr: gas.ErrInsufficientCapacity,
+		},
+		{
+			name:             "updates fee state",
+			timestamp:        genesistest.DefaultValidatorStartTime.Add(secondsToAdvance * time.Second),
+			expectedFeeState: feeStateAfterGasConsumed,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Clear the state to prevent prior tests from impacting this test.
+			clear(verifier.blkIDToState)
+
+			verifier.txExecutorBackend.Clk.Set(test.timestamp)
+			timestamp, _, err := state.NextBlockTime(
+				verifier.txExecutorBackend.Config.ValidatorFeeConfig,
+				s,
+				verifier.txExecutorBackend.Clk,
+			)
+			require.NoError(err)
+
+			lastAcceptedID := s.GetLastAccepted()
+			lastAccepted, err := s.GetStatelessBlock(lastAcceptedID)
+			require.NoError(err)
+
+			blk, err := block.NewBanffStandardBlock(
+				timestamp,
+				lastAcceptedID,
+				lastAccepted.Height()+1,
+				[]*txs.Tx{
+					baseTx0,
+					baseTx1,
+				},
+			)
+			require.NoError(err)
+
+			blkID := blk.ID()
+			err = blk.Visit(verifier)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				require.NotContains(verifier.blkIDToState, blkID)
+				return
+			}
+
+			require.Contains(verifier.blkIDToState, blkID)
+			blockState := verifier.blkIDToState[blkID]
+			require.Equal(blk, blockState.statelessBlock)
+			require.Equal(test.expectedFeeState, blockState.onAcceptState.GetFeeState())
+		})
+	}
+}
+
 func TestVerifierVisitAtomicBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)

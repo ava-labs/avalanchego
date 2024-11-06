@@ -383,11 +383,11 @@ type complexityVisitor struct {
 	output gas.Dimensions
 }
 
-func (*complexityVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (*complexityVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
-func (*complexityVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
+func (*complexityVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	return ErrUnsupportedTx
 }
 
@@ -401,6 +401,124 @@ func (*complexityVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 
 func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrUnsupportedTx
+}
+
+func (c *complexityVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicAddSubnetValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
+	bandwidth, err := math.Mul(uint64(len(tx.FxIDs)), ids.IDLen)
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ChainName)))
+	if err != nil {
+		return err
+	}
+	bandwidth, err = math.Add(bandwidth, uint64(len(tx.GenesisData)))
+	if err != nil {
+		return err
+	}
+	dynamicComplexity := gas.Dimensions{
+		gas.Bandwidth: bandwidth,
+		gas.DBRead:    0,
+		gas.DBWrite:   0,
+		gas.Compute:   0,
+	}
+
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicCreateChainTxComplexities.Add(
+		&dynamicComplexity,
+		&baseTxComplexity,
+		&authComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	ownerComplexity, err := OwnerComplexity(tx.Owner)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicCreateSubnetTxComplexities.Add(
+		&baseTxComplexity,
+		&ownerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	// TODO: Should imported inputs be more complex?
+	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicImportTxComplexities.Add(
+		&baseTxComplexity,
+		&inputsComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	// TODO: Should exported outputs be more complex?
+	outputsComplexity, err := OutputComplexity(tx.ExportedOutputs...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicExportTxComplexities.Add(
+		&baseTxComplexity,
+		&outputsComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicRemoveSubnetValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+	)
+	return err
 }
 
 func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
@@ -457,133 +575,6 @@ func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	return err
 }
 
-func (c *complexityVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	authComplexity, err := AuthComplexity(tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicAddSubnetValidatorTxComplexities.Add(
-		&baseTxComplexity,
-		&authComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) BaseTx(tx *txs.BaseTx) error {
-	baseTxComplexity, err := baseTxComplexity(tx)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicBaseTxComplexities.Add(&baseTxComplexity)
-	return err
-}
-
-func (c *complexityVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
-	bandwidth, err := math.Mul(uint64(len(tx.FxIDs)), ids.IDLen)
-	if err != nil {
-		return err
-	}
-	bandwidth, err = math.Add(bandwidth, uint64(len(tx.ChainName)))
-	if err != nil {
-		return err
-	}
-	bandwidth, err = math.Add(bandwidth, uint64(len(tx.GenesisData)))
-	if err != nil {
-		return err
-	}
-	dynamicComplexity := gas.Dimensions{
-		gas.Bandwidth: bandwidth,
-		gas.DBRead:    0,
-		gas.DBWrite:   0,
-		gas.Compute:   0,
-	}
-
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	authComplexity, err := AuthComplexity(tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicCreateChainTxComplexities.Add(
-		&dynamicComplexity,
-		&baseTxComplexity,
-		&authComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	ownerComplexity, err := OwnerComplexity(tx.Owner)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicCreateSubnetTxComplexities.Add(
-		&baseTxComplexity,
-		&ownerComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	// TODO: Should exported outputs be more complex?
-	outputsComplexity, err := OutputComplexity(tx.ExportedOutputs...)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicExportTxComplexities.Add(
-		&baseTxComplexity,
-		&outputsComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	// TODO: Should imported inputs be more complex?
-	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicImportTxComplexities.Add(
-		&baseTxComplexity,
-		&inputsComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	authComplexity, err := AuthComplexity(tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicRemoveSubnetValidatorTxComplexities.Add(
-		&baseTxComplexity,
-		&authComplexity,
-	)
-	return err
-}
-
 func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
@@ -602,6 +593,15 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		&authComplexity,
 		&ownerComplexity,
 	)
+	return err
+}
+
+func (c *complexityVisitor) BaseTx(tx *txs.BaseTx) error {
+	baseTxComplexity, err := baseTxComplexity(tx)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicBaseTxComplexities.Add(&baseTxComplexity)
 	return err
 }
 

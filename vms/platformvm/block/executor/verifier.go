@@ -230,23 +230,22 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	}
 
 	feeCalculator := state.NewStaticFeeCalculator(v.txExecutorBackend.Config, currentTimestamp)
-	atomicExecutor := executor.AtomicTxExecutor{
-		Backend:       v.txExecutorBackend,
-		FeeCalculator: feeCalculator,
-		ParentID:      parentID,
-		StateVersions: v,
-		Tx:            b.Tx,
-	}
-
-	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
+	onAcceptState, atomicInputs, atomicRequests, err := executor.AtomicTx(
+		v.txExecutorBackend,
+		feeCalculator,
+		parentID,
+		v,
+		b.Tx,
+	)
+	if err != nil {
 		txID := b.Tx.ID()
 		v.MarkDropped(txID, err) // cache tx as dropped
-		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
+		return err
 	}
 
-	atomicExecutor.OnAccept.AddTx(b.Tx, status.Committed)
+	onAcceptState.AddTx(b.Tx, status.Committed)
 
-	if err := v.verifyUniqueInputs(parentID, atomicExecutor.Inputs); err != nil {
+	if err := v.verifyUniqueInputs(parentID, atomicInputs); err != nil {
 		return err
 	}
 
@@ -256,11 +255,11 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 	v.blkIDToState[blkID] = &blockState{
 		statelessBlock: b,
 
-		onAcceptState: atomicExecutor.OnAccept,
+		onAcceptState: onAcceptState,
 
-		inputs:          atomicExecutor.Inputs,
-		timestamp:       atomicExecutor.OnAccept.GetTimestamp(),
-		atomicRequests:  atomicExecutor.AtomicRequests,
+		inputs:          atomicInputs,
+		timestamp:       onAcceptState.GetTimestamp(),
+		atomicRequests:  atomicRequests,
 		verifiedHeights: set.Of(v.pChainHeight),
 	}
 	return nil
