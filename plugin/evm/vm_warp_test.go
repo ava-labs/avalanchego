@@ -424,7 +424,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 		true, // RequirePrimaryNetworkSigners
 	)
 
-	vm.chainConfig.UpgradeConfig = params.UpgradeConfig{
+	vm.chainConfigExtra().UpgradeConfig = params.UpgradeConfig{
 		PrecompileUpgrades: []params.PrecompileUpgrade{
 			{Config: enableConfig},
 			{Config: disableConfig},
@@ -644,8 +644,8 @@ func testReceiveWarpMessage(
 
 	// Require the block was built with a successful predicate result
 	ethBlock := block2.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	headerPredicateResultsBytes, ok := predicate.GetPredicateResultBytes(ethBlock.Extra())
-	require.True(ok)
+	headerPredicateResultsBytes := predicate.GetPredicateResultBytes(ethBlock.Extra())
+	require.NotEmpty(headerPredicateResultsBytes)
 	results, err := predicate.ParseResults(headerPredicateResultsBytes)
 	require.NoError(err)
 

@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 
-	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/core"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/sync/statesync"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/triedb"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -426,7 +426,7 @@ type syncVMSetup struct {
 	serverAppSender *enginetest.Sender
 
 	includedAtomicTxs []*Tx
-	fundedAccounts    map[*keystore.Key]*types.StateAccount
+	fundedAccounts    map[*utils.Key]*types.StateAccount
 
 	syncerVM             *VM
 	syncerDB             database.Database

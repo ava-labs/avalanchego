@@ -144,21 +144,24 @@ func TestCheckCompatible(t *testing.T) {
 }
 
 func TestConfigRules(t *testing.T) {
-	c := &ChainConfig{
-		NetworkUpgrades: NetworkUpgrades{
-			CortinaBlockTimestamp: utils.NewUint64(500),
+	c := WithExtra(
+		&ChainConfig{},
+		&ChainConfigExtra{
+			NetworkUpgrades: NetworkUpgrades{
+				CortinaBlockTimestamp: utils.NewUint64(500),
+			},
 		},
-	}
+	)
 	var stamp uint64
-	if r := c.Rules(big.NewInt(0), stamp); r.IsCortina {
+	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); GetRulesExtra(r).IsCortina {
 		t.Errorf("expected %v to not be cortina", stamp)
 	}
 	stamp = 500
-	if r := c.Rules(big.NewInt(0), stamp); !r.IsCortina {
+	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsCortina {
 		t.Errorf("expected %v to be cortina", stamp)
 	}
 	stamp = math.MaxInt64
-	if r := c.Rules(big.NewInt(0), stamp); !r.IsCortina {
+	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsCortina {
 		t.Errorf("expected %v to be cortina", stamp)
 	}
 }

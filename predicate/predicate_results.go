@@ -44,6 +44,14 @@ type Results struct {
 	Results map[common.Hash]TxResults `serialize:"true"`
 }
 
+func (r Results) GetPredicateResults(txHash common.Hash, address common.Address) []byte {
+	tx, ok := r.Results[txHash]
+	if !ok {
+		return nil
+	}
+	return tx[address]
+}
+
 // NewResults returns an empty predicate results.
 func NewResults() *Results {
 	return &Results{

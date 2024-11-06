@@ -526,7 +526,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		tx        *Tx
 		signers   [][]*secp256k1.PrivateKey
 		baseFee   *big.Int
-		rules     params.Rules
+		rules     params.RulesExtra
 		shouldErr bool
 	}{
 		{
@@ -1633,7 +1633,7 @@ func TestNewExportTx(t *testing.T) {
 	tests := []struct {
 		name               string
 		genesis            string
-		rules              params.Rules
+		rules              params.RulesExtra
 		bal                uint64
 		expectedBurnedAVAX uint64
 	}{
@@ -1806,7 +1806,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 	tests := []struct {
 		name    string
 		genesis string
-		rules   params.Rules
+		rules   params.RulesExtra
 		bal     uint64
 		balmc   uint64
 	}{

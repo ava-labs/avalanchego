@@ -69,7 +69,7 @@ func (utx *UnsignedExportTx) InputUTXOs() set.Set[ids.ID] {
 // Verify this transaction is well-formed
 func (utx *UnsignedExportTx) Verify(
 	ctx *snow.Context,
-	rules params.Rules,
+	rules params.RulesExtra,
 ) error {
 	switch {
 	case utx == nil:
@@ -180,7 +180,7 @@ func (utx *UnsignedExportTx) SemanticVerify(
 	stx *Tx,
 	_ *Block,
 	baseFee *big.Int,
-	rules params.Rules,
+	rules params.RulesExtra,
 ) error {
 	if err := utx.Verify(vm.ctx, rules); err != nil {
 		return err

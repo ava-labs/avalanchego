@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/coreth/predicate"
 )
 
 // Minimum Gas Price
@@ -32,7 +33,9 @@ const (
 	ApricotPhase5BaseFeeChangeDenominator uint64 = 36
 	EtnaMinBaseFee                        int64  = GWei
 
-	DynamicFeeExtraDataSize        = 80
+	// DynamicFeeExtraDataSize is defined in the predicate package to avoid a circular dependency.
+	// After Durango, the extra data past the dynamic fee rollup window represents predicate results.
+	DynamicFeeExtraDataSize        = predicate.DynamicFeeExtraDataSize
 	RollupWindow            uint64 = 10
 
 	// The base cost to charge per atomic transaction. Added in Apricot Phase 5.

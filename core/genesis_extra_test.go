@@ -42,24 +42,28 @@ import (
 
 func TestGenesisEthUpgrades(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	preEthUpgrades := &params.ChainConfig{
-		ChainID:             big.NewInt(43114), // Specifically refers to mainnet for this UT
-		HomesteadBlock:      big.NewInt(0),
-		DAOForkBlock:        nil,
-		DAOForkSupport:      false,
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		NetworkUpgrades: params.NetworkUpgrades{
-			ApricotPhase1BlockTimestamp: utils.NewUint64(0),
-			ApricotPhase2BlockTimestamp: utils.NewUint64(0),
+	preEthUpgrades := params.WithExtra(
+		&params.ChainConfig{
+			ChainID:             big.NewInt(43114), // Specifically refers to mainnet for this UT
+			HomesteadBlock:      big.NewInt(0),
+			DAOForkBlock:        nil,
+			DAOForkSupport:      false,
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
 		},
-	}
+		&params.ChainConfigExtra{
+			NetworkUpgrades: params.NetworkUpgrades{
+				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
+				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
+			},
+		},
+	)
 
 	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
 	config := *preEthUpgrades
@@ -84,7 +88,7 @@ func TestGenesisEthUpgrades(t *testing.T) {
 
 	// We should still be able to re-initialize
 	config = *preEthUpgrades
-	config.SetEthUpgrades() // New versions will set additional fields eg, LondonBlock
+	params.SetEthUpgrades(&config) // New versions will set additional fields eg, LondonBlock
 	_, _, err = SetupGenesisBlock(db, tdb, &Genesis{Config: &config}, block.Hash(), false)
 	require.NoError(t, err)
 }
