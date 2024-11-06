@@ -42,8 +42,7 @@ var (
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 )
 
-// ProposalTx executes the proposal transaction [tx] and modifies
-// [onCommitState] and [onAbortState] according to the transaction logic.
+// ProposalTx executes the proposal transaction [tx].
 //
 // [onCommitState] will be modified to reflect the changes made to the state if
 // the proposal is committed.
