@@ -14,108 +14,107 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Builder = (*builderWithOptions)(nil)
+var _ Builder = (*withOptions)(nil)
 
-type builderWithOptions struct {
+type withOptions struct {
 	builder Builder
 	options []common.Option
 }
 
-// NewWithOptions returns a new builder that will use the given options by
-// default.
+// WithOptions returns a new builder that will use the given options by default.
 //
 //   - [builder] is the builder that will be called to perform the underlying
 //     operations.
 //   - [options] will be provided to the builder in addition to the options
 //     provided in the method calls.
-func NewWithOptions(builder Builder, options ...common.Option) Builder {
-	return &builderWithOptions{
+func WithOptions(builder Builder, options ...common.Option) Builder {
+	return &withOptions{
 		builder: builder,
 		options: options,
 	}
 }
 
-func (b *builderWithOptions) Context() *Context {
-	return b.builder.Context()
+func (w *withOptions) Context() *Context {
+	return w.builder.Context()
 }
 
-func (b *builderWithOptions) GetBalance(
+func (w *withOptions) GetBalance(
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.builder.GetBalance(
-		common.UnionOptions(b.options, options)...,
+	return w.builder.GetBalance(
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) GetImportableBalance(
+func (w *withOptions) GetImportableBalance(
 	chainID ids.ID,
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
-	return b.builder.GetImportableBalance(
+	return w.builder.GetImportableBalance(
 		chainID,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewBaseTx(
+func (w *withOptions) NewBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.BaseTx, error) {
-	return b.builder.NewBaseTx(
+	return w.builder.NewBaseTx(
 		outputs,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewAddValidatorTx(
+func (w *withOptions) NewAddValidatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
 ) (*txs.AddValidatorTx, error) {
-	return b.builder.NewAddValidatorTx(
+	return w.builder.NewAddValidatorTx(
 		vdr,
 		rewardsOwner,
 		shares,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewAddSubnetValidatorTx(
+func (w *withOptions) NewAddSubnetValidatorTx(
 	vdr *txs.SubnetValidator,
 	options ...common.Option,
 ) (*txs.AddSubnetValidatorTx, error) {
-	return b.builder.NewAddSubnetValidatorTx(
+	return w.builder.NewAddSubnetValidatorTx(
 		vdr,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewRemoveSubnetValidatorTx(
+func (w *withOptions) NewRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	options ...common.Option,
 ) (*txs.RemoveSubnetValidatorTx, error) {
-	return b.builder.NewRemoveSubnetValidatorTx(
+	return w.builder.NewRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewAddDelegatorTx(
+func (w *withOptions) NewAddDelegatorTx(
 	vdr *txs.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.AddDelegatorTx, error) {
-	return b.builder.NewAddDelegatorTx(
+	return w.builder.NewAddDelegatorTx(
 		vdr,
 		rewardsOwner,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewCreateChainTx(
+func (w *withOptions) NewCreateChainTx(
 	subnetID ids.ID,
 	genesis []byte,
 	vmID ids.ID,
@@ -123,79 +122,79 @@ func (b *builderWithOptions) NewCreateChainTx(
 	chainName string,
 	options ...common.Option,
 ) (*txs.CreateChainTx, error) {
-	return b.builder.NewCreateChainTx(
+	return w.builder.NewCreateChainTx(
 		subnetID,
 		genesis,
 		vmID,
 		fxIDs,
 		chainName,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewCreateSubnetTx(
+func (w *withOptions) NewCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.CreateSubnetTx, error) {
-	return b.builder.NewCreateSubnetTx(
+	return w.builder.NewCreateSubnetTx(
 		owner,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewTransferSubnetOwnershipTx(
+func (w *withOptions) NewTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.TransferSubnetOwnershipTx, error) {
-	return b.builder.NewTransferSubnetOwnershipTx(
+	return w.builder.NewTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewConvertSubnetTx(
+func (w *withOptions) NewConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
 	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.ConvertSubnetTx, error) {
-	return b.builder.NewConvertSubnetTx(
+	return w.builder.NewConvertSubnetTx(
 		subnetID,
 		chainID,
 		address,
 		validators,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewImportTx(
+func (w *withOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.ImportTx, error) {
-	return b.builder.NewImportTx(
+	return w.builder.NewImportTx(
 		sourceChainID,
 		to,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewExportTx(
+func (w *withOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
 ) (*txs.ExportTx, error) {
-	return b.builder.NewExportTx(
+	return w.builder.NewExportTx(
 		chainID,
 		outputs,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewTransformSubnetTx(
+func (w *withOptions) NewTransformSubnetTx(
 	subnetID ids.ID,
 	assetID ids.ID,
 	initialSupply uint64,
@@ -212,7 +211,7 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 	uptimeRequirement uint32,
 	options ...common.Option,
 ) (*txs.TransformSubnetTx, error) {
-	return b.builder.NewTransformSubnetTx(
+	return w.builder.NewTransformSubnetTx(
 		subnetID,
 		assetID,
 		initialSupply,
@@ -227,11 +226,11 @@ func (b *builderWithOptions) NewTransformSubnetTx(
 		minDelegatorStake,
 		maxValidatorWeightFactor,
 		uptimeRequirement,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
+func (w *withOptions) NewAddPermissionlessValidatorTx(
 	vdr *txs.SubnetValidator,
 	signer signer.Signer,
 	assetID ids.ID,
@@ -240,27 +239,27 @@ func (b *builderWithOptions) NewAddPermissionlessValidatorTx(
 	shares uint32,
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
-	return b.builder.NewAddPermissionlessValidatorTx(
+	return w.builder.NewAddPermissionlessValidatorTx(
 		vdr,
 		signer,
 		assetID,
 		validationRewardsOwner,
 		delegationRewardsOwner,
 		shares,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (b *builderWithOptions) NewAddPermissionlessDelegatorTx(
+func (w *withOptions) NewAddPermissionlessDelegatorTx(
 	vdr *txs.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
 ) (*txs.AddPermissionlessDelegatorTx, error) {
-	return b.builder.NewAddPermissionlessDelegatorTx(
+	return w.builder.NewAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
 		rewardsOwner,
-		common.UnionOptions(b.options, options)...,
+		common.UnionOptions(w.options, options)...,
 	)
 }
