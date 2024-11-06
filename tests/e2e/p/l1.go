@@ -144,6 +144,35 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			chainID = chainTx.ID()
 		})
 
+		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			require.NoError(err)
+			require.Equal(expectedValidators, subnetValidators)
+		}
+		tc.By("verifying the Permissioned Subnet is configured as expected", func() {
+			tc.By("verifying the subnet reports as permissioned", func() {
+				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.GetSubnetClientResponse{
+						IsPermissioned: true,
+						ControlKeys: []ids.ShortID{
+							keychain.Keys[0].Address(),
+						},
+						Threshold: 1,
+					},
+					subnet,
+				)
+			})
+
+			tc.By("verifying the validator set is empty", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{})
+			})
+		})
+
 		tc.By("creating the genesis validator")
 		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
@@ -195,14 +224,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.NoError(err)
 		})
 
-		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
-
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(expectedValidators, subnetValidators)
-		}
 		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
 				SubnetID:       subnetID,
