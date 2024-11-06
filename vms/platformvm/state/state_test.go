@@ -2242,8 +2242,8 @@ func TestGetCurrentValidators(t *testing.T) {
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         otherPKBytes,
 					StartTime:         uint64(now.Unix()),
-					Weight:            1,
-					EndAccumulatedFee: 3,
+					Weight:            0,
+					EndAccumulatedFee: 0,
 				},
 				{
 					ValidationID:      ids.GenerateTestID(),
