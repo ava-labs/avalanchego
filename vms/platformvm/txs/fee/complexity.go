@@ -62,13 +62,22 @@ const (
 	intrinsicSECP256k1FxSignatureBandwidth = wrappers.IntLen + // signature index
 		secp256k1.SignatureLen // signature length
 
+	intrinsicConvertSubnetValidatorBandwidth = wrappers.IntLen + // nodeID length
+		wrappers.LongLen + // weight
+		wrappers.LongLen + // balance
+		wrappers.IntLen + // remaining balance owner threshold
+		wrappers.IntLen + // remaining balance owner num addresses
+		wrappers.IntLen + // deactivation owner threshold
+		wrappers.IntLen // deactivation owner num addresses
+
 	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
 		bls.SignatureLen // signature
 
 	intrinsicInputDBRead = 1
 
-	intrinsicInputDBWrite  = 1
-	intrinsicOutputDBWrite = 1
+	intrinsicInputDBWrite                  = 1
+	intrinsicOutputDBWrite                 = 1
+	intrinsicConvertSubnetValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
 )
 
 var (
@@ -180,10 +189,11 @@ var (
 			ids.IDLen + // subnetID
 			ids.IDLen + // chainID
 			wrappers.IntLen + // address length
+			wrappers.IntLen + // validators length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  1,
-		gas.DBWrite: 1,
+		gas.DBRead:  2, // subnet auth + manager lookup
+		gas.DBWrite: 2, // manager + weight
 		gas.Compute: 0,
 	}
 
@@ -303,6 +313,53 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 	}
 	complexity[gas.Bandwidth], err = math.Add(complexity[gas.Bandwidth], signatureBandwidth)
 	return complexity, err
+}
+
+// ConvertSubnetValidatorComplexity returns the complexity the validators add to
+// a transaction.
+func ConvertSubnetValidatorComplexity(sovs ...*txs.ConvertSubnetValidator) (gas.Dimensions, error) {
+	var complexity gas.Dimensions
+	for _, sov := range sovs {
+		sovComplexity, err := convertSubnetValidatorComplexity(sov)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+
+		complexity, err = complexity.Add(&sovComplexity)
+		if err != nil {
+			return gas.Dimensions{}, err
+		}
+	}
+	return complexity, nil
+}
+
+func convertSubnetValidatorComplexity(sov *txs.ConvertSubnetValidator) (gas.Dimensions, error) {
+	complexity := gas.Dimensions{
+		gas.Bandwidth: intrinsicConvertSubnetValidatorBandwidth,
+		gas.DBRead:    0,
+		gas.DBWrite:   intrinsicConvertSubnetValidatorDBWrite,
+		gas.Compute:   0, // TODO: Add compute complexity
+	}
+
+	signerComplexity, err := SignerComplexity(&sov.Signer)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
+	numAddresses := uint64(len(sov.RemainingBalanceOwner.Addresses) + len(sov.DeactivationOwner.Addresses))
+	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+	return complexity.Add(
+		&gas.Dimensions{
+			gas.Bandwidth: uint64(len(sov.NodeID)),
+		},
+		&signerComplexity,
+		&gas.Dimensions{
+			gas.Bandwidth: addressBandwidth,
+		},
+	)
 }
 
 // OwnerComplexity returns the complexity an owner adds to a transaction.
@@ -610,12 +667,17 @@ func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	if err != nil {
 		return err
 	}
+	validatorComplexity, err := ConvertSubnetValidatorComplexity(tx.Validators...)
+	if err != nil {
+		return err
+	}
 	authComplexity, err := AuthComplexity(tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
 	c.output, err = IntrinsicConvertSubnetTxComplexities.Add(
 		&baseTxComplexity,
+		&validatorComplexity,
 		&authComplexity,
 		&gas.Dimensions{
 			gas.Bandwidth: uint64(len(tx.Address)),

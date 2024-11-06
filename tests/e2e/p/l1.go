@@ -11,13 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
+	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+)
+
+const (
+	genesisWeight  = units.Schmeckle
+	genesisBalance = units.Avax
 )
 
 var _ = e2e.DescribePChain("[L1]", func() {
@@ -111,18 +124,80 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			chainID = chainTx.ID()
 		})
 
+		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			require.NoError(err)
+			require.Equal(expectedValidators, subnetValidators)
+		}
+		tc.By("verifying the Permissioned Subnet is configured as expected", func() {
+			tc.By("verifying the subnet reports as permissioned", func() {
+				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.GetSubnetClientResponse{
+						IsPermissioned: true,
+						ControlKeys: []ids.ShortID{
+							keychain.Keys[0].Address(),
+						},
+						Threshold: 1,
+					},
+					subnet,
+				)
+			})
+
+			tc.By("verifying the validator set is empty", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{})
+			})
+		})
+
+		tc.By("creating the genesis validator")
+		subnetGenesisNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.FlagsMap{
+			config.TrackSubnetsKey: subnetID.String(),
+		})
+
+		genesisNodePoP, err := subnetGenesisNode.GetProofOfPossession()
+		require.NoError(err)
+
+		genesisNodePK, err := bls.PublicKeyFromCompressedBytes(genesisNodePoP.PublicKey[:])
+		require.NoError(err)
+
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetTx", func() {
 			_, err := pWallet.IssueConvertSubnetTx(
 				subnetID,
 				chainID,
 				address,
+				[]*txs.ConvertSubnetValidator{
+					{
+						NodeID:  subnetGenesisNode.NodeID.Bytes(),
+						Weight:  genesisWeight,
+						Balance: genesisBalance,
+						Signer:  *genesisNodePoP,
+					},
+				},
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
 		})
 
 		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
+			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
+				SubnetID:       subnetID,
+				ManagerChainID: chainID,
+				ManagerAddress: address,
+				Validators: []warpmessage.SubnetConversionValidatorData{
+					{
+						NodeID:       subnetGenesisNode.NodeID.Bytes(),
+						BLSPublicKey: genesisNodePoP.PublicKey,
+						Weight:       genesisWeight,
+					},
+				},
+			})
+			require.NoError(err)
+
 			tc.By("verifying the subnet reports as being converted", func() {
 				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
@@ -133,11 +208,22 @@ var _ = e2e.DescribePChain("[L1]", func() {
 							keychain.Keys[0].Address(),
 						},
 						Threshold:      1,
+						ConversionID:   expectedConversionID,
 						ManagerChainID: chainID,
 						ManagerAddress: address,
 					},
 					subnet,
 				)
+			})
+
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+				})
 			})
 		})
 
