@@ -42,6 +42,17 @@ var (
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 )
 
+// ProposalTx executes the proposal transaction [tx] and modifies
+// [onCommitState] and [onAbortState] according to the transaction logic.
+//
+// [onCommitState] will be modified to reflect the changes made to the state if
+// the proposal is committed.
+//
+// [onAbortState] will be modified to reflect the changes made to the state if
+// the proposal is aborted.
+//
+// Invariant: It is assumed that [onCommitState] and [onAbortState] represent
+// the same state when passed into this function.
 func ProposalTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
@@ -71,9 +82,6 @@ type proposalTxExecutor struct {
 	// [onCommitState] is the state used for validation.
 	// [onCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
-	//
-	// Invariant: Both [onCommitState] and [OnAbortState] represent the same
-	//            state when provided to this struct.
 	onCommitState state.Diff
 	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
