@@ -51,6 +51,11 @@ const (
 	genesisBalance  = units.Avax
 	registerWeight  = genesisWeight / 10
 	registerBalance = 0
+
+	// Validator registration attempts expire 5 minutes after they are created
+	expiryDelay = 5 * time.Minute
+	// P2P message requests timeout after 10 seconds
+	p2pTimeout = 10 * time.Second
 )
 
 var _ = e2e.DescribePChain("[L1]", func() {
@@ -289,11 +294,12 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		tc.By("creating the RegisterSubnetValidatorMessage")
+		expiry := uint64(time.Now().Add(expiryDelay).Unix()) // This message will expire in 5 minutes
 		registerSubnetValidatorMessage, err := warpmessage.NewRegisterSubnetValidator(
 			subnetID,
 			subnetRegisterNode.NodeID,
 			registerNodePoP.PublicKey,
-			uint64(time.Now().Add(5*time.Minute).Unix()),
+			expiry,
 			warpmessage.PChainOwner{},
 			warpmessage.PChainOwner{},
 			registerWeight,
@@ -379,7 +385,7 @@ func wrapWarpSignatureRequest(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
-		10*time.Second,
+		p2pTimeout,
 	)
 	if err != nil {
 		return nil, err
