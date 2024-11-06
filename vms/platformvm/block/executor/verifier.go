@@ -394,15 +394,14 @@ func (v *verifier) proposalBlock(
 	atomicRequests map[ids.ID]*atomic.Requests,
 	onAcceptFunc func(),
 ) error {
-	txExecutor := executor.ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       v.txExecutorBackend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-
-	if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+	err := executor.ProposalTx(
+		v.txExecutorBackend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
+	if err != nil {
 		txID := tx.ID()
 		v.MarkDropped(txID, err) // cache tx as dropped
 		return err

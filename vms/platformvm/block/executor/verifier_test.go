@@ -108,89 +108,70 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 }
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
-	parentID := ids.GenerateTestID()
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	timestamp := time.Now()
-	// One call for each of onCommitState and onAbortState.
-	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetFeeState().Return(gas.State{}).Times(2)
-	parentOnAcceptState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(2)
-	parentOnAcceptState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(2)
-	parentOnAcceptState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(2)
-
-	backend := &backend{
-		lastAccepted: parentID,
-		blkIDToState: map[ids.ID]*blockState{
-			parentID: {
-				statelessBlock: parentStatelessBlk,
-				onAcceptState:  parentOnAcceptState,
+	var (
+		require  = require.New(t)
+		verifier = newTestVerifier(t, testVerifierConfig{
+			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+		})
+		initialTimestamp = verifier.state.GetTimestamp()
+		newTimestamp     = initialTimestamp.Add(time.Second)
+		proposalTx       = &txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{
+				Time: uint64(newTimestamp.Unix()),
 			},
-		},
-		Mempool: mempool,
-		state:   s,
-		ctx: &snow.Context{
-			Log: logging.NoLog{},
-		},
-	}
-	manager := &manager{
-		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
-			},
-			Clk: &mockable.Clock{},
-		},
-		backend: backend,
-	}
+		}
+	)
+	require.NoError(proposalTx.Initialize(txs.Codec))
 
-	blkTx := txsmock.NewUnsignedTx(ctrl)
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
+	// Build the block that will be executed on top of the last accepted block.
+	lastAcceptedID := verifier.state.GetLastAccepted()
+	lastAccepted, err := verifier.state.GetStatelessBlock(lastAcceptedID)
+	require.NoError(err)
 
-	// We can't serialize [blkTx] because it isn't
-	// registered with the blocks.Codec.
-	// Serialize this block with a dummy tx
-	// and replace it after creation with the mock tx.
-	// TODO allow serialization of mock txs.
-	apricotBlk, err := block.NewApricotProposalBlock(
-		parentID,
-		2,
-		&txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{},
-			Creds:    []verify.Verifiable{},
-		},
+	proposalBlock, err := block.NewApricotProposalBlock(
+		lastAcceptedID,
+		lastAccepted.Height()+1,
+		proposalTx,
 	)
 	require.NoError(err)
-	apricotBlk.Tx.Unsigned = blkTx
 
-	// Set expectations for dependencies.
-	tx := apricotBlk.Txs()[0]
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().Remove([]*txs.Tx{tx}).Times(1)
+	// Execute the block.
+	require.NoError(proposalBlock.Visit(verifier))
 
-	// Visit the block
-	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
-	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
-	require.Equal(apricotBlk, gotBlkState.statelessBlock)
-	require.Equal(timestamp, gotBlkState.timestamp)
+	// Verify that the block's execution was recorded as expected.
+	blkID := proposalBlock.ID()
+	require.Contains(verifier.blkIDToState, blkID)
+	executedBlockState := verifier.blkIDToState[blkID]
 
-	// Assert that the expected tx statuses are set.
-	_, gotStatus, err := gotBlkState.onCommitState.GetTx(tx.ID())
+	txID := proposalTx.ID()
+
+	onCommit := executedBlockState.onCommitState
+	require.NotNil(onCommit)
+	acceptedTx, acceptedStatus, err := onCommit.GetTx(txID)
 	require.NoError(err)
-	require.Equal(status.Committed, gotStatus)
+	require.Equal(proposalTx, acceptedTx)
+	require.Equal(status.Committed, acceptedStatus)
 
-	_, gotStatus, err = gotBlkState.onAbortState.GetTx(tx.ID())
+	onAbort := executedBlockState.onAbortState
+	require.NotNil(onAbort)
+	acceptedTx, acceptedStatus, err = onAbort.GetTx(txID)
 	require.NoError(err)
-	require.Equal(status.Aborted, gotStatus)
+	require.Equal(proposalTx, acceptedTx)
+	require.Equal(status.Aborted, acceptedStatus)
 
-	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	require.Equal(
+		&blockState{
+			proposalBlockState: proposalBlockState{
+				onCommitState: onCommit,
+				onAbortState:  onAbort,
+			},
+			statelessBlock: proposalBlock,
+
+			timestamp:       initialTimestamp,
+			verifiedHeights: set.Of(uint64(0)),
+		},
+		executedBlockState,
+	)
 }
 
 func TestVerifierVisitAtomicBlock(t *testing.T) {
