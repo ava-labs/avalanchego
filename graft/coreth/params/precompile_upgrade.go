@@ -67,7 +67,7 @@ func (u *PrecompileUpgrade) MarshalJSON() ([]byte, error) {
 //   - the specified blockTimestamps must be compatible with those
 //     specified in the chainConfig by genesis.
 //   - check a precompile is disabled before it is re-enabled
-func (c *ChainConfig) verifyPrecompileUpgrades() error {
+func (c *ChainConfigExtra) verifyPrecompileUpgrades() error {
 	// Store this struct to keep track of the last upgrade for each precompile key.
 	// Required for timestamp and disabled checks.
 	type lastUpgradeData struct {
@@ -133,7 +133,7 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 
 // getActivePrecompileConfig returns the most recent precompile config corresponding to [address].
 // If none have occurred, returns nil.
-func (c *ChainConfig) getActivePrecompileConfig(address common.Address, timestamp uint64) precompileconfig.Config {
+func (c *ChainConfigExtra) getActivePrecompileConfig(address common.Address, timestamp uint64) precompileconfig.Config {
 	configs := c.GetActivatingPrecompileConfigs(address, nil, timestamp, c.PrecompileUpgrades)
 	if len(configs) == 0 {
 		return nil
@@ -143,7 +143,7 @@ func (c *ChainConfig) getActivePrecompileConfig(address common.Address, timestam
 
 // GetActivatingPrecompileConfigs returns all precompile upgrades configured to activate during the
 // state transition from a block with timestamp [from] to a block with timestamp [to].
-func (c *ChainConfig) GetActivatingPrecompileConfigs(address common.Address, from *uint64, to uint64, upgrades []PrecompileUpgrade) []precompileconfig.Config {
+func (c *ChainConfigExtra) GetActivatingPrecompileConfigs(address common.Address, from *uint64, to uint64, upgrades []PrecompileUpgrade) []precompileconfig.Config {
 	// Get key from address.
 	module, ok := modules.GetPrecompileModuleByAddress(address)
 	if !ok {
@@ -163,14 +163,16 @@ func (c *ChainConfig) GetActivatingPrecompileConfigs(address common.Address, fro
 	return configs
 }
 
-// CheckPrecompilesCompatible checks if [precompileUpgrades] are compatible with [c] at [headTimestamp].
+// checkPrecompilesCompatible checks if [precompileUpgrades] are compatible with [c] at [headTimestamp].
 // Returns a ConfigCompatError if upgrades already activated at [headTimestamp] are missing from
 // [precompileUpgrades]. Upgrades not already activated may be modified or absent from [precompileUpgrades].
 // Returns nil if [precompileUpgrades] is compatible with [c].
 // Assumes given timestamp is the last accepted block timestamp.
 // This ensures that as long as the node has not accepted a block with a different rule set it will allow a
 // new upgrade to be applied as long as it activates after the last accepted block.
-func (c *ChainConfig) CheckPrecompilesCompatible(precompileUpgrades []PrecompileUpgrade, time uint64) *ConfigCompatError {
+//
+//nolint:unused
+func (c *ChainConfigExtra) checkPrecompilesCompatible(precompileUpgrades []PrecompileUpgrade, time uint64) *ConfigCompatError {
 	for _, module := range modules.RegisteredModules() {
 		if err := c.checkPrecompileCompatible(module.Address, precompileUpgrades, time); err != nil {
 			return err
@@ -184,7 +186,9 @@ func (c *ChainConfig) CheckPrecompilesCompatible(precompileUpgrades []Precompile
 // and [precompileUpgrades] at [headTimestamp].
 // Returns an error if upgrades already activated at [headTimestamp] are missing from [precompileUpgrades].
 // Upgrades that have already gone into effect cannot be modified or absent from [precompileUpgrades].
-func (c *ChainConfig) checkPrecompileCompatible(address common.Address, precompileUpgrades []PrecompileUpgrade, time uint64) *ConfigCompatError {
+//
+//nolint:unused
+func (c *ChainConfigExtra) checkPrecompileCompatible(address common.Address, precompileUpgrades []PrecompileUpgrade, time uint64) *ConfigCompatError {
 	// All active upgrades (from nil to [lastTimestamp]) must match.
 	activeUpgrades := c.GetActivatingPrecompileConfigs(address, nil, time, c.PrecompileUpgrades)
 	newUpgrades := c.GetActivatingPrecompileConfigs(address, nil, time, precompileUpgrades)
@@ -222,7 +226,7 @@ func (c *ChainConfig) checkPrecompileCompatible(address common.Address, precompi
 }
 
 // EnabledStatefulPrecompiles returns current stateful precompile configs that are enabled at [blockTimestamp].
-func (c *ChainConfig) EnabledStatefulPrecompiles(blockTimestamp uint64) Precompiles {
+func (c *ChainConfigExtra) EnabledStatefulPrecompiles(blockTimestamp uint64) Precompiles {
 	statefulPrecompileConfigs := make(Precompiles)
 	for _, module := range modules.RegisteredModules() {
 		if config := c.getActivePrecompileConfig(module.Address, blockTimestamp); config != nil && !config.IsDisabled() {

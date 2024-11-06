@@ -28,7 +28,7 @@ package runtime
 
 import (
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 func NewEnv(cfg *Config) *vm.EVM {
@@ -39,18 +39,17 @@ func NewEnv(cfg *Config) *vm.EVM {
 		BlobFeeCap: cfg.BlobFeeCap,
 	}
 	blockContext := vm.BlockContext{
-		CanTransfer:       core.CanTransfer,
-		CanTransferMC:     core.CanTransferMC,
-		Transfer:          core.Transfer,
-		TransferMultiCoin: core.TransferMultiCoin,
-		GetHash:           cfg.GetHashFn,
-		Coinbase:          cfg.Coinbase,
-		BlockNumber:       cfg.BlockNumber,
-		Time:              cfg.Time,
-		Difficulty:        cfg.Difficulty,
-		GasLimit:          cfg.GasLimit,
-		BaseFee:           cfg.BaseFee,
-		BlobBaseFee:       cfg.BlobBaseFee,
+		CanTransfer: core.CanTransfer,
+		Transfer:    core.Transfer,
+		GetHash:     cfg.GetHashFn,
+		Coinbase:    cfg.Coinbase,
+		BlockNumber: cfg.BlockNumber,
+		Time:        cfg.Time,
+		Difficulty:  cfg.Difficulty,
+		GasLimit:    cfg.GasLimit,
+		BaseFee:     cfg.BaseFee,
+		BlobBaseFee: cfg.BlobBaseFee,
+		Random:      cfg.Random,
 	}
 
 	return vm.NewEVM(blockContext, txContext, cfg.State, cfg.ChainConfig, cfg.EVMConfig)

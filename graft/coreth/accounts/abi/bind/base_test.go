@@ -38,8 +38,8 @@ import (
 	"github.com/ava-labs/coreth/accounts/abi"
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ava-labs/coreth/nativeasset"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -404,8 +404,8 @@ func TestTransactNativeAssetCall(t *testing.T) {
 	nativeCallTx, err := bc.Transact(opts, methodName, arg1, arg2)
 	assert.Nil(err)
 	// verify transformations
-	assert.Equal(vm.NativeAssetCallAddr, *nativeCallTx.To())
-	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedData, err := vm.UnpackNativeAssetCallInput(nativeCallTx.Data())
+	assert.Equal(nativeasset.NativeAssetCallAddr, *nativeCallTx.To())
+	unpackedAddr, unpackedAssetID, unpackedAssetAmount, unpackedData, err := nativeasset.UnpackNativeAssetCallInput(nativeCallTx.Data())
 	assert.Nil(err)
 	assert.NotEmpty(unpackedData)
 	assert.Equal(unpackedData, normalCallTx.Data())

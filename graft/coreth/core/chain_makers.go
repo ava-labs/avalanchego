@@ -36,10 +36,10 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/holiman/uint256"
 )
@@ -374,9 +374,10 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
 
 	var gasLimit uint64
-	if cm.config.IsCortina(time) {
+	configExtra := params.GetExtra(cm.config)
+	if configExtra.IsCortina(time) {
 		gasLimit = params.CortinaGasLimit
-	} else if cm.config.IsApricotPhase1(time) {
+	} else if configExtra.IsApricotPhase1(time) {
 		gasLimit = params.ApricotPhase1GasLimit
 	} else {
 		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
@@ -391,7 +392,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
 	}
-	if cm.config.IsApricotPhase3(time) {
+	if configExtra.IsApricotPhase3(time) {
 		var err error
 		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(cm.config, parent.Header(), time)
 		if err != nil {

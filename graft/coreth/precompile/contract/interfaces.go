@@ -10,8 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/holiman/uint256"
 )
+
+type Log = gethtypes.Log
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
@@ -19,9 +23,13 @@ type StatefulPrecompiledContract interface {
 	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 }
 
+type StateReader interface {
+	GetState(common.Address, common.Hash) common.Hash
+}
+
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	GetState(common.Address, common.Hash) common.Hash
+	StateReader
 	SetState(common.Address, common.Hash, common.Hash)
 
 	SetNonce(common.Address, uint64)
@@ -30,11 +38,13 @@ type StateDB interface {
 	GetBalance(common.Address) *uint256.Int
 	AddBalance(common.Address, *uint256.Int)
 	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
+	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
-	AddLog(addr common.Address, topics []common.Hash, data []byte, blockNumber uint64)
+	AddLog(*Log)
 	GetLogData() (topics [][]common.Hash, data [][]byte)
 	GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool)
 	SetPredicateStorageSlots(address common.Address, predicates [][]byte)
@@ -51,7 +61,7 @@ type AccessibleState interface {
 	GetBlockContext() BlockContext
 	GetSnowContext() *snow.Context
 	GetChainConfig() precompileconfig.ChainConfig
-	NativeAssetCall(caller common.Address, input []byte, suppliedGas uint64, gasCost uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
+	Call(addr common.Address, input []byte, gas uint64, value *uint256.Int, _ ...vm.CallOption) (ret []byte, gasRemaining uint64, _ error)
 }
 
 // ConfigurationBlockContext defines the interface required to configure a precompile.
@@ -62,8 +72,8 @@ type ConfigurationBlockContext interface {
 
 type BlockContext interface {
 	ConfigurationBlockContext
-	// GetResults returns an arbitrary byte array result of verifying the predicates
-	// of the given transaction, precompile address pair.
+	// GetPredicateResults returns a the result of verifying the predicates of the
+	// given transaction, precompile address pair as a byte array.
 	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) []byte
 }
 

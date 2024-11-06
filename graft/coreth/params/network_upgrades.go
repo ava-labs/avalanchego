@@ -47,7 +47,7 @@ func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
 	return reflect.DeepEqual(n, other)
 }
 
-func (n *NetworkUpgrades) CheckNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ConfigCompatError {
+func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ConfigCompatError {
 	if isForkTimestampIncompatible(n.ApricotPhase1BlockTimestamp, newcfg.ApricotPhase1BlockTimestamp, time) {
 		return newTimestampCompatError("ApricotPhase1 fork block timestamp", n.ApricotPhase1BlockTimestamp, newcfg.ApricotPhase1BlockTimestamp)
 	}
@@ -107,13 +107,13 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 
 // IsApricotPhase1 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 1 upgrade time.
-func (n *NetworkUpgrades) IsApricotPhase1(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhase1(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase1BlockTimestamp, time)
 }
 
 // IsApricotPhase2 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 2 upgrade time.
-func (n *NetworkUpgrades) IsApricotPhase2(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhase2(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase2BlockTimestamp, time)
 }
 
@@ -125,59 +125,59 @@ func (n *NetworkUpgrades) IsApricotPhase3(time uint64) bool {
 
 // IsApricotPhase4 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 4 upgrade time.
-func (n *NetworkUpgrades) IsApricotPhase4(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhase4(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase4BlockTimestamp, time)
 }
 
 // IsApricotPhase5 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 5 upgrade time.
-func (n *NetworkUpgrades) IsApricotPhase5(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhase5(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase5BlockTimestamp, time)
 }
 
 // IsApricotPhasePre6 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase Pre 6 upgrade time.
-func (n *NetworkUpgrades) IsApricotPhasePre6(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhasePre6(time uint64) bool {
 	return isTimestampForked(n.ApricotPhasePre6BlockTimestamp, time)
 }
 
 // IsApricotPhase6 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 6 upgrade time.
-func (n *NetworkUpgrades) IsApricotPhase6(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhase6(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase6BlockTimestamp, time)
 }
 
 // IsApricotPhasePost6 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 6 Post upgrade time.
-func (n *NetworkUpgrades) IsApricotPhasePost6(time uint64) bool {
+func (n NetworkUpgrades) IsApricotPhasePost6(time uint64) bool {
 	return isTimestampForked(n.ApricotPhasePost6BlockTimestamp, time)
 }
 
 // IsBanff returns whether [time] represents a block
 // with a timestamp after the Banff upgrade time.
-func (n *NetworkUpgrades) IsBanff(time uint64) bool {
+func (n NetworkUpgrades) IsBanff(time uint64) bool {
 	return isTimestampForked(n.BanffBlockTimestamp, time)
 }
 
 // IsCortina returns whether [time] represents a block
 // with a timestamp after the Cortina upgrade time.
-func (n *NetworkUpgrades) IsCortina(time uint64) bool {
+func (n NetworkUpgrades) IsCortina(time uint64) bool {
 	return isTimestampForked(n.CortinaBlockTimestamp, time)
 }
 
 // IsDurango returns whether [time] represents a block
 // with a timestamp after the Durango upgrade time.
-func (n *NetworkUpgrades) IsDurango(time uint64) bool {
+func (n NetworkUpgrades) IsDurango(time uint64) bool {
 	return isTimestampForked(n.DurangoBlockTimestamp, time)
 }
 
 // IsEtna returns whether [time] represents a block
 // with a timestamp after the Etna upgrade time.
-func (n *NetworkUpgrades) IsEtna(time uint64) bool {
+func (n NetworkUpgrades) IsEtna(time uint64) bool {
 	return isTimestampForked(n.EtnaTimestamp, time)
 }
 
-func (n *NetworkUpgrades) Description() string {
+func (n NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - Apricot Phase 1 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.3.0)\n", ptrToString(n.ApricotPhase1BlockTimestamp))
 	banner += fmt.Sprintf(" - Apricot Phase 2 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.4.0)\n", ptrToString(n.ApricotPhase2BlockTimestamp))

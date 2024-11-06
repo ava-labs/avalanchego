@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/coreth/params"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,15 +51,14 @@ func TestUnpackInvalidPredicate(t *testing.T) {
 
 func TestPredicateResultsBytes(t *testing.T) {
 	require := require.New(t)
-	dataTooShort := utils.RandomBytes(params.DynamicFeeExtraDataSize - 1)
-	_, ok := GetPredicateResultBytes(dataTooShort)
-	require.False(ok)
+	dataTooShort := utils.RandomBytes(DynamicFeeExtraDataSize - 1)
+	resultBytes := GetPredicateResultBytes(dataTooShort)
+	require.Empty(resultBytes)
 
-	preDurangoData := utils.RandomBytes(params.DynamicFeeExtraDataSize)
-	_, ok = GetPredicateResultBytes(preDurangoData)
-	require.False(ok)
-	postDurangoData := utils.RandomBytes(params.DynamicFeeExtraDataSize + 2)
-	resultBytes, ok := GetPredicateResultBytes(postDurangoData)
-	require.True(ok)
-	require.Equal(resultBytes, postDurangoData[params.DynamicFeeExtraDataSize:])
+	preDurangoData := utils.RandomBytes(DynamicFeeExtraDataSize)
+	resultBytes = GetPredicateResultBytes(preDurangoData)
+	require.Empty(resultBytes)
+	postDurangoData := utils.RandomBytes(DynamicFeeExtraDataSize + 2)
+	resultBytes = GetPredicateResultBytes(postDurangoData)
+	require.Equal(resultBytes, postDurangoData[DynamicFeeExtraDataSize:])
 }
