@@ -867,15 +867,8 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
 	}
-	maxAllowedExpiry, err := math.Add(currentTimestampUnix, RegisterSubnetValidatorTxExpiryWindow)
-	if err != nil {
-		// This should never happen, as it would imply that either
-		// currentTimestampUnix or RegisterSubnetValidatorTxExpiryWindow is
-		// significantly larger than expected.
-		return err
-	}
-	if msg.Expiry > maxAllowedExpiry {
-		return fmt.Errorf("expected expiry not to be after %d but got %d", maxAllowedExpiry, msg.Expiry)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterSubnetValidatorTxExpiryWindow {
+		return fmt.Errorf("expected expiry not to be more than %d seconds in the future but got %d", RegisterSubnetValidatorTxExpiryWindow, secondsUntilExpiry)
 	}
 
 	pop := signer.ProofOfPossession{
