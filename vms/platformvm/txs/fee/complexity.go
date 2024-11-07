@@ -591,23 +591,6 @@ func (c *complexityVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return err
 }
 
-func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	// TODO: Should imported inputs be more complex?
-	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicImportTxComplexities.Add(
-		&baseTxComplexity,
-		&inputsComplexity,
-	)
-	return err
-}
-
 func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
@@ -621,6 +604,23 @@ func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
 	c.output, err = IntrinsicExportTxComplexities.Add(
 		&baseTxComplexity,
 		&outputsComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	// TODO: Should imported inputs be more complex?
+	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicImportTxComplexities.Add(
+		&baseTxComplexity,
+		&inputsComplexity,
 	)
 	return err
 }
