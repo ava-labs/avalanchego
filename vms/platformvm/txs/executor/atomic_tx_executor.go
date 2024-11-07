@@ -128,14 +128,14 @@ func (e *atomicTxExecutor) atomicTx() error {
 	if err != nil {
 		return err
 	}
-	e.onAccept = onAccept
 
 	inputs, atomicRequests, _, err := StandardTx(
 		e.backend,
 		e.feeCalculator,
 		e.tx,
-		e.onAccept,
+		onAccept,
 	)
+	e.onAccept = onAccept
 	e.inputs = inputs
 	e.atomicRequests = atomicRequests
 	return err
