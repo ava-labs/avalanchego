@@ -30,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
+// TODO: Before Etna, ensure that the maximum number of expiries to track is
+// limited to a reasonable number by this window.
 const (
 	second                                = 1
 	minute                                = 60 * second
