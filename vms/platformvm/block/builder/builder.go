@@ -533,8 +533,7 @@ func executeTx(
 		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 		return false, nil
 	}
-	err = manager.VerifyUniqueInputs(parentID, txInputs)
-	if err != nil {
+	if err := manager.VerifyUniqueInputs(parentID, txInputs); err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
