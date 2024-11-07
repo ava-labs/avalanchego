@@ -102,6 +102,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 						tc.DefaultContext(),
 						constants.PrimaryNetworkID,
 						height,
+						false,
 					)
 					require.NoError(err)
 					if observedValidatorSet == nil {

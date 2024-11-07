@@ -113,11 +113,12 @@ type Client interface {
 	// GetTimestamp returns the current chain timestamp
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
 	// GetValidatorsAt returns the weights of the validator set of a provided
-	// subnet at the specified height.
+	// subnet at the specified height or at proposerVM height if [isProposed] is true.
 	GetValidatorsAt(
 		ctx context.Context,
 		subnetID ids.ID,
 		height uint64,
+		isProposed bool,
 		options ...rpc.Option,
 	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
@@ -496,12 +497,13 @@ func (c *client) GetValidatorsAt(
 	ctx context.Context,
 	subnetID ids.ID,
 	height uint64,
+	isProposed bool,
 	options ...rpc.Option,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
-		Height:   json.Uint64(height),
+		Height:   json.Height{Numeric: json.Uint64(height), IsProposed: isProposed},
 	}, res, options...)
 	return res.Validators, err
 }
