@@ -92,15 +92,15 @@ func (*atomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
-}
-
 func (*atomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
 func (*atomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*atomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
 	return ErrWrongTxType
 }
 
