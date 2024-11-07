@@ -165,7 +165,7 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.ConvertSubnetTx, error)
 
-	// RegisterSubnetValidatorTx adds a validator to a Permissionless L1.
+	// RegisterSubnetValidatorTx adds a validator to an L1.
 	//
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp

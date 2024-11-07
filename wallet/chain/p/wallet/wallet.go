@@ -152,7 +152,7 @@ type Wallet interface {
 	) (*txs.Tx, error)
 
 	// IssueRegisterSubnetValidatorTx creates, signs, and issues a transaction
-	// that adds a validator to a Permissionless L1.
+	// that adds a validator to an L1.
 	//
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
