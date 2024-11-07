@@ -185,6 +185,97 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return nil
 }
 
+func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
+	e.inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoID := in.UTXOID.InputID()
+
+		e.inputs.Add(utxoID)
+		utxoIDs[i] = utxoID[:]
+	}
+
+	// Skip verification of the shared memory inputs if the other primary
+	// network chains are not guaranteed to be up-to-date.
+	if e.backend.Bootstrapped.Get() && !e.backend.Config.PartialSyncPrimaryNetwork {
+		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.SourceChain); err != nil {
+			return err
+		}
+
+		allUTXOBytes, err := e.backend.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
+		if err != nil {
+			return fmt.Errorf("failed to get shared memory: %w", err)
+		}
+
+		utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
+		for index, input := range tx.Ins {
+			utxo, err := e.state.GetUTXO(input.InputID())
+			if err != nil {
+				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
+			}
+			utxos[index] = utxo
+		}
+		for i, utxoBytes := range allUTXOBytes {
+			utxo := &avax.UTXO{}
+			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+				return fmt.Errorf("failed to unmarshal UTXO: %w", err)
+			}
+			utxos[i+len(tx.Ins)] = utxo
+		}
+
+		ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
+		copy(ins, tx.Ins)
+		copy(ins[len(tx.Ins):], tx.ImportedInputs)
+
+		// Verify the flowcheck
+		fee, err := e.feeCalculator.CalculateFee(tx)
+		if err != nil {
+			return err
+		}
+		if err := e.backend.FlowChecker.VerifySpendUTXOs(
+			tx,
+			utxos,
+			ins,
+			tx.Outs,
+			e.tx.Creds,
+			map[ids.ID]uint64{
+				e.backend.Ctx.AVAXAssetID: fee,
+			},
+		); err != nil {
+			return err
+		}
+	}
+
+	txID := e.tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.state, txID, tx.Outs)
+
+	// Note: We apply atomic requests even if we are not verifying atomic
+	// requests to ensure the shared state will be correct if we later start
+	// verifying the requests.
+	e.atomicRequests = map[ids.ID]*atomic.Requests{
+		tx.SourceChain: {
+			RemoveRequests: utxoIDs,
+		},
+	}
+	return nil
+}
+
 func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -343,97 +434,6 @@ func (e *standardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	txID := e.tx.ID()
 	avax.Consume(e.state, tx.Ins)
 	avax.Produce(e.state, txID, tx.Outs)
-	return nil
-}
-
-func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
-	}
-
-	e.inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		utxoID := in.UTXOID.InputID()
-
-		e.inputs.Add(utxoID)
-		utxoIDs[i] = utxoID[:]
-	}
-
-	// Skip verification of the shared memory inputs if the other primary
-	// network chains are not guaranteed to be up-to-date.
-	if e.backend.Bootstrapped.Get() && !e.backend.Config.PartialSyncPrimaryNetwork {
-		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.SourceChain); err != nil {
-			return err
-		}
-
-		allUTXOBytes, err := e.backend.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
-		if err != nil {
-			return fmt.Errorf("failed to get shared memory: %w", err)
-		}
-
-		utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
-		for index, input := range tx.Ins {
-			utxo, err := e.state.GetUTXO(input.InputID())
-			if err != nil {
-				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
-			}
-			utxos[index] = utxo
-		}
-		for i, utxoBytes := range allUTXOBytes {
-			utxo := &avax.UTXO{}
-			if _, err := txs.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-				return fmt.Errorf("failed to unmarshal UTXO: %w", err)
-			}
-			utxos[i+len(tx.Ins)] = utxo
-		}
-
-		ins := make([]*avax.TransferableInput, len(tx.Ins)+len(tx.ImportedInputs))
-		copy(ins, tx.Ins)
-		copy(ins[len(tx.Ins):], tx.ImportedInputs)
-
-		// Verify the flowcheck
-		fee, err := e.feeCalculator.CalculateFee(tx)
-		if err != nil {
-			return err
-		}
-		if err := e.backend.FlowChecker.VerifySpendUTXOs(
-			tx,
-			utxos,
-			ins,
-			tx.Outs,
-			e.tx.Creds,
-			map[ids.ID]uint64{
-				e.backend.Ctx.AVAXAssetID: fee,
-			},
-		); err != nil {
-			return err
-		}
-	}
-
-	txID := e.tx.ID()
-
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
-
-	// Note: We apply atomic requests even if we are not verifying atomic
-	// requests to ensure the shared state will be correct if we later start
-	// verifying the requests.
-	e.atomicRequests = map[ids.ID]*atomic.Requests{
-		tx.SourceChain: {
-			RemoveRequests: utxoIDs,
-		},
-	}
 	return nil
 }
 
