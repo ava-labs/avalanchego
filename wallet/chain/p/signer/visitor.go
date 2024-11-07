@@ -51,6 +51,14 @@ func (*visitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
+func (s *visitor) BaseTx(tx *txs.BaseTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
 func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
@@ -135,6 +143,19 @@ func (s *visitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error
 	return sign(s.tx, true, txSigners)
 }
 
+func (s *visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, true, txSigners)
+}
+
 func (s *visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
@@ -162,27 +183,6 @@ func (s *visitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegato
 		return err
 	}
 	return sign(s.tx, true, txSigners)
-}
-
-func (s *visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, true, txSigners)
-}
-
-func (s *visitor) BaseTx(tx *txs.BaseTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	return sign(s.tx, false, txSigners)
 }
 
 func (s *visitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
