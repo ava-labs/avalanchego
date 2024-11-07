@@ -101,13 +101,12 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         stateDiff,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			stateDiff,
+		)
 		require.ErrorIs(err, errEmptyNodeID)
 	}
 }
@@ -353,13 +352,12 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			env.config.UpgradeConfig.BanffTime = onAcceptState.GetTimestamp()
 
 			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-			executor := StandardTxExecutor{
-				Backend:       &env.backend,
-				State:         onAcceptState,
-				FeeCalculator: feeCalculator,
-				Tx:            tx,
-			}
-			err = tx.Unsigned.Visit(&executor)
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				onAcceptState,
+			)
 			require.ErrorIs(err, tt.expectedExecutionErr)
 		})
 	}
@@ -400,13 +398,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
@@ -435,13 +432,13 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&executor))
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
+		require.NoError(err)
 	}
 
 	// Add a validator to pending validator set of primary network
@@ -488,13 +485,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrNotValidator)
 	}
 
@@ -538,13 +534,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
@@ -571,13 +566,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
@@ -604,13 +598,13 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&executor))
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
+		require.NoError(err)
 	}
 
 	// Case: Proposed validator start validating at/before current timestamp
@@ -639,13 +633,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
 	}
 
@@ -707,13 +700,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
@@ -751,13 +743,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, secp256k1fx.ErrInputIndicesNotSortedUnique)
 	}
 
@@ -791,13 +782,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, errUnauthorizedSubnetModification)
 	}
 
@@ -829,13 +819,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, errUnauthorizedSubnetModification)
 	}
 
@@ -877,13 +866,12 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 }
@@ -925,12 +913,13 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		},
 	)
 
-	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      tx,
-	}
-	err = tx.Unsigned.Visit(&executor)
+	feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onAcceptState,
+	)
 	require.ErrorIs(err, errIsImmutable)
 }
 
@@ -965,13 +954,12 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
 	}
 
@@ -1008,13 +996,12 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.AddTx(tx, status.Committed)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrAlreadyValidator)
 	}
 
@@ -1048,13 +1035,12 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		onAcceptState.AddTx(tx, status.Committed)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			State:         onAcceptState,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrAlreadyValidator)
 	}
 
@@ -1089,13 +1075,12 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		}
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-		executor := StandardTxExecutor{
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			State:         onAcceptState,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onAcceptState,
+		)
 		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
 }
@@ -1188,14 +1173,13 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 			require.NoError(err)
 
 			tx := tt.buildTx(t, env)
-
 			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-			err = tx.Unsigned.Visit(&StandardTxExecutor{
-				Backend:       &env.backend,
-				State:         onAcceptState,
-				FeeCalculator: feeCalculator,
-				Tx:            tx,
-			})
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				onAcceptState,
+			)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -1401,12 +1385,13 @@ func TestDurangoMemoField(t *testing.T) {
 				require.NoError(err)
 
 				feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-				require.NoError(subnetValTx.Unsigned.Visit(&StandardTxExecutor{
-					Backend:       &env.backend,
-					State:         onAcceptState,
-					FeeCalculator: feeCalculator,
-					Tx:            subnetValTx,
-				}))
+				_, _, _, err = StandardTx(
+					&env.backend,
+					feeCalculator,
+					subnetValTx,
+					onAcceptState,
+				)
+				require.NoError(err)
 
 				tx, err := wallet.IssueRemoveSubnetValidatorTx(
 					primaryValidator.NodeID,
@@ -1592,22 +1577,23 @@ func TestDurangoMemoField(t *testing.T) {
 
 			// Populated memo field should error
 			tx, onAcceptState := tt.setupTest(t, env, []byte{'m', 'e', 'm', 'o'})
-			err := tx.Unsigned.Visit(&StandardTxExecutor{
-				Backend:       &env.backend,
-				State:         onAcceptState,
-				FeeCalculator: feeCalculator,
-				Tx:            tx,
-			})
+			_, _, _, err := StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				onAcceptState,
+			)
 			require.ErrorIs(err, avax.ErrMemoTooLarge)
 
 			// Empty memo field should not error
 			tx, onAcceptState = tt.setupTest(t, env, []byte{})
-			require.NoError(tx.Unsigned.Visit(&StandardTxExecutor{
-				Backend:       &env.backend,
-				State:         onAcceptState,
-				FeeCalculator: feeCalculator,
-				Tx:            tx,
-			}))
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				onAcceptState,
+			)
+			require.NoError(err)
 		})
 	}
 }
@@ -1623,15 +1609,16 @@ func TestEtnaDisabledTransactions(t *testing.T) {
 	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 	require.NoError(err)
 
+	feeCalculator := state.PickFeeCalculator(env.config, env.state)
 	tx := &txs.Tx{
 		Unsigned: &txs.TransformSubnetTx{},
 	}
-
-	err = tx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      tx,
-	})
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onAcceptState,
+	)
 	require.ErrorIs(err, errTransformSubnetTxPostEtna)
 }
 
@@ -1735,14 +1722,14 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
-		newExecutor func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor)
+		newExecutor func(*gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor)
 		expectedErr error
 	}
 
 	tests := []test{
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
@@ -1774,26 +1761,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
 				env.tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
@@ -1804,26 +1790,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: txs.ErrRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "node isn't a validator of the subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
@@ -1834,26 +1819,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: ErrNotValidator,
 		},
 		{
 			name: "validator is permissionless",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				staker := *env.staker
@@ -1867,26 +1851,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: ErrRemovePermissionlessValidator,
 		},
 		{
 			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
@@ -1898,26 +1881,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: errWrongNumberOfCredentials,
 		},
 		{
 			name: "can't find subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
@@ -1928,26 +1910,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "no permission to remove validator",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
@@ -1960,26 +1941,25 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: errUnauthorizedSubnetModification,
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
@@ -1995,19 +1975,18 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			expectedErr: ErrFlowCheckFailed,
@@ -2137,14 +2116,14 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	type test struct {
 		name        string
-		newExecutor func(*gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor)
+		newExecutor func(*gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor)
 		err         error
 	}
 
 	tests := []test{
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				// Setting the tx to nil makes the tx fail syntactic verification
 				env.tx.Unsigned = (*txs.TransformSubnetTx)(nil)
@@ -2155,26 +2134,25 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: txs.ErrNilTx,
 		},
 		{
 			name: "max stake duration too large",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 				env.state = state.NewMockDiff(ctrl)
@@ -2184,26 +2162,25 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: errMaxStakeDurationTooLarge,
 		},
 		{
 			name: "fail subnet authorization",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				// Remove credentials
 				env.tx.Creds = nil
@@ -2216,26 +2193,25 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				}
 
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: errWrongNumberOfCredentials,
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 				env.state = state.NewMockDiff(ctrl)
 				subnetOwner := fxmock.NewOwner(ctrl)
@@ -2257,26 +2233,25 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				}
 
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: ErrFlowCheckFailed,
 		},
 		{
 			name: "invalid after subnet conversion",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
@@ -2299,26 +2274,25 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					MaxStakeDuration: math.MaxInt64,
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: errIsImmutable,
 		},
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *StandardTxExecutor) {
+			newExecutor: func(ctrl *gomock.Controller) (*txs.TransformSubnetTx, *standardTxExecutor) {
 				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
 
 				// Set dependency expectations.
@@ -2345,19 +2319,18 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				}
 
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &StandardTxExecutor{
-					Backend: &Backend{
+				e := &standardTxExecutor{
+					backend: &Backend{
 						Config:       cfg,
-						Bootstrapped: &utils.Atomic[bool]{},
+						Bootstrapped: utils.NewAtomic(true),
 						Fx:           env.fx,
 						FlowChecker:  env.flowChecker,
 						Ctx:          &snow.Context{},
 					},
-					FeeCalculator: feeCalculator,
-					Tx:            env.tx,
-					State:         env.state,
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
 				}
-				e.Bootstrapped.Set(true)
 				return env.unsignedTx, e
 			},
 			err: nil,
@@ -2419,18 +2392,19 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	diff, err := state.NewDiffOn(baseState)
 	require.NoError(t, err)
 
-	require.NoError(t, createSubnetTx.Unsigned.Visit(&StandardTxExecutor{
-		Backend: &Backend{
+	_, _, _, err = StandardTx(
+		&Backend{
 			Config:       defaultConfig,
 			Bootstrapped: utils.NewAtomic(true),
 			Fx:           fx,
 			FlowChecker:  flowChecker,
 			Ctx:          ctx,
 		},
-		FeeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-		Tx:            createSubnetTx,
-		State:         diff,
-	}))
+		state.PickFeeCalculator(defaultConfig, baseState),
+		createSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
@@ -2441,13 +2415,13 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 	tests := []struct {
 		name           string
 		builderOptions []common.Option
-		updateExecutor func(executor *StandardTxExecutor) error
+		updateExecutor func(executor *standardTxExecutor) error
 		expectedErr    error
 	}{
 		{
 			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.Backend.Config = &config.Config{
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Config{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
 				return nil
@@ -2456,8 +2430,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "tx fails syntactic verification",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.Backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
 				return nil
 			},
 			expectedErr: avax.ErrWrongChainID,
@@ -2471,8 +2445,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "fail subnet authorization",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.State.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs: []ids.ShortID{
 						ids.GenerateTestShortID(),
@@ -2484,8 +2458,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "invalid if subnet is transformed",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.State.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
 					Subnet: subnetID,
 				}})
 				return nil
@@ -2494,8 +2468,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "invalid if subnet is converted",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.State.SetSubnetConversion(
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetSubnetConversion(
 					subnetID,
 					state.SubnetConversion{
 						ConversionID: ids.GenerateTestID(),
@@ -2509,16 +2483,16 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "invalid fee calculation",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.FeeCalculator = txfee.NewStaticCalculator(e.Config.StaticFeeConfig)
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
 				return nil
 			},
 			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "too many active validators",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.Backend.Config = &config.Config{
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Config{
 					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
 					ValidatorFeeConfig: validatorfee.Config{
 						Capacity:                 0,
@@ -2534,8 +2508,8 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "invalid subnet only validator",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				return e.State.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
+			updateExecutor: func(e *standardTxExecutor) error {
+				return e.state.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
@@ -2546,9 +2520,9 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		},
 		{
 			name: "insufficient fee",
-			updateExecutor: func(e *StandardTxExecutor) error {
-				e.FeeCalculator = txfee.NewDynamicCalculator(
-					e.Config.DynamicFeeConfig.Weights,
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewDynamicCalculator(
+					e.backend.Config.DynamicFeeConfig.Weights,
 					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
 				)
 				return nil
@@ -2607,17 +2581,17 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
 
-			executor := &StandardTxExecutor{
-				Backend: &Backend{
+			executor := &standardTxExecutor{
+				backend: &Backend{
 					Config:       defaultConfig,
 					Bootstrapped: utils.NewAtomic(true),
 					Fx:           fx,
 					FlowChecker:  flowChecker,
 					Ctx:          ctx,
 				},
-				FeeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				Tx:            convertSubnetTx,
-				State:         diff,
+				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+				tx:            convertSubnetTx,
+				state:         diff,
 			}
 			if test.updateExecutor != nil {
 				require.NoError(test.updateExecutor(executor))
