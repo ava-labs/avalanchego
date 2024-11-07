@@ -113,4 +113,5 @@ cd "${PROMTAIL_WORKING_DIR}"
 nohup "${CMD}" -config.file=promtail.yaml > promtail.log 2>&1 &
 echo $! > "${PIDFILE}"
 echo "promtail started with pid $(cat "${PIDFILE}")"
+# shellcheck disable=SC2016
 echo 'To stop promtail: "kill -SIGTERM `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid"'

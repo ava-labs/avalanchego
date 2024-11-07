@@ -118,4 +118,5 @@ cd "${PROMETHEUS_WORKING_DIR}"
 nohup "${CMD}" --config.file=prometheus.yaml --web.listen-address=localhost:0 --enable-feature=agent > prometheus.log 2>&1 &
 echo $! > "${PIDFILE}"
 echo "prometheus started with pid $(cat "${PIDFILE}")"
+# shellcheck disable=SC2016
 echo 'To stop prometheus: "kill -SIGTERM `cat ~/.tmpnet/prometheus/run.pid` && rm ~/.tmpnet/prometheus/run.pid"'
