@@ -729,7 +729,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			StartTime:             startTime,
 			Weight:                vdr.Weight,
 			MinNonce:              0,
-			EndAccumulatedFee:     0, // If Balance is 0, this is 0
+			EndAccumulatedFee:     0, // If Balance is 0, this is will remain 0
 		}
 		if vdr.Balance != 0 {
 			// We are attempting to add an active validator
