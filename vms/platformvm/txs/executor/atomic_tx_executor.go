@@ -20,7 +20,7 @@ var _ txs.Visitor = (*atomicTxExecutor)(nil)
 // modifications.
 //
 // This is only used to execute atomic transactions pre-AP5. After AP5 the
-// execution was moved to be performed during standard transaction execution.
+// execution was moved to [StandardTx].
 func AtomicTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
