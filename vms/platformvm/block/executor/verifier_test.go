@@ -411,7 +411,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 		)
 	}
 
-	// Verify that the import transaction can no be replayed.
+	// Verify that the import transaction can not be replayed.
 	{
 		secondBlock, err := block.NewApricotStandardBlock(
 			firstBlockID,
