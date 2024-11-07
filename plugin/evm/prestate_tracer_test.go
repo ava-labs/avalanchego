@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/tests"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
+	gethtypes "github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 )
 
 func TestPrestateWithDiffModeANTTracer(t *testing.T) {

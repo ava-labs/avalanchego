@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/coreth/utils"
-	gethparams "github.com/ethereum/go-ethereum/params"
+	gethparams "github.com/ava-labs/libevm/params"
 )
 
 // Avalanche ChainIDs

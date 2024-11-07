@@ -6,7 +6,7 @@ package message
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/ids"
 )

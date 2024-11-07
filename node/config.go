@@ -31,10 +31,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/external"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/accounts"
+	"github.com/ava-labs/libevm/accounts/external"
+	"github.com/ava-labs/libevm/accounts/keystore"
+	"github.com/ava-labs/libevm/log"
 )
 
 // Config represents a small collection of configuration values to fine tune the

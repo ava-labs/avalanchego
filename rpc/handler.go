@@ -39,7 +39,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/metrics"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/log"
 	"golang.org/x/time/rate"
 )
 

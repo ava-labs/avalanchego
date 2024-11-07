@@ -9,7 +9,7 @@ set -o pipefail
 # 2. Ignore lines that import go-ethereum with a named import starting with "geth"
 # 3. Sort the unique results
 # 4. Print out the difference between the search results and the list of specified allowed package imports from geth.
-geth_regexp='"github.com/ethereum/go-ethereum/.*"'
+geth_regexp='"github.com/ava-labs/libevm/.*"'
 allow_named_imports='geth\w\+ "'
 extra_imports=$(grep -r --include='*.go' --exclude=mocks.go "${geth_regexp}" -h | grep -v "${allow_named_imports}" | grep -o "${geth_regexp}" | sort -u | comm -23 - ./scripts/geth-allowed-packages.txt)
 if [ -n "${extra_imports}" ]; then

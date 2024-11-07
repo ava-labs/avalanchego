@@ -40,9 +40,9 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )

@@ -6,7 +6,7 @@ package utils
 import (
 	"bytes"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 // AddressRange represents a continuous range of addresses

@@ -7,9 +7,9 @@ import (
 	"encoding/binary"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 )
 
 // ReadSyncRoot reads the root corresponding to the main trie of an in-progress

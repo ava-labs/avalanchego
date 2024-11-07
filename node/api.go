@@ -29,8 +29,8 @@ package node
 import (
 	"github.com/ava-labs/coreth/internal/debug"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/crypto"
 )
 
 // apis returns the collection of built-in RPC APIs.

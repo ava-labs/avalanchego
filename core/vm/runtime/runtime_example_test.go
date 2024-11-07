@@ -30,7 +30,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/vm/runtime"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 func ExampleExecute() {
