@@ -37,6 +37,17 @@ var (
 	errMaxNumActiveValidators     = errors.New("already at the max number of active validators")
 )
 
+// StandardTx executes the standard transaction [tx].
+//
+// [state] is modified to represent the state of the chain after the execution
+// of [tx].
+//
+// Returns:
+//   - The IDs of any import UTXOs consumed.
+//   - The, potentially nil, atomic requests that should be performed against
+//     shared memory when this transaction is accepted.
+//   - A, potentially nil, function that should be called when this transaction
+//     is accepted.
 func StandardTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
