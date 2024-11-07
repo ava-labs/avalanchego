@@ -5,7 +5,6 @@ package txs
 
 // Allow vm to execute custom logic against the underlying transaction types.
 type Visitor interface {
-	// Apricot Transactions:
 	AddValidatorTx(*AddValidatorTx) error
 	AddSubnetValidatorTx(*AddSubnetValidatorTx) error
 	AddDelegatorTx(*AddDelegatorTx) error
@@ -15,17 +14,11 @@ type Visitor interface {
 	ExportTx(*ExportTx) error
 	AdvanceTimeTx(*AdvanceTimeTx) error
 	RewardValidatorTx(*RewardValidatorTx) error
-
-	// Banff Transactions:
 	RemoveSubnetValidatorTx(*RemoveSubnetValidatorTx) error
 	TransformSubnetTx(*TransformSubnetTx) error
 	AddPermissionlessValidatorTx(*AddPermissionlessValidatorTx) error
 	AddPermissionlessDelegatorTx(*AddPermissionlessDelegatorTx) error
-
-	// Durango Transactions:
 	TransferSubnetOwnershipTx(*TransferSubnetOwnershipTx) error
-	BaseTx(*BaseTx) error
-
-	// Etna Transactions:
 	ConvertSubnetTx(*ConvertSubnetTx) error
+	BaseTx(*BaseTx) error
 }
