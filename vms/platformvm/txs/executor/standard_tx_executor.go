@@ -834,16 +834,15 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
+	// Parse the warp message.
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
 		return err
 	}
-
 	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
 	if err != nil {
 		return err
 	}
-
 	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
 	if err != nil {
 		return err
@@ -852,6 +851,8 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
+	// Verify that the warp message was sent from the expected chain and
+	// address.
 	subnetConversion, err := e.state.GetSubnetConversion(msg.SubnetID)
 	if err != nil {
 		return err
@@ -863,6 +864,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return fmt.Errorf("expected address %s but got %s", subnetConversion.Addr, addressedCall.SourceAddress)
 	}
 
+	// Verify that the message contains a valid expiry time.
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
@@ -871,14 +873,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return fmt.Errorf("expected expiry not to be more than %d seconds in the future but got %d", RegisterSubnetValidatorTxExpiryWindow, secondsUntilExpiry)
 	}
 
-	pop := signer.ProofOfPossession{
-		PublicKey:         msg.BLSPublicKey,
-		ProofOfPossession: tx.ProofOfPossession,
-	}
-	if err := pop.Verify(); err != nil {
-		return err
-	}
-
+	// Verify that this warp message isn't being replayed.
 	validationID := msg.ValidationID()
 	expiry := state.ExpiryEntry{
 		Timestamp:    msg.Expiry,
@@ -892,21 +887,29 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return fmt.Errorf("expiry for %s already exists", validationID)
 	}
 
+	// Verify proof of possession provided by the transaction against the public
+	// key provided by the warp message.
+	pop := signer.ProofOfPossession{
+		PublicKey:         msg.BLSPublicKey,
+		ProofOfPossession: tx.ProofOfPossession,
+	}
+	if err := pop.Verify(); err != nil {
+		return err
+	}
+
+	// Create the SoV.
 	nodeID, err := ids.ToNodeID(msg.NodeID)
 	if err != nil {
 		return err
 	}
-
 	remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.RemainingBalanceOwner)
 	if err != nil {
 		return err
 	}
-
 	deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.DisableOwner)
 	if err != nil {
 		return err
 	}
-
 	sov := state.SubnetOnlyValidator{
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
@@ -919,12 +922,15 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		MinNonce:              0,
 		EndAccumulatedFee:     0, // If Balance is 0, this is 0
 	}
+
+	// If the balance is non-zero, this validator should be initially active.
 	if tx.Balance != 0 {
-		// We are attempting to add an active validator
+		// Verify that there is space for an active validator.
 		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
+		// Mark the validator as active.
 		currentFees := e.state.GetAccruedFees()
 		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
 		if err != nil {
