@@ -729,7 +729,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			StartTime:             startTime,
 			Weight:                vdr.Weight,
 			MinNonce:              0,
-			EndAccumulatedFee:     0, // If Balance is 0, this is will remain 0
+			EndAccumulatedFee:     0, // If Balance is 0, this is 0
 		}
 		if vdr.Balance != 0 {
 			// We are attempting to add an active validator
@@ -920,7 +920,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		StartTime:             currentTimestampUnix,
 		Weight:                msg.Weight,
 		MinNonce:              0,
-		EndAccumulatedFee:     0, // If Balance is 0, this is 0
+		EndAccumulatedFee:     0, // If Balance is 0, this is will remain 0
 	}
 
 	// If the balance is non-zero, this validator should be initially active.
