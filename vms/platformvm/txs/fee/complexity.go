@@ -530,6 +530,15 @@ func (c *complexityVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) e
 	return err
 }
 
+func (c *complexityVisitor) BaseTx(tx *txs.BaseTx) error {
+	baseTxComplexity, err := baseTxComplexity(tx)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicBaseTxComplexities.Add(&baseTxComplexity)
+	return err
+}
+
 func (c *complexityVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	bandwidth, err := math.Mul(uint64(len(tx.FxIDs)), ids.IDLen)
 	if err != nil {
@@ -650,15 +659,6 @@ func (c *complexityVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwne
 		&authComplexity,
 		&ownerComplexity,
 	)
-	return err
-}
-
-func (c *complexityVisitor) BaseTx(tx *txs.BaseTx) error {
-	baseTxComplexity, err := baseTxComplexity(tx)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicBaseTxComplexities.Add(&baseTxComplexity)
 	return err
 }
 
