@@ -516,32 +516,30 @@ func executeTx(
 		return false, err
 	}
 
-	executor := &txexecutor.StandardTxExecutor{
-		Backend:       backend,
-		State:         txDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-
-	err = tx.Unsigned.Visit(executor)
+	txInputs, _, _, err := txexecutor.StandardTx(
+		backend,
+		feeCalculator,
+		tx,
+		txDiff,
+	)
 	if err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
 
-	if inputs.Overlaps(executor.Inputs) {
+	if inputs.Overlaps(txInputs) {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 		return false, nil
 	}
-	err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
+	err = manager.VerifyUniqueInputs(parentID, txInputs)
 	if err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
-	inputs.Union(executor.Inputs)
+	inputs.Union(txInputs)
 
 	txDiff.AddTx(tx, status.Committed)
 	return true, txDiff.Apply(stateDiff)

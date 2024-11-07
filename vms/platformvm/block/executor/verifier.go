@@ -517,30 +517,30 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		atomicRequests = make(map[ids.ID]*atomic.Requests)
 	)
 	for _, tx := range txs {
-		txExecutor := executor.StandardTxExecutor{
-			Backend:       v.txExecutorBackend,
-			State:         diff,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+		txInputs, txAtomicRequests, onAccept, err := executor.StandardTx(
+			v.txExecutorBackend,
+			feeCalculator,
+			tx,
+			diff,
+		)
+		if err != nil {
 			txID := tx.ID()
 			v.MarkDropped(txID, err) // cache tx as dropped
 			return nil, nil, nil, err
 		}
 		// ensure it doesn't overlap with current input batch
-		if inputs.Overlaps(txExecutor.Inputs) {
+		if inputs.Overlaps(txInputs) {
 			return nil, nil, nil, ErrConflictingBlockTxs
 		}
 		// Add UTXOs to batch
-		inputs.Union(txExecutor.Inputs)
+		inputs.Union(txInputs)
 
 		diff.AddTx(tx, status.Committed)
-		if txExecutor.OnAccept != nil {
-			funcs = append(funcs, txExecutor.OnAccept)
+		if onAccept != nil {
+			funcs = append(funcs, onAccept)
 		}
 
-		for chainID, txRequests := range txExecutor.AtomicRequests {
+		for chainID, txRequests := range txAtomicRequests {
 			// Add/merge in the atomic requests represented by [tx]
 			chainRequests, exists := atomicRequests[chainID]
 			if !exists {

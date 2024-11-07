@@ -112,15 +112,15 @@ func (*atomicTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (e *atomicTxExecutor) ImportTx(tx *txs.ImportTx) error {
-	return e.atomicTx(tx)
+func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
+	return e.atomicTx()
 }
 
-func (e *atomicTxExecutor) ExportTx(tx *txs.ExportTx) error {
-	return e.atomicTx(tx)
+func (e *atomicTxExecutor) ExportTx(*txs.ExportTx) error {
+	return e.atomicTx()
 }
 
-func (e *atomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
+func (e *atomicTxExecutor) atomicTx() error {
 	onAccept, err := state.NewDiff(
 		e.parentID,
 		e.stateVersions,
@@ -130,14 +130,13 @@ func (e *atomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	}
 	e.onAccept = onAccept
 
-	executor := StandardTxExecutor{
-		Backend:       e.backend,
-		State:         e.onAccept,
-		FeeCalculator: e.feeCalculator,
-		Tx:            e.tx,
-	}
-	err = tx.Visit(&executor)
-	e.inputs = executor.Inputs
-	e.atomicRequests = executor.AtomicRequests
+	inputs, atomicRequests, _, err := StandardTx(
+		e.backend,
+		e.feeCalculator,
+		e.tx,
+		e.onAccept,
+	)
+	e.inputs = inputs
+	e.atomicRequests = atomicRequests
 	return err
 }
