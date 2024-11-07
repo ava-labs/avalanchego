@@ -32,8 +32,8 @@ import (
 	"os"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/log"
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 )
 

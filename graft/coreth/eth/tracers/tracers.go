@@ -21,8 +21,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/core/vm"
-	gethtracers "github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/ava-labs/libevm/core/vm"
+	gethtracers "github.com/ava-labs/libevm/eth/tracers"
 )
 
 // Context contains some contextual infos for a transaction execution that is not

@@ -32,8 +32,8 @@ import (
 	mrand "math/rand"
 
 	"github.com/ava-labs/coreth/trie/trienode"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/crypto"
 )
 
 // Prng is a pseudo random number generator seeded by strong randomness.

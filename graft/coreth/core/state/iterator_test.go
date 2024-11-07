@@ -30,8 +30,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/crypto"
 )
 
 // Tests that the node iterator indeed walks over the entire database contents.

@@ -42,8 +42,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/log"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 func TestClientRequest(t *testing.T) {

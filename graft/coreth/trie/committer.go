@@ -30,7 +30,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/trie/trienode"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 // committer is the tool used for the trie Commit operation. The committer will

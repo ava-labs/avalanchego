@@ -37,10 +37,10 @@ import (
 	"github.com/ava-labs/coreth/precompile/modules"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/vmerrs"
-	"github.com/ethereum/go-ethereum/common"
-	cmath "github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ava-labs/libevm/common"
+	cmath "github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto/kzg4844"
 	"github.com/holiman/uint256"
 )
 

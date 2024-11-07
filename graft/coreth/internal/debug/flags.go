@@ -37,7 +37,7 @@ import (
 	"runtime"
 
 	"github.com/ava-labs/coreth/internal/flags"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/log"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/urfave/cli/v2"

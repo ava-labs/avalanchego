@@ -28,7 +28,7 @@ package core
 
 import (
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.

@@ -6,7 +6,7 @@ package predicate
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 // DynamicFeeExtraDataSize is defined in the predicate package to avoid a circular dependency.

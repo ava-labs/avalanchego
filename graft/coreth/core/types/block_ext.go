@@ -6,7 +6,7 @@ package types
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 func (b *Block) WithExtData(version uint32, extdata *[]byte) *Block {

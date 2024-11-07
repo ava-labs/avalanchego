@@ -25,8 +25,8 @@ import (
 	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ava-labs/coreth/trie/utils"
 	"github.com/ava-labs/coreth/triedb/database"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/gballet/go-verkle"
 	"github.com/holiman/uint256"
 )

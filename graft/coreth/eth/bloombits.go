@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ethereum/go-ethereum/common/bitutil"
+	"github.com/ava-labs/libevm/common/bitutil"
 )
 
 const (

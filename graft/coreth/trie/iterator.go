@@ -32,7 +32,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 // NodeResolver is used for looking up trie nodes before reaching into the real
