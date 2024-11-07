@@ -178,7 +178,7 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 			statelessBlock: proposalBlock,
 
 			timestamp:       initialTimestamp,
-			verifiedHeights: set.Of(uint64(0)),
+			verifiedHeights: set.Of[uint64](0),
 		},
 		executedBlockState,
 	)
@@ -276,7 +276,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 					},
 				},
 			},
-			verifiedHeights: set.Of(uint64(0)),
+			verifiedHeights: set.Of[uint64](0),
 		},
 		atomicBlockState,
 	)
@@ -405,7 +405,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 						},
 					},
 				},
-				verifiedHeights: set.Of(uint64(0)),
+				verifiedHeights: set.Of[uint64](0),
 			},
 			atomicBlockState,
 		)
