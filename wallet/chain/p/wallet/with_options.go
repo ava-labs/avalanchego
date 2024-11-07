@@ -35,7 +35,7 @@ type withOptions struct {
 }
 
 func (w *withOptions) Builder() builder.Builder {
-	return builder.NewWithOptions(
+	return builder.WithOptions(
 		w.wallet.Builder(),
 		w.options...,
 	)
