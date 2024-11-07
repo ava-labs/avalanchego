@@ -838,9 +838,6 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
-	if warpMessage.NetworkID != e.backend.Ctx.NetworkID {
-		return fmt.Errorf("expected networkID %d but got %d", e.backend.Ctx.NetworkID, warpMessage.NetworkID)
-	}
 
 	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
 	if err != nil {
