@@ -889,13 +889,13 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 			b.context.AVAXAssetID: balance,
 		}
 		toStake = map[ids.ID]uint64{}
-	)
 
-	ops := common.NewOptions(options)
-	memo := ops.Memo()
-	memoComplexity := gas.Dimensions{
-		gas.Bandwidth: uint64(len(memo)),
-	}
+		ops            = common.NewOptions(options)
+		memo           = ops.Memo()
+		memoComplexity = gas.Dimensions{
+			gas.Bandwidth: uint64(len(memo)),
+		}
+	)
 	warpComplexity, err := fee.WarpComplexity(message)
 	if err != nil {
 		return nil, err
