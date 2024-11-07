@@ -88,82 +88,6 @@ func (*standardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
-	if tx.Validator.NodeID == ids.EmptyNodeID {
-		return errEmptyNodeID
-	}
-
-	if _, err := verifyAddValidatorTx(
-		e.backend,
-		e.feeCalculator,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
-		return err
-	}
-
-	if err := e.putStaker(tx); err != nil {
-		return err
-	}
-
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
-
-	if e.backend.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.backend.Ctx.NodeID {
-		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
-			zap.String("reason", "primary network is not being fully synced"),
-			zap.Stringer("txID", txID),
-			zap.String("txType", "addValidator"),
-			zap.Stringer("nodeID", tx.Validator.NodeID),
-		)
-	}
-	return nil
-}
-
-func (e *standardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
-		e.backend,
-		e.feeCalculator,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
-		return err
-	}
-
-	if err := e.putStaker(tx); err != nil {
-		return err
-	}
-
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
-	return nil
-}
-
-func (e *standardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if _, err := verifyAddDelegatorTx(
-		e.backend,
-		e.feeCalculator,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
-		return err
-	}
-
-	if err := e.putStaker(tx); err != nil {
-		return err
-	}
-
-	txID := e.tx.ID()
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, txID, tx.Outs)
-	return nil
-}
-
 func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -261,6 +185,167 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return nil
 }
 
+func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
+	)
+	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+		return err
+	}
+
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
+
+	if e.backend.Bootstrapped.Get() {
+		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.DestinationChain); err != nil {
+			return err
+		}
+	}
+
+	// Verify the flowcheck
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	if err := e.backend.FlowChecker.VerifySpend(
+		tx,
+		e.state,
+		tx.Ins,
+		outs,
+		e.tx.Creds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return fmt.Errorf("failed verifySpend: %w", err)
+	}
+
+	txID := e.tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.state, txID, tx.Outs)
+
+	// Note: We apply atomic requests even if we are not verifying atomic
+	// requests to ensure the shared state will be correct if we later start
+	// verifying the requests.
+	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
+	for i, out := range tx.ExportedOutputs {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(len(tx.Outs) + i),
+			},
+			Asset: avax.Asset{ID: out.AssetID()},
+			Out:   out.Out,
+		}
+
+		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal UTXO: %w", err)
+		}
+		utxoID := utxo.InputID()
+		elem := &atomic.Element{
+			Key:   utxoID[:],
+			Value: utxoBytes,
+		}
+		if out, ok := utxo.Out.(avax.Addressable); ok {
+			elem.Traits = out.Addresses()
+		}
+
+		elems[i] = elem
+	}
+	e.atomicRequests = map[ids.ID]*atomic.Requests{
+		tx.DestinationChain: {
+			PutRequests: elems,
+		},
+	}
+	return nil
+}
+
+func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+	if tx.Validator.NodeID == ids.EmptyNodeID {
+		return errEmptyNodeID
+	}
+
+	if _, err := verifyAddValidatorTx(
+		e.backend,
+		e.feeCalculator,
+		e.state,
+		e.tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, txID, tx.Outs)
+
+	if e.backend.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.backend.Ctx.NodeID {
+		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", txID),
+			zap.String("txType", "addValidator"),
+			zap.Stringer("nodeID", tx.Validator.NodeID),
+		)
+	}
+	return nil
+}
+
+func (e *standardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	if err := verifyAddSubnetValidatorTx(
+		e.backend,
+		e.feeCalculator,
+		e.state,
+		e.tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, txID, tx.Outs)
+	return nil
+}
+
+func (e *standardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	if _, err := verifyAddDelegatorTx(
+		e.backend,
+		e.feeCalculator,
+		e.state,
+		e.tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, txID, tx.Outs)
+	return nil
+}
+
 func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -347,91 +432,6 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	e.atomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
 			RemoveRequests: utxoIDs,
-		},
-	}
-	return nil
-}
-
-func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
-	}
-
-	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.ExportedOutputs))
-	copy(outs, tx.Outs)
-	copy(outs[len(tx.Outs):], tx.ExportedOutputs)
-
-	if e.backend.Bootstrapped.Get() {
-		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.DestinationChain); err != nil {
-			return err
-		}
-	}
-
-	// Verify the flowcheck
-	fee, err := e.feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
-		e.state,
-		tx.Ins,
-		outs,
-		e.tx.Creds,
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
-		},
-	); err != nil {
-		return fmt.Errorf("failed verifySpend: %w", err)
-	}
-
-	txID := e.tx.ID()
-
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
-
-	// Note: We apply atomic requests even if we are not verifying atomic
-	// requests to ensure the shared state will be correct if we later start
-	// verifying the requests.
-	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
-	for i, out := range tx.ExportedOutputs {
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID:        txID,
-				OutputIndex: uint32(len(tx.Outs) + i),
-			},
-			Asset: avax.Asset{ID: out.AssetID()},
-			Out:   out.Out,
-		}
-
-		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
-		if err != nil {
-			return fmt.Errorf("failed to marshal UTXO: %w", err)
-		}
-		utxoID := utxo.InputID()
-		elem := &atomic.Element{
-			Key:   utxoID[:],
-			Value: utxoBytes,
-		}
-		if out, ok := utxo.Out.(avax.Addressable); ok {
-			elem.Traits = out.Addresses()
-		}
-
-		elems[i] = elem
-	}
-	e.atomicRequests = map[ids.ID]*atomic.Requests{
-		tx.DestinationChain: {
-			PutRequests: elems,
 		},
 	}
 	return nil
