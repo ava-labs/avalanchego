@@ -440,11 +440,11 @@ type complexityVisitor struct {
 	output gas.Dimensions
 }
 
-func (*complexityVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
+func (*complexityVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
 	return ErrUnsupportedTx
 }
 
-func (*complexityVisitor) AddDelegatorTx(*txs.AddDelegatorTx) error {
+func (*complexityVisitor) AddValidatorTx(*txs.AddValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
@@ -458,6 +458,60 @@ func (*complexityVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 
 func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrUnsupportedTx
+}
+
+func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	// TODO: Should we include additional complexity for subnets?
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	signerComplexity, err := SignerComplexity(tx.Signer)
+	if err != nil {
+		return err
+	}
+	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
+	if err != nil {
+		return err
+	}
+	validatorOwnerComplexity, err := OwnerComplexity(tx.ValidatorRewardsOwner)
+	if err != nil {
+		return err
+	}
+	delegatorOwnerComplexity, err := OwnerComplexity(tx.DelegatorRewardsOwner)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicAddPermissionlessValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&signerComplexity,
+		&outputsComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	// TODO: Should we include additional complexity for subnets?
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	ownerComplexity, err := OwnerComplexity(tx.DelegationRewardsOwner)
+	if err != nil {
+		return err
+	}
+	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
+		&baseTxComplexity,
+		&ownerComplexity,
+		&outputsComplexity,
+	)
+	return err
 }
 
 func (c *complexityVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -574,60 +628,6 @@ func (c *complexityVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidato
 	c.output, err = IntrinsicRemoveSubnetValidatorTxComplexities.Add(
 		&baseTxComplexity,
 		&authComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	// TODO: Should we include additional complexity for subnets?
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	signerComplexity, err := SignerComplexity(tx.Signer)
-	if err != nil {
-		return err
-	}
-	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
-	if err != nil {
-		return err
-	}
-	validatorOwnerComplexity, err := OwnerComplexity(tx.ValidatorRewardsOwner)
-	if err != nil {
-		return err
-	}
-	delegatorOwnerComplexity, err := OwnerComplexity(tx.DelegatorRewardsOwner)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicAddPermissionlessValidatorTxComplexities.Add(
-		&baseTxComplexity,
-		&signerComplexity,
-		&outputsComplexity,
-		&validatorOwnerComplexity,
-		&delegatorOwnerComplexity,
-	)
-	return err
-}
-
-func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	// TODO: Should we include additional complexity for subnets?
-	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
-	if err != nil {
-		return err
-	}
-	ownerComplexity, err := OwnerComplexity(tx.DelegationRewardsOwner)
-	if err != nil {
-		return err
-	}
-	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
-	if err != nil {
-		return err
-	}
-	c.output, err = IntrinsicAddPermissionlessDelegatorTxComplexities.Add(
-		&baseTxComplexity,
-		&ownerComplexity,
-		&outputsComplexity,
 	)
 	return err
 }
