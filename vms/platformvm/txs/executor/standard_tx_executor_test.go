@@ -3327,7 +3327,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
 	require.NoError(t, err)
 
-	// Create the Warp message
+	// Create the Warp messages
 	const (
 		nonce  = 1
 		weight = initialWeight + 1
