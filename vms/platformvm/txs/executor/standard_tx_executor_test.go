@@ -3198,6 +3198,13 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				},
 				sov,
 			)
+
+			hasExpiry, err := diff.HasExpiry(state.ExpiryEntry{
+				Timestamp:    expiry,
+				ValidationID: validationID,
+			})
+			require.NoError(err)
+			require.True(hasExpiry)
 		})
 	}
 }
