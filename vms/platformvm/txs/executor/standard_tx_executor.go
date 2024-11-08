@@ -56,6 +56,7 @@ var (
 	errWarpMessageExpired            = errors.New("warp message expired")
 	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
 	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
+	errCouldNotLoadSoV               = errors.New("could not load SoV")
 	errWarpMessageContainsStaleNonce = errors.New("warp message contains stale nonce")
 	errRemovingLastValidator         = errors.New("attempting to remove the last SoV from a converted subnet")
 	errStateCorruption               = errors.New("state corruption")
@@ -1012,7 +1013,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	// Verify that the message contains a valid nonce for a current validator.
 	sov, err := e.state.GetSubnetOnlyValidator(msg.ValidationID)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
 	}
 	if msg.Nonce < sov.MinNonce {
 		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, sov.MinNonce)
@@ -1031,7 +1032,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		// Verify that we are not removing the last validator.
 		weight, err := e.state.WeightOfSubnetOnlyValidators(sov.SubnetID)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not load SoV weights: %w", err)
 		}
 		if weight == sov.Weight {
 			return errRemovingLastValidator
@@ -1042,7 +1043,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		if sov.EndAccumulatedFee != 0 {
 			var remainingBalanceOwner message.PChainOwner
 			if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
-				return err
+				return fmt.Errorf("%w: remaining balance owner is malformed", errStateCorruption)
 			}
 
 			accruedFees := e.state.GetAccruedFees()
