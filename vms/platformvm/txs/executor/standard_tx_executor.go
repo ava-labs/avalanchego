@@ -56,6 +56,7 @@ var (
 	errWarpMessageExpired            = errors.New("warp message expired")
 	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
 	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
+	errWarpMessageContainsStaleNonce = errors.New("warp message contains stale nonce")
 	errRemovingLastValidator         = errors.New("attempting to remove the last SoV from a converted subnet")
 	errStateCorruption               = errors.New("state corruption")
 )
@@ -1014,7 +1015,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return err
 	}
 	if msg.Nonce < sov.MinNonce {
-		return fmt.Errorf("expected nonce to be at least %d but got %d", sov.MinNonce, msg.Nonce)
+		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, sov.MinNonce)
 	}
 
 	// Verify that the warp message was sent from the expected chain and
