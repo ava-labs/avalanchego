@@ -4,8 +4,6 @@
 package json
 
 import (
-	"errors"
-	"fmt"
 	"strconv"
 )
 
@@ -15,10 +13,6 @@ type Height struct {
 }
 
 const ProposedHeightFlag = "proposed"
-
-var errInvalidHeightFlag = errors.New(fmt.Sprintf(
-	"height flag must be either a number or \"%s\"",
-	ProposedHeightFlag))
 
 func (h Height) MarshalJSON() ([]byte, error) {
 	if h.IsProposed {

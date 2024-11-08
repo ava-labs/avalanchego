@@ -776,7 +776,7 @@ func TestGetValidatorsAt(t *testing.T) {
 
 	// Confirm that it returns the genesis validators given the latest height
 	args.Height.Numeric = avajson.Uint64(lastAcceptedBlk.Height())
-	service.GetValidatorsAt(&http.Request{}, &args, &response)
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
 	service.vm.ctx.Lock.Lock()
