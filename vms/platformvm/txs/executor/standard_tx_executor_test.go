@@ -3028,7 +3028,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			expectedErr: errWarpMessageNotYetAllowed,
 		},
 		{
-			name:    "duplicate SoV",
+			name:    "SoV previously registered",
 			balance: 1,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.PutExpiry(state.ExpiryEntry{
@@ -3090,8 +3090,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			expectedErr: safemath.ErrOverflow,
 		},
 		{
-			name:    "duplicate SoV",
-			balance: 1,
+			name: "duplicate subnetID + nodeID pair",
 			updateExecutor: func(e *standardTxExecutor) error {
 				return e.state.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
 					ValidationID: ids.GenerateTestID(),
