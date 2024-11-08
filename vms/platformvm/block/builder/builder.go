@@ -211,7 +211,12 @@ func (b *builder) ShutdownBlockTimer() {
 }
 
 func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
-	return b.BuildBlockWithContext(ctx, nil)
+	return b.BuildBlockWithContext(
+		ctx,
+		&smblock.Context{
+			PChainHeight: 0,
+		},
+	)
 }
 
 func (b *builder) BuildBlockWithContext(
@@ -245,11 +250,6 @@ func (b *builder) BuildBlockWithContext(
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
-	var pChainHeight uint64
-	if blockContext != nil {
-		pChainHeight = blockContext.PChainHeight
-	}
-
 	statelessBlk, err := buildBlock(
 		ctx,
 		b,
@@ -258,7 +258,7 @@ func (b *builder) BuildBlockWithContext(
 		timestamp,
 		timeWasCapped,
 		preferredState,
-		pChainHeight,
+		blockContext.PChainHeight,
 	)
 	if err != nil {
 		return nil, err
