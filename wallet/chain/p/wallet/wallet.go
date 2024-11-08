@@ -167,7 +167,7 @@ type Wallet interface {
 	) (*txs.Tx, error)
 
 	// IssueSetSubnetValidatorWeightTx creates, signs, and issues a transaction
-	// that sets the weight of a validator on a Permissionless L1.
+	// that sets the weight of a validator on an L1.
 	//
 	// - [message] is the Warp message that authorizes this validator's weight
 	//   to be changed

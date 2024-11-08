@@ -179,8 +179,7 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.RegisterSubnetValidatorTx, error)
 
-	// NewSetSubnetValidatorWeightTx sets the weight of a validator on a
-	// Permissionless L1.
+	// NewSetSubnetValidatorWeightTx sets the weight of a validator on an L1.
 	//
 	// - [message] is the Warp message that authorizes this validator's weight
 	//   to be changed
