@@ -339,7 +339,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					),
 				},
 			)
-			require.NoError(err)
 
 			tc.By("issuing a RegisterSubnetValidatorTx", func() {
 				_, err := pWallet.IssueRegisterSubnetValidatorTx(
