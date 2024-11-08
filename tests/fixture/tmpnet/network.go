@@ -373,10 +373,17 @@ func (n *Network) StartNodes(ctx context.Context, w io.Writer, nodesToStart ...*
 	if _, err := fmt.Fprintf(w, "\nStarted network %s (UUID: %s)\n", n.Dir, n.UUID); err != nil {
 		return err
 	}
-	// Provide a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
+
+	// Generate a link to the main dashboard filtered by the uuid and showing results from now till whenever the link is viewed
 	startTimeStr := strconv.FormatInt(startTime.UnixMilli(), 10)
 	metricsURL := MetricsLinkForNetwork(n.UUID, startTimeStr, "")
-	if _, err := fmt.Fprintf(w, "\nMetrics: %s\n", metricsURL); err != nil {
+
+	// Write link to the network path and to stdout
+	metricsPath := filepath.Join(n.Dir, "metrics.txt")
+	if err := os.WriteFile(metricsPath, []byte(metricsURL+"\n"), perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write metrics link to %s: %w", metricsPath, err)
+	}
+	if _, err := fmt.Fprintf(w, "\nMetrics: %s\nLink also saved to %s\n", metricsURL, metricsPath); err != nil {
 		return err
 	}
 

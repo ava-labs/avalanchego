@@ -211,7 +211,12 @@ func (b *builder) ShutdownBlockTimer() {
 }
 
 func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
-	return b.BuildBlockWithContext(ctx, nil)
+	return b.BuildBlockWithContext(
+		ctx,
+		&smblock.Context{
+			PChainHeight: 0,
+		},
+	)
 }
 
 func (b *builder) BuildBlockWithContext(
@@ -245,11 +250,6 @@ func (b *builder) BuildBlockWithContext(
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
-	var pChainHeight uint64
-	if blockContext != nil {
-		pChainHeight = blockContext.PChainHeight
-	}
-
 	statelessBlk, err := buildBlock(
 		ctx,
 		b,
@@ -258,7 +258,7 @@ func (b *builder) BuildBlockWithContext(
 		timestamp,
 		timeWasCapped,
 		preferredState,
-		pChainHeight,
+		blockContext.PChainHeight,
 	)
 	if err != nil {
 		return nil, err
@@ -567,32 +567,29 @@ func executeTx(
 		return false, err
 	}
 
-	executor := &txexecutor.StandardTxExecutor{
-		Backend:       backend,
-		State:         txDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-
-	err = tx.Unsigned.Visit(executor)
+	txInputs, _, _, err := txexecutor.StandardTx(
+		backend,
+		feeCalculator,
+		tx,
+		txDiff,
+	)
 	if err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
 
-	if inputs.Overlaps(executor.Inputs) {
+	if inputs.Overlaps(txInputs) {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 		return false, nil
 	}
-	err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
-	if err != nil {
+	if err := manager.VerifyUniqueInputs(parentID, txInputs); err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
-	inputs.Union(executor.Inputs)
+	inputs.Union(txInputs)
 
 	txDiff.AddTx(tx, status.Committed)
 	return true, txDiff.Apply(stateDiff)

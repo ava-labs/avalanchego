@@ -21,11 +21,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const VersionsAnnotationKey = "avalanche.avax.network/avalanchego-versions"
+// The sync mode of a bootstrap configuration should be as explicit as possible to ensure
+// unambiguous names if/when new sync modes become supported.
+//
+// For example, at time of writing only the C-Chain supports state sync. The temptation
+// might be to call this mode that tests C-Chain state sync `state-sync`. But if the P-
+// or X-Chains start supporting state sync in the future, a name like
+// `c-chain-state-sync` ensures that logs and metrics for historical results can be
+// differentiated from new results that involve state sync of the other chains.
+type SyncMode string
+
+const (
+	FullSync           SyncMode = "full-sync"
+	CChainStateSync    SyncMode = "c-chain-state-sync"     // aka state sync
+	OnlyPChainFullSync SyncMode = "p-chain-full-sync-only" // aka partial sync
+
+	VersionsAnnotationKey = "avalanche.avax.network/avalanchego-versions"
+)
 
 var (
-	chainConfigContentEnvName = config.EnvVarName(config.EnvPrefix, config.ChainConfigContentKey)
-	networkEnvName            = config.EnvVarName(config.EnvPrefix, config.NetworkNameKey)
+	chainConfigContentEnvName        = config.EnvVarName(config.EnvPrefix, config.ChainConfigContentKey)
+	networkEnvName                   = config.EnvVarName(config.EnvPrefix, config.NetworkNameKey)
+	partialSyncPrimaryNetworkEnvName = config.EnvVarName(config.EnvPrefix, config.PartialSyncPrimaryNetworkKey)
 
 	// Errors for bootstrapTestConfigForPod
 	errContainerNotFound          = errors.New("container not found")
@@ -40,10 +57,10 @@ var (
 )
 
 type BootstrapTestConfig struct {
-	Network          string            `json:"network"`
-	StateSyncEnabled bool              `json:"stateSyncEnabled"`
-	Image            string            `json:"image"`
-	Versions         *version.Versions `json:"versions,omitempty"`
+	Network  string            `json:"network"`
+	SyncMode SyncMode          `json:"syncMode"`
+	Image    string            `json:"image"`
+	Versions *version.Versions `json:"versions,omitempty"`
 }
 
 // GetBootstrapTestConfigFromPod extracts the bootstrap test configuration from the specified pod.
@@ -81,16 +98,16 @@ func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*Boot
 		return nil, fmt.Errorf("%w in container %q", errInvalidNetworkEnvVar, nodeContainerName)
 	}
 
-	// Determine whether state sync is enabled in the env vars
-	stateSyncEnabled, err := stateSyncEnabledFromEnvVars(nodeContainer.Env)
+	// Determine the sync mode from the env vars
+	syncMode, err := syncModeFromEnvVars(nodeContainer.Env)
 	if err != nil {
 		return nil, err
 	}
 
 	testConfig := &BootstrapTestConfig{
-		Network:          network,
-		StateSyncEnabled: stateSyncEnabled,
-		Image:            nodeContainer.Image,
+		Network:  network,
+		SyncMode: syncMode,
+		Image:    nodeContainer.Image,
 	}
 
 	// Attempt to retrieve the image versions from a pod annotation. The annotation may not be populated in
@@ -103,6 +120,52 @@ func bootstrapTestConfigForPod(pod *corev1.Pod, nodeContainerName string) (*Boot
 	}
 
 	return testConfig, nil
+}
+
+// syncModeFromEnvVars derives the bootstrap sync mode from the provided environment variables.
+func syncModeFromEnvVars(env []corev1.EnvVar) (SyncMode, error) {
+	partialSyncPrimaryNetwork, err := partialSyncEnabledFromEnvVars(env)
+	if err != nil {
+		return "", err
+	}
+	if partialSyncPrimaryNetwork {
+		// If partial sync is enabled, only the P-Chain will be synced so the state sync
+		// configuration of the C-Chain is irrelevant.
+		return OnlyPChainFullSync, nil
+	}
+	stateSyncEnabled, err := stateSyncEnabledFromEnvVars(env)
+	if err != nil {
+		return "", err
+	}
+	if !stateSyncEnabled {
+		// Full sync is enabled
+		return FullSync, nil
+	}
+
+	// C-Chain state sync is assumed if the other modes are not explicitly enabled
+	return CChainStateSync, nil
+}
+
+// partialSyncEnabledFromEnvVars determines whether the env vars configure partial sync
+// for a node container. Partial sync is assumed to be enabled if the
+// AVAGO_PARTIAL_SYNC_PRIMARY_NETWORK env var is set and evaluates to true.
+func partialSyncEnabledFromEnvVars(env []corev1.EnvVar) (bool, error) {
+	var rawPartialSyncPrimaryNetwork string
+	for _, envVar := range env {
+		if envVar.Name == partialSyncPrimaryNetworkEnvName {
+			rawPartialSyncPrimaryNetwork = envVar.Value
+			break
+		}
+	}
+	if len(rawPartialSyncPrimaryNetwork) == 0 {
+		return false, nil
+	}
+
+	partialSyncPrimaryNetwork, err := cast.ToBoolE(rawPartialSyncPrimaryNetwork)
+	if err != nil {
+		return false, fmt.Errorf("%w (%v): %w", errFailedToCastToBool, rawPartialSyncPrimaryNetwork, err)
+	}
+	return partialSyncPrimaryNetwork, nil
 }
 
 // stateSyncEnabledFromEnvVars determines whether the env vars configure state sync for a

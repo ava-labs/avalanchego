@@ -58,38 +58,6 @@ func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	b.b.setSubnetOwner(
-		tx.Subnet,
-		tx.Owner,
-	)
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
-	return b.baseTx(tx)
-}
-
 func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
 	err := b.b.removeUTXOs(
 		b.ctx,
@@ -123,6 +91,10 @@ func (b *backendVisitor) ExportTx(tx *txs.ExportTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
@@ -132,6 +104,34 @@ func (b *backendVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 }
 
 func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	b.b.setSubnetOwner(
+		tx.Subnet,
+		tx.Owner,
+	)
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
+	return b.baseTx(tx)
+}
+
+func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 

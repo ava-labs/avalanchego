@@ -30,29 +30,23 @@ func (*Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 }
 
 func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Context) error {
-	var pChainHeight uint64
-	if blockContext != nil {
-		pChainHeight = blockContext.PChainHeight
-	}
-
 	blkID := b.ID()
 	if blkState, ok := b.manager.blkIDToState[blkID]; ok {
-		if !blkState.verifiedHeights.Contains(pChainHeight) {
+		if !blkState.verifiedHeights.Contains(blockContext.PChainHeight) {
 			// Only the validity of warp messages need to be verified because
-			// this block has already passed verification with a different
-			// height.
+			// this block was already executed with a different block context.
 			err := VerifyWarpMessages(
 				ctx,
 				b.manager.ctx.NetworkID,
 				b.manager.ctx.ValidatorState,
-				pChainHeight,
+				blockContext.PChainHeight,
 				b,
 			)
 			if err != nil {
 				return err
 			}
 
-			blkState.verifiedHeights.Add(pChainHeight)
+			blkState.verifiedHeights.Add(blockContext.PChainHeight)
 		}
 
 		return nil // This block has already been executed.
@@ -63,7 +57,7 @@ func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Con
 		ctx,
 		b.manager.ctx.NetworkID,
 		b.manager.ctx.ValidatorState,
-		pChainHeight,
+		blockContext.PChainHeight,
 		b,
 	)
 	if err != nil {
@@ -75,12 +69,17 @@ func (b *Block) VerifyWithContext(ctx context.Context, blockContext *smblock.Con
 	return b.Visit(&verifier{
 		backend:           b.manager.backend,
 		txExecutorBackend: b.manager.txExecutorBackend,
-		pChainHeight:      pChainHeight,
+		pChainHeight:      blockContext.PChainHeight,
 	})
 }
 
 func (b *Block) Verify(ctx context.Context) error {
-	return b.VerifyWithContext(ctx, nil)
+	return b.VerifyWithContext(
+		ctx,
+		&smblock.Context{
+			PChainHeight: 0,
+		},
+	)
 }
 
 func (b *Block) Accept(context.Context) error {
