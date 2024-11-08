@@ -2987,7 +2987,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			expectedErr: errWrongWarpMessageSourceChainID,
 		},
 		{
-			name: "invalid source chain",
+			name: "invalid source address",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{
 					ChainID: chainID,
@@ -3005,7 +3005,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			expectedErr: errWarpMessageExpired,
 		},
 		{
-			name: "message too far in the future",
+			name: "message expiry too far in the future",
 			message: must[*warp.Message](t)(warp.NewMessage(
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					ctx.NetworkID,
