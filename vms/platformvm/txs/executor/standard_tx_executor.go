@@ -43,12 +43,17 @@ const (
 var (
 	_ txs.Visitor = (*standardTxExecutor)(nil)
 
-	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
-	errMaxNumActiveValidators     = errors.New("already at the max number of active validators")
+	errEmptyNodeID                   = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge      = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango    = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEtnaUpgradeNotActive          = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errTransformSubnetTxPostEtna     = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxNumActiveValidators        = errors.New("already at the max number of active validators")
+	errWrongWarpMessageSourceChainID = errors.New("wrong warp message source chain ID")
+	errWrongWarpMessageSourceAddress = errors.New("wrong warp message source address")
+	errWarpMessageExpired            = errors.New("warp message expired")
+	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
+	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -858,19 +863,19 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 	if warpMessage.SourceChainID != subnetConversion.ChainID {
-		return fmt.Errorf("expected chainID %s but got %s", subnetConversion.ChainID, warpMessage.SourceChainID)
+		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, warpMessage.SourceChainID)
 	}
 	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
-		return fmt.Errorf("expected address %s but got %s", subnetConversion.Addr, addressedCall.SourceAddress)
+		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, addressedCall.SourceAddress)
 	}
 
 	// Verify that the message contains a valid expiry time.
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
 	if msg.Expiry <= currentTimestampUnix {
-		return fmt.Errorf("expected expiry to be after %d but got %d", currentTimestampUnix, msg.Expiry)
+		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
 	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterSubnetValidatorTxExpiryWindow {
-		return fmt.Errorf("expected expiry not to be more than %d seconds in the future but got %d", RegisterSubnetValidatorTxExpiryWindow, secondsUntilExpiry)
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterSubnetValidatorTxExpiryWindow)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -884,7 +889,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 	if isDuplicate {
-		return fmt.Errorf("expiry for %s already exists", validationID)
+		return fmt.Errorf("%w for validationID %s", errWarpMessageAlreadyIssued, validationID)
 	}
 
 	// Verify proof of possession provided by the transaction against the public
