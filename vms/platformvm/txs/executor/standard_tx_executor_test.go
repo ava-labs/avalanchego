@@ -3554,6 +3554,34 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 			},
 		},
 		{
+			name: "remove deactivated validator with nonce overflow",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							validationID,
+							math.MaxUint64,
+							0,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				// Add another validator to allow removal
+				if err := increaseL1Weight(1)(e); err != nil {
+					return err
+				}
+
+				sov := initialSoV
+				sov.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+		},
+		{
 			name:    "should have been previously deactivated",
 			message: removeValidatorWarpMessage.Bytes(),
 			updateExecutor: func(e *standardTxExecutor) error {
