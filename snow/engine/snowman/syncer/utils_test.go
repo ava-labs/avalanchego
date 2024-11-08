@@ -107,7 +107,7 @@ func buildTestsObjects(
 		startupTracker,
 		sender,
 		beacons,
-		beacons.Count(ctx.SubnetID),
+		beacons.NumValidators(ctx.SubnetID),
 		alpha,
 		nil,
 		fullVM,

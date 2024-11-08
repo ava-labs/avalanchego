@@ -167,6 +167,7 @@ HOME
             │       └── config.json                      // Custom chain configuration for all nodes
             ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
+            ├── metrics.txt                              // Link for metrics and logs collected from the network (see: Monitoring)
             ├── network.env                              // Sets network dir env var to simplify network usage
             └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
@@ -269,6 +270,11 @@ LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./build/tmpnetctl start-network
+
+# Configure metrics collection from a local node binding to the default API
+# port of 9650 and storing its logs in ~/.avalanchego/logs. The script will
+# also emit a link to grafana.
+./scripts/configure-local-metrics-collection.sh
 ```
 
 ### Metrics collection

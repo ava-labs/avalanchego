@@ -221,67 +221,104 @@ func advanceTimeTo(
 		changed = true
 	}
 
-	// Remove all expiries whose timestamp now implies they can never be
-	// re-issued.
-	//
-	// The expiry timestamp is the time at which it is no longer valid, so any
-	// expiry with a timestamp less than or equal to the new chain time can be
-	// removed.
-	//
-	// Ref: https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/77-reinventing-subnets#registersubnetvalidatortx
-	//
-	// The expiry iterator is sorted in order of increasing timestamp.
-	//
-	// Invariant: It is not safe to modify the state while iterating over it,
-	// so we use the parentState's iterator rather than the changes iterator.
+	if !backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
+		changes.SetTimestamp(newChainTime)
+		return changes, changed, nil
+	}
+
+	newChainTimeUnix := uint64(newChainTime.Unix())
+	if err := removeStaleExpiries(parentState, changes, newChainTimeUnix); err != nil {
+		return nil, false, fmt.Errorf("failed to remove stale expiries: %w", err)
+	}
+
+	// Calculate number of seconds the time is advancing
+	previousChainTime := changes.GetTimestamp()
+	seconds := uint64(newChainTime.Sub(previousChainTime) / time.Second)
+
+	advanceDynamicFeeState(backend.Config.DynamicFeeConfig, changes, seconds)
+	sovsChanged, err := advanceValidatorFeeState(
+		backend.Config.ValidatorFeeConfig,
+		parentState,
+		changes,
+		seconds,
+	)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to advance validator fee state: %w", err)
+	}
+	changed = changed || sovsChanged
+
+	changes.SetTimestamp(newChainTime)
+	return changes, changed, nil
+}
+
+// Remove all expiries whose timestamp now implies they can never be re-issued.
+//
+// The expiry timestamp is the time at which it is no longer valid, so any
+// expiry with a timestamp less than or equal to the new chain time can be
+// removed.
+//
+// Ref: https://github.com/avalanche-foundation/ACPs/tree/e333b335c34c8692d84259d21bd07b2bb849dc2c/ACPs/77-reinventing-subnets#registerl1validatortx
+func removeStaleExpiries(
+	parentState state.Chain,
+	changes state.Diff,
+	newChainTimeUnix uint64,
+) error {
+	// Invariant: It is not safe to modify the state while iterating over it, so
+	// we use the parentState's iterator rather than the changes iterator.
 	// ParentState must not be modified before this iterator is released.
 	expiryIterator, err := parentState.GetExpiryIterator()
 	if err != nil {
-		return nil, false, err
+		return fmt.Errorf("could not iterate over expiries: %w", err)
 	}
 	defer expiryIterator.Release()
 
-	newChainTimeUnix := uint64(newChainTime.Unix())
 	for expiryIterator.Next() {
 		expiry := expiryIterator.Value()
+		// The expiry iterator is sorted in order of increasing timestamp. Once
+		// we find a non-expired expiry, we can break.
 		if expiry.Timestamp > newChainTimeUnix {
 			break
 		}
 
 		changes.DeleteExpiry(expiry)
 	}
+	return nil
+}
 
-	if !backend.Config.UpgradeConfig.IsEtnaActivated(newChainTime) {
-		changes.SetTimestamp(newChainTime)
-		return changes, changed, nil
-	}
-
-	// Advance the dynamic fees state
-	previousChainTime := changes.GetTimestamp()
-	duration := uint64(newChainTime.Sub(previousChainTime) / time.Second)
-
+func advanceDynamicFeeState(
+	config gas.Config,
+	changes state.Diff,
+	seconds uint64,
+) {
 	dynamicFeeState := changes.GetFeeState()
 	dynamicFeeState = dynamicFeeState.AdvanceTime(
-		backend.Config.DynamicFeeConfig.MaxCapacity,
-		backend.Config.DynamicFeeConfig.MaxPerSecond,
-		backend.Config.DynamicFeeConfig.TargetPerSecond,
-		duration,
+		config.MaxCapacity,
+		config.MaxPerSecond,
+		config.TargetPerSecond,
+		seconds,
 	)
 	changes.SetFeeState(dynamicFeeState)
+}
 
+// advanceValidatorFeeState advances the validator fee state by [seconds]. SoVs
+// are read from [parentState] and written to [changes] to avoid modifying state
+// while an iterator is held.
+func advanceValidatorFeeState(
+	config fee.Config,
+	parentState state.Chain,
+	changes state.Diff,
+	seconds uint64,
+) (bool, error) {
 	validatorFeeState := fee.State{
 		Current: gas.Gas(changes.NumActiveSubnetOnlyValidators()),
 		Excess:  changes.GetSoVExcess(),
 	}
-	validatorCost := validatorFeeState.CostOf(
-		backend.Config.ValidatorFeeConfig,
-		duration,
-	)
+	validatorCost := validatorFeeState.CostOf(config, seconds)
 
 	accruedFees := changes.GetAccruedFees()
-	accruedFees, err = math.Add(accruedFees, validatorCost)
+	accruedFees, err := math.Add(accruedFees, validatorCost)
 	if err != nil {
-		return nil, false, err
+		return false, fmt.Errorf("could not calculate accrued fees: %w", err)
 	}
 
 	// Invariant: It is not safe to modify the state while iterating over it,
@@ -289,31 +326,30 @@ func advanceTimeTo(
 	// ParentState must not be modified before this iterator is released.
 	sovIterator, err := parentState.GetActiveSubnetOnlyValidatorsIterator()
 	if err != nil {
-		return nil, false, err
+		return false, fmt.Errorf("could not iterate over active SoVs: %w", err)
 	}
 	defer sovIterator.Release()
 
+	var changed bool
 	for sovIterator.Next() {
 		sov := sovIterator.Value()
+		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
+		// EndAccumulatedFee, so we can break early.
 		if sov.EndAccumulatedFee > accruedFees {
 			break
 		}
 
 		sov.EndAccumulatedFee = 0 // Deactivate the validator
 		if err := changes.PutSubnetOnlyValidator(sov); err != nil {
-			return nil, false, err
+			return false, fmt.Errorf("could not deactivate SoV %s: %w", sov.ValidationID, err)
 		}
 		changed = true
 	}
 
-	validatorFeeState = validatorFeeState.AdvanceTime(
-		backend.Config.ValidatorFeeConfig.Target,
-		duration,
-	)
+	validatorFeeState = validatorFeeState.AdvanceTime(config.Target, seconds)
 	changes.SetSoVExcess(validatorFeeState.Excess)
 	changes.SetAccruedFees(accruedFees)
-	changes.SetTimestamp(newChainTime)
-	return changes, changed, nil
+	return changed, nil
 }
 
 func GetRewardsCalculator(

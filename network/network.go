@@ -778,7 +778,7 @@ func (n *network) samplePeers(
 	// As an optimization, if there are fewer validators than
 	// [numValidatorsToSample], only attempt to sample [numValidatorsToSample]
 	// validators to potentially avoid iterating over the entire peer set.
-	numValidatorsToSample := min(config.Validators, n.config.Validators.Count(subnetID))
+	numValidatorsToSample := min(config.Validators, n.config.Validators.NumValidators(subnetID))
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()

@@ -84,6 +84,16 @@ func (c *staticVisitor) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return nil
 }
 
+func (c *staticVisitor) ImportTx(*txs.ImportTx) error {
+	c.fee = c.config.TxFee
+	return nil
+}
+
+func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
+	c.fee = c.config.TxFee
+	return nil
+}
+
 func (c *staticVisitor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	c.fee = c.config.TxFee
 	return nil
@@ -91,11 +101,6 @@ func (c *staticVisitor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) er
 
 func (c *staticVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	c.fee = c.config.TransformSubnetTxFee
-	return nil
-}
-
-func (c *staticVisitor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
-	c.fee = c.config.TxFee
 	return nil
 }
 
@@ -117,17 +122,12 @@ func (c *staticVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDe
 	return nil
 }
 
+func (c *staticVisitor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	c.fee = c.config.TxFee
+	return nil
+}
+
 func (c *staticVisitor) BaseTx(*txs.BaseTx) error {
-	c.fee = c.config.TxFee
-	return nil
-}
-
-func (c *staticVisitor) ImportTx(*txs.ImportTx) error {
-	c.fee = c.config.TxFee
-	return nil
-}
-
-func (c *staticVisitor) ExportTx(*txs.ExportTx) error {
 	c.fee = c.config.TxFee
 	return nil
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -41,7 +42,6 @@ import (
 	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
-	platformvmsdk "github.com/ava-labs/avalanchego/vms/platformvm"
 	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
@@ -52,13 +52,18 @@ const (
 	registerWeight  = genesisWeight / 10
 	updatedWeight   = 2 * registerWeight
 	registerBalance = 0
+
+	// Validator registration attempts expire 5 minutes after they are created
+	expiryDelay = 5 * time.Minute
+	// P2P message requests timeout after 10 seconds
+	p2pTimeout = 10 * time.Second
 )
 
-var _ = e2e.DescribePChain("[Permissionless L1]", func() {
+var _ = e2e.DescribePChain("[L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("creates and updates Permissionless L1", func() {
+	ginkgo.It("creates and updates L1 validators", func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
 
@@ -69,7 +74,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 			now := time.Now()
 			if !upgrades.IsEtnaActivated(now) {
-				ginkgo.Skip("Etna is not activated. Permissionless L1s are enabled post-Etna, skipping test.")
+				ginkgo.Skip("Etna is not activated. L1s are enabled post-Etna, skipping test.")
 			}
 		})
 
@@ -78,7 +83,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			keychain   = env.NewKeychain()
 			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet    = baseWallet.P()
-			pClient    = platformvmsdk.NewClient(nodeURI.URI)
+			pClient    = platformvm.NewClient(nodeURI.URI)
 			owner      = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
@@ -119,7 +124,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 			require.NoError(err)
 			require.Equal(
-				platformvmsdk.GetSubnetClientResponse{
+				platformvm.GetSubnetClientResponse{
 					IsPermissioned: true,
 					ControlKeys: []ids.ShortID{
 						keychain.Keys[0].Address(),
@@ -143,6 +148,35 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 
 			chainID = chainTx.ID()
+		})
+
+		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
+			height, err := pClient.GetHeight(tc.DefaultContext())
+			require.NoError(err)
+
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			require.NoError(err)
+			require.Equal(expectedValidators, subnetValidators)
+		}
+		tc.By("verifying the Permissioned Subnet is configured as expected", func() {
+			tc.By("verifying the subnet reports as permissioned", func() {
+				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.GetSubnetClientResponse{
+						IsPermissioned: true,
+						ControlKeys: []ids.ShortID{
+							keychain.Keys[0].Address(),
+						},
+						Threshold: 1,
+					},
+					subnet,
+				)
+			})
+
+			tc.By("verifying the validator set is empty", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{})
+			})
 		})
 
 		tc.By("creating the genesis validator")
@@ -171,11 +205,6 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			}),
 		)
 		require.NoError(err)
-		defer func() {
-			genesisPeerMessages.Close()
-			genesisPeer.StartClose()
-			require.NoError(genesisPeer.AwaitClosed(tc.DefaultContext()))
-		}()
 
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetTx", func() {
@@ -196,15 +225,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.NoError(err)
 		})
 
-		verifyValidatorSet := func(expectedValidators map[ids.NodeID]*snowvalidators.GetValidatorOutput) {
-			height, err := pClient.GetHeight(tc.DefaultContext())
-			require.NoError(err)
-
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
-			require.NoError(err)
-			require.Equal(expectedValidators, subnetValidators)
-		}
-		tc.By("verifying the Permissioned Subnet was converted to a Permissionless L1", func() {
+		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
@@ -223,7 +244,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 				subnet, err := pClient.GetSubnet(tc.DefaultContext(), subnetID)
 				require.NoError(err)
 				require.Equal(
-					platformvmsdk.GetSubnetClientResponse{
+					platformvm.GetSubnetClientResponse{
 						IsPermissioned: false,
 						ControlKeys: []ids.ShortID{
 							keychain.Keys[0].Address(),
@@ -269,11 +290,12 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 		})
 
 		tc.By("creating the RegisterSubnetValidatorMessage")
+		expiry := uint64(time.Now().Add(expiryDelay).Unix()) // This message will expire in 5 minutes
 		registerSubnetValidatorMessage, err := warpmessage.NewRegisterSubnetValidator(
 			subnetID,
 			subnetRegisterNode.NodeID,
 			registerNodePoP.PublicKey,
-			uint64(time.Now().Add(5*time.Minute).Unix()),
+			expiry,
 			warpmessage.PChainOwner{},
 			warpmessage.PChainOwner{},
 			registerWeight,
@@ -308,16 +330,13 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.True(ok)
 
 			tc.By("creating the signed warp message to register the validator")
-			signers := set.NewBits()
-			signers.Add(0) // [signers] has weight from the genesis peer
-
-			var sigBytes [bls.SignatureLen]byte
-			copy(sigBytes[:], bls.SignatureToBytes(registerSubnetValidatorSignature))
 			registerSubnetValidator, err := warp.NewMessage(
 				unsignedRegisterSubnetValidator,
 				&warp.BitSetSignature{
-					Signers:   signers.Bytes(),
-					Signature: sigBytes,
+					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis peer
+					Signature: ([bls.SignatureLen]byte)(
+						bls.SignatureToBytes(registerSubnetValidatorSignature),
+					),
 				},
 			)
 			require.NoError(err)
@@ -350,7 +369,7 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 
 		var nextNonce uint64
 		setWeight := func(validationID ids.ID, weight uint64) {
-			tc.By("creating the unsigned warp message")
+			tc.By("creating the unsigned SubnetValidatorWeightMessage")
 			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 				networkID,
 				chainID,
@@ -380,23 +399,20 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			require.True(ok)
 
 			tc.By("creating the signed warp message to increase the weight of the validator")
-			signers := set.NewBits()
-			signers.Add(0) // [signers] has weight from the genesis peer
-
-			var sigBytes [bls.SignatureLen]byte
-			copy(sigBytes[:], bls.SignatureToBytes(setSubnetValidatorWeightSignature))
-			registerSubnetValidator, err := warp.NewMessage(
+			setSubnetValidatorWeight, err := warp.NewMessage(
 				unsignedSubnetValidatorWeight,
 				&warp.BitSetSignature{
-					Signers:   signers.Bytes(),
-					Signature: sigBytes,
+					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis peer
+					Signature: ([bls.SignatureLen]byte)(
+						bls.SignatureToBytes(setSubnetValidatorWeightSignature),
+					),
 				},
 			)
 			require.NoError(err)
 
 			tc.By("issuing a SetSubnetValidatorWeightTx", func() {
 				_, err := pWallet.IssueSetSubnetValidatorWeightTx(
-					registerSubnetValidator.Bytes(),
+					setSubnetValidatorWeight.Bytes(),
 				)
 				require.NoError(err)
 			})
@@ -442,6 +458,10 @@ var _ = e2e.DescribePChain("[Permissionless L1]", func() {
 			})
 		})
 
+		genesisPeerMessages.Close()
+		genesisPeer.StartClose()
+		require.NoError(genesisPeer.AwaitClosed(tc.DefaultContext()))
+
 		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })
@@ -454,7 +474,7 @@ func wrapWarpSignatureRequest(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
-		10*time.Second,
+		p2pTimeout,
 	)
 	if err != nil {
 		return nil, err

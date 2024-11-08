@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log"
-	"os"
 	"time"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -27,28 +26,24 @@ func main() {
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	chainID := ids.FromStringOrPanic("2BMFrJ9xeh5JdwZEx6uuFcjfZC2SV2hdbMT8ee5HrvjtfJb5br")
-	addressHex := ""
+	address := []byte{}
 	validationID := ids.FromStringOrPanic("2Y3ZZZXxpzm46geqVuqFXeSFVbeKihgrfeXRDaiF4ds6R2N8M5")
 	nonce := uint64(1)
 	weight := uint64(2)
+	blsSKHex := "3f783929b295f16cd1172396acb23b20eed057b9afb1caa419e9915f92860b35"
 
-	address, err := hex.DecodeString(addressHex)
+	blsSKBytes, err := hex.DecodeString(blsSKHex)
 	if err != nil {
-		log.Fatalf("failed to decode address %q: %s\n", addressHex, err)
+		log.Fatalf("failed to decode secret key: %s\n", err)
 	}
 
-	skBytes, err := os.ReadFile("/Users/stephen/.avalanchego/staking/signer.key")
-	if err != nil {
-		log.Fatalf("failed to read signer key: %s\n", err)
-	}
-
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk, err := bls.SecretKeyFromBytes(blsSKBytes)
 	if err != nil {
 		log.Fatalf("failed to parse secret key: %s\n", err)
 	}
 
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
-	// [uri] is hosting and registers [subnetID].
+	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
 	ctx := context.Background()
 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
@@ -96,19 +91,18 @@ func main() {
 		log.Fatalf("failed to create unsigned Warp message: %s\n", err)
 	}
 
-	signers := set.NewBits()
-	signers.Add(0) // [signers] has weight from [vdr[0]]
-
-	unsignedBytes := unsignedWarp.Bytes()
-	sig := bls.Sign(sk, unsignedBytes)
-	sigBytes := [bls.SignatureLen]byte{}
-	copy(sigBytes[:], bls.SignatureToBytes(sig))
-
 	warp, err := warp.NewMessage(
 		unsignedWarp,
 		&warp.BitSetSignature{
-			Signers:   signers.Bytes(),
-			Signature: sigBytes,
+			Signers: set.NewBits(0).Bytes(),
+			Signature: ([bls.SignatureLen]byte)(
+				bls.SignatureToBytes(
+					bls.Sign(
+						sk,
+						unsignedWarp.Bytes(),
+					),
+				),
+			),
 		},
 	)
 	if err != nil {
