@@ -123,6 +123,10 @@ func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) baseTx(tx *txs.BaseTx) error {
 	return b.b.removeUTXOs(
 		b.ctx,

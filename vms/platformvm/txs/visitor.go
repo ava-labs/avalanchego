@@ -28,4 +28,5 @@ type Visitor interface {
 
 	// Etna Transactions:
 	ConvertSubnetTx(*ConvertSubnetTx) error
+	RegisterSubnetValidatorTx(*RegisterSubnetValidatorTx) error
 }

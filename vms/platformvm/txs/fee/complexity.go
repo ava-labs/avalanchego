@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// TODO: Before Etna, address all TODOs in this package and ensure ACP-103
+// compliance.
 package fee
 
 import (
@@ -195,6 +197,15 @@ var (
 		gas.DBRead:  2, // subnet auth + manager lookup
 		gas.DBWrite: 2, // manager + weight
 		gas.Compute: 0,
+	}
+	IntrinsicRegisterSubnetValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			wrappers.LongLen + // balance
+			bls.SignatureLen + // proof of possession
+			wrappers.IntLen, // message length
+		gas.DBRead:  0, // TODO
+		gas.DBWrite: 0, // TODO
+		gas.Compute: 0, // TODO: Include PoP verification time
 	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
@@ -434,6 +445,14 @@ func SignerComplexity(s signer.Signer) (gas.Dimensions, error) {
 	default:
 		return gas.Dimensions{}, errUnsupportedSigner
 	}
+}
+
+// WarpComplexity returns the complexity a warp message adds to a transaction.
+func WarpComplexity(message []byte) (gas.Dimensions, error) {
+	// TODO: Implement me
+	return gas.Dimensions{
+		gas.Bandwidth: uint64(len(message)),
+	}, nil
 }
 
 type complexityVisitor struct {
@@ -682,6 +701,22 @@ func (c *complexityVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		&gas.Dimensions{
 			gas.Bandwidth: uint64(len(tx.Address)),
 		},
+	)
+	return err
+}
+
+func (c *complexityVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	warpComplexity, err := WarpComplexity(tx.Message)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicRegisterSubnetValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&warpComplexity,
 	)
 	return err
 }

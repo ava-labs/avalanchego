@@ -26,10 +26,18 @@ import (
 )
 
 const (
-	validatorSetsCacheSize        = 64
-	maxRecentlyAcceptedWindowSize = 64
-	minRecentlyAcceptedWindowSize = 0
-	recentlyAcceptedWindowTTL     = 30 * time.Second
+	// MaxRecentlyAcceptedWindowSize is the maximum number of blocks that the
+	// recommended minimum height will lag behind the last accepted block.
+	MaxRecentlyAcceptedWindowSize = 64
+	// MinRecentlyAcceptedWindowSize is the minimum number of blocks that the
+	// recommended minimum height will lag behind the last accepted block.
+	MinRecentlyAcceptedWindowSize = 0
+	// RecentlyAcceptedWindowTTL is the amount of time after a block is accepted
+	// to avoid recommending it as the minimum height. The size constraints take
+	// precedence over this time constraint.
+	RecentlyAcceptedWindowTTL = 30 * time.Second
+
+	validatorSetsCacheSize = 64
 )
 
 var (
@@ -111,9 +119,9 @@ func NewManager(
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
-				MaxSize: maxRecentlyAcceptedWindowSize,
-				MinSize: minRecentlyAcceptedWindowSize,
-				TTL:     recentlyAcceptedWindowTTL,
+				MaxSize: MaxRecentlyAcceptedWindowSize,
+				MinSize: MinRecentlyAcceptedWindowSize,
+				TTL:     RecentlyAcceptedWindowTTL,
 			},
 		),
 	}

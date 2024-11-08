@@ -131,6 +131,10 @@ func (*proposalTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return ErrWrongTxType
 }
 
+func (*proposalTxExecutor) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into

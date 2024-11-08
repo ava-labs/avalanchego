@@ -112,6 +112,10 @@ func (*atomicTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return ErrWrongTxType
 }
 
+func (*atomicTxExecutor) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
 	return e.atomicTx()
 }

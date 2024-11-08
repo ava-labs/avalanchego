@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -155,6 +156,20 @@ func (w *withOptions) IssueConvertSubnetTx(
 		chainID,
 		address,
 		validators,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) IssueRegisterSubnetValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueRegisterSubnetValidatorTx(
+		balance,
+		proofOfPossession,
+		message,
 		common.UnionOptions(w.options, options)...,
 	)
 }

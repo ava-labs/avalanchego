@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -20,21 +21,40 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+)
+
+// TODO: Before Etna, ensure that the maximum number of expiries to track is
+// limited to a reasonable number by this window.
+const (
+	second                                = 1
+	minute                                = 60 * second
+	hour                                  = 60 * minute
+	day                                   = 24 * hour
+	RegisterSubnetValidatorTxExpiryWindow = day
 )
 
 var (
 	_ txs.Visitor = (*standardTxExecutor)(nil)
 
-	errEmptyNodeID                = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge   = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive       = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errTransformSubnetTxPostEtna  = errors.New("TransformSubnetTx is not permitted post-Etna")
-	errMaxNumActiveValidators     = errors.New("already at the max number of active validators")
+	errEmptyNodeID                   = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge      = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango    = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEtnaUpgradeNotActive          = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errTransformSubnetTxPostEtna     = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxNumActiveValidators        = errors.New("already at the max number of active validators")
+	errCouldNotLoadSubnetConversion  = errors.New("could not load subnet conversion")
+	errWrongWarpMessageSourceChainID = errors.New("wrong warp message source chain ID")
+	errWrongWarpMessageSourceAddress = errors.New("wrong warp message source address")
+	errWarpMessageExpired            = errors.New("warp message expired")
+	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
+	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -777,6 +797,165 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			Addr:         tx.Address,
 		},
 	)
+	return nil
+}
+
+func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		upgrades         = e.backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	fee, err = math.Add(fee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.backend.FlowChecker.VerifySpend(
+		tx,
+		e.state,
+		tx.Ins,
+		tx.Outs,
+		e.tx.Creds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	// Parse the warp message.
+	warpMessage, err := warp.ParseMessage(tx.Message)
+	if err != nil {
+		return err
+	}
+	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
+	if err != nil {
+		return err
+	}
+	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
+	if err != nil {
+		return err
+	}
+	if err := msg.Verify(); err != nil {
+		return err
+	}
+
+	// Verify that the warp message was sent from the expected chain and
+	// address.
+	subnetConversion, err := e.state.GetSubnetConversion(msg.SubnetID)
+	if err != nil {
+		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, msg.SubnetID, err)
+	}
+	if warpMessage.SourceChainID != subnetConversion.ChainID {
+		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, warpMessage.SourceChainID)
+	}
+	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
+		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, addressedCall.SourceAddress)
+	}
+
+	// Verify that the message contains a valid expiry time.
+	currentTimestampUnix := uint64(currentTimestamp.Unix())
+	if msg.Expiry <= currentTimestampUnix {
+		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
+	}
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterSubnetValidatorTxExpiryWindow {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterSubnetValidatorTxExpiryWindow)
+	}
+
+	// Verify that this warp message isn't being replayed.
+	validationID := msg.ValidationID()
+	expiry := state.ExpiryEntry{
+		Timestamp:    msg.Expiry,
+		ValidationID: validationID,
+	}
+	isDuplicate, err := e.state.HasExpiry(expiry)
+	if err != nil {
+		return err
+	}
+	if isDuplicate {
+		return fmt.Errorf("%w for validationID %s", errWarpMessageAlreadyIssued, validationID)
+	}
+
+	// Verify proof of possession provided by the transaction against the public
+	// key provided by the warp message.
+	pop := signer.ProofOfPossession{
+		PublicKey:         msg.BLSPublicKey,
+		ProofOfPossession: tx.ProofOfPossession,
+	}
+	if err := pop.Verify(); err != nil {
+		return err
+	}
+
+	// Create the SoV.
+	nodeID, err := ids.ToNodeID(msg.NodeID)
+	if err != nil {
+		return err
+	}
+	remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.RemainingBalanceOwner)
+	if err != nil {
+		return err
+	}
+	deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &msg.DisableOwner)
+	if err != nil {
+		return err
+	}
+	sov := state.SubnetOnlyValidator{
+		ValidationID:          validationID,
+		SubnetID:              msg.SubnetID,
+		NodeID:                nodeID,
+		PublicKey:             bls.PublicKeyToUncompressedBytes(pop.Key()),
+		RemainingBalanceOwner: remainingBalanceOwner,
+		DeactivationOwner:     deactivationOwner,
+		StartTime:             currentTimestampUnix,
+		Weight:                msg.Weight,
+		MinNonce:              0,
+		EndAccumulatedFee:     0, // If Balance is 0, this is will remain 0
+	}
+
+	// If the balance is non-zero, this validator should be initially active.
+	if tx.Balance != 0 {
+		// Verify that there is space for an active validator.
+		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+			return errMaxNumActiveValidators
+		}
+
+		// Mark the validator as active.
+		currentFees := e.state.GetAccruedFees()
+		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.state, txID, tx.Outs)
+	// Prevent this warp message from being replayed
+	e.state.PutExpiry(expiry)
 	return nil
 }
 
