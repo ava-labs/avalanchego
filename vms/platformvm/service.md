@@ -1771,13 +1771,14 @@ Get the validators and their weights of a Subnet or the Primary Network at a giv
 ```sh
 platform.getValidatorsAt(
     {
-        height: int,
+        height: string,
         subnetID: string, // optional
     }
 )
 ```
 
-- `height` is the P-Chain height to get the validator set at.
+- `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
+  to return the validator set at this node's ProposerVM height. 
 - `subnetID` is the Subnet ID to get the validator set of. If not given, gets validator set of the
   Primary Network.
 

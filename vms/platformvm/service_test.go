@@ -830,7 +830,7 @@ func TestGetValidatorsAt(t *testing.T) {
 
 	// Confirm that it returns the genesis validators + the new validator given the latest height
 	args.Height.Numeric = avajson.Uint64(newLastAcceptedBlk.Height())
-	service.GetValidatorsAt(&http.Request{}, &args, &response)
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators)+1)
 
 	// Confirm that [IsProposed] works. The proposed height should be the genesis height
@@ -839,8 +839,20 @@ func TestGetValidatorsAt(t *testing.T) {
 		Numeric:    avajson.Uint64(newLastAcceptedBlk.Height()),
 		IsProposed: true,
 	}
-	service.GetValidatorsAt(&http.Request{}, &args, &response)
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
+
+	service.vm.ctx.Lock.Lock()
+
+	// set clock beyond the [validators.recentlyAcceptedWindowTTL] to bump the
+	// proposerVM height
+	service.vm.clock.Set(newLastAcceptedBlk.Timestamp().Add(40 * time.Second))
+	service.vm.ctx.Lock.Unlock()
+
+	// Resending the same request with [IsProposed] set to true should now
+	// include the new validator
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators, len(genesis.Validators)+1)
 }
 
 func TestGetTimestamp(t *testing.T) {
