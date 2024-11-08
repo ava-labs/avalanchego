@@ -115,10 +115,12 @@ type SubnetOnlyValidator struct {
 	// the weight is being set to 0, which removes the validator from the set.
 	MinNonce uint64 `serialize:"true"`
 
-	// EndAccumulatedFee is the amount of globally accumulated fees that can
-	// accrue before this validator must be deactivated. It is equal to the
-	// amount of fees this validator is willing to pay plus the amount of
-	// globally accumulated fees when this validator started validating.
+	// EndAccumulatedFee is the amount of accumulated fees per validator that
+	// can accrue before this validator must be deactivated. It is equal to the
+	// amount of fees this validator is willing to pay plus the total amount of
+	// fees a validator would have needed to pay from the activation of the Etna
+	// upgrade until this validator was registered. Note that this relies on the
+	// fact that every validator is charged the same fee for each unit of time.
 	//
 	// If this value is 0, the validator is inactive.
 	EndAccumulatedFee uint64 `serialize:"true"`

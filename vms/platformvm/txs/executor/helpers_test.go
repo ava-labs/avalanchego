@@ -220,13 +220,13 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            testSubnet1,
-	}
-	require.NoError(testSubnet1.Unsigned.Visit(&executor))
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		testSubnet1,
+		stateDiff,
+	)
+	require.NoError(err)
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
