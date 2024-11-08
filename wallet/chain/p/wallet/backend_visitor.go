@@ -11,10 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -62,71 +58,6 @@ func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	b.b.setOwner(
-		tx.Subnet,
-		tx.Owner,
-	)
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
-	for i, vdr := range tx.Validators {
-		b.b.setOwner(
-			tx.Subnet.Prefix(uint64(i)),
-			&secp256k1fx.OutputOwners{
-				Threshold: vdr.DeactivationOwner.Threshold,
-				Addrs:     vdr.DeactivationOwner.Addresses,
-			},
-		)
-	}
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
-	warpMessage, err := warp.ParseMessage(tx.Message)
-	if err != nil {
-		return err
-	}
-	addressedCallPayload, err := payload.ParseAddressedCall(warpMessage.Payload)
-	if err != nil {
-		return err
-	}
-	registerSubnetValidatorMessage, err := message.ParseRegisterSubnetValidator(addressedCallPayload.Payload)
-	if err != nil {
-		return err
-	}
-
-	b.b.setOwner(
-		registerSubnetValidatorMessage.ValidationID(),
-		&secp256k1fx.OutputOwners{
-			Threshold: registerSubnetValidatorMessage.DisableOwner.Threshold,
-			Addrs:     registerSubnetValidatorMessage.DisableOwner.Addresses,
-		},
-	)
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
-func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
-	return b.baseTx(tx)
-}
-
 func (b *backendVisitor) ImportTx(tx *txs.ImportTx) error {
 	err := b.b.removeUTXOs(
 		b.ctx,
@@ -160,6 +91,10 @@ func (b *backendVisitor) ExportTx(tx *txs.ExportTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
@@ -169,6 +104,38 @@ func (b *backendVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 }
 
 func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	b.b.setOwner(
+		tx.Subnet,
+		tx.Owner,
+	)
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
+	return b.baseTx(tx)
+}
+
+func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
