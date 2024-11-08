@@ -991,6 +991,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return err
 	}
 
+	// Parse the warp message.
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
 		return err
@@ -1007,6 +1008,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return err
 	}
 
+	// Verify that the message contains a valid nonce for a current validator.
 	sov, err := e.state.GetSubnetOnlyValidator(msg.ValidationID)
 	if err != nil {
 		return err
@@ -1023,8 +1025,9 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 
 	txID := e.tx.ID()
 
-	// We are removing the validator
+	// Check if we are removing the validator.
 	if msg.Weight == 0 {
+		// Verify that we are not removing the last validator.
 		weight, err := e.state.WeightOfSubnetOnlyValidators(sov.SubnetID)
 		if err != nil {
 			return err
@@ -1033,7 +1036,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 			return errRemovingLastValidator
 		}
 
-		// The validator is currently active, we need to refund the remaining
+		// If the validator is currently active, we need to refund the remaining
 		// balance.
 		if sov.EndAccumulatedFee != 0 {
 			var remainingBalanceOwner message.PChainOwner
