@@ -330,15 +330,13 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.True(ok)
 
 			tc.By("creating the signed warp message to register the validator")
-			signers := set.NewBits(0) // [signers] has weight from the genesis peer
-
-			var sigBytes [bls.SignatureLen]byte
-			copy(sigBytes[:], bls.SignatureToBytes(registerSubnetValidatorSignature))
 			registerSubnetValidator, err := warp.NewMessage(
 				unsignedRegisterSubnetValidator,
 				&warp.BitSetSignature{
-					Signers:   signers.Bytes(),
-					Signature: sigBytes,
+					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis peer
+					Signature: ([bls.SignatureLen]byte)(
+						bls.SignatureToBytes(registerSubnetValidatorSignature),
+					),
 				},
 			)
 			require.NoError(err)
@@ -401,8 +399,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.True(ok)
 
 			tc.By("creating the signed warp message to increase the weight of the validator")
-			signers := set.NewBits()
-			signers.Add(0) // [signers] has weight from the genesis peer
+			signers := set.NewBits(0) // [signers] has weight from the genesis peer
 
 			var sigBytes [bls.SignatureLen]byte
 			copy(sigBytes[:], bls.SignatureToBytes(setSubnetValidatorWeightSignature))
