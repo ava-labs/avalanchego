@@ -49,6 +49,7 @@ var (
 	errEtnaUpgradeNotActive          = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna     = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators        = errors.New("already at the max number of active validators")
+	errCouldNotLoadSubnetConversion  = errors.New("could not load subnet conversion")
 	errWrongWarpMessageSourceChainID = errors.New("wrong warp message source chain ID")
 	errWrongWarpMessageSourceAddress = errors.New("wrong warp message source address")
 	errWarpMessageExpired            = errors.New("warp message expired")
@@ -860,7 +861,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	// address.
 	subnetConversion, err := e.state.GetSubnetConversion(msg.SubnetID)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, msg.SubnetID, err)
 	}
 	if warpMessage.SourceChainID != subnetConversion.ChainID {
 		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, warpMessage.SourceChainID)

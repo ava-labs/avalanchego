@@ -2976,7 +2976,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				)),
 				warpSignature,
 			)).Bytes(),
-			expectedErr: database.ErrNotFound,
+			expectedErr: errCouldNotLoadSubnetConversion,
 		},
 		{
 			name: "invalid source chain",
