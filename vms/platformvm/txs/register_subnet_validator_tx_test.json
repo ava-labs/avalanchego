@@ -1,0 +1,175 @@
+{
+	"networkID": 10,
+	"blockchainID": "11111111111111111111111111111111LpoYY",
+	"outputs": [
+		{
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 87654321,
+				"output": {
+					"addresses": [],
+					"amount": 1,
+					"locktime": 12345678,
+					"threshold": 0
+				}
+			}
+		},
+		{
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"output": {
+				"locktime": 876543210,
+				"output": {
+					"addresses": [
+						"P-testing1g32kvaugnx4tk3z4vemc3xd2hdz92enhgrdu9n"
+					],
+					"amount": 18446744073709551615,
+					"locktime": 0,
+					"threshold": 1
+				}
+			}
+		}
+	],
+	"inputs": [
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 1,
+			"assetID": "FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1000000000,
+				"signatureIndices": [
+					2,
+					5
+				]
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 2,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"locktime": 876543210,
+				"input": {
+					"amount": 17293822569102704639,
+					"signatureIndices": [
+						0
+					]
+				}
+			}
+		},
+		{
+			"txID": "2wiU5PnFTjTmoAXGZutHAsPF36qGGyLHYHj9G1Aucfmb3JFFGN",
+			"outputIndex": 3,
+			"assetID": "2Ab62uWwJw1T6VvmKD36ufsiuGZuX1pGykXAvPX1LtjTRHxwcc",
+			"fxID": "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ",
+			"input": {
+				"amount": 1152921504606846976,
+				"signatureIndices": []
+			}
+		}
+	],
+	"memo": "0xf09f98850a77656c6c2074686174277301234521",
+	"balance": 1000000000,
+	"proofOfPossession": [
+		140,
+		253,
+		121,
+		9,
+		209,
+		83,
+		185,
+		96,
+		75,
+		98,
+		177,
+		67,
+		186,
+		54,
+		32,
+		123,
+		183,
+		230,
+		72,
+		103,
+		66,
+		68,
+		128,
+		32,
+		42,
+		103,
+		220,
+		104,
+		118,
+		131,
+		70,
+		217,
+		92,
+		144,
+		152,
+		60,
+		45,
+		39,
+		156,
+		100,
+		196,
+		60,
+		81,
+		19,
+		107,
+		42,
+		5,
+		224,
+		22,
+		2,
+		213,
+		42,
+		166,
+		55,
+		111,
+		218,
+		23,
+		250,
+		110,
+		42,
+		24,
+		160,
+		131,
+		228,
+		157,
+		156,
+		69,
+		14,
+		171,
+		123,
+		137,
+		177,
+		213,
+		85,
+		93,
+		165,
+		196,
+		137,
+		135,
+		46,
+		2,
+		183,
+		229,
+		34,
+		123,
+		119,
+		85,
+		10,
+		241,
+		51,
+		14,
+		90,
+		113,
+		248,
+		195,
+		104
+	],
+	"message": "0x6d657373616765"
+}

@@ -37,7 +37,7 @@ func ParseAddressedCall(b []byte) (*AddressedCall, error) {
 	}
 	payload, ok := payloadIntf.(*AddressedCall)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", errWrongType, payloadIntf)
+		return nil, fmt.Errorf("%w: %T", ErrWrongType, payloadIntf)
 	}
 	return payload, nil
 }

@@ -5,6 +5,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/google/btree"
 
@@ -271,6 +272,34 @@ type diffValidator struct {
 
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker
+}
+
+func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
+	weightDiff := ValidatorWeightDiff{
+		Decrease: d.validatorStatus == deleted,
+	}
+	if d.validatorStatus != unmodified {
+		weightDiff.Amount = d.validator.Weight
+	}
+
+	for _, staker := range d.deletedDelegators {
+		if err := weightDiff.Sub(staker.Weight); err != nil {
+			return ValidatorWeightDiff{}, fmt.Errorf("failed to decrease node weight diff: %w", err)
+		}
+	}
+
+	addedDelegatorIterator := iterator.FromTree(d.addedDelegators)
+	defer addedDelegatorIterator.Release()
+
+	for addedDelegatorIterator.Next() {
+		staker := addedDelegatorIterator.Value()
+
+		if err := weightDiff.Add(staker.Weight); err != nil {
+			return ValidatorWeightDiff{}, fmt.Errorf("failed to increase node weight diff: %w", err)
+		}
+	}
+
+	return weightDiff, nil
 }
 
 // GetValidator attempts to fetch the validator with the given subnetID and

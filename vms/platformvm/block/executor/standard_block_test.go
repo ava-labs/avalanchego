@@ -62,6 +62,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
 	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
+	onParentAccept.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(&iterator.Empty[state.SubnetOnlyValidator]{}, nil).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(

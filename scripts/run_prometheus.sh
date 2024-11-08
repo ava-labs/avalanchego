@@ -2,17 +2,16 @@
 
 set -euo pipefail
 
-# Starts a prometheus instance in agent-mode, forwarding to a central
-# instance. Intended to enable metrics collection from temporary networks running
-# locally and in CI.
+# - Starts a prometheus instance in agent-mode to collect metrics from nodes running
+#   locally and in CI.
 #
-# The prometheus instance will remain running in the background and will forward
-# metrics to the central instance for all tmpnet networks.
+# - promtail will remain running in the background and will forward metrics to the
+#   specified prometheus endpoint.
 #
-# To stop it:
+# - Each node is configured with a file written to ~/.tmpnet/prometheus/file_sd_configs
 #
-#   $ kill -9 `cat ~/.tmpnet/prometheus/run.pid` && rm ~/.tmpnet/prometheus/run.pid
-#
+# - To stop the running instance:
+#     $ kill -9 `cat ~/.tmpnet/promtheus/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
 # PROMETHEUS_ID=<id> PROMETHEUS_PASSWORD=<password> ./scripts/run_prometheus.sh
@@ -45,7 +44,7 @@ fi
 
 PROMETHEUS_PASSWORD="${PROMETHEUS_PASSWORD:-}"
 if [[ -z "${PROMETHEUS_PASSWORD}" ]]; then
-  echo "Plase provide a value for PROMETHEUS_PASSWORD"
+  echo "Please provide a value for PROMETHEUS_PASSWORD"
   exit 1
 fi
 
@@ -64,13 +63,13 @@ if ! command -v "${CMD}" &> /dev/null; then
 
     # Determine the arch
     if which sw_vers &> /dev/null; then
-      echo "on macos, only amd64 binaries are available so rosetta is required on apple silicon machines."
-      echo "to avoid using rosetta, install via homebrew: brew install prometheus"
+      echo "On macos, only amd64 binaries are available so rosetta is required on apple silicon machines."
+      echo "To avoid using rosetta, install via homebrew: brew install prometheus"
       DIST=darwin
     else
       ARCH="$(uname -i)"
       if [[ "${ARCH}" != "x86_64" ]]; then
-        echo "on linux, only amd64 binaries are available. manual installation of prometheus is required."
+        echo "On linux, only amd64 binaries are available. manual installation of prometheus is required."
         exit 1
       else
         DIST="linux"
@@ -90,8 +89,8 @@ fi
 FILE_SD_PATH="${PROMETHEUS_WORKING_DIR}/file_sd_configs"
 mkdir -p "${FILE_SD_PATH}"
 
-echo "writing configuration..."
-cat >"${PROMETHEUS_WORKING_DIR}"/prometheus.yaml <<EOL
+CONFIG_PATH="${PROMETHEUS_WORKING_DIR}/prometheus.yaml"
+cat > "${CONFIG_PATH}" <<EOL
 # my global config
 global:
   # Make sure this value takes into account the network-shutdown-delay in tests/fixture/e2e/env.go
@@ -112,9 +111,12 @@ remote_write:
       username: "${PROMETHEUS_ID}"
       password: "${PROMETHEUS_PASSWORD}"
 EOL
+echo "Wrote configuration to ${CONFIG_PATH}"
 
-echo "starting prometheus..."
+echo "Starting prometheus..."
 cd "${PROMETHEUS_WORKING_DIR}"
 nohup "${CMD}" --config.file=prometheus.yaml --web.listen-address=localhost:0 --enable-feature=agent > prometheus.log 2>&1 &
 echo $! > "${PIDFILE}"
-echo "running with pid $(cat "${PIDFILE}")"
+echo "prometheus started with pid $(cat "${PIDFILE}")"
+# shellcheck disable=SC2016
+echo 'To stop prometheus: "kill -SIGTERM `cat ~/.tmpnet/prometheus/run.pid` && rm ~/.tmpnet/prometheus/run.pid"'

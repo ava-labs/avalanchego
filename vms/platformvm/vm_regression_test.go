@@ -1971,6 +1971,22 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	}
 }
 
+func TestValidatorSetReturnsCopy(t *testing.T) {
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+
+	validators1, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	require.NoError(err)
+
+	validators2, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	require.NoError(err)
+
+	require.NotNil(validators1[genesistest.DefaultNodeIDs[0]])
+	delete(validators1, genesistest.DefaultNodeIDs[0])
+	require.NotNil(validators2[genesistest.DefaultNodeIDs[0]])
+}
+
 func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	// A primary network validator and a subnet validator are running.
 	// Primary network validator terminates its staking cycle.
