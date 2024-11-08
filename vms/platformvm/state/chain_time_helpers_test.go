@@ -15,10 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 func TestNextBlockTime(t *testing.T) {
@@ -82,6 +86,13 @@ func TestNextBlockTime(t *testing.T) {
 }
 
 func TestGetNextStakerChangeTime(t *testing.T) {
+	config := validatorfee.Config{
+		Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+		Target:                   genesis.LocalParams.ValidatorFeeConfig.Target,
+		MinPrice:                 gas.Price(2 * units.NanoAvax), // Increase minimum price to test fractional seconds
+		ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+	}
+
 	tests := []struct {
 		name     string
 		pending  []*Staker
@@ -113,18 +124,60 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "current and subnet only validators",
+			name: "subnet only validator with less than 1 second of fees",
 			sovs: []SubnetOnlyValidator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
 					NodeID:            ids.GenerateTestNodeID(),
 					Weight:            1,
-					EndAccumulatedFee: 1, // This validator should be evicted in 1 second.
+					EndAccumulatedFee: 1, // This validator should be evicted in .5 seconds, which is rounded to 0.
+				},
+			},
+			maxTime:  mockable.MaxTime,
+			expected: genesistest.DefaultValidatorStartTime,
+		},
+		{
+			name: "subnet only validator with 1 second of fees",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1,
+					EndAccumulatedFee: 2, // This validator should be evicted in 1 second.
 				},
 			},
 			maxTime:  mockable.MaxTime,
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
+		},
+		{
+			name: "subnet only validator with less than 2 seconds of fees",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1,
+					EndAccumulatedFee: 3, // This validator should be evicted in 1.5 seconds, which is rounded to 1.
+				},
+			},
+			maxTime:  mockable.MaxTime,
+			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
+		},
+		{
+			name: "current and subnet only validator with high balance",
+			sovs: []SubnetOnlyValidator{
+				{
+					ValidationID:      ids.GenerateTestID(),
+					SubnetID:          ids.GenerateTestID(),
+					NodeID:            ids.GenerateTestNodeID(),
+					Weight:            1,
+					EndAccumulatedFee: units.Avax, // This validator won't be evicted soon.
+				},
+			},
+			maxTime:  mockable.MaxTime,
+			expected: genesistest.DefaultValidatorEndTime,
 		},
 		{
 			name:     "restricted timestamp",
@@ -146,7 +199,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			}
 
 			actual, err := GetNextStakerChangeTime(
-				genesis.LocalParams.ValidatorFeeConfig,
+				config,
 				s,
 				test.maxTime,
 			)
@@ -169,19 +222,19 @@ func TestPickFeeCalculator(t *testing.T) {
 
 	tests := []struct {
 		fork     upgradetest.Fork
-		expected fee.Calculator
+		expected txfee.Calculator
 	}{
 		{
 			fork:     upgradetest.ApricotPhase2,
-			expected: fee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
+			expected: txfee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
 		},
 		{
 			fork:     upgradetest.ApricotPhase3,
-			expected: fee.NewStaticCalculator(staticFeeConfig),
+			expected: txfee.NewStaticCalculator(staticFeeConfig),
 		},
 		{
 			fork: upgradetest.Etna,
-			expected: fee.NewDynamicCalculator(
+			expected: txfee.NewDynamicCalculator(
 				dynamicFeeConfig.Weights,
 				dynamicFeeConfig.MinPrice,
 			),

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -676,6 +677,42 @@ func TestConvertSubnetTxSyntacticVerify(t *testing.T) {
 				SubnetAuth: validSubnetAuth,
 			},
 			expectedErr: ErrZeroWeight,
+		},
+		{
+			name: "invalid validator nodeID length",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []*ConvertSubnetValidator{
+					{
+						NodeID:                utils.RandomBytes(ids.NodeIDLen + 1),
+						Weight:                1,
+						Signer:                *signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner:     message.PChainOwner{},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: hashing.ErrInvalidHashLen,
+		},
+		{
+			name: "invalid validator nodeID",
+			tx: &ConvertSubnetTx{
+				BaseTx: validBaseTx,
+				Subnet: validSubnetID,
+				Validators: []*ConvertSubnetValidator{
+					{
+						NodeID:                ids.EmptyNodeID[:],
+						Weight:                1,
+						Signer:                *signer.NewProofOfPossession(sk),
+						RemainingBalanceOwner: message.PChainOwner{},
+						DeactivationOwner:     message.PChainOwner{},
+					},
+				},
+				SubnetAuth: validSubnetAuth,
+			},
+			expectedErr: errEmptyNodeID,
 		},
 		{
 			name: "invalid validator pop",

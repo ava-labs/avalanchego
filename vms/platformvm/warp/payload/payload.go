@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-var errWrongType = errors.New("wrong payload type")
+var ErrWrongType = errors.New("wrong payload type")
 
 // Payload provides a common interface for all payloads implemented by this
 // package.
