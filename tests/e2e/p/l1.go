@@ -399,7 +399,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.True(ok)
 
 			tc.By("creating the signed warp message to increase the weight of the validator")
-			registerSubnetValidator, err := warp.NewMessage(
+			setSubnetValidatorWeight, err := warp.NewMessage(
 				unsignedSubnetValidatorWeight,
 				&warp.BitSetSignature{
 					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis peer
@@ -412,7 +412,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 			tc.By("issuing a SetSubnetValidatorWeightTx", func() {
 				_, err := pWallet.IssueSetSubnetValidatorWeightTx(
-					registerSubnetValidator.Bytes(),
+					setSubnetValidatorWeight.Bytes(),
 				)
 				require.NoError(err)
 			})
