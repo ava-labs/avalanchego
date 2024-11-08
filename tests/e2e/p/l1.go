@@ -369,7 +369,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		var nextNonce uint64
 		setWeight := func(validationID ids.ID, weight uint64) {
-			tc.By("creating the unsigned warp message")
+			tc.By("creating the unsigned SubnetValidatorWeightMessage")
 			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 				networkID,
 				chainID,
