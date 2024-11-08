@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
 	"testing"
 	"time"
 
@@ -752,6 +753,94 @@ func TestGetCurrentValidators(t *testing.T) {
 		}
 		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))
 	}
+}
+
+func TestGetValidatorsAt(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t, upgradetest.Latest)
+
+	genesis := genesistest.New(t, genesistest.Config{})
+
+	args := GetValidatorsAtArgs{
+		Height:   avajson.Height{},
+		SubnetID: constants.PrimaryNetworkID,
+	}
+	response := GetValidatorsAtReply{}
+
+	service.vm.ctx.Lock.Lock()
+	lastAccepted := service.vm.manager.LastAccepted()
+	lastAcceptedBlk, err := service.vm.manager.GetBlock(lastAccepted)
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+
+	// Confirm that it returns the genesis validators given the latest height
+	args.Height.Numeric = avajson.Uint64(lastAcceptedBlk.Height())
+	service.GetValidatorsAt(&http.Request{}, &args, &response)
+	require.Len(response.Validators, len(genesis.Validators))
+
+	service.vm.ctx.Lock.Lock()
+
+	wallet := newWallet(t, service.vm, walletConfig{})
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+				End:    uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+				Wght:   service.vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		signer.NewProofOfPossession(sk),
+		service.vm.ctx.AVAXAssetID,
+		rewardsOwner,
+		rewardsOwner,
+		0,
+		common.WithMemo([]byte{}),
+	)
+
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	service.vm.ctx.Lock.Lock()
+
+	block, err := service.vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	blk := block.(*blockexecutor.Block)
+	require.NoError(blk.Verify(context.Background()))
+
+	require.NoError(blk.Accept(context.Background()))
+	service.vm.ctx.Lock.Unlock()
+
+	newLastAccepted := service.vm.manager.LastAccepted()
+	newLastAcceptedBlk, err := service.vm.manager.GetBlock(newLastAccepted)
+	require.NoError(err)
+	require.NotEqual(newLastAccepted, lastAccepted)
+
+	// Confirm that it returns the genesis validators + the new validator given the latest height
+	args.Height.Numeric = avajson.Uint64(newLastAcceptedBlk.Height())
+	service.GetValidatorsAt(&http.Request{}, &args, &response)
+	require.Len(response.Validators, len(genesis.Validators)+1)
+
+	// Confirm that [IsProposed] works. The proposed height should be the genesis height
+	// and the [newLastAcceptedBlk] should be ignored since [IsProposed] is true
+	args.Height = avajson.Height{
+		Numeric:    avajson.Uint64(newLastAcceptedBlk.Height()),
+		IsProposed: true,
+	}
+	service.GetValidatorsAt(&http.Request{}, &args, &response)
+	require.Len(response.Validators, len(genesis.Validators))
 }
 
 func TestGetTimestamp(t *testing.T) {
