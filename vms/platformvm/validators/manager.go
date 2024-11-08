@@ -33,9 +33,8 @@ const (
 	// recommended minimum height will lag behind the last accepted block.
 	MinRecentlyAcceptedWindowSize = 0
 	// RecentlyAcceptedWindowTTL is the amount of time after a block is accepted
-	// to avoid recommending it as the minimum height. If the evicting, or not
-	// evicting, the block would violate either the maxiumum or minimum window
-	// size, the block will not be evicted.
+	// to avoid recommending it as the minimum height. The size constraints take
+	// precedence over this time constraint.
 	RecentlyAcceptedWindowTTL = 30 * time.Second
 
 	validatorSetsCacheSize = 64
