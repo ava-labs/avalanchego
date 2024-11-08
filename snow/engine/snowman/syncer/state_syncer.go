@@ -373,7 +373,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		if votingStakes < ss.Alpha {
 			ss.Ctx.Log.Debug("restarting state sync",
 				zap.String("reason", "not enough votes received"),
-				zap.Int("numBeacons", ss.StateSyncBeacons.Count(ss.Ctx.SubnetID)),
+				zap.Int("numBeacons", ss.StateSyncBeacons.NumValidators(ss.Ctx.SubnetID)),
 				zap.Int("numFailedSyncers", ss.failedVoters.Len()),
 			)
 			return ss.startup(ctx)

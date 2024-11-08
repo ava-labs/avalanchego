@@ -46,7 +46,7 @@ var (
 				MaxPerSecond:    250_000,
 				TargetPerSecond: 125_000, // Target block size ~125KB
 				MinPrice:        1,
-				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
+				// ExcessConversionConstant = (MaxPerSecond - TargetPerSecond) * NumberOfSecondsPerDoubling / ln(2)
 				//
 				// ln(2) is a float and the result is consensus critical, so we
 				// hardcode the result.

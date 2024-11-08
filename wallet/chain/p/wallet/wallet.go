@@ -142,7 +142,7 @@ type Wallet interface {
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
-	// - [validators] specifies the initial SoVs of the converted subnet
+	// - [validators] specifies the initial SoVs of the L1
 	IssueConvertSubnetTx(
 		subnetID ids.ID,
 		chainID ids.ID,
@@ -152,7 +152,7 @@ type Wallet interface {
 	) (*txs.Tx, error)
 
 	// IssueRegisterSubnetValidatorTx creates, signs, and issues a transaction
-	// that adds a validator to a Permissionless L1.
+	// that adds a validator to an L1.
 	//
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp

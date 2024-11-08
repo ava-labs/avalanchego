@@ -12,22 +12,30 @@ node is running be compatible with the historical data of that
 network. Bootstrapping regularly is a good way of insuring against
 regressions in compatibility.
 
-### Types of bootstrap testing for C-Chain
+### Sync modes for bootstrap testing
 
-The X-Chain and P-Chain always synchronize all state, but the bulk of
-data for testnet and mainnet is on the C-Chain and there are 2 options:
+The 'sync mode' for a bootstrap test determines what history will be
+processed (fetched and executed) during the bootstrap process of a
+non-validating node. There are 3 such modes:
 
-#### State Sync
+#### C-Chain State Sync
 
-A bootstrap with state sync enabled (the default) ensures that only
-recent blocks will be processed.
+In this mode, the full history of the X- and P-Chains will
+processed. Only recent blocks of the C-Chain will be processed. This
+is the default mode.
+
+#### Only P-Chain Full Sync
+
+In this mode, only the full history of the P-Chain will be
+processed. This is the expected mode for L1 validators. This mode is
+configured by the supplying the `--partial-sync-primary-network`
+flag.
 
 #### Full Sync
 
-All history will be processed, though with pruning (enabled by
-default) not all history will be stored.
-
-To enable, supply `state-sync-enabled: false` as C-Chain configuration.
+In this mode, the full history of the X-, P- and C-Chains will be
+processed. This is configured by including
+`state-sync-enabled:false` in the C-Chain configuration.
 
 ## Overview
 
@@ -48,9 +56,18 @@ and initiates a new test when one is found.
    - The network targeted by the test is determined by the value of
      the `AVAGO_NETWORK_NAME` env var set for the avalanchego
      container.
-   - Whether state sync is enabled is determined by the value of the
-     `AVAGO_CHAIN_CONFIG_CONTENT` env var set for the avalanchego
-     container.
+   - By default, the sync mode will be `c-chain-state-sync`. The other sync
+     modes require providing additional configuration:
+     - The `only-p-chain-full-sync` mode is enabled by setting the
+       `AVAGO_PARTIAL_SYNC_PRIMARY_NETWORK` env var to `"true"` for
+       the avalanchego container. If this mode is enabled, the state
+       sync configuration for the C-Chain will be ignored.
+     - The `full-sync` mode is enabled by including
+       `state-sync-enabled:false` in the
+       `AVAGO_CHAIN_CONFIG_CONTENT` env var set for the avalanchego
+       container and either not including a value for
+       `AVAGO_PARTIAL_SYNC_PRIMARY_NETWORK` or setting it to
+       `"false"`.
    - The image used by the test is determined by the image configured
      for the avalanchego container.
    - The versions of the avalanchego image used by the test is

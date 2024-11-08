@@ -316,6 +316,15 @@ func TestDiffSubnetOnlyValidatorsErrors(t *testing.T) {
 			expectedErr: ErrMutatedSubnetOnlyValidator,
 		},
 		{
+			name:                     "conflicting legacy subnetID and nodeID pair",
+			initialEndAccumulatedFee: 1,
+			sov: SubnetOnlyValidator{
+				ValidationID: ids.GenerateTestID(),
+				NodeID:       defaultValidatorNodeID,
+			},
+			expectedErr: ErrConflictingSubnetOnlyValidator,
+		},
+		{
 			name:                     "duplicate active subnetID and nodeID pair",
 			initialEndAccumulatedFee: 1,
 			sov: SubnetOnlyValidator{
@@ -340,6 +349,12 @@ func TestDiffSubnetOnlyValidatorsErrors(t *testing.T) {
 			require := require.New(t)
 
 			state := newTestState(t, memdb.New())
+
+			require.NoError(state.PutCurrentValidator(&Staker{
+				TxID:     ids.GenerateTestID(),
+				SubnetID: sov.SubnetID,
+				NodeID:   defaultValidatorNodeID,
+			}))
 
 			sov.EndAccumulatedFee = test.initialEndAccumulatedFee
 			require.NoError(state.PutSubnetOnlyValidator(sov))

@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -24,9 +26,17 @@ import (
 )
 
 const (
+	// MaxRecentlyAcceptedWindowSize is the maximum number of blocks that the
+	// recommended minimum height will lag behind the last accepted block.
 	MaxRecentlyAcceptedWindowSize = 64
+	// MinRecentlyAcceptedWindowSize is the minimum number of blocks that the
+	// recommended minimum height will lag behind the last accepted block.
 	MinRecentlyAcceptedWindowSize = 0
-	RecentlyAcceptedWindowTTL     = 30 * time.Second
+	// RecentlyAcceptedWindowTTL is the amount of time after a block is accepted
+	// to avoid recommending it as the minimum height. If the evicting, or not
+	// evicting, the block would violate either the maxiumum or minimum window
+	// size, the block will not be evicted.
+	RecentlyAcceptedWindowTTL = 30 * time.Second
 
 	validatorSetsCacheSize = 64
 )
@@ -49,6 +59,9 @@ type Manager interface {
 
 type State interface {
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
+
+	// TODO: Remove after Etna is activated
+	GetEtnaHeight() (uint64, error)
 
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
@@ -196,12 +209,26 @@ func (m *manager) GetValidatorSet(
 
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
+		return maps.Clone(validatorSet), nil
+	}
+
+	etnaHeight, err := m.state.GetEtnaHeight()
+	if err != nil && err != database.ErrNotFound {
+		return nil, err
 	}
 
 	// get the start time to track metrics
 	startTime := m.clk.Time()
-	validatorSet, currentHeight, err := m.makeValidatorSet(ctx, targetHeight, subnetID)
+
+	var (
+		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
+		currentHeight uint64
+	)
+	if subnetID == constants.PrimaryNetworkID || (err == nil && targetHeight >= etnaHeight) {
+		validatorSet, currentHeight, err = m.makeValidatorSet(ctx, targetHeight, subnetID)
+	} else {
+		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +240,7 @@ func (m *manager) GetValidatorSet(
 	m.metrics.IncValidatorSetsCreated()
 	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
-	return validatorSet, nil
+	return maps.Clone(validatorSet), nil
 }
 
 func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
@@ -239,7 +266,64 @@ func (m *manager) makeValidatorSet(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	subnetValidatorSet, currentHeight, err := m.getCurrentValidatorSet(ctx, subnetID)
+	validatorSet, currentHeight, err := m.getCurrentValidatorSet(ctx, subnetID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if currentHeight < targetHeight {
+		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
+			subnetID,
+			currentHeight,
+			targetHeight,
+		)
+	}
+
+	// Rebuild subnet validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyValidatorWeightDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		subnetID,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		subnetID,
+	)
+	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getCurrentValidatorSet(
+	ctx context.Context,
+	subnetID ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetMap := m.cfg.Validators.GetMap(subnetID)
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return subnetMap, currentHeight, err
+}
+
+// TODO: Once Etna has been activated, remove this function and use
+// makeValidatorSet for all validator set lookups.
+func (m *manager) makeSubnetValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+	subnetID ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetValidatorSet, primaryValidatorSet, currentHeight, err := m.getCurrentValidatorSets(ctx, subnetID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -270,23 +354,37 @@ func (m *manager) makeValidatorSet(
 		return nil, 0, err
 	}
 
+	// Update the subnet validator set to include the public keys at
+	// [currentHeight]. When we apply the public key diffs, we will convert
+	// these keys to represent the public keys at [targetHeight]. If the subnet
+	// validator is not currently a primary network validator, it doesn't have a
+	// key at [currentHeight].
+	for nodeID, vdr := range subnetValidatorSet {
+		if primaryVdr, ok := primaryValidatorSet[nodeID]; ok {
+			vdr.PublicKey = primaryVdr.PublicKey
+		} else {
+			vdr.PublicKey = nil
+		}
+	}
+
 	err = m.state.ApplyValidatorPublicKeyDiffs(
 		ctx,
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
-		subnetID,
+		constants.PrimaryNetworkID,
 	)
 	return subnetValidatorSet, currentHeight, err
 }
 
-func (m *manager) getCurrentValidatorSet(
+func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	subnetMap := m.cfg.Validators.GetMap(subnetID)
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return subnetMap, currentHeight, err
+	return subnetMap, primaryMap, currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
