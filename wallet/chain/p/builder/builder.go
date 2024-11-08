@@ -962,7 +962,7 @@ func (b *builder) NewSetSubnetValidatorWeightTx(
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := fee.IntrinsicRegisterSubnetValidatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicSetSubnetValidatorWeightTxComplexities.Add(
 		&memoComplexity,
 		&warpComplexity,
 	)

@@ -862,15 +862,8 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 
 	// Verify that the warp message was sent from the expected chain and
 	// address.
-	subnetConversion, err := e.state.GetSubnetConversion(msg.SubnetID)
-	if err != nil {
-		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, msg.SubnetID, err)
-	}
-	if warpMessage.SourceChainID != subnetConversion.ChainID {
-		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, warpMessage.SourceChainID)
-	}
-	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
-		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, addressedCall.SourceAddress)
+	if err := verifyL1Conversion(e.state, msg.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
+		return err
 	}
 
 	// Verify that the message contains a valid expiry time.
@@ -1022,15 +1015,10 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		return fmt.Errorf("expected nonce to be at least %d but got %d", sov.MinNonce, msg.Nonce)
 	}
 
-	subnetConversion, err := e.state.GetSubnetConversion(sov.SubnetID)
-	if err != nil {
+	// Verify that the warp message was sent from the expected chain and
+	// address.
+	if err := verifyL1Conversion(e.state, sov.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
 		return err
-	}
-	if warpMessage.SourceChainID != subnetConversion.ChainID {
-		return fmt.Errorf("expected chainID %s but got %s", subnetConversion.ChainID, warpMessage.SourceChainID)
-	}
-	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
-		return fmt.Errorf("expected address %s but got %s", subnetConversion.Addr, addressedCall.SourceAddress)
 	}
 
 	txID := e.tx.ID()
@@ -1055,9 +1043,9 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 
 			accruedFees := e.state.GetAccruedFees()
 			if sov.EndAccumulatedFee <= accruedFees {
-				// This check should be unreachable. However, including it ensures
-				// that AVAX can't get minted out of thin air due to state
-				// corruption.
+				// This check should be unreachable. However, it prevents AVAX
+				// from being minted due to state corruption. This also prevents
+				// invalid UTXOs from being created (with 0 value).
 				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 			}
 			remainingBalance := sov.EndAccumulatedFee - accruedFees
@@ -1082,8 +1070,11 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 		}
 	}
 
-	// If the weight is being set to 0, the validator is being removed and the
-	// nonce doesn't matter.
+	// If the weight is being set to 0, it is possible for the nonce increment
+	// to overflow. However, the validator is being removed and the nonce
+	// doesn't matter. If weight is not 0, [msg.Nonce] is enforced by
+	// [msg.Verify()] to be less than MaxUInt64 and can therefore be incremented
+	// without overflow.
 	sov.MinNonce = msg.Nonce + 1
 	sov.Weight = msg.Weight
 	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
@@ -1165,6 +1156,27 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 		e.state.PutPendingDelegator(staker)
 	default:
 		return fmt.Errorf("staker %s, unexpected priority %d", staker.TxID, priority)
+	}
+	return nil
+}
+
+// verifyL1Conversion verifies that the L1 conversion of [subnetID] references
+// the [expectedChainID] and [expectedAddress].
+func verifyL1Conversion(
+	state state.Chain,
+	subnetID ids.ID,
+	expectedChainID ids.ID,
+	expectedAddress []byte,
+) error {
+	subnetConversion, err := state.GetSubnetConversion(subnetID)
+	if err != nil {
+		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, subnetID, err)
+	}
+	if expectedChainID != subnetConversion.ChainID {
+		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, expectedChainID)
+	}
+	if !bytes.Equal(expectedAddress, subnetConversion.Addr) {
+		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, expectedAddress)
 	}
 	return nil
 }
