@@ -100,6 +100,8 @@ type State interface {
 		endHeight uint64,
 		subnetID ids.ID,
 	) error
+
+	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 }
 
 func NewManager(
@@ -408,4 +410,12 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 
 func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
+}
+
+func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+	vdrs, currentHeight, err := m.state.GetCurrentValidatorSet(ctx, subnetID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return vdrs, currentHeight, nil
 }
