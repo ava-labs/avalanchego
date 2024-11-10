@@ -162,8 +162,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	}
 }
 
-// verifySubnetValidatorCanNotValidate verifies that the validationID is
-// currently a validator.
+// verifySubnetValidatorRegistered verifies that the validationID is currently a
+// validator.
 func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
 	validationID ids.ID,
 ) *common.AppError {
@@ -187,8 +187,9 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
 	return nil
 }
 
-// verifySubnetValidatorCanNotValidate verifies that the validationID is not
-// currently a validator.
+// verifySubnetValidatorNotCurrentlyRegistered verifies that the validationID
+// could only correspond to a validator from a ConvertSubnetTx and that it is
+// not currently a validator.
 func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	validationID ids.ID,
 	justification *platformvm.SubnetIDIndex,
@@ -249,7 +250,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	return nil
 }
 
-// verifySubnetValidatorCanNotValidate verifies that the validationID does not
+// verifySubnetValidatorCanNotValidate verifies that the validationID is not
 // currently and can never become a validator.
 func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	validationID ids.ID,
@@ -294,6 +295,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 		return nil // The expiry time has passed
 	}
 
+	// If the validation ID was successfully registered and then removed, it can
+	// never be re-used again even if its expiry has not yet passed.
 	hasExpiry, err := s.state.HasExpiry(state.ExpiryEntry{
 		Timestamp:    justification.Expiry,
 		ValidationID: validationID,
