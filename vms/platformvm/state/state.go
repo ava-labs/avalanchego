@@ -526,7 +526,7 @@ func New(
 	metricsReg prometheus.Registerer,
 	validators validators.Manager,
 	upgrades upgrade.Config,
-	execCfg *config.ExecutionConfig,
+	execCfg *config.Config,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,

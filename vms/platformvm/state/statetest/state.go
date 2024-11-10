@@ -35,7 +35,7 @@ type Config struct {
 	Registerer      prometheus.Registerer
 	Validators      validators.Manager
 	Upgrades        upgrade.Config
-	ExecutionConfig config.ExecutionConfig
+	ExecutionConfig config.Config
 	Context         *snow.Context
 	Metrics         metrics.Metrics
 	Rewards         reward.Calculator
@@ -57,8 +57,8 @@ func New(t testing.TB, c Config) state.State {
 	if c.Upgrades == (upgrade.Config{}) {
 		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
 	}
-	if c.ExecutionConfig == (config.ExecutionConfig{}) {
-		c.ExecutionConfig = config.DefaultExecutionConfig
+	if c.ExecutionConfig == (config.Config{}) {
+		c.ExecutionConfig = config.Default
 	}
 	if c.Context == nil {
 		c.Context = &snow.Context{
