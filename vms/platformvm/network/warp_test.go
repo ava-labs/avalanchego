@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"encoding/hex"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -516,6 +517,102 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 				// intentionally makes the error message unstable.
 				err.Message = strings.ReplaceAll(err.Message, " ", " ")
 			}
+			require.Equal(t, test.expectedErr, err)
+		})
+	}
+}
+
+func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	const (
+		weight = 100
+		nonce  = 10
+	)
+	var (
+		sov = state.SubnetOnlyValidator{
+			ValidationID: ids.GenerateTestID(),
+			SubnetID:     ids.GenerateTestID(),
+			NodeID:       ids.GenerateTestNodeID(),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk)),
+			Weight:       weight,
+			MinNonce:     nonce + 1,
+		}
+
+		state = statetest.New(t, statetest.Config{})
+		s     = signatureRequestVerifier{
+			stateLock: &sync.Mutex{},
+			state:     state,
+		}
+	)
+
+	require.NoError(t, state.PutSubnetOnlyValidator(sov))
+
+	tests := []struct {
+		name         string
+		validationID ids.ID
+		nonce        uint64
+		weight       uint64
+		expectedErr  *common.AppError
+	}{
+		{
+			name:  "impossible nonce",
+			nonce: math.MaxUint64,
+			expectedErr: &common.AppError{
+				Code:    ErrImpossibleNonce,
+				Message: "impossible nonce",
+			},
+		},
+		{
+			name: "validation does not exist",
+			expectedErr: &common.AppError{
+				Code:    ErrValidationDoesNotExist,
+				Message: `validation "11111111111111111111111111111111LpoYY" does not exist`,
+			},
+		},
+		{
+			name:         "wrong nonce",
+			validationID: sov.ValidationID,
+			expectedErr: &common.AppError{
+				Code:    ErrWrongNonce,
+				Message: "provided nonce 0 != expected nonce (11 - 1)",
+			},
+		},
+		{
+			name:         "wrong weight",
+			validationID: sov.ValidationID,
+			nonce:        nonce,
+			expectedErr: &common.AppError{
+				Code:    ErrWrongWeight,
+				Message: "provided weight 0 != expected weight 100",
+			},
+		},
+		{
+			name:         "valid",
+			validationID: sov.ValidationID,
+			nonce:        nonce,
+			weight:       weight,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := s.Verify(
+				context.Background(),
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					constants.UnitTestID,
+					constants.PlatformChainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						nil,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							test.validationID,
+							test.nonce,
+							test.weight,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				nil,
+			)
 			require.Equal(t, test.expectedErr, err)
 		})
 	}
