@@ -244,18 +244,19 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	require.NoError(t, err)
 
 	var (
-		subnetID        = ids.ID{3}
-		nodeID0         = ids.NodeID{4}
-		nodeID1         = ids.NodeID{5}
-		nodeID2         = ids.NodeID{6}
-		nodeID3         = ids.NodeID{6}
-		pk              = bls.PublicFromSecretKey(sk)
-		expiry          = genesistest.DefaultValidatorStartTimeUnix + 1
-		weight   uint64 = 1
+		convertedSubnetID          = ids.ID{3}
+		unconvertedSubnetID        = ids.ID{7}
+		nodeID0                    = ids.NodeID{4}
+		nodeID1                    = ids.NodeID{5}
+		nodeID2                    = ids.NodeID{6}
+		nodeID3                    = ids.NodeID{6}
+		pk                         = bls.PublicFromSecretKey(sk)
+		expiry                     = genesistest.DefaultValidatorStartTimeUnix + 1
+		weight              uint64 = 1
 	)
 
 	registerSubnetValidatorToRegister, err := message.NewRegisterSubnetValidator(
-		subnetID,
+		convertedSubnetID,
 		nodeID0,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
 		expiry,
@@ -266,7 +267,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	require.NoError(t, err)
 
 	registerSubnetValidatorNotToRegister, err := message.NewRegisterSubnetValidator(
-		subnetID,
+		convertedSubnetID,
 		nodeID1,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
 		expiry,
@@ -277,7 +278,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	require.NoError(t, err)
 
 	registerSubnetValidatorExpired, err := message.NewRegisterSubnetValidator(
-		subnetID,
+		convertedSubnetID,
 		nodeID2,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
 		genesistest.DefaultValidatorStartTimeUnix,
@@ -288,7 +289,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	require.NoError(t, err)
 
 	registerSubnetValidatorToMarkExpired, err := message.NewRegisterSubnetValidator(
-		subnetID,
+		convertedSubnetID,
 		nodeID3,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
 		expiry,
@@ -299,6 +300,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	require.NoError(t, err)
 
 	var (
+		conversion                          = state.SubnetConversion{}
 		registerSubnetValidatorValidationID = registerSubnetValidatorToRegister.ValidationID()
 		registerSubnetValidatorSoV          = state.SubnetOnlyValidator{
 			ValidationID: registerSubnetValidatorValidationID,
@@ -327,6 +329,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		}
 	)
 
+	state.SetSubnetConversion(convertedSubnetID, conversion)
 	require.NoError(t, state.PutSubnetOnlyValidator(registerSubnetValidatorSoV))
 	require.NoError(t, state.PutSubnetOnlyValidator(convertSubnetValidatorSoV))
 	state.PutExpiry(expiryEntry)
@@ -364,7 +367,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 				&platformvm.SubnetValidatorRegistrationJustification{
 					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
 						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
-							SubnetId: subnetID[:],
+							SubnetId: convertedSubnetID[:],
 							Index:    0,
 						},
 					},
@@ -382,7 +385,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 				&platformvm.SubnetValidatorRegistrationJustification{
 					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
 						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
-							SubnetId: subnetID[:],
+							SubnetId: convertedSubnetID[:],
 							Index:    0,
 						},
 					},
@@ -394,13 +397,31 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 			},
 		},
 		{
-			name:         "valid convert subnet data",
-			validationID: subnetID.Append(1),
+			name:         "conversion does not exist",
+			validationID: unconvertedSubnetID.Append(0),
 			justification: must[[]byte](t)(proto.Marshal(
 				&platformvm.SubnetValidatorRegistrationJustification{
 					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
 						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
-							SubnetId: subnetID[:],
+							SubnetId: unconvertedSubnetID[:],
+							Index:    0,
+						},
+					},
+				},
+			)),
+			expectedErr: &common.AppError{
+				Code:    ErrConversionDoesNotExist,
+				Message: `subnet "45oj4CqFViNHUtBxJ55TZfqaVAXFwMRMj2XkHVqUYjJYoTaEM" has not been converted`,
+			},
+		},
+		{
+			name:         "valid convert subnet data",
+			validationID: convertedSubnetID.Append(1),
+			justification: must[[]byte](t)(proto.Marshal(
+				&platformvm.SubnetValidatorRegistrationJustification{
+					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
+						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
+							SubnetId: convertedSubnetID[:],
 							Index:    1,
 						},
 					},

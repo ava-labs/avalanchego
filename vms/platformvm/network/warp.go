@@ -212,7 +212,25 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	// Verify that the validator does not currently exist
+	// Verify that the provided validationID either:
+	// - Is in the current state
+	// - Was removed from the current state
+	// - Was not included in the subnet conversion
+	_, err = s.state.GetSubnetConversion(subnetID)
+	if err == database.ErrNotFound {
+		return &common.AppError{
+			Code:    ErrConversionDoesNotExist,
+			Message: fmt.Sprintf("subnet %q has not been converted", subnetID),
+		}
+	}
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get subnet conversionID: " + err.Error(),
+		}
+	}
+
+	// Verify that the validator is not in the current state
 	_, err = s.state.GetSubnetOnlyValidator(validationID)
 	if err == nil {
 		return &common.AppError{
@@ -226,6 +244,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 			Message: "failed to lookup subnet only validator: " + err.Error(),
 		}
 	}
+
+	// Either the validator was removed or it was never registered.
 	return nil
 }
 
@@ -254,7 +274,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	// Verify that the validator does not and can never exists
+	// Verify that the validator does not currently exist
 	_, err = s.state.GetSubnetOnlyValidator(validationID)
 	if err == nil {
 		return &common.AppError{
@@ -271,8 +291,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 
 	currentTimeUnix := uint64(s.state.GetTimestamp().Unix())
 	if justification.Expiry <= currentTimeUnix {
-		// The validator is not registered and the expiry time has passed
-		return nil
+		return nil // The expiry time has passed
 	}
 
 	hasExpiry, err := s.state.HasExpiry(state.ExpiryEntry{
