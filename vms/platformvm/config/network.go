@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-var DefaultNetworkConfig = NetworkConfig{
+var DefaultNetwork = Network{
 	MaxValidatorSetStaleness:                    time.Minute,
 	TargetGossipSize:                            20 * units.KiB,
 	PushGossipPercentStake:                      .9,
@@ -29,7 +29,7 @@ var DefaultNetworkConfig = NetworkConfig{
 	MaxBloomFilterFalsePositiveProbability:      .05,
 }
 
-type NetworkConfig struct {
+type Network struct {
 	// MaxValidatorSetStaleness limits how old of a validator set the network
 	// will use for peer sampling and rate limiting.
 	MaxValidatorSetStaleness time.Duration `json:"max-validator-set-staleness"`

@@ -28,7 +28,7 @@ import (
 var (
 	errTest = errors.New("test error")
 
-	testConfig = config.NetworkConfig{
+	testConfig = config.Network{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
 		PushGossipNumValidators:                     1,
