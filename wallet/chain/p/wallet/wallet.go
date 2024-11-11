@@ -188,8 +188,8 @@ type Wallet interface {
 	) (*txs.Tx, error)
 
 	// IssueDisableSubnetValidatorTx creates, signs, and issues a transaction
-	// that disables a validator and returns the continuous fee to the
-	// remaining balance owner.
+	// that disables an L1 validator and returns the remaining funds allocated
+	// to the  continuous fee to the remaining balance owner.
 	//
 	// - [validationID] of the validator to disable
 	IssueDisableSubnetValidatorTx(
