@@ -463,7 +463,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
-			Clk: &mockable.Clock{},
+			Clk:          &mockable.Clock{},
+			Bootstrapped: utils.NewAtomic(true),
 		},
 		backend: backend,
 	}
@@ -530,7 +531,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
-			Clk: &mockable.Clock{},
+			Clk:          &mockable.Clock{},
+			Bootstrapped: utils.NewAtomic(true),
 		},
 		backend: backend,
 	}

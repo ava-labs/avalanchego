@@ -190,6 +190,10 @@ func TestVerifyWarpMessages(t *testing.T) {
 				Message: validWarpMessage.Bytes(),
 			},
 		},
+		{
+			name: "IncreaseBalanceTx",
+			tx:   &txs.IncreaseBalanceTx{},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
