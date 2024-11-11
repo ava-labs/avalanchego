@@ -606,6 +606,8 @@ github.com/supranational/blst v0.3.11/go.mod h1:jZJtfjgudtNl4en1tzwPIV3KjUnQUvG3
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7/go.mod h1:q4W45IWZaF22tdD+VEXcAWRA037jwmWEB5VWYORlTpc=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a h1:1ur3QoCqvE5fl+nylMaIr9PVV1w343YRDtsy+Rwu7XI=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
+github.com/taurusgroup/coreth v0.12.1-rc.0-taurus h1:UtRZOYLyI28wTZmSjP87QQi7+81X56QP9zwtYz2MlwY=
+github.com/taurusgroup/coreth v0.12.1-rc.0-taurus/go.mod h1:ZGhoIZTWbIaTmzEbprXu0hLtLdoE2PSTEFnCTYr0BRk=
 github.com/thepudds/fzgen v0.4.2 h1:HlEHl5hk2/cqEomf2uK5SA/FeJc12s/vIHmOG+FbACw=
 github.com/thepudds/fzgen v0.4.2/go.mod h1:kHCWdsv5tdnt32NIHYDdgq083m6bMtaY0M+ipiO9xWE=
 github.com/tklauser/go-sysconf v0.3.12 h1:0QaGUFOdQaIVdPgfITYzaTegZvdCjmYO52cSFAEVmqU=
