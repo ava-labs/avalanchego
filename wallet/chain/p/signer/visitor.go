@@ -227,11 +227,11 @@ func (s *visitor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) err
 	if err != nil {
 		return err
 	}
-	validatorAuthSigners, err := s.getAuthSigners(tx.ValidationID, tx.DisableAuth)
+	disableAuthSigners, err := s.getAuthSigners(tx.ValidationID, tx.DisableAuth)
 	if err != nil {
 		return err
 	}
-	txSigners = append(txSigners, validatorAuthSigners)
+	txSigners = append(txSigners, disableAuthSigners)
 	return sign(s.tx, true, txSigners)
 }
 

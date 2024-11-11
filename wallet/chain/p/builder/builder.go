@@ -199,8 +199,9 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.IncreaseBalanceTx, error)
 
-	// NewIncreaseBalanceTx disables a validator and returns the continuous fee
-	// to the remaining balance owner.
+	// NewDisableSubnetValidatorTx disables an L1 validator and returns the
+	// remaining funds allocated to the  continuous fee to the remaining balance
+	// owner.
 	//
 	// - [validationID] of the validator to disable
 	NewDisableSubnetValidatorTx(
@@ -321,7 +322,7 @@ type Builder interface {
 
 type Backend interface {
 	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetOwner(ctx context.Context, subnetID ids.ID) (fx.Owner, error)
+	GetOwner(ctx context.Context, ownerID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
