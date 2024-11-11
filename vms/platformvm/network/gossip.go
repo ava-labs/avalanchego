@@ -109,7 +109,7 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 
 	if err := g.txVerifier.VerifyTx(tx); err != nil {
 		g.Mempool.MarkDropped(txID, err)
-		return fmt.Errorf("failed verification: %w", err)
+		return err
 	}
 
 	if err := g.Mempool.Add(tx); err != nil {
