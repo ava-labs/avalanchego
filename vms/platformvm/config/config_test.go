@@ -29,7 +29,7 @@ func verifyInitializedStruct(tb testing.TB, s interface{}) {
 	}
 }
 
-func TestExecutionConfigUnmarshal(t *testing.T) {
+func TestConfigUnmarshal(t *testing.T) {
 	t.Run("default values from empty json", func(t *testing.T) {
 		require := require.New(t)
 		b := []byte(`{}`)
