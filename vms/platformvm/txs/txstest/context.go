@@ -13,7 +13,7 @@ import (
 
 func newContext(
 	ctx *snow.Context,
-	config *config.Config,
+	config *config.Internal,
 	state state.State,
 ) *builder.Context {
 	var (

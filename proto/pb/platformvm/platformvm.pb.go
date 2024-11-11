@@ -90,13 +90,17 @@ type isSubnetValidatorRegistrationJustification_Preimage interface {
 }
 
 type SubnetValidatorRegistrationJustification_ConvertSubnetTxData struct {
-	// Validator was added to the Subnet during the ConvertSubnetTx.
+	// This should be set to obtain an attestation that a validator specified in
+	// a ConvertSubnetTx has been removed from the validator set.
 	ConvertSubnetTxData *SubnetIDIndex `protobuf:"bytes,1,opt,name=convert_subnet_tx_data,json=convertSubnetTxData,proto3,oneof"`
 }
 
 type SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage struct {
-	// Validator was registered to the Subnet after the ConvertSubnetTx.
-	// The SubnetValidator is being removed from the Subnet
+	// This should be set to a RegisterSubnetValidatorMessage to obtain an
+	// attestation that a validator is not currently registered and can never be
+	// registered. This can be because the validator was successfully added and
+	// then later removed, or because the validator was never added and the
+	// registration expired.
 	RegisterSubnetValidatorMessage []byte `protobuf:"bytes,2,opt,name=register_subnet_validator_message,json=registerSubnetValidatorMessage,proto3,oneof"`
 }
 

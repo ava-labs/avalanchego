@@ -100,7 +100,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 
 	m := NewManager(
 		logging.NoLog{},
-		config.Config{
+		config.Internal{
 			Validators: vdrs,
 		},
 		s,
