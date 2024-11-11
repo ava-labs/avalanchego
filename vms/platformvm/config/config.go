@@ -47,13 +47,13 @@ type Config struct {
 	MempoolPruneFrequency         time.Duration `json:"mempool-prune-frequency"`
 }
 
-// GetConfig returns an ExecutionConfig
-// input is unmarshalled into an ExecutionConfig previously
-// initialized with default values
+// GetConfig returns a Config from the provided json encoded bytes. If a
+// configuration is not provided in the bytes, the default value is set. If
+// empty bytes are provided, the default config is returned.
 func GetConfig(b []byte) (*Config, error) {
 	ec := Default
 
-	// if bytes are empty keep default values
+	// An empty slice is invalid json, so handle that as a special case.
 	if len(b) == 0 {
 		return &ec, nil
 	}
