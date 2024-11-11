@@ -1863,7 +1863,7 @@ func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *gas.Config) 
 
 	// TODO: Remove after Etna is activated.
 	now := time.Now()
-	if !s.vm.Config.UpgradeConfig.IsEtnaActivated(now) {
+	if !s.vm.Internal.UpgradeConfig.IsEtnaActivated(now) {
 		return nil
 	}
 

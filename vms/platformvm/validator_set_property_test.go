@@ -259,7 +259,7 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.Config.MinValidatorStake,
+				Wght:   vm.Internal.MinValidatorStake,
 			},
 			Subnet: subnetID,
 		},
@@ -290,7 +290,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.Config.MinValidatorStake,
+				Wght:   vm.Internal.MinValidatorStake,
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
@@ -620,7 +620,7 @@ func TestTimestampListGenerator(t *testing.T) {
 // add a single validator at the end of times,
 // to make sure it won't pollute our tests
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
