@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -141,10 +142,27 @@ type Wallet interface {
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
+	// - [validators] specifies the initial SoVs of the L1
 	IssueConvertSubnetTx(
 		subnetID ids.ID,
 		chainID ids.ID,
 		address []byte,
+		validators []*txs.ConvertSubnetValidator,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	// IssueRegisterSubnetValidatorTx creates, signs, and issues a transaction
+	// that adds a validator to an L1.
+	//
+	// - [balance] that the validator should allocate to continuous fees
+	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
+	//   message
+	// - [message] is the Warp message that authorizes this validator to be
+	//   added
+	IssueRegisterSubnetValidatorTx(
+		balance uint64,
+		proofOfPossession [bls.SignatureLen]byte,
+		message []byte,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -392,9 +410,23 @@ func (w *wallet) IssueConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
+	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewConvertSubnetTx(subnetID, chainID, address, options...)
+	utx, err := w.builder.NewConvertSubnetTx(subnetID, chainID, address, validators, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueRegisterSubnetValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewRegisterSubnetValidatorTx(balance, proofOfPossession, message, options...)
 	if err != nil {
 		return nil, err
 	}
