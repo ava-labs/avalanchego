@@ -1873,36 +1873,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			expectedErr: ErrRemovePermissionlessValidator,
 		},
 		{
-			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				// Remove credentials
-				env.tx.Creds = nil
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
-			},
-			expectedErr: errWrongNumberOfCredentials,
-		},
-		{
 			name: "can't find subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
@@ -1930,6 +1900,38 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				return env.unsignedTx, e
 			},
 			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "tx has no credentials",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				// Remove credentials
+				env.tx.Creds = nil
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				subnetOwner := fxmock.NewOwner(ctrl)
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
+
+				cfg := &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+				}
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
+				e := &standardTxExecutor{
+					backend: &Backend{
+						Config:       cfg,
+						Bootstrapped: utils.NewAtomic(true),
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
+				}
+				return env.unsignedTx, e
+			},
+			expectedErr: errWrongNumberOfCredentials,
 		},
 		{
 			name: "no permission to remove validator",
@@ -2190,7 +2192,9 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
+				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
 
 				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
