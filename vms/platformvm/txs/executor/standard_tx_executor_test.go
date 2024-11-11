@@ -1762,7 +1762,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					nil,
 				).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
@@ -1791,7 +1791,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1820,7 +1820,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1852,7 +1852,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1882,7 +1882,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1911,7 +1911,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1942,7 +1942,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1976,7 +1976,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(errTest)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2135,7 +2135,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2163,7 +2163,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2192,7 +2192,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2232,7 +2232,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2274,7 +2274,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2318,7 +2318,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2364,7 +2364,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
-		defaultConfig = &config.Config{
+		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
@@ -2426,7 +2426,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
 				return nil
@@ -2497,7 +2497,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "too many active validators",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
 					ValidatorFeeConfig: validatorfee.Config{
 						Capacity:                 0,
@@ -2687,7 +2687,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
-		defaultConfig = &config.Config{
+		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
@@ -2852,7 +2852,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		{
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
 				return nil
@@ -3066,7 +3066,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			name:    "too many active validators",
 			balance: 1,
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
 					ValidatorFeeConfig: validatorfee.Config{
 						Capacity:                 0,

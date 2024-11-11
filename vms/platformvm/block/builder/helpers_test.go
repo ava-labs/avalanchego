@@ -75,7 +75,7 @@ type environment struct {
 	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
+	config         *config.Internal
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
@@ -167,7 +167,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
 		registerer,
-		network.DefaultConfig,
+		config.DefaultNetwork,
 	)
 	require.NoError(err)
 
@@ -260,7 +260,7 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(env.state.Commit())
 }
 
-func defaultConfig(f upgradetest.Fork) *config.Config {
+func defaultConfig(f upgradetest.Fork) *config.Internal {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(f, time.Time{})
 	// This package neglects fork ordering
 	upgradetest.SetTimesTo(
@@ -269,7 +269,7 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 		genesistest.DefaultValidatorEndTime,
 	)
 
-	return &config.Config{
+	return &config.Internal{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),

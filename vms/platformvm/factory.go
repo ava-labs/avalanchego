@@ -13,10 +13,10 @@ var _ vms.Factory = (*Factory)(nil)
 
 // Factory can create new instances of the Platform Chain
 type Factory struct {
-	config.Config
+	config.Internal
 }
 
 // New returns a new instance of the Platform Chain
 func (f *Factory) New(logging.Logger) (interface{}, error) {
-	return &VM{Config: f.Config}, nil
+	return &VM{Internal: f.Internal}, nil
 }
