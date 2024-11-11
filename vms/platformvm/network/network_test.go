@@ -28,7 +28,7 @@ import (
 var (
 	errTest = errors.New("test error")
 
-	testConfig = config.NetworkConfig{
+	testConfig = config.Network{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
 		PushGossipNumValidators:                     1,
@@ -176,7 +176,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
-				nil, // TODO: Populate and test
+				nil,
 				nil,
 				nil,
 				prometheus.NewRegistry(),

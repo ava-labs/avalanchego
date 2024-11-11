@@ -162,8 +162,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	}
 }
 
-// verifySubnetValidatorCanNotValidate verifies that the validationID is
-// currently a validator.
+// verifySubnetValidatorRegistered verifies that the validationID is currently a
+// validator.
 func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
 	validationID ids.ID,
 ) *common.AppError {
@@ -187,8 +187,9 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
 	return nil
 }
 
-// verifySubnetValidatorCanNotValidate verifies that the validationID is not
-// currently a validator.
+// verifySubnetValidatorNotCurrentlyRegistered verifies that the validationID
+// could only correspond to a validator from a ConvertSubnetTx and that it is
+// not currently a validator.
 func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	validationID ids.ID,
 	justification *platformvm.SubnetIDIndex,
@@ -212,7 +213,25 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	// Verify that the validator does not currently exist
+	// Verify that the provided validationID either:
+	// - Is in the current state
+	// - Was removed from the current state
+	// - Was not included in the subnet conversion
+	_, err = s.state.GetSubnetConversion(subnetID)
+	if err == database.ErrNotFound {
+		return &common.AppError{
+			Code:    ErrConversionDoesNotExist,
+			Message: fmt.Sprintf("subnet %q has not been converted", subnetID),
+		}
+	}
+	if err != nil {
+		return &common.AppError{
+			Code:    common.ErrUndefined.Code,
+			Message: "failed to get subnet conversionID: " + err.Error(),
+		}
+	}
+
+	// Verify that the validator is not in the current state
 	_, err = s.state.GetSubnetOnlyValidator(validationID)
 	if err == nil {
 		return &common.AppError{
@@ -226,10 +245,12 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 			Message: "failed to lookup subnet only validator: " + err.Error(),
 		}
 	}
+
+	// Either the validator was removed or it was never registered.
 	return nil
 }
 
-// verifySubnetValidatorCanNotValidate verifies that the validationID does not
+// verifySubnetValidatorCanNotValidate verifies that the validationID is not
 // currently and can never become a validator.
 func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	validationID ids.ID,
@@ -254,7 +275,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	// Verify that the validator does not and can never exists
+	// Verify that the validator does not currently exist
 	_, err = s.state.GetSubnetOnlyValidator(validationID)
 	if err == nil {
 		return &common.AppError{
@@ -271,10 +292,11 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 
 	currentTimeUnix := uint64(s.state.GetTimestamp().Unix())
 	if justification.Expiry <= currentTimeUnix {
-		// The validator is not registered and the expiry time has passed
-		return nil
+		return nil // The expiry time has passed
 	}
 
+	// If the validation ID was successfully registered and then removed, it can
+	// never be re-used again even if its expiry has not yet passed.
 	hasExpiry, err := s.state.HasExpiry(state.ExpiryEntry{
 		Timestamp:    justification.Expiry,
 		ValidationID: validationID,
