@@ -56,7 +56,7 @@ func verifyPoASubnetAuthorization(
 }
 
 // verifySubnetAuthorization carries out the validation for modifying a subnet.
-// The last credential in [sTx.Creds] is used as the subnet authorization.
+// The last credential in [tx.Creds] is used as the subnet authorization.
 // Returns the remaining tx credentials that should be used to authorize the
 // other operations in the tx.
 func verifySubnetAuthorization(
@@ -75,7 +75,11 @@ func verifySubnetAuthorization(
 }
 
 // verifyAuthorization carries out the validation of an auth. The last
+<<<<<<< HEAD
 // credential in [sTx.Creds] is used as the authorization.
+=======
+// credential in [tx.Creds] is used as the authorization.
+>>>>>>> implement-acp-77-increase-balance-tx
 // Returns the remaining tx credentials that should be used to authorize the
 // other operations in the tx.
 func verifyAuthorization(
