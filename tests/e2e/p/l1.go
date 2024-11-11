@@ -231,10 +231,15 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					client = platformvm.NewClient(subnetGenesisNode.URI)
 					txID   = tx.ID()
 				)
-				require.Eventually(func() bool {
-					_, err := client.GetTx(tc.DefaultContext(), txID)
-					return err == nil
-				}, tests.DefaultTimeout, 100*time.Millisecond)
+				tc.Eventually(
+					func() bool {
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						return err == nil
+					},
+					tests.DefaultTimeout,
+					e2e.DefaultPollingInterval,
+					"transaction not accepted",
+				)
 			})
 		})
 
@@ -400,10 +405,15 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						client = platformvm.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
 					)
-					require.Eventually(func() bool {
-						_, err := client.GetTx(tc.DefaultContext(), txID)
-						return err == nil
-					}, tests.DefaultTimeout, 100*time.Millisecond)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
 				})
 			})
 		})
@@ -509,10 +519,15 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						client = platformvm.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
 					)
-					require.Eventually(func() bool {
-						_, err := client.GetTx(tc.DefaultContext(), txID)
-						return err == nil
-					}, tests.DefaultTimeout, 100*time.Millisecond)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
 				})
 			})
 
