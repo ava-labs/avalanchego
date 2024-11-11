@@ -213,10 +213,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	// Verify that the provided validationID either:
-	// - Is in the current state
-	// - Was removed from the current state
-	// - Was not included in the subnet conversion
+	// Verify that the provided subnetID has been converted.
 	_, err = s.state.GetSubnetConversion(subnetID)
 	if err == database.ErrNotFound {
 		return &common.AppError{
@@ -246,7 +243,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 		}
 	}
 
-	// Either the validator was removed or it was never registered.
+	// Either the validator was removed or it was never registered as part of
+	// the subnet conversion.
 	return nil
 }
 
