@@ -192,4 +192,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/ava-labs/coreth v0.12.1-rc.0 => github.com/taurusgroup/coreth v0.12.1-rc.0-taurus
+replace github.com/ava-labs/coreth v0.13.8 => github.com/taurusgroup/coreth v0.13.8-taurus
