@@ -382,7 +382,7 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 			// Read a line from the file
 			line, err := reader.ReadString('\n')
 			if err != nil {
-				if err.Error() == "EOF" {
+				if errors.Is(err, io.EOF) {
 					// If end of file is reached, wait and try again
 					time.Sleep(waitInterval)
 					continue
