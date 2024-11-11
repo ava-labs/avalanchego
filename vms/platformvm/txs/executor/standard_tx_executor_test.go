@@ -3273,12 +3273,12 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	initialSK, err := bls.NewSecretKey()
+	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
 	const (
-		initialWeight  = 1
-		initialBalance = units.Avax
+		initialWeight = 1
+		balance       = units.Avax
 	)
 	var (
 		subnetID  = createSubnetTx.ID()
@@ -3287,8 +3287,8 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		validator = &txs.ConvertSubnetValidator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  initialWeight,
-			Balance: initialBalance,
-			Signer:  *signer.NewProofOfPossession(initialSK),
+			Balance: balance,
+			Signer:  *signer.NewProofOfPossession(sk),
 			// RemainingBalanceOwner and DeactivationOwner are initialized so
 			// that later reflect based equality checks pass.
 			RemainingBalanceOwner: message.PChainOwner{
@@ -3348,7 +3348,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		Signers: set.NewBits(0).Bytes(),
 		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
 			bls.Sign(
-				initialSK,
+				sk,
 				unsignedIncreaseWeightWarpMessage.Bytes(),
 			),
 		)),
@@ -3599,7 +3599,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					ID: ctx.AVAXAssetID,
 				},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: initialBalance,
+					Amt: balance,
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: validator.RemainingBalanceOwner.Threshold,
 						Addrs:     validator.RemainingBalanceOwner.Addresses,
