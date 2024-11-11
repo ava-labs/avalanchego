@@ -23,7 +23,7 @@ func main() {
 	ctx := context.Background()
 
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
-	// [uri] is hosting and registers [subnetID].
+	// [uri] is hosting and registers [validationID].
 	walletSyncStartTime := time.Now()
 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
 		URI:           uri,
