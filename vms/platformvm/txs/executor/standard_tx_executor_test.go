@@ -3219,7 +3219,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
-		defaultConfig = &config.Config{
+		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
@@ -3396,7 +3396,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		{
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
 				return nil
