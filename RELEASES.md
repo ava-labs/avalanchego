@@ -4,7 +4,7 @@
 
 ### APIs
 
-- Added `platform.getSubnetOnlyValidator` API
+- Added `platform.getSubnetOnlyValidator`
 
 ### Configs
 
