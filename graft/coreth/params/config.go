@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/coreth/utils"
-	gethparams "github.com/ava-labs/libevm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // Avalanche ChainIDs
@@ -547,11 +547,11 @@ var (
 // ChainConfig is stored in the database on a per block basis. This means
 // that any network, identified by its genesis block, can have its own
 // set of configuration options.
-type ChainConfig = gethparams.ChainConfig
+type ChainConfig = ethparams.ChainConfig
 
 // Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
 // that do not have or require information about the block.
 //
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
-type Rules = gethparams.Rules
+type Rules = ethparams.Rules

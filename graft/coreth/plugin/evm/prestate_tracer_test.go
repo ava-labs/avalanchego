@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/coreth/tests"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
-	gethtypes "github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 )
 
@@ -67,7 +67,7 @@ func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 					Difficulty:  (*big.Int)(test.Context.Difficulty),
 					GasLimit:    uint64(test.Context.GasLimit),
 					BaseFee:     test.Genesis.BaseFee,
-					Header: &gethtypes.Header{
+					Header: &ethtypes.Header{
 						Number: new(big.Int).SetUint64(uint64(test.Context.Number)),
 						Time:   uint64(test.Context.Time),
 					},
