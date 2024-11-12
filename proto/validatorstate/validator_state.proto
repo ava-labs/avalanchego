@@ -58,7 +58,7 @@ message CurrentValidator {
   uint64 weight = 2;
   bytes public_key = 3;
   uint64 start_time = 4;
-  uint64 set_weight_nonce = 5;
+  uint64 min_nonce = 5;
   bool is_active = 6;
   bytes validation_id = 7;
   bool is_sov = 8;

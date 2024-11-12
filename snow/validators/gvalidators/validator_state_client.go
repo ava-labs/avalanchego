@@ -114,11 +114,11 @@ func (c *Client) GetCurrentValidatorSet(
 		}
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
-			// This is a performance optimization to avoid the cost of
-			// compression and key re-verification with
-			// PublicKeyFromCompressedBytes. We can safely assume that the BLS
-			// Public Keys are verified before being added to the P-Chain and
-			// served by the gRPC server.
+			// PublicKeyFromValidUncompressedBytes is used rather than
+			// PublicKeyFromCompressedBytes because it is significantly faster
+			// due to the avoidance of decompression and key re-verification. We
+			// can safely assume that the BLS Public Keys are verified before
+			// being added to the P-Chain and served by the gRPC server.
 			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
 			if publicKey == nil {
 				return nil, 0, errFailedPublicKeyDeserialize
@@ -130,13 +130,13 @@ func (c *Client) GetCurrentValidatorSet(
 		}
 
 		vdrs[validationID] = &validators.GetCurrentValidatorOutput{
-			NodeID:         nodeID,
-			PublicKey:      publicKey,
-			Weight:         validator.Weight,
-			StartTime:      validator.StartTime,
-			SetWeightNonce: validator.SetWeightNonce,
-			IsActive:       validator.IsActive,
-			IsSoV:          validator.IsSov,
+			NodeID:    nodeID,
+			PublicKey: publicKey,
+			Weight:    validator.Weight,
+			StartTime: validator.StartTime,
+			MinNonce:  validator.MinNonce,
+			IsActive:  validator.IsActive,
+			IsSoV:     validator.IsSov,
 		}
 	}
 	return vdrs, resp.GetCurrentHeight(), nil

@@ -2331,7 +2331,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					require.Equal(expectedStaker.PublicKey, currentValidator.PublicKey)
 					require.Equal(expectedStaker.Weight, currentValidator.Weight)
 					require.Equal(uint64(expectedStaker.StartTime.Unix()), currentValidator.StartTime)
-					require.Equal(uint64(0), currentValidator.SetWeightNonce)
+					require.Equal(uint64(0), currentValidator.MinNonce)
 					require.True(currentValidator.IsActive)
 					require.False(currentValidator.IsSoV)
 				}
@@ -2344,7 +2344,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					require.Equal(expectedSOV.PublicKey, currentValidator.PublicKey.Serialize())
 					require.Equal(expectedSOV.Weight, currentValidator.Weight)
 					require.Equal(expectedSOV.StartTime, currentValidator.StartTime)
-					require.Equal(expectedSOV.MinNonce, currentValidator.SetWeightNonce)
+					require.Equal(expectedSOV.MinNonce, currentValidator.MinNonce)
 					require.Equal(expectedSOV.isActive(), currentValidator.IsActive)
 					require.True(currentValidator.IsSoV)
 				}

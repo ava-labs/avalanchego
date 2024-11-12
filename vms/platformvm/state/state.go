@@ -835,56 +835,56 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 
 func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
+	// First add the current validators (non-SoV)
 	for _, staker := range s.currentStakers.validators[subnetID] {
 		if err := ctx.Err(); err != nil {
 			return nil, 0, err
 		}
 		validator := staker.validator
 		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:   validator.TxID,
-			NodeID:         validator.NodeID,
-			PublicKey:      validator.PublicKey,
-			Weight:         validator.Weight,
-			StartTime:      uint64(validator.StartTime.Unix()),
-			SetWeightNonce: 0,
-			IsActive:       true,
-			IsSoV:          false,
+			ValidationID: validator.TxID,
+			NodeID:       validator.NodeID,
+			PublicKey:    validator.PublicKey,
+			Weight:       validator.Weight,
+			StartTime:    uint64(validator.StartTime.Unix()),
+			MinNonce:     0,
+			IsActive:     true,
+			IsSoV:        false,
 		}
 	}
 
-	// this is L1 subnet, fetch all validation IDs from subnetIDNodeIDDB
-	// with subnetID as prefix
-	subnetIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
+	// Then iterate over subnetIDNodeID DB and add the SoV validators (if any)
+	// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
+	// if all validators are active (inactive weight is 0)
+	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
 		subnetID[:],
 	)
-	defer subnetIDIter.Release()
+	defer validationIDIter.Release()
 
-	for subnetIDIter.Next() {
+	for validationIDIter.Next() {
 		if err := ctx.Err(); err != nil {
 			return nil, 0, err
 		}
 
-		validationID, err := ids.ToID(subnetIDIter.Value())
+		validationID, err := ids.ToID(validationIDIter.Value())
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
 
-		// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
-		// if all validators are active (inactive weight is 0)
 		vdr, err := s.GetSubnetOnlyValidator(validationID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get validator: %w", err)
 		}
 
 		result[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:   validationID,
-			NodeID:         vdr.NodeID,
-			PublicKey:      bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-			Weight:         vdr.Weight,
-			StartTime:      vdr.StartTime,
-			IsActive:       vdr.isActive(),
-			SetWeightNonce: vdr.MinNonce,
-			IsSoV:          true,
+			ValidationID: validationID,
+			NodeID:       vdr.NodeID,
+			PublicKey:    bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
+			Weight:       vdr.Weight,
+			StartTime:    vdr.StartTime,
+			IsActive:     vdr.isActive(),
+			MinNonce:     vdr.MinNonce,
+			IsSoV:        true,
 		}
 	}
 

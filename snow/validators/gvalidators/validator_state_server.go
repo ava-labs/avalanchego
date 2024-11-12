@@ -99,17 +99,18 @@ func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentV
 	i := 0
 	for _, vdr := range vdrs {
 		vdrPB := &pb.CurrentValidator{
-			NodeId:         vdr.NodeID.Bytes(),
-			StartTime:      vdr.StartTime,
-			IsActive:       vdr.IsActive,
-			ValidationId:   vdr.ValidationID[:],
-			Weight:         vdr.Weight,
-			SetWeightNonce: vdr.SetWeightNonce,
-			IsSov:          vdr.IsSoV,
+			NodeId:       vdr.NodeID.Bytes(),
+			StartTime:    vdr.StartTime,
+			IsActive:     vdr.IsActive,
+			ValidationId: vdr.ValidationID[:],
+			Weight:       vdr.Weight,
+			MinNonce:     vdr.MinNonce,
+			IsSov:        vdr.IsSoV,
 		}
 		if vdr.PublicKey != nil {
-			// This is a performance optimization to avoid the cost of compression
-			// from PublicKeyToCompressedBytes.
+			// Passing in the uncompressed bytes is a performance optimization
+			// to avoid the cost of calling PublicKeyFromCompressedBytes on the
+			// client side.
 			vdrPB.PublicKey = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 		}
 		resp.Validators[i] = vdrPB

@@ -31,12 +31,12 @@ type GetValidatorOutput struct {
 }
 
 type GetCurrentValidatorOutput struct {
-	ValidationID   ids.ID
-	NodeID         ids.NodeID
-	PublicKey      *bls.PublicKey
-	Weight         uint64
-	StartTime      uint64
-	SetWeightNonce uint64
-	IsActive       bool
-	IsSoV          bool
+	ValidationID ids.ID
+	NodeID       ids.NodeID
+	PublicKey    *bls.PublicKey
+	Weight       uint64
+	StartTime    uint64
+	MinNonce     uint64
+	IsActive     bool
+	IsSoV        bool
 }

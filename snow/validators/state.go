@@ -111,7 +111,7 @@ func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.N
 	return nil, nil
 }
 
-func (*noValidators) GetCurrentValidatorSet(context.Context, ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
-	// TODO: should we return the actual height?
-	return nil, 0, nil
+func (n *noValidators) GetCurrentValidatorSet(ctx context.Context, _ ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
+	height, err := n.GetCurrentHeight(ctx)
+	return nil, height, err
 }
