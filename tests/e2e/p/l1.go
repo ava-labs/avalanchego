@@ -224,6 +224,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			)
 			require.NoError(err)
 		})
+		genesisValidationID := subnetID.Append(0)
 
 		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
@@ -267,6 +268,32 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					},
 				})
 			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), genesisValidationID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:              subnetID,
+						NodeID:                subnetGenesisNode.NodeID,
+						PublicKey:             genesisNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						DeactivationOwner:     &secp256k1fx.OutputOwners{},
+						Weight:                genesisWeight,
+						MinNonce:              0,
+					},
+					platformvm.SubnetOnlyValidator{
+						SubnetID:              sov.SubnetID,
+						NodeID:                sov.NodeID,
+						PublicKey:             sov.PublicKey,
+						RemainingBalanceOwner: sov.RemainingBalanceOwner,
+						DeactivationOwner:     sov.DeactivationOwner,
+						Weight:                sov.Weight,
+						MinNonce:              sov.MinNonce,
+					},
+				)
+				require.LessOrEqual(sov.Balance, genesisBalance)
+			})
 		})
 
 		advanceProposerVMPChainHeight := func() {
@@ -282,6 +309,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
+		require.NoError(err)
+
+		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
 		require.NoError(err)
 
 		tc.By("ensuring the subnet nodes are healthy", func() {
@@ -365,6 +395,33 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					},
 				})
 			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:              subnetID,
+						NodeID:                subnetRegisterNode.NodeID,
+						PublicKey:             registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						DeactivationOwner:     &secp256k1fx.OutputOwners{},
+						Weight:                registerWeight,
+						MinNonce:              0,
+						Balance:               0,
+					},
+					platformvm.SubnetOnlyValidator{
+						SubnetID:              sov.SubnetID,
+						NodeID:                sov.NodeID,
+						PublicKey:             sov.PublicKey,
+						RemainingBalanceOwner: sov.RemainingBalanceOwner,
+						DeactivationOwner:     sov.DeactivationOwner,
+						Weight:                sov.Weight,
+						MinNonce:              sov.MinNonce,
+						Balance:               sov.Balance,
+					},
+				)
+			})
 		})
 
 		var nextNonce uint64
@@ -437,6 +494,33 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight: updatedWeight,
 					},
 				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:              subnetID,
+						NodeID:                subnetRegisterNode.NodeID,
+						PublicKey:             registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
+						DeactivationOwner:     &secp256k1fx.OutputOwners{},
+						Weight:                updatedWeight,
+						MinNonce:              nextNonce,
+						Balance:               0,
+					},
+					platformvm.SubnetOnlyValidator{
+						SubnetID:              sov.SubnetID,
+						NodeID:                sov.NodeID,
+						PublicKey:             sov.PublicKey,
+						RemainingBalanceOwner: sov.RemainingBalanceOwner,
+						DeactivationOwner:     sov.DeactivationOwner,
+						Weight:                sov.Weight,
+						MinNonce:              sov.MinNonce,
+						Balance:               sov.Balance,
+					},
+				)
 			})
 		})
 
