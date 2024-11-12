@@ -780,6 +780,112 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getSubnetOnlyValidator`
+
+Returns a current L1 validator.
+
+**Signature:**
+
+```sh
+platform.getSubnetOnlyValidator({
+    validationID: string,
+}) -> {
+    subnetID: string,
+    nodeID: string,
+    publicKey: string,
+    remainingBalanceOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    deactivationOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    startTime: string,
+    weight: string,
+    minNonce: string,
+    balance: string,
+    height: string
+}
+```
+
+- `subnetID` is the L1 this validator is validating.
+- `nodeID` is the node ID of the validator.
+- `publicKey` is the compressed BLS public key of the validator.
+- `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance.
+- `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
+- `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
+- `weight` is weight of this validator used for consensus voting and ICM.
+- `minNonce` is minimum nonce that must be included in a `SetSubnetValidatorWeightTx` for the transaction to be valid.
+- `balance` is current remaining balance that can be used to pay for the validators continuous fee.
+- `height` is height of the last accepted block.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getCurrentValidators",
+    "params": {
+      "nodeIDs": ["NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD"]
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validators": [
+      {
+        "txID": "2NNkpYTGfTFLSGXJcHtVv6drwVU2cczhmjK2uhvwDyxwsjzZMm",
+        "startTime": "1600368632",
+        "endTime": "1602960455",
+        "stakeAmount": "2000000000000",
+        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
+        "validationRewardOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "delegationRewardOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "potentialReward": "117431493426",
+        "delegationFee": "10.0000",
+        "uptime": "0.0000",
+        "connected": false,
+        "delegatorCount": "1",
+        "delegatorWeight": "25000000000",
+        "delegators": [
+          {
+            "txID": "Bbai8nzGVcyn2VmeYcbS74zfjJLjDacGNVuzuvAQkHn1uWfoV",
+            "startTime": "1600368523",
+            "endTime": "1602960342",
+            "stakeAmount": "25000000000",
+            "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
+            "rewardOwner": {
+              "locktime": "0",
+              "threshold": "1",
+              "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+            },
+            "potentialReward": "11743144774"
+          }
+        ]
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
 ### `platform.getHeight`
 
 Returns the height of the last accepted block.

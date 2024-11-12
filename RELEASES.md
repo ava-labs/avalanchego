@@ -2,6 +2,10 @@
 
 ## Pending Release
 
+### APIs
+
+- Added `platform.getSubnetOnlyValidator` API
+
 ### Configs
 
 - Added P-chain configs
