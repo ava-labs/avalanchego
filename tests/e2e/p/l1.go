@@ -224,6 +224,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			)
 			require.NoError(err)
 		})
+		genesisValidationID := subnetID.Append(0)
 
 		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
@@ -267,6 +268,31 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					},
 				})
 			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), genesisValidationID)
+				require.NoError(err)
+				require.LessOrEqual(sov.Balance, genesisBalance)
+
+				sov.StartTime = 0
+				sov.Balance = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   genesisWeight,
+						MinNonce: 0,
+					},
+					sov,
+				)
+			})
 		})
 
 		advanceProposerVMPChainHeight := func() {
@@ -282,6 +308,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
+		require.NoError(err)
+
+		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
 		require.NoError(err)
 
 		tc.By("ensuring the subnet nodes are healthy", func() {
@@ -362,6 +391,145 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					ids.EmptyNodeID: { // The validator is not active
 						NodeID: ids.EmptyNodeID,
 						Weight: registerWeight,
+					},
+				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+
+				sov.StartTime = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   registerWeight,
+						MinNonce: 0,
+						Balance:  0,
+					},
+					sov,
+				)
+			})
+		})
+
+		var nextNonce uint64
+		setWeight := func(validationID ids.ID, weight uint64) {
+			tc.By("creating the unsigned SubnetValidatorWeightMessage")
+			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+				networkID,
+				chainID,
+				must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+					address,
+					must[*warpmessage.SubnetValidatorWeight](tc)(warpmessage.NewSubnetValidatorWeight(
+						validationID,
+						nextNonce,
+						weight,
+					)).Bytes(),
+				)).Bytes(),
+			))
+
+			tc.By("sending the request to sign the warp message", func() {
+				setSubnetValidatorWeightRequest, err := wrapWarpSignatureRequest(
+					unsignedSubnetValidatorWeight,
+					nil,
+				)
+				require.NoError(err)
+
+				require.True(genesisPeer.Send(tc.DefaultContext(), setSubnetValidatorWeightRequest))
+			})
+
+			tc.By("getting the signature response")
+			setSubnetValidatorWeightSignature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+			require.NoError(err)
+			require.True(ok)
+
+			tc.By("creating the signed warp message to increase the weight of the validator")
+			setSubnetValidatorWeight, err := warp.NewMessage(
+				unsignedSubnetValidatorWeight,
+				&warp.BitSetSignature{
+					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis peer
+					Signature: ([bls.SignatureLen]byte)(
+						bls.SignatureToBytes(setSubnetValidatorWeightSignature),
+					),
+				},
+			)
+			require.NoError(err)
+
+			tc.By("issuing a SetSubnetValidatorWeightTx", func() {
+				_, err := pWallet.IssueSetSubnetValidatorWeightTx(
+					setSubnetValidatorWeight.Bytes(),
+				)
+				require.NoError(err)
+			})
+
+			nextNonce++
+		}
+
+		tc.By("increasing the weight of the validator", func() {
+			setWeight(registerValidationID, updatedWeight)
+		})
+
+		tc.By("verifying the validator weight was increased", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
+					},
+					ids.EmptyNodeID: { // The validator is not active
+						NodeID: ids.EmptyNodeID,
+						Weight: updatedWeight,
+					},
+				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+
+				sov.StartTime = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   updatedWeight,
+						MinNonce: nextNonce,
+						Balance:  0,
+					},
+					sov,
+				)
+			})
+		})
+
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+
+		tc.By("removing the registered validator", func() {
+			setWeight(registerValidationID, 0)
+		})
+
+		tc.By("verifying the validator was removed", func() {
+			tc.By("verifying the validator set was updated", func() {
+				verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+					subnetGenesisNode.NodeID: {
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						Weight:    genesisWeight,
 					},
 				})
 			})
