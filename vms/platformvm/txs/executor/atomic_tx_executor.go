@@ -116,6 +116,10 @@ func (*atomicTxExecutor) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorT
 	return ErrWrongTxType
 }
 
+func (*atomicTxExecutor) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeightTx) error {
+	return ErrWrongTxType
+}
+
 func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
 	return e.atomicTx()
 }
