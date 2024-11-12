@@ -3,9 +3,7 @@
 
 package json
 
-import (
-	"strconv"
-)
+import "strconv"
 
 type Height struct {
 	Numeric    Uint64
