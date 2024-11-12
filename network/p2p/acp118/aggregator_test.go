@@ -32,7 +32,6 @@ func TestVerifier_Verify(t *testing.T) {
 	pk1 := bls.PublicFromSecretKey(sk1)
 
 	networkID := uint32(123)
-	subnetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
 	signer := warp.NewSigner(sk0, networkID, chainID)
 
@@ -68,7 +67,7 @@ func TestVerifier_Verify(t *testing.T) {
 			pChainState: &validatorstest.State{
 				T: t,
 				GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-					return subnetID, nil
+					return ids.Empty, nil
 				},
 				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 					return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -98,7 +97,7 @@ func TestVerifier_Verify(t *testing.T) {
 			pChainState: &validatorstest.State{
 				T: t,
 				GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-					return subnetID, nil
+					return ids.Empty, nil
 				},
 				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 					return map[ids.NodeID]*validators.GetValidatorOutput{
