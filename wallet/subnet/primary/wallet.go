@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -109,13 +109,21 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, validationID := range config.ValidationIDs {
-		// TODO: Fetch validation disableOwners
-		subnetOwners[validationID] = &secp256k1fx.OutputOwners{}
+	deactivationOwners, err := platformvm.GetDeactivationOwners(avaxState.PClient, ctx, config.ValidationIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	for id, owner := range subnetOwners {
+		owners[id] = owner
+	}
+	for id, owner := range deactivationOwners {
+		owners[id] = owner
 	}
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)

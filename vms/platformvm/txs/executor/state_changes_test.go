@@ -95,7 +95,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						DynamicFeeConfig: feeConfig,
 						UpgradeConfig:    upgradetest.GetConfig(test.fork),
 					},
@@ -207,7 +207,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 					},
 				},
@@ -257,7 +257,7 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 		currentTime = genesistest.DefaultValidatorStartTime
 		newTime     = currentTime.Add(timeToAdvance)
 
-		config = config.Config{
+		config = config.Internal{
 			ValidatorFeeConfig: fee.Config{
 				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
 				Target:                   1,

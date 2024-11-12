@@ -231,12 +231,18 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					client = platformvm.NewClient(subnetGenesisNode.URI)
 					txID   = tx.ID()
 				)
-				require.Eventually(func() bool {
-					_, err := client.GetTx(tc.DefaultContext(), txID)
-					return err == nil
-				}, tests.DefaultTimeout, 100*time.Millisecond)
+				tc.Eventually(
+					func() bool {
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						return err == nil
+					},
+					tests.DefaultTimeout,
+					e2e.DefaultPollingInterval,
+					"transaction not accepted",
+				)
 			})
 		})
+		genesisValidationID := subnetID.Append(0)
 
 		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
@@ -279,6 +285,31 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight:    genesisWeight,
 					},
 				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), genesisValidationID)
+				require.NoError(err)
+				require.LessOrEqual(sov.Balance, genesisBalance)
+
+				sov.StartTime = 0
+				sov.Balance = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   genesisWeight,
+						MinNonce: 0,
+					},
+					sov,
+				)
 			})
 
 			tc.By("fetching the subnet conversion attestation", func() {
@@ -400,10 +431,15 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						client = platformvm.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
 					)
-					require.Eventually(func() bool {
-						_, err := client.GetTx(tc.DefaultContext(), txID)
-						return err == nil
-					}, tests.DefaultTimeout, 100*time.Millisecond)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
 				})
 			})
 		})
@@ -421,6 +457,30 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight: registerWeight,
 					},
 				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+
+				sov.StartTime = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   registerWeight,
+						MinNonce: 0,
+						Balance:  0,
+					},
+					sov,
+				)
 			})
 
 			tc.By("fetching the validator registration attestation", func() {
@@ -509,10 +569,15 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						client = platformvm.NewClient(subnetGenesisNode.URI)
 						txID   = tx.ID()
 					)
-					require.Eventually(func() bool {
-						_, err := client.GetTx(tc.DefaultContext(), txID)
-						return err == nil
-					}, tests.DefaultTimeout, 100*time.Millisecond)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
 				})
 			})
 
@@ -536,6 +601,30 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight: updatedWeight,
 					},
 				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+
+				sov.StartTime = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   updatedWeight,
+						MinNonce: nextNonce,
+						Balance:  0,
+					},
+					sov,
+				)
 			})
 
 			tc.By("fetching the validator weight change attestation", func() {
