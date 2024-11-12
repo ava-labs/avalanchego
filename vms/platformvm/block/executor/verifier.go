@@ -621,7 +621,7 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 }
 
 func calculateBlockMetrics(
-	config *config.Config,
+	config *config.Internal,
 	blk block.Block,
 	s state.Chain,
 	gasConsumed gas.Gas,
