@@ -242,6 +242,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 			})
 		})
+		genesisValidationID := subnetID.Append(0)
 
 		tc.By("verifying the Permissioned Subnet was converted to an L1", func() {
 			expectedConversionID, err := warpmessage.SubnetConversionID(warpmessage.SubnetConversionData{
@@ -284,6 +285,31 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight:    genesisWeight,
 					},
 				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), genesisValidationID)
+				require.NoError(err)
+				require.LessOrEqual(sov.Balance, genesisBalance)
+
+				sov.StartTime = 0
+				sov.Balance = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   genesisWeight,
+						MinNonce: 0,
+					},
+					sov,
+				)
 			})
 
 			tc.By("fetching the subnet conversion attestation", func() {
@@ -330,6 +356,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		registerNodePoP, err := subnetRegisterNode.GetProofOfPossession()
+		require.NoError(err)
+
+		registerNodePK, err := bls.PublicKeyFromCompressedBytes(registerNodePoP.PublicKey[:])
 		require.NoError(err)
 
 		tc.By("ensuring the subnet nodes are healthy", func() {
@@ -428,6 +457,30 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight: registerWeight,
 					},
 				})
+			})
+
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+
+				sov.StartTime = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   registerWeight,
+						MinNonce: 0,
+						Balance:  0,
+					},
+					sov,
+				)
 			})
 
 			tc.By("fetching the validator registration attestation", func() {
