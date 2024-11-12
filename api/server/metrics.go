@@ -1,15 +1,14 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
@@ -18,41 +17,37 @@ type metrics struct {
 	totalDuration *prometheus.GaugeVec
 }
 
-func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, error) {
+func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
 	m := &metrics{
 		numProcessing: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "calls_processing",
-				Help:      "The number of calls this API is currently processing",
+				Name: "calls_processing",
+				Help: "The number of calls this API is currently processing",
 			},
 			[]string{"base"},
 		),
 		numCalls: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "calls",
-				Help:      "The number of calls this API has processed",
+				Name: "calls",
+				Help: "The number of calls this API has processed",
 			},
 			[]string{"base"},
 		),
 		totalDuration: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "calls_duration",
-				Help:      "The total amount of time, in nanoseconds, spent handling API calls",
+				Name: "calls_duration",
+				Help: "The total amount of time, in nanoseconds, spent handling API calls",
 			},
 			[]string{"base"},
 		),
 	}
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := errors.Join(
 		registerer.Register(m.numProcessing),
 		registerer.Register(m.numCalls),
 		registerer.Register(m.totalDuration),
 	)
-	return m, errs.Err
+	return m, err
 }
 
 func (m *metrics) wrapHandler(chainName string, handler http.Handler) http.Handler {

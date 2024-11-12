@@ -1,49 +1,60 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
 import (
 	"fmt"
+	"slices"
 )
 
-var _ UnarySnowball = (*unarySnowball)(nil)
+var _ Unary = (*unarySnowball)(nil)
+
+func newUnarySnowball(alphaPreference int, terminationConditions []terminationCondition) unarySnowball {
+	return unarySnowball{
+		unarySnowflake: newUnarySnowflake(alphaPreference, terminationConditions),
+	}
+}
 
 // unarySnowball is the implementation of a unary snowball instance
 type unarySnowball struct {
 	// wrap the unary snowflake logic
 	unarySnowflake
 
-	// numSuccessfulPolls tracks the total number of successful network polls
-	numSuccessfulPolls int
+	// preferenceStrength tracks the total number of polls with a preference
+	preferenceStrength int
 }
 
-func (sb *unarySnowball) RecordSuccessfulPoll() {
-	sb.numSuccessfulPolls++
-	sb.unarySnowflake.RecordSuccessfulPoll()
+func (sb *unarySnowball) RecordPoll(count int) {
+	if count >= sb.alphaPreference {
+		sb.preferenceStrength++
+	}
+	sb.unarySnowflake.RecordPoll(count)
 }
 
-func (sb *unarySnowball) Extend(beta int, choice int) BinarySnowball {
+func (sb *unarySnowball) Extend(choice int) Binary {
 	bs := &binarySnowball{
 		binarySnowflake: binarySnowflake{
-			binarySlush: binarySlush{preference: choice},
-			confidence:  sb.confidence,
-			beta:        beta,
-			finalized:   sb.Finalized(),
+			binarySlush:           binarySlush{preference: choice},
+			confidence:            slices.Clone(sb.confidence),
+			alphaPreference:       sb.alphaPreference,
+			terminationConditions: sb.terminationConditions,
+			finalized:             sb.Finalized(),
 		},
 		preference: choice,
 	}
-	bs.numSuccessfulPolls[choice] = sb.numSuccessfulPolls
+	bs.preferenceStrength[choice] = sb.preferenceStrength
 	return bs
 }
 
-func (sb *unarySnowball) Clone() UnarySnowball {
+func (sb *unarySnowball) Clone() Unary {
 	newSnowball := *sb
+	newSnowball.confidence = slices.Clone(sb.confidence)
 	return &newSnowball
 }
 
 func (sb *unarySnowball) String() string {
-	return fmt.Sprintf("SB(NumSuccessfulPolls = %d, %s)",
-		sb.numSuccessfulPolls,
+	return fmt.Sprintf("SB(PreferenceStrength = %d, %s)",
+		sb.preferenceStrength,
 		&sb.unarySnowflake)
 }

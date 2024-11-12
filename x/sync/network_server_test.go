@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
@@ -7,129 +7,141 @@ import (
 	"context"
 	"math/rand"
 	"testing"
-
-	"github.com/golang/mock/gomock"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func Test_Server_GetRangeProof(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
+	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
-	tests := map[string]struct {
-		request                  *syncpb.RangeProofRequest
-		expectedErr              error
+	tests := []struct {
+		name                     string
+		request                  *pb.SyncGetRangeProofRequest
+		expectedErr              *common.AppError
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
 		nodeID                   ids.NodeID
 		proofNil                 bool
 	}{
-		"proof too large": {
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
+		{
+			name: "proof too large",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 1000,
 			},
 			proofNil:    true,
-			expectedErr: ErrMinProofSizeIsTooLarge,
+			expectedErr: p2p.ErrUnexpected,
 		},
-		"byteslimit is 0": {
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
+		{
+			name: "byteslimit is 0",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 0,
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: p2p.ErrUnexpected,
 		},
-		"keylimit is 0": {
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 0,
+		{
+			name: "keylimit is 0",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   smallTrieRoot[:],
+				KeyLimit:   0,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: p2p.ErrUnexpected,
 		},
-		"keys out of order": {
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
+		{
+			name: "keys out of order",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
-				Start:      []byte{1},
-				End:        []byte{0},
+				StartKey:   &pb.MaybeBytes{Value: []byte{1}},
+				EndKey:     &pb.MaybeBytes{Value: []byte{0}},
 			},
-			proofNil: true,
+			proofNil:    true,
+			expectedErr: p2p.ErrUnexpected,
 		},
-		"key limit too large": {
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
+		{
+			name: "response bounded by key limit",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   smallTrieRoot[:],
 				KeyLimit:   2 * defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
-		"bytes limit too large": {
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
+		{
+			name: "response bounded by byte limit",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 2 * defaultRequestByteSizeLimit,
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
+		{
+			name: "empty proof",
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   ids.Empty[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			proofNil:    true,
+			expectedErr: p2p.ErrUnexpected,
+		},
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			sender := common.NewMockSender(ctrl)
-			var proofResult *merkledb.RangeProof
-			sender.EXPECT().SendAppResponse(
-				gomock.Any(), // ctx
-				gomock.Any(), // nodeID
-				gomock.Any(), // requestID
-				gomock.Any(), // responseBytes
-			).DoAndReturn(
-				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-					// grab a copy of the proof so we can inspect it later
-					if !test.proofNil {
-						var err error
-						proofResult = &merkledb.RangeProof{}
-						_, err = merkledb.Codec.DecodeRangeProof(responseBytes, proofResult)
-						require.NoError(err)
-					}
-					return nil
-				},
-			).AnyTimes()
-			handler := NewNetworkServer(sender, smallTrieDB, logging.NoLog{})
-			err := handler.HandleRangeProofRequest(context.Background(), test.nodeID, 0, test.request)
-			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
-				return
-			}
+
+			handler := NewGetRangeProofHandler(logging.NoLog{}, smallTrieDB)
+			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			if test.proofNil {
-				require.Nil(proofResult)
+			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr != nil {
 				return
 			}
-			require.NotNil(proofResult)
-			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proofResult.KeyValues), test.expectedResponseLen)
+			if test.proofNil {
+				require.Nil(responseBytes)
+				return
 			}
 
-			bytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, proofResult)
+			var proofProto pb.RangeProof
+			require.NoError(proto.Unmarshal(responseBytes, &proofProto))
+
+			var proof merkledb.RangeProof
+			require.NoError(proof.UnmarshalProto(&proofProto))
+
+			if test.expectedResponseLen > 0 {
+				require.LessOrEqual(len(proof.KeyValues), test.expectedResponseLen)
+			}
+
+			bytes, err := proto.Marshal(proof.ToProto())
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {
@@ -140,149 +152,225 @@ func Test_Server_GetRangeProof(t *testing.T) {
 }
 
 func Test_Server_GetChangeProof(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
-	trieDB, _, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
-	require.NoError(t, err)
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	startRoot, err := trieDB.GetMerkleRoot(context.Background())
+	serverDB, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(t, err)
+	startRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	// create changes
-	for x := 0; x < 600; x++ {
-		view, err := trieDB.NewView()
-		require.NoError(t, err)
+	for x := 0; x < defaultRequestKeyLimit/2; x++ {
+		ops := make([]database.BatchOp, 0, 11)
+		// add some key/values
+		for i := 0; i < 10; i++ {
+			key := make([]byte, r.Intn(100))
+			_, err = r.Read(key)
+			require.NoError(t, err)
 
-		key := make([]byte, r.Intn(100))
-		_, err = r.Read(key)
-		require.NoError(t, err)
+			val := make([]byte, r.Intn(100))
+			_, err = r.Read(val)
+			require.NoError(t, err)
 
-		val := make([]byte, r.Intn(100))
-		_, err = r.Read(val)
-		require.NoError(t, err)
+			ops = append(ops, database.BatchOp{Key: key, Value: val})
+		}
 
-		err = view.Insert(context.Background(), key, val)
-		require.NoError(t, err)
-
+		// delete a key
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
 		require.NoError(t, err)
 
-		it := trieDB.NewIteratorWithStart(deleteKeyStart)
+		it := serverDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			err = view.Remove(context.Background(), it.Key())
-			require.NoError(t, err)
+			ops = append(ops, database.BatchOp{Key: it.Key(), Delete: true})
 		}
 		require.NoError(t, it.Error())
 		it.Release()
 
+		view, err := serverDB.NewView(
+			context.Background(),
+			merkledb.ViewChanges{BatchOps: ops},
+		)
+		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
-	endRoot, err := trieDB.GetMerkleRoot(context.Background())
+	endRoot, err := serverDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
-	tests := map[string]struct {
-		request                  *syncpb.ChangeProofRequest
-		expectedErr              error
+	fakeRootID := ids.GenerateTestID()
+
+	tests := []struct {
+		name                     string
+		request                  *pb.SyncGetChangeProofRequest
+		expectedErr              *common.AppError
 		expectedResponseLen      int
 		expectedMaxResponseBytes int
 		nodeID                   ids.NodeID
-		proofNil                 bool
+		expectRangeProof         bool // Otherwise expect change proof
 	}{
-		"byteslimit is 0": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 0,
+		{
+			name: "proof restricted by BytesLimit",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    10000,
 			},
-			proofNil: true,
 		},
-		"keylimit is 0": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 0,
-			},
-			proofNil: true,
-		},
-		"keys out of order": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-				Start:      []byte{1},
-				End:        []byte{0},
-			},
-			proofNil: true,
-		},
-		"key limit too large": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   2 * defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
+		{
+			name: "full response for small (single request) trie",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
-		"bytes limit too large": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 2 * defaultRequestByteSizeLimit,
+		{
+			name: "partial response to request for entire trie (full leaf limit)",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: defaultRequestKeyLimit,
+		},
+		{
+			name: "byteslimit is 0",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    0,
+			},
+			expectedErr: p2p.ErrUnexpected,
+		},
+		{
+			name: "keylimit is 0",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      0,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedErr: p2p.ErrUnexpected,
+		},
+		{
+			name: "keys out of order",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey:      &pb.MaybeBytes{Value: []byte{1}},
+				EndKey:        &pb.MaybeBytes{Value: []byte{0}},
+			},
+			expectedErr: p2p.ErrUnexpected,
+		},
+		{
+			name: "key limit too large",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      2 * defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedResponseLen: defaultRequestKeyLimit,
+		},
+		{
+			name: "bytes limit too large",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: startRoot[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    2 * defaultRequestByteSizeLimit,
 			},
 			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
 		},
+		{
+			name: "insufficient history for change proof; return range proof",
+			request: &pb.SyncGetChangeProofRequest{
+				// This root doesn't exist so server has insufficient history
+				// to serve a change proof
+				StartRootHash: fakeRootID[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
+			expectRangeProof:         true,
+		},
+		{
+			name: "insufficient history for change proof or range proof",
+			request: &pb.SyncGetChangeProofRequest{
+				// These roots don't exist so server has insufficient history
+				// to serve a change proof or range proof
+				StartRootHash: ids.Empty[:],
+				EndRootHash:   fakeRootID[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
+			expectedErr:              p2p.ErrUnexpected,
+		},
+		{
+			name: "empty proof",
+			request: &pb.SyncGetChangeProofRequest{
+				StartRootHash: fakeRootID[:],
+				EndRootHash:   ids.Empty[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
+			expectedErr:              p2p.ErrUnexpected,
+		},
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			sender := common.NewMockSender(ctrl)
-			var proofResult *merkledb.ChangeProof
-			sender.EXPECT().SendAppResponse(
-				gomock.Any(), // ctx
-				gomock.Any(), // nodeID
-				gomock.Any(), // requestID
-				gomock.Any(), // responseBytes
-			).DoAndReturn(
-				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-					// grab a copy of the proof so we can inspect it later
-					if !test.proofNil {
-						var err error
-						proofResult = &merkledb.ChangeProof{}
-						_, err = merkledb.Codec.DecodeChangeProof(responseBytes, proofResult)
-						require.NoError(err)
-					}
-					return nil
-				},
-			).AnyTimes()
-			handler := NewNetworkServer(sender, trieDB, logging.NoLog{})
-			err := handler.HandleChangeProofRequest(context.Background(), test.nodeID, 0, test.request)
-			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
-				return
-			}
+
+			handler := NewGetChangeProofHandler(logging.NoLog{}, serverDB)
+
+			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			if test.proofNil {
-				require.Nil(proofResult)
+			proofBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			require.ErrorIs(err, test.expectedErr)
+
+			if test.expectedErr != nil {
+				require.Nil(proofBytes)
 				return
-			}
-			require.NotNil(proofResult)
-			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proofResult.KeyChanges), test.expectedResponseLen)
 			}
 
-			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proofResult)
-			require.NoError(err)
-			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
+			proofResult := &pb.SyncGetChangeProofResponse{}
+			require.NoError(proto.Unmarshal(proofBytes, proofResult))
+
+			if test.expectRangeProof {
+				require.NotNil(proofResult.GetRangeProof())
+			} else {
+				require.NotNil(proofResult.GetChangeProof())
+			}
+
+			if test.expectedResponseLen > 0 {
+				if test.expectRangeProof {
+					require.LessOrEqual(len(proofResult.GetRangeProof().KeyValues), test.expectedResponseLen)
+				} else {
+					require.LessOrEqual(len(proofResult.GetChangeProof().KeyChanges), test.expectedResponseLen)
+				}
+			}
+
+			require.LessOrEqual(len(proofBytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {
-				require.LessOrEqual(len(bytes), test.expectedMaxResponseBytes)
+				require.LessOrEqual(len(proofBytes), test.expectedMaxResponseBytes)
 			}
 		})
 	}

@@ -1,67 +1,96 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence int, expectedFinalized bool) {
-	if confidence := sf.confidence; confidence != expectedConfidence {
-		t.Fatalf("Wrong confidence. Expected %d got %d", expectedConfidence, confidence)
-	} else if finalized := sf.Finalized(); finalized != expectedFinalized {
-		t.Fatalf("Wrong finalized status. Expected %v got %v", expectedFinalized, finalized)
-	}
+func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidences []int, expectedFinalized bool) {
+	require := require.New(t)
+
+	require.Equal(expectedConfidences, sf.confidence)
+	require.Equal(expectedFinalized, sf.Finalized())
 }
 
 func TestUnarySnowflake(t *testing.T) {
+	require := require.New(t)
+
+	alphaPreference, alphaConfidence := 1, 2
 	beta := 2
+	terminationConditions := newSingleTerminationCondition(alphaConfidence, beta)
 
-	sf := &unarySnowflake{}
-	sf.Initialize(beta)
+	sf := newUnarySnowflake(alphaPreference, terminationConditions)
 
-	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 1, false)
+	sf.RecordPoll(alphaConfidence)
+	UnarySnowflakeStateTest(t, &sf, []int{1}, false)
 
 	sf.RecordUnsuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 0, false)
+	UnarySnowflakeStateTest(t, &sf, []int{0}, false)
 
-	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 1, false)
+	sf.RecordPoll(alphaConfidence)
+	UnarySnowflakeStateTest(t, &sf, []int{1}, false)
 
 	sfCloneIntf := sf.Clone()
-	sfClone, ok := sfCloneIntf.(*unarySnowflake)
-	if !ok {
-		t.Fatalf("Unexpected clone type")
-	}
+	require.IsType(&unarySnowflake{}, sfCloneIntf)
+	sfClone := sfCloneIntf.(*unarySnowflake)
 
-	UnarySnowflakeStateTest(t, sfClone, 1, false)
+	UnarySnowflakeStateTest(t, sfClone, []int{1}, false)
 
-	binarySnowflake := sfClone.Extend(beta, 0)
+	binarySnowflake := sfClone.Extend(0)
 
 	binarySnowflake.RecordUnsuccessfulPoll()
 
-	binarySnowflake.RecordSuccessfulPoll(1)
+	binarySnowflake.RecordPoll(alphaConfidence, 1)
 
-	if binarySnowflake.Finalized() {
-		t.Fatalf("Should not have finalized")
-	}
+	require.False(binarySnowflake.Finalized())
 
-	binarySnowflake.RecordSuccessfulPoll(1)
+	binarySnowflake.RecordPoll(alphaConfidence, 1)
 
-	if binarySnowflake.Preference() != 1 {
-		t.Fatalf("Wrong preference")
-	} else if !binarySnowflake.Finalized() {
-		t.Fatalf("Should have finalized")
-	}
+	require.Equal(1, binarySnowflake.Preference())
+	require.True(binarySnowflake.Finalized())
 
-	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 2, true)
+	sf.RecordPoll(alphaConfidence)
+	UnarySnowflakeStateTest(t, &sf, []int{2}, true)
 
 	sf.RecordUnsuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 0, true)
+	UnarySnowflakeStateTest(t, &sf, []int{0}, true)
 
-	sf.RecordSuccessfulPoll()
-	UnarySnowflakeStateTest(t, sf, 1, true)
+	sf.RecordPoll(alphaConfidence)
+	UnarySnowflakeStateTest(t, &sf, []int{1}, true)
+}
+
+type unarySnowflakeTest struct {
+	require *require.Assertions
+
+	unarySnowflake
+}
+
+func newUnarySnowflakeTest(t *testing.T, alphaPreference int, terminationConditions []terminationCondition) snowflakeTest[struct{}] {
+	require := require.New(t)
+
+	return &unarySnowflakeTest{
+		require:        require,
+		unarySnowflake: newUnarySnowflake(alphaPreference, terminationConditions),
+	}
+}
+
+func (sf *unarySnowflakeTest) RecordPoll(count int, _ struct{}) {
+	sf.unarySnowflake.RecordPoll(count)
+}
+
+func (sf *unarySnowflakeTest) AssertEqual(expectedConfidences []int, expectedFinalized bool, _ struct{}) {
+	sf.require.Equal(expectedConfidences, sf.unarySnowflake.confidence)
+	sf.require.Equal(expectedFinalized, sf.Finalized())
+}
+
+func TestUnarySnowflakeErrorDriven(t *testing.T) {
+	for _, test := range getErrorDrivenSnowflakeSingleChoiceSuite[struct{}]() {
+		t.Run(test.name, func(t *testing.T) {
+			test.f(t, newUnarySnowflakeTest, struct{}{})
+		})
+	}
 }

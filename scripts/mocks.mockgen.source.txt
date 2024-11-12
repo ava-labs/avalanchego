@@ -1,0 +1,14 @@
+snow/engine/common/sender.go=StateSummarySender,AcceptedStateSummarySender,FrontierSender,AcceptedSender,FetchSender,AppSender,QuerySender,Gossiper=Sender=snow/engine/common/commonmock/sender.go
+snow/networking/router/router.go=InternalHandler=Router=snow/networking/router/routermock/router.go
+snow/networking/sender/external_sender.go==ExternalSender=snow/networking/sender/sendermock/external_sender.go
+vms/avm/block/block.go==MockBlock=vms/avm/block/mock_block.go
+vms/avm/block/executor/manager.go==Manager=vms/avm/block/executor/executormock/manager.go
+vms/avm/txs/tx.go==UnsignedTx=vms/avm/txs/txsmock/tx.go
+vms/platformvm/block/block.go=BanffBlock=MockBlock=vms/platformvm/block/mock_block.go
+vms/platformvm/block/executor/manager.go==Manager=vms/platformvm/block/executor/executormock/manager.go
+vms/platformvm/signer/signer.go==Signer=vms/platformvm/signer/signermock/signer.go
+vms/platformvm/state/diff.go==MockDiff=vms/platformvm/state/mock_diff.go
+vms/platformvm/state/state.go=Chain=MockState=vms/platformvm/state/mock_state.go
+vms/platformvm/state/state.go=State=MockChain=vms/platformvm/state/mock_chain.go
+vms/platformvm/txs/unsigned_tx.go==UnsignedTx=vms/platformvm/txs/txsmock/unsigned_tx.go
+vms/proposervm/block.go=Block=MockPostForkBlock=vms/proposervm/mock_post_fork_block.go

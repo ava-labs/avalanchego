@@ -4,20 +4,27 @@
 
 - [Overview](#overview)
 - [Peers](#peers)
-  - [Lifecycle](#lifecycle)
+  - [Message Handling](#message-handling)
+  - [Peer Handshake](#peer-handshake)
+  - [Ping-Pong Messages](#ping-pong-messages)
+- [Peer Discovery](#peer-discovery)
+    - [Inbound Connections](#inbound-connections)
+    - [Outbound Connections](#outbound-connections)
+      - [IP Authentication](#ip-authentication)
     - [Bootstrapping](#bootstrapping)
-    - [Connecting](#connecting)
-      - [Peer Handshake](#peer-handshake)
-    - [Connected](#connected)
-      - [PeerList Gossip](#peerlist-gossip)
-        - [Messages](#messages)
-        - [Gossip](#gossip)
+    - [PeerList Gossip](#peerlist-gossip)
+      - [Bloom Filter](#bloom-filter)
+      - [GetPeerList](#getpeerlist)
+      - [PeerList](#peerlist)
+      - [Avoiding Persistent Network Traffic](#avoiding-persistent-network-traffic)
 
 ## Overview
 
 Avalanche is a decentralized [p2p](https://en.wikipedia.org/wiki/Peer-to-peer) (peer-to-peer) network of nodes that work together to run the Avalanche blockchain protocol.
 
 The `network` package implements the networking layer of the protocol which allows a node to discover, connect to, and communicate with other peers.
+
+All connections are authenticated using [TLS](https://en.wikipedia.org/wiki/Transport_Layer_Security). However, there is no reliance on any certificate authorities. The `network` package identifies peers by the public key in the leaf certificate.
 
 ## Peers
 
@@ -27,136 +34,191 @@ Peers communicate by enqueuing messages between one another. Each peer on either
 
 ```mermaid
 sequenceDiagram
+    actor Morty
+    actor Rick
     loop 
-        Peer-1->>Peer-2: Write outbound messages
-        Peer-2->>Peer-1: Read incoming messages
+        Morty->>Rick: Write outbound messages
+        Rick->>Morty: Read incoming messages
     end
     loop
-        Peer-2->>Peer-1: Write outbound messages
-        Peer-1->>Peer-2: Read incoming messages
+        Rick->>Morty: Write outbound messages
+        Morty->>Rick: Read incoming messages
     end
 ```
 
-### Lifecycle
+### Message Handling
 
-#### Bootstrapping
+All messages are prefixed with their length. Reading a message first reads the 4-byte message length from the connection. The rate-limiting logic then waits until there is sufficient capacity to read these bytes from the connection.
 
-When starting an Avalanche node, a node needs to be able to initiate some process that eventually allows itself to become a participating member of the network. In traditional web2 systems, it's common to use a web service by hitting the service's DNS and being routed to an available server behind a load balancer. In decentralized p2p systems however, connecting to a node is more complex as no single entity owns the network. [Avalanche consensus](https://docs.avax.network/overview/getting-started/avalanche-consensus) requires a node to repeatedly sample peers in the network, so each node needs some way of discovering and connecting to every other peer to participate in the protocol.
+A peer will then read the full message and attempt to parse it into either a networking message or an application message. If the message is malformed the connection is not dropped. The peer will simply continue to the next sent message.
 
-In Avalanche, nodes connect to an initial set of bootstrapper nodes known as **beacons** (this is user-configurable). Once connected to a set of beacons, a node is able to discover other nodes in the network. Over time, a node eventually discovers other peers in the network through `PeerList` messages it receives through:
+### Peer Handshake
 
-- The handshake initiated between two peers when attempting to connect to a peer (see [Connecting](#connecting)).
-- Periodic `PeerList` gossip messages that every peer sends to the peers it's connected to (see [Connected](#connected)).
+Upon connection to a new peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
 
-#### Connecting
+When attempting to establish the connection, the first message that the node sends is a `Handshake` message describing the configuration of the node. If the `Handshake` message is successfully received and the peer decides that it will allow a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. See [PeerList Gossip](#peerlist-gossip).
 
-##### Peer Handshake
-
-Upon connection to any peer, a handshake is performed between the node attempting to establish the outbound connection to the peer and the peer receiving the inbound connection.
-
-When attempting to establish the connection, the first message that the node attempting to connect to the peer in the network is a `Version` message describing compatibility of the candidate node with the peer. As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected by the peer.
+As an example, nodes that are attempting to connect with an incompatible version of AvalancheGo or a significantly skewed local clock are rejected.
 
 ```mermaid
 sequenceDiagram
-Note over Node,Peer: Initiate Handshake
-Note left of Node: I want to connect to you!
-Note over Node,Peer: Version message
-Node->>Peer: AvalancheGo v1.0.0
-Note right of Peer: My version v1.9.4 is incompatible with your version v1.0.0.
-Peer-xNode: Connection dropped
-Note over Node,Peer: Handshake Failed
+    actor Morty
+    actor Rick
+    Note over Morty,Rick: Connection Created
+    par
+        Morty->>Rick: AvalancheGo v1.0.0
+    and
+        Rick->>Morty: AvalancheGo v1.11.4
+    end
+    Note right of Rick: v1.0.0 is incompatible with v1.11.4.
+    Note left of Morty: v1.11.4 could be compatible with v1.0.0!
+    par
+        Rick-->>Morty: Disconnect
+    and
+        Morty-XRick: Peerlist
+    end
+    Note over Morty,Rick: Handshake Failed
 ```
 
-If the `Version` message is successfully received and the peer decides that it wants a connection with this node, it replies with a `PeerList` message that contains metadata about other peers that allows a node to connect to them. Upon reception of a `PeerList` message, a node will attempt to connect to any peers that the node is not already connected to to allow the node to discover more peers in the network.
+Nodes that mutually desire the connection will both respond with `PeerList` messages and complete the handshake.
 
 ```mermaid
 sequenceDiagram
-Note over Node,Peer: Initiate Handshake
-Note left of Node: I want to connect to you!
-Note over Node,Peer: Version message
-Node->>Peer: AvalancheGo v1.9.4
-Note right of Peer: LGTM!
-Note over Node,Peer: PeerList message
-Peer->>Node: Peer-X, Peer-Y, Peer-Z
-Note over Node,Peer: Handshake Complete
-Node->>Peer: ACK Peer-X, Peer-Y, Peer-Z
+    actor Morty
+    actor Rick
+    Note over Morty,Rick: Connection Created
+    par
+        Morty->>Rick: AvalancheGo v1.11.0
+    and
+        Rick->>Morty: AvalancheGo v1.11.4
+    end
+    Note right of Rick: v1.11.0 is compatible with v1.11.4!
+    Note left of Morty: v1.11.4 could be compatible with v1.11.0!
+    par
+        Rick->>Morty: Peerlist
+    and
+        Morty->>Rick: Peerlist
+    end
+    Note over Morty,Rick: Handshake Complete
 ```
 
-Once the node attempting to join the network receives this `PeerList` message, the handshake is complete and the node is now connected to the peer. The node attempts to connect to the new peers discovered in the `PeerList` message. Each connection results in another peer handshake, which results in the node incrementally discovering more and more peers in the network as more and more `PeerList` messages are exchanged.
+### Ping-Pong Messages
 
-#### Connected
-
-Some peers aren't discovered through the `PeerList` messages exchanged through peer handshakes. This can happen if a peer is either not randomly sampled, or if a new peer joins the network after the node has already connected to the network.
+Peers periodically send `Ping` messages containing perceived uptime information. This information can be used to monitor how the node is considered to be performing by the network. It is expected for a node to reply to a `Ping` message with a `Pong` message.
 
 ```mermaid
 sequenceDiagram
-Node ->> Peer-1: Version - v1.9.5
-Peer-1 ->> Node: PeerList - Peer-2
-Node ->> Peer-1: ACK - Peer-2
-Note left of Node: Node is connected to Peer-1 and now tries to connect to Peer-2.
-Node ->> Peer-2: Version - v1.9.5
-Peer-2 ->> Node: PeerList - Peer-1
-Node ->> Peer-2: ACK - Peer-1
-Note left of Node: Peer-3 was never sampled, so we haven't connected yet!
-Node --> Peer-3: No connection
+    actor Morty
+    actor Rick
+    Note left of Morty: Send Ping
+    Morty->>Rick: I think your uptime is 95%
+    Note right of Rick: Send Pong
+    Rick->>Morty: ACK
 ```
 
-To guarantee that a node can discover all peers, each node periodically gossips a sample of the peers it knows about to other peers.
+## Peer Discovery
 
-##### PeerList Gossip
+When starting an Avalanche node, a node needs to be able to initiate some process that eventually allows itself to become a participating member of the network. In traditional web2 systems, it's common to use a web service by hitting the service's DNS and being routed to an available server behind a load balancer. In decentralized p2p systems, however, connecting to a node is more complex as no single entity owns the network. [Avalanche consensus](https://docs.avax.network/overview/getting-started/avalanche-consensus) requires a node to repeatedly sample peers in the network, so each node needs some way of discovering and connecting to every other peer to participate in the protocol.
 
-###### Messages
+### Inbound Connections
 
-A `PeerList` is the message that is used to communicate the presence of peers in the network. Each `PeerList` message contains networking-level metadata about the peer that provides the necessary information to connect to it, alongside the corresponding transaction id that added that peer to the validator set. Transaction ids are unique hashes that only add a single validator, so it is guaranteed that there is a 1:1 mapping between a validator and its associated transaction id.
+It is expected for Avalanche nodes to allow inbound connections. If a validator does not allow inbound connections, its observed uptime may be reduced.
 
-`PeerListAck` messages are sent in response to `PeerList` messages to allow a peer to confirm which peers it will actually attempt to connect to. Because nodes only gossip peers they believe another peer doesn't already know about to optimize bandwidth, `PeerListAck` messages are important to confirm that a peer will attempt to connect to someone. Without this, a node might gossip a peer to another peer and assume a connection between the two is being established, and not re-gossip the peer in future gossip cycles. If the connection was never actually wanted by the peer being gossiped to due to a transient reason, that peer would never be able to re-discover the gossiped peer and could be isolated from a subset of the network.
+### Outbound Connections
 
-Once a `PeerListAck` message is received from a peer, the node that sent the original `PeerList` message marks the corresponding acknowledged validators as already having been transmitted to the peer, so that it's excluded from subsequent iterations of `PeerList` gossip.
+Avalanche nodes that have identified the `IP:Port` pair of a node they want to connect to will initiate outbound connections to this `IP:Port` pair. If the connection is not able to complete the [Peer Handshake](#peer-handshake), the connection will be re-attempted with an [Exponential Backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
 
-###### Gossip
+A node should initiate outbound connections to an `IP:Port` pair that is believed to belong to another node that is not connected and meets at least one of the following conditions:
+- The peer is in the initial bootstrapper set.
+- The peer is in the default bootstrapper set.
+- The peer is a Primary Network validator.
+- The peer is a validator of a tracked Subnet.
+- The peer is a validator of a Subnet and the local node is a Primary Network validator.
 
-Handshake messages provide a node with some knowledge of peers in the network, but offers no guarantee that learning about a subset of peers from each peer the node connects with will result in the node learning about every peer in the network.
+#### IP Authentication
 
-In order to provide a probabilistic guarantee that all peers in the network will eventually learn of one another, each node periodically gossips a sample of the peers that they're aware of to a sample of the peers that they're connected to. Over time, this probabilistically guarantees that every peer will eventually learn of every other peer.
+To ensure that outbound connections are being made to the correct `IP:Port` pair of a node, all `IP:Port` pairs sent by the network are signed by the node that is claiming ownership of the pair. To prevent replays of these messages, the signature is over the `Timestamp` in addition to the `IP:Port` pair.
 
-To optimize bandwidth usage, each node tracks which peers are guaranteed to know of which peers. A node learns this information by tracking both inbound and outbound `PeerList` gossip.
+The `Timestamp` guarantees that nodes provided an `IP:Port` pair can track the most up-to-date `IP:Port` pair of a peer.
 
-- Inbound
-  - If a node ever receives `PeerList` from a peer, that peer _must_ have known about the peers in that `PeerList` message in order to have gossiped them.
-- Outbound
-  - If a node sends a `PeerList` to a peer and the peer replies with an `PeerListAck` message, then all peers in the `PeerListAck` must be known by the peer.
+### Bootstrapping
 
-To efficiently track which peers know of which peers, the peers that each peer is aware of is represented in a [bit set](https://en.wikipedia.org/wiki/Bit_array). A peer is represented by either a `0` if it isn't known by the peer yet, or a `1` if it is known by the peer.
+In Avalanche, nodes connect to an initial set (this is user-configurable) of bootstrap nodes.
 
-An node follows the following steps for every cycle of `PeerList` gossip:
+### PeerList Gossip
 
-1. Get a sample of peers in the network that the node is connected to
-2. For each peer:
-    1. Figure out which peers the node hasn't gossiped to them yet.
-    2. Take a random sample of these unknown peers.
-    3. Send a message describing these peers to the peer.
+Once connected to an initial set of peers, a node can use these connections to discover additional peers.
 
+Peers are discovered by receiving [`PeerList`](#peerlist) messages during the [Peer Handshake](#peer-handshake). These messages quickly provide a node with knowledge of peers in the network. However, they offer no guarantee that the node will connect to and maintain connections with every peer in the network.
+
+To provide an eventual guarantee that all peers learn of one another, nodes periodically send a [`GetPeerList`](#getpeerlist) message to a randomly selected Primary Network validator with the node's current [Bloom Filter](#bloom-filter) and `Salt`.
+
+#### Gossipable Peers
+
+The peers that a node may include into a [`GetPeerList`](#getpeerlist) message are considered `gossipable`.
+
+
+#### Trackable Peers
+
+The peers that a node would attempt to connect to if included in a [`PeerList`](#peerlist) message are considered `trackable`.
+
+#### Bloom Filter
+
+A [Bloom Filter](https://en.wikipedia.org/wiki/Bloom_filter) is used to track which nodes are known.
+
+The parameterization of the Bloom Filter is based on the number of desired peers.
+
+Entries in the Bloom Filter are determined by a locally calculated [`Salt`](https://en.wikipedia.org/wiki/Salt_(cryptography)) along with the `NodeID` and `Timestamp` of the most recently known `IP:Port`. The `Salt` is added to prevent griefing attacks where malicious nodes intentionally generate hash collisions with other virtuous nodes to reduce their connectivity.
+
+The Bloom Filter is reconstructed if there are more entries than expected to avoid increasing the false positive probability. It is also reconstructed periodically. When reconstructing the Bloom Filter, a new `Salt` is generated.
+
+To prevent a malicious node from arbitrarily filling this Bloom Filter, only `2` entries are added to the Bloom Filter per node. If a node's `IP:Port` pair changes once, it will immediately be added to the Bloom Filter. If a node's `IP:Port` pair changes more than once, it will only be added to the Bloom Filter after the Bloom Filter is reconstructed.
+
+#### GetPeerList
+
+A `GetPeerList` message contains the Bloom Filter of the currently known peers along with the `Salt` that was used to add entries to the Bloom Filter. Upon receipt of a `GetPeerList` message, a node is expected to respond with a `PeerList` message.
+
+#### PeerList
+
+`PeerList` messages are expected to contain `IP:Port` pairs that satisfy all of the following constraints:
+- The Bloom Filter sent when requesting the `PeerList` message does not contain the node claiming the `IP:Port` pair.
+- The node claiming the `IP:Port` pair is currently connected.
+- The node claiming the `IP:Port` pair is either in the default bootstrapper set, is a current Primary Network validator, is a validator of a tracked Subnet, or is a validator of a Subnet and the peer is a Primary Network validator.
+
+#### Avoiding Persistent Network Traffic
+
+To avoid persistent network traffic, it must eventually hold that the set of [`gossipable peers`](#gossipable-peers) is a subset of the [`trackable peers`](#trackable-peers) for all nodes in the network.
+
+For example, say there are 3 nodes: `Rick`, `Morty`, and `Summer`.
+
+First we consider the case that `Rick` and `Morty` consider `Summer` [`gossipable`](#gossipable-peers) and [`trackable`](#trackable-peers), respectively.
 ```mermaid
 sequenceDiagram
-Note left of Node: Initialize gossip bit set for Peer-123
-Note left of Node: Peer-123: [0, 0, 0]
-Node->>Peer-123: PeerList - Peer-1
-Peer-123->>Node: PeerListAck - Peer-1
-Note left of Node: Peer-123: [1, 0, 0]
-Node->>Peer-123: PeerList - Peer-3
-Peer-123->>Node: PeerListAck - Peer-3
-Note left of Node: Peer-123: [1, 0, 1]
-Node->>Peer-123: PeerList - Peer-2
-Peer-123->>Node: PeerListAck - Peer-2
-Note left of Node: Peer-123: [1, 1, 1]
-Note left of Node: No more gossip left to send to Peer-123!
+    actor Morty
+    actor Rick
+    Note left of Morty: Not currently tracking Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+    Note left of Morty: Track Summer and add to bloom filter
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer is in the bloom filter
+    Rick->>Morty: PeerList - Empty
 ```
+This case is ideal, as `Rick` only notifies `Morty` about `Summer` once, and never uses bandwidth for their connection again.
 
-Because network state is generally expected to be stable (i.e nodes are not continuously flickering online/offline), as more and more gossip messages are exchanged nodes eventually realize that the peers that they are connected to have learned about every other peer.
-
-A node eventually stops gossiping peers when there's no more new peers to gossip about. `PeerList` gossip only resumes once:
-
-1. a new peer joins
-2. a peer disconnects and reconnects
-3. a new validator joins the network
-4. a validator's IP is updated
+Now we consider the case that `Rick` considers `Summer` [`gossipable`](#gossipable-peers), but `Morty` does not consider `Summer` [`trackable`](#trackable-peers).
+```mermaid
+sequenceDiagram
+    actor Morty
+    actor Rick
+    Note left of Morty: Not currently tracking Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+    Note left of Morty: Ignore Summer
+    Morty->>Rick: GetPeerList
+    Note right of Rick: Summer isn't in the bloom filter
+    Rick->>Morty: PeerList - Contains Summer
+```
+This case is suboptimal, because `Rick` told `Morty` about `Summer` multiple times. If this case were to happen consistently, `Rick` may waste a significant amount of bandwidth trying to teach `Morty` about `Summer`.

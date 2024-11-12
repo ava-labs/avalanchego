@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -20,25 +20,22 @@ import (
 
 func BenchmarkLoadUser(b *testing.B) {
 	runLoadUserBenchmark := func(b *testing.B, numKeys int) {
-		// This will segfault instead of failing gracefully if there's an error
-		_, _, vm, _ := GenesisVM(nil)
-		ctx := vm.ctx
-		defer func() {
-			if err := vm.Shutdown(context.Background()); err != nil {
-				b.Fatal(err)
-			}
-			ctx.Lock.Unlock()
-		}()
+		require := require.New(b)
 
-		user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
-		if err != nil {
-			b.Fatalf("Failed to get user keystore db: %s", err)
-		}
+		env := setup(b, &envConfig{
+			fork: upgradetest.Latest,
+			keystoreUsers: []*user{{
+				username: username,
+				password: password,
+			}},
+		})
+		defer env.vm.ctx.Lock.Unlock()
+
+		user, err := keystore.NewUserFromKeystore(env.vm.ctx.Keystore, username, password)
+		require.NoError(err)
 
 		keys, err := keystore.NewKeys(user, numKeys)
-		if err != nil {
-			b.Fatalf("problem generating private key: %s", err)
-		}
+		require.NoError(err)
 
 		b.ResetTimer()
 
@@ -47,19 +44,16 @@ func BenchmarkLoadUser(b *testing.B) {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
 			fromAddrs.Add(keys[addrIndex].PublicKey().Address())
-			if _, _, err := vm.LoadUser(username, password, fromAddrs); err != nil {
-				b.Fatalf("Failed to load user: %s", err)
-			}
+			_, _, err := env.vm.LoadUser(username, password, fromAddrs)
+			require.NoError(err)
 		}
 
 		b.StopTimer()
 
-		if err := user.Close(); err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(user.Close())
 	}
 
-	benchmarkSize := []int{10, 100, 1000, 10000}
+	benchmarkSize := []int{10, 100, 1000, 5000}
 	for _, numKeys := range benchmarkSize {
 		b.Run(fmt.Sprintf("NumKeys=%d", numKeys), func(b *testing.B) {
 			runLoadUserBenchmark(b, numKeys)
@@ -67,27 +61,22 @@ func BenchmarkLoadUser(b *testing.B) {
 	}
 }
 
-// GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
-func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
-	_, _, vm, _ := GenesisVM(b)
-	ctx := vm.ctx
-	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			b.Fatal(err)
-		}
-		ctx.Lock.Unlock()
-	}()
+// getAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
+func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
+	require := require.New(b)
+
+	env := setup(b, &envConfig{fork: upgradetest.Latest})
+	defer env.vm.ctx.Lock.Unlock()
 
 	addr := ids.GenerateTestShortID()
 
-	// #nosec G404
 	for i := 0; i < utxoCount; i++ {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        ids.GenerateTestID(),
-				OutputIndex: rand.Uint32(),
+				OutputIndex: uint32(randSrc.Int63()),
 			},
-			Asset: avax.Asset{ID: ids.ID{'y', 'e', 'e', 't'}},
+			Asset: avax.Asset{ID: env.vm.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: 100000,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -98,20 +87,19 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		vm.state.AddUTXO(utxo)
+		env.vm.state.AddUTXO(utxo)
 	}
-	require.NoError(b, vm.state.Commit())
+	require.NoError(env.vm.state.Commit())
 
-	addrsSet := set.Set[ids.ShortID]{}
-	addrsSet.Add(addr)
+	addrsSet := set.Of(addr)
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, err := avax.GetAllUTXOs(vm.state, addrsSet)
-		require.NoError(b, err)
-		require.Len(b, notPaginatedUTXOs, utxoCount)
+		notPaginatedUTXOs, err := avax.GetAllUTXOs(env.vm.state, addrsSet)
+		require.NoError(err)
+		require.Len(notPaginatedUTXOs, utxoCount)
 	}
 }
 
@@ -120,14 +108,24 @@ func BenchmarkGetUTXOs(b *testing.B) {
 		name      string
 		utxoCount int
 	}{
-		{"100", 100},
-		{"10k", 10000},
-		{"100k", 100000},
+		{
+			name:      "100",
+			utxoCount: 100,
+		},
+		{
+			name:      "10k",
+			utxoCount: 10_000,
+		},
+		{
+			name:      "100k",
+			utxoCount: 100_000,
+		},
 	}
 
-	for _, count := range tests {
+	for testIdx, count := range tests {
+		randSrc := rand.NewSource(int64(testIdx))
 		b.Run(count.name, func(b *testing.B) {
-			GetAllUTXOsBenchmark(b, count.utxoCount)
+			getAllUTXOsBenchmark(b, count.utxoCount, randSrc)
 		})
 	}
 }

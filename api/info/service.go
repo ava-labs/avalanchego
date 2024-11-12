@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -7,25 +7,30 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 
 	"github.com/gorilla/rpc/v2"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var errNoChainProvided = errors.New("argument 'chain' not given")
@@ -34,62 +39,51 @@ var errNoChainProvided = errors.New("argument 'chain' not given")
 type Info struct {
 	Parameters
 	log          logging.Logger
-	myIP         ips.DynamicIPPort
+	validators   validators.Manager
+	myIP         *utils.Atomic[netip.AddrPort]
 	networking   network.Network
 	chainManager chains.Manager
 	vmManager    vms.Manager
-	validators   validators.Set
 	benchlist    benchlist.Manager
 }
 
 type Parameters struct {
-	Version                       *version.Application
-	NodeID                        ids.NodeID
-	NodePOP                       *signer.ProofOfPossession
-	NetworkID                     uint32
-	TxFee                         uint64
-	CreateAssetTxFee              uint64
-	CreateSubnetTxFee             uint64
-	TransformSubnetTxFee          uint64
-	CreateBlockchainTxFee         uint64
-	AddPrimaryNetworkValidatorFee uint64
-	AddPrimaryNetworkDelegatorFee uint64
-	AddSubnetValidatorFee         uint64
-	AddSubnetDelegatorFee         uint64
-	VMManager                     vms.Manager
+	Version     *version.Application
+	NodeID      ids.NodeID
+	NodePOP     *signer.ProofOfPossession
+	NetworkID   uint32
+	TxFeeConfig genesis.TxFeeConfig
+	VMManager   vms.Manager
+	Upgrades    upgrade.Config
 }
 
-// NewService returns a new admin API service
 func NewService(
 	parameters Parameters,
 	log logging.Logger,
+	validators validators.Manager,
 	chainManager chains.Manager,
 	vmManager vms.Manager,
-	myIP ips.DynamicIPPort,
+	myIP *utils.Atomic[netip.AddrPort],
 	network network.Network,
-	validators validators.Set,
 	benchlist benchlist.Manager,
-) (*common.HTTPHandler, error) {
-	newServer := rpc.NewServer()
+) (http.Handler, error) {
+	server := rpc.NewServer()
 	codec := json.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&Info{
-		Parameters:   parameters,
-		log:          log,
-		chainManager: chainManager,
-		vmManager:    vmManager,
-		myIP:         myIP,
-		networking:   network,
-		validators:   validators,
-		benchlist:    benchlist,
-	}, "info"); err != nil {
-		return nil, err
-	}
-	return &common.HTTPHandler{
-		LockOptions: common.NoLock,
-		Handler:     newServer,
-	}, nil
+	server.RegisterCodec(codec, "application/json")
+	server.RegisterCodec(codec, "application/json;charset=UTF-8")
+	return server, server.RegisterService(
+		&Info{
+			Parameters:   parameters,
+			log:          log,
+			validators:   validators,
+			chainManager: chainManager,
+			vmManager:    vmManager,
+			myIP:         myIP,
+			networking:   network,
+			benchlist:    benchlist,
+		},
+		"info",
+	)
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
@@ -146,7 +140,7 @@ type GetNetworkIDReply struct {
 
 // GetNodeIPReply are the results from calling GetNodeIP
 type GetNodeIPReply struct {
-	IP string `json:"ip"`
+	IP netip.AddrPort `json:"ip"`
 }
 
 // GetNodeIP returns the IP of this node
@@ -156,7 +150,7 @@ func (i *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) er
 		zap.String("method", "getNodeIP"),
 	)
 
-	reply.IP = i.myIP.IPPort().String()
+	reply.IP = i.myIP.Get()
 	return nil
 }
 
@@ -217,7 +211,7 @@ type PeersArgs struct {
 type Peer struct {
 	peer.Info
 
-	Benched []ids.ID `json:"benched"`
+	Benched []string `json:"benched"`
 }
 
 // PeersReply are the results from calling Peers
@@ -238,9 +232,18 @@ func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error 
 	peers := i.networking.PeerInfo(args.NodeIDs)
 	peerInfo := make([]Peer, len(peers))
 	for index, peer := range peers {
+		benchedIDs := i.benchlist.GetBenched(peer.ID)
+		benchedAliases := make([]string, len(benchedIDs))
+		for idx, id := range benchedIDs {
+			alias, err := i.chainManager.PrimaryAlias(id)
+			if err != nil {
+				return fmt.Errorf("failed to get primary alias for chain ID %s: %w", id, err)
+			}
+			benchedAliases[idx] = alias
+		}
 		peerInfo[index] = Peer{
 			Info:    peer,
-			Benched: i.benchlist.GetBenched(peer.ID),
+			Benched: benchedAliases,
 		}
 	}
 
@@ -282,6 +285,17 @@ func (i *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *
 	return nil
 }
 
+// Upgrades returns the upgrade schedule this node is running.
+func (i *Info) Upgrades(_ *http.Request, _ *struct{}, reply *upgrade.Config) error {
+	i.log.Debug("API called",
+		zap.String("service", "info"),
+		zap.String("method", "upgrades"),
+	)
+
+	*reply = i.Parameters.Upgrades
+	return nil
+}
+
 // UptimeResponse are the results from calling Uptime
 type UptimeResponse struct {
 	// RewardingStakePercentage shows what percent of network stake thinks we're
@@ -299,23 +313,76 @@ type UptimeResponse struct {
 	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
 }
 
-type UptimeRequest struct {
-	// if omitted, defaults to primary network
-	SubnetID ids.ID `json:"subnetID"`
-}
-
-func (i *Info) Uptime(_ *http.Request, args *UptimeRequest, reply *UptimeResponse) error {
+func (i *Info) Uptime(_ *http.Request, _ *struct{}, reply *UptimeResponse) error {
 	i.log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "uptime"),
 	)
 
-	result, err := i.networking.NodeUptime(args.SubnetID)
+	result, err := i.networking.NodeUptime()
 	if err != nil {
 		return fmt.Errorf("couldn't get node uptime: %w", err)
 	}
 	reply.WeightedAveragePercentage = json.Float64(result.WeightedAveragePercentage)
 	reply.RewardingStakePercentage = json.Float64(result.RewardingStakePercentage)
+	return nil
+}
+
+type ACP struct {
+	SupportWeight json.Uint64         `json:"supportWeight"`
+	Supporters    set.Set[ids.NodeID] `json:"supporters"`
+	ObjectWeight  json.Uint64         `json:"objectWeight"`
+	Objectors     set.Set[ids.NodeID] `json:"objectors"`
+	AbstainWeight json.Uint64         `json:"abstainWeight"`
+}
+
+type ACPsReply struct {
+	ACPs map[uint32]*ACP `json:"acps"`
+}
+
+func (a *ACPsReply) getACP(acpNum uint32) *ACP {
+	acp, ok := a.ACPs[acpNum]
+	if !ok {
+		acp = &ACP{}
+		a.ACPs[acpNum] = acp
+	}
+	return acp
+}
+
+func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
+	i.log.Debug("API called",
+		zap.String("service", "info"),
+		zap.String("method", "acps"),
+	)
+
+	reply.ACPs = make(map[uint32]*ACP, constants.CurrentACPs.Len())
+	peers := i.networking.PeerInfo(nil)
+	for _, peer := range peers {
+		weight := json.Uint64(i.validators.GetWeight(constants.PrimaryNetworkID, peer.ID))
+		if weight == 0 {
+			continue
+		}
+
+		for acpNum := range peer.SupportedACPs {
+			acp := reply.getACP(acpNum)
+			acp.Supporters.Add(peer.ID)
+			acp.SupportWeight += weight
+		}
+		for acpNum := range peer.ObjectedACPs {
+			acp := reply.getACP(acpNum)
+			acp.Objectors.Add(peer.ID)
+			acp.ObjectWeight += weight
+		}
+	}
+
+	totalWeight, err := i.validators.TotalWeight(constants.PrimaryNetworkID)
+	if err != nil {
+		return err
+	}
+	for acpNum := range constants.CurrentACPs {
+		acp := reply.getACP(acpNum)
+		acp.AbstainWeight = json.Uint64(totalWeight) - acp.SupportWeight - acp.ObjectWeight
+	}
 	return nil
 }
 
@@ -338,21 +405,22 @@ func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) e
 		zap.String("method", "getTxFee"),
 	)
 
-	reply.TxFee = json.Uint64(i.TxFee)
-	reply.CreateAssetTxFee = json.Uint64(i.CreateAssetTxFee)
-	reply.CreateSubnetTxFee = json.Uint64(i.CreateSubnetTxFee)
-	reply.TransformSubnetTxFee = json.Uint64(i.TransformSubnetTxFee)
-	reply.CreateBlockchainTxFee = json.Uint64(i.CreateBlockchainTxFee)
-	reply.AddPrimaryNetworkValidatorFee = json.Uint64(i.AddPrimaryNetworkValidatorFee)
-	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(i.AddPrimaryNetworkDelegatorFee)
-	reply.AddSubnetValidatorFee = json.Uint64(i.AddSubnetValidatorFee)
-	reply.AddSubnetDelegatorFee = json.Uint64(i.AddSubnetDelegatorFee)
+	reply.TxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.TxFee)
+	reply.CreateAssetTxFee = json.Uint64(i.TxFeeConfig.CreateAssetTxFee)
+	reply.CreateSubnetTxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.CreateSubnetTxFee)
+	reply.TransformSubnetTxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.TransformSubnetTxFee)
+	reply.CreateBlockchainTxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.CreateBlockchainTxFee)
+	reply.AddPrimaryNetworkValidatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddPrimaryNetworkValidatorFee)
+	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddPrimaryNetworkDelegatorFee)
+	reply.AddSubnetValidatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddSubnetValidatorFee)
+	reply.AddSubnetDelegatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddSubnetDelegatorFee)
 	return nil
 }
 
 // GetVMsReply contains the response metadata for GetVMs
 type GetVMsReply struct {
 	VMs map[ids.ID][]string `json:"vms"`
+	Fxs map[ids.ID]string   `json:"fxs"`
 }
 
 // GetVMs lists the virtual machines installed on the node
@@ -369,5 +437,10 @@ func (i *Info) GetVMs(_ *http.Request, _ *struct{}, reply *GetVMsReply) error {
 	}
 
 	reply.VMs, err = ids.GetRelevantAliases(i.VMManager, vmIDs)
+	reply.Fxs = map[ids.ID]string{
+		secp256k1fx.ID: secp256k1fx.Name,
+		nftfx.ID:       nftfx.Name,
+		propertyfx.ID:  propertyfx.Name,
+	}
 	return err
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -15,21 +15,6 @@ import (
 )
 
 var _ btree.LessFunc[*Staker] = (*Staker).Less
-
-// StakerIterator defines an interface for iterating over a set of stakers.
-type StakerIterator interface {
-	// Next attempts to move the iterator to the next staker. It returns false
-	// once there are no more stakers to return.
-	Next() bool
-
-	// Value returns the current staker. Value should only be called after a
-	// call to Next which returned true.
-	Value() *Staker
-
-	// Release any resources associated with the iterator. This must be called
-	// after the interator is no longer needed.
-	Release()
-}
 
 // Staker contains all information required to represent a validator or
 // delegator in the current and pending validator sets.
@@ -83,7 +68,12 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
-func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*Staker, error) {
+func NewCurrentStaker(
+	txID ids.ID,
+	staker txs.Staker,
+	startTime time.Time,
+	potentialReward uint64,
+) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err
@@ -95,7 +85,7 @@ func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*
 		PublicKey:       publicKey,
 		SubnetID:        staker.SubnetID(),
 		Weight:          staker.Weight(),
-		StartTime:       staker.StartTime(),
+		StartTime:       startTime,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        endTime,
@@ -103,7 +93,7 @@ func NewCurrentStaker(txID ids.ID, staker txs.Staker, potentialReward uint64) (*
 	}, nil
 }
 
-func NewPendingStaker(txID ids.ID, staker txs.Staker) (*Staker, error) {
+func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) {
 	publicKey, _, err := staker.PublicKey()
 	if err != nil {
 		return nil, err

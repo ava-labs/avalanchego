@@ -1,75 +1,56 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
-	"golang.org/x/exp/maps"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
-
-const (
-	NodeBranchFactor = 16
-	HashLength       = 32
-)
-
-// the values that go into the node's id
-type hashValues struct {
-	Children map[byte]child
-	Value    Maybe[[]byte]
-	Key      SerializedPath
-}
 
 // Representation of a node stored in the database.
 type dbNode struct {
-	value    Maybe[[]byte]
-	children map[byte]child
+	value    maybe.Maybe[[]byte]
+	children map[byte]*child
 }
 
 type child struct {
-	compressedPath path
-	id             ids.ID
+	compressedKey Key
+	id            ids.ID
+	hasValue      bool
 }
 
-// node holds additional information on top of the dbNode that makes calulcations easier to do
+// node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
-	id          ids.ID
-	key         path
-	nodeBytes   []byte
-	valueDigest Maybe[[]byte]
+	key         Key
+	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
-// If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key path) *node {
-	newNode := &node{
+func newNode(key Key) *node {
+	return &node{
 		dbNode: dbNode{
-			children: make(map[byte]child, NodeBranchFactor),
+			children: make(map[byte]*child, 2),
 		},
 		key: key,
 	}
-	if parent != nil {
-		parent.addChild(newNode)
-	}
-	return newNode
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key path, nodeBytes []byte) (*node, error) {
+func parseNode(hasher Hasher, key Key, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if _, err := Codec.decodeDBNode(nodeBytes, &n); err != nil {
+	if err := decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
-		dbNode:    n,
-		key:       key,
-		nodeBytes: nodeBytes,
+		dbNode: n,
+		key:    key,
 	}
 
-	result.setValueDigest()
+	result.setValueDigest(hasher)
 	return result, nil
 }
 
@@ -79,122 +60,82 @@ func (n *node) hasValue() bool {
 }
 
 // Returns the byte representation of this node.
-func (n *node) marshal() ([]byte, error) {
-	if n.nodeBytes != nil {
-		return n.nodeBytes, nil
-	}
-
-	nodeBytes, err := Codec.encodeDBNode(Version, &(n.dbNode))
-	if err != nil {
-		return nil, err
-	}
-	n.nodeBytes = nodeBytes
-	return n.nodeBytes, nil
-}
-
-// clear the cached values that will need to be recalculated whenever the node changes
-// for example, node ID and byte representation
-func (n *node) onNodeChanged() {
-	n.id = ids.Empty
-	n.nodeBytes = nil
-}
-
-// Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) error {
-	if n.id != ids.Empty {
-		return nil
-	}
-
-	hv := &hashValues{
-		Children: n.children,
-		Value:    n.valueDigest,
-		Key:      n.key.Serialize(),
-	}
-
-	bytes, err := Codec.encodeHashValues(Version, hv)
-	if err != nil {
-		return err
-	}
-
-	metrics.HashCalculated()
-	n.id = hashing.ComputeHash256Array(bytes)
-	return nil
+func (n *node) bytes() []byte {
+	return encodeDBNode(&n.dbNode)
 }
 
 // Set [n]'s value to [val].
-func (n *node) setValue(val Maybe[[]byte]) {
-	n.onNodeChanged()
+func (n *node) setValue(hasher Hasher, val maybe.Maybe[[]byte]) {
 	n.value = val
-	n.setValueDigest()
+	n.setValueDigest(hasher)
 }
 
-func (n *node) setValueDigest() {
-	if n.value.IsNothing() || len(n.value.value) < HashLength {
+func (n *node) setValueDigest(hasher Hasher) {
+	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
 		n.valueDigest = n.value
 	} else {
-		n.valueDigest = Some(hashing.ComputeHash256(n.value.value))
+		hash := hasher.HashValue(n.value.Value())
+		n.valueDigest = maybe.Some(hash[:])
 	}
 }
 
 // Adds [child] as a child of [n].
 // Assumes [child]'s key is valid as a child of [n].
 // That is, [n.key] is a prefix of [child.key].
-func (n *node) addChild(child *node) {
-	n.addChildWithoutNode(
-		child.key[len(n.key)],
-		child.key[len(n.key)+1:],
-		child.id,
+func (n *node) addChild(childNode *node, tokenSize int) {
+	n.addChildWithID(childNode, tokenSize, ids.Empty)
+}
+
+func (n *node) addChildWithID(childNode *node, tokenSize int, childID ids.ID) {
+	n.setChildEntry(
+		childNode.key.Token(n.key.length, tokenSize),
+		&child{
+			compressedKey: childNode.key.Skip(n.key.length + tokenSize),
+			id:            childID,
+			hasValue:      childNode.hasValue(),
+		},
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID) {
-	n.onNodeChanged()
-	n.children[index] = child{
-		compressedPath: compressedPath,
-		id:             childID,
-	}
-}
-
-// Returns the path of the only child of this node.
-// Assumes this node has exactly one child.
-func (n *node) getSingleChildPath() path {
-	for index, entry := range n.children {
-		return n.key + path(index) + entry.compressedPath
-	}
-	return ""
+func (n *node) setChildEntry(index byte, childEntry *child) {
+	n.children[index] = childEntry
 }
 
 // Removes [child] from [n]'s children.
-func (n *node) removeChild(child *node) {
-	n.onNodeChanged()
-	delete(n.children, child.key[len(n.key)])
+func (n *node) removeChild(child *node, tokenSize int) {
+	delete(n.children, child.key.Token(n.key.length, tokenSize))
 }
 
 // clone Returns a copy of [n].
-// nodeBytes is intentionally not included because it can cause a race.
-// nodes being evicted by the cache can write nodeBytes,
-// so reading them during the cloning would be a data race.
 // Note: value isn't cloned because it is never edited, only overwritten
 // if this ever changes, value will need to be copied as well
+// it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
-	return &node{
-		id:  n.id,
+	result := &node{
 		key: n.key,
 		dbNode: dbNode{
 			value:    n.value,
-			children: maps.Clone(n.children),
+			children: make(map[byte]*child, len(n.children)),
 		},
 		valueDigest: n.valueDigest,
 	}
+	for key, existing := range n.children {
+		result.children[key] = &child{
+			compressedKey: existing.compressedKey,
+			id:            existing.id,
+			hasValue:      existing.hasValue,
+		}
+	}
+	return result
 }
 
 // Returns the ProofNode representation of this node.
 func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
-		KeyPath:     n.key.Serialize(),
+		Key:         n.key,
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: Clone(n.valueDigest),
+		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

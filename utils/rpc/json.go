@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpc
@@ -31,7 +31,7 @@ func SendJSONRequest(
 
 	request, err := http.NewRequestWithContext(
 		ctx,
-		"POST",
+		http.MethodPost,
 		uri.String(),
 		bytes.NewBuffer(requestBodyBytes),
 	)

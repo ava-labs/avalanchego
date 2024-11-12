@@ -16,7 +16,9 @@ graph LR
 
 ## Intro
 
-The Avalanche network consists of 3 built-in blockchains: X-Chain, C-Chain, and P-Chain. The X-Chain is used to manage assets and uses the Avalanche consensus protocol. The C-Chain is used to create and interact with smart contracts and uses the Snowman consensus protocol. The P-Chain is used to coordinate validators and stake and also uses the Snowman consensus protocol. At the time of writing, the Avalanche network has ~1200 validators. A set of validators makes up a subnet. Subnets can validate 1 or more chains. It is a common misconception that 1 subnet = 1 chain and this is shown by the primary subnet of Avalanche which is made up of the X-Chain, C-Chain, and P-Chain.
+The Avalanche primary network consists of 3 built-in blockchains: the X-Chain, C-Chain, and P-Chain. All three chains rely on the Snowman consensus protocol. The X-Chain, which previously used DAG-based Avalanche consensus, was upgraded to Snowman in the Cortina network update. 
+
+The X-Chain is used to manage assets. The C-Chain is used to create and interact with smart contracts. The P-Chain is used to coordinate validators and stake. At the time of writing, the Avalanche network has ~1200 validators. A set of validators makes up a subnet. Subnets can validate 1 or more chains. It is a common misconception that 1 subnet = 1 chain and this is shown by the primary subnet of Avalanche which is made up of the X-Chain, C-Chain, and P-Chain.
 
 A node in the Avalanche network can either be a validator or a non-validator. A validator stakes AVAX tokens and participates in consensus to earn rewards. A non-validator does not participate in consensus or have any AVAX staked but is used as a public API. Both validators and non-validator need to have their own copy of the chain and to know the current state of the mempool. At the time of writing, there are ~1200 validators and ~1800 non-validator.
 
@@ -45,7 +47,7 @@ Currently, Avalanchego implements its own message serialization to communicate. 
 
 ### [Network](https://github.com/ava-labs/avalanchego/blob/master/network/network.go)
 
-The networking interface is shared across all chains. It implements functions from the `ExternalSender` interface. The two functions it implements are `Send` and `Gossip`. `Send` sends a message of type `OutboundMessage` to a specific set of nodes (specified by an array of `NodeIDs`). `Gossip` sends a message of type `OutboundMessage` to a random group of nodes in a subnet (can be a validator or a non-validator). Gossipping is used to push transactions across the network. The networking protocol uses TLS to pass messages between peers.
+The networking interface is shared across all chains. It implements functions from the `ExternalSender` interface. The two functions it implements are `Send` and `Gossip`. `Send` sends a message of type `OutboundMessage` to a specific set of nodes (specified by an array of `NodeIDs`). `Gossip` sends a message of type `OutboundMessage` to a random group of nodes in a subnet (can be a validator or a non-validator). Gossiping is used to push transactions across the network. The networking protocol uses TLS to pass messages between peers.
 
 Along with sending and gossiping, the networking library is also responsible for making connections and maintaining connections. Any node whether they are a validator or non-validator will attempt to connect to the primary network.
 
@@ -68,7 +70,7 @@ The main role of the `sender` is to build and send outbound messages. It is actu
 
 ## [Consensus Engine](https://github.com/ava-labs/avalanchego/blob/master/snow/consensus/snowman/consensus.go)
 
-Consensus is defined as getting a group of distributed systems to agree on an outcome. In the case of the Avalanche network, consensus is achieved when validators are in agreement with the state of the blockchain. The novel consensus algorithm is documented in the [white paper](https://assets.website-files.com/5d80307810123f5ffbb34d6e/6009805681b416f34dcae012_Avalanche%20Consensus%20Whitepaper.pdf). There are two main consensus algorithms: Avalanche and Snowman. The engine is responsible for adding proposing a new block to consensus, repeatedly polling the network for decisions (accept/reject), and communicating that decision to the `Sender`.
+Consensus is defined as getting a group of distributed systems to agree on an outcome. In the case of the Avalanche network, consensus is achieved when validators are in agreement with the state of the blockchain. The novel consensus algorithm is documented in the [white paper](https://assets.website-files.com/5d80307810123f5ffbb34d6e/6009805681b416f34dcae012_Avalanche%20Consensus%20Whitepaper.pdf). There are two main consensus algorithms: Avalanche and Snowman. The engine is responsible for proposing a new block to consensus, repeatedly polling the network for decisions (accept/reject), and communicating that decision to the `Sender`.
 
 ## [Blockchain Creation](https://github.com/ava-labs/avalanchego/blob/master/chains/manager.go)
 

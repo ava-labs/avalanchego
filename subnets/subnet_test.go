@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package subnets
@@ -61,9 +61,7 @@ func TestIsAllowed(t *testing.T) {
 	allowedNodeID := ids.GenerateTestNodeID()
 	s = New(myNodeID, Config{
 		ValidatorOnly: true,
-		AllowedNodes: set.Set[ids.NodeID]{
-			allowedNodeID: struct{}{},
-		},
+		AllowedNodes:  set.Of(allowedNodeID),
 	})
 	require.True(s.IsAllowed(allowedNodeID, true), "Validator should be allowed with validator only rules and allowed nodes")
 	require.True(s.IsAllowed(myNodeID, false), "Self node should be allowed with validator only rules")

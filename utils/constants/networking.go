@@ -1,22 +1,16 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package constants
 
 import (
-	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-// Const variables to be exported
 const (
-	// Request ID used when sending a Put message to gossip an accepted container
-	// (ie not sent in response to a Get)
-	GossipMsgRequestID uint32 = math.MaxUint32
-
 	// The network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 	NetworkType = "tcp"
 
@@ -27,16 +21,13 @@ const (
 
 	MaxContainersLen = int(4 * DefaultMaxMessageSize / 5)
 
-	// MinConnectedStakeBuffer is the safety buffer for calculation of MinConnectedStake.
-	// This increases the required stake percentage above alpha/k. Must be [0-1]
-	// 0 means MinConnectedStake = alpha/k, 1 means MinConnectedStake = 1 (fully connected)
-	MinConnectedStakeBuffer = .2
-
 	DefaultNetworkPeerListNumValidatorIPs        = 15
 	DefaultNetworkPeerListValidatorGossipSize    = 20
 	DefaultNetworkPeerListNonValidatorGossipSize = 0
 	DefaultNetworkPeerListPeersGossipSize        = 10
 	DefaultNetworkPeerListGossipFreq             = time.Minute
+	DefaultNetworkPeerListPullGossipFreq         = 2 * time.Second
+	DefaultNetworkPeerListBloomResetFreq         = time.Minute
 
 	// Inbound Connection Throttling
 	DefaultInboundConnUpgradeThrottlerCooldown = 10 * time.Second
@@ -55,10 +46,8 @@ const (
 	DefaultNetworkTimeoutCoefficient    = 2
 	DefaultNetworkReadHandshakeTimeout  = 15 * time.Second
 
-	DefaultNetworkCompressionEnabled        = true // TODO remove when NetworkCompressionEnabledKey is removed
-	DefaultNetworkCompressionType           = compression.TypeGzip
+	DefaultNetworkCompressionType           = compression.TypeZstd
 	DefaultNetworkMaxClockDifference        = time.Minute
-	DefaultNetworkAllowPrivateIPs           = true
 	DefaultNetworkRequireValidatorToConnect = false
 	DefaultNetworkPeerReadBufferSize        = 8 * units.KiB
 	DefaultNetworkPeerWriteBufferSize       = 8 * units.KiB
@@ -78,18 +67,9 @@ const (
 	DefaultBenchlistMinFailingDuration = 2*time.Minute + 30*time.Second
 
 	// Router
-	DefaultConsensusGossipFrequency                        = 10 * time.Second
-	DefaultConsensusAppConcurrency                         = 2
-	DefaultConsensusShutdownTimeout                        = 30 * time.Second
-	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
-	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
-	DefaultConsensusGossipAcceptedFrontierPeerSize         = 15
-	DefaultConsensusGossipOnAcceptValidatorSize            = 0
-	DefaultConsensusGossipOnAcceptNonValidatorSize         = 0
-	DefaultConsensusGossipOnAcceptPeerSize                 = 10
-	DefaultAppGossipValidatorSize                          = 10
-	DefaultAppGossipNonValidatorSize                       = 0
-	DefaultAppGossipPeerSize                               = 0
+	DefaultConsensusAppConcurrency  = 2
+	DefaultConsensusShutdownTimeout = time.Minute
+	DefaultFrontierPollFrequency    = 100 * time.Millisecond
 
 	// Inbound Throttling
 	DefaultInboundThrottlerAtLargeAllocSize         = 6 * units.MiB
@@ -100,6 +80,7 @@ const (
 	DefaultInboundThrottlerBandwidthMaxBurstSize    = DefaultMaxMessageSize
 	DefaultInboundThrottlerCPUMaxRecheckDelay       = 5 * time.Second
 	DefaultInboundThrottlerDiskMaxRecheckDelay      = 5 * time.Second
+	MinInboundThrottlerMaxRecheckDelay              = time.Millisecond
 
 	// Outbound Throttling
 	DefaultOutboundThrottlerAtLargeAllocSize    = 32 * units.MiB

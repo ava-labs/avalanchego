@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -24,6 +24,8 @@ var (
 )
 
 type Signature interface {
+	fmt.Stringer
+
 	// NumSigners is the number of [bls.PublicKeys] that participated in the
 	// [Signature]. This is exposed because users of these signatures typically
 	// impose a verification fee that is a function of the number of
@@ -37,6 +39,7 @@ type Signature interface {
 	Verify(
 		ctx context.Context,
 		msg *UnsignedMessage,
+		networkID uint32,
 		pChainState validators.State,
 		pChainHeight uint64,
 		quorumNum uint64,
@@ -67,11 +70,16 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 func (s *BitSetSignature) Verify(
 	ctx context.Context,
 	msg *UnsignedMessage,
+	networkID uint32,
 	pChainState validators.State,
 	pChainHeight uint64,
 	quorumNum uint64,
 	quorumDen uint64,
 ) error {
+	if msg.NetworkID != networkID {
+		return ErrWrongNetworkID
+	}
+
 	subnetID, err := pChainState.GetSubnetID(ctx, msg.SourceChainID)
 	if err != nil {
 		return err
@@ -115,7 +123,7 @@ func (s *BitSetSignature) Verify(
 	// Parse the aggregate signature
 	aggSig, err := bls.SignatureFromBytes(s.Signature[:])
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrParseSignature, err)
+		return fmt.Errorf("%w: %w", ErrParseSignature, err)
 	}
 
 	// Create the aggregate public key
@@ -130,6 +138,10 @@ func (s *BitSetSignature) Verify(
 		return ErrInvalidSignature
 	}
 	return nil
+}
+
+func (s *BitSetSignature) String() string {
+	return fmt.Sprintf("BitSetSignature(Signers = %x, Signature = %x)", s.Signers, s.Signature)
 }
 
 // VerifyWeight returns [nil] if [sigWeight] is at least [quorumNum]/[quorumDen]

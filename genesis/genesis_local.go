@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -12,7 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -37,15 +41,41 @@ var (
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
-			TxFee:                         units.MilliAvax,
-			CreateAssetTxFee:              units.MilliAvax,
-			CreateSubnetTxFee:             100 * units.MilliAvax,
-			TransformSubnetTxFee:          100 * units.MilliAvax,
-			CreateBlockchainTxFee:         100 * units.MilliAvax,
-			AddPrimaryNetworkValidatorFee: 0,
-			AddPrimaryNetworkDelegatorFee: 0,
-			AddSubnetValidatorFee:         units.MilliAvax,
-			AddSubnetDelegatorFee:         units.MilliAvax,
+			CreateAssetTxFee: units.MilliAvax,
+			StaticFeeConfig: txfee.StaticConfig{
+				TxFee:                         units.MilliAvax,
+				CreateSubnetTxFee:             100 * units.MilliAvax,
+				TransformSubnetTxFee:          100 * units.MilliAvax,
+				CreateBlockchainTxFee:         100 * units.MilliAvax,
+				AddPrimaryNetworkValidatorFee: 0,
+				AddPrimaryNetworkDelegatorFee: 0,
+				AddSubnetValidatorFee:         units.MilliAvax,
+				AddSubnetDelegatorFee:         units.MilliAvax,
+			},
+			// TODO: Set these values to something more reasonable
+			DynamicFeeConfig: gas.Config{
+				Weights: gas.Dimensions{
+					gas.Bandwidth: 1,
+					gas.DBRead:    1,
+					gas.DBWrite:   1,
+					gas.Compute:   1,
+				},
+				MaxCapacity:              1_000_000,
+				MaxPerSecond:             1_000,
+				TargetPerSecond:          500,
+				MinPrice:                 1,
+				ExcessConversionConstant: 5_000,
+			},
+			ValidatorFeeConfig: validatorfee.Config{
+				Capacity: 20_000,
+				Target:   10_000,
+				MinPrice: gas.Price(1 * units.NanoAvax),
+				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
+				//
+				// ln(2) is a float and the result is consensus critical, so we
+				// hardcode the result.
+				ExcessConversionConstant: 865_617, // Double every minute
+			},
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement: .8, // 80%
@@ -72,10 +102,9 @@ func init() {
 	ewoqBytes, err := cb58.Decode(EWOQKeyStr)
 	errs.Add(err)
 
-	factory := secp256k1.Factory{}
-	VMRQKey, err = factory.ToPrivateKey(vmrqBytes)
+	VMRQKey, err = secp256k1.ToPrivateKey(vmrqBytes)
 	errs.Add(err)
-	EWOQKey, err = factory.ToPrivateKey(ewoqBytes)
+	EWOQKey, err = secp256k1.ToPrivateKey(ewoqBytes)
 	errs.Add(err)
 
 	if errs.Err != nil {

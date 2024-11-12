@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 //go:build freebsd
@@ -9,6 +9,8 @@ package ulimit
 import (
 	"fmt"
 	"syscall"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )

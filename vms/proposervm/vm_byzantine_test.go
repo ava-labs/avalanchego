@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -7,17 +7,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
@@ -30,67 +30,47 @@ import (
 //	    |
 //	    Y
 func TestInvalidByzantineProposerParent(t *testing.T) {
-	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	require := require.New(t)
 
-	xBlock := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:     []byte{1},
-		ParentV:    gBlock.ID(),
-		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
-	}
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
 
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(aBlock.Accept(context.Background()))
 
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatalf("could not accept valid block due to %s", err)
-	}
-
-	yBlockBytes := []byte{2}
-	yBlock := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:     yBlockBytes,
-		ParentV:    xBlock.ID(),
-		HeightV:    xBlock.Height() + 1,
-		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
-	}
-
+	yBlock := snowmantest.BuildChild(xBlock)
 	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
-		if !bytes.Equal(blockBytes, yBlockBytes) {
+		if !bytes.Equal(blockBytes, yBlock.Bytes()) {
 			return nil, errUnknownBlock
 		}
 		return yBlock, nil
 	}
 
-	parsedBlock, err := proVM.ParseBlock(context.Background(), yBlockBytes)
+	parsedBlock, err := proVM.ParseBlock(context.Background(), yBlock.Bytes())
 	if err != nil {
 		// If there was an error parsing, then this is fine.
 		return
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	if err := parsedBlock.Verify(context.Background()); err == nil {
-		t.Fatal("should have marked the parsed block as invalid")
-	}
+	err = parsedBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnknownBlock)
 }
 
 // Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
@@ -103,39 +83,24 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 //	   / \
 //	  Y   Z
 func TestInvalidByzantineProposerOracleParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
-	proVM.Set(coreGenBlk.Timestamp())
+	require := require.New(t)
 
-	xBlockID := ids.GenerateTestID()
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	proVM.Set(snowmantest.GenesisTimestamp)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     xBlockID,
-				StatusV: choices.Processing,
-			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
-		},
-		opts: [2]snowman.Block{
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{2},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
-			},
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{3},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
-			},
+		Block: *xTestBlock,
+		opts: [2]*snowmantest.Block{
+			snowmantest.BuildChild(xTestBlock),
+			snowmantest.BuildChild(xTestBlock),
 		},
 	}
 
@@ -144,8 +109,8 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case coreGenBlk.ID():
-			return coreGenBlk, nil
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		case xBlock.ID():
 			return xBlock, nil
 		case xBlock.opts[0].ID():
@@ -158,8 +123,8 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		case bytes.Equal(b, xBlock.Bytes()):
 			return xBlock, nil
 		case bytes.Equal(b, xBlock.opts[0].Bytes()):
@@ -172,46 +137,24 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	}
 
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("could not build post fork oracle block")
-	}
+	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
-
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 	opts, err := aBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve options from post fork oracle block")
-	}
+	require.NoError(err)
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := opts[0].Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := opts[1].Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(opts[0].Verify(context.Background()))
+	require.NoError(opts[1].Verify(context.Background()))
 
-	yBlock, err := proVM.ParseBlock(context.Background(), xBlock.opts[0].Bytes())
-	if err != nil {
-		// It's okay for this block not to be parsed
-		return
-	}
-	if err := yBlock.Verify(context.Background()); err == nil {
-		t.Fatal("unexpectedly passed block verification")
-	}
+	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	require.NoError(err)
 
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := yBlock.Verify(context.Background()); err == nil {
-		t.Fatal("unexpectedly passed block verification")
-	}
+	// This should never be invoked by the consensus engine. However, it is
+	// enforced to fail verification as a failsafe.
+	err = wrappedXBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
@@ -224,46 +167,27 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 //	  / |
 //	B - Y
 func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
-	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	require := require.New(t)
 
-	xBlock := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:     []byte{1},
-		ParentV:    gBlock.ID(),
-		HeightV:    gBlock.Height() + 1,
-		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
-	}
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
 
-	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
-
-	coreVM.BuildBlockF = nil
-
-	yBlockBytes := []byte{2}
-	yBlock := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:     yBlockBytes,
-		ParentV:    xBlock.ID(),
-		HeightV:    xBlock.Height() + 1,
-		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
-	}
-
+	yBlock := snowmantest.BuildChild(xBlock)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case gBlock.ID():
-			return gBlock, nil
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		case xBlock.ID():
 			return xBlock, nil
 		case yBlock.ID():
@@ -274,8 +198,8 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(blockBytes, gBlock.Bytes()):
-			return gBlock, nil
+		case bytes.Equal(blockBytes, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		case bytes.Equal(blockBytes, xBlock.Bytes()):
 			return xBlock, nil
 		case bytes.Equal(blockBytes, yBlock.Bytes()):
@@ -285,39 +209,19 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		}
 	}
 
-	bStatelessBlock, err := block.BuildUnsigned(
-		xBlock.ID(),
-		yBlock.Timestamp(),
-		0,
-		yBlockBytes,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	aBlock, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+	coreVM.BuildBlockF = nil
 
-	bBlock, err := proVM.ParseBlock(context.Background(), bStatelessBlock.Bytes())
-	if err != nil {
-		// If there was an error parsing, then this is fine.
-		return
-	}
+	require.NoError(aBlock.Verify(context.Background()))
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	require.NoError(err)
 
-	// If there wasn't an error parsing - verify must return an error
-	if err := bBlock.Verify(context.Background()); err == nil {
-		t.Fatal("should have marked the parsed block as invalid")
-	}
-
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatalf("could not accept valid block due to %s", err)
-	}
-
-	// If there wasn't an error parsing - verify must return an error
-	if err := bBlock.Verify(context.Background()); err == nil {
-		t.Fatal("should have marked the parsed block as invalid")
-	}
+	// This should never be invoked by the consensus engine. However, it is
+	// enforced to fail verification as a failsafe.
+	err = wrappedXBlock.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which
@@ -330,38 +234,23 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 //	|     /
 //	B - Y
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
-	proVM.Set(coreGenBlk.Timestamp())
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	proVM.Set(snowmantest.GenesisTimestamp)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.GenerateTestID(),
-				StatusV: choices.Processing,
-			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
-		},
-		opts: [2]snowman.Block{
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{2},
-				ParentV:    coreGenBlk.ID(), // valid block should reference xBlock
-				TimestampV: coreGenBlk.Timestamp(),
-			},
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{3},
-				ParentV:    coreGenBlk.ID(), // valid block should reference xBlock
-				TimestampV: coreGenBlk.Timestamp(),
-			},
+		Block: *snowmantest.BuildChild(snowmantest.Genesis),
+		opts: [2]*snowmantest.Block{ // valid blocks should reference xBlock
+			snowmantest.BuildChild(snowmantest.Genesis),
+			snowmantest.BuildChild(snowmantest.Genesis),
 		},
 	}
 
@@ -370,8 +259,8 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case coreGenBlk.ID():
-			return coreGenBlk, nil
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		case xBlock.ID():
 			return xBlock, nil
 		case xBlock.opts[0].ID():
@@ -384,8 +273,8 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		case bytes.Equal(b, xBlock.Bytes()):
 			return xBlock, nil
 		case bytes.Equal(b, xBlock.opts[0].Bytes()):
@@ -398,28 +287,18 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	}
 
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("could not build post fork oracle block")
-	}
+	require.NoError(err)
 
-	aBlock, ok := aBlockIntf.(*postForkBlock)
-	if !ok {
-		t.Fatal("expected post fork block")
-	}
+	require.IsType(&postForkBlock{}, aBlockIntf)
+	aBlock := aBlockIntf.(*postForkBlock)
 	opts, err := aBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve options from post fork oracle block")
-	}
+	require.NoError(err)
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := opts[0].Verify(context.Background()); err == nil {
-		t.Fatal("option 0 has invalid parent, should not verify")
-	}
-	if err := opts[1].Verify(context.Background()); err == nil {
-		t.Fatal("option 1 has invalid parent, should not verify")
-	}
+	require.NoError(aBlock.Verify(context.Background()))
+	err = opts[0].Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
+	err = opts[1].Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 //	  ,--G ----.
@@ -434,70 +313,41 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 // O2.parent = A (original), O2.inner = first option of X (valid)
 // O3.parent = C (Oracle), O3.inner = first option of X (invalid parent)
 func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
-	proVM.Set(coreGenBlk.Timestamp())
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	proVM.Set(snowmantest.GenesisTimestamp)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create an Oracle pre-fork block X
-	xBlockID := ids.GenerateTestID()
+	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	xBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     xBlockID,
-				StatusV: choices.Processing,
-			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
-		},
-		opts: [2]snowman.Block{
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{2},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
-			},
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{3},
-				ParentV:    xBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
-			},
+		Block: *xTestBlock,
+		opts: [2]*snowmantest.Block{
+			snowmantest.BuildChild(xTestBlock),
+			snowmantest.BuildChild(xTestBlock),
 		},
 	}
 
 	xInnerOptions, err := xBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	xInnerOption := xInnerOptions[0]
 
 	// create a non-Oracle pre-fork block Y
-	yBlock := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
-	}
-
+	yBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	ySlb, err := block.BuildUnsigned(
-		coreGenBlk.ID(),
-		coreGenBlk.Timestamp(),
+		snowmantest.GenesisID,
+		snowmantest.GenesisTimestamp,
 		uint64(2000),
 		yBlock.Bytes(),
 	)
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	// create post-fork block B from Y
 	bBlock := postForkBlock{
@@ -505,102 +355,62 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: yBlock,
-			status:   choices.Processing,
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bBlock.Verify(context.Background()))
 
 	// generate O1
 	statelessOuterOption, err := block.BuildOption(
 		bBlock.ID(),
 		xInnerOption.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	outerOption := &postForkOption{
 		Block: statelessOuterOption,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: xInnerOption,
-			status:   xInnerOption.Status(),
 		},
 	}
 
-	if err := outerOption.Verify(context.Background()); !errors.Is(err, errUnexpectedBlockType) {
-		t.Fatal(err)
-	}
+	err = outerOption.Verify(context.Background())
+	require.ErrorIs(err, errUnexpectedBlockType)
 
 	// generate A from X and O2
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	coreVM.BuildBlockF = nil
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
 
 	statelessOuterOption, err = block.BuildOption(
 		aBlock.ID(),
 		xInnerOption.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	outerOption = &postForkOption{
 		Block: statelessOuterOption,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: xInnerOption,
-			status:   xInnerOption.Status(),
 		},
 	}
 
-	if err := outerOption.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(outerOption.Verify(context.Background()))
 
 	// create an Oracle pre-fork block Z
 	// create post-fork block B from Y
-	zBlockID := ids.GenerateTestID()
+	zTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
 	zBlock := &TestOptionsBlock{
-		TestBlock: snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     zBlockID,
-				StatusV: choices.Processing,
-			},
-			BytesV:     []byte{1},
-			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
-		},
-		opts: [2]snowman.Block{
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{2},
-				ParentV:    zBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
-			},
-			&snowman.TestBlock{
-				TestDecidable: choices.TestDecidable{
-					IDV:     ids.GenerateTestID(),
-					StatusV: choices.Processing,
-				},
-				BytesV:     []byte{3},
-				ParentV:    zBlockID,
-				TimestampV: coreGenBlk.Timestamp(),
-			},
+		Block: *zTestBlock,
+		opts: [2]*snowmantest.Block{
+			snowmantest.BuildChild(zTestBlock),
+			snowmantest.BuildChild(zTestBlock),
 		},
 	}
 
@@ -608,39 +418,40 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		return zBlock, nil
 	}
 	cBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	coreVM.BuildBlockF = nil
-	if err := cBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(cBlock.Verify(context.Background()))
 
 	// generate O3
 	statelessOuterOption, err = block.BuildOption(
 		cBlock.ID(),
 		xInnerOption.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	outerOption = &postForkOption{
 		Block: statelessOuterOption,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: xInnerOption,
-			status:   xInnerOption.Status(),
 		},
 	}
 
-	if err := outerOption.Verify(context.Background()); err != errInnerParentMismatch {
-		t.Fatal(err)
-	}
+	err = outerOption.Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 func TestGetBlock_MutatedSignature(t *testing.T) {
-	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	require := require.New(t)
+
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
+	)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Make sure that we will be sampled to perform the proposals.
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
@@ -652,35 +463,15 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		}, nil
 	}
 
-	proVM.Set(coreGenBlk.Timestamp())
+	proVM.Set(snowmantest.GenesisTimestamp)
 
 	// Create valid core blocks to build our chain on.
-	coreBlk0 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(1111),
-			StatusV: choices.Processing,
-		},
-		BytesV:     []byte{1},
-		ParentV:    coreGenBlk.ID(),
-		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
-	}
-
-	coreBlk1 := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2222),
-			StatusV: choices.Processing,
-		},
-		BytesV:     []byte{2},
-		ParentV:    coreBlk0.ID(),
-		HeightV:    coreBlk0.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp(),
-	}
-
+	coreBlk0 := snowmantest.BuildChild(snowmantest.Genesis)
+	coreBlk1 := snowmantest.BuildChild(coreBlk0)
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case coreGenBlk.ID():
-			return coreGenBlk, nil
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
 		case coreBlk0.ID():
 			return coreBlk0, nil
 		case coreBlk1.ID():
@@ -691,8 +482,8 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		switch {
-		case bytes.Equal(b, coreGenBlk.Bytes()):
-			return coreGenBlk, nil
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
 		case bytes.Equal(b, coreBlk0.Bytes()):
 			return coreBlk0, nil
 		case bytes.Equal(b, coreBlk1.Bytes()):
@@ -708,19 +499,13 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	}
 
 	builtBlk0, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("could not build post fork block %s", err)
-	}
+	require.NoError(err)
 
-	if err := builtBlk0.Verify(context.Background()); err != nil {
-		t.Fatalf("failed to verify newly created block %s", err)
-	}
+	require.NoError(builtBlk0.Verify(context.Background()))
 
-	if err := proVM.SetPreference(context.Background(), builtBlk0.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), builtBlk0.ID()))
 
-	// The second propsal block will need to be signed because the timestamp
+	// The second proposal block will need to be signed because the timestamp
 	// hasn't moved forward
 
 	// Craft what would be the next block, but with an invalid signature:
@@ -729,9 +514,7 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	// Invalid Bytes: 000000000000fd81ce4f1ab2650176d46a3d1fbb593af5717a2ada7dabdcef19622325a8ce8400000000000003e800000000000006d0000004a13082049d30820285a003020102020100300d06092a864886f70d01010b050030003020170d3939313233313030303030305a180f32313231313132333130313030305a300030820222300d06092a864886f70d01010105000382020f003082020a0282020100b9c3615c42d501f3b9d21ed127b31855827dbe12652e6e6f278991a3ad1ca55e2241b1cac69a0aeeefdd913db8ae445ff847789fdcbc1cbe6cce0a63109d1c1fb9d441c524a6eb1412f9b8090f1507e3e50a725f9d0a9d5db424ea229a7c11d8b91c73fecbad31c7b216bb2ac5e4d5ff080a80fabc73b34beb8fa46513ab59d489ce3f273c0edab43ded4d4914e081e6e850f9e502c3c4a54afc8a3a89d889aec275b7162a7616d53a61cd3ee466394212e5bef307790100142ad9e0b6c95ad2424c6e84d06411ad066d0c37d4d14125bae22b49ad2a761a09507bbfe43d023696d278d9fbbaf06c4ff677356113d3105e248078c33caed144d85929b1dd994df33c5d3445675104659ca9642c269b5cfa39c7bad5e399e7ebce3b5e6661f989d5f388006ebd90f0e035d533f5662cb925df8744f61289e66517b51b9a2f54792dca9078d5e12bf8ad79e35a68d4d661d15f0d3029d6c5903c845323d5426e49deaa2be2bc261423a9cd77df9a2706afaca27f589cc2c8f53e2a1f90eb5a3f8bcee0769971db6bacaec265d86b39380f69e3e0e06072de986feede26fe856c55e24e88ee5ac342653ac55a04e21b8517310c717dff0e22825c0944c6ba263f8f060099ea6e44a57721c7aa54e2790a4421fb85e3347e4572cba44e62b2cad19c1623c1cab4a715078e56458554cef8442769e6d5dd7f99a6234653a46828804f0203010001a320301e300e0603551d0f0101ff0404030204b0300c0603551d130101ff04023000300d06092a864886f70d01010b050003820201004ee2229d354720a751e2d2821134994f5679997113192626cf61594225cfdf51e6479e2c17e1013ab9dceb713bc0f24649e5cab463a8cf8617816ed736ac5251a853ff35e859ac6853ebb314f967ff7867c53512d42e329659375682c854ca9150cfa4c3964680e7650beb93e8b4a0d6489a9ca0ce0104752ba4d9cf3e2dc9436b56ecd0bd2e33cbbeb5a107ec4fd6f41a943c8bee06c0b32f4291a3e3759a7984d919a97d5d6517b841053df6e795ed33b52ed5e41357c3e431beb725e4e4f2ef956c44fd1f76fa4d847602e491c3585a90cdccfff982405d388b83d6f32ea16da2f5e4595926a7d26078e32992179032d30831b1f1b42de1781c507536a49adb4c95bad04c171911eed30d63c73712873d1e8094355efb9aeee0c16f8599575fd7f8bb027024bad63b097d2230d8f0ba12a8ed23e618adc3d7cb6a63e02b82a6d4d74b21928dbcb6d3788c6fd45022d69f3ab94d914d97cd651db662e92918a5d891ef730a813f03aade2fe385b61f44840f8925ad3345df1c82c9de882bb7184b4cd0bbd9db8322aaedb4ff86e5be9635987e6c40455ab9b063cdb423bee2edcac47cf654487e9286f33bdbad10018f4db9564cee6e048570e1517a2e396501b5978a53d10a548aed26938c2f9aada3ae62d3fdae486deb9413dffb6524666453633d665c3712d0fec9f844632b2b3eaf0267ca495eb41dba8273862609de00000001020000000101
 	invalidBlkBytesHex := "000000000000fd81ce4f1ab2650176d46a3d1fbb593af5717a2ada7dabdcef19622325a8ce8400000000000003e800000000000006d0000004a13082049d30820285a003020102020100300d06092a864886f70d01010b050030003020170d3939313233313030303030305a180f32313231313132333130313030305a300030820222300d06092a864886f70d01010105000382020f003082020a0282020100b9c3615c42d501f3b9d21ed127b31855827dbe12652e6e6f278991a3ad1ca55e2241b1cac69a0aeeefdd913db8ae445ff847789fdcbc1cbe6cce0a63109d1c1fb9d441c524a6eb1412f9b8090f1507e3e50a725f9d0a9d5db424ea229a7c11d8b91c73fecbad31c7b216bb2ac5e4d5ff080a80fabc73b34beb8fa46513ab59d489ce3f273c0edab43ded4d4914e081e6e850f9e502c3c4a54afc8a3a89d889aec275b7162a7616d53a61cd3ee466394212e5bef307790100142ad9e0b6c95ad2424c6e84d06411ad066d0c37d4d14125bae22b49ad2a761a09507bbfe43d023696d278d9fbbaf06c4ff677356113d3105e248078c33caed144d85929b1dd994df33c5d3445675104659ca9642c269b5cfa39c7bad5e399e7ebce3b5e6661f989d5f388006ebd90f0e035d533f5662cb925df8744f61289e66517b51b9a2f54792dca9078d5e12bf8ad79e35a68d4d661d15f0d3029d6c5903c845323d5426e49deaa2be2bc261423a9cd77df9a2706afaca27f589cc2c8f53e2a1f90eb5a3f8bcee0769971db6bacaec265d86b39380f69e3e0e06072de986feede26fe856c55e24e88ee5ac342653ac55a04e21b8517310c717dff0e22825c0944c6ba263f8f060099ea6e44a57721c7aa54e2790a4421fb85e3347e4572cba44e62b2cad19c1623c1cab4a715078e56458554cef8442769e6d5dd7f99a6234653a46828804f0203010001a320301e300e0603551d0f0101ff0404030204b0300c0603551d130101ff04023000300d06092a864886f70d01010b050003820201004ee2229d354720a751e2d2821134994f5679997113192626cf61594225cfdf51e6479e2c17e1013ab9dceb713bc0f24649e5cab463a8cf8617816ed736ac5251a853ff35e859ac6853ebb314f967ff7867c53512d42e329659375682c854ca9150cfa4c3964680e7650beb93e8b4a0d6489a9ca0ce0104752ba4d9cf3e2dc9436b56ecd0bd2e33cbbeb5a107ec4fd6f41a943c8bee06c0b32f4291a3e3759a7984d919a97d5d6517b841053df6e795ed33b52ed5e41357c3e431beb725e4e4f2ef956c44fd1f76fa4d847602e491c3585a90cdccfff982405d388b83d6f32ea16da2f5e4595926a7d26078e32992179032d30831b1f1b42de1781c507536a49adb4c95bad04c171911eed30d63c73712873d1e8094355efb9aeee0c16f8599575fd7f8bb027024bad63b097d2230d8f0ba12a8ed23e618adc3d7cb6a63e02b82a6d4d74b21928dbcb6d3788c6fd45022d69f3ab94d914d97cd651db662e92918a5d891ef730a813f03aade2fe385b61f44840f8925ad3345df1c82c9de882bb7184b4cd0bbd9db8322aaedb4ff86e5be9635987e6c40455ab9b063cdb423bee2edcac47cf654487e9286f33bdbad10018f4db9564cee6e048570e1517a2e396501b5978a53d10a548aed26938c2f9aada3ae62d3fdae486deb9413dffb6524666453633d665c3712d0fec9f844632b2b3eaf0267ca495eb41dba8273862609de00000001020000000101"
 	invalidBlkBytes, err := hex.DecodeString(invalidBlkBytesHex)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	invalidBlk, err := proVM.ParseBlock(context.Background(), invalidBlkBytes)
 	if err != nil {
@@ -739,20 +522,14 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		t.Skip(err)
 	}
 
-	if err := invalidBlk.Verify(context.Background()); err == nil {
-		t.Fatalf("verified block without valid signature")
-	}
+	err = invalidBlk.Verify(context.Background())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Note that the invalidBlk.ID() is the same as the correct blk ID because
 	// the signature isn't part of the blk ID.
 	blkID, err := ids.FromString("2R3Uz98YmxHUJARWv6suApPdAbbZ7X7ipat1gZuZNNhC5wPwJW")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if blkID != invalidBlk.ID() {
-		t.Fatalf("unexpected block ID; expected = %s , got = %s", blkID, invalidBlk.ID())
-	}
+	require.NoError(err)
+	require.Equal(blkID, invalidBlk.ID())
 
 	// GetBlock shouldn't really be able to succeed, as we don't have a valid
 	// representation of [blkID]
@@ -764,7 +541,5 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 
 	// GetBlock returned, so it must have somehow gotten a valid representation
 	// of [blkID].
-	if err := fetchedBlk.Verify(context.Background()); err != nil {
-		t.Fatalf("GetBlock returned an invalid block when the ID represented a potentially valid block: %s", err)
-	}
+	require.NoError(fetchedBlk.Verify(context.Background()))
 }

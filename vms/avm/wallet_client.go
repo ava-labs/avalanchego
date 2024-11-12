@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -75,7 +75,7 @@ func NewWalletClient(uri, chain string) WalletClient {
 func (c *walletClient) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	res := &api.JSONTxID{}
 	err = c.requester.SendRequest(ctx, "wallet.issueTx", &api.FormattedTx{

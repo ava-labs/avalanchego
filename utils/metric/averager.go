@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metric
@@ -23,31 +23,29 @@ type averager struct {
 	sum   prometheus.Gauge
 }
 
-func NewAverager(namespace, name, desc string, reg prometheus.Registerer) (Averager, error) {
+func NewAverager(name, desc string, reg prometheus.Registerer) (Averager, error) {
 	errs := wrappers.Errs{}
-	a := NewAveragerWithErrs(namespace, name, desc, reg, &errs)
+	a := NewAveragerWithErrs(name, desc, reg, &errs)
 	return a, errs.Err
 }
 
-func NewAveragerWithErrs(namespace, name, desc string, reg prometheus.Registerer, errs *wrappers.Errs) Averager {
+func NewAveragerWithErrs(name, desc string, reg prometheus.Registerer, errs *wrappers.Errs) Averager {
 	a := averager{
 		count: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_count", name),
-			Help:      fmt.Sprintf("Total # of observations of %s", desc),
+			Name: AppendNamespace(name, "count"),
+			Help: "Total # of observations of " + desc,
 		}),
 		sum: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("%s_sum", name),
-			Help:      fmt.Sprintf("Sum of %s", desc),
+			Name: AppendNamespace(name, "sum"),
+			Help: "Sum of " + desc,
 		}),
 	}
 
 	if err := reg.Register(a.count); err != nil {
-		errs.Add(fmt.Errorf("%w: %s", ErrFailedRegistering, err))
+		errs.Add(fmt.Errorf("%w: %w", ErrFailedRegistering, err))
 	}
 	if err := reg.Register(a.sum); err != nil {
-		errs.Add(fmt.Errorf("%w: %s", ErrFailedRegistering, err))
+		errs.Add(fmt.Errorf("%w: %w", ErrFailedRegistering, err))
 	}
 	return &a
 }

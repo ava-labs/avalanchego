@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -58,11 +57,11 @@ func (t *testExternalHandler) Disconnected(nodeID ids.NodeID) {
 	)
 }
 
-type testAggressiveValidatorSet struct {
-	validators.Set
+type testAggressiveValidatorManager struct {
+	validators.Manager
 }
 
-func (*testAggressiveValidatorSet) Contains(ids.NodeID) bool {
+func (*testAggressiveValidatorManager) Contains(ids.ID, ids.NodeID) bool {
 	return true
 }
 
@@ -78,8 +77,8 @@ func ExampleNewTestNetwork() {
 
 	// Needs to be periodically updated by the caller to have the latest
 	// validator set
-	validators := &testAggressiveValidatorSet{
-		Set: validators.NewSet(),
+	validators := &testAggressiveValidatorManager{
+		Manager: validators.NewManager(),
 	}
 
 	// If we want to be able to communicate with non-primary network subnets, we
@@ -108,30 +107,9 @@ func ExampleNewTestNetwork() {
 
 	// We need to initially connect to some nodes in the network before peer
 	// gossip will enable connecting to all the remaining nodes in the network.
-	beaconIPs, beaconIDs := genesis.SampleBeacons(constants.FujiID, 5)
-	for i, beaconIDStr := range beaconIDs {
-		beaconID, err := ids.NodeIDFromString(beaconIDStr)
-		if err != nil {
-			log.Fatal(
-				"failed to parse beaconID",
-				zap.String("beaconID", beaconIDStr),
-				zap.Error(err),
-			)
-			return
-		}
-
-		beaconIPStr := beaconIPs[i]
-		ipPort, err := ips.ToIPPort(beaconIPStr)
-		if err != nil {
-			log.Fatal(
-				"failed to parse beaconIP",
-				zap.String("beaconIP", beaconIPStr),
-				zap.Error(err),
-			)
-			return
-		}
-
-		network.ManuallyTrack(beaconID, ipPort)
+	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
+	for _, bootstrapper := range bootstrappers {
+		network.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
 	}
 
 	// Typically network.StartClose() should be called based on receiving a

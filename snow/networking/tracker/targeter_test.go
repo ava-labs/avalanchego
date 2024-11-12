@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -6,35 +6,37 @@ package tracker
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/tracker/trackermock"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Assert fields are set correctly.
 func TestNewTargeter(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	config := &TargeterConfig{
 		VdrAlloc:           10,
 		MaxNonVdrUsage:     10,
 		MaxNonVdrNodeUsage: 10,
 	}
-	vdrs := validators.NewSet()
-	tracker := NewMockTracker(ctrl)
+	vdrs := validators.NewManager()
+	tracker := trackermock.NewTracker(ctrl)
 
 	targeterIntf := NewTargeter(
+		logging.NoLog{},
 		config,
 		vdrs,
 		tracker,
 	)
-	targeter, ok := targeterIntf.(*targeter)
-	require.True(ok)
+	require.IsType(&targeter{}, targeterIntf)
+	targeter := targeterIntf.(*targeter)
 	require.Equal(vdrs, targeter.vdrs)
 	require.Equal(tracker, targeter.tracker)
 	require.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
@@ -43,21 +45,16 @@ func TestNewTargeter(t *testing.T) {
 
 func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	vdr := ids.NodeID{1}
+	vdr := ids.BuildTestNodeID([]byte{1})
 	vdrWeight := uint64(1)
 	totalVdrWeight := uint64(10)
-	nonVdr := ids.NodeID{2}
-	vdrs := validators.NewSet()
-	if err := vdrs.Add(vdr, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight); err != nil {
-		t.Fatal(err)
-	}
+	nonVdr := ids.BuildTestNodeID([]byte{2})
+	vdrs := validators.NewManager()
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, vdr, nil, ids.Empty, 1))
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
-	tracker := NewMockTracker(ctrl)
+	tracker := trackermock.NewTracker(ctrl)
 	config := &TargeterConfig{
 		VdrAlloc:           20,
 		MaxNonVdrUsage:     10,
@@ -65,6 +62,7 @@ func TestTarget(t *testing.T) {
 	}
 
 	targeter := NewTargeter(
+		logging.NoLog{},
 		config,
 		vdrs,
 		tracker,

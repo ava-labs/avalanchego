@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package summary
@@ -20,7 +20,7 @@ func Build(
 		InnerSummary: coreSummary,
 	}
 
-	bytes, err := c.Marshal(codecVersion, &summary)
+	bytes, err := Codec.Marshal(CodecVersion, &summary)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal proposer summary due to: %w", err)
 	}

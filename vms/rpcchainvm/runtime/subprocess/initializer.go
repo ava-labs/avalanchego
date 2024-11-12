@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package subprocess
@@ -16,6 +16,8 @@ var _ runtime.Initializer = (*initializer)(nil)
 
 // Subprocess VM Runtime intializer.
 type initializer struct {
+	path string
+
 	once sync.Once
 	// Address of the RPC Chain VM server
 	vmAddr string
@@ -25,8 +27,9 @@ type initializer struct {
 	initialized chan struct{}
 }
 
-func newInitializer() *initializer {
+func newInitializer(path string) *initializer {
 	return &initializer{
+		path:        path,
 		initialized: make(chan struct{}),
 	}
 }
@@ -34,10 +37,11 @@ func newInitializer() *initializer {
 func (i *initializer) Initialize(_ context.Context, protocolVersion uint, vmAddr string) error {
 	i.once.Do(func() {
 		if version.RPCChainVMProtocol != protocolVersion {
-			i.err = fmt.Errorf(
-				"%w avalanchego: %d, vm: %d",
+			i.err = fmt.Errorf("%w. AvalancheGo version %s implements RPCChainVM protocol version %d. The VM located at %s implements RPCChainVM protocol version %d. Please make sure that there is an exact match of the protocol versions. This can be achieved by updating your VM or running an older/newer version of AvalancheGo. Please be advised that some virtual machines may not yet support the latest RPCChainVM protocol version",
 				runtime.ErrProtocolVersionMismatch,
+				version.Current,
 				version.RPCChainVMProtocol,
+				i.path,
 				protocolVersion,
 			)
 		}

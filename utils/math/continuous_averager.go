@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package math
@@ -7,8 +7,6 @@ import (
 	"math"
 	"time"
 )
-
-var convertEToBase2 = math.Log(2)
 
 type continuousAverager struct {
 	halflife    float64
@@ -34,7 +32,7 @@ func NewAverager(
 	currentTime time.Time,
 ) Averager {
 	return &continuousAverager{
-		halflife:    float64(halflife) / convertEToBase2,
+		halflife:    float64(halflife) / math.Ln2,
 		weightedSum: initialPrediction,
 		normalizer:  1,
 		lastUpdated: currentTime,

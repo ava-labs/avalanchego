@@ -1,579 +1,158 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sync
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func sendRangeRequest(
+var _ p2p.Handler = (*flakyHandler)(nil)
+
+func newDefaultDBConfig() merkledb.Config {
+	return merkledb.Config{
+		IntermediateWriteBatchSize:  100,
+		HistoryLength:               defaultRequestKeyLimit,
+		ValueNodeCacheSize:          defaultRequestKeyLimit,
+		IntermediateWriteBufferSize: defaultRequestKeyLimit,
+		IntermediateNodeCacheSize:   defaultRequestKeyLimit,
+		Reg:                         prometheus.NewRegistry(),
+		Tracer:                      trace.Noop,
+		BranchFactor:                merkledb.BranchFactor16,
+	}
+}
+
+func newFlakyRangeProofHandler(
 	t *testing.T,
-	db *merkledb.Database,
-	request *syncpb.RangeProofRequest,
-	maxAttempts uint32,
-	modifyResponse func(*merkledb.RangeProof),
-) (*merkledb.RangeProof, error) {
-	t.Helper()
+	db merkledb.MerkleDB,
+	modifyResponse func(response *merkledb.RangeProof),
+) p2p.Handler {
+	handler := NewGetRangeProofHandler(logging.NoLog{}, db)
 
-	var wg sync.WaitGroup
-	defer wg.Wait() // wait for goroutines spawned
-
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	sender := common.NewMockSender(ctrl)
-	handler := NewNetworkServer(sender, db, logging.NoLog{})
-	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
-	require.NoError(err)
-	client := NewClient(&ClientConfig{
-		NetworkClient: networkClient,
-		Metrics:       &mockMetrics{},
-		Log:           logging.NoLog{},
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
-	defer cancel()                            // avoid leaking a goroutine
-
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
-	sender.EXPECT().SendAppRequest(
-		gomock.Any(),        // ctx
-		expectedSendNodeIDs, // {serverNodeID}
-		gomock.Any(),        // requestID
-		gomock.Any(),        // requestBytes
-	).DoAndReturn(
-		func(ctx context.Context, _ set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
-			// limit the number of attempts to [maxAttempts] by cancelling the context if needed.
-			if requestID >= maxAttempts {
-				cancel()
-				return ctx.Err()
+	c := counter{m: 2}
+	return &p2p.TestHandler{
+		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+			responseBytes, appErr := handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+			if appErr != nil {
+				return nil, appErr
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				err := handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes)
-				require.NoError(err)
-			}() // should be on a goroutine so the test can make progress.
-			return nil
-		},
-	).AnyTimes()
-	sender.EXPECT().SendAppResponse(
-		gomock.Any(), // ctx
-		clientNodeID,
-		gomock.Any(), // requestID
-		gomock.Any(), // responseBytes
-	).DoAndReturn(
-		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-			// deserialize the response so we can modify it if needed.
-			response := &merkledb.RangeProof{}
-			_, err := merkledb.Codec.DecodeRangeProof(responseBytes, response)
-			require.NoError(err)
+			response := &pb.RangeProof{}
+			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
-			// modify if needed
-			if modifyResponse != nil {
-				modifyResponse(response)
+			proof := &merkledb.RangeProof{}
+			require.NoError(t, proof.UnmarshalProto(response))
+
+			// Half of requests are modified
+			if c.Inc() == 0 {
+				modifyResponse(proof)
 			}
 
-			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err = merkledb.Codec.EncodeRangeProof(merkledb.Version, response)
-			require.NoError(err)
-			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
-			require.NoError(err)
-			return nil
-		},
-	).AnyTimes()
-
-	return client.GetRangeProof(ctx, request)
-}
-
-func TestGetRangeProof(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
-
-	smallTrieKeyCount := defaultRequestKeyLimit
-	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
-	require.NoError(t, err)
-	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	largeTrieKeyCount := 10_000
-	largeTrieDB, largeTrieKeys, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
-	require.NoError(t, err)
-	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	tests := map[string]struct {
-		db                  *merkledb.Database
-		request             *syncpb.RangeProofRequest
-		modifyResponse      func(*merkledb.RangeProof)
-		expectedErr         error
-		expectedResponseLen int
-	}{
-		"proof restricted by BytesLimit": {
-			db: smallTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 10000,
-			},
-		},
-		"full response for small (single request) trie": {
-			db: smallTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: defaultRequestKeyLimit,
-		},
-		"too many leaves in response": {
-			db: smallTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       smallTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = append(response.KeyValues, merkledb.KeyValue{})
-			},
-			expectedErr: errTooManyKeys,
-		},
-		"partial response to request for entire trie (full leaf limit)": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: defaultRequestKeyLimit,
-		},
-		"full response from near end of trie to end of trie (less than leaf limit)": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				Start:      largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: 30,
-		},
-		"full response for intermediate range of trie (less than leaf limit)": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				Start:      largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-				End:        largeTrieKeys[1099], // (inclusive range)
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: 100,
-		},
-		"removed first key in response": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = response.KeyValues[1:]
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"removed first key in response and replaced proof": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				start := response.KeyValues[1].Key
-				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultRequestKeyLimit)
-				if err != nil {
-					panic(err)
-				}
-				response.KeyValues = proof.KeyValues
-				response.StartProof = proof.StartProof
-				response.EndProof = proof.EndProof
-			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
-		},
-		"removed last key in response": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"removed key from middle of response": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.KeyValues = append(response.KeyValues[:100], response.KeyValues[101:]...)
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"all proof keys removed from response": {
-			db: largeTrieDB,
-			request: &syncpb.RangeProofRequest{
-				Root:       largeTrieRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.RangeProof) {
-				response.StartProof = nil
-				response.EndProof = nil
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
-			proof, err := sendRangeRequest(t, test.db, test.request, 1, test.modifyResponse)
-			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
-				return
+			responseBytes, err := proto.Marshal(proof.ToProto())
+			if err != nil {
+				return nil, &common.AppError{Code: 123, Message: err.Error()}
 			}
-			require.NoError(err)
-			if test.expectedResponseLen > 0 {
-				require.Len(proof.KeyValues, test.expectedResponseLen)
-			}
-			bytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, proof)
-			require.NoError(err)
-			require.Less(len(bytes), int(test.request.BytesLimit))
-		})
+
+			return responseBytes, nil
+		},
 	}
 }
 
-func sendChangeRequest(
+func newFlakyChangeProofHandler(
 	t *testing.T,
-	db *merkledb.Database,
-	verificationDB *merkledb.Database,
-	request *syncpb.ChangeProofRequest,
-	maxAttempts uint32,
-	modifyResponse func(*merkledb.ChangeProof),
-) (*merkledb.ChangeProof, error) {
-	t.Helper()
+	db merkledb.MerkleDB,
+	modifyResponse func(response *merkledb.ChangeProof),
+) p2p.Handler {
+	handler := NewGetChangeProofHandler(logging.NoLog{}, db)
 
-	var wg sync.WaitGroup
-	defer wg.Wait() // wait for goroutines spawned
-
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	sender := common.NewMockSender(ctrl)
-	handler := NewNetworkServer(sender, db, logging.NoLog{})
-	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
-	require.NoError(err)
-	client := NewClient(&ClientConfig{
-		NetworkClient: networkClient,
-		Metrics:       &mockMetrics{},
-		Log:           logging.NoLog{},
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
-	defer cancel()                            // avoid leaking a goroutine
-
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
-	sender.EXPECT().SendAppRequest(
-		gomock.Any(),        // ctx
-		expectedSendNodeIDs, // {serverNodeID}
-		gomock.Any(),        // requestID
-		gomock.Any(),        // requestBytes
-	).DoAndReturn(
-		func(ctx context.Context, _ set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
-			// limit the number of attempts to [maxAttempts] by cancelling the context if needed.
-			if requestID >= maxAttempts {
-				cancel()
-				return ctx.Err()
+	c := counter{m: 2}
+	return &p2p.TestHandler{
+		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+			var err error
+			responseBytes, appErr := handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+			if appErr != nil {
+				return nil, appErr
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				err := handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes)
-				require.NoError(err)
-			}() // should be on a goroutine so the test can make progress.
-			return nil
-		},
-	).AnyTimes()
-	sender.EXPECT().SendAppResponse(
-		gomock.Any(), // ctx
-		clientNodeID,
-		gomock.Any(), // requestID
-		gomock.Any(), // responseBytes
-	).DoAndReturn(
-		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
-			// deserialize the response so we can modify it if needed.
-			response := &merkledb.ChangeProof{}
-			_, err := merkledb.Codec.DecodeChangeProof(responseBytes, response)
-			require.NoError(err)
+			response := &pb.SyncGetChangeProofResponse{}
+			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
-			// modify if needed
-			if modifyResponse != nil {
-				modifyResponse(response)
+			changeProof := response.Response.(*pb.SyncGetChangeProofResponse_ChangeProof)
+			proof := &merkledb.ChangeProof{}
+			require.NoError(t, proof.UnmarshalProto(changeProof.ChangeProof))
+
+			// Half of requests are modified
+			if c.Inc() == 0 {
+				modifyResponse(proof)
 			}
 
-			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err = merkledb.Codec.EncodeChangeProof(merkledb.Version, response)
-			require.NoError(err)
-			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
-			require.NoError(err)
-			return nil
-		},
-	).AnyTimes()
-
-	return client.GetChangeProof(ctx, request, verificationDB)
-}
-
-func TestGetChangeProof(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
-
-	trieDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: defaultRequestKeyLimit,
-			NodeCacheSize: defaultRequestKeyLimit,
-		},
-	)
-	require.NoError(t, err)
-	verificationDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: defaultRequestKeyLimit,
-			NodeCacheSize: defaultRequestKeyLimit,
-		},
-	)
-	require.NoError(t, err)
-	startRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	// create changes
-	for x := 0; x < defaultRequestKeyLimit/2; x++ {
-		view, err := trieDB.NewView()
-		require.NoError(t, err)
-
-		// add some key/values
-		for i := 0; i < 10; i++ {
-			key := make([]byte, r.Intn(100))
-			_, err = r.Read(key)
-			require.NoError(t, err)
-
-			val := make([]byte, r.Intn(100))
-			_, err = r.Read(val)
-			require.NoError(t, err)
-
-			err = view.Insert(context.Background(), key, val)
-			require.NoError(t, err)
-		}
-
-		// delete a key
-		deleteKeyStart := make([]byte, r.Intn(10))
-		_, err = r.Read(deleteKeyStart)
-		require.NoError(t, err)
-
-		it := trieDB.NewIteratorWithStart(deleteKeyStart)
-		if it.Next() {
-			err = view.Remove(context.Background(), it.Key())
-			require.NoError(t, err)
-		}
-		require.NoError(t, it.Error())
-		it.Release()
-
-		require.NoError(t, view.CommitToDB(context.Background()))
-	}
-
-	endRoot, err := trieDB.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	tests := map[string]struct {
-		db                  *merkledb.Database
-		request             *syncpb.ChangeProofRequest
-		modifyResponse      func(*merkledb.ChangeProof)
-		expectedErr         error
-		expectedResponseLen int
-	}{
-		"proof restricted by BytesLimit": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: 10000,
-			},
-		},
-		"full response for small (single request) trie": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: defaultRequestKeyLimit,
-		},
-		"too many keys in response": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, defaultRequestKeyLimit)...)
-			},
-			expectedErr: errTooManyKeys,
-		},
-		"partial response to request for entire trie (full leaf limit)": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			expectedResponseLen: defaultRequestKeyLimit,
-		},
-		"removed first key in response": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyChanges = response.KeyChanges[1:]
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"removed last key in response": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyChanges = response.KeyChanges[:len(response.KeyChanges)-2]
-			},
-			expectedErr: merkledb.ErrProofNodeNotForKey,
-		},
-		"removed key from middle of response": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyChanges = append(response.KeyChanges[:100], response.KeyChanges[101:]...)
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-		"all proof keys removed from response": {
-			request: &syncpb.ChangeProofRequest{
-				StartRoot:  startRoot[:],
-				EndRoot:    endRoot[:],
-				KeyLimit:   defaultRequestKeyLimit,
-				BytesLimit: defaultRequestByteSizeLimit,
-			},
-			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.StartProof = nil
-				response.EndProof = nil
-			},
-			expectedErr: merkledb.ErrInvalidProof,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
-
-			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
-			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
-				return
+			responseBytes, err = proto.Marshal(&pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+					ChangeProof: proof.ToProto(),
+				},
+			})
+			if err != nil {
+				return nil, &common.AppError{Code: 123, Message: err.Error()}
 			}
-			require.NoError(err)
-			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
-			}
-			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proof)
-			require.NoError(err)
-			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
-		})
+
+			return responseBytes, nil
+		},
 	}
 }
 
-func TestRangeProofRetries(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
-	require := require.New(t)
+type flakyHandler struct {
+	p2p.Handler
+	c *counter
+}
 
-	keyCount := defaultRequestKeyLimit
-	db, _, err := generateTrieWithMinKeyLen(t, r, keyCount, 1)
-	require.NoError(err)
-	root, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	maxRequests := 4
-	request := &syncpb.RangeProofRequest{
-		Root:       root[:],
-		KeyLimit:   uint32(keyCount),
-		BytesLimit: defaultRequestByteSizeLimit,
+func (f *flakyHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	if f.c.Inc() == 0 {
+		return nil, &common.AppError{Code: 123, Message: "flake error"}
 	}
 
-	responseCount := 0
-	modifyResponse := func(response *merkledb.RangeProof) {
-		responseCount++
-		if responseCount < maxRequests {
-			// corrupt the first [maxRequests] responses, to force the client to retry.
-			response.KeyValues = nil
-		}
-	}
-	proof, err := sendRangeRequest(t, db, request, uint32(maxRequests), modifyResponse)
-	require.NoError(err)
-	require.Len(proof.KeyValues, keyCount)
+	return f.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
 
-	require.Equal(responseCount, maxRequests) // check the client performed retries.
+type counter struct {
+	i    int
+	m    int
+	lock sync.Mutex
+}
+
+func (c *counter) Inc() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	tmp := c.i
+	result := tmp % c.m
+
+	c.i++
+	return result
+}
+
+type waitingHandler struct {
+	p2p.NoOpHandler
+	handler         p2p.Handler
+	updatedRootChan chan struct{}
+}
+
+func (w *waitingHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	<-w.updatedRootChan
+	return w.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }

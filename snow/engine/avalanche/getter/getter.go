@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package getter
@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -25,30 +26,38 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = (*getter)(nil)
 
-func New(storage vertex.Storage, commonCfg common.Config) (common.AllGetsServer, error) {
+func New(
+	storage vertex.Storage,
+	sender common.Sender,
+	log logging.Logger,
+	maxTimeGetAncestors time.Duration,
+	maxContainersGetAncestors int,
+	reg prometheus.Registerer,
+) (common.AllGetsServer, error) {
 	gh := &getter{
-		storage: storage,
-		sender:  commonCfg.Sender,
-		cfg:     commonCfg,
-		log:     commonCfg.Ctx.Log,
+		storage:                   storage,
+		sender:                    sender,
+		log:                       log,
+		maxTimeGetAncestors:       maxTimeGetAncestors,
+		maxContainersGetAncestors: maxContainersGetAncestors,
 	}
 
 	var err error
 	gh.getAncestorsVtxs, err = metric.NewAverager(
-		"bs",
-		"get_ancestors_vtxs",
+		"bs_get_ancestors_vtxs",
 		"vertices fetched in a call to GetAncestors",
-		commonCfg.Ctx.AvalancheRegisterer,
+		reg,
 	)
 	return gh, err
 }
 
 type getter struct {
-	storage vertex.Storage
-	sender  common.Sender
-	cfg     common.Config
+	storage                   vertex.Storage
+	sender                    common.Sender
+	log                       logging.Logger
+	maxTimeGetAncestors       time.Duration
+	maxContainersGetAncestors int
 
-	log              logging.Logger
 	getAncestorsVtxs metric.Averager
 }
 
@@ -62,7 +71,7 @@ func (gh *getter) GetStateSummaryFrontier(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []uint64) error {
+func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[uint64]) error {
 	gh.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.GetAcceptedStateSummaryOp),
@@ -72,20 +81,23 @@ func (gh *getter) GetAcceptedStateSummary(_ context.Context, nodeID ids.NodeID, 
 	return nil
 }
 
-func (gh *getter) GetAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32) error {
-	acceptedFrontier := gh.storage.Edge(ctx)
-	gh.sender.SendAcceptedFrontier(ctx, validatorID, requestID, acceptedFrontier)
+func (gh *getter) GetAcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedFrontierOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
-func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
-	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
-	for _, vtxID := range containerIDs {
-		if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil && vtx.Status() == choices.Accepted {
-			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
-		}
-	}
-	gh.sender.SendAccepted(ctx, nodeID, requestID, acceptedVtxIDs)
+func (gh *getter) GetAccepted(_ context.Context, nodeID ids.NodeID, requestID uint32, _ set.Set[ids.ID]) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetAcceptedOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }
 
@@ -98,18 +110,18 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	)
 	vertex, err := gh.storage.GetVtx(ctx, vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
+		// Don't have the requested vertex. Drop message.
 		gh.log.Verbo("dropping getAncestors")
-		return nil // Don't have the requested vertex. Drop message.
+		return nil //nolint:nilerr
 	}
 
-	queue := make([]avalanche.Vertex, 1, gh.cfg.AncestorsMaxContainersSent) // for BFS
+	queue := make([]avalanche.Vertex, 1, gh.maxContainersGetAncestors) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := 0                                                 // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, gh.cfg.AncestorsMaxContainersSent) // vertex and its ancestors in BFS order
-	visited := set.Set[ids.ID]{}                                           // IDs of vertices that have been in queue before
-	visited.Add(vertex.ID())
+	ancestorsBytesLen := 0                                            // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, gh.maxContainersGetAncestors) // vertex and its ancestors in BFS order
+	visited := set.Of(vertex.ID())                                    // IDs of vertices that have been in queue before
 
-	for len(ancestorsBytes) < gh.cfg.AncestorsMaxContainersSent && len(queue) > 0 && time.Since(startTime) < gh.cfg.MaxTimeGetAncestors {
+	for len(ancestorsBytes) < gh.maxContainersGetAncestors && len(queue) > 0 && time.Since(startTime) < gh.maxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()
@@ -142,10 +154,12 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	return nil
 }
 
-func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxID ids.ID) error {
-	// If this engine has access to the requested vertex, provide it
-	if vtx, err := gh.storage.GetVtx(ctx, vtxID); err == nil {
-		gh.sender.SendPut(ctx, nodeID, requestID, vtx.Bytes())
-	}
+func (gh *getter) Get(_ context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID) error {
+	gh.log.Debug("dropping request",
+		zap.String("reason", "unhandled by this gear"),
+		zap.Stringer("messageOp", message.GetOp),
+		zap.Stringer("nodeID", nodeID),
+		zap.Uint32("requestID", requestID),
+	)
 	return nil
 }

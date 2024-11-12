@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -14,9 +14,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
-
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime"
@@ -24,6 +23,7 @@ import (
 
 	vmpb "github.com/ava-labs/avalanchego/proto/pb/vm"
 	runtimepb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 const defaultRuntimeDialTimeout = 5 * time.Second
@@ -35,8 +35,10 @@ const defaultRuntimeDialTimeout = 5 * time.Second
 func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption) error {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
 
-	server := newVMServer(vm, opts...)
+	var allowShutdown utils.Atomic[bool]
+	server := newVMServer(vm, &allowShutdown, opts...)
 	go func(ctx context.Context) {
 		defer func() {
 			server.GracefulStop()
@@ -46,11 +48,19 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		for {
 			select {
 			case s := <-signals:
+				// We drop all signals until our parent process has notified us
+				// that we are shutting down. Once we are in the shutdown
+				// workflow, we will gracefully exit upon receiving a SIGTERM.
+				if !allowShutdown.Get() {
+					fmt.Printf("runtime engine: ignoring signal: %s\n", s)
+					continue
+				}
+
 				switch s {
 				case syscall.SIGINT:
-					fmt.Println("runtime engine: ignoring signal: SIGINT")
+					fmt.Printf("runtime engine: ignoring signal: %s\n", s)
 				case syscall.SIGTERM:
-					fmt.Println("runtime engine: received shutdown signal: SIGTERM")
+					fmt.Printf("runtime engine: received shutdown signal: %s\n", s)
 					return
 				}
 			case <-ctx.Done():
@@ -93,9 +103,9 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 }
 
 // Returns an RPC Chain VM server serving health and VM services.
-func newVMServer(vm block.ChainVM, opts ...grpcutils.ServerOption) *grpc.Server {
+func newVMServer(vm block.ChainVM, allowShutdown *utils.Atomic[bool], opts ...grpcutils.ServerOption) *grpc.Server {
 	server := grpcutils.NewServer(opts...)
-	vmpb.RegisterVMServer(server, NewServer(vm))
+	vmpb.RegisterVMServer(server, NewServer(vm, allowShutdown))
 
 	health := health.NewServer()
 	health.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)

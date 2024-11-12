@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package leveldb
@@ -9,21 +9,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
-
 	"go.uber.org/zap"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
@@ -189,7 +186,7 @@ type config struct {
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, configBytes []byte, log logging.Logger, namespace string, reg prometheus.Registerer) (database.Database, error) {
+func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Registerer) (database.Database, error) {
 	parsedConfig := config{
 		BlockCacheCapacity:     DefaultBlockCacheSize,
 		DisableSeeksCompaction: true,
@@ -201,7 +198,7 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 	}
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrInvalidConfig, err)
+			return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 		}
 	}
 
@@ -231,7 +228,7 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 		db, err = leveldb.RecoverFile(file, nil)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrCouldNotOpen, err)
+		return nil, fmt.Errorf("%w: %w", ErrCouldNotOpen, err)
 	}
 
 	wrappedDB := &Database{
@@ -239,7 +236,7 @@ func New(file string, configBytes []byte, log logging.Logger, namespace string, 
 		closeCh: make(chan struct{}),
 	}
 	if parsedConfig.MetricUpdateFrequency > 0 {
-		metrics, err := newMetrics(namespace, reg)
+		metrics, err := newMetrics(reg)
 		if err != nil {
 			// Drop any close error to report the original error
 			_ = db.Close()

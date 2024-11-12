@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -17,7 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ DelegatorTx = (*AddPermissionlessDelegatorTx)(nil)
+var (
+	_ DelegatorTx     = (*AddPermissionlessDelegatorTx)(nil)
+	_ ScheduledStaker = (*AddPermissionlessDelegatorTx)(nil)
+)
 
 // AddPermissionlessDelegatorTx is an unsigned addPermissionlessDelegatorTx
 type AddPermissionlessDelegatorTx struct {
@@ -107,7 +110,7 @@ func (tx *AddPermissionlessDelegatorTx) SyntacticVerify(ctx *snow.Context) error
 	stakedAssetID := firstStakeOutput.AssetID()
 	totalStakeWeight := firstStakeOutput.Output().Amount()
 	for _, out := range tx.StakeOuts[1:] {
-		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}

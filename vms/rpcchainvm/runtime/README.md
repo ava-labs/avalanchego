@@ -17,7 +17,7 @@ It works by starting the VM's as a subprocess of AvalancheGo by `os.Exec`.
 ## Workflow
 
 - `VMRegistry` calls the RPC Chain VM `Factory`.
-- Factory Starts an instanace of a `VMRE` server that consumes a `runtime.Initializer` interface implementation.
+- Factory Starts an instance of a `VMRE` server that consumes a `runtime.Initializer` interface implementation.
 - The address of this server is passed as a ENV variable `AVALANCHE_VM_RUNTIME_ENGINE_ADDR` via `os.Exec` which starts the VM binary.
 - The VM uses the address of the `VMRE` server to create a client.
 - Client sends a `Initialize` RPC informing the server of the `Protocol Version` and future `Address` of the RPC Chain VM server allowing it to perform a validation `Handshake`.

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -31,17 +30,13 @@ func TestServiceResponses(t *testing.T) {
 		health: h,
 	}
 
-	err = h.RegisterReadinessCheck("check", check)
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check", check)
-	require.NoError(err)
-	err = h.RegisterLivenessCheck("check", check)
-	require.NoError(err)
+	require.NoError(h.RegisterReadinessCheck("check", check))
+	require.NoError(h.RegisterHealthCheck("check", check))
+	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	{
 		reply := APIReply{}
-		err = s.Readiness(nil, &APIArgs{}, &reply)
-		require.NoError(err)
+		require.NoError(s.Readiness(nil, &APIArgs{}, &reply))
 
 		require.Len(reply.Checks, 1)
 		require.Contains(reply.Checks, "check")
@@ -51,8 +46,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Health(nil, &APIArgs{}, &reply)
-		require.NoError(err)
+		require.NoError(s.Health(nil, &APIArgs{}, &reply))
 
 		require.Len(reply.Checks, 1)
 		require.Contains(reply.Checks, "check")
@@ -62,8 +56,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Liveness(nil, &APIArgs{}, &reply)
-		require.NoError(err)
+		require.NoError(s.Liveness(nil, &APIArgs{}, &reply))
 
 		require.Len(reply.Checks, 1)
 		require.Contains(reply.Checks, "check")
@@ -80,8 +73,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Readiness(nil, &APIArgs{}, &reply)
-		require.NoError(err)
+		require.NoError(s.Readiness(nil, &APIArgs{}, &reply))
 
 		result := reply.Checks["check"]
 		require.Equal("", result.Details)
@@ -92,8 +84,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Health(nil, &APIArgs{}, &reply)
-		require.NoError(err)
+		require.NoError(s.Health(nil, &APIArgs{}, &reply))
 
 		result := reply.Checks["check"]
 		require.Equal("", result.Details)
@@ -104,8 +95,7 @@ func TestServiceResponses(t *testing.T) {
 
 	{
 		reply := APIReply{}
-		err = s.Liveness(nil, &APIArgs{}, &reply)
-		require.NoError(err)
+		require.NoError(s.Liveness(nil, &APIArgs{}, &reply))
 
 		result := reply.Checks["check"]
 		require.Equal("", result.Details)
@@ -170,14 +160,10 @@ func TestServiceTagResponse(t *testing.T) {
 
 			h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 			require.NoError(err)
-			err = test.register(h, "check1", check)
-			require.NoError(err)
-			err = test.register(h, "check2", check, subnetID1.String())
-			require.NoError(err)
-			err = test.register(h, "check3", check, subnetID2.String())
-			require.NoError(err)
-			err = test.register(h, "check4", check, subnetID1.String(), subnetID2.String())
-			require.NoError(err)
+			require.NoError(test.register(h, "check1", check))
+			require.NoError(test.register(h, "check2", check, subnetID1.String()))
+			require.NoError(test.register(h, "check3", check, subnetID2.String()))
+			require.NoError(test.register(h, "check4", check, subnetID1.String(), subnetID2.String()))
 
 			s := &Service{
 				log:    logging.NoLog{},
@@ -187,8 +173,7 @@ func TestServiceTagResponse(t *testing.T) {
 			// default checks
 			{
 				reply := APIReply{}
-				err = test.check(s, nil, &APIArgs{}, &reply)
-				require.NoError(err)
+				require.NoError(test.check(s, nil, &APIArgs{}, &reply))
 				require.Len(reply.Checks, 4)
 				require.Contains(reply.Checks, "check1")
 				require.Contains(reply.Checks, "check2")
@@ -197,8 +182,7 @@ func TestServiceTagResponse(t *testing.T) {
 				require.Equal(notYetRunResult, reply.Checks["check1"])
 				require.False(reply.Healthy)
 
-				err = test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply)
-				require.NoError(err)
+				require.NoError(test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply))
 				require.Len(reply.Checks, 2)
 				require.Contains(reply.Checks, "check2")
 				require.Contains(reply.Checks, "check4")
@@ -212,8 +196,7 @@ func TestServiceTagResponse(t *testing.T) {
 
 			{
 				reply := APIReply{}
-				err = test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply)
-				require.NoError(err)
+				require.NoError(test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply))
 				require.Len(reply.Checks, 2)
 				require.Contains(reply.Checks, "check2")
 				require.Contains(reply.Checks, "check4")
@@ -225,12 +208,10 @@ func TestServiceTagResponse(t *testing.T) {
 
 			{
 				// now we'll add a new check which is unhealthy by default (notYetRunResult)
-				err = test.register(h, "check5", check, subnetID1.String())
-				require.NoError(err)
+				require.NoError(test.register(h, "check5", check, subnetID1.String()))
 
 				reply := APIReply{}
-				err = test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply)
-				require.NoError(err)
+				require.NoError(test.check(s, nil, &APIArgs{Tags: []string{subnetID1.String()}}, &reply))
 				require.Len(reply.Checks, 3)
 				require.Contains(reply.Checks, "check2")
 				require.Contains(reply.Checks, "check4")

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -123,8 +123,8 @@ func TestMintOperationVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.ErrorIs(tt.op.Verify(), tt.expectedErr)
+			err := tt.op.Verify()
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

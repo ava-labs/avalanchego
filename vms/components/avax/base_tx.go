@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
@@ -41,20 +40,6 @@ func (t *BaseTx) InputUTXOs() []*UTXOID {
 	return utxos
 }
 
-// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *BaseTx) ConsumedAssetIDs() set.Set[ids.ID] {
-	assets := set.Set[ids.ID]{}
-	for _, in := range t.Ins {
-		assets.Add(in.AssetID())
-	}
-	return assets
-}
-
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *BaseTx) AssetIDs() set.Set[ids.ID] {
-	return t.ConsumedAssetIDs()
-}
-
 // NumCredentials returns the number of expected credentials
 func (t *BaseTx) NumCredentials() int {
 	return len(t.Ins)
@@ -79,4 +64,22 @@ func (t *BaseTx) Verify(ctx *snow.Context) error {
 	default:
 		return nil
 	}
+}
+
+func VerifyMemoFieldLength(memo types.JSONByteSlice, isDurangoActive bool) error {
+	if !isDurangoActive {
+		// SyntacticVerify validates this field pre-Durango
+		return nil
+	}
+
+	if len(memo) != 0 {
+		return fmt.Errorf(
+			"%w: %d > %d",
+			ErrMemoTooLarge,
+			len(memo),
+			0,
+		)
+	}
+
+	return nil
 }

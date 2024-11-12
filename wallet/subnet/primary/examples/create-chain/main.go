@@ -1,18 +1,21 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
 
 import (
 	"context"
-	"encoding/hex"
 	"log"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+
+	xsgenesis "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 func main() {
@@ -20,8 +23,16 @@ func main() {
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
-	genesisHex := "00000000000000000000000000017b5490493f8a2fff444ac8b54e27b3339d7c60dcffffffffffffffff"
-	vmID := ids.ID{'x', 's', 'v', 'm'}
+	genesis := &xsgenesis.Genesis{
+		Timestamp: time.Now().Unix(),
+		Allocations: []xsgenesis.Allocation{
+			{
+				Address: genesis.EWOQKey.Address(),
+				Balance: math.MaxUint64,
+			},
+		},
+	}
+	vmID := constants.XSVMID
 	name := "let there"
 
 	subnetID, err := ids.FromString(subnetIDStr)
@@ -29,17 +40,22 @@ func main() {
 		log.Fatalf("failed to parse subnet ID: %s\n", err)
 	}
 
-	genesisBytes, err := hex.DecodeString(genesisHex)
+	genesisBytes, err := xsgenesis.Codec.Marshal(xsgenesis.CodecVersion, genesis)
 	if err != nil {
-		log.Fatalf("failed to parse genesis bytes: %s\n", err)
+		log.Fatalf("failed to create genesis bytes: %s\n", err)
 	}
 
 	ctx := context.Background()
 
-	// NewWalletWithTxs fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting and registers [subnetID].
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.NewWalletWithTxs(ctx, uri, kc, subnetID)
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:          uri,
+		AVAXKeychain: kc,
+		EthKeychain:  kc,
+		SubnetIDs:    []ids.ID{subnetID},
+	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
@@ -49,7 +65,7 @@ func main() {
 	pWallet := wallet.P()
 
 	createChainStartTime := time.Now()
-	createChainTxID, err := pWallet.IssueCreateChainTx(
+	createChainTx, err := pWallet.IssueCreateChainTx(
 		subnetID,
 		genesisBytes,
 		vmID,
@@ -59,5 +75,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue create chain transaction: %s\n", err)
 	}
-	log.Printf("created new chain %s in %s\n", createChainTxID, time.Since(createChainStartTime))
+	log.Printf("created new chain %s in %s\n", createChainTx.ID(), time.Since(createChainStartTime))
 }

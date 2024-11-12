@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bls
 
 import (
-	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,12 +28,10 @@ var sizes = []int{
 }
 
 func BenchmarkSign(b *testing.B) {
-	require := require.New(b)
-
 	privateKey, err := NewSecretKey()
-	require.NoError(err)
+	require.NoError(b, err)
 	for _, messageSize := range sizes {
-		b.Run(fmt.Sprintf("%d", messageSize), func(b *testing.B) {
+		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
 
 			b.ResetTimer()
@@ -46,21 +44,19 @@ func BenchmarkSign(b *testing.B) {
 }
 
 func BenchmarkVerify(b *testing.B) {
-	require := require.New(b)
-
 	privateKey, err := NewSecretKey()
-	require.NoError(err)
+	require.NoError(b, err)
 	publicKey := PublicFromSecretKey(privateKey)
 
 	for _, messageSize := range sizes {
-		b.Run(fmt.Sprintf("%d", messageSize), func(b *testing.B) {
+		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
 			signature := Sign(privateKey, message)
 
 			b.ResetTimer()
 
 			for n := 0; n < b.N; n++ {
-				require.True(Verify(publicKey, signature, message))
+				require.True(b, Verify(publicKey, signature, message))
 			}
 		})
 	}
@@ -76,12 +72,10 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 	}
 
 	for _, size := range sizes {
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			require := require.New(b)
-
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				_, err := AggregatePublicKeys(keys[:size])
-				require.NoError(err)
+				require.NoError(b, err)
 			}
 		})
 	}

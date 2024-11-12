@@ -1,0 +1,31 @@
+# BUILDER_IMAGE_TAG should identify the builder image
+ARG BUILDER_IMAGE_TAG
+
+# AVALANCHEGO_NODE_IMAGE needs to identify an existing avalanchego node image and should include the tag
+ARG AVALANCHEGO_NODE_IMAGE
+
+# ============= Compilation Stage ================
+FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
+
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
+
+WORKDIR $BUILDER_WORKDIR
+
+# Build xsvm VM
+RUN ./scripts/build_xsvm.sh
+
+# ============= Cleanup Stage ================
+FROM $AVALANCHEGO_NODE_IMAGE AS execution
+
+# The commit hash and antithesis dependencies should be part of the base image.
+
+# The builder workdir will vary between instrumented and non-instrumented builders
+ARG BUILDER_WORKDIR
+
+# Copy the executable into the container
+RUN mkdir -p /root/.avalanchego/plugins
+COPY --from=builder $BUILDER_WORKDIR/build/xsvm \
+    /root/.avalanchego/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
+
+# The node image's entrypoint will be reused.

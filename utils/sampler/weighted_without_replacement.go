@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -8,17 +8,14 @@ package sampler
 // indices. So duplicate indices can be returned.
 type WeightedWithoutReplacement interface {
 	Initialize(weights []uint64) error
-	Sample(count int) ([]int, error)
-
-	Seed(int64)
-	ClearSeed()
+	Sample(count int) ([]int, bool)
 }
 
-// NewWeightedWithoutReplacement returns a new sampler
-func NewDeterministicWeightedWithoutReplacement() WeightedWithoutReplacement {
+// NewDeterministicWeightedWithoutReplacement returns a new sampler
+func NewDeterministicWeightedWithoutReplacement(source Source) WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
-		u: NewUniform(),
-		w: NewDeterministicWeighted(),
+		u: NewDeterministicUniform(source),
+		w: NewWeighted(),
 	}
 }
 
@@ -26,16 +23,6 @@ func NewDeterministicWeightedWithoutReplacement() WeightedWithoutReplacement {
 func NewWeightedWithoutReplacement() WeightedWithoutReplacement {
 	return &weightedWithoutReplacementGeneric{
 		u: NewUniform(),
-		w: NewWeighted(),
-	}
-}
-
-// NewBestWeightedWithoutReplacement returns a new sampler
-func NewBestWeightedWithoutReplacement(
-	expectedSampleSize int,
-) WeightedWithoutReplacement {
-	return &weightedWithoutReplacementGeneric{
-		u: NewBestUniform(expectedSampleSize),
 		w: NewWeighted(),
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package subnets
@@ -15,9 +15,9 @@ import (
 
 var validParameters = snowball.Parameters{
 	K:                     1,
-	Alpha:                 1,
-	BetaVirtuous:          1,
-	BetaRogue:             1,
+	AlphaPreference:       1,
+	AlphaConfidence:       1,
+	Beta:                  1,
 	ConcurrentRepolls:     1,
 	OptimalProcessing:     1,
 	MaxOutstandingItems:   1,
@@ -34,8 +34,8 @@ func TestValid(t *testing.T) {
 			name: "invalid consensus parameters",
 			s: Config{
 				ConsensusParameters: snowball.Parameters{
-					K:     2,
-					Alpha: 1,
+					K:               2,
+					AlphaPreference: 1,
 				},
 			},
 			expectedErr: snowball.ErrParametersInvalid,
@@ -43,7 +43,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid allowed node IDs",
 			s: Config{
-				AllowedNodes:        set.Set[ids.NodeID]{ids.GenerateTestNodeID(): struct{}{}},
+				AllowedNodes:        set.Of(ids.GenerateTestNodeID()),
 				ValidatorOnly:       false,
 				ConsensusParameters: validParameters,
 			},

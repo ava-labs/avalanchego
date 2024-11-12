@@ -1,77 +1,144 @@
 # https://golangci-lint.run/usage/configuration/
 run:
   timeout: 10m
-  # skip auto-generated files.
-  skip-files:
-    - ".*\\.pb\\.go$"
-    - ".*mock.*"
+
+  # If set we pass it to "go list -mod={option}". From "go help modules":
+  # If invoked with -mod=readonly, the go command is disallowed from the implicit
+  # automatic updating of go.mod described above. Instead, it fails when any changes
+  # to go.mod are needed. This setting is most useful to check that go.mod does
+  # not need updates, such as in a continuous integration and testing system.
+  # If invoked with -mod=vendor, the go command assumes that the vendor
+  # directory holds the correct copies of dependencies and ignores
+  # the dependency descriptions in go.mod.
+  #
+  # Allowed values: readonly|vendor|mod
+  # By default, it isn't set.
+  modules-download-mode: readonly
+
+  # Include non-test files tagged as test-only.
+  # Context: https://github.com/ava-labs/avalanchego/pull/3173
+  build-tags:
+    - test
+
+output:
+  # Make issues output unique by line.
+  # Default: true
+  uniq-by-line: false
 
 issues:
-  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
   max-same-issues: 0
 
+  # Enables skipping of directories:
+  # - vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
+  # Default: true
+  exclude-dirs-use-default: false
+
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
     - asciicheck
     - bodyclose
     - depguard
+    - dupword
     - errcheck
+    - errorlint
     - exportloopref
     - forbidigo
+    - gci
     - goconst
     - gocritic
+    # - goerr113
     - gofmt
     - gofumpt
-    - goimports
+    # - gomnd
     - goprintffuncname
     - gosec
     - gosimple
     - govet
+    - importas
     - ineffassign
+    # - lll
     - misspell
     - nakedret
+    - nilerr
     - noctx
     - nolintlint
+    - perfsprint
     - prealloc
+    - predeclared
     - revive
+    - spancheck
     - staticcheck
     - stylecheck
+    - tagalign
+    - testifylint
     - typecheck
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     - whitespace
-    # - errorlint (TODO: re-enable in go1.20 migration)
-    # - goerr113
-    # - gomnd
-    # - lll
 
 linters-settings:
   depguard:
-    list-type: blacklist
-    packages-with-error-message:
-      - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
-      - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
-    include-go-root: true
+    rules:
+      packages:
+        deny:
+          - pkg: "container/list"
+            desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
+          - pkg: "github.com/golang/mock/gomock"
+            desc: go.uber.org/mock/gomock should be used instead.
+          - pkg: "github.com/stretchr/testify/assert"
+            desc: github.com/stretchr/testify/require should be used instead.
+          - pkg: "io/ioutil"
+            desc: io/ioutil is deprecated. Use package io or os instead.
   errorlint:
     # Check for plain type assertions and type switches.
     asserts: false
     # Check for plain error comparisons.
     comparison: false
-  # https://golangci-lint.run/usage/linters/#forbidigo
   forbidigo:
     # Forbid the following identifiers (list of regexp).
     forbid:
       - 'require\.Error$(# ErrorIs should be used instead)?'
       - 'require\.ErrorContains$(# ErrorIs should be used instead)?'
+      - 'require\.EqualValues$(# Equal should be used instead)?'
+      - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
+      - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
+    # Exclude godoc examples from forbidigo checks.
     exclude_godoc_examples: false
-  # https://golangci-lint.run/usage/linters#gosec
+  gci:
+    sections:
+      - standard
+      - default
+      - blank
+      - prefix(github.com/ava-labs/avalanchego)
+      - alias
+      - dot
+    skip-generated: true
+    custom-order: true
   gosec:
     excludes:
-      - G107 # https://securego.io/docs/rules/g107.html
+      - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+  importas:
+    # Do not allow unaliased imports of aliased packages.
+    no-unaliased: false
+    # Do not allow non-required aliases.
+    no-extra-aliases: false
+    # List of aliases
+    alias:
+      - pkg: github.com/ava-labs/avalanchego/utils/math
+        alias: safemath
+      - pkg: github.com/ava-labs/avalanchego/utils/json
+        alias: avajson
   revive:
     rules:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
@@ -87,7 +154,14 @@ linters-settings:
       - name: string-format
         disabled: false
         arguments:
+        - ["b.Logf[0]", "/.*%.*/", "no format directive, use b.Log instead"]
         - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
+        - ["fmt.Fprintf[1]", "/.*%.*/", "no format directive, use fmt.Fprint instead"]
+        - ["fmt.Printf[0]", "/.*%.*/", "no format directive, use fmt.Print instead"]
+        - ["fmt.Sprintf[0]", "/.*%.*/", "no format directive, use fmt.Sprint instead"]
+        - ["log.Fatalf[0]", "/.*%.*/", "no format directive, use log.Fatal instead"]
+        - ["log.Printf[0]", "/.*%.*/", "no format directive, use log.Print instead"]
+        - ["t.Logf[0]", "/.*%.*/", "no format directive, use t.Log instead"]
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
       - name: struct-tag
         disabled: false
@@ -96,15 +170,10 @@ linters-settings:
         disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
       - name: unhandled-error
-        disabled: false
-        arguments:
-          - "fmt\\.Fprint"
-          - "fmt\\.Fprintf"
-          - "fmt\\.Print"
-          - "fmt\\.Printf"
-          - "fmt\\.Println"
-          - "math/rand\\.Read"
-          - "strings\\.Builder\\.WriteString"
+        # prefer the errcheck linter since it can be disabled directly with nolint directive
+        # but revive's disable directive (e.g. //revive:disable:unhandled-error) is not
+        # supported when run under golangci_lint
+        disabled: true
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
       - name: unused-parameter
         disabled: false
@@ -114,10 +183,32 @@ linters-settings:
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
       - name: useless-break
         disabled: false
+  spancheck:
+    # https://github.com/jjti/go-spancheck#checks
+    checks:
+      - end
+      # - record-error # check that `span.RecordError(err)` is called when an error is returned
+      # - set-status   # check that `span.SetStatus(codes.Error, msg)` is called when an error is returned
   staticcheck:
-    go: "1.19"
     # https://staticcheck.io/docs/options#checks
     checks:
       - "all"
-      - "-SA6002" # argument should be pointer-like to avoid allocation, for sync.Pool
-      - "-SA1019" # deprecated packages e.g., golang.org/x/crypto/ripemd160
+      - "-SA6002" # Storing non-pointer values in sync.Pool allocates memory
+      - "-SA1019" # Using a deprecated function, variable, constant or field
+  tagalign:
+    align: true
+    sort: true
+    strict: true
+    order:
+      - serialize
+  testifylint:
+    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+    # Default: false
+    enable-all: true
+    # Disable checkers by name
+    # (in addition to default
+    #   suite-thelper
+    # ).
+    disable:
+      - go-require
+      - float-compare

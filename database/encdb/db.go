@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package encdb
@@ -7,20 +7,13 @@ import (
 	"context"
 	"crypto/cipher"
 	"crypto/rand"
+	"slices"
 	"sync"
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"golang.org/x/exp/slices"
-
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-)
-
-const (
-	codecVersion = 0
 )
 
 var (
@@ -32,7 +25,6 @@ var (
 // Database encrypts all values that are provided
 type Database struct {
 	lock   sync.RWMutex
-	codec  codec.Manager
 	cipher cipher.AEAD
 	db     database.Database
 	closed bool
@@ -42,16 +34,10 @@ type Database struct {
 func New(password []byte, db database.Database) (*Database, error) {
 	h := hashing.ComputeHash256(password)
 	aead, err := chacha20poly1305.NewX(h)
-	if err != nil {
-		return nil, err
-	}
-	c := linearcodec.NewDefault()
-	manager := codec.NewDefaultManager()
 	return &Database{
-		codec:  manager,
 		cipher: aead,
 		db:     db,
-	}, manager.RegisterCodec(codecVersion, c)
+	}, err
 }
 
 func (db *Database) Has(key []byte) (bool, error) {
@@ -218,6 +204,7 @@ func (b *batch) Reset() {
 	if cap(b.ops) > len(b.ops)*database.MaxExcessCapacityFactor {
 		b.ops = make([]database.BatchOp, 0, cap(b.ops)/database.CapacityReductionFactor)
 	} else {
+		clear(b.ops)
 		b.ops = b.ops[:0]
 	}
 	b.Batch.Reset()
@@ -297,7 +284,7 @@ func (db *Database) encrypt(plaintext []byte) ([]byte, error) {
 		return nil, err
 	}
 	ciphertext := db.cipher.Seal(nil, nonce, plaintext, nil)
-	return db.codec.Marshal(codecVersion, &encryptedValue{
+	return Codec.Marshal(CodecVersion, &encryptedValue{
 		Ciphertext: ciphertext,
 		Nonce:      nonce,
 	})
@@ -305,7 +292,7 @@ func (db *Database) encrypt(plaintext []byte) ([]byte, error) {
 
 func (db *Database) decrypt(ciphertext []byte) ([]byte, error) {
 	val := encryptedValue{}
-	if _, err := db.codec.Unmarshal(ciphertext, &val); err != nil {
+	if _, err := Codec.Unmarshal(ciphertext, &val); err != nil {
 		return nil, err
 	}
 	return db.cipher.Open(nil, val.Nonce, val.Ciphertext, nil)

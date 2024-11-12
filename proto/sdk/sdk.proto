@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package sdk;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/sdk";
+
+message PullGossipRequest {
+  bytes salt = 2;
+  bytes filter = 3;
+}
+
+message PullGossipResponse {
+  repeated bytes gossip = 1;
+}
+
+message PushGossip {
+  repeated bytes gossip = 1;
+}
+
+// SignatureRequest is an AppRequest message type for requesting
+// a BLS signature over a Warp message, as defined in ACP-118:
+// https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
+message SignatureRequest {
+  // Warp message to be signed
+  bytes message = 1;
+  // Justification for the message
+  bytes justification = 2;
+}
+
+// SignatureResponse is an AppResponse message type for providing
+// a requested BLS signature over a Warp message, as defined in ACP-118:
+// https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
+message SignatureResponse {
+  // BLS signature over the Warp message
+  bytes signature = 1;
+}

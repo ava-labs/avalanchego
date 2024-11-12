@@ -45,14 +45,14 @@ message Userinfo {
   string username = 1;
   // password is the password for the user
   string password = 2;
-  // password_set is a boolean which is true if the passord is set
+  // password_set is a boolean which is true if the password is set
   bool password_set = 3;
 }
 
 message Element {
   // key is a element key in a key value pair
   string key = 1;
-  // values are a list of strings coresponding to the key
+  // values are a list of strings corresponding to the key
   repeated string values = 2;
 }
 

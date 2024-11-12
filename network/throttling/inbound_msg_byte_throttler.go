@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -8,14 +8,13 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -24,9 +23,8 @@ import (
 
 func newInboundMsgByteThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	config MsgByteThrottlerConfig,
 ) (*inboundMsgByteThrottler, error) {
 	t := &inboundMsgByteThrottler{
@@ -40,10 +38,10 @@ func newInboundMsgByteThrottler(
 			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
 			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
-		waitingToAcquire:   linkedhashmap.New[uint64, *msgMetadata](),
+		waitingToAcquire:   linked.NewHashmap[uint64, *msgMetadata](),
 		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
 	}
-	return t, t.metrics.initialize(namespace, registerer)
+	return t, t.metrics.initialize(registerer)
 }
 
 // Information about a message waiting to be read.
@@ -68,7 +66,7 @@ type inboundMsgByteThrottler struct {
 	// Node ID --> Msg ID for a message this node is waiting to acquire
 	nodeToWaitingMsgID map[ids.NodeID]uint64
 	// Msg ID --> *msgMetadata
-	waitingToAcquire linkedhashmap.LinkedHashmap[uint64, *msgMetadata]
+	waitingToAcquire *linked.Hashmap[uint64, *msgMetadata]
 	// Invariant: The node is only waiting on a single message at a time
 	//
 	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID])
@@ -96,7 +94,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 
 	t.lock.Lock()
 
-	// If there is already a message waiting, log the error but continue
+	// If there is already a message waiting, log the error and return
 	if existingID, exists := t.nodeToWaitingMsgID[nodeID]; exists {
 		t.log.Error("node already waiting on message",
 			zap.Stringer("nodeID", nodeID),
@@ -107,7 +105,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	}
 
 	// Take as many bytes as we can from the at-large allocation.
-	atLargeBytesUsed := math.Min(
+	atLargeBytesUsed := min(
 		// only give as many bytes as needed
 		metadata.bytesNeeded,
 		// don't exceed per-node limit
@@ -131,9 +129,16 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	weight := t.vdrs.GetWeight(nodeID)
+	weight := t.vdrs.GetWeight(constants.PrimaryNetworkID, nodeID)
 	if weight != 0 {
-		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
+		totalWeight, err := t.vdrs.TotalWeight(constants.PrimaryNetworkID)
+		if err != nil {
+			t.log.Error("couldn't get total weight of primary network",
+				zap.Error(err),
+			)
+		} else {
+			vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(totalWeight))
+		}
 	}
 	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
 	// [vdrBytesAllowed] is the number of bytes this node
@@ -145,7 +150,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min(t.remainingVdrBytes, metadata.bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := min(t.remainingVdrBytes, metadata.bytesNeeded, vdrBytesAllowed)
 	if vdrBytesUsed > 0 {
 		// Mark that [nodeID] used [vdrBytesUsed] from its validator allocation
 		t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
@@ -208,7 +213,7 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 	// or messages from [nodeID] currently waiting to acquire bytes.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
 	releasedBytes := metadata.msgSize - metadata.bytesNeeded
-	vdrBytesToReturn := math.Min(releasedBytes, vdrBytesUsed)
+	vdrBytesToReturn := min(releasedBytes, vdrBytesUsed)
 
 	// [atLargeBytesToReturn] is the number of bytes from [msgSize]
 	// that will be given to the at-large allocation or a message
@@ -231,7 +236,7 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 			msg := iter.Value()
 			// From the at-large allocation, take the maximum number of bytes
 			// without exceeding the per-node limit on taking from at-large pool.
-			atLargeBytesGiven := math.Min(
+			atLargeBytesGiven := min(
 				// don't give [msg] too many bytes
 				msg.bytesNeeded,
 				// don't exceed per-node limit
@@ -264,7 +269,7 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 		msg, exists := t.waitingToAcquire.Get(msgID)
 		if exists {
 			// Give [msg] all the bytes we can
-			bytesToGive := math.Min(msg.bytesNeeded, vdrBytesToReturn)
+			bytesToGive := min(msg.bytesNeeded, vdrBytesToReturn)
 			msg.bytesNeeded -= bytesToGive
 			vdrBytesToReturn -= bytesToGive
 			if msg.bytesNeeded == 0 {
@@ -300,34 +305,29 @@ type inboundMsgByteThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *inboundMsgByteThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
+func (m *inboundMsgByteThrottlerMetrics) initialize(reg prometheus.Registerer) error {
 	errs := wrappers.Errs{}
 	m.acquireLatency = metric.NewAveragerWithErrs(
-		namespace,
 		"byte_throttler_inbound_acquire_latency",
 		"average time (in ns) to get space on the inbound message byte buffer",
 		reg,
 		&errs,
 	)
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_remaining_at_large_bytes",
-		Help:      "Bytes remaining in the at-large byte buffer",
+		Name: "byte_throttler_inbound_remaining_at_large_bytes",
+		Help: "Bytes remaining in the at-large byte buffer",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_remaining_validator_bytes",
-		Help:      "Bytes remaining in the validator byte buffer",
+		Name: "byte_throttler_inbound_remaining_validator_bytes",
+		Help: "Bytes remaining in the validator byte buffer",
 	})
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_awaiting_acquire",
-		Help:      "Number of inbound messages waiting to acquire space on the inbound message byte buffer",
+		Name: "byte_throttler_inbound_awaiting_acquire",
+		Help: "Number of inbound messages waiting to acquire space on the inbound message byte buffer",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "byte_throttler_inbound_awaiting_release",
-		Help:      "Number of messages currently being read/handled",
+		Name: "byte_throttler_inbound_awaiting_release",
+		Help: "Number of messages currently being read/handled",
 	})
 	errs.Add(
 		reg.Register(m.remainingAtLargeBytes),

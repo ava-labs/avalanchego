@@ -1,0 +1,41 @@
+name: Trigger Antithesis XSVM Setup
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Every day at 6AM UTC
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'The duration (in hours) to run the test for'
+        default: '0.5'
+        required: true
+        type: string
+      recipients:
+        description: 'Comma-seperated email addresses to send the test report to'
+        required: true
+        type: string
+      image_tag:
+        description: 'The image tag to target'
+        default: latest
+        required: true
+        type: string
+
+jobs:
+  antithesis_xsvm:
+    name: Run Antithesis XSVM Test Setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: antithesishq/antithesis-trigger-action@v0.5
+        with:
+          notebook_name: avalanche
+          tenant: avalanche
+          username: ${{ secrets.ANTITHESIS_USERNAME }}
+          password: ${{ secrets.ANTITHESIS_PASSWORD }}
+          github_token: ${{ secrets.ANTITHESIS_GH_PAT }}
+          config_image: antithesis-xsvm-config:${{ github.event.inputs.image_tag || 'latest' }}
+          images: antithesis-xsvm-workload:${{ github.event.inputs.image_tag || 'latest' }};antithesis-xsvm-node:${{ github.event.inputs.image_tag || 'latest' }}
+          email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
+          # Duration is in hours
+          additional_parameters: |-
+            custom.duration=${{ github.event.inputs.duration || '7.5' }}
+            custom.workload=xsvm

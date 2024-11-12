@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -9,30 +9,31 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySnowball = (*nnarySnowball)(nil)
+var _ Nnary = (*nnarySnowball)(nil)
+
+func newNnarySnowball(alphaPreference int, terminationConditions []terminationCondition, choice ids.ID) nnarySnowball {
+	return nnarySnowball{
+		nnarySnowflake:     newNnarySnowflake(alphaPreference, terminationConditions, choice),
+		preference:         choice,
+		preferenceStrength: make(map[ids.ID]int),
+	}
+}
 
 // nnarySnowball is a naive implementation of a multi-color snowball instance
 type nnarySnowball struct {
 	// wrap the n-nary snowflake logic
 	nnarySnowflake
 
-	// preference is the choice with the largest number of successful polls.
-	// Ties are broken by switching choice lazily
+	// preference is the choice with the largest number of polls which preferred
+	// it. Ties are broken by switching choice lazily
 	preference ids.ID
 
-	// maxSuccessfulPolls maximum number of successful polls this instance has
-	// gotten for any choice
-	maxSuccessfulPolls int
+	// maxPreferenceStrength is the maximum value stored in [preferenceStrength]
+	maxPreferenceStrength int
 
-	// numSuccessfulPolls tracks the total number of successful network polls of
-	// the choices
-	numSuccessfulPolls map[ids.ID]int
-}
-
-func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
-	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
-	sb.preference = choice
-	sb.numSuccessfulPolls = make(map[ids.ID]int)
+	// preferenceStrength tracks the total number of network polls which
+	// preferred that choice
+	preferenceStrength map[ids.ID]int
 }
 
 func (sb *nnarySnowball) Preference() ids.ID {
@@ -46,19 +47,20 @@ func (sb *nnarySnowball) Preference() ids.ID {
 	return sb.preference
 }
 
-func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
-	numSuccessfulPolls := sb.numSuccessfulPolls[choice] + 1
-	sb.numSuccessfulPolls[choice] = numSuccessfulPolls
+func (sb *nnarySnowball) RecordPoll(count int, choice ids.ID) {
+	if count >= sb.alphaPreference {
+		preferenceStrength := sb.preferenceStrength[choice] + 1
+		sb.preferenceStrength[choice] = preferenceStrength
 
-	if numSuccessfulPolls > sb.maxSuccessfulPolls {
-		sb.preference = choice
-		sb.maxSuccessfulPolls = numSuccessfulPolls
+		if preferenceStrength > sb.maxPreferenceStrength {
+			sb.preference = choice
+			sb.maxPreferenceStrength = preferenceStrength
+		}
 	}
-
-	sb.nnarySnowflake.RecordSuccessfulPoll(choice)
+	sb.nnarySnowflake.RecordPoll(count, choice)
 }
 
 func (sb *nnarySnowball) String() string {
-	return fmt.Sprintf("SB(Preference = %s, NumSuccessfulPolls = %d, %s)",
-		sb.preference, sb.maxSuccessfulPolls, &sb.nnarySnowflake)
+	return fmt.Sprintf("SB(Preference = %s, PreferenceStrength = %d, %s)",
+		sb.preference, sb.maxPreferenceStrength, &sb.nnarySnowflake)
 }

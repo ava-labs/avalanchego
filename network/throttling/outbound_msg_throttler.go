@@ -1,17 +1,19 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
 import (
+	"errors"
+
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -41,9 +43,8 @@ type outboundMsgThrottler struct {
 
 func NewSybilOutboundMsgThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	config MsgByteThrottlerConfig,
 ) (OutboundMsgThrottler, error) {
 	t := &outboundMsgThrottler{
@@ -58,7 +59,7 @@ func NewSybilOutboundMsgThrottler(
 			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
 	}
-	return t, t.metrics.initialize(namespace, registerer)
+	return t, t.metrics.initialize(registerer)
 }
 
 func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.NodeID) bool {
@@ -72,7 +73,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 
 	// Take as many bytes as we can from the at-large allocation.
 	bytesNeeded := uint64(len(msg.Bytes()))
-	atLargeBytesUsed := math.Min(
+	atLargeBytesUsed := min(
 		// only give as many bytes as needed
 		bytesNeeded,
 		// don't exceed per-node limit
@@ -85,9 +86,16 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	weight := t.vdrs.GetWeight(nodeID)
+	weight := t.vdrs.GetWeight(constants.PrimaryNetworkID, nodeID)
 	if weight != 0 {
-		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
+		totalWeight, err := t.vdrs.TotalWeight(constants.PrimaryNetworkID)
+		if err != nil {
+			t.log.Error("Failed to get total weight of primary network validators",
+				zap.Error(err),
+			)
+		} else {
+			vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(totalWeight))
+		}
 	}
 	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
 	// [vdrBytesAllowed] is the number of bytes this node
@@ -99,7 +107,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := min(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
 	bytesNeeded -= vdrBytesUsed
 	if bytesNeeded != 0 {
 		// Can't acquire enough bytes to queue this message to be sent
@@ -142,7 +150,7 @@ func (t *outboundMsgThrottler) Release(msg message.OutboundMessage, nodeID ids.N
 	// that will be given back to [nodeID]'s validator allocation.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
 	msgSize := uint64(len(msg.Bytes()))
-	vdrBytesToReturn := math.Min(msgSize, vdrBytesUsed)
+	vdrBytesToReturn := min(msgSize, vdrBytesUsed)
 	t.nodeToVdrBytesUsed[nodeID] -= vdrBytesToReturn
 	if t.nodeToVdrBytesUsed[nodeID] == 0 {
 		delete(t.nodeToVdrBytesUsed, nodeID)
@@ -168,41 +176,34 @@ type outboundMsgThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *outboundMsgThrottlerMetrics) initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *outboundMsgThrottlerMetrics) initialize(registerer prometheus.Registerer) error {
 	m.acquireSuccesses = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_acquire_successes",
-		Help:      "Outbound messages not dropped due to rate-limiting",
+		Name: "throttler_outbound_acquire_successes",
+		Help: "Outbound messages not dropped due to rate-limiting",
 	})
 	m.acquireFailures = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_acquire_failures",
-		Help:      "Outbound messages dropped due to rate-limiting",
+		Name: "throttler_outbound_acquire_failures",
+		Help: "Outbound messages dropped due to rate-limiting",
 	})
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_remaining_at_large_bytes",
-		Help:      "Bytes remaining in the at large byte allocation",
+		Name: "throttler_outbound_remaining_at_large_bytes",
+		Help: "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_remaining_validator_bytes",
-		Help:      "Bytes remaining in the validator byte allocation",
+		Name: "throttler_outbound_remaining_validator_bytes",
+		Help: "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "throttler_outbound_awaiting_release",
-		Help:      "Number of messages waiting to be sent",
+		Name: "throttler_outbound_awaiting_release",
+		Help: "Number of messages waiting to be sent",
 	})
-	errs := wrappers.Errs{}
-	errs.Add(
+	return errors.Join(
 		registerer.Register(m.acquireSuccesses),
 		registerer.Register(m.acquireFailures),
 		registerer.Register(m.remainingAtLargeBytes),
 		registerer.Register(m.remainingVdrBytes),
 		registerer.Register(m.awaitingRelease),
 	)
-	return errs.Err
 }
 
 func NewNoOutboundThrottler() OutboundMsgThrottler {

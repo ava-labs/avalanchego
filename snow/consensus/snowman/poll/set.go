@@ -1,22 +1,27 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
+)
+
+var (
+	errFailedPollsMetric         = errors.New("failed to register polls metric")
+	errFailedPollDurationMetrics = errors.New("failed to register poll_duration metrics")
 )
 
 type pollHolder interface {
@@ -43,37 +48,30 @@ type set struct {
 	durPolls metric.Averager
 	factory  Factory
 	// maps requestID -> poll
-	polls linkedhashmap.LinkedHashmap[uint32, pollHolder]
+	polls *linked.Hashmap[uint32, pollHolder]
 }
 
 // NewSet returns a new empty set of polls
 func NewSet(
 	factory Factory,
 	log logging.Logger,
-	namespace string,
 	reg prometheus.Registerer,
-) Set {
+) (Set, error) {
 	numPolls := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "polls",
-		Help:      "Number of pending network polls",
+		Name: "polls",
+		Help: "Number of pending network polls",
 	})
 	if err := reg.Register(numPolls); err != nil {
-		log.Error("failed to register polls statistics",
-			zap.Error(err),
-		)
+		return nil, fmt.Errorf("%w: %w", errFailedPollsMetric, err)
 	}
 
 	durPolls, err := metric.NewAverager(
-		namespace,
 		"poll_duration",
 		"time (in ns) this poll took to complete",
 		reg,
 	)
 	if err != nil {
-		log.Error("failed to register poll_duration statistics",
-			zap.Error(err),
-		)
+		return nil, fmt.Errorf("%w: %w", errFailedPollDurationMetrics, err)
 	}
 
 	return &set{
@@ -81,8 +79,8 @@ func NewSet(
 		numPolls: numPolls,
 		durPolls: durPolls,
 		factory:  factory,
-		polls:    linkedhashmap.New[uint32, pollHolder](),
-	}
+		polls:    linked.NewHashmap[uint32, pollHolder](),
+	}, nil
 }
 
 // Add to the current set of polls

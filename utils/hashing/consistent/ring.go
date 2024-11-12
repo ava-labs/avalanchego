@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package consistent
@@ -7,8 +7,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/google/btree"
+
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (

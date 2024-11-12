@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
@@ -52,13 +51,7 @@ var (
 	_ requestIDGetter = (*p2p.AppRequest)(nil)
 	_ requestIDGetter = (*p2p.AppResponse)(nil)
 
-	_ engineTypeGetter = (*p2p.GetAcceptedFrontier)(nil)
-	_ engineTypeGetter = (*p2p.GetAccepted)(nil)
 	_ engineTypeGetter = (*p2p.GetAncestors)(nil)
-	_ engineTypeGetter = (*p2p.Get)(nil)
-	_ engineTypeGetter = (*p2p.Put)(nil)
-	_ engineTypeGetter = (*p2p.PushQuery)(nil)
-	_ engineTypeGetter = (*p2p.PullQuery)(nil)
 
 	_ deadlineGetter = (*p2p.GetStateSummaryFrontier)(nil)
 	_ deadlineGetter = (*p2p.GetAcceptedStateSummary)(nil)
@@ -84,18 +77,6 @@ func GetChainID(m any) (ids.ID, error) {
 	return ids.ToID(chainIDBytes)
 }
 
-type sourceChainIDGetter interface {
-	GetSourceChainID() ids.ID
-}
-
-func GetSourceChainID(m any) (ids.ID, error) {
-	msg, ok := m.(sourceChainIDGetter)
-	if !ok {
-		return GetChainID(m)
-	}
-	return msg.GetSourceChainID(), nil
-}
-
 type requestIDGetter interface {
 	GetRequestId() uint32
 }
@@ -106,14 +87,10 @@ func GetRequestID(m any) (uint32, bool) {
 		return requestID, true
 	}
 
-	// AppGossip is the only message currently not containing a requestID
-	// Here we assign the requestID already in use for gossiped containers
-	// to allow a uniform handling of all messages
-	if _, ok := m.(*p2p.AppGossip); ok {
-		return constants.GossipMsgRequestID, true
-	}
-
-	return 0, false
+	// AppGossip is the only inbound message not containing a requestID. For
+	// ease of handling, imagine that it does have a requestID.
+	_, ok := m.(*p2p.AppGossip)
+	return 0, ok
 }
 
 type engineTypeGetter interface {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -6,14 +6,12 @@ package nftfx
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFactory(t *testing.T) {
+	require := require.New(t)
+
 	factory := Factory{}
-	if fx, err := factory.New(logging.NoLog{}); err != nil {
-		t.Fatal(err)
-	} else if fx == nil {
-		t.Fatalf("Factory.New returned nil")
-	}
+	require.Equal(&Fx{}, factory.New())
 }

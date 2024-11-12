@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package hashing
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 
@@ -15,6 +16,8 @@ const (
 	HashLen = sha256.Size
 	AddrLen = ripemd160.Size
 )
+
+var ErrInvalidHashLen = errors.New("invalid hash length")
 
 // Hash256 A 256 bit long hash value.
 type Hash256 = [HashLen]byte
@@ -33,22 +36,6 @@ func ComputeHash256Array(buf []byte) Hash256 {
 func ComputeHash256(buf []byte) []byte {
 	arr := ComputeHash256Array(buf)
 	return arr[:]
-}
-
-// ComputeHash256Ranges computes a cryptographically strong 256 bit hash of the input
-// byte slice in the ranges specified.
-// Example:
-// ComputeHash256Ranges({1, 2, 4, 8, 16}, {{1, 2}, {3, 5}}) is equivalent to
-// ComputeHash256({2, 8, 16}).
-func ComputeHash256Ranges(buf []byte, ranges [][2]int) []byte {
-	hashBuilder := sha256.New()
-	for _, r := range ranges {
-		_, err := hashBuilder.Write(buf[r[0]:r[1]])
-		if err != nil {
-			panic(err)
-		}
-	}
-	return hashBuilder.Sum(nil)
 }
 
 // ComputeHash160Array computes a cryptographically strong 160 bit hash of the
@@ -85,7 +72,7 @@ func Checksum(bytes []byte, length int) []byte {
 func ToHash256(bytes []byte) (Hash256, error) {
 	hash := Hash256{}
 	if bytesLen := len(bytes); bytesLen != HashLen {
-		return hash, fmt.Errorf("expected 32 bytes but got %d", bytesLen)
+		return hash, fmt.Errorf("%w: expected 32 bytes but got %d", ErrInvalidHashLen, bytesLen)
 	}
 	copy(hash[:], bytes)
 	return hash, nil
@@ -94,7 +81,7 @@ func ToHash256(bytes []byte) (Hash256, error) {
 func ToHash160(bytes []byte) (Hash160, error) {
 	hash := Hash160{}
 	if bytesLen := len(bytes); bytesLen != ripemd160.Size {
-		return hash, fmt.Errorf("expected 20 bytes but got %d", bytesLen)
+		return hash, fmt.Errorf("%w: expected 20 bytes but got %d", ErrInvalidHashLen, bytesLen)
 	}
 	copy(hash[:], bytes)
 	return hash, nil

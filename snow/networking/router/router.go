@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -32,12 +32,11 @@ type Router interface {
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
 		criticalChains set.Set[ids.ID],
-		stakingEnabled bool,
+		sybilProtectionEnabled bool,
 		trackedSubnets set.Set[ids.ID],
 		onFatal func(exitCode int),
 		healthConfig HealthConfig,
-		metricsNamespace string,
-		metricsRegisterer prometheus.Registerer,
+		reg prometheus.Registerer,
 	) error
 	Shutdown(context.Context)
 	AddChain(ctx context.Context, chain handler.Handler)
@@ -51,8 +50,7 @@ type InternalHandler interface {
 	RegisterRequest(
 		ctx context.Context,
 		nodeID ids.NodeID,
-		sourceChainID ids.ID,
-		destinationChainID ids.ID,
+		chainID ids.ID,
 		requestID uint32,
 		op message.Op,
 		failedMsg message.InboundMessage,

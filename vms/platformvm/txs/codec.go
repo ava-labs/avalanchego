@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
 
 import (
+	"errors"
 	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -14,8 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Version is the current default codec version
-const Version = 0
+const CodecVersion = 0
 
 var (
 	Codec codec.Manager
@@ -29,9 +29,7 @@ var (
 
 func init() {
 	c := linearcodec.NewDefault()
-	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
-	GenesisCodec = codec.NewManager(math.MaxInt32)
+	gc := linearcodec.NewDefault()
 
 	errs := wrappers.Errs{}
 	for _, c := range []linearcodec.Codec{c, gc} {
@@ -40,32 +38,43 @@ func init() {
 		// we skip positions for the blocks.
 		c.SkipRegistrations(5)
 
-		errs.Add(RegisterUnsignedTxsTypes(c))
+		errs.Add(
+			RegisterApricotTypes(c),
+			RegisterBanffTypes(c),
+		)
+
+		c.SkipRegistrations(4)
+
+		errs.Add(
+			RegisterDurangoTypes(c),
+			RegisterEtnaTypes(c),
+		)
 	}
+
+	Codec = codec.NewDefaultManager()
+	GenesisCodec = codec.NewManager(math.MaxInt32)
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(CodecVersion, c),
+		GenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
 	}
 }
 
-// RegisterUnsignedTxsTypes allows registering relevant type of unsigned package
-// in the right sequence. Following repackaging of platformvm package, a few
-// subpackage-level codecs were introduced, each handling serialization of specific types.
-// RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
-// are coherent with components one.
-func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
+// RegisterApricotTypes registers the type information for transactions that
+// were valid during the Apricot series of upgrades.
+func RegisterApricotTypes(targetCodec linearcodec.Codec) error {
 	errs := wrappers.Errs{}
+
+	// The secp256k1fx is registered here because this is the same place it is
+	// registered in the AVM. This ensures that the typeIDs match up for utxos
+	// in shared memory.
+	errs.Add(targetCodec.RegisterType(&secp256k1fx.TransferInput{}))
+	targetCodec.SkipRegistrations(1)
+	errs.Add(targetCodec.RegisterType(&secp256k1fx.TransferOutput{}))
+	targetCodec.SkipRegistrations(1)
 	errs.Add(
-		// The Fx is registered here because this is the same place it is
-		// registered in the AVM. This ensures that the typeIDs match up for
-		// utxos in shared memory.
-		targetCodec.RegisterType(&secp256k1fx.TransferInput{}),
-		targetCodec.RegisterType(&secp256k1fx.MintOutput{}),
-		targetCodec.RegisterType(&secp256k1fx.TransferOutput{}),
-		targetCodec.RegisterType(&secp256k1fx.MintOperation{}),
 		targetCodec.RegisterType(&secp256k1fx.Credential{}),
 		targetCodec.RegisterType(&secp256k1fx.Input{}),
 		targetCodec.RegisterType(&secp256k1fx.OutputOwners{}),
@@ -82,8 +91,14 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 
 		targetCodec.RegisterType(&stakeable.LockIn{}),
 		targetCodec.RegisterType(&stakeable.LockOut{}),
+	)
+	return errs.Err
+}
 
-		// Banff additions:
+// RegisterBanffTypes registers the type information for transactions that were
+// valid during the Banff series of upgrades.
+func RegisterBanffTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
 		targetCodec.RegisterType(&RemoveSubnetValidatorTx{}),
 		targetCodec.RegisterType(&TransformSubnetTx{}),
 		targetCodec.RegisterType(&AddPermissionlessValidatorTx{}),
@@ -92,5 +107,21 @@ func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
 		targetCodec.RegisterType(&signer.Empty{}),
 		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 	)
-	return errs.Err
+}
+
+// RegisterDurangoTypes registers the type information for transactions that
+// were valid during the Durango series of upgrades.
+func RegisterDurangoTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
+		targetCodec.RegisterType(&TransferSubnetOwnershipTx{}),
+		targetCodec.RegisterType(&BaseTx{}),
+	)
+}
+
+// RegisterEtnaTypes registers the type information for transactions that
+// were valid during the Etna series of upgrades.
+func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
+	return errors.Join(
+		targetCodec.RegisterType(&ConvertSubnetTx{}),
+	)
 }

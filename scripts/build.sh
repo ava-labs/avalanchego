@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 print_usage() {
   printf "Usage: build [OPTIONS]

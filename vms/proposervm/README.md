@@ -47,7 +47,7 @@ A proposer in position `i` in the proposers list has its submission windows star
 The following validation rules are enforced:
 
 - Given a `proposervm.Block` **C** and its parent block **P**, **P**'s inner block must be **C**'s inner block's parent.
-- A block must have a `PChainHeight` is larger or equal to its parent's `PChainHeight` (`PChainHeight` is monotonic).
+- A block must have a `PChainHeight` that is larger or equal to its parent's `PChainHeight` (`PChainHeight` is monotonic).
 - A block must have a `PChainHeight` that is less or equal to current P-Chain height.
 - A block must have a `Timestamp` larger or equal to its parent's `Timestamp` (`Timestamp` is monotonic)
 - A block received by a node at time `t_local` must have a `Timestamp` such that `Timestamp < t_local + maxSkew` (a block too far in the future is invalid). `maxSkew` is currently set to `10 seconds`.

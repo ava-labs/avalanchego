@@ -1,44 +1,185 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+)
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+const (
+	ioType    = "type"
+	readType  = "read"
+	writeType = "write"
+
+	lookupType                = "type"
+	valueNodeCacheType        = "valueNodeCache"
+	intermediateNodeCacheType = "intermediateNodeCache"
+	viewChangesValueType      = "viewChangesValue"
+	viewChangesNodeType       = "viewChangesNode"
+
+	lookupResult = "result"
+	hitResult    = "hit"
+	missResult   = "miss"
 )
 
 var (
-	_ merkleMetrics = &mockMetrics{}
-	_ merkleMetrics = &metrics{}
+	_ metrics = (*prometheusMetrics)(nil)
+	_ metrics = (*mockMetrics)(nil)
+
+	ioLabels     = []string{ioType}
+	ioReadLabels = prometheus.Labels{
+		ioType: readType,
+	}
+	ioWriteLabels = prometheus.Labels{
+		ioType: writeType,
+	}
+
+	lookupLabels            = []string{lookupType, lookupResult}
+	valueNodeCacheHitLabels = prometheus.Labels{
+		lookupType:   valueNodeCacheType,
+		lookupResult: hitResult,
+	}
+	valueNodeCacheMissLabels = prometheus.Labels{
+		lookupType:   valueNodeCacheType,
+		lookupResult: missResult,
+	}
+	intermediateNodeCacheHitLabels = prometheus.Labels{
+		lookupType:   intermediateNodeCacheType,
+		lookupResult: hitResult,
+	}
+	intermediateNodeCacheMissLabels = prometheus.Labels{
+		lookupType:   intermediateNodeCacheType,
+		lookupResult: missResult,
+	}
+	viewChangesValueHitLabels = prometheus.Labels{
+		lookupType:   viewChangesValueType,
+		lookupResult: hitResult,
+	}
+	viewChangesValueMissLabels = prometheus.Labels{
+		lookupType:   viewChangesValueType,
+		lookupResult: missResult,
+	}
+	viewChangesNodeHitLabels = prometheus.Labels{
+		lookupType:   viewChangesNodeType,
+		lookupResult: hitResult,
+	}
+	viewChangesNodeMissLabels = prometheus.Labels{
+		lookupType:   viewChangesNodeType,
+		lookupResult: missResult,
+	}
 )
 
-type merkleMetrics interface {
-	IOKeyRead()
-	IOKeyWrite()
+type metrics interface {
 	HashCalculated()
-	DBNodeCacheHit()
-	DBNodeCacheMiss()
-	ViewNodeCacheHit()
-	ViewNodeCacheMiss()
-	ViewValueCacheHit()
-	ViewValueCacheMiss()
+	DatabaseNodeRead()
+	DatabaseNodeWrite()
+	ValueNodeCacheHit()
+	ValueNodeCacheMiss()
+	IntermediateNodeCacheHit()
+	IntermediateNodeCacheMiss()
+	ViewChangesValueHit()
+	ViewChangesValueMiss()
+	ViewChangesNodeHit()
+	ViewChangesNodeMiss()
+}
+
+type prometheusMetrics struct {
+	hashes prometheus.Counter
+	io     *prometheus.CounterVec
+	lookup *prometheus.CounterVec
+}
+
+func newMetrics(namespace string, reg prometheus.Registerer) (metrics, error) {
+	// TODO: Should we instead return an error if reg is nil?
+	if reg == nil {
+		return &mockMetrics{}, nil
+	}
+	m := prometheusMetrics{
+		hashes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "hashes",
+			Help:      "cumulative number of nodes hashed",
+		}),
+		io: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "io",
+			Help:      "cumulative number of operations performed to the db",
+		}, ioLabels),
+		lookup: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "lookup",
+			Help:      "cumulative number of in-memory lookups performed",
+		}, lookupLabels),
+	}
+	err := errors.Join(
+		reg.Register(m.hashes),
+		reg.Register(m.io),
+		reg.Register(m.lookup),
+	)
+	return &m, err
+}
+
+func (m *prometheusMetrics) HashCalculated() {
+	m.hashes.Inc()
+}
+
+func (m *prometheusMetrics) DatabaseNodeRead() {
+	m.io.With(ioReadLabels).Inc()
+}
+
+func (m *prometheusMetrics) DatabaseNodeWrite() {
+	m.io.With(ioWriteLabels).Inc()
+}
+
+func (m *prometheusMetrics) ValueNodeCacheHit() {
+	m.lookup.With(valueNodeCacheHitLabels).Inc()
+}
+
+func (m *prometheusMetrics) ValueNodeCacheMiss() {
+	m.lookup.With(valueNodeCacheMissLabels).Inc()
+}
+
+func (m *prometheusMetrics) IntermediateNodeCacheHit() {
+	m.lookup.With(intermediateNodeCacheHitLabels).Inc()
+}
+
+func (m *prometheusMetrics) IntermediateNodeCacheMiss() {
+	m.lookup.With(intermediateNodeCacheMissLabels).Inc()
+}
+
+func (m *prometheusMetrics) ViewChangesValueHit() {
+	m.lookup.With(viewChangesValueHitLabels).Inc()
+}
+
+func (m *prometheusMetrics) ViewChangesValueMiss() {
+	m.lookup.With(viewChangesValueMissLabels).Inc()
+}
+
+func (m *prometheusMetrics) ViewChangesNodeHit() {
+	m.lookup.With(viewChangesNodeHitLabels).Inc()
+}
+
+func (m *prometheusMetrics) ViewChangesNodeMiss() {
+	m.lookup.With(viewChangesNodeMissLabels).Inc()
 }
 
 type mockMetrics struct {
-	lock               sync.Mutex
-	keyReadCount       int64
-	keyWriteCount      int64
-	hashCount          int64
-	dbNodeCacheHit     int64
-	dbNodeCacheMiss    int64
-	viewNodeCacheHit   int64
-	viewNodeCacheMiss  int64
-	viewValueCacheHit  int64
-	viewValueCacheMiss int64
+	lock                      sync.Mutex
+	hashCount                 int64
+	nodeReadCount             int64
+	nodeWriteCount            int64
+	valueNodeCacheHit         int64
+	valueNodeCacheMiss        int64
+	intermediateNodeCacheHit  int64
+	intermediateNodeCacheMiss int64
+	viewChangesValueHit       int64
+	viewChangesValueMiss      int64
+	viewChangesNodeHit        int64
+	viewChangesNodeMiss       int64
 }
 
 func (m *mockMetrics) HashCalculated() {
@@ -48,172 +189,72 @@ func (m *mockMetrics) HashCalculated() {
 	m.hashCount++
 }
 
-func (m *mockMetrics) IOKeyRead() {
+func (m *mockMetrics) DatabaseNodeRead() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.keyReadCount++
+	m.nodeReadCount++
 }
 
-func (m *mockMetrics) IOKeyWrite() {
+func (m *mockMetrics) DatabaseNodeWrite() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.keyWriteCount++
+	m.nodeWriteCount++
 }
 
-func (m *mockMetrics) ViewNodeCacheHit() {
+func (m *mockMetrics) ValueNodeCacheHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewNodeCacheHit++
+	m.valueNodeCacheHit++
 }
 
-func (m *mockMetrics) ViewValueCacheHit() {
+func (m *mockMetrics) ValueNodeCacheMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewValueCacheHit++
+	m.valueNodeCacheMiss++
 }
 
-func (m *mockMetrics) ViewNodeCacheMiss() {
+func (m *mockMetrics) IntermediateNodeCacheHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewNodeCacheMiss++
+	m.intermediateNodeCacheHit++
 }
 
-func (m *mockMetrics) ViewValueCacheMiss() {
+func (m *mockMetrics) IntermediateNodeCacheMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.viewValueCacheMiss++
+	m.intermediateNodeCacheMiss++
 }
 
-func (m *mockMetrics) DBNodeCacheHit() {
+func (m *mockMetrics) ViewChangesValueHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.dbNodeCacheHit++
+	m.viewChangesValueHit++
 }
 
-func (m *mockMetrics) DBNodeCacheMiss() {
+func (m *mockMetrics) ViewChangesValueMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.dbNodeCacheMiss++
+	m.viewChangesValueMiss++
 }
 
-type metrics struct {
-	ioKeyWrite         prometheus.Counter
-	ioKeyRead          prometheus.Counter
-	hashCount          prometheus.Counter
-	dbNodeCacheHit     prometheus.Counter
-	dbNodeCacheMiss    prometheus.Counter
-	viewNodeCacheHit   prometheus.Counter
-	viewNodeCacheMiss  prometheus.Counter
-	viewValueCacheHit  prometheus.Counter
-	viewValueCacheMiss prometheus.Counter
+func (m *mockMetrics) ViewChangesNodeHit() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.viewChangesNodeHit++
 }
 
-func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, error) {
-	if reg == nil {
-		return &mockMetrics{}, nil
-	}
-	m := metrics{
-		ioKeyWrite: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "io_key_write",
-			Help:      "cumulative amount of io write to the key db",
-		}),
-		ioKeyRead: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "io_key_read",
-			Help:      "cumulative amount of io read to the key db",
-		}),
-		hashCount: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "hashes_calculated",
-			Help:      "cumulative number of node hashes done",
-		}),
-		dbNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "db_node_cache_hit",
-			Help:      "cumulative amount of hits on the db node cache",
-		}),
-		dbNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "db_node_cache_miss",
-			Help:      "cumulative amount of misses on the db node cache",
-		}),
-		viewNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "view_node_cache_hit",
-			Help:      "cumulative amount of hits on the view node cache",
-		}),
-		viewNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "view_node_cache_miss",
-			Help:      "cumulative amount of misses on the view node cache",
-		}),
-		viewValueCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "view_value_cache_hit",
-			Help:      "cumulative amount of hits on the view value cache",
-		}),
-		viewValueCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "view_value_cache_miss",
-			Help:      "cumulative amount of misses on the view value cache",
-		}),
-	}
-	errs := wrappers.Errs{}
-	errs.Add(
-		reg.Register(m.ioKeyWrite),
-		reg.Register(m.ioKeyRead),
-		reg.Register(m.hashCount),
-		reg.Register(m.dbNodeCacheHit),
-		reg.Register(m.dbNodeCacheMiss),
-		reg.Register(m.viewNodeCacheHit),
-		reg.Register(m.viewNodeCacheMiss),
-		reg.Register(m.viewValueCacheHit),
-		reg.Register(m.viewValueCacheMiss),
-	)
-	return &m, errs.Err
-}
+func (m *mockMetrics) ViewChangesNodeMiss() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-func (m *metrics) IOKeyRead() {
-	m.ioKeyRead.Inc()
-}
-
-func (m *metrics) IOKeyWrite() {
-	m.ioKeyWrite.Inc()
-}
-
-func (m *metrics) HashCalculated() {
-	m.hashCount.Inc()
-}
-
-func (m *metrics) ViewNodeCacheHit() {
-	m.viewNodeCacheHit.Inc()
-}
-
-func (m *metrics) ViewNodeCacheMiss() {
-	m.viewNodeCacheMiss.Inc()
-}
-
-func (m *metrics) ViewValueCacheHit() {
-	m.viewValueCacheHit.Inc()
-}
-
-func (m *metrics) ViewValueCacheMiss() {
-	m.viewValueCacheMiss.Inc()
-}
-
-func (m *metrics) DBNodeCacheHit() {
-	m.dbNodeCacheHit.Inc()
-}
-
-func (m *metrics) DBNodeCacheMiss() {
-	m.dbNodeCacheMiss.Inc()
+	m.viewChangesNodeMiss++
 }

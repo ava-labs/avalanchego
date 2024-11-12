@@ -1,15 +1,13 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package versiondb
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -210,7 +208,7 @@ func (db *Database) Abort() {
 }
 
 func (db *Database) abort() {
-	maps.Clear(db.mem)
+	clear(db.mem)
 }
 
 // CommitBatch returns a batch that contains all uncommitted puts/deletes.

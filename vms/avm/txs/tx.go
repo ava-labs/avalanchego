@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -19,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var _ gossip.Gossipable = (*Tx)(nil)
+
 type UnsignedTx interface {
 	snow.ContextInitializable
 
@@ -26,9 +29,6 @@ type UnsignedTx interface {
 	Bytes() []byte
 
 	InputIDs() set.Set[ids.ID]
-
-	ConsumedAssetIDs() set.Set[ids.ID]
-	AssetIDs() set.Set[ids.ID]
 
 	NumCredentials() int
 	// TODO: deprecate after x-chain linearization
@@ -78,9 +78,18 @@ func (t *Tx) ID() ids.ID {
 	return t.TxID
 }
 
+// GossipID returns the unique ID that this tx should use for mempool gossip
+func (t *Tx) GossipID() ids.ID {
+	return t.TxID
+}
+
 // Bytes returns the binary representation of this tx
 func (t *Tx) Bytes() []byte {
 	return t.bytes
+}
+
+func (t *Tx) Size() int {
+	return len(t.bytes)
 }
 
 // UTXOs returns the UTXOs transaction is producing.
@@ -90,6 +99,10 @@ func (t *Tx) UTXOs() []*avax.UTXO {
 	// returned from the utxoGetter.
 	_ = t.Unsigned.Visit(&u)
 	return u.utxos
+}
+
+func (t *Tx) InputIDs() set.Set[ids.ID] {
+	return t.Unsigned.InputIDs()
 }
 
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
@@ -110,7 +123,7 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*secp256k1.PrivateKey)
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, &fxs.FxCredential{Verifiable: cred})
+		t.Creds = append(t.Creds, &fxs.FxCredential{Credential: cred})
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, t)
@@ -139,7 +152,7 @@ func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*secp256k1.PrivateKey) 
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, &fxs.FxCredential{Verifiable: cred})
+		t.Creds = append(t.Creds, &fxs.FxCredential{Credential: cred})
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, t)
@@ -168,7 +181,7 @@ func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*secp256k1.PrivateKey) error
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, &fxs.FxCredential{Verifiable: cred})
+		t.Creds = append(t.Creds, &fxs.FxCredential{Credential: cred})
 	}
 
 	signedBytes, err := c.Marshal(CodecVersion, t)

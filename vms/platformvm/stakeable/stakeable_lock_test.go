@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package stakeable
@@ -7,11 +7,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/avax/avaxmock"
 )
 
 var errTest = errors.New("hi mom")
@@ -27,7 +27,7 @@ func TestLockOutVerify(t *testing.T) {
 			name:     "happy path",
 			locktime: 1,
 			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
-				o := avax.NewMockTransferableOut(ctrl)
+				o := avaxmock.NewTransferableOut(ctrl)
 				o.EXPECT().Verify().Return(nil)
 				return o
 			},
@@ -36,7 +36,7 @@ func TestLockOutVerify(t *testing.T) {
 		{
 			name:     "invalid locktime",
 			locktime: 0,
-			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
+			transferableOutF: func(*gomock.Controller) avax.TransferableOut {
 				return nil
 			},
 			expectedErr: errInvalidLocktime,
@@ -44,7 +44,7 @@ func TestLockOutVerify(t *testing.T) {
 		{
 			name:     "nested",
 			locktime: 1,
-			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
+			transferableOutF: func(*gomock.Controller) avax.TransferableOut {
 				return &LockOut{}
 			},
 			expectedErr: errNestedStakeableLocks,
@@ -53,7 +53,7 @@ func TestLockOutVerify(t *testing.T) {
 			name:     "inner output fails verification",
 			locktime: 1,
 			transferableOutF: func(ctrl *gomock.Controller) avax.TransferableOut {
-				o := avax.NewMockTransferableOut(ctrl)
+				o := avaxmock.NewTransferableOut(ctrl)
 				o.EXPECT().Verify().Return(errTest)
 				return o
 			},
@@ -64,7 +64,6 @@ func TestLockOutVerify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			lockOut := &LockOut{
 				Locktime:        tt.locktime,
@@ -86,7 +85,7 @@ func TestLockInVerify(t *testing.T) {
 			name:     "happy path",
 			locktime: 1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				o := avax.NewMockTransferableIn(ctrl)
+				o := avaxmock.NewTransferableIn(ctrl)
 				o.EXPECT().Verify().Return(nil)
 				return o
 			},
@@ -95,7 +94,7 @@ func TestLockInVerify(t *testing.T) {
 		{
 			name:     "invalid locktime",
 			locktime: 0,
-			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
+			transferableInF: func(*gomock.Controller) avax.TransferableIn {
 				return nil
 			},
 			expectedErr: errInvalidLocktime,
@@ -103,7 +102,7 @@ func TestLockInVerify(t *testing.T) {
 		{
 			name:     "nested",
 			locktime: 1,
-			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
+			transferableInF: func(*gomock.Controller) avax.TransferableIn {
 				return &LockIn{}
 			},
 			expectedErr: errNestedStakeableLocks,
@@ -112,7 +111,7 @@ func TestLockInVerify(t *testing.T) {
 			name:     "inner input fails verification",
 			locktime: 1,
 			transferableInF: func(ctrl *gomock.Controller) avax.TransferableIn {
-				o := avax.NewMockTransferableIn(ctrl)
+				o := avaxmock.NewTransferableIn(ctrl)
 				o.EXPECT().Verify().Return(errTest)
 				return o
 			},
@@ -123,7 +122,6 @@ func TestLockInVerify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			lockOut := &LockIn{
 				Locktime:       tt.locktime,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package wrappers
@@ -22,8 +22,6 @@ const (
 	LongLen = 8
 	// BoolLen is the number of bytes per bool
 	BoolLen = 1
-	// IPLen is the number of bytes per IP
-	IPLen = 16 + ShortLen
 )
 
 func StringLen(str string) int {

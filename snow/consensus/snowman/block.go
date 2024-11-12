@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 // Block is a possible decision that dictates the next canonical block.
@@ -22,7 +22,7 @@ import (
 // If the status of the block is Accepted or Rejected; Parent, Verify, Accept,
 // and Reject will never be called.
 type Block interface {
-	choices.Decidable
+	snow.Decidable
 
 	// Parent returns the ID of this block's parent.
 	Parent() ids.ID

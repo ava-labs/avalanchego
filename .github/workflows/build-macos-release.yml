@@ -18,16 +18,16 @@ jobs:
   # This workflow contains a single job called "build"
   build-mac:
     # The type of runner that the job will run on
-    runs-on: macos-12
+    runs-on: macos-14
+    permissions:
+      id-token: write
+      contents: read
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
-        with:
-          go-version: '~1.19.6'
-          check-latest: true
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
       # Runs a single command using the runners shell
@@ -38,18 +38,18 @@ jobs:
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create zip file
-        run: 7z a avalanchego-macos-${TAG}.zip build/avalanchego
+        run: 7z a "avalanchego-macos-${TAG}.zip" build/avalanchego
         env:
           TAG: ${{ env.TAG }}
 
@@ -59,23 +59,23 @@ jobs:
           sudo installer -pkg AWSCLIV2.pkg -target /
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Upload file to S3
-        run: aws s3 cp avalanchego-macos-${{ env.TAG }}.zip s3://${BUCKET}/macos/
+        run: aws s3 cp avalanchego-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
         env:
           BUCKET: ${{ secrets.BUCKET }}
 
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build
           path: avalanchego-macos-${{ env.TAG }}.zip
-      
+
       - name: Cleanup
         run: |
           rm -rf ./build

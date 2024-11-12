@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -34,15 +33,13 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	log.Debug("initializing nft fx")
 
 	c := fx.VM.CodecRegistry()
-	errs := wrappers.Errs{}
-	errs.Add(
+	return errors.Join(
 		c.RegisterType(&MintOutput{}),
 		c.RegisterType(&TransferOutput{}),
 		c.RegisterType(&MintOperation{}),
 		c.RegisterType(&TransferOperation{}),
 		c.RegisterType(&Credential{}),
 	)
-	return errs.Err
 }
 
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {

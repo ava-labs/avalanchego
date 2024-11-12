@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -21,7 +21,8 @@ import (
 )
 
 var (
-	_ ValidatorTx = (*AddPermissionlessValidatorTx)(nil)
+	_ ValidatorTx     = (*AddPermissionlessValidatorTx)(nil)
+	_ ScheduledStaker = (*AddPermissionlessDelegatorTx)(nil)
 
 	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
 	errNoStake                 = errors.New("no stake")
@@ -159,7 +160,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	stakedAssetID := firstStakeOutput.AssetID()
 	totalStakeWeight := firstStakeOutput.Output().Amount()
 	for _, out := range tx.StakeOuts[1:] {
-		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}

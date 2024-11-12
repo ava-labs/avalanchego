@@ -1,0 +1,33 @@
+# BUILDER_IMAGE_TAG should identify the builder image
+ARG BUILDER_IMAGE_TAG
+
+# ============= Compilation Stage ================
+FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
+
+# The workdir is hard-coded since this Dockerfile is only intended for instrumented builds.
+WORKDIR /instrumented/customer
+
+# Build avalanchego with race detection (-r) enabled.
+RUN ./scripts/build.sh -r
+
+# ============= Cleanup Stage ================
+FROM debian:11-slim AS execution
+
+# Install curl to simplify debugging
+RUN apt update && apt install curl -y
+
+# Copy identifying information into the container
+COPY --from=builder /build/commit_hash.txt ./commit_hash.txt
+
+# Copy the antithesis dependencies into the container
+RUN mkdir -p /symbols
+COPY --from=builder /instrumented/symbols /symbols
+COPY --from=builder /opt/antithesis/lib/libvoidstar.so /usr/lib/libvoidstar.so
+
+# Use the same path as the uninstrumented node image for consistency
+WORKDIR /avalanchego/build
+
+# Copy the executable into the container
+COPY --from=builder /instrumented/customer/build/avalanchego ./avalanchego
+
+CMD [ "./avalanchego" ]

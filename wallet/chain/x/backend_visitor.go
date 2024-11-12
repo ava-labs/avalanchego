@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
 
 import (
-	stdcontext "context"
+	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -16,7 +16,7 @@ var _ txs.Visitor = (*backendVisitor)(nil)
 // backendVisitor handles accepting of transactions for the backend
 type backendVisitor struct {
 	b    *backend
-	ctx  stdcontext.Context
+	ctx  context.Context
 	txID ids.ID
 }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -6,49 +6,34 @@ package snowman
 import (
 	"context"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/job"
 )
+
+var _ job.Job[ids.ID] = (*issuer)(nil)
 
 // issuer issues [blk] into to consensus after its dependencies are met.
 type issuer struct {
-	t         *Transitive
-	blk       snowman.Block
-	abandoned bool
-	deps      set.Set[ids.ID]
+	e            *Engine
+	nodeID       ids.NodeID // nodeID of the peer that provided this block
+	blk          snowman.Block
+	push         bool
+	issuedMetric prometheus.Counter
 }
 
-func (i *issuer) Dependencies() set.Set[ids.ID] {
-	return i.deps
-}
-
-// Mark that a dependency has been met
-func (i *issuer) Fulfill(ctx context.Context, id ids.ID) {
-	i.deps.Remove(id)
-	i.Update(ctx)
-}
-
-// Abandon the attempt to issue [i.block]
-func (i *issuer) Abandon(ctx context.Context, _ ids.ID) {
-	if !i.abandoned {
-		blkID := i.blk.ID()
-		i.t.removeFromPending(i.blk)
-		i.t.addToNonVerifieds(i.blk)
-		i.t.blocked.Abandon(ctx, blkID)
-
-		// Tracks performance statistics
-		i.t.metrics.numRequests.Set(float64(i.t.blkReqs.Len()))
-		i.t.metrics.numBlocked.Set(float64(len(i.t.pending)))
-		i.t.metrics.numBlockers.Set(float64(i.t.blocked.Len()))
+func (i *issuer) Execute(ctx context.Context, _ []ids.ID, abandoned []ids.ID) error {
+	if len(abandoned) == 0 {
+		// If the parent block wasn't abandoned, this block can be issued.
+		return i.e.deliver(ctx, i.nodeID, i.blk, i.push, i.issuedMetric)
 	}
-	i.abandoned = true
-}
 
-func (i *issuer) Update(ctx context.Context) {
-	if i.abandoned || i.deps.Len() != 0 || i.t.errs.Errored() {
-		return
-	}
-	// Issue the block into consensus
-	i.t.errs.Add(i.t.deliver(ctx, i.blk))
+	// If the parent block was abandoned, this block should be abandoned as
+	// well.
+	blkID := i.blk.ID()
+	delete(i.e.pending, blkID)
+	i.e.markAsUnverified(i.blk)
+	return i.e.blocked.Abandon(ctx, blkID)
 }

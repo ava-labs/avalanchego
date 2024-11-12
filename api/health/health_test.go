@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -58,18 +57,15 @@ func TestDuplicatedRegistations(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	err = h.RegisterReadinessCheck("check", check)
-	require.NoError(err)
+	require.NoError(h.RegisterReadinessCheck("check", check))
 	err = h.RegisterReadinessCheck("check", check)
 	require.ErrorIs(err, errDuplicateCheck)
 
-	err = h.RegisterHealthCheck("check", check)
-	require.NoError(err)
+	require.NoError(h.RegisterHealthCheck("check", check))
 	err = h.RegisterHealthCheck("check", check)
 	require.ErrorIs(err, errDuplicateCheck)
 
-	err = h.RegisterLivenessCheck("check", check)
-	require.NoError(err)
+	require.NoError(h.RegisterLivenessCheck("check", check))
 	err = h.RegisterLivenessCheck("check", check)
 	require.ErrorIs(err, errDuplicateCheck)
 }
@@ -85,8 +81,7 @@ func TestDefaultFailing(t *testing.T) {
 	require.NoError(err)
 
 	{
-		err = h.RegisterReadinessCheck("check", check)
-		require.NoError(err)
+		require.NoError(h.RegisterReadinessCheck("check", check))
 
 		readinessResult, readiness := h.Readiness()
 		require.Len(readinessResult, 1)
@@ -96,8 +91,7 @@ func TestDefaultFailing(t *testing.T) {
 	}
 
 	{
-		err = h.RegisterHealthCheck("check", check)
-		require.NoError(err)
+		require.NoError(h.RegisterHealthCheck("check", check))
 
 		healthResult, health := h.Health()
 		require.Len(healthResult, 1)
@@ -107,8 +101,7 @@ func TestDefaultFailing(t *testing.T) {
 	}
 
 	{
-		err = h.RegisterLivenessCheck("check", check)
-		require.NoError(err)
+		require.NoError(h.RegisterLivenessCheck("check", check))
 
 		livenessResult, liveness := h.Liveness()
 		require.Len(livenessResult, 1)
@@ -128,12 +121,9 @@ func TestPassingChecks(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	err = h.RegisterReadinessCheck("check", check)
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check", check)
-	require.NoError(err)
-	err = h.RegisterLivenessCheck("check", check)
-	require.NoError(err)
+	require.NoError(h.RegisterReadinessCheck("check", check))
+	require.NoError(h.RegisterHealthCheck("check", check))
+	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
@@ -195,12 +185,9 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	err = h.RegisterReadinessCheck("check", check)
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check", check)
-	require.NoError(err)
-	err = h.RegisterLivenessCheck("check", check)
-	require.NoError(err)
+	require.NoError(h.RegisterReadinessCheck("check", check))
+	require.NoError(h.RegisterHealthCheck("check", check))
+	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
@@ -256,11 +243,10 @@ func TestDeadlockRegression(t *testing.T) {
 	h.Start(context.Background(), time.Nanosecond)
 	defer h.Stop()
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		lock.Lock()
-		err = h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check)
+		require.NoError(h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check))
 		lock.Unlock()
-		require.NoError(err)
 	}
 
 	awaitHealthy(t, h, true)
@@ -275,16 +261,11 @@ func TestTags(t *testing.T) {
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(err)
-	err = h.RegisterHealthCheck("check1", check)
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check2", check, "tag1")
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check3", check, "tag2")
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check4", check, "tag1", "tag2")
-	require.NoError(err)
-	err = h.RegisterHealthCheck("check5", check, GlobalTag)
-	require.NoError(err)
+	require.NoError(h.RegisterHealthCheck("check1", check))
+	require.NoError(h.RegisterHealthCheck("check2", check, "tag1"))
+	require.NoError(h.RegisterHealthCheck("check3", check, "tag2"))
+	require.NoError(h.RegisterHealthCheck("check4", check, "tag1", "tag2"))
+	require.NoError(h.RegisterHealthCheck("check5", check, ApplicationTag))
 
 	// default checks
 	{
@@ -374,8 +355,7 @@ func TestTags(t *testing.T) {
 
 	{
 		// now we'll add a new check which is unhealthy by default (notYetRunResult)
-		err = h.RegisterHealthCheck("check6", check, "tag1")
-		require.NoError(err)
+		require.NoError(h.RegisterHealthCheck("check6", check, "tag1"))
 
 		awaitHealthy(t, h, false)
 
@@ -395,9 +375,8 @@ func TestTags(t *testing.T) {
 		require.Contains(healthResult, "check5")
 		require.True(health)
 
-		// add global tag
-		err = h.RegisterHealthCheck("check7", check, GlobalTag)
-		require.NoError(err)
+		// add application tag
+		require.NoError(h.RegisterHealthCheck("check7", check, ApplicationTag))
 
 		awaitHealthy(t, h, false)
 

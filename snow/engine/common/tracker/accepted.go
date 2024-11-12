@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Accepted = (*accepted)(nil)
@@ -16,24 +17,29 @@ var _ Accepted = (*accepted)(nil)
 type Accepted interface {
 	validators.SetCallbackListener
 
-	// SetAcceptedFrontier updates the latest frontier for [nodeID] to
-	// [frontier]. If [nodeID] is not currently a validator, this is a noop.
-	SetAcceptedFrontier(nodeID ids.NodeID, frontier []ids.ID)
-	// AcceptedFrontier returns the latest known accepted frontier of [nodeID].
-	// If [nodeID]'s last accepted frontier is unknown, an empty slice will be
-	// returned.
-	AcceptedFrontier(nodeID ids.NodeID) []ids.ID
+	// SetLastAccepted updates the latest accepted block for [nodeID] to
+	// [blockID], with a corresponding height.
+	// If [nodeID] is not currently a validator, this is a noop.
+	SetLastAccepted(nodeID ids.NodeID, blockID ids.ID, height uint64)
+	// LastAccepted returns the latest known accepted block of [nodeID]. If
+	// [nodeID]'s last accepted block was never unknown, false will be returned.
+	LastAccepted(nodeID ids.NodeID) (ids.ID, uint64, bool)
+}
+
+type idHeight struct {
+	id     ids.ID
+	height uint64
 }
 
 type accepted struct {
-	lock sync.RWMutex
-	// frontier contains an entry for all current validators
-	frontier map[ids.NodeID][]ids.ID
+	lock         sync.RWMutex
+	validators   set.Set[ids.NodeID]
+	lastAccepted map[ids.NodeID]idHeight
 }
 
 func NewAccepted() Accepted {
 	return &accepted{
-		frontier: make(map[ids.NodeID][]ids.ID),
+		lastAccepted: make(map[ids.NodeID]idHeight),
 	}
 }
 
@@ -41,30 +47,35 @@ func (a *accepted) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.I
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	a.frontier[nodeID] = nil
+	a.validators.Add(nodeID)
 }
 
 func (a *accepted) OnValidatorRemoved(nodeID ids.NodeID, _ uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	delete(a.frontier, nodeID)
+	a.validators.Remove(nodeID)
+	delete(a.lastAccepted, nodeID)
 }
 
 func (*accepted) OnValidatorWeightChanged(_ ids.NodeID, _, _ uint64) {}
 
-func (a *accepted) SetAcceptedFrontier(nodeID ids.NodeID, frontier []ids.ID) {
+func (a *accepted) SetLastAccepted(nodeID ids.NodeID, id ids.ID, height uint64) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if _, ok := a.frontier[nodeID]; ok {
-		a.frontier[nodeID] = frontier
+	if a.validators.Contains(nodeID) {
+		a.lastAccepted[nodeID] = idHeight{
+			id:     id,
+			height: height,
+		}
 	}
 }
 
-func (a *accepted) AcceptedFrontier(nodeID ids.NodeID) []ids.ID {
+func (a *accepted) LastAccepted(nodeID ids.NodeID) (ids.ID, uint64, bool) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	return a.frontier[nodeID]
+	acceptedAndHeight, ok := a.lastAccepted[nodeID]
+	return acceptedAndHeight.id, acceptedAndHeight.height, ok
 }

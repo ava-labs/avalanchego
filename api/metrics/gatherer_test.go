@@ -1,17 +1,18 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+
 	dto "github.com/prometheus/client_model/go"
 )
 
-var (
-	hello      = "hello"
-	world      = "world"
-	helloWorld = "hello_world"
-)
+var counterOpts = prometheus.CounterOpts{
+	Name: "counter",
+	Help: "help",
+}
 
 type testGatherer struct {
 	mfs []*dto.MetricFamily

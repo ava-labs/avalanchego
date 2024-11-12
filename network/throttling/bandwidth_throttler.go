@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
-
 	"golang.org/x/time/rate"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -60,7 +58,6 @@ type BandwidthThrottlerConfig struct {
 
 func newBandwidthThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
 	config BandwidthThrottlerConfig,
 ) (bandwidthThrottler, error) {
@@ -71,16 +68,14 @@ func newBandwidthThrottler(
 		limiters:                 make(map[ids.NodeID]*rate.Limiter),
 		metrics: bandwidthThrottlerMetrics{
 			acquireLatency: metric.NewAveragerWithErrs(
-				namespace,
 				"bandwidth_throttler_inbound_acquire_latency",
 				"average time (in ns) to acquire bytes from the inbound bandwidth throttler",
 				registerer,
 				&errs,
 			),
 			awaitingAcquire: prometheus.NewGauge(prometheus.GaugeOpts{
-				Namespace: namespace,
-				Name:      "bandwidth_throttler_inbound_awaiting_acquire",
-				Help:      "Number of inbound messages waiting to acquire bandwidth from the inbound bandwidth throttler",
+				Name: "bandwidth_throttler_inbound_awaiting_acquire",
+				Help: "Number of inbound messages waiting to acquire bandwidth from the inbound bandwidth throttler",
 			}),
 		},
 	}

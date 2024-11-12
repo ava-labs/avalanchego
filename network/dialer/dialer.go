@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dialer
@@ -7,12 +7,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -22,7 +22,7 @@ var _ Dialer = (*dialer)(nil)
 type Dialer interface {
 	// If [ctx] is canceled, gives up trying to connect to [ip]
 	// and returns an error.
-	Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error)
+	Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error)
 }
 
 type dialer struct {
@@ -62,7 +62,7 @@ func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 	}
 }
 
-func (d *dialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) {
+func (d *dialer) Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error) {
 	if err := d.throttler.Acquire(ctx); err != nil {
 		return nil, err
 	}

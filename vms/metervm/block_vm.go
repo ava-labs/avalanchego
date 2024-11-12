@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
@@ -8,8 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -22,7 +21,6 @@ var (
 	_ block.ChainVM                      = (*blockVM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*blockVM)(nil)
 	_ block.BatchedChainVM               = (*blockVM)(nil)
-	_ block.HeightIndexedChainVM         = (*blockVM)(nil)
 	_ block.StateSyncableVM              = (*blockVM)(nil)
 )
 
@@ -30,31 +28,33 @@ type blockVM struct {
 	block.ChainVM
 	buildBlockVM block.BuildBlockWithContextChainVM
 	batchedVM    block.BatchedChainVM
-	hVM          block.HeightIndexedChainVM
 	ssVM         block.StateSyncableVM
 
 	blockMetrics
-	clock mockable.Clock
+	registry prometheus.Registerer
+	clock    mockable.Clock
 }
 
-func NewBlockVM(vm block.ChainVM) block.ChainVM {
+func NewBlockVM(
+	vm block.ChainVM,
+	reg prometheus.Registerer,
+) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
-	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &blockVM{
 		ChainVM:      vm,
 		buildBlockVM: buildBlockVM,
 		batchedVM:    batchedVM,
-		hVM:          hVM,
 		ssVM:         ssVM,
+		registry:     reg,
 	}
 }
 
 func (vm *blockVM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
-	db manager.Manager,
+	db database.Database,
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
@@ -62,31 +62,15 @@ func (vm *blockVM) Initialize(
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
-	registerer := prometheus.NewRegistry()
 	err := vm.blockMetrics.Initialize(
 		vm.buildBlockVM != nil,
 		vm.batchedVM != nil,
-		vm.hVM != nil,
 		vm.ssVM != nil,
-		"",
-		registerer,
+		vm.registry,
 	)
 	if err != nil {
 		return err
 	}
-
-	optionalGatherer := metrics.NewOptionalGatherer()
-	multiGatherer := metrics.NewMultiGatherer()
-	if err := multiGatherer.Register("metervm", registerer); err != nil {
-		return err
-	}
-	if err := multiGatherer.Register("", optionalGatherer); err != nil {
-		return err
-	}
-	if err := chainCtx.Metrics.Register(multiGatherer); err != nil {
-		return err
-	}
-	chainCtx.Metrics = optionalGatherer
 
 	return vm.ChainVM.Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
@@ -153,4 +137,12 @@ func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
+}
+
+func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	start := vm.clock.Time()
+	blockID, err := vm.ChainVM.GetBlockIDAtHeight(ctx, height)
+	end := vm.clock.Time()
+	vm.blockMetrics.getBlockIDAtHeight.Observe(float64(end.Sub(start)))
+	return blockID, err
 }

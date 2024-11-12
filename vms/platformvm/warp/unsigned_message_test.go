@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -10,13 +10,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestUnsignedMessage(t *testing.T) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
-		ids.GenerateTestID(),
+		constants.UnitTestID,
 		ids.GenerateTestID(),
 		[]byte("payload"),
 	)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bag
@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -93,10 +94,10 @@ func (b *UniqueBag[T]) Bag(threshold int) Bag[T] {
 	return bag
 }
 
-func (b *UniqueBag[_]) PrefixedString(prefix string) string {
+func (b *UniqueBag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("UniqueBag: (Size = %d)", len(*b)))
+	sb.WriteString(fmt.Sprintf("UniqueBag[%T]: (Size = %d)", utils.Zero[T](), len(*b)))
 	for key, set := range *b {
 		sb.WriteString(fmt.Sprintf("\n%s    %v: %s", prefix, key, set))
 	}
@@ -110,5 +111,5 @@ func (b *UniqueBag[_]) String() string {
 
 // Removes all key --> bitset pairs.
 func (b *UniqueBag[_]) Clear() {
-	maps.Clear(*b)
+	clear(*b)
 }

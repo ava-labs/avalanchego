@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -35,7 +35,7 @@ func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) {
 
 func (fc *FlowChecker) add(value map[ids.ID]uint64, assetID ids.ID, amount uint64) {
 	var err error
-	value[assetID], err = math.Add64(value[assetID], amount)
+	value[assetID], err = math.Add(value[assetID], amount)
 	fc.errs.Add(err)
 }
 

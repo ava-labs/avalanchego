@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -108,13 +108,15 @@ func TestExportTxSerialization(t *testing.T) {
 		},
 	}}
 
-	parser, err := NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := NewParser(
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
-	require.NoError(parser.InitializeTx(tx))
-	require.Equal(tx.ID().String(), "2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3")
+	require.NoError(tx.Initialize(parser.Codec()))
+	require.Equal("2PKJE4TrKYpgynBFCpNPpV3GHK7d9QTgrL5mpYG6abHKDvNBG3", tx.ID().String())
 
 	result := tx.Bytes()
 	require.Equal(expected, result)
@@ -168,15 +170,14 @@ func TestExportTxSerialization(t *testing.T) {
 		0x8f, 0xe0, 0x2a, 0xf3, 0xcc, 0x31, 0x32, 0xef, 0xfe, 0x7d,
 		0x3d, 0x9f, 0x14, 0x94, 0x01,
 	}
-	err = tx.SignSECP256K1Fx(
+	require.NoError(tx.SignSECP256K1Fx(
 		parser.Codec(),
 		[][]*secp256k1.PrivateKey{
 			{keys[0], keys[0]},
 			{keys[0], keys[0]},
 		},
-	)
-	require.NoError(err)
-	require.Equal(tx.ID().String(), "2oG52e7Cb7XF1yUzv3pRFndAypgbpswWRcSAKD5SH5VgaiTm5D")
+	))
+	require.Equal("2oG52e7Cb7XF1yUzv3pRFndAypgbpswWRcSAKD5SH5VgaiTm5D", tx.ID().String())
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02

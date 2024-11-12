@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -48,6 +48,15 @@ type ChainVM interface {
 	// a definitionally accepted block, the Genesis block, that will be
 	// returned.
 	LastAccepted(context.Context) (ids.ID, error)
+
+	// GetBlockIDAtHeight returns:
+	// - The ID of the block that was accepted with [height].
+	// - database.ErrNotFound if the [height] index is unknown.
+	//
+	// Note: A returned value of [database.ErrNotFound] typically means that the
+	//       underlying VM was state synced and does not have access to the
+	//       blockID at [height].
+	GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error)
 }
 
 // Getter defines the functionality for fetching a block by its ID.
@@ -73,4 +82,12 @@ type Parser interface {
 	//
 	// It is expected for all historical blocks to be parseable.
 	ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error)
+}
+
+// ParseFunc defines a function that parses raw bytes into a block.
+type ParseFunc func(context.Context, []byte) (snowman.Block, error)
+
+// ParseBlock wraps a ParseFunc into a ParseBlock function, to be used by a Parser interface
+func (f ParseFunc) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
+	return f(ctx, blockBytes)
 }

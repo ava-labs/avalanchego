@@ -1,65 +1,58 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chain
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var (
-	_ Block = (*TestBlock)(nil)
+const (
+	Unknown snowtest.Status = -1
 
-	errCantBuildBlock = errors.New("can't build new block")
-	errVerify         = errors.New("verify failed")
-	errAccept         = errors.New("accept failed")
-	errReject         = errors.New("reject failed")
+	defaultBlockCacheSize = 256
 )
 
-type TestBlock struct {
-	*snowman.TestBlock
-}
-
-// SetStatus sets the status of the Block.
-func (b *TestBlock) SetStatus(status choices.Status) {
-	b.TestBlock.TestDecidable.StatusV = status
-}
+var (
+	errCantBuildBlock       = errors.New("can't build new block")
+	errVerify               = errors.New("verify failed")
+	errAccept               = errors.New("accept failed")
+	errReject               = errors.New("reject failed")
+	errUnexpectedBlockBytes = errors.New("unexpected block bytes")
+)
 
 // NewTestBlock returns a new test block with height, bytes, and ID derived from [i]
 // and using [parentID] as the parent block ID
-func NewTestBlock(i uint64, parentID ids.ID) *TestBlock {
+func NewTestBlock(i uint64, parentID ids.ID) *snowmantest.Block {
 	b := []byte{byte(i)}
 	id := hashing.ComputeHash256Array(b)
-	return &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     id,
-				StatusV: choices.Unknown,
-			},
-			HeightV: i,
-			ParentV: parentID,
-			BytesV:  b,
+	return &snowmantest.Block{
+		Decidable: snowtest.Decidable{
+			IDV:    id,
+			Status: Unknown,
 		},
+		HeightV: i,
+		ParentV: parentID,
+		BytesV:  b,
 	}
 }
 
 // NewTestBlocks generates [numBlocks] consecutive blocks
-func NewTestBlocks(numBlocks uint64) []*TestBlock {
-	blks := make([]*TestBlock, 0, numBlocks)
+func NewTestBlocks(numBlocks uint64) []*snowmantest.Block {
+	blks := make([]*snowmantest.Block, 0, numBlocks)
 	parentID := ids.Empty
 	for i := uint64(0); i < numBlocks; i++ {
 		blks = append(blks, NewTestBlock(i, parentID))
@@ -70,25 +63,21 @@ func NewTestBlocks(numBlocks uint64) []*TestBlock {
 	return blks
 }
 
-func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
+func createInternalBlockFuncs(blks []*snowmantest.Block) (
 	func(ctx context.Context, blkID ids.ID) (snowman.Block, error),
 	func(ctx context.Context, b []byte) (snowman.Block, error),
-	func(ctx context.Context, height uint64) (ids.ID, error),
 ) {
-	blkMap := make(map[ids.ID]*TestBlock)
-	blkByteMap := make(map[byte]*TestBlock)
+	blkMap := make(map[ids.ID]*snowmantest.Block)
+	blkBytesMap := make(map[string]*snowmantest.Block)
 	for _, blk := range blks {
 		blkMap[blk.ID()] = blk
 		blkBytes := blk.Bytes()
-		if len(blkBytes) != 1 {
-			t.Fatalf("Expected block bytes to be length 1, but found %d", len(blkBytes))
-		}
-		blkByteMap[blkBytes[0]] = blk
+		blkBytesMap[string(blkBytes)] = blk
 	}
 
 	getBlock := func(_ context.Context, id ids.ID) (snowman.Block, error) {
 		blk, ok := blkMap[id]
-		if !ok || !blk.Status().Fetched() {
+		if !ok || blk.Status == Unknown {
 			return nil, database.ErrNotFound
 		}
 
@@ -96,36 +85,19 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
 	}
 
 	parseBlk := func(_ context.Context, b []byte) (snowman.Block, error) {
-		if len(b) != 1 {
-			return nil, fmt.Errorf("expected block bytes to be length 1, but found %d", len(b))
-		}
-
-		blk, ok := blkByteMap[b[0]]
+		blk, ok := blkBytesMap[string(b)]
 		if !ok {
-			return nil, fmt.Errorf("parsed unexpected block with bytes %x", b)
+			return nil, fmt.Errorf("%w: %x", errUnexpectedBlockBytes, b)
 		}
-		if blk.Status() == choices.Unknown {
-			blk.SetStatus(choices.Processing)
+		if blk.Status == Unknown {
+			blk.Status = snowtest.Undecided
 		}
 		blkMap[blk.ID()] = blk
 
 		return blk, nil
 	}
-	getAcceptedBlockIDAtHeight := func(_ context.Context, height uint64) (ids.ID, error) {
-		for _, blk := range blks {
-			if blk.Height() != height {
-				continue
-			}
 
-			if blk.Status() == choices.Accepted {
-				return blk.ID(), nil
-			}
-		}
-
-		return ids.ID{}, database.ErrNotFound
-	}
-
-	return getBlock, parseBlk, getAcceptedBlockIDAtHeight
+	return getBlock, parseBlk
 }
 
 func cantBuildBlock(context.Context) (snowman.Block, error) {
@@ -135,437 +107,316 @@ func cantBuildBlock(context.Context) (snowman.Block, error) {
 // checkProcessingBlock checks that [blk] is of the correct type and is
 // correctly uniquified when calling GetBlock and ParseBlock.
 func checkProcessingBlock(t *testing.T, s *State, blk snowman.Block) {
-	if _, ok := blk.(*BlockWrapper); !ok {
-		t.Fatalf("Expected block to be of type (*BlockWrapper)")
-	}
+	require := require.New(t)
+
+	require.IsType(&BlockWrapper{}, blk)
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
-	if err != nil {
-		t.Fatalf("Failed to parse verified block due to %s", err)
-	}
-	if parsedBlk.ID() != blk.ID() {
-		t.Fatalf("Expected parsed block to have the same ID as the requested block")
-	}
-	if !bytes.Equal(parsedBlk.Bytes(), blk.Bytes()) {
-		t.Fatalf("Expected parsed block to have the same bytes as the requested block")
-	}
-	if status := parsedBlk.Status(); status != choices.Processing {
-		t.Fatalf("Expected parsed block to have status Processing, but found %s", status)
-	}
-	if parsedBlk != blk {
-		t.Fatalf("Expected parsed block to return a uniquified block")
-	}
+	require.NoError(err)
+	require.Equal(blk.ID(), parsedBlk.ID())
+	require.Equal(blk.Bytes(), parsedBlk.Bytes())
+	require.Equal(blk, parsedBlk)
 
 	getBlk, err := s.GetBlock(context.Background(), blk.ID())
-	if err != nil {
-		t.Fatalf("Unexpected error during GetBlock for processing block %s", err)
-	}
-	if getBlk != parsedBlk {
-		t.Fatalf("Expected GetBlock to return the same unique block as ParseBlock")
-	}
+	require.NoError(err)
+	require.Equal(parsedBlk, getBlk)
 }
 
 // checkDecidedBlock asserts that [blk] is returned with the correct status by ParseBlock
 // and GetBlock.
-func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, expectedStatus choices.Status, cached bool) {
-	if _, ok := blk.(*BlockWrapper); !ok {
-		t.Fatalf("Expected block to be of type (*BlockWrapper)")
+// expectedStatus should be either Accepted or Rejected.
+func checkDecidedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
+	require := require.New(t)
+
+	require.IsType(&BlockWrapper{}, blk)
+
+	if cached {
+		_, ok := s.decidedBlocks.Get(blk.ID())
+		require.True(ok)
 	}
 
 	parsedBlk, err := s.ParseBlock(context.Background(), blk.Bytes())
-	if err != nil {
-		t.Fatalf("Unexpected error parsing decided block %s", err)
-	}
-	if parsedBlk.ID() != blk.ID() {
-		t.Fatalf("ParseBlock returned block with unexpected ID %s, expected %s", parsedBlk.ID(), blk.ID())
-	}
-	if !bytes.Equal(parsedBlk.Bytes(), blk.Bytes()) {
-		t.Fatalf("Expected parsed block to have the same bytes as the requested block")
-	}
-	if status := parsedBlk.Status(); status != expectedStatus {
-		t.Fatalf("Expected parsed block to have status %s, but found %s", expectedStatus, status)
-	}
+	require.NoError(err)
+	require.Equal(blk.ID(), parsedBlk.ID())
+	require.Equal(blk.Bytes(), parsedBlk.Bytes())
+
+	_, ok := s.decidedBlocks.Get(blk.ID())
+	require.True(ok)
+
 	// If the block should be in the cache, assert that the returned block is identical to [blk]
-	if cached && parsedBlk != blk {
-		t.Fatalf("Expected parsed block to have been cached, but retrieved non-unique decided block")
+	if cached {
+		require.Equal(blk, parsedBlk)
 	}
 
 	getBlk, err := s.GetBlock(context.Background(), blk.ID())
-	if err != nil {
-		t.Fatalf("Unexpected error during GetBlock for decided block %s", err)
-	}
-	if getBlk.ID() != blk.ID() {
-		t.Fatalf("GetBlock returned block with unexpected ID %s, expected %s", getBlk.ID(), blk.ID())
-	}
-	if !bytes.Equal(getBlk.Bytes(), blk.Bytes()) {
-		t.Fatalf("Expected block from GetBlock to have the same bytes as the requested block")
-	}
-	if status := getBlk.Status(); status != expectedStatus {
-		t.Fatalf("Expected block from GetBlock to have status %s, but found %s", expectedStatus, status)
-	}
+	require.NoError(err)
+	require.Equal(blk.ID(), getBlk.ID())
+	require.Equal(blk.Bytes(), getBlk.Bytes())
 
 	// Since ParseBlock should have triggered a cache hit, assert that the block is identical
 	// to the parsed block.
-	if getBlk != parsedBlk {
-		t.Fatalf("Expected block returned by GetBlock to have been cached, but retrieved non-unique decided block")
-	}
-}
-
-func checkAcceptedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, s, blk, choices.Accepted, cached)
-}
-
-func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) {
-	checkDecidedBlock(t, s, blk, choices.Rejected, cached)
+	require.Equal(parsedBlk, getBlk)
 }
 
 func TestState(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 	// Need to create a block with a different bytes and hash here
 	// to generate a conflict with blk2
-	blk3Bytes := []byte{byte(3)}
-	blk3ID := hashing.ComputeHash256Array(blk3Bytes)
-	blk3 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     blk3ID,
-				StatusV: choices.Processing,
-			},
-			HeightV: uint64(2),
-			BytesV:  blk3Bytes,
-			ParentV: blk1.IDV,
-		},
-	}
+	blk3 := snowmantest.BuildChild(blk1)
 	testBlks = append(testBlks, blk3)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	lastAccepted, err := chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastAccepted != genesisBlock.ID() {
-		t.Fatal("Expected last accepted block to be the genesis block")
-	}
+	require.NoError(err)
+	require.Equal(genesisBlock.ID(), lastAccepted)
 
 	wrappedGenesisBlk, err := chainState.GetBlock(context.Background(), genesisBlock.ID())
-	if err != nil {
-		t.Fatalf("Failed to get genesis block due to: %s", err)
-	}
+	require.NoError(err)
 
 	// Check that a cache miss on a block is handled correctly
-	if _, err := chainState.GetBlock(context.Background(), blk1.ID()); err == nil {
-		t.Fatal("expected GetBlock to return an error for blk1 before it's been parsed")
-	}
-	if _, err := chainState.GetBlock(context.Background(), blk1.ID()); err == nil {
-		t.Fatal("expected GetBlock to return an error for blk1 before it's been parsed")
-	}
+	_, err = chainState.GetBlock(context.Background(), blk1.ID())
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Parse and verify blk1 and blk2
 	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
-	if err != nil {
-		t.Fatal("Failed to parse blk1 due to: %w", err)
-	}
-	if err := parsedBlk1.Verify(context.Background()); err != nil {
-		t.Fatal("Parsed blk1 failed verification unexpectedly due to %w", err)
-	}
+	require.NoError(err)
+	require.NoError(parsedBlk1.Verify(context.Background()))
+
 	parsedBlk2, err := chainState.ParseBlock(context.Background(), blk2.Bytes())
-	if err != nil {
-		t.Fatalf("Failed to parse blk2 due to: %s", err)
-	}
-	if err := parsedBlk2.Verify(context.Background()); err != nil {
-		t.Fatalf("Parsed blk2 failed verification unexpectedly due to %s", err)
-	}
+	require.NoError(err)
+	require.NoError(parsedBlk2.Verify(context.Background()))
 
 	// Check that the verified blocks have been placed in the processing map
-	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 2 {
-		t.Fatalf("Expected chain state to have 2 processing blocks, but found: %d", numProcessing)
-	}
+	require.Len(chainState.verifiedBlocks, 2)
 
 	parsedBlk3, err := chainState.ParseBlock(context.Background(), blk3.Bytes())
-	if err != nil {
-		t.Fatalf("Failed to parse blk3 due to %s", err)
-	}
+	require.NoError(err)
 	getBlk3, err := chainState.GetBlock(context.Background(), blk3.ID())
-	if err != nil {
-		t.Fatalf("Failed to get blk3 due to %s", err)
-	}
-	require.Equal(t, parsedBlk3.ID(), getBlk3.ID(), "State GetBlock returned the wrong block")
+	require.NoError(err)
+	require.Equal(parsedBlk3.ID(), getBlk3.ID(), "State GetBlock returned the wrong block")
 
 	// Check that parsing blk3 does not add it to processing blocks since it has
 	// not been verified.
-	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 2 {
-		t.Fatalf("Expected State to have 2 processing blocks, but found: %d", numProcessing)
-	}
+	require.Len(chainState.verifiedBlocks, 2)
 
-	if err := parsedBlk3.Verify(context.Background()); err != nil {
-		t.Fatalf("Parsed blk3 failed verification unexpectedly due to %s", err)
-	}
+	require.NoError(parsedBlk3.Verify(context.Background()))
 	// Check that blk3 has been added to processing blocks.
-	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 3 {
-		t.Fatalf("Expected chain state to have 3 processing blocks, but found: %d", numProcessing)
-	}
+	require.Len(chainState.verifiedBlocks, 3)
 
 	// Decide the blocks and ensure they are removed from the processing blocks map
-	if err := parsedBlk1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := parsedBlk2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := parsedBlk3.Reject(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlk1.Accept(context.Background()))
+	require.NoError(parsedBlk2.Accept(context.Background()))
+	require.NoError(parsedBlk3.Reject(context.Background()))
 
-	if numProcessing := len(chainState.verifiedBlocks); numProcessing != 0 {
-		t.Fatalf("Expected chain state to have 0 processing blocks, but found: %d", numProcessing)
-	}
+	require.Empty(chainState.verifiedBlocks)
 
 	// Check that the last accepted block was updated correctly
 	lastAcceptedID, err := chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastAcceptedID != blk2.ID() {
-		t.Fatal("Expected last accepted block to be blk2")
-	}
-	if lastAcceptedID := chainState.LastAcceptedBlock().ID(); lastAcceptedID != blk2.ID() {
-		t.Fatal("Expected last accepted block to be blk2")
-	}
+	require.NoError(err)
+	require.Equal(blk2.ID(), lastAcceptedID)
+	require.Equal(blk2.ID(), chainState.LastAcceptedBlock().ID())
 
 	// Flush the caches to ensure decided blocks are handled correctly on cache misses.
 	chainState.Flush()
-	checkAcceptedBlock(t, chainState, wrappedGenesisBlk, false)
-	checkAcceptedBlock(t, chainState, parsedBlk1, false)
-	checkAcceptedBlock(t, chainState, parsedBlk2, false)
-	checkRejectedBlock(t, chainState, parsedBlk3, false)
+	checkDecidedBlock(t, chainState, wrappedGenesisBlk, false)
+	checkDecidedBlock(t, chainState, parsedBlk1, false)
+	checkDecidedBlock(t, chainState, parsedBlk2, false)
+	checkDecidedBlock(t, chainState, parsedBlk3, false)
 }
 
 func TestBuildBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		// Once the block is built, mark it as processing
-		blk1.SetStatus(choices.Processing)
+		blk1.Status = snowtest.Undecided
 		return blk1, nil
 	}
 
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          buildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	builtBlk, err := chainState.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.NoError(err)
+	require.Empty(chainState.verifiedBlocks)
 
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatalf("Built block failed verification due to %s", err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 1)
+	require.NoError(builtBlk.Verify(context.Background()))
+	require.Len(chainState.verifiedBlocks, 1)
 
 	checkProcessingBlock(t, chainState, builtBlk)
 
-	if err := builtBlk.Accept(context.Background()); err != nil {
-		t.Fatalf("Unexpected error while accepting built block %s", err)
-	}
+	require.NoError(builtBlk.Accept(context.Background()))
 
-	checkAcceptedBlock(t, chainState, builtBlk, true)
+	checkDecidedBlock(t, chainState, builtBlk, true)
 }
 
 func TestStateDecideBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(4)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	badAcceptBlk := testBlks[1]
 	badAcceptBlk.AcceptV = errAccept
 	badVerifyBlk := testBlks[2]
 	badVerifyBlk.VerifyV = errVerify
 	badRejectBlk := testBlks[3]
 	badRejectBlk.RejectV = errReject
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	// Parse badVerifyBlk (which should fail verification)
 	badBlk, err := chainState.ParseBlock(context.Background(), badVerifyBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := badBlk.Verify(context.Background()); err == nil {
-		t.Fatal("Bad block should have failed verification")
-	}
+	require.NoError(err)
+	err = badBlk.Verify(context.Background())
+	require.ErrorIs(err, errVerify)
 	// Ensure a block that fails verification is not marked as processing
-	require.Len(t, chainState.verifiedBlocks, 0)
+	require.Empty(chainState.verifiedBlocks)
 
 	// Ensure that an error during block acceptance is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badAcceptBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := badBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	require.Len(t, chainState.verifiedBlocks, 1)
+	require.NoError(err)
+	require.NoError(badBlk.Verify(context.Background()))
+	require.Len(chainState.verifiedBlocks, 1)
 
-	if err := badBlk.Accept(context.Background()); err == nil {
-		t.Fatal("Block should have errored on Accept")
-	}
+	err = badBlk.Accept(context.Background())
+	require.ErrorIs(err, errAccept)
 
 	// Ensure that an error during block reject is propagated correctly
 	badBlk, err = chainState.ParseBlock(context.Background(), badRejectBlk.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := badBlk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(badBlk.Verify(context.Background()))
 	// Note: an error during block Accept/Reject is fatal, so it is undefined whether
 	// the block that failed on Accept should be removed from processing or not. We allow
 	// either case here to make this test more flexible.
-	if numProcessing := len(chainState.verifiedBlocks); numProcessing > 2 || numProcessing == 0 {
-		t.Fatalf("Expected number of processing blocks to be either 1 or 2, but found %d", numProcessing)
-	}
+	numProcessing := len(chainState.verifiedBlocks)
+	require.Contains([]int{1, 2}, numProcessing)
 
-	if err := badBlk.Reject(context.Background()); err == nil {
-		t.Fatal("Block should have errored on Reject")
-	}
+	err = badBlk.Reject(context.Background())
+	require.ErrorIs(err, errReject)
 }
 
 func TestStateParent(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	parsedBlk2, err := chainState.ParseBlock(context.Background(), blk2.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	missingBlk1ID := parsedBlk2.Parent()
 
-	if _, err := chainState.GetBlock(context.Background(), missingBlk1ID); err == nil {
-		t.Fatalf("Expected  parent of blk2 to be not found")
-	}
+	_, err = chainState.GetBlock(context.Background(), missingBlk1ID)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	genesisBlkParentID := parsedBlk1.Parent()
 	genesisBlkParent, err := chainState.GetBlock(context.Background(), genesisBlkParentID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	checkAcceptedBlock(t, chainState, genesisBlkParent, true)
+	require.NoError(err)
+	checkDecidedBlock(t, chainState, genesisBlkParent, true)
 
 	parentBlk1ID := parsedBlk2.Parent()
 	parentBlk1, err := chainState.GetBlock(context.Background(), parentBlk1ID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	checkProcessingBlock(t, chainState, parentBlk1)
 }
 
 func TestGetBlockInternal(t *testing.T) {
+	require := require.New(t)
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	genesisBlockInternal := chainState.LastAcceptedBlockInternal()
-	if _, ok := genesisBlockInternal.(*TestBlock); !ok {
-		t.Fatalf("Expected LastAcceptedBlockInternal to return a block of type *snowman.TestBlock, but found %T", genesisBlockInternal)
-	}
-	if genesisBlockInternal.ID() != genesisBlock.ID() {
-		t.Fatalf("Expected LastAcceptedBlockInternal to be blk %s, but found %s", genesisBlock.ID(), genesisBlockInternal.ID())
-	}
+	require.IsType(&snowmantest.Block{}, genesisBlockInternal)
+	require.Equal(genesisBlock.ID(), genesisBlockInternal.ID())
 
 	blk, err := chainState.GetBlockInternal(context.Background(), genesisBlock.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if _, ok := blk.(*TestBlock); !ok {
-		t.Fatalf("Expected retrieved block to return a block of type *snowman.TestBlock, but found %T", blk)
-	}
-	if blk.ID() != genesisBlock.ID() {
-		t.Fatalf("Expected GetBlock to be blk %s, but found %s", genesisBlock.ID(), blk.ID())
-	}
+	require.IsType(&snowmantest.Block{}, blk)
+	require.Equal(genesisBlock.ID(), blk.ID())
 }
 
 func TestGetBlockError(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	wrappedGetBlock := func(ctx context.Context, id ids.ID) (snowman.Block, error) {
 		blk, err := getBlock(ctx, id)
 		if err != nil {
@@ -574,110 +425,94 @@ func TestGetBlockError(t *testing.T) {
 		return blk, nil
 	}
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            wrappedGetBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	_, err := chainState.GetBlock(context.Background(), blk1.ID())
-	if err == nil {
-		t.Fatal("Expected GetBlock to return an error for unknown block")
-	}
+	require.ErrorIs(err, database.ErrNotFound)
 
-	// Update the status to Processing, so that it will be returned by the internal get block
-	// function.
-	blk1.SetStatus(choices.Processing)
+	// Update the status to Undecided, so that it will be returned by the
+	// internal get block function.
+	blk1.Status = snowtest.Undecided
 	blk, err := chainState.GetBlock(context.Background(), blk1.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if blk.ID() != blk1.ID() {
-		t.Fatalf("Expected GetBlock to retrieve %s, but found %s", blk1.ID(), blk.ID())
-	}
+	require.NoError(err)
+	require.Equal(blk1.ID(), blk.ID())
 	checkProcessingBlock(t, chainState, blk)
 }
 
 func TestParseBlockError(t *testing.T) {
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	blk, err := chainState.ParseBlock(context.Background(), []byte{255})
-	if err == nil {
-		t.Fatalf("Expected ParseBlock to return an error parsing an invalid block but found block of type %T", blk)
-	}
+	_, err := chainState.ParseBlock(context.Background(), []byte{255})
+	require.ErrorIs(t, err, errUnexpectedBlockBytes)
 }
 
 func TestBuildBlockError(t *testing.T) {
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
-	blk, err := chainState.BuildBlock(context.Background())
-	if err == nil {
-		t.Fatalf("Expected BuildBlock to return an error but found block of type %T", blk)
-	}
+	_, err := chainState.BuildBlock(context.Background())
+	require.ErrorIs(t, err, errCantBuildBlock)
 }
 
 func TestMeteredCache(t *testing.T) {
+	require := require.New(t)
+
 	registry := prometheus.NewRegistry()
 
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	config := &Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	}
 	_, err := NewMeteredState(registry, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	_, err = NewMeteredState(registry, config)
-	if err == nil {
-		t.Fatal("Expected creating a second NewMeteredState to error due to a registry conflict")
-	}
+	require.Error(err) //nolint:forbidigo // error is not exported https://github.com/prometheus/client_golang/blob/main/prometheus/registry.go#L315
 }
 
 // Test the bytesToIDCache
@@ -686,13 +521,13 @@ func TestStateBytesToIDCache(t *testing.T) {
 
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
-		t.Fatal("shouldn't have been called")
+		require.FailNow("shouldn't have been called")
 		return nil, nil
 	}
 
@@ -700,12 +535,11 @@ func TestStateBytesToIDCache(t *testing.T) {
 		DecidedCacheSize:    0,
 		MissingCacheSize:    0,
 		UnverifiedCacheSize: 0,
-		BytesToIDCacheSize:  1,
+		BytesToIDCacheSize:  1 + ids.IDLen, // Size of one block
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          buildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	// Shouldn't have blk1 ID to start with
@@ -736,92 +570,52 @@ func TestStateBytesToIDCache(t *testing.T) {
 // TestSetLastAcceptedBlock ensures chainState's last accepted block
 // can be updated by calling [SetLastAcceptedBlock].
 func TestSetLastAcceptedBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 
 	postSetBlk1ParentID := hashing.ComputeHash256Array([]byte{byte(199)})
-	postSetBlk1Bytes := []byte{byte(200)}
-	postSetBlk2Bytes := []byte{byte(201)}
-	postSetBlk1 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     hashing.ComputeHash256Array(postSetBlk1Bytes),
-				StatusV: choices.Accepted,
-			},
-			HeightV: uint64(200),
-			BytesV:  postSetBlk1Bytes,
-			ParentV: postSetBlk1ParentID,
-		},
-	}
-	postSetBlk2 := &TestBlock{
-		TestBlock: &snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     hashing.ComputeHash256Array(postSetBlk2Bytes),
-				StatusV: choices.Processing,
-			},
-			HeightV: uint64(201),
-			BytesV:  postSetBlk2Bytes,
-			ParentV: postSetBlk1.IDV,
-		},
-	}
+	postSetBlk1 := NewTestBlock(200, postSetBlk1ParentID)
+	postSetBlk2 := NewTestBlock(201, postSetBlk1.ID())
+
 	// note we do not need to parse postSetBlk1 so it is omitted here
 	testBlks = append(testBlks, postSetBlk2)
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		LastAcceptedBlock:  genesisBlock,
-		GetBlock:           getBlock,
-		UnmarshalBlock:     parseBlock,
-		BuildBlock:         cantBuildBlock,
-		GetBlockIDAtHeight: getCanonicalBlockID,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
 	})
 	lastAcceptedID, err := chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastAcceptedID != genesisBlock.ID() {
-		t.Fatal("Expected last accepted block to be the genesis block")
-	}
+	require.NoError(err)
+	require.Equal(genesisBlock.ID(), lastAcceptedID)
 
 	// call SetLastAcceptedBlock for postSetBlk1
-	if err := chainState.SetLastAcceptedBlock(postSetBlk1); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(chainState.SetLastAcceptedBlock(postSetBlk1))
 	lastAcceptedID, err = chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastAcceptedID != postSetBlk1.ID() {
-		t.Fatal("Expected last accepted block to be postSetBlk1")
-	}
-	if lastAcceptedID := chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk1.ID() {
-		t.Fatal("Expected last accepted block to be postSetBlk1")
-	}
+	require.NoError(err)
+	require.Equal(postSetBlk1.ID(), lastAcceptedID)
+	require.Equal(postSetBlk1.ID(), chainState.LastAcceptedBlock().ID())
 
 	// ensure further blocks can be accepted
 	parsedpostSetBlk2, err := chainState.ParseBlock(context.Background(), postSetBlk2.Bytes())
-	if err != nil {
-		t.Fatal("Failed to parse postSetBlk2 due to: %w", err)
-	}
-	if err := parsedpostSetBlk2.Verify(context.Background()); err != nil {
-		t.Fatal("Parsed postSetBlk2 failed verification unexpectedly due to %w", err)
-	}
-	if err := parsedpostSetBlk2.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(parsedpostSetBlk2.Verify(context.Background()))
+	require.NoError(parsedpostSetBlk2.Accept(context.Background()))
 	lastAcceptedID, err = chainState.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if lastAcceptedID != postSetBlk2.ID() {
-		t.Fatal("Expected last accepted block to be postSetBlk2")
-	}
-	if lastAcceptedID := chainState.LastAcceptedBlock().ID(); lastAcceptedID != postSetBlk2.ID() {
-		t.Fatal("Expected last accepted block to be postSetBlk2")
-	}
+	require.NoError(err)
+	require.Equal(postSetBlk2.ID(), lastAcceptedID)
+	require.Equal(postSetBlk2.ID(), chainState.LastAcceptedBlock().ID())
 
-	checkAcceptedBlock(t, chainState, parsedpostSetBlk2, false)
+	checkDecidedBlock(t, chainState, parsedpostSetBlk2, false)
 }
 
 func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
@@ -829,27 +623,26 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 
 	testBlks := NewTestBlocks(5)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	resetBlk := testBlks[4]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
-		// Once the block is built, mark it as processing
-		blk1.SetStatus(choices.Processing)
+		// Once the block is built, mark it as undecided
+		genesisBlock.Status = snowtest.Undecided
 		return blk1, nil
 	}
 
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          buildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	builtBlk, err := chainState.BuildBlock(context.Background())
@@ -866,73 +659,68 @@ func TestSetLastAcceptedBlockWithProcessingBlocksErrors(t *testing.T) {
 }
 
 func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 	blk2 := testBlks[2]
-	blk2.SetStatus(choices.Accepted)
+	blk2.Status = snowtest.Accepted
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   blk2,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
-	if err != nil {
-		t.Fatalf("Failed to parse blk1 due to: %s", err)
-	}
-
-	if blk1.Height() != parsedBlk1.Height() {
-		t.Fatalf("Parsed blk1 reported incorrect height. Expected %d got %d", blk1.Height(), parsedBlk1.Height())
-	}
+	require.NoError(err)
+	require.Equal(blk1.Height(), parsedBlk1.Height())
 }
 
 func TestIsProcessing(t *testing.T) {
+	require := require.New(t)
+
 	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
-	genesisBlock.SetStatus(choices.Accepted)
+	genesisBlock.Status = snowtest.Accepted
 	blk1 := testBlks[1]
 
-	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	getBlock, parseBlock := createInternalBlockFuncs(testBlks)
 	chainState := NewState(&Config{
-		DecidedCacheSize:    2,
-		MissingCacheSize:    2,
-		UnverifiedCacheSize: 2,
-		BytesToIDCacheSize:  2,
+		DecidedCacheSize:    defaultBlockCacheSize,
+		MissingCacheSize:    defaultBlockCacheSize,
+		UnverifiedCacheSize: defaultBlockCacheSize,
+		BytesToIDCacheSize:  defaultBlockCacheSize,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
 		BuildBlock:          cantBuildBlock,
-		GetBlockIDAtHeight:  getCanonicalBlockID,
 	})
 
 	// Parse blk1
 	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// Check that it is not processing in consensus
-	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+	require.False(chainState.IsProcessing(parsedBlk1.ID()))
 
 	// Verify blk1
-	err = parsedBlk1.Verify(context.Background())
-	require.NoError(t, err)
+	require.NoError(parsedBlk1.Verify(context.Background()))
 
 	// Check that it is processing in consensus
-	require.True(t, chainState.IsProcessing(parsedBlk1.ID()))
+	require.True(chainState.IsProcessing(parsedBlk1.ID()))
 
 	// Accept blk1
-	err = parsedBlk1.Accept(context.Background())
-	require.NoError(t, err)
+	require.NoError(parsedBlk1.Accept(context.Background()))
 
 	// Check that it is no longer processing in consensus
-	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+	require.False(chainState.IsProcessing(parsedBlk1.ID()))
 }

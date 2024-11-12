@@ -9,8 +9,8 @@ service Signer {
 }
 
 message SignRequest {
-  bytes source_chain_id = 1;
-  bytes destination_chain_id = 2;
+  uint32 network_id = 1;
+  bytes source_chain_id = 2;
   bytes payload = 3;
 }
 

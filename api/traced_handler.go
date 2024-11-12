@@ -1,17 +1,16 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
 
 import (
-	"fmt"
 	"net/http"
 
 	"go.opentelemetry.io/otel/attribute"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/ava-labs/avalanchego/trace"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var _ http.Handler = (*tracedHandler)(nil)
@@ -25,7 +24,7 @@ type tracedHandler struct {
 func TraceHandler(h http.Handler, name string, tracer trace.Tracer) http.Handler {
 	return &tracedHandler{
 		h:            h,
-		serveHTTPTag: fmt.Sprintf("%s.ServeHTTP", name),
+		serveHTTPTag: name + ".ServeHTTP",
 		tracer:       tracer,
 	}
 }

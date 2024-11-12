@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
 
 import (
 	"io"
+	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -67,8 +68,15 @@ func (l *log) Write(p []byte) (int, error) {
 // TODO: return errors here
 func (l *log) Stop() {
 	for _, wc := range l.wrappedCores {
-		_ = wc.Writer.Close()
+		if wc.Writer != os.Stdout && wc.Writer != os.Stderr {
+			_ = wc.Writer.Close()
+		}
 	}
+}
+
+// Enabled returns true if the given level is at or above this level.
+func (l *log) Enabled(lvl Level) bool {
+	return l.internalLogger.Level().Enabled(zapcore.Level(lvl))
 }
 
 // Should only be called from [Level] functions.

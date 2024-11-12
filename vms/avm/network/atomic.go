@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -30,51 +30,6 @@ func NewAtomic(h common.AppHandler) Atomic {
 	return a
 }
 
-func (a *atomic) CrossChainAppRequest(
-	ctx context.Context,
-	chainID ids.ID,
-	requestID uint32,
-	deadline time.Time,
-	msg []byte,
-) error {
-	h := a.handler.Get()
-	return h.CrossChainAppRequest(
-		ctx,
-		chainID,
-		requestID,
-		deadline,
-		msg,
-	)
-}
-
-func (a *atomic) CrossChainAppRequestFailed(
-	ctx context.Context,
-	chainID ids.ID,
-	requestID uint32,
-) error {
-	h := a.handler.Get()
-	return h.CrossChainAppRequestFailed(
-		ctx,
-		chainID,
-		requestID,
-	)
-}
-
-func (a *atomic) CrossChainAppResponse(
-	ctx context.Context,
-	chainID ids.ID,
-	requestID uint32,
-	msg []byte,
-) error {
-	h := a.handler.Get()
-	return h.CrossChainAppResponse(
-		ctx,
-		chainID,
-		requestID,
-		msg,
-	)
-}
-
 func (a *atomic) AppRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -96,12 +51,14 @@ func (a *atomic) AppRequestFailed(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
+	appErr *common.AppError,
 ) error {
 	h := a.handler.Get()
 	return h.AppRequestFailed(
 		ctx,
 		nodeID,
 		requestID,
+		appErr,
 	)
 }
 

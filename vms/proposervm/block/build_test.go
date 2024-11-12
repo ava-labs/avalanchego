@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -26,8 +26,10 @@ func TestBuild(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	cert := tlsCert.Leaf
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
 	key := tlsCert.PrivateKey.(crypto.Signer)
+	nodeID := ids.NodeIDFromCert(cert)
 
 	builtBlock, err := Build(
 		parentID,
@@ -44,12 +46,7 @@ func TestBuild(t *testing.T) {
 	require.Equal(pChainHeight, builtBlock.PChainHeight())
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
-
-	err = builtBlock.Verify(true, chainID)
-	require.NoError(err)
-
-	err = builtBlock.Verify(false, chainID)
-	require.ErrorIs(err, errUnexpectedProposer)
+	require.Equal(nodeID, builtBlock.Proposer())
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -68,12 +65,6 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
-
-	err = builtBlock.Verify(false, ids.Empty)
-	require.NoError(err)
-
-	err = builtBlock.Verify(true, ids.Empty)
-	require.ErrorIs(err, errMissingProposer)
 }
 
 func TestBuildHeader(t *testing.T) {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // For ease of implementation, our database's interface matches Ethereum's
@@ -7,7 +7,7 @@
 
 package database
 
-import "golang.org/x/exp/slices"
+import "slices"
 
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. A batch cannot be used concurrently.
@@ -75,6 +75,7 @@ func (b *BatchOps) Size() int {
 }
 
 func (b *BatchOps) Reset() {
+	clear(b.Ops)
 	b.Ops = b.Ops[:0]
 	b.size = 0
 }

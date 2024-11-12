@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,15 +22,15 @@ func TestBandwidthThrottler(t *testing.T) {
 		RefillRate:   8,
 		MaxBurstSize: 10,
 	}
-	throttlerIntf, err := newBandwidthThrottler(logging.NoLog{}, "", prometheus.NewRegistry(), config)
+	throttlerIntf, err := newBandwidthThrottler(logging.NoLog{}, prometheus.NewRegistry(), config)
 	require.NoError(err)
-	throttler, ok := throttlerIntf.(*bandwidthThrottlerImpl)
-	require.True(ok)
+	require.IsType(&bandwidthThrottlerImpl{}, throttlerIntf)
+	throttler := throttlerIntf.(*bandwidthThrottlerImpl)
 	require.NotNil(throttler.log)
 	require.NotNil(throttler.limiters)
-	require.EqualValues(throttler.RefillRate, 8)
-	require.EqualValues(throttler.MaxBurstSize, 10)
-	require.Len(throttler.limiters, 0)
+	require.Equal(config.RefillRate, throttler.RefillRate)
+	require.Equal(config.MaxBurstSize, throttler.MaxBurstSize)
+	require.Empty(throttler.limiters)
 
 	// Add a node
 	nodeID1 := ids.GenerateTestNodeID()
@@ -40,7 +39,7 @@ func TestBandwidthThrottler(t *testing.T) {
 
 	// Remove the node
 	throttler.RemoveNode(nodeID1)
-	require.Len(throttler.limiters, 0)
+	require.Empty(throttler.limiters)
 
 	// Add the node back
 	throttler.AddNode(nodeID1)

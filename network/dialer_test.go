@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -7,9 +7,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/utils/ips"
 )
 
 var (
@@ -20,33 +20,32 @@ var (
 
 type testDialer struct {
 	// maps [ip.String] to a listener
-	listeners map[string]*testListener
+	listeners map[netip.AddrPort]*testListener
 }
 
 func newTestDialer() *testDialer {
 	return &testDialer{
-		listeners: make(map[string]*testListener),
+		listeners: make(map[netip.AddrPort]*testListener),
 	}
 }
 
-func (d *testDialer) NewListener() (ips.DynamicIPPort, *testListener) {
+func (d *testDialer) NewListener() (netip.AddrPort, *testListener) {
 	// Uses a private IP to easily enable testing AllowPrivateIPs
-	ip := ips.NewDynamicIPPort(
-		net.IPv4(10, 0, 0, 0),
-		uint16(len(d.listeners)),
+	addrPort := netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{10, 0, 0, 0}),
+		uint16(len(d.listeners)+1),
 	)
-	staticIP := ip.IPPort()
-	listener := newTestListener(staticIP)
-	d.AddListener(staticIP, listener)
-	return ip, listener
+	listener := newTestListener(addrPort)
+	d.AddListener(addrPort, listener)
+	return addrPort, listener
 }
 
-func (d *testDialer) AddListener(ip ips.IPPort, listener *testListener) {
-	d.listeners[ip.String()] = listener
+func (d *testDialer) AddListener(ip netip.AddrPort, listener *testListener) {
+	d.listeners[ip] = listener
 }
 
-func (d *testDialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) {
-	listener, ok := d.listeners[ip.String()]
+func (d *testDialer) Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error) {
+	listener, ok := d.listeners[ip]
 	if !ok {
 		return nil, errRefused
 	}
@@ -55,22 +54,22 @@ func (d *testDialer) Dial(ctx context.Context, ip ips.IPPort) (net.Conn, error) 
 		Conn: serverConn,
 		localAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 0,
+			Port: 1,
 		},
 		remoteAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 1,
+			Port: 2,
 		},
 	}
 	client := &testConn{
 		Conn: clientConn,
 		localAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 2,
+			Port: 3,
 		},
 		remoteAddr: &net.TCPAddr{
 			IP:   net.IPv6loopback,
-			Port: 3,
+			Port: 4,
 		},
 	}
 	select {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -52,11 +52,11 @@ func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	}
 	lastAcceptedBytes, err := s.db.Get(lastAcceptedKey)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	lastAccepted, err := ids.ToID(lastAcceptedBytes)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	s.lastAccepted = lastAccepted
 	return lastAccepted, nil

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -6,39 +6,40 @@ package version
 import (
 	"errors"
 	"fmt"
-	"sync/atomic"
+	"sync"
 )
 
 var (
 	errDifferentMajor = errors.New("different major version")
 
-	_ fmt.Stringer = (*Semantic)(nil)
+	_ fmt.Stringer = (*Application)(nil)
 )
 
 type Application struct {
-	Major int `json:"major" yaml:"major"`
-	Minor int `json:"minor" yaml:"minor"`
-	Patch int `json:"patch" yaml:"patch"`
+	Name  string `json:"name"  yaml:"name"`
+	Major int    `json:"major" yaml:"major"`
+	Minor int    `json:"minor" yaml:"minor"`
+	Patch int    `json:"patch" yaml:"patch"`
 
-	str atomic.Value
+	makeStrOnce sync.Once
+	str         string
 }
 
 // The only difference here between Application and Semantic is that Application
-// prepends "avalanche/" rather than "v".
+// prepends the client name rather than "v".
 func (a *Application) String() string {
-	strIntf := a.str.Load()
-	if strIntf != nil {
-		return strIntf.(string)
-	}
+	a.makeStrOnce.Do(a.initString)
+	return a.str
+}
 
-	str := fmt.Sprintf(
-		"avalanche/%d.%d.%d",
+func (a *Application) initString() {
+	a.str = fmt.Sprintf(
+		"%s/%d.%d.%d",
+		a.Name,
 		a.Major,
 		a.Minor,
 		a.Patch,
 	)
-	a.str.Store(str)
-	return str
 }
 
 func (a *Application) Compatible(o *Application) error {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -9,17 +9,15 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
-	"golang.org/x/exp/slices"
-
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
@@ -41,7 +39,7 @@ const (
 	batchedParseBlockCachingTestKey                = "batchedParseBlockCachingTest"
 )
 
-var TestServerPluginMap = map[string]func(*testing.T, bool) (block.ChainVM, *gomock.Controller){
+var TestServerPluginMap = map[string]func(*testing.T, bool) block.ChainVM{
 	stateSyncEnabledTestKey:                        stateSyncEnabledTestPlugin,
 	getOngoingSyncStateSummaryTestKey:              getOngoingSyncStateSummaryTestPlugin,
 	getLastStateSummaryTestKey:                     getLastStateSummaryTestPlugin,
@@ -82,7 +80,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "failed to receive testKey\n")
+		fmt.Fprintln(os.Stderr, "failed to receive testKey")
 		os.Exit(2)
 	}
 
@@ -92,12 +90,11 @@ func TestHelperProcess(t *testing.T) {
 		select {}
 	}
 
-	mockedVM, ctrl := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
+	mockedVM := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
 	err := Serve(context.Background(), mockedVM)
 	if err != nil {
 		os.Exit(1)
 	}
-	ctrl.Finish()
 
 	os.Exit(0)
 }
@@ -118,9 +115,7 @@ func TestVMServerInterface(t *testing.T) {
 	}
 	slices.Sort(gotMethods)
 
-	if !reflect.DeepEqual(gotMethods, wantMethods) {
-		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
-	}
+	require.Equal(t, wantMethods, gotMethods)
 }
 
 func TestRuntimeSubprocessBootstrap(t *testing.T) {
@@ -175,14 +170,12 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			require := require.New(t)
 
 			ctrl := gomock.NewController(t)
-			vm := mocks.NewMockChainVM(ctrl)
-			defer ctrl.Finish()
+			vm := blockmock.NewChainVM(ctrl)
 
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)
 
-			err = os.Setenv(runtime.EngineAddressKey, listener.Addr().String())
-			require.NoError(err)
+			require.NoError(os.Setenv(runtime.EngineAddressKey, listener.Addr().String()))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

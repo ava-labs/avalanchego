@@ -1,7 +1,9 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
+
+import "fmt"
 
 // Message defines the standard format for a Warp message.
 type Message struct {
@@ -28,7 +30,7 @@ func ParseMessage(b []byte) (*Message, error) {
 	msg := &Message{
 		bytes: b,
 	}
-	_, err := c.Unmarshal(b, msg)
+	_, err := Codec.Unmarshal(b, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +40,7 @@ func ParseMessage(b []byte) (*Message, error) {
 // Initialize recalculates the result of Bytes(). It does not call Initialize()
 // on the UnsignedMessage.
 func (m *Message) Initialize() error {
-	bytes, err := c.Marshal(codecVersion, m)
+	bytes, err := Codec.Marshal(CodecVersion, m)
 	m.bytes = bytes
 	return err
 }
@@ -48,4 +50,8 @@ func (m *Message) Initialize() error {
 // Initialize.
 func (m *Message) Bytes() []byte {
 	return m.bytes
+}
+
+func (m *Message) String() string {
+	return fmt.Sprintf("WarpMessage(%s, %s)", &m.UnsignedMessage, m.Signature)
 }

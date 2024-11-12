@@ -1,18 +1,17 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package validators
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel/attribute"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var _ State = (*tracedState)(nil)
@@ -29,10 +28,10 @@ type tracedState struct {
 func Trace(s State, name string, tracer trace.Tracer) State {
 	return &tracedState{
 		s:                   s,
-		getMinimumHeightTag: fmt.Sprintf("%s.GetMinimumHeight", name),
-		getCurrentHeightTag: fmt.Sprintf("%s.GetCurrentHeight", name),
-		getSubnetIDTag:      fmt.Sprintf("%s.GetSubnetID", name),
-		getValidatorSetTag:  fmt.Sprintf("%s.GetValidatorSet", name),
+		getMinimumHeightTag: name + ".GetMinimumHeight",
+		getCurrentHeightTag: name + ".GetCurrentHeight",
+		getSubnetIDTag:      name + ".GetSubnetID",
+		getValidatorSetTag:  name + ".GetValidatorSet",
 		tracer:              tracer,
 	}
 }

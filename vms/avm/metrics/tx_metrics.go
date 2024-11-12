@@ -1,78 +1,70 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
-var _ txs.Visitor = (*txMetrics)(nil)
+const txLabel = "tx"
+
+var (
+	_ txs.Visitor = (*txMetrics)(nil)
+
+	txLabels = []string{txLabel}
+)
 
 type txMetrics struct {
-	numBaseTxs,
-	numCreateAssetTxs,
-	numOperationTxs,
-	numImportTxs,
-	numExportTxs prometheus.Counter
+	numTxs *prometheus.CounterVec
 }
 
-func newTxMetrics(
-	namespace string,
-	registerer prometheus.Registerer,
-) (*txMetrics, error) {
-	errs := wrappers.Errs{}
+func newTxMetrics(registerer prometheus.Registerer) (*txMetrics, error) {
 	m := &txMetrics{
-		numBaseTxs:        newTxMetric(namespace, "base", registerer, &errs),
-		numCreateAssetTxs: newTxMetric(namespace, "create_asset", registerer, &errs),
-		numOperationTxs:   newTxMetric(namespace, "operation", registerer, &errs),
-		numImportTxs:      newTxMetric(namespace, "import", registerer, &errs),
-		numExportTxs:      newTxMetric(namespace, "export", registerer, &errs),
+		numTxs: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "txs_accepted",
+				Help: "number of transactions accepted",
+			},
+			txLabels,
+		),
 	}
-	return m, errs.Err
-}
-
-func newTxMetric(
-	namespace string,
-	txName string,
-	registerer prometheus.Registerer,
-	errs *wrappers.Errs,
-) prometheus.Counter {
-	txMetric := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_txs_accepted", txName),
-		Help:      fmt.Sprintf("Number of %s transactions accepted", txName),
-	})
-	errs.Add(registerer.Register(txMetric))
-	return txMetric
+	return m, registerer.Register(m.numTxs)
 }
 
 func (m *txMetrics) BaseTx(*txs.BaseTx) error {
-	m.numBaseTxs.Inc()
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "base",
+	}).Inc()
 	return nil
 }
 
 func (m *txMetrics) CreateAssetTx(*txs.CreateAssetTx) error {
-	m.numCreateAssetTxs.Inc()
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "create_asset",
+	}).Inc()
 	return nil
 }
 
 func (m *txMetrics) OperationTx(*txs.OperationTx) error {
-	m.numOperationTxs.Inc()
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "operation",
+	}).Inc()
 	return nil
 }
 
 func (m *txMetrics) ImportTx(*txs.ImportTx) error {
-	m.numImportTxs.Inc()
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "import",
+	}).Inc()
 	return nil
 }
 
 func (m *txMetrics) ExportTx(*txs.ExportTx) error {
-	m.numExportTxs.Inc()
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "export",
+	}).Inc()
 	return nil
 }

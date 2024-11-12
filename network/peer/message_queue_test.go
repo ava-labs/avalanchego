@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -9,9 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -20,7 +18,7 @@ func TestMessageQueue(t *testing.T) {
 
 	expectFail := false
 	q := NewBlockingMessageQueue(
-		SendFailedFunc(func(msg message.OutboundMessage) {
+		SendFailedFunc(func(message.OutboundMessage) {
 			require.True(expectFail)
 		}),
 		logging.NoLog{},
@@ -33,13 +31,7 @@ func TestMessageQueue(t *testing.T) {
 
 	// Assert that the messages are popped in the same order they were pushed
 	for i := 0; i < numToSend; i++ {
-		testID := ids.GenerateTestID()
-		testID2 := ids.GenerateTestID()
-		m, err := mc.Pong(uint32(i),
-			[]*p2p.SubnetUptime{
-				{SubnetId: testID[:], Uptime: uint32(i)},
-				{SubnetId: testID2[:], Uptime: uint32(i)},
-			})
+		m, err := mc.Ping(uint32(i))
 		require.NoError(err)
 		msgs = append(msgs, m)
 	}

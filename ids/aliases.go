@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ids
@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	errNoIDWithAlias      = errors.New("there is no ID with alias")
+	ErrNoIDWithAlias      = errors.New("there is no ID with alias")
 	errNoAliasForID       = errors.New("there is no alias for ID")
 	errAliasAlreadyMapped = errors.New("alias already mapped to an ID")
 )
@@ -68,7 +68,7 @@ func (a *aliaser) Lookup(alias string) (ID, error) {
 	if id, ok := a.dealias[alias]; ok {
 		return id, nil
 	}
-	return ID{}, fmt.Errorf("%w: %s", errNoIDWithAlias, alias)
+	return ID{}, fmt.Errorf("%w: %s", ErrNoIDWithAlias, alias)
 }
 
 func (a *aliaser) PrimaryAlias(id ID) (string, error) {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -22,8 +22,7 @@ import (
 func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snow.DefaultContextTest()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -33,13 +32,15 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	)
 
 	// Case : signed tx is nil
-	require.ErrorIs(stx.SyntacticVerify(ctx), ErrNilSignedTx)
+	err = stx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilSignedTx)
 
 	// Case : unsigned tx is nil
-	require.ErrorIs(addValidatorTx.SyntacticVerify(ctx), ErrNilTx)
+	err = addValidatorTx.SyntacticVerify(ctx)
+	require.ErrorIs(err, ErrNilTx)
 
 	validatorWeight := uint64(2022)
-	rewardAddress := preFundedKeys[0].PublicKey().Address()
+	rewardAddress := preFundedKeys[0].Address()
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
@@ -57,7 +58,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 			},
 		},
 	}}
@@ -69,7 +70,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},
@@ -144,8 +145,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	require := require.New(t)
 	clk := mockable.Clock{}
-	ctx := snow.DefaultContextTest()
-	ctx.AVAXAssetID = ids.GenerateTestID()
+	ctx := snowtest.Context(t, snowtest.PChainID)
 	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
@@ -156,7 +156,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 
 	assetID := ids.GenerateTestID()
 	validatorWeight := uint64(2022)
-	rewardAddress := preFundedKeys[0].PublicKey().Address()
+	rewardAddress := preFundedKeys[0].Address()
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.ID{'t', 'x', 'I', 'D'},
@@ -174,7 +174,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 			},
 		},
 	}}
@@ -186,7 +186,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},

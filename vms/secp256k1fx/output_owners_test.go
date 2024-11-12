@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -67,8 +67,8 @@ func TestOutputOwnersVerify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			require.ErrorIs(tt.out.Verify(), tt.expectedErr)
-			require.ErrorIs(tt.out.VerifyState(), tt.expectedErr)
+			err := tt.out.Verify()
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
@@ -149,31 +149,19 @@ func TestOutputOwnerEquals(t *testing.T) {
 	}
 }
 
-func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
+func TestMarshalJSONDoesNotRequireCtx(t *testing.T) {
 	require := require.New(t)
 	out := &OutputOwners{
 		Threshold: 1,
+		Locktime:  2,
 		Addrs: []ids.ShortID{
 			{1},
 			{0},
 		},
 	}
 
-	_, err := out.MarshalJSON()
-	require.ErrorIs(err, ErrMarshal)
-}
-
-func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
-	require := require.New(t)
-	out := &OutputOwners{
-		Threshold: 1,
-		Locktime:  2,
-		Addrs:     []ids.ShortID{},
-	}
-
 	b, err := out.MarshalJSON()
 	require.NoError(err)
 
-	jsonData := string(b)
-	require.Equal(jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
+	require.Equal(`{"addresses":["6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt","111111111111111111116DBWJs"],"locktime":2,"threshold":1}`, string(b))
 }

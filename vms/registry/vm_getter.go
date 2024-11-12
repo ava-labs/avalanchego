@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package registry
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -40,6 +41,7 @@ type VMGetterConfig struct {
 	PluginDirectory string
 	CPUTracker      resource.ProcessTracker
 	RuntimeTracker  runtime.Tracker
+	MetricsGatherer metrics.MultiGatherer
 }
 
 type vmGetter struct {
@@ -103,6 +105,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			filepath.Join(getter.config.PluginDirectory, file.Name()),
 			getter.config.CPUTracker,
 			getter.config.RuntimeTracker,
+			getter.config.MetricsGatherer,
 		)
 	}
 	return registeredVMs, unregisteredVMs, nil

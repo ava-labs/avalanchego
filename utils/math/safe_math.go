@@ -1,49 +1,35 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package math
 
 import (
 	"errors"
-	"math"
 
 	"golang.org/x/exp/constraints"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
 	ErrOverflow  = errors.New("overflow")
 	ErrUnderflow = errors.New("underflow")
+
+	// Deprecated: Add64 is deprecated. Use Add[uint64] instead.
+	Add64 = Add[uint64]
+
+	// Deprecated: Mul64 is deprecated. Use Mul[uint64] instead.
+	Mul64 = Mul[uint64]
 )
 
-func Max[T constraints.Ordered](max T, nums ...T) T {
-	for _, num := range nums {
-		if num > max {
-			max = num
-		}
-	}
-	return max
+// MaxUint returns the maximum value of an unsigned integer of type T.
+func MaxUint[T constraints.Unsigned]() T {
+	return ^T(0)
 }
 
-func Min[T constraints.Ordered](min T, nums ...T) T {
-	for _, num := range nums {
-		if num < min {
-			min = num
-		}
-	}
-	return min
-}
-
-// Add64 returns:
+// Add returns:
 // 1) a + b
 // 2) If there is overflow, an error
-//
-// Note that we don't have a generic Add function because checking for
-// an overflow requires knowing the max size of a given type, which we
-// don't know if we're adding generic types.
-func Add64(a, b uint64) (uint64, error) {
-	if a > math.MaxUint64-b {
+func Add[T constraints.Unsigned](a, b T) (T, error) {
+	if a > MaxUint[T]()-b {
 		return 0, ErrOverflow
 	}
 	return a + b, nil
@@ -54,25 +40,21 @@ func Add64(a, b uint64) (uint64, error) {
 // 2) If there is underflow, an error
 func Sub[T constraints.Unsigned](a, b T) (T, error) {
 	if a < b {
-		return utils.Zero[T](), ErrUnderflow
+		return 0, ErrUnderflow
 	}
 	return a - b, nil
 }
 
-// Mul64 returns:
+// Mul returns:
 // 1) a * b
 // 2) If there is overflow, an error
-//
-// Note that we don't have a generic Mul function because checking for
-// an overflow requires knowing the max size of a given type, which we
-// don't know if we're adding generic types.
-func Mul64(a, b uint64) (uint64, error) {
-	if b != 0 && a > math.MaxUint64/b {
+func Mul[T constraints.Unsigned](a, b T) (T, error) {
+	if b != 0 && a > MaxUint[T]()/b {
 		return 0, ErrOverflow
 	}
 	return a * b, nil
 }
 
 func AbsDiff[T constraints.Unsigned](a, b T) T {
-	return Max(a, b) - Min(a, b)
+	return max(a, b) - min(a, b)
 }

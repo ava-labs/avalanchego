@@ -1,0 +1,25 @@
+# This action targets the project default version of setup-go. For
+# workers with old NodeJS incompabible with newer versions of
+# setup-go, try setup-go-for-project-v3.
+#
+# Since github actions do not support dynamically configuring the
+# versions in a uses statement (e.g. `actions/setup-go@${{ var }}`) it
+# is necessary to define an action per version rather than one action
+# that can be parameterized.
+#
+# Must be run after actions/checkout to ensure go.mod is available to
+# source the project's go version from.
+
+name: 'Install Go toolchain with project defaults'
+description: 'Install a go toolchain with project defaults'
+
+runs:
+  using: composite
+  steps:
+    - name: Set the project Go version in the environment
+      uses: ./.github/actions/set-go-version-in-env
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '${{ env.GO_VERSION }}'
+        check-latest: true

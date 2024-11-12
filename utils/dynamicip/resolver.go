@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"strings"
 )
 
@@ -29,7 +29,7 @@ var errUnknownResolver = errors.New("unknown resolver")
 // Resolver resolves our public IP
 type Resolver interface {
 	// Resolve and return our public IP.
-	Resolve(context.Context) (net.IP, error)
+	Resolve(context.Context) (netip.Addr, error)
 }
 
 // Returns a new Resolver that uses the given service

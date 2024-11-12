@@ -19,42 +19,43 @@ jobs:
   build-win:
     # The type of runner that the job will run on
     runs-on: windows-2019
+    permissions:
+      id-token: write
+      contents: read
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v3
-        with:
-          go-version: '~1.19.6'
-          check-latest: true
+      - uses: ./.github/actions/setup-go-for-project
 
       - run: go version
 
       - name: Install awscli
         run: |
-          msiexec.exe /passive /i /n https://awscli.amazonaws.com/AWSCLIV2.msi 
+          msiexec.exe /passive /i /n https://awscli.amazonaws.com/AWSCLIV2.msi
           aws --version
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_SA_ROLE_ARN }}
+          role-session-name: githubrolesession
           aws-region: us-east-1
 
       - name: Try to get tag from git
         if: "${{ github.event.inputs.tag == '' }}"
         id: get_tag_from_git
         run: |
-          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          echo "TAG=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Try to get tag from workflow dispatch
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       # Runs a single command using the runners shell
@@ -69,9 +70,9 @@ jobs:
 
       - name: Copy to s3
         run: aws s3 cp .\build\avalanchego-win-${{ env.TAG }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/avalanchego-win-${{ env.TAG }}-experimental.zip
-      
+
       - name: Save as Github artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build
           path: .\build\avalanchego-win-${{ env.TAG }}-experimental.zip

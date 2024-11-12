@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -8,38 +8,26 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
-var (
-	_ Factory   = (*FlatFactory)(nil)
-	_ Consensus = (*Flat)(nil)
-)
+var _ Consensus = (*Flat)(nil)
 
-// FlatFactory implements Factory by returning a flat struct
-type FlatFactory struct{}
-
-func (FlatFactory) New() Consensus {
-	return &Flat{}
+func NewFlat(factory Factory, params Parameters, choice ids.ID) Consensus {
+	return &Flat{
+		Nnary:  factory.NewNnary(params, choice),
+		params: params,
+	}
 }
 
-// Flat is a naive implementation of a multi-choice snowball instance
+// Flat is a naive implementation of a multi-choice snow instance
 type Flat struct {
-	// wraps the n-nary snowball logic
-	nnarySnowball
+	// wraps the n-nary snow logic
+	Nnary
 
-	// params contains all the configurations of a snowball instance
+	// params contains all the configurations of a snow instance
 	params Parameters
 }
 
-func (f *Flat) Initialize(params Parameters, choice ids.ID) {
-	f.nnarySnowball.Initialize(params.BetaVirtuous, params.BetaRogue, choice)
-	f.params = params
-}
-
 func (f *Flat) RecordPoll(votes bag.Bag[ids.ID]) bool {
-	if pollMode, numVotes := votes.Mode(); numVotes >= f.params.Alpha {
-		f.RecordSuccessfulPoll(pollMode)
-		return true
-	}
-
-	f.RecordUnsuccessfulPoll()
-	return false
+	pollMode, numVotes := votes.Mode()
+	f.Nnary.RecordPoll(numVotes, pollMode)
+	return numVotes >= f.params.AlphaPreference
 }

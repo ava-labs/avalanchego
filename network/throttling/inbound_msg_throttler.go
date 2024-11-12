@@ -1,11 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -54,9 +53,8 @@ type InboundMsgThrottlerConfig struct {
 // Returns a new, sybil-safe inbound message throttler.
 func NewInboundMsgThrottler(
 	log logging.Logger,
-	namespace string,
 	registerer prometheus.Registerer,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	throttlerConfig InboundMsgThrottlerConfig,
 	resourceTracker tracker.ResourceTracker,
 	cpuTargeter tracker.Targeter,
@@ -64,7 +62,6 @@ func NewInboundMsgThrottler(
 ) (InboundMsgThrottler, error) {
 	byteThrottler, err := newInboundMsgByteThrottler(
 		log,
-		namespace,
 		registerer,
 		vdrs,
 		throttlerConfig.MsgByteThrottlerConfig,
@@ -73,7 +70,6 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	bufferThrottler, err := newInboundMsgBufferThrottler(
-		namespace,
 		registerer,
 		throttlerConfig.MaxProcessingMsgsPerNode,
 	)
@@ -82,7 +78,6 @@ func NewInboundMsgThrottler(
 	}
 	bandwidthThrottler, err := newBandwidthThrottler(
 		log,
-		namespace,
 		registerer,
 		throttlerConfig.BandwidthThrottlerConfig,
 	)
@@ -90,7 +85,7 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	cpuThrottler, err := NewSystemThrottler(
-		fmt.Sprintf("%s_cpu", namespace),
+		"cpu",
 		registerer,
 		throttlerConfig.CPUThrottlerConfig,
 		resourceTracker.CPUTracker(),
@@ -100,7 +95,7 @@ func NewInboundMsgThrottler(
 		return nil, err
 	}
 	diskThrottler, err := NewSystemThrottler(
-		fmt.Sprintf("%s_disk", namespace),
+		"disk",
 		registerer,
 		throttlerConfig.DiskThrottlerConfig,
 		resourceTracker.DiskTracker(),

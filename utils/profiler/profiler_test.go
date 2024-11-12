@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package profiler
@@ -19,13 +19,11 @@ func TestProfiler(t *testing.T) {
 	p := New(dir)
 
 	// Test Start and Stop CPU Profiler
-	err := p.StartCPUProfiler()
-	require.NoError(err)
+	require.NoError(p.StartCPUProfiler())
 
-	err = p.StopCPUProfiler()
-	require.NoError(err)
+	require.NoError(p.StopCPUProfiler())
 
-	_, err = os.Stat(filepath.Join(dir, cpuProfileFile))
+	_, err := os.Stat(filepath.Join(dir, cpuProfileFile))
 	require.NoError(err)
 
 	// Test Stop CPU Profiler without it running
@@ -33,15 +31,13 @@ func TestProfiler(t *testing.T) {
 	require.ErrorIs(err, errCPUProfilerNotRunning)
 
 	// Test Memory Profiler
-	err = p.MemoryProfile()
-	require.NoError(err)
+	require.NoError(p.MemoryProfile())
 
 	_, err = os.Stat(filepath.Join(dir, memProfileFile))
 	require.NoError(err)
 
 	// Test Lock Profiler
-	err = p.LockProfile()
-	require.NoError(err)
+	require.NoError(p.LockProfile())
 
 	_, err = os.Stat(filepath.Join(dir, lockProfileFile))
 	require.NoError(err)

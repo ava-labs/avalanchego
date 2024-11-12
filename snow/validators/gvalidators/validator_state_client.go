@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -76,11 +76,12 @@ func (c *Client) GetValidatorSet(
 		}
 		var publicKey *bls.PublicKey
 		if len(validator.PublicKey) > 0 {
-			// This is a performance optimization to avoid the cost of compression
-			// and key re-verification with PublicKeyFromBytes. We can safely
-			// assume that the BLS Public Keys are verified before being added
-			// to the P-Chain and served by the gRPC server.
-			publicKey = new(bls.PublicKey).Deserialize(validator.PublicKey)
+			// This is a performance optimization to avoid the cost of
+			// compression and key re-verification with
+			// PublicKeyFromCompressedBytes. We can safely assume that the BLS
+			// Public Keys are verified before being added to the P-Chain and
+			// served by the gRPC server.
+			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
 			if publicKey == nil {
 				return nil, errFailedPublicKeyDeserialize
 			}

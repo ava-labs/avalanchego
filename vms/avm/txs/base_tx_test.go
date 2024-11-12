@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -125,13 +125,15 @@ func TestBaseTxSerialization(t *testing.T) {
 		Memo: []byte{0x00, 0x01, 0x02, 0x03},
 	}}}
 
-	parser, err := NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := NewParser(
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	require.NoError(err)
 
-	require.NoError(parser.InitializeTx(tx))
-	require.Equal(tx.ID().String(), "zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz")
+	require.NoError(tx.Initialize(parser.Codec()))
+	require.Equal("zeqT8FTnRAxes7QQQYkaWhNkHavd9d6aCdH8TQu2Mx5KEydEz", tx.ID().String())
 
 	result := tx.Bytes()
 	require.Equal(expected, result)
@@ -186,15 +188,14 @@ func TestBaseTxSerialization(t *testing.T) {
 		0xc8, 0x06, 0xd7, 0x43, 0x00,
 	}
 
-	err = tx.SignSECP256K1Fx(
+	require.NoError(tx.SignSECP256K1Fx(
 		parser.Codec(),
 		[][]*secp256k1.PrivateKey{
 			{keys[0], keys[0]},
 			{keys[0], keys[0]},
 		},
-	)
-	require.NoError(err)
-	require.Equal(tx.ID().String(), "QnTUuie2qe6BKyYrC2jqd73bJ828QNhYnZbdA2HWsnVRPjBfV")
+	))
+	require.Equal("QnTUuie2qe6BKyYrC2jqd73bJ828QNhYnZbdA2HWsnVRPjBfV", tx.ID().String())
 
 	// there are two credentials
 	expected[len(expected)-1] = 0x02
@@ -202,46 +203,6 @@ func TestBaseTxSerialization(t *testing.T) {
 
 	result = tx.Bytes()
 	require.Equal(expected, result)
-}
-
-func TestBaseTxGetters(t *testing.T) {
-	require := require.New(t)
-
-	tx := &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: assetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: 12345,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-				},
-			},
-		}},
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.GenerateTestID(),
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: assetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 54321,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{2},
-				},
-			},
-		}},
-	}}
-
-	assets := tx.AssetIDs()
-	require.Len(assets, 1)
-	require.Contains(assets, assetID)
-
-	consumedAssets := tx.ConsumedAssetIDs()
-	require.Len(consumedAssets, 1)
-	require.Contains(consumedAssets, assetID)
 }
 
 func TestBaseTxNotState(t *testing.T) {

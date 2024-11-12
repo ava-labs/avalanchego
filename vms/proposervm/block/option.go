@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -35,5 +35,9 @@ func (b *option) Bytes() []byte {
 func (b *option) initialize(bytes []byte) error {
 	b.id = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
+	return nil
+}
+
+func (*option) verify(ids.ID) error {
 	return nil
 }

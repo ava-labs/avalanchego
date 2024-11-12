@@ -1,16 +1,14 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package json
 
-import (
-	"strconv"
-)
+import "strconv"
 
 type Uint16 uint16
 
 func (u Uint16) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + strconv.FormatUint(uint64(u), 10) + "\""), nil
+	return []byte(`"` + strconv.FormatUint(uint64(u), 10) + `"`), nil
 }
 
 func (u *Uint16) UnmarshalJSON(b []byte) error {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	_ StakerTx = (*AddSubnetValidatorTx)(nil)
+	_ StakerTx        = (*AddSubnetValidatorTx)(nil)
+	_ ScheduledStaker = (*AddSubnetValidatorTx)(nil)
 
 	errAddPrimaryNetworkValidator = errors.New("can't add primary network validator with AddSubnetValidatorTx")
 )

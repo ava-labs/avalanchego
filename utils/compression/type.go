@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -14,7 +14,6 @@ type Type byte
 
 const (
 	TypeNone Type = iota + 1
-	TypeGzip
 	TypeZstd
 )
 
@@ -22,8 +21,6 @@ func (t Type) String() string {
 	switch t {
 	case TypeNone:
 		return "none"
-	case TypeGzip:
-		return "gzip"
 	case TypeZstd:
 		return "zstd"
 	default:
@@ -35,8 +32,6 @@ func TypeFromString(s string) (Type, error) {
 	switch s {
 	case TypeNone.String():
 		return TypeNone, nil
-	case TypeGzip.String():
-		return TypeGzip, nil
 	case TypeZstd.String():
 		return TypeZstd, nil
 	default:

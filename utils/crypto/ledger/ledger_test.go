@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ledger
@@ -17,8 +17,6 @@ const (
 	chainAlias = "P"
 	hrp        = "fuji"
 )
-
-var factory secp256k1.Factory
 
 // TestLedger will be skipped if a ledger is not connected.
 func TestLedger(t *testing.T) {
@@ -66,7 +64,7 @@ func TestLedger(t *testing.T) {
 	for i, addrIndex := range indices {
 		sig := sigs[i]
 
-		pk, err := factory.RecoverHashPublicKey(rawHash, sig)
+		pk, err := secp256k1.RecoverPublicKeyFromHash(rawHash, sig)
 		require.NoError(err)
 		require.Equal(addresses[addrIndex], pk.Address())
 	}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -15,12 +15,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 const (
@@ -29,6 +33,8 @@ const (
 
 	AvalancheGoDataDirVar    = "AVALANCHEGO_DATA_DIR"
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
+
+	DefaultProcessContextFilename = "process.json"
 )
 
 var (
@@ -49,6 +55,7 @@ var (
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
+	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, DefaultProcessContextFilename)
 )
 
 func deprecateFlags(fs *pflag.FlagSet) error {
@@ -63,6 +70,7 @@ func deprecateFlags(fs *pflag.FlagSet) error {
 func addProcessFlags(fs *pflag.FlagSet) {
 	// If true, print the version and quit.
 	fs.Bool(VersionKey, false, "If true, print version and quit")
+	fs.Bool(VersionJSONKey, false, "If true, print version in JSON format and quit")
 }
 
 func addNodeFlags(fs *pflag.FlagSet) {
@@ -80,26 +88,52 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(ConfigContentTypeKey, "json", "Specifies the format of the base64 encoded config content. Available values: 'json', 'yaml', 'toml'")
 
 	// Genesis
-	fs.String(GenesisConfigFileKey, "", fmt.Sprintf("Specifies a genesis config file (ignored when running standard networks or if %s is specified)",
-		GenesisConfigContentKey))
-	fs.String(GenesisConfigContentKey, "", "Specifies base64 encoded genesis content")
+	fs.String(GenesisFileKey, "", fmt.Sprintf("Specifies a genesis config file path. Ignored when running standard networks or if %s is specified",
+		GenesisFileContentKey))
+	fs.String(GenesisFileContentKey, "", "Specifies base64 encoded genesis content")
+
+	// Upgrade
+	fs.String(UpgradeFileKey, "", fmt.Sprintf("Specifies an upgrade config file path. Ignored when running standard networks or if %s is specified",
+		UpgradeFileContentKey))
+	fs.String(UpgradeFileContentKey, "", "Specifies base64 encoded upgrade content")
 
 	// Network ID
 	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
 
-	// AVAX fees
-	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
+	// ACP flagging
+	fs.IntSlice(ACPSupportKey, nil, "ACPs to support adoption")
+	fs.IntSlice(ACPObjectKey, nil, "ACPs to object adoption")
+
+	// AVAX fees:
+	// Validator fees:
+	fs.Uint64(ValidatorFeesCapacityKey, uint64(genesis.LocalParams.ValidatorFeeConfig.Capacity), "Maximum number of validators")
+	fs.Uint64(ValidatorFeesTargetKey, uint64(genesis.LocalParams.ValidatorFeeConfig.Target), "Target number of validators")
+	fs.Uint64(ValidatorFeesMinPriceKey, uint64(genesis.LocalParams.ValidatorFeeConfig.MinPrice), "Minimum validator price in nAVAX per second")
+	fs.Uint64(ValidatorFeesExcessConversionConstantKey, uint64(genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant), "Constant to convert validator excess price")
+	// Dynamic fees:
+	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
+	fs.Uint64(DynamicFeesDBReadWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.DBRead], "Complexity multiplier used to convert DB Reads into Gas")
+	fs.Uint64(DynamicFeesDBWriteWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.DBWrite], "Complexity multiplier used to convert DB Writes into Gas")
+	fs.Uint64(DynamicFeesComputeWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Compute], "Complexity multiplier used to convert Compute into Gas")
+	fs.Uint64(DynamicFeesMaxGasCapacityKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxCapacity), "Maximum amount of Gas the chain is allowed to store for future use")
+	fs.Uint64(DynamicFeesMaxGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxPerSecond), "Rate at which Gas is stored for future use")
+	fs.Uint64(DynamicFeesTargetGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.TargetPerSecond), "Target rate of Gas usage")
+	fs.Uint64(DynamicFeesMinGasPriceKey, uint64(genesis.LocalParams.DynamicFeeConfig.MinPrice), "Minimum Gas price")
+	fs.Uint64(DynamicFeesExcessConversionConstantKey, uint64(genesis.LocalParams.DynamicFeeConfig.ExcessConversionConstant), "Constant to convert excess Gas to the Gas price")
+	// Static fees:
+	fs.Uint64(TxFeeKey, genesis.LocalParams.StaticFeeConfig.TxFee, "Transaction fee, in nAVAX")
 	fs.Uint64(CreateAssetTxFeeKey, genesis.LocalParams.CreateAssetTxFee, "Transaction fee, in nAVAX, for transactions that create new assets")
-	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
-	fs.Uint64(TransformSubnetTxFeeKey, genesis.LocalParams.TransformSubnetTxFee, "Transaction fee, in nAVAX, for transactions that transform subnets")
-	fs.Uint64(CreateBlockchainTxFeeKey, genesis.LocalParams.CreateBlockchainTxFee, "Transaction fee, in nAVAX, for transactions that create new blockchains")
-	fs.Uint64(AddPrimaryNetworkValidatorFeeKey, genesis.LocalParams.AddPrimaryNetworkValidatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network validators")
-	fs.Uint64(AddPrimaryNetworkDelegatorFeeKey, genesis.LocalParams.AddPrimaryNetworkDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network delegators")
-	fs.Uint64(AddSubnetValidatorFeeKey, genesis.LocalParams.AddSubnetValidatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet validators")
-	fs.Uint64(AddSubnetDelegatorFeeKey, genesis.LocalParams.AddSubnetDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet delegators")
+	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
+	fs.Uint64(TransformSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.TransformSubnetTxFee, "Transaction fee, in nAVAX, for transactions that transform subnets")
+	fs.Uint64(CreateBlockchainTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateBlockchainTxFee, "Transaction fee, in nAVAX, for transactions that create new blockchains")
+	fs.Uint64(AddPrimaryNetworkValidatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddPrimaryNetworkValidatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network validators")
+	fs.Uint64(AddPrimaryNetworkDelegatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddPrimaryNetworkDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network delegators")
+	fs.Uint64(AddSubnetValidatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddSubnetValidatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet validators")
+	fs.Uint64(AddSubnetDelegatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddSubnetDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet delegators")
 
 	// Database
-	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s}", leveldb.Name, memdb.Name))
+	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Must be one of {%s, %s, %s}", leveldb.Name, memdb.Name, pebbledb.Name))
+	fs.Bool(DBReadOnlyKey, false, "If true, database writes are to memory and never persisted. May still initialize database directory/files on disk if they don't exist")
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 	fs.String(DBConfigFileKey, "", fmt.Sprintf("Path to database config file. Ignored if %s is specified", DBConfigContentKey))
 	fs.String(DBConfigContentKey, "", "Specifies base64 encoded database config content")
@@ -116,31 +150,21 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(LogDisableDisplayPluginLogsKey, false, "Disables displaying plugin logs in stdout.")
 
 	// Peer List Gossip
-	gossipHelpMsg := fmt.Sprintf(
-		"Gossip [%s] validator IPs to [%s] validators, [%s] non-validators, and [%s] validating or non-validating peers every [%s]",
-		NetworkPeerListNumValidatorIPsKey,
-		NetworkPeerListValidatorGossipSizeKey,
-		NetworkPeerListNonValidatorGossipSizeKey,
-		NetworkPeerListPeersGossipSizeKey,
-		NetworkPeerListGossipFreqKey,
-	)
-	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, gossipHelpMsg)
-	fs.Uint(NetworkPeerListValidatorGossipSizeKey, constants.DefaultNetworkPeerListValidatorGossipSize, gossipHelpMsg)
-	fs.Uint(NetworkPeerListNonValidatorGossipSizeKey, constants.DefaultNetworkPeerListNonValidatorGossipSize, gossipHelpMsg)
-	fs.Uint(NetworkPeerListPeersGossipSizeKey, constants.DefaultNetworkPeerListPeersGossipSize, gossipHelpMsg)
-	fs.Duration(NetworkPeerListGossipFreqKey, constants.DefaultNetworkPeerListGossipFreq, gossipHelpMsg)
+	fs.Uint(NetworkPeerListNumValidatorIPsKey, constants.DefaultNetworkPeerListNumValidatorIPs, "Number of validator IPs to gossip to other nodes")
+	fs.Duration(NetworkPeerListPullGossipFreqKey, constants.DefaultNetworkPeerListPullGossipFreq, "Frequency to request peers from other nodes")
+	fs.Duration(NetworkPeerListBloomResetFreqKey, constants.DefaultNetworkPeerListBloomResetFreq, "Frequency to recalculate the bloom filter used to request new peers from other nodes")
 
 	// Public IP Resolution
-	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT")
+	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication")
 	fs.Duration(PublicIPResolutionFreqKey, 5*time.Minute, "Frequency at which this node resolves/updates its public IP and renew NAT mappings, if applicable")
-	fs.String(PublicIPResolutionServiceKey, "", fmt.Sprintf("Only acceptable values are 'ifconfigco', 'opendns' or 'ifconfigme'. When provided, the node will use that service to periodically resolve/update its public IP. Ignored if %s is set", PublicIPKey))
+	fs.String(PublicIPResolutionServiceKey, "", fmt.Sprintf("Only acceptable values are %q, %q or %q. When provided, the node will use that service to periodically resolve/update its public IP", dynamicip.OpenDNSName, dynamicip.IFConfigCoName, dynamicip.IFConfigMeName))
 
 	// Inbound Connection Throttling
-	fs.Duration(InboundConnUpgradeThrottlerCooldownKey, constants.DefaultInboundConnUpgradeThrottlerCooldown, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
-	fs.Float64(InboundThrottlerMaxConnsPerSecKey, constants.DefaultInboundThrottlerMaxConnsPerSec, "Max number of inbound connections to accept (from all peers) per second")
+	fs.Duration(NetworkInboundConnUpgradeThrottlerCooldownKey, constants.DefaultInboundConnUpgradeThrottlerCooldown, "Upgrade an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connection upgrades")
+	fs.Float64(NetworkInboundThrottlerMaxConnsPerSecKey, constants.DefaultInboundThrottlerMaxConnsPerSec, "Max number of inbound connections to accept (from all peers) per second")
 	// Outbound Connection Throttling
-	fs.Uint(OutboundConnectionThrottlingRpsKey, constants.DefaultOutboundConnectionThrottlingRps, "Make at most this number of outgoing peer connection attempts per second")
-	fs.Duration(OutboundConnectionTimeoutKey, constants.DefaultOutboundConnectionTimeout, "Timeout when dialing a peer")
+	fs.Uint(NetworkOutboundConnectionThrottlingRpsKey, constants.DefaultOutboundConnectionThrottlingRps, "Make at most this number of outgoing peer connection attempts per second")
+	fs.Duration(NetworkOutboundConnectionTimeoutKey, constants.DefaultOutboundConnectionTimeout, "Timeout when dialing a peer")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, constants.DefaultNetworkInitialTimeout, "Initial timeout value of the adaptive timeout manager")
 	fs.Duration(NetworkMinimumTimeoutKey, constants.DefaultNetworkMinimumTimeout, "Minimum timeout value of the adaptive timeout manager")
@@ -152,11 +176,13 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(NetworkPingTimeoutKey, constants.DefaultPingPongTimeout, "Timeout value for Ping-Pong with a peer")
 	fs.Duration(NetworkPingFrequencyKey, constants.DefaultPingFrequency, "Frequency of pinging other peers")
 
-	fs.Bool(NetworkCompressionEnabledKey, constants.DefaultNetworkCompressionEnabled, "If true, compress certain outbound messages. This node will be able to parse compressed inbound messages regardless of this flag's value")
-	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s, %s]", compression.TypeGzip, compression.TypeZstd, compression.TypeNone))
+	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s]", compression.TypeZstd, compression.TypeNone))
 
 	fs.Duration(NetworkMaxClockDifferenceKey, constants.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
-	fs.Bool(NetworkAllowPrivateIPsKey, constants.DefaultNetworkAllowPrivateIPs, "Allows the node to initiate outbound connection attempts to peers with private IPs")
+	// Note: The default value is set to false here because the default
+	// networkID is mainnet. The real default value of NetworkAllowPrivateIPs is
+	// based on the networkID.
+	fs.Bool(NetworkAllowPrivateIPsKey, false, fmt.Sprintf("Allows the node to initiate outbound connection attempts to peers with private IPs. If the provided --%s is one of [%s, %s] the default is false. Oterhwise, the default is true", NetworkNameKey, constants.MainnetName, constants.FujiName))
 	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
 	fs.Uint(NetworkPeerReadBufferSizeKey, constants.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, constants.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
@@ -177,18 +203,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(BenchlistMinFailingDurationKey, constants.DefaultBenchlistMinFailingDuration, "Minimum amount of time messages to a peer must be failing before the peer is benched")
 
 	// Router
-	fs.Duration(ConsensusGossipFrequencyKey, constants.DefaultConsensusGossipFrequency, "Frequency of gossiping accepted frontiers")
 	fs.Uint(ConsensusAppConcurrencyKey, constants.DefaultConsensusAppConcurrency, "Maximum number of goroutines to use when handling App messages on a chain")
 	fs.Duration(ConsensusShutdownTimeoutKey, constants.DefaultConsensusShutdownTimeout, "Timeout before killing an unresponsive chain")
-	fs.Uint(ConsensusGossipAcceptedFrontierValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierValidatorSize, "Number of validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierNonValidatorSizeKey, constants.DefaultConsensusGossipAcceptedFrontierNonValidatorSize, "Number of non-validators to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipAcceptedFrontierPeerSizeKey, constants.DefaultConsensusGossipAcceptedFrontierPeerSize, "Number of peers to gossip to when gossiping accepted frontier")
-	fs.Uint(ConsensusGossipOnAcceptValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptValidatorSize, "Number of validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptNonValidatorSizeKey, constants.DefaultConsensusGossipOnAcceptNonValidatorSize, "Number of non-validators to gossip to each accepted container to")
-	fs.Uint(ConsensusGossipOnAcceptPeerSizeKey, constants.DefaultConsensusGossipOnAcceptPeerSize, "Number of peers to gossip to each accepted container to")
-	fs.Uint(AppGossipValidatorSizeKey, constants.DefaultAppGossipValidatorSize, "Number of validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipNonValidatorSizeKey, constants.DefaultAppGossipNonValidatorSize, "Number of non-validators to gossip an AppGossip message to")
-	fs.Uint(AppGossipPeerSizeKey, constants.DefaultAppGossipPeerSize, "Number of peers (which may be validators or non-validators) to gossip an AppGossip message to")
+	fs.Duration(ConsensusFrontierPollFrequencyKey, constants.DefaultFrontierPollFrequency, "Frequency of polling for new consensus frontiers")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, constants.DefaultInboundThrottlerAtLargeAllocSize, "Size, in bytes, of at-large byte allocation in inbound message throttler")
@@ -206,25 +223,21 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, constants.DefaultOutboundThrottlerNodeMaxAtLargeBytes, "Max number of bytes a node can take from the outbound message throttler's at-large allocation. Must be at least the max message size")
 
 	// HTTP APIs
-	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
-	fs.Uint(HTTPPortKey, DefaultHTTPPort, "Port of the HTTP server")
+	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server. If the address is empty or a literal unspecified IP address, the server will bind on all available unicast and anycast IP addresses of the local system")
+	fs.Uint(HTTPPortKey, DefaultHTTPPort, "Port of the HTTP server. If the port is 0 a port number is automatically chosen")
 	fs.Bool(HTTPSEnabledKey, false, "Upgrade the HTTP server to HTTPs")
 	fs.String(HTTPSKeyFileKey, "", fmt.Sprintf("TLS private key file for the HTTPs server. Ignored if %s is specified", HTTPSKeyContentKey))
 	fs.String(HTTPSKeyContentKey, "", "Specifies base64 encoded TLS private key for the HTTPs server")
 	fs.String(HTTPSCertFileKey, "", fmt.Sprintf("TLS certificate file for the HTTPs server. Ignored if %s is specified", HTTPSCertContentKey))
 	fs.String(HTTPSCertContentKey, "", "Specifies base64 encoded TLS certificate for the HTTPs server")
 	fs.String(HTTPAllowedOrigins, "*", "Origins to allow on the HTTP port. Defaults to * which allows all origins. Example: https://*.avax.network https://*.avax-test.network")
+	fs.StringSlice(HTTPAllowedHostsKey, []string{"localhost"}, "List of acceptable host names in API requests. Provide the wildcard ('*') to accept requests from all hosts. API requests where the Host field is empty or an IP address will always be accepted. An API call whose HTTP Host field isn't acceptable will receive a 403 error code")
 	fs.Duration(HTTPShutdownWaitKey, 0, "Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown. The /health endpoint will return unhealthy during this duration")
 	fs.Duration(HTTPShutdownTimeoutKey, 10*time.Second, "Maximum duration to wait for existing connections to complete during node shutdown")
 	fs.Duration(HTTPReadTimeoutKey, 30*time.Second, "Maximum duration for reading the entire request, including the body. A zero or negative value means there will be no timeout")
 	fs.Duration(HTTPReadHeaderTimeoutKey, 30*time.Second, fmt.Sprintf("Maximum duration to read request headers. The connection's read deadline is reset after reading the headers. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPReadHeaderTimeoutKey, HTTPReadTimeoutKey))
 	fs.Duration(HTTPWriteTimeoutKey, 30*time.Second, "Maximum duration before timing out writes of the response. It is reset whenever a new request's header is read. A zero or negative value means there will be no timeout.")
 	fs.Duration(HTTPIdleTimeoutKey, 120*time.Second, fmt.Sprintf("Maximum duration to wait for the next request when keep-alives are enabled. If %s is zero, the value of %s is used. If both are zero, there is no timeout.", HTTPIdleTimeoutKey, HTTPReadTimeoutKey))
-	fs.Bool(APIAuthRequiredKey, false, "Require authorization token to call HTTP APIs")
-	fs.String(APIAuthPasswordFileKey, "",
-		fmt.Sprintf("Password file used to initially create/validate API authorization tokens. Ignored if %s is specified. Leading and trailing whitespace is removed from the password. Can be changed via API call",
-			APIAuthPasswordKey))
-	fs.String(APIAuthPasswordKey, "", "Specifies password for API authorization tokens")
 
 	// Enable/Disable APIs
 	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
@@ -232,7 +245,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
-	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
 
 	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
@@ -249,8 +261,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(NetworkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
-	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")
-	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required")
+	fs.String(StakingHostKey, "", "Address of the consensus server. If the address is empty or a literal unspecified IP address, the server will bind on all available unicast and anycast IP addresses of the local system") // Bind to all interfaces by default.
+	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server. If the port is 0 a port number is automatically chosen")
 	fs.Bool(StakingEphemeralCertEnabledKey, false, "If true, the node uses an ephemeral staking TLS key and certificate, and has an ephemeral node ID")
 	fs.String(StakingTLSKeyPathKey, defaultStakingTLSKeyPath, fmt.Sprintf("Path to the TLS private key for staking. Ignored if %s is specified", StakingTLSKeyContentKey))
 	fs.String(StakingTLSKeyContentKey, "", "Specifies base64 encoded TLS private key for staking")
@@ -259,8 +271,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(StakingEphemeralSignerEnabledKey, false, "If true, the node uses an ephemeral staking signer key")
 	fs.String(StakingSignerKeyPathKey, defaultStakingSignerKeyPath, fmt.Sprintf("Path to the signer private key for staking. Ignored if %s is specified", StakingSignerKeyContentKey))
 	fs.String(StakingSignerKeyContentKey, "", "Specifies base64 encoded signer private key for staking")
-
-	fs.Uint64(StakingDisabledWeightKey, 100, "Weight to provide to each peer when staking is disabled")
+	fs.Bool(SybilProtectionEnabledKey, true, "Enables sybil protection. If enabled, Network TLS is required")
+	fs.Uint64(SybilProtectionDisabledWeightKey, 100, "Weight to provide to each peer when sybil protection is disabled")
+	fs.Bool(PartialSyncPrimaryNetworkKey, false, "Only sync the P-chain on the Primary Network. If the node is a Primary Network validator, it will report unhealthy")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network
@@ -287,28 +300,26 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(StateSyncIDsKey, "", "Comma separated list of state sync peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 
 	// Bootstrapping
+	// TODO: combine "BootstrapIPsKey" and "BootstrapIDsKey" into one flag
 	fs.String(BootstrapIPsKey, "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
 	fs.String(BootstrapIDsKey, "", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
-	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
-	fs.Int(RetryBootstrapWarnFrequencyKey, 50, "Specifies how many times bootstrap should be retried before warning the operator")
 	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout before emitting a warn log when connecting to bootstrapping beacons")
 	fs.Duration(BootstrapMaxTimeGetAncestorsKey, 50*time.Millisecond, "Max Time to spend fetching a container and its ancestors when responding to a GetAncestors")
 	fs.Uint(BootstrapAncestorsMaxContainersSentKey, 2000, "Max number of containers in an Ancestors message sent by this node")
 	fs.Uint(BootstrapAncestorsMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Ancestors message")
 
 	// Consensus
-	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
-	fs.Int(SnowQuorumSizeKey, 15, "Alpha value to use for required number positive results")
-	// TODO: Replace this temporary flag description after the X-chain
-	// linearization with "Beta value to use for virtuous transactions"
-	fs.Int(SnowVirtuousCommitThresholdKey, 15, "This flag is temporarily ignored due to the X-chain linearization")
-	fs.Int(SnowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
-	fs.Int(SnowConcurrentRepollsKey, 4, "Minimum number of concurrent polls for finalizing consensus")
-	fs.Int(SnowOptimalProcessingKey, 10, "Optimal number of processing containers in consensus")
-	fs.Int(SnowMaxProcessingKey, 256, "Maximum number of processing items to be considered healthy")
-	fs.Duration(SnowMaxTimeProcessingKey, 30*time.Second, "Maximum amount of time an item should be processing and still be healthy")
-	fs.Uint(SnowMixedQueryNumPushVdrKey, 10, fmt.Sprintf("If this node is a validator, when a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushVdrKey))
-	fs.Uint(SnowMixedQueryNumPushNonVdrKey, 0, fmt.Sprintf("If this node is not a validator, when a container is inserted into consensus, send a Push Query to %s validators and a Pull Query to the others. Must be <= k.", SnowMixedQueryNumPushNonVdrKey))
+	fs.Int(SnowSampleSizeKey, snowball.DefaultParameters.K, "Number of nodes to query for each network poll")
+	fs.Int(SnowQuorumSizeKey, snowball.DefaultParameters.AlphaConfidence, "Threshold of nodes required to update this node's preference and increase its confidence in a network poll")
+	fs.Int(SnowPreferenceQuorumSizeKey, snowball.DefaultParameters.AlphaPreference, fmt.Sprintf("Threshold of nodes required to update this node's preference in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))
+	fs.Int(SnowConfidenceQuorumSizeKey, snowball.DefaultParameters.AlphaConfidence, fmt.Sprintf("Threshold of nodes required to increase this node's confidence in a network poll. Ignored if %s is provided", SnowQuorumSizeKey))
+
+	fs.Int(SnowCommitThresholdKey, snowball.DefaultParameters.Beta, "Beta value to use for consensus")
+
+	fs.Int(SnowConcurrentRepollsKey, snowball.DefaultParameters.ConcurrentRepolls, "Minimum number of concurrent polls for finalizing consensus")
+	fs.Int(SnowOptimalProcessingKey, snowball.DefaultParameters.OptimalProcessing, "Optimal number of processing containers in consensus")
+	fs.Int(SnowMaxProcessingKey, snowball.DefaultParameters.MaxOutstandingItems, "Maximum number of processing items to be considered healthy")
+	fs.Duration(SnowMaxTimeProcessingKey, snowball.DefaultParameters.MaxItemProcessingTime, "Maximum amount of time an item should be processing and still be healthy")
 
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")
@@ -316,10 +327,6 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, true, "Enable Meter VMs to track VM performance with more granularity")
 	fs.Duration(UptimeMetricFreqKey, 30*time.Second, "Frequency of renewing this node's average uptime metric")
-
-	// IPC
-	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
-	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
@@ -374,7 +381,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(TracingEndpointKey, "localhost:4317", "The endpoint to send trace data to")
 	fs.Bool(TracingInsecureKey, true, "If true, don't use TLS when sending trace data")
 	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
-	// TODO add flag to take in headers to send from exporter
+	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")
+
+	fs.String(ProcessContextFileKey, defaultProcessContextPath, "The path to write process context to (including PID, API URI, and staking address).")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

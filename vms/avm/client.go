@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,7 +20,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var _ Client = (*client)(nil)
+var (
+	_ Client = (*client)(nil)
+
+	ErrRejected = errors.New("rejected")
+)
 
 // Client for interacting with an AVM (X-Chain) instance
 type Client interface {
@@ -35,12 +40,6 @@ type Client interface {
 	// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
 	// used instead to determine if the tx was accepted.
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error)
-	// ConfirmTx attempts to confirm [txID] by repeatedly checking its status.
-	// Note: ConfirmTx will block until either the context is done or the client
-	//       returns a decided status.
-	// TODO: Move this function off of the Client interface into a utility
-	// function.
-	ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error)
 	// GetTx returns the byte representation of [txID]
 	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
@@ -243,7 +242,6 @@ func (c *client) GetBlock(ctx context.Context, blkID ids.ID, options ...rpc.Opti
 	if err != nil {
 		return nil, err
 	}
-
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
@@ -256,7 +254,6 @@ func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ..
 	if err != nil {
 		return nil, err
 	}
-
 	return formatting.Decode(res.Encoding, res.Block)
 }
 
@@ -269,7 +266,7 @@ func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, 
 func (c *client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Option) (ids.ID, error) {
 	txStr, err := formatting.Encode(formatting.Hex, txBytes)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	res := &api.JSONTxID{}
 	err = c.requester.SendRequest(ctx, "avm.issueTx", &api.FormattedTx{
@@ -287,26 +284,6 @@ func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 	return res.Status, err
 }
 
-func (c *client) ConfirmTx(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) (choices.Status, error) {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-
-	for {
-		status, err := c.GetTxStatus(ctx, txID, options...)
-		if err == nil {
-			if status.Decided() {
-				return status, nil
-			}
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return status, ctx.Err()
-		}
-	}
-}
-
 func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest(ctx, "avm.getTx", &api.GetTxArgs{
@@ -316,12 +293,7 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 	if err != nil {
 		return nil, err
 	}
-
-	txBytes, err := formatting.Decode(res.Encoding, res.Tx)
-	if err != nil {
-		return nil, err
-	}
-	return txBytes, nil
+	return formatting.Decode(res.Encoding, res.Tx)
 }
 
 func (c *client) GetUTXOs(
@@ -721,7 +693,7 @@ func (c *client) MintNFT(
 ) (ids.ID, error) {
 	payloadStr, err := formatting.Encode(formatting.Hex, payload)
 	if err != nil {
-		return ids.ID{}, err
+		return ids.Empty, err
 	}
 	res := &api.JSONTxID{}
 	err = c.requester.SendRequest(ctx, "avm.mintNFT", &MintNFTArgs{
@@ -772,4 +744,35 @@ func (c *client) Export(
 		AssetID:     assetID,
 	}, res, options...)
 	return res.TxID, err
+}
+
+func AwaitTxAccepted(
+	c Client,
+	ctx context.Context,
+	txID ids.ID,
+	freq time.Duration,
+	options ...rpc.Option,
+) error {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		status, err := c.GetTxStatus(ctx, txID, options...)
+		if err != nil {
+			return err
+		}
+
+		switch status {
+		case choices.Accepted:
+			return nil
+		case choices.Rejected:
+			return ErrRejected
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

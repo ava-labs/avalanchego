@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package vertex
@@ -19,6 +19,8 @@ func TestParseInvalid(t *testing.T) {
 }
 
 func TestParseValid(t *testing.T) {
+	require := require.New(t)
+
 	chainID := ids.ID{1}
 	height := uint64(2)
 	parentIDs := []ids.ID{{4}, {5}}
@@ -29,10 +31,10 @@ func TestParseValid(t *testing.T) {
 		parentIDs,
 		txs,
 	)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	vtxBytes := vtx.Bytes()
 	parsedVtx, err := Parse(vtxBytes)
-	require.NoError(t, err)
-	require.Equal(t, vtx, parsedVtx)
+	require.NoError(err)
+	require.Equal(vtx, parsedVtx)
 }

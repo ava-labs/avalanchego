@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cache
@@ -18,6 +18,12 @@ type Cacher[K comparable, V any] interface {
 
 	// Flush removes all entries from the cache
 	Flush()
+
+	// Returns the number of elements currently in the cache
+	Len() int
+
+	// Returns fraction of cache currently filled (0 --> 1)
+	PortionFilled() float64
 }
 
 // Evictable allows the object to be notified when it is evicted

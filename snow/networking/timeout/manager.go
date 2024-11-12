@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timeout
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -62,32 +63,42 @@ type Manager interface {
 	// Mark that we no longer expect a response to this request we sent.
 	// Does not modify the timeout.
 	RemoveRequest(requestID ids.RequestID)
+
+	// Stops the manager.
+	Stop()
 }
 
 func NewManager(
 	timeoutConfig *timer.AdaptiveTimeoutConfig,
 	benchlistMgr benchlist.Manager,
-	metricsNamespace string,
-	metricsRegister prometheus.Registerer,
+	requestReg prometheus.Registerer,
+	responseReg prometheus.Registerer,
 ) (Manager, error) {
 	tm, err := timer.NewAdaptiveTimeoutManager(
 		timeoutConfig,
-		metricsNamespace,
-		metricsRegister,
+		requestReg,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create timeout manager: %w", err)
 	}
+
+	m, err := newTimeoutMetrics(responseReg)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create timeout metrics: %w", err)
+	}
+
 	return &manager{
-		benchlistMgr: benchlistMgr,
 		tm:           tm,
+		benchlistMgr: benchlistMgr,
+		metrics:      m,
 	}, nil
 }
 
 type manager struct {
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
-	metrics      metrics
+	metrics      *timeoutMetrics
+	stopOnce     sync.Once
 }
 
 func (m *manager) Dispatch() {
@@ -125,8 +136,11 @@ func (m *manager) RegisterRequest(
 	timeoutHandler func(),
 ) {
 	newTimeoutHandler := func() {
-		// If this request timed out, tell the benchlist manager
-		m.benchlistMgr.RegisterFailure(chainID, nodeID)
+		if requestID.Op != byte(message.AppResponseOp) {
+			// If the request timed out and wasn't an AppRequest, tell the
+			// benchlist manager.
+			m.benchlistMgr.RegisterFailure(chainID, nodeID)
+		}
 		timeoutHandler()
 	}
 	m.tm.Put(requestID, measureLatency, newTimeoutHandler)
@@ -141,7 +155,7 @@ func (m *manager) RegisterResponse(
 	op message.Op,
 	latency time.Duration,
 ) {
-	m.metrics.Observe(nodeID, chainID, op, latency)
+	m.metrics.Observe(chainID, op, latency)
 	m.benchlistMgr.RegisterResponse(chainID, nodeID)
 	m.tm.Remove(requestID)
 }
@@ -152,4 +166,8 @@ func (m *manager) RemoveRequest(requestID ids.RequestID) {
 
 func (m *manager) RegisterRequestToUnreachableValidator() {
 	m.tm.ObserveLatency(m.TimeoutDuration())
+}
+
+func (m *manager) Stop() {
+	m.stopOnce.Do(m.tm.Stop)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -14,7 +14,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -22,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
 )
+
+const chainConfigFilenameExtention = ".ex"
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
@@ -73,11 +74,11 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainConfigFileName+".ex", value)
+				setupFile(t, chainDir, chainConfigFileName+chainConfigFilenameExtention, value)
 			}
 			for key, value := range test.upgrades {
 				chainDir := filepath.Join(chainsDir, key)
-				setupFile(t, chainDir, chainUpgradeFileName+".ex", value)
+				setupFile(t, chainDir, chainUpgradeFileName+chainConfigFilenameExtention, value)
 			}
 
 			v := setupViper(configFile)
@@ -162,7 +163,7 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	require.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
 	chainsDir := filepath.Join(defaultChainConfigDir, "C")
-	setupFile(t, chainsDir, chainConfigFileName+".ex", "helloworld")
+	setupFile(t, chainsDir, chainConfigFileName+chainConfigFilenameExtention, "helloworld")
 	chainConfigs, err := getChainConfigs(v)
 	require.NoError(err)
 	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
@@ -399,7 +400,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"invalid consensus parameters": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,
+			givenJSON: `{"consensusParameters":{"k": 111, "alphaPreference":1234} }`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
@@ -407,30 +408,16 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alpha":16} }`,
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alphaConfidence":16} }`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
-				require.Equal(true, config.ValidatorOnly)
-				require.Equal(16, config.ConsensusParameters.Alpha)
+				require.True(config.ValidatorOnly)
+				require.Equal(16, config.ConsensusParameters.AlphaConfidence)
 				// must still respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
-			},
-			expectedErr: nil,
-		},
-		"gossip config": {
-			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"appGossipNonValidatorSize": 100 }`,
-			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-				config, ok := given[id]
-				require.True(ok)
-				require.Equal(uint(100), config.GossipConfig.AppGossipNonValidatorSize)
-				// must still respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
-				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 			},
 			expectedErr: nil,
 		},
@@ -451,9 +438,10 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			v := setupViper(configFilePath)
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
 			require.ErrorIs(err, test.expectedErr)
-			if test.expectedErr == nil {
-				test.testF(require, subnetConfigs)
+			if test.expectedErr != nil {
+				return
 			}
+			test.testF(require, subnetConfigs)
 		})
 	}
 }
@@ -477,7 +465,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.True(len(given) == 1)
+				require.Len(given, 1)
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
@@ -498,7 +486,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusParameters": {
 						"k": 111,
-						"alpha": 1234
+						"alphaPreference": 1234
 					}
 				}
 			}`,
@@ -512,7 +500,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusParameters": {
 						"k": 30,
-						"alpha": 20
+						"alphaPreference": 16,
+						"alphaConfidence": 20
 					},
 					"validatorOnly": true
 				}
@@ -521,11 +510,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
-				require.Equal(true, config.ValidatorOnly)
-				require.Equal(20, config.ConsensusParameters.Alpha)
+				require.True(config.ValidatorOnly)
+				require.Equal(16, config.ConsensusParameters.AlphaPreference)
+				require.Equal(20, config.ConsensusParameters.AlphaConfidence)
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
-				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			expectedErr: nil,
@@ -544,19 +533,12 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
 			require.ErrorIs(err, test.expectedErr)
-			if test.expectedErr == nil {
-				test.testF(require, subnetConfigs)
+			if test.expectedErr != nil {
+				return
 			}
+			test.testF(require, subnetConfigs)
 		})
 	}
-}
-
-func TestCalcMinConnectedStake(t *testing.T) {
-	v := setupViperFlags()
-	defaultParams := getConsensusConfig(v)
-	defaultExpectedMinStake := 0.8
-	minStake := calcMinConnectedStake(defaultParams)
-	require.Equal(t, defaultExpectedMinStake, minStake)
 }
 
 // setups config json file and writes content
@@ -568,9 +550,11 @@ func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
-	require.NoError(t, os.MkdirAll(path, 0o700))
+	require := require.New(t)
+
+	require.NoError(os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	require.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
+	require.NoError(os.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViperFlags() *viper.Viper {

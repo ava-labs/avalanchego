@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracedvm
@@ -8,10 +8,10 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func (vm *blockVM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {

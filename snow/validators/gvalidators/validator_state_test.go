@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 
@@ -24,22 +24,21 @@ import (
 var errCustom = errors.New("custom")
 
 type testState struct {
-	client  *Client
-	server  *validators.MockState
-	closeFn func()
+	client *Client
+	server *validatorsmock.State
 }
 
 func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
+	require := require.New(t)
+
 	t.Helper()
 
 	state := &testState{
-		server: validators.NewMockState(ctrl),
+		server: validatorsmock.NewState(ctrl),
 	}
 
 	listener, err := grpcutils.NewListener()
-	if err != nil {
-		t.Fatalf("Failed to create listener: %s", err)
-	}
+	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
@@ -49,26 +48,24 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
-	if err != nil {
-		t.Fatalf("Failed to dial: %s", err)
-	}
+	require.NoError(err)
 
 	state.client = NewClient(pb.NewValidatorStateClient(conn))
-	state.closeFn = func() {
+
+	t.Cleanup(func() {
 		serverCloser.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
-	}
+	})
+
 	return state
 }
 
 func TestGetMinimumHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	expectedHeight := uint64(1337)
@@ -89,10 +86,8 @@ func TestGetMinimumHeight(t *testing.T) {
 func TestGetCurrentHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	expectedHeight := uint64(1337)
@@ -113,10 +108,8 @@ func TestGetCurrentHeight(t *testing.T) {
 func TestGetSubnetID(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	chainID := ids.GenerateTestID()
@@ -138,10 +131,8 @@ func TestGetSubnetID(t *testing.T) {
 func TestGetValidatorSet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
-	defer state.closeFn()
 
 	// Happy path
 	sk0, err := bls.NewSecretKey()
@@ -194,10 +185,10 @@ func TestPublicKeyDeserialize(t *testing.T) {
 	require.NoError(err)
 	pk := bls.PublicFromSecretKey(sk)
 
-	pkBytes := pk.Serialize()
-	pkDe := new(bls.PublicKey).Deserialize(pkBytes)
+	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+	pkDe := bls.PublicKeyFromValidUncompressedBytes(pkBytes)
 	require.NotNil(pkDe)
-	require.EqualValues(pk, pkDe)
+	require.Equal(pk, pkDe)
 }
 
 // BenchmarkGetValidatorSet measures the time it takes complete a gRPC client
@@ -215,10 +206,6 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	require := require.New(b)
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
-	defer func() {
-		ctrl.Finish()
-		state.closeFn()
-	}()
 
 	height := uint64(1337)
 	subnetID := ids.GenerateTestID()

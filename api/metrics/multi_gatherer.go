@@ -1,24 +1,15 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
-
-	"golang.org/x/exp/slices"
-)
-
-var (
-	errDuplicatedPrefix = errors.New("duplicated prefix")
-
-	_ MultiGatherer = (*multiGatherer)(nil)
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers
@@ -27,66 +18,34 @@ type MultiGatherer interface {
 	prometheus.Gatherer
 
 	// Register adds the outputs of [gatherer] to the results of future calls to
-	// Gather with the provided [namespace] added to the metrics.
-	Register(namespace string, gatherer prometheus.Gatherer) error
+	// Gather with the provided [name] added to the metrics.
+	Register(name string, gatherer prometheus.Gatherer) error
+}
+
+// Deprecated: Use NewPrefixGatherer instead.
+//
+// TODO: Remove once coreth is updated.
+func NewMultiGatherer() MultiGatherer {
+	return NewPrefixGatherer()
 }
 
 type multiGatherer struct {
 	lock      sync.RWMutex
-	gatherers map[string]prometheus.Gatherer
-}
-
-func NewMultiGatherer() MultiGatherer {
-	return &multiGatherer{
-		gatherers: make(map[string]prometheus.Gatherer),
-	}
+	names     []string
+	gatherers prometheus.Gatherers
 }
 
 func (g *multiGatherer) Gather() ([]*dto.MetricFamily, error) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	var results []*dto.MetricFamily
-	for namespace, gatherer := range g.gatherers {
-		metrics, err := gatherer.Gather()
-		if err != nil {
-			return nil, err
-		}
-		for _, metric := range metrics {
-			var name string
-			if metric.Name != nil {
-				if len(namespace) > 0 {
-					name = fmt.Sprintf("%s_%s", namespace, *metric.Name)
-				} else {
-					name = *metric.Name
-				}
-			} else {
-				name = namespace
-			}
-			metric.Name = &name
-			results = append(results, metric)
-		}
-	}
-	// Because we overwrite every metric's name, we are guaranteed that there
-	// are no metrics with nil names.
-	sortMetrics(results)
-	return results, nil
+	return g.gatherers.Gather()
 }
 
-func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer) error {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	if _, exists := g.gatherers[namespace]; exists {
-		return errDuplicatedPrefix
+func MakeAndRegister(gatherer MultiGatherer, name string) (*prometheus.Registry, error) {
+	reg := prometheus.NewRegistry()
+	if err := gatherer.Register(name, reg); err != nil {
+		return nil, fmt.Errorf("couldn't register %q metrics: %w", name, err)
 	}
-
-	g.gatherers[namespace] = gatherer
-	return nil
-}
-
-func sortMetrics(m []*dto.MetricFamily) {
-	slices.SortFunc(m, func(i, j *dto.MetricFamily) bool {
-		return *i.Name < *j.Name
-	})
+	return reg, nil
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -8,13 +8,12 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var _ common.Sender = (*tracedSender)(nil)
@@ -81,15 +80,15 @@ func (s *tracedSender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.
 	s.sender.SendGetAcceptedFrontier(ctx, nodeIDs, requestID)
 }
 
-func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
-	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerIDs)
+	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerID)
 }
 
 func (s *tracedSender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
@@ -157,58 +156,40 @@ func (s *tracedSender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID
 	s.sender.SendPut(ctx, nodeID, requestID, container)
 }
 
-func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte) {
+func (s *tracedSender) SendPushQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, container []byte, requestedHeight uint64) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendPushQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Int("containerLen", len(container)),
+		attribute.Int64("requestedHeight", int64(requestedHeight)),
 	))
 	defer span.End()
 
-	s.sender.SendPushQuery(ctx, nodeIDs, requestID, container)
+	s.sender.SendPushQuery(ctx, nodeIDs, requestID, container, requestedHeight)
 }
 
-func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID) {
+func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID, requestedHeight uint64) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendPullQuery", oteltrace.WithAttributes(
 		attribute.Int64("requestID", int64(requestID)),
 		attribute.Stringer("containerID", containerID),
+		attribute.Int64("requestedHeight", int64(requestedHeight)),
 	))
 	defer span.End()
 
-	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID)
+	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID, requestedHeight)
 }
 
-func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
+func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVotes", len(votes)),
-		attribute.Int("numAccepted", len(accepted)),
+		attribute.Stringer("preferredID", preferredID),
+		attribute.Stringer("preferredIDAtHeight", preferredIDAtHeight),
+		attribute.Stringer("acceptedID", acceptedID),
+		attribute.Int("acceptedHeight", int(acceptedHeight)),
 	))
 	defer span.End()
 
-	s.sender.SendChits(ctx, nodeID, requestID, votes, accepted)
-}
-
-func (s *tracedSender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
-	ctx, span := s.tracer.Start(ctx, "tracedSender.SendCrossChainAppRequest", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("requestLen", len(appRequestBytes)),
-	))
-	defer span.End()
-
-	return s.sender.SendCrossChainAppRequest(ctx, chainID, requestID, appRequestBytes)
-}
-
-func (s *tracedSender) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
-	ctx, span := s.tracer.Start(ctx, "tracedSender.SendCrossChainAppResponse", oteltrace.WithAttributes(
-		attribute.Stringer("chainID", chainID),
-		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("responseLen", len(appResponseBytes)),
-	))
-	defer span.End()
-
-	return s.sender.SendCrossChainAppResponse(ctx, chainID, requestID, appResponseBytes)
+	s.sender.SendChits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
 
 func (s *tracedSender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, appRequestBytes []byte) error {
@@ -232,33 +213,35 @@ func (s *tracedSender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, r
 	return s.sender.SendAppResponse(ctx, nodeID, requestID, appResponseBytes)
 }
 
-func (s *tracedSender) SendAppGossipSpecific(ctx context.Context, nodeIDs set.Set[ids.NodeID], appGossipBytes []byte) error {
-	_, span := s.tracer.Start(ctx, "tracedSender.SendAppGossipSpecific", oteltrace.WithAttributes(
-		attribute.Int("gossipLen", len(appGossipBytes)),
+func (s *tracedSender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+	ctx, span := s.tracer.Start(ctx, "tracedSender.SendAppError", oteltrace.WithAttributes(
+		attribute.Stringer("nodeID", nodeID),
+		attribute.Int64("requestID", int64(requestID)),
+		attribute.Int64("errorCode", int64(errorCode)),
+		attribute.String("errorMessage", errorMessage),
 	))
 	defer span.End()
 
-	return s.sender.SendAppGossipSpecific(ctx, nodeIDs, appGossipBytes)
+	return s.sender.SendAppError(ctx, nodeID, requestID, errorCode, errorMessage)
 }
 
-func (s *tracedSender) SendAppGossip(ctx context.Context, appGossipBytes []byte) error {
+func (s *tracedSender) SendAppGossip(
+	ctx context.Context,
+	config common.SendConfig,
+	appGossipBytes []byte,
+) error {
 	_, span := s.tracer.Start(ctx, "tracedSender.SendAppGossip", oteltrace.WithAttributes(
+		attribute.Int("numNodeIDs", config.NodeIDs.Len()),
+		attribute.Int("numValidators", config.Validators),
+		attribute.Int("numNonValidators", config.NonValidators),
+		attribute.Int("numPeers", config.Peers),
 		attribute.Int("gossipLen", len(appGossipBytes)),
 	))
 	defer span.End()
 
-	return s.sender.SendAppGossip(ctx, appGossipBytes)
-}
-
-func (s *tracedSender) SendGossip(ctx context.Context, container []byte) {
-	_, span := s.tracer.Start(ctx, "tracedSender.SendGossip", oteltrace.WithAttributes(
-		attribute.Int("containerLen", len(container)),
-	))
-	defer span.End()
-
-	s.sender.SendGossip(ctx, container)
-}
-
-func (s *tracedSender) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
-	return s.sender.Accept(ctx, containerID, container)
+	return s.sender.SendAppGossip(
+		ctx,
+		config,
+		appGossipBytes,
+	)
 }

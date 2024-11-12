@@ -1,31 +1,31 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
-import (
-	"fmt"
-)
+import "fmt"
 
-var _ BinarySnowball = (*binarySnowball)(nil)
+var _ Binary = (*binarySnowball)(nil)
+
+func newBinarySnowball(alphaPreference int, terminationConditions []terminationCondition, choice int) binarySnowball {
+	return binarySnowball{
+		binarySnowflake: newBinarySnowflake(alphaPreference, terminationConditions, choice),
+		preference:      choice,
+	}
+}
 
 // binarySnowball is the implementation of a binary snowball instance
 type binarySnowball struct {
 	// wrap the binary snowflake logic
 	binarySnowflake
 
-	// preference is the choice with the largest number of successful polls.
-	// Ties are broken by switching choice lazily
+	// preference is the choice with the largest number of polls which preferred
+	// the color. Ties are broken by switching choice lazily
 	preference int
 
-	// numSuccessfulPolls tracks the total number of successful network polls of
-	// the 0 and 1 choices
-	numSuccessfulPolls [2]int
-}
-
-func (sb *binarySnowball) Initialize(beta, choice int) {
-	sb.binarySnowflake.Initialize(beta, choice)
-	sb.preference = choice
+	// preferenceStrength tracks the total number of network polls which
+	// preferred each choice
+	preferenceStrength [2]int
 }
 
 func (sb *binarySnowball) Preference() int {
@@ -39,19 +39,21 @@ func (sb *binarySnowball) Preference() int {
 	return sb.preference
 }
 
-func (sb *binarySnowball) RecordSuccessfulPoll(choice int) {
-	sb.numSuccessfulPolls[choice]++
-	if sb.numSuccessfulPolls[choice] > sb.numSuccessfulPolls[1-choice] {
-		sb.preference = choice
+func (sb *binarySnowball) RecordPoll(count, choice int) {
+	if count >= sb.alphaPreference {
+		sb.preferenceStrength[choice]++
+		if sb.preferenceStrength[choice] > sb.preferenceStrength[1-choice] {
+			sb.preference = choice
+		}
 	}
-	sb.binarySnowflake.RecordSuccessfulPoll(choice)
+	sb.binarySnowflake.RecordPoll(count, choice)
 }
 
 func (sb *binarySnowball) String() string {
 	return fmt.Sprintf(
-		"SB(Preference = %d, NumSuccessfulPolls[0] = %d, NumSuccessfulPolls[1] = %d, %s)",
+		"SB(Preference = %d, PreferenceStrength[0] = %d, PreferenceStrength[1] = %d, %s)",
 		sb.preference,
-		sb.numSuccessfulPolls[0],
-		sb.numSuccessfulPolls[1],
+		sb.preferenceStrength[0],
+		sb.preferenceStrength[1],
 		&sb.binarySnowflake)
 }

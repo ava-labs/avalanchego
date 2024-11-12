@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -9,9 +9,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"go.uber.org/zap"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,27 +16,36 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+)
+
+const (
+	typeLabel      = "type"
+	opLabel        = "op"
+	directionLabel = "direction"
+
+	compressionLabel   = "compression"
+	decompressionLabel = "decompression"
 )
 
 var (
 	_ InboundMessage  = (*inboundMessage)(nil)
 	_ OutboundMessage = (*outboundMessage)(nil)
 
+	metricLabels = []string{typeLabel, opLabel, directionLabel}
+
 	errUnknownCompressionType = errors.New("message is compressed with an unknown compression type")
 )
 
 // InboundMessage represents a set of fields for an inbound message
 type InboundMessage interface {
+	fmt.Stringer
 	// NodeID returns the ID of the node that sent this message
 	NodeID() ids.NodeID
 	// Op returns the op that describes this message type
 	Op() Op
 	// Message returns the message that was sent
-	Message() any
+	Message() fmt.Stringer
 	// Expiration returns the time that the sender will have already timed out
 	// this request
 	Expiration() time.Time
@@ -54,7 +60,7 @@ type InboundMessage interface {
 type inboundMessage struct {
 	nodeID                ids.NodeID
 	op                    Op
-	message               any
+	message               fmt.Stringer
 	expiration            time.Time
 	onFinishedHandling    func()
 	bytesSavedCompression int
@@ -68,7 +74,7 @@ func (m *inboundMessage) Op() Op {
 	return m.op
 }
 
-func (m *inboundMessage) Message() any {
+func (m *inboundMessage) Message() fmt.Stringer {
 	return m.message
 }
 
@@ -84,6 +90,11 @@ func (m *inboundMessage) OnFinishedHandling() {
 
 func (m *inboundMessage) BytesSavedCompression() int {
 	return m.bytesSavedCompression
+}
+
+func (m *inboundMessage) String() string {
+	return fmt.Sprintf("%s Op: %s Message: %s",
+		m.nodeID, m.op, m.message)
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
@@ -128,27 +139,18 @@ func (m *outboundMessage) BytesSavedCompression() int {
 type msgBuilder struct {
 	log logging.Logger
 
-	gzipCompressor            compression.Compressor
-	gzipCompressTimeMetrics   map[Op]metric.Averager
-	gzipDecompressTimeMetrics map[Op]metric.Averager
-
-	zstdCompressor            compression.Compressor
-	zstdCompressTimeMetrics   map[Op]metric.Averager
-	zstdDecompressTimeMetrics map[Op]metric.Averager
+	zstdCompressor compression.Compressor
+	count          *prometheus.CounterVec // type + op + direction
+	duration       *prometheus.GaugeVec   // type + op + direction
 
 	maxMessageTimeout time.Duration
 }
 
 func newMsgBuilder(
 	log logging.Logger,
-	namespace string,
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 ) (*msgBuilder, error) {
-	gzipCompressor, err := compression.NewGzipCompressor(constants.DefaultMaxMessageSize)
-	if err != nil {
-		return nil, err
-	}
 	zstdCompressor, err := compression.NewZstdCompressor(constants.DefaultMaxMessageSize)
 	if err != nil {
 		return nil, err
@@ -157,49 +159,28 @@ func newMsgBuilder(
 	mb := &msgBuilder{
 		log: log,
 
-		gzipCompressor:            gzipCompressor,
-		gzipCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
-		gzipDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
-
-		zstdCompressor:            zstdCompressor,
-		zstdCompressTimeMetrics:   make(map[Op]metric.Averager, len(ExternalOps)),
-		zstdDecompressTimeMetrics: make(map[Op]metric.Averager, len(ExternalOps)),
+		zstdCompressor: zstdCompressor,
+		count: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "codec_compressed_count",
+				Help: "number of compressed messages",
+			},
+			metricLabels,
+		),
+		duration: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "codec_compressed_duration",
+				Help: "time spent handling compressed messages",
+			},
+			metricLabels,
+		),
 
 		maxMessageTimeout: maxMessageTimeout,
 	}
-
-	errs := wrappers.Errs{}
-	for _, op := range ExternalOps {
-		mb.gzipCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("gzip_%s_compress_time", op),
-			fmt.Sprintf("time (in ns) to compress %s messages with gzip", op),
-			metrics,
-			&errs,
-		)
-		mb.gzipDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("gzip_%s_decompress_time", op),
-			fmt.Sprintf("time (in ns) to decompress %s messages with gzip", op),
-			metrics,
-			&errs,
-		)
-		mb.zstdCompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("zstd_%s_compress_time", op),
-			fmt.Sprintf("time (in ns) to compress %s messages with zstd", op),
-			metrics,
-			&errs,
-		)
-		mb.zstdDecompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("zstd_%s_decompress_time", op),
-			fmt.Sprintf("time (in ns) to decompress %s messages with zstd", op),
-			metrics,
-			&errs,
-		)
-	}
-	return mb, errs.Err
+	return mb, errors.Join(
+		metrics.Register(mb.count),
+		metrics.Register(mb.duration),
+	)
 }
 
 func (mb *msgBuilder) marshal(
@@ -223,24 +204,12 @@ func (mb *msgBuilder) marshal(
 	// This recursive packing allows us to avoid an extra compression on/off
 	// field in the message.
 	var (
-		startTime               = time.Now()
-		compressedMsg           p2p.Message
-		opToCompressTimeMetrics map[Op]metric.Averager
+		startTime     = time.Now()
+		compressedMsg p2p.Message
 	)
 	switch compressionType {
 	case compression.TypeNone:
 		return uncompressedMsgBytes, 0, op, nil
-	case compression.TypeGzip:
-		compressedBytes, err := mb.gzipCompressor.Compress(uncompressedMsgBytes)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		compressedMsg = p2p.Message{
-			Message: &p2p.Message_CompressedGzip{
-				CompressedGzip: compressedBytes,
-			},
-		}
-		opToCompressTimeMetrics = mb.gzipCompressTimeMetrics
 	case compression.TypeZstd:
 		compressedBytes, err := mb.zstdCompressor.Compress(uncompressedMsgBytes)
 		if err != nil {
@@ -251,7 +220,6 @@ func (mb *msgBuilder) marshal(
 				CompressedZstd: compressedBytes,
 			},
 		}
-		opToCompressTimeMetrics = mb.zstdCompressTimeMetrics
 	default:
 		return nil, 0, 0, errUnknownCompressionType
 	}
@@ -262,15 +230,13 @@ func (mb *msgBuilder) marshal(
 	}
 	compressTook := time.Since(startTime)
 
-	if compressTimeMetric, ok := opToCompressTimeMetrics[op]; ok {
-		compressTimeMetric.Observe(float64(compressTook))
-	} else {
-		// Should never happen
-		mb.log.Warn("no compression metric found for op",
-			zap.Stringer("op", op),
-			zap.Stringer("compressionType", compressionType),
-		)
+	labels := prometheus.Labels{
+		typeLabel:      compressionType.String(),
+		opLabel:        op.String(),
+		directionLabel: compressionLabel,
 	}
+	mb.count.With(labels).Inc()
+	mb.duration.With(labels).Add(float64(compressTook))
 
 	bytesSaved := len(uncompressedMsgBytes) - len(compressedMsgBytes)
 	return compressedMsgBytes, bytesSaved, op, nil
@@ -284,19 +250,12 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 
 	// Figure out what compression type, if any, was used to compress the message.
 	var (
-		opToDecompressTimeMetrics map[Op]metric.Averager
-		compressor                compression.Compressor
-		compressedBytes           []byte
-		gzipCompressed            = m.GetCompressedGzip()
-		zstdCompressed            = m.GetCompressedZstd()
+		compressor      compression.Compressor
+		compressedBytes []byte
+		zstdCompressed  = m.GetCompressedZstd()
 	)
 	switch {
-	case len(gzipCompressed) > 0:
-		opToDecompressTimeMetrics = mb.gzipDecompressTimeMetrics
-		compressor = mb.gzipCompressor
-		compressedBytes = gzipCompressed
 	case len(zstdCompressed) > 0:
-		opToDecompressTimeMetrics = mb.zstdDecompressTimeMetrics
 		compressor = mb.zstdCompressor
 		compressedBytes = zstdCompressed
 	default:
@@ -323,14 +282,14 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	if decompressTimeMetric, ok := opToDecompressTimeMetrics[op]; ok {
-		decompressTimeMetric.Observe(float64(decompressTook))
-	} else {
-		// Should never happen
-		mb.log.Warn("no decompression metric found for op",
-			zap.Stringer("op", op),
-		)
+
+	labels := prometheus.Labels{
+		typeLabel:      compression.TypeZstd.String(),
+		opLabel:        op.String(),
+		directionLabel: decompressionLabel,
 	}
+	mb.count.With(labels).Inc()
+	mb.duration.With(labels).Add(float64(decompressTook))
 
 	return m, bytesSavedCompression, op, nil
 }
@@ -366,7 +325,7 @@ func (mb *msgBuilder) parseInbound(
 
 	expiration := mockable.MaxTime
 	if deadline, ok := GetDeadline(msg); ok {
-		deadline = math.Min(deadline, mb.maxMessageTimeout)
+		deadline = min(deadline, mb.maxMessageTimeout)
 		expiration = time.Now().Add(deadline)
 	}
 

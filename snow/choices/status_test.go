@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package choices
@@ -17,7 +17,8 @@ func TestStatusValid(t *testing.T) {
 	require.NoError(Rejected.Valid())
 	require.NoError(Processing.Valid())
 	require.NoError(Unknown.Valid())
-	require.ErrorIs(Status(math.MaxInt32).Valid(), errUnknownStatus)
+	err := Status(math.MaxInt32).Valid()
+	require.ErrorIs(err, errUnknownStatus)
 }
 
 func TestStatusDecided(t *testing.T) {

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package warp
@@ -12,9 +12,9 @@ import (
 
 // UnsignedMessage defines the standard format for an unsigned Warp message.
 type UnsignedMessage struct {
-	SourceChainID      ids.ID `serialize:"true"`
-	DestinationChainID ids.ID `serialize:"true"`
-	Payload            []byte `serialize:"true"`
+	NetworkID     uint32 `serialize:"true"`
+	SourceChainID ids.ID `serialize:"true"`
+	Payload       []byte `serialize:"true"`
 
 	bytes []byte
 	id    ids.ID
@@ -22,14 +22,14 @@ type UnsignedMessage struct {
 
 // NewUnsignedMessage creates a new *UnsignedMessage and initializes it.
 func NewUnsignedMessage(
+	networkID uint32,
 	sourceChainID ids.ID,
-	destinationChainID ids.ID,
 	payload []byte,
 ) (*UnsignedMessage, error) {
 	msg := &UnsignedMessage{
-		SourceChainID:      sourceChainID,
-		DestinationChainID: destinationChainID,
-		Payload:            payload,
+		NetworkID:     networkID,
+		SourceChainID: sourceChainID,
+		Payload:       payload,
 	}
 	return msg, msg.Initialize()
 }
@@ -41,13 +41,13 @@ func ParseUnsignedMessage(b []byte) (*UnsignedMessage, error) {
 		bytes: b,
 		id:    hashing.ComputeHash256Array(b),
 	}
-	_, err := c.Unmarshal(b, msg)
+	_, err := Codec.Unmarshal(b, msg)
 	return msg, err
 }
 
 // Initialize recalculates the result of Bytes().
 func (m *UnsignedMessage) Initialize() error {
-	bytes, err := c.Marshal(codecVersion, m)
+	bytes, err := Codec.Marshal(CodecVersion, m)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal warp unsigned message: %w", err)
 	}
@@ -68,4 +68,8 @@ func (m *UnsignedMessage) Bytes() []byte {
 // Initialize.
 func (m *UnsignedMessage) ID() ids.ID {
 	return m.id
+}
+
+func (m *UnsignedMessage) String() string {
+	return fmt.Sprintf("UnsignedMessage(NetworkID = %d, SourceChainID = %s, Payload = %x)", m.NetworkID, m.SourceChainID, m.Payload)
 }

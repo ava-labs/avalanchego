@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/builder"
+	"github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -19,28 +21,32 @@ func NewWalletWithOptions(
 	options ...common.Option,
 ) Wallet {
 	return &walletWithOptions{
-		Wallet:  wallet,
+		wallet:  wallet,
 		options: options,
 	}
 }
 
 type walletWithOptions struct {
-	Wallet
+	wallet  Wallet
 	options []common.Option
 }
 
-func (w *walletWithOptions) Builder() Builder {
-	return NewBuilderWithOptions(
-		w.Wallet.Builder(),
+func (w *walletWithOptions) Builder() builder.Builder {
+	return builder.NewWithOptions(
+		w.wallet.Builder(),
 		w.options...,
 	)
+}
+
+func (w *walletWithOptions) Signer() signer.Signer {
+	return w.wallet.Signer()
 }
 
 func (w *walletWithOptions) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueBaseTx(
+) (*txs.Tx, error) {
+	return w.wallet.IssueBaseTx(
 		outputs,
 		common.UnionOptions(w.options, options)...,
 	)
@@ -52,8 +58,8 @@ func (w *walletWithOptions) IssueCreateAssetTx(
 	denomination byte,
 	initialState map[uint32][]verify.State,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueCreateAssetTx(
+) (*txs.Tx, error) {
+	return w.wallet.IssueCreateAssetTx(
 		name,
 		symbol,
 		denomination,
@@ -65,8 +71,8 @@ func (w *walletWithOptions) IssueCreateAssetTx(
 func (w *walletWithOptions) IssueOperationTx(
 	operations []*txs.Operation,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueOperationTx(
+) (*txs.Tx, error) {
+	return w.wallet.IssueOperationTx(
 		operations,
 		common.UnionOptions(w.options, options)...,
 	)
@@ -75,8 +81,8 @@ func (w *walletWithOptions) IssueOperationTx(
 func (w *walletWithOptions) IssueOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueOperationTxMintFT(
+) (*txs.Tx, error) {
+	return w.wallet.IssueOperationTxMintFT(
 		outputs,
 		common.UnionOptions(w.options, options)...,
 	)
@@ -87,8 +93,8 @@ func (w *walletWithOptions) IssueOperationTxMintNFT(
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueOperationTxMintNFT(
+) (*txs.Tx, error) {
+	return w.wallet.IssueOperationTxMintNFT(
 		assetID,
 		payload,
 		owners,
@@ -100,8 +106,8 @@ func (w *walletWithOptions) IssueOperationTxMintProperty(
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueOperationTxMintProperty(
+) (*txs.Tx, error) {
+	return w.wallet.IssueOperationTxMintProperty(
 		assetID,
 		owner,
 		common.UnionOptions(w.options, options)...,
@@ -111,8 +117,8 @@ func (w *walletWithOptions) IssueOperationTxMintProperty(
 func (w *walletWithOptions) IssueOperationTxBurnProperty(
 	assetID ids.ID,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueOperationTxBurnProperty(
+) (*txs.Tx, error) {
+	return w.wallet.IssueOperationTxBurnProperty(
 		assetID,
 		common.UnionOptions(w.options, options)...,
 	)
@@ -122,8 +128,8 @@ func (w *walletWithOptions) IssueImportTx(
 	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueImportTx(
+) (*txs.Tx, error) {
+	return w.wallet.IssueImportTx(
 		chainID,
 		to,
 		common.UnionOptions(w.options, options)...,
@@ -134,8 +140,8 @@ func (w *walletWithOptions) IssueExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueExportTx(
+) (*txs.Tx, error) {
+	return w.wallet.IssueExportTx(
 		chainID,
 		outputs,
 		common.UnionOptions(w.options, options)...,
@@ -145,8 +151,8 @@ func (w *walletWithOptions) IssueExportTx(
 func (w *walletWithOptions) IssueUnsignedTx(
 	utx txs.UnsignedTx,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueUnsignedTx(
+) (*txs.Tx, error) {
+	return w.wallet.IssueUnsignedTx(
 		utx,
 		common.UnionOptions(w.options, options)...,
 	)
@@ -155,8 +161,8 @@ func (w *walletWithOptions) IssueUnsignedTx(
 func (w *walletWithOptions) IssueTx(
 	tx *txs.Tx,
 	options ...common.Option,
-) (ids.ID, error) {
-	return w.Wallet.IssueTx(
+) error {
+	return w.wallet.IssueTx(
 		tx,
 		common.UnionOptions(w.options, options)...,
 	)

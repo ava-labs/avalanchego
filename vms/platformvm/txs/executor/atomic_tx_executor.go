@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 var _ txs.Visitor = (*AtomicTxExecutor)(nil)
@@ -18,6 +19,7 @@ var _ txs.Visitor = (*AtomicTxExecutor)(nil)
 type AtomicTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	*Backend
+	FeeCalculator fee.Calculator
 	ParentID      ids.ID
 	StateVersions state.Versions
 	Tx            *txs.Tx
@@ -64,11 +66,23 @@ func (*AtomicTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
+func (*AtomicTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+	return ErrWrongTxType
+}
+
 func (*AtomicTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
 func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*AtomicTxExecutor) BaseTx(*txs.BaseTx) error {
+	return ErrWrongTxType
+}
+
+func (*AtomicTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
 	return ErrWrongTxType
 }
 
@@ -91,9 +105,10 @@ func (e *AtomicTxExecutor) atomicTx(tx txs.UnsignedTx) error {
 	e.OnAccept = onAccept
 
 	executor := StandardTxExecutor{
-		Backend: e.Backend,
-		State:   e.OnAccept,
-		Tx:      e.Tx,
+		Backend:       e.Backend,
+		State:         e.OnAccept,
+		FeeCalculator: e.FeeCalculator,
+		Tx:            e.Tx,
 	}
 	err = tx.Visit(&executor)
 	e.Inputs = executor.Inputs

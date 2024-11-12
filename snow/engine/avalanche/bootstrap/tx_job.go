@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -9,14 +9,13 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
-	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -24,9 +23,9 @@ import (
 var errMissingTxDependenciesOnAccept = errors.New("attempting to accept a transaction with missing dependencies")
 
 type txParser struct {
-	log                     logging.Logger
-	numAccepted, numDropped prometheus.Counter
-	vm                      vertex.LinearizableVM
+	log         logging.Logger
+	numAccepted prometheus.Counter
+	vm          vertex.LinearizableVM
 }
 
 func (p *txParser) Parse(ctx context.Context, txBytes []byte) (queue.Job, error) {
@@ -37,15 +36,14 @@ func (p *txParser) Parse(ctx context.Context, txBytes []byte) (queue.Job, error)
 	return &txJob{
 		log:         p.log,
 		numAccepted: p.numAccepted,
-		numDropped:  p.numDropped,
 		tx:          tx,
 	}, nil
 }
 
 type txJob struct {
-	log                     logging.Logger
-	numAccepted, numDropped prometheus.Counter
-	tx                      snowstorm.Tx
+	log         logging.Logger
+	numAccepted prometheus.Counter
+	tx          snowstorm.Tx
 }
 
 func (t *txJob) ID() ids.ID {
@@ -53,31 +51,13 @@ func (t *txJob) ID() ids.ID {
 }
 
 func (t *txJob) MissingDependencies(context.Context) (set.Set[ids.ID], error) {
-	missing := set.Set[ids.ID]{}
-	deps, err := t.tx.Dependencies()
-	if err != nil {
-		return missing, err
-	}
-	for _, dep := range deps {
-		if dep.Status() != choices.Accepted {
-			missing.Add(dep.ID())
-		}
-	}
-	return missing, nil
+	return t.tx.MissingDependencies()
 }
 
 // Returns true if this tx job has at least 1 missing dependency
 func (t *txJob) HasMissingDependencies(context.Context) (bool, error) {
-	deps, err := t.tx.Dependencies()
-	if err != nil {
-		return false, err
-	}
-	for _, dep := range deps {
-		if dep.Status() != choices.Accepted {
-			return true, nil
-		}
-	}
-	return false, nil
+	deps, err := t.tx.MissingDependencies()
+	return deps.Len() > 0, err
 }
 
 func (t *txJob) Execute(ctx context.Context) error {
@@ -86,14 +66,12 @@ func (t *txJob) Execute(ctx context.Context) error {
 		return err
 	}
 	if hasMissingDeps {
-		t.numDropped.Inc()
 		return errMissingTxDependenciesOnAccept
 	}
 
 	status := t.tx.Status()
 	switch status {
 	case choices.Unknown, choices.Rejected:
-		t.numDropped.Inc()
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
 	case choices.Processing:
 		txID := t.tx.ID()

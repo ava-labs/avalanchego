@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fxs
@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	_ Fx = (*secp256k1fx.Fx)(nil)
-	_ Fx = (*nftfx.Fx)(nil)
-	_ Fx = (*propertyfx.Fx)(nil)
+	_ Fx                = (*secp256k1fx.Fx)(nil)
+	_ Fx                = (*nftfx.Fx)(nil)
+	_ Fx                = (*propertyfx.Fx)(nil)
+	_ verify.Verifiable = (*FxCredential)(nil)
 )
 
 type ParsedFx struct {
@@ -45,7 +46,7 @@ type Fx interface {
 	// VerifyOperation verifies that the specified transaction can spend the
 	// provided utxos conditioned on the result being restricted to the provided
 	// outputs. If the transaction can't spend the output based on the input and
-	// credential, a non-nil error  should be returned.
+	// credential, a non-nil error should be returned.
 	VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error
 }
 
@@ -58,6 +59,10 @@ type FxOperation interface {
 }
 
 type FxCredential struct {
-	FxID              ids.ID `serialize:"false" json:"fxID"`
-	verify.Verifiable `serialize:"true" json:"credential"`
+	FxID       ids.ID            `serialize:"false" json:"fxID"`
+	Credential verify.Verifiable `serialize:"true"  json:"credential"`
+}
+
+func (f *FxCredential) Verify() error {
+	return f.Credential.Verify()
 }

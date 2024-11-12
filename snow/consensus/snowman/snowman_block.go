@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 // Tracks the state of a snowman block
 type snowmanBlock struct {
-	// parameters to initialize the snowball instance with
-	params snowball.Parameters
+	t *Topological
 
 	// block that this node contains. For the genesis, this value will be nil
 	blk Block
@@ -38,8 +36,7 @@ func (n *snowmanBlock) AddChild(child Block) {
 	// if the snowball instance is nil, this is the first child. So the instance
 	// should be initialized.
 	if n.sb == nil {
-		n.sb = &snowball.Tree{}
-		n.sb.Initialize(n.params, childID)
+		n.sb = snowball.NewTree(snowball.SnowballFactory, n.t.params, childID)
 		n.children = make(map[ids.ID]Block)
 	} else {
 		n.sb.Add(childID)
@@ -48,11 +45,8 @@ func (n *snowmanBlock) AddChild(child Block) {
 	n.children[childID] = child
 }
 
-func (n *snowmanBlock) Accepted() bool {
+func (n *snowmanBlock) Decided() bool {
 	// if the block is nil, then this is the genesis which is defined as
 	// accepted
-	if n.blk == nil {
-		return true
-	}
-	return n.blk.Status() == choices.Accepted
+	return n.blk == nil || n.blk.Height() <= n.t.lastAcceptedHeight
 }

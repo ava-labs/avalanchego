@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -33,10 +33,15 @@ func main() {
 
 	ctx := context.Background()
 
-	// NewWalletWithTxs fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting and registers [subnetID].
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.NewWalletWithTxs(ctx, uri, kc, subnetID)
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:          uri,
+		AVAXKeychain: kc,
+		EthKeychain:  kc,
+		SubnetIDs:    []ids.ID{subnetID},
+	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
@@ -46,12 +51,12 @@ func main() {
 	pWallet := wallet.P()
 
 	removeValidatorStartTime := time.Now()
-	removeValidatorTxID, err := pWallet.IssueRemoveSubnetValidatorTx(
+	removeValidatorTx, err := pWallet.IssueRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
 	)
 	if err != nil {
 		log.Fatalf("failed to issue remove subnet validator transaction: %s\n", err)
 	}
-	log.Printf("removed subnet validator %s from %s with %s in %s\n", nodeID, subnetID, removeValidatorTxID, time.Since(removeValidatorStartTime))
+	log.Printf("removed subnet validator %s from %s with %s in %s\n", nodeID, subnetID, removeValidatorTx.ID(), time.Since(removeValidatorStartTime))
 }

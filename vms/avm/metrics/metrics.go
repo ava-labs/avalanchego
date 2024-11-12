@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 )
 
@@ -23,7 +23,7 @@ type Metrics interface {
 
 	// MarkBlockAccepted updates all metrics relating to the acceptance of a
 	// block, including the underlying acceptance of the contained transactions.
-	MarkBlockAccepted(b blocks.Block) error
+	MarkBlockAccepted(b block.Block) error
 	// MarkTxAccepted updates all metrics relating to the acceptance of a
 	// transaction.
 	//
@@ -53,7 +53,7 @@ func (m *metrics) IncTxRefreshMisses() {
 	m.numTxRefreshMisses.Inc()
 }
 
-func (m *metrics) MarkBlockAccepted(b blocks.Block) error {
+func (m *metrics) MarkBlockAccepted(b block.Block) error {
 	for _, tx := range b.Txs() {
 		if err := tx.Unsigned.Visit(m.txMetrics); err != nil {
 			return err
@@ -66,32 +66,26 @@ func (m *metrics) MarkTxAccepted(tx *txs.Tx) error {
 	return tx.Unsigned.Visit(m.txMetrics)
 }
 
-func New(
-	namespace string,
-	registerer prometheus.Registerer,
-) (Metrics, error) {
-	txMetrics, err := newTxMetrics(namespace, registerer)
+func New(registerer prometheus.Registerer) (Metrics, error) {
+	txMetrics, err := newTxMetrics(registerer)
 	errs := wrappers.Errs{Err: err}
 
 	m := &metrics{txMetrics: txMetrics}
 
 	m.numTxRefreshes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "tx_refreshes",
-		Help:      "Number of times unique txs have been refreshed",
+		Name: "tx_refreshes",
+		Help: "Number of times unique txs have been refreshed",
 	})
 	m.numTxRefreshHits = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "tx_refresh_hits",
-		Help:      "Number of times unique txs have not been unique, but were cached",
+		Name: "tx_refresh_hits",
+		Help: "Number of times unique txs have not been unique, but were cached",
 	})
 	m.numTxRefreshMisses = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "tx_refresh_misses",
-		Help:      "Number of times unique txs have not been unique and weren't cached",
+		Name: "tx_refresh_misses",
+		Help: "Number of times unique txs have not been unique and weren't cached",
 	})
 
-	apiRequestMetric, err := metric.NewAPIInterceptor(namespace, registerer)
+	apiRequestMetric, err := metric.NewAPIInterceptor(registerer)
 	m.APIInterceptor = apiRequestMetric
 	errs.Add(
 		err,

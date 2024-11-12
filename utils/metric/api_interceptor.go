@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metric
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
-
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type APIInterceptor interface {
@@ -30,33 +28,29 @@ type apiInterceptor struct {
 	requestErrors        *prometheus.CounterVec
 }
 
-func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APIInterceptor, error) {
+func NewAPIInterceptor(registerer prometheus.Registerer) (APIInterceptor, error) {
 	requestDurationCount := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "request_duration_count",
-			Help:      "Number of times this type of request was made",
+			Name: "request_duration_count",
+			Help: "Number of times this type of request was made",
 		},
 		[]string{"method"},
 	)
 	requestDurationSum := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "request_duration_sum",
-			Help:      "Amount of time in nanoseconds that has been spent handling this type of request",
+			Name: "request_duration_sum",
+			Help: "Amount of time in nanoseconds that has been spent handling this type of request",
 		},
 		[]string{"method"},
 	)
 	requestErrors := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "request_error_count",
+			Name: "request_error_count",
 		},
 		[]string{"method"},
 	)
 
-	errs := wrappers.Errs{}
-	errs.Add(
+	err := errors.Join(
 		registerer.Register(requestDurationCount),
 		registerer.Register(requestDurationSum),
 		registerer.Register(requestErrors),
@@ -65,7 +59,7 @@ func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APII
 		requestDurationCount: requestDurationCount,
 		requestDurationSum:   requestDurationSum,
 		requestErrors:        requestErrors,
-	}, errs.Err
+	}, err
 }
 
 func (*apiInterceptor) InterceptRequest(i *rpc.RequestInfo) *http.Request {

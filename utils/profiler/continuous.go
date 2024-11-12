@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package profiler
@@ -37,7 +37,7 @@ type continuousProfiler struct {
 
 func NewContinuous(dir string, freq time.Duration, maxNumFiles int) ContinuousProfiler {
 	return &continuousProfiler{
-		profiler:    new(dir),
+		profiler:    newProfiler(dir),
 		freq:        freq,
 		maxNumFiles: maxNumFiles,
 		closer:      make(chan struct{}),
@@ -108,7 +108,7 @@ func rotate(name string, maxNumFiles int) error {
 			return err
 		}
 	}
-	destFilename := fmt.Sprintf("%s.1", name)
+	destFilename := name + ".1"
 	_, err := filesystem.RenameIfExists(name, destFilename)
 	return err
 }

@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"sort"
 
@@ -25,9 +26,9 @@ var (
 )
 
 type InitialState struct {
-	FxIndex uint32         `serialize:"true" json:"fxIndex"`
+	FxIndex uint32         `serialize:"true"  json:"fxIndex"`
 	FxID    ids.ID         `serialize:"false" json:"fxID"`
-	Outs    []verify.State `serialize:"true" json:"outputs"`
+	Outs    []verify.State `serialize:"true"  json:"outputs"`
 }
 
 func (is *InitialState) InitCtx(ctx *snow.Context) {
@@ -59,8 +60,8 @@ func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	return nil
 }
 
-func (is *InitialState) Less(other *InitialState) bool {
-	return is.FxIndex < other.FxIndex
+func (is *InitialState) Compare(other *InitialState) int {
+	return cmp.Compare(is.FxIndex, other.FxIndex)
 }
 
 func (is *InitialState) Sort(c codec.Manager) {

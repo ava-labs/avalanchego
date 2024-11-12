@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -6,17 +6,18 @@ package network
 import (
 	"crypto"
 	"crypto/tls"
+	"net/netip"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -26,7 +27,7 @@ type HealthConfig struct {
 	Enabled bool `json:"-"`
 
 	// MinConnectedPeers is the minimum number of peers that the network should
-	// be connected to to be considered healthy.
+	// be connected to be considered healthy.
 	MinConnectedPeers uint `json:"minConnectedPeers"`
 
 	// MaxTimeSinceMsgReceived is the maximum amount of time since the network
@@ -58,21 +59,13 @@ type PeerListGossipConfig struct {
 	// gossip event.
 	PeerListNumValidatorIPs uint32 `json:"peerListNumValidatorIPs"`
 
-	// PeerListValidatorGossipSize is the number of validators to gossip the IPs
-	// to in every IP gossip event.
-	PeerListValidatorGossipSize uint32 `json:"peerListValidatorGossipSize"`
+	// PeerListPullGossipFreq is the frequency that this node will attempt to
+	// request signed IPs from its peers.
+	PeerListPullGossipFreq time.Duration `json:"peerListPullGossipFreq"`
 
-	// PeerListNonValidatorGossipSize is the number of non-validators to gossip
-	// the IPs to in every IP gossip event.
-	PeerListNonValidatorGossipSize uint32 `json:"peerListNonValidatorGossipSize"`
-
-	// PeerListPeersGossipSize is the number of peers to gossip
-	// the IPs to in every IP gossip event.
-	PeerListPeersGossipSize uint32 `json:"peerListPeersGossipSize"`
-
-	// PeerListGossipFreq is the frequency that this node will attempt to gossip
-	// signed IPs to its peers.
-	PeerListGossipFreq time.Duration `json:"peerListGossipFreq"`
+	// PeerListBloomResetFreq is how frequently this node will recalculate the
+	// IP tracker's bloom filter.
+	PeerListBloomResetFreq time.Duration `json:"peerListBloomResetFreq"`
 }
 
 type TimeoutConfig struct {
@@ -118,13 +111,15 @@ type Config struct {
 
 	TLSKeyLogFile string `json:"tlsKeyLogFile"`
 
-	Namespace          string            `json:"namespace"`
-	MyNodeID           ids.NodeID        `json:"myNodeID"`
-	MyIPPort           ips.DynamicIPPort `json:"myIP"`
-	NetworkID          uint32            `json:"networkID"`
-	MaxClockDifference time.Duration     `json:"maxClockDifference"`
-	PingFrequency      time.Duration     `json:"pingFrequency"`
-	AllowPrivateIPs    bool              `json:"allowPrivateIPs"`
+	MyNodeID           ids.NodeID                    `json:"myNodeID"`
+	MyIPPort           *utils.Atomic[netip.AddrPort] `json:"myIP"`
+	NetworkID          uint32                        `json:"networkID"`
+	MaxClockDifference time.Duration                 `json:"maxClockDifference"`
+	PingFrequency      time.Duration                 `json:"pingFrequency"`
+	AllowPrivateIPs    bool                          `json:"allowPrivateIPs"`
+
+	SupportedACPs set.Set[uint32] `json:"supportedACPs"`
+	ObjectedACPs  set.Set[uint32] `json:"objectedACPs"`
 
 	// The compression type to use when compressing outbound messages.
 	// Assumes all peers support this compression type.
@@ -132,10 +127,13 @@ type Config struct {
 
 	// TLSKey is this node's TLS key that is used to sign IPs.
 	TLSKey crypto.Signer `json:"-"`
+	// BLSKey is this node's BLS key that is used to sign IPs.
+	BLSKey *bls.SecretKey `json:"-"`
 
 	// TrackedSubnets of the node.
-	TrackedSubnets set.Set[ids.ID] `json:"-"`
-	Beacons        validators.Set  `json:"-"`
+	// It must not include the primary network ID.
+	TrackedSubnets set.Set[ids.ID]    `json:"-"`
+	Beacons        validators.Manager `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`
@@ -179,7 +177,4 @@ type Config struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	DiskTargeter tracker.Targeter `json:"-"`
-
-	// Tracks which validators have been sent to which peers
-	GossipTracker peer.GossipTracker `json:"-"`
 }

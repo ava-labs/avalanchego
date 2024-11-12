@@ -1,24 +1,26 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Implements X-chain transfer tests.
 package transfer
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -29,32 +31,92 @@ import (
 const (
 	totalRounds = 50
 
-	metricBlksProcessing = "avalanche_X_blks_processing"
-	metricBlksAccepted   = "avalanche_X_blks_accepted_count"
+	blksProcessingMetric = "avalanche_snowman_blks_processing"
+	blksAcceptedMetric   = "avalanche_snowman_blks_accepted_count"
 )
 
-var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
-	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"require-network-runner",
-			"x",
-			"virtuous-transfer-tx-avax",
-		),
-		func() {
-			rpcEps := e2e.Env.GetURIs()
-			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
+var xChainMetricLabels = prometheus.Labels{
+	chains.ChainLabel: "X",
+}
 
-			allMetrics := []string{
-				metricBlksProcessing,
-				metricBlksAccepted,
+// This test requires that the network not have ongoing blocks and
+// cannot reliably be run in parallel.
+var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
+	tc := e2e.NewTestContext()
+	require := require.New(tc)
+
+	ginkgo.It("can issue a virtuous transfer tx for AVAX asset",
+		func() {
+			env := e2e.GetEnv(tc)
+			rpcEps := make([]string, len(env.URIs))
+			for i, nodeURI := range env.URIs {
+				rpcEps[i] = nodeURI.URI
 			}
 
-			runFunc := func(round int) {
-				tests.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
+			// Waiting for ongoing blocks to have completed before starting this
+			// test avoids the case of a previous test having initiated block
+			// processing but not having completed it.
+			tc.Eventually(func() bool {
+				allNodeMetrics, err := tests.GetNodesMetrics(
+					tc.DefaultContext(),
+					rpcEps,
+				)
+				require.NoError(err)
 
-				testKeys, _, _ := e2e.Env.GetTestKeys()
+				for _, metrics := range allNodeMetrics {
+					xBlksProcessing, ok := tests.GetMetricValue(metrics, blksProcessingMetric, xChainMetricLabels)
+					if !ok || xBlksProcessing > 0 {
+						return false
+					}
+				}
+				return true
+			},
+				e2e.DefaultTimeout,
+				e2e.DefaultPollingInterval,
+				"The cluster is generating ongoing blocks. Is this test being run in parallel?",
+			)
+
+			// Ensure the same set of 10 keys is used for all tests
+			// by retrieving them outside of runFunc.
+			testKeys := []*secp256k1.PrivateKey{
+				// The funded key will be the source of funds for the new keys
+				env.PreFundedKey,
+			}
+			newKeys, err := tmpnet.NewPrivateKeys(9)
+			require.NoError(err)
+			testKeys = append(testKeys, newKeys...)
+
+			const transferPerRound = units.MilliAvax
+
+			tc.By("Funding new keys")
+			fundingWallet := e2e.NewWallet(tc, env.NewKeychain(), env.GetRandomNodeURI())
+			fundingOutputs := make([]*avax.TransferableOutput, len(newKeys))
+			fundingAssetID := fundingWallet.X().Builder().Context().AVAXAssetID
+			for i, key := range newKeys {
+				fundingOutputs[i] = &avax.TransferableOutput{
+					Asset: avax.Asset{
+						ID: fundingAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						// Enough for 1 transfer per round
+						Amt: totalRounds * transferPerRound,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								key.Address(),
+							},
+						},
+					},
+				}
+			}
+			_, err = fundingWallet.X().IssueBaseTx(
+				fundingOutputs,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
+
+			runFunc := func(round int) {
+				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
 
 				needPermute := round > 3
 				if needPermute {
@@ -63,20 +125,13 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 						testKeys[i], testKeys[j] = testKeys[j], testKeys[i]
 					})
 				}
-				keyChain := secp256k1fx.NewKeychain(testKeys...)
 
-				var baseWallet primary.Wallet
-				var err error
-				ginkgo.By("setting up a base wallet", func() {
-					walletURI := rpcEps[0]
-
-					// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-					baseWallet, err = primary.NewWalletFromURI(ctx, walletURI, keyChain)
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-				})
-				avaxAssetID := baseWallet.X().AVAXAssetID()
+				keychain := secp256k1fx.NewKeychain(testKeys...)
+				baseWallet := e2e.NewWallet(tc, keychain, env.GetRandomNodeURI())
+				xWallet := baseWallet.X()
+				xBuilder := xWallet.Builder()
+				xContext := xBuilder.Context()
+				avaxAssetID := xContext.AVAXAssetID
 
 				wallets := make([]primary.Wallet, len(testKeys))
 				shortAddrs := make([]ids.ShortID, len(testKeys))
@@ -85,33 +140,27 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 
 					wallets[i] = primary.NewWalletWithOptions(
 						baseWallet,
-						common.WithCustomAddresses(set.Set[ids.ShortID]{
-							testKeys[i].PublicKey().Address(): struct{}{},
-						}),
+						common.WithCustomAddresses(set.Of(
+							testKeys[i].PublicKey().Address(),
+						)),
 					)
 				}
 
-				// URI -> "metric name" -> "metric value"
-				metricsBeforeTx := make(map[string]map[string]float64)
-				for _, u := range rpcEps {
-					ep := u + "/ext/metrics"
-
-					mm, err := tests.GetMetricsValue(ep, allMetrics...)
-					gomega.Expect(err).Should(gomega.BeNil())
-					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
-
-					if mm[metricBlksProcessing] > 0 {
-						tests.Outf("{{red}}{{bold}}%q already has processing block!!!{{/}}\n", u)
-						ginkgo.Skip("the cluster has already ongoing blocks thus skipping to prevent conflicts...")
+				metricsBeforeTx, err := tests.GetNodesMetrics(
+					tc.DefaultContext(),
+					rpcEps,
+				)
+				require.NoError(err)
+				for _, uri := range rpcEps {
+					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
+						tc.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
 					}
-
-					metricsBeforeTx[u] = mm
 				}
 
 				testBalances := make([]uint64, 0)
 				for i, w := range wallets {
 					balances, err := w.X().Builder().GetFTBalance()
-					gomega.Expect(err).Should(gomega.BeNil())
+					require.NoError(err)
 
 					bal := balances[avaxAssetID]
 					testBalances = append(testBalances, bal)
@@ -129,9 +178,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 						break
 					}
 				}
-				if fromIdx < 0 {
-					gomega.Expect(fromIdx).Should(gomega.BeNumerically(">", 0), "no address found with non-zero balance")
-				}
+				require.GreaterOrEqual(fromIdx, 0, "no address found with non-zero balance")
 
 				toIdx := -1
 				for i := range testBalances {
@@ -148,15 +195,12 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 
 				senderOrigBal := testBalances[fromIdx]
 				receiverOrigBal := testBalances[toIdx]
-
-				amountToTransfer := senderOrigBal / 10
-
-				senderNewBal := senderOrigBal - amountToTransfer - baseWallet.X().BaseTxFee()
+				amountToTransfer := transferPerRound
+				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
-				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					_, err = wallets[fromIdx].X().IssueBaseTx(
+				tc.By("X-Chain transfer with wrong amount must fail", func() {
+					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
 							Asset: avax.Asset{
 								ID: avaxAssetID,
@@ -169,10 +213,9 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 								},
 							},
 						}},
-						common.WithContext(ctx),
+						tc.WithDefaultContext(),
 					)
-					cancel()
-					gomega.Expect(err.Error()).Should(gomega.ContainSubstring("insufficient funds"))
+					require.Contains(err.Error(), "insufficient funds")
 				})
 
 				fmt.Printf(`===
@@ -198,8 +241,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					receiverNewBal,
 				)
 
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txID, err := wallets[fromIdx].X().IssueBaseTx(
+				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{
 							ID: avaxAssetID,
@@ -212,53 +254,48 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 							},
 						},
 					}},
-					common.WithContext(ctx),
+					tc.WithDefaultContext(),
 				)
-				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 				senderCurBalX := balances[avaxAssetID]
-				tests.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
+				tc.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
 
 				balances, err = wallets[toIdx].X().Builder().GetFTBalance()
-				gomega.Expect(err).Should(gomega.BeNil())
+				require.NoError(err)
 				receiverCurBalX := balances[avaxAssetID]
-				tests.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
+				tc.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
 
-				gomega.Expect(senderCurBalX).Should(gomega.Equal(senderNewBal))
-				gomega.Expect(receiverCurBalX).Should(gomega.Equal(receiverNewBal))
+				require.Equal(senderCurBalX, senderNewBal)
+				require.Equal(receiverCurBalX, receiverNewBal)
 
+				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
+					require.NoError(avm.AwaitTxAccepted(xc, tc.DefaultContext(), txID, 2*time.Second))
 				}
 
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
+					require.NoError(avm.AwaitTxAccepted(xc, tc.DefaultContext(), txID, 2*time.Second))
 
-					ep := u + "/ext/metrics"
-					mm, err := tests.GetMetricsValue(ep, allMetrics...)
-					gomega.Expect(err).Should(gomega.BeNil())
+					mm, err := tests.GetNodeMetrics(tc.DefaultContext(), u)
+					require.NoError(err)
 
 					prev := metricsBeforeTx[u]
 
 					// +0 since X-chain tx must have been processed and accepted
 					// by now
-					gomega.Expect(mm[metricBlksProcessing]).Should(gomega.Equal(prev[metricBlksProcessing]))
+					currentXBlksProcessing, _ := tests.GetMetricValue(mm, blksProcessingMetric, xChainMetricLabels)
+					previousXBlksProcessing, _ := tests.GetMetricValue(prev, blksProcessingMetric, xChainMetricLabels)
+					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
 					// +1 since X-chain tx must have been accepted by now
-					gomega.Expect(mm[metricBlksAccepted]).Should(gomega.Equal(prev[metricBlksAccepted] + 1))
+					currentXBlksAccepted, _ := tests.GetMetricValue(mm, blksAcceptedMetric, xChainMetricLabels)
+					previousXBlksAccepted, _ := tests.GetMetricValue(prev, blksAcceptedMetric, xChainMetricLabels)
+					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm
 				}

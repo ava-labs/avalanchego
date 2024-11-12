@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"strconv"
@@ -68,12 +69,12 @@ func UTXOIDFromString(s string) (*UTXOID, error) {
 
 	txID, err := ids.FromString(ss[0])
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errFailedDecodingUTXOIDTxID, err)
+		return nil, fmt.Errorf("%w: %w", errFailedDecodingUTXOIDTxID, err)
 	}
 
 	idx, err := strconv.ParseUint(ss[1], 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errFailedDecodingUTXOIDIndex, err)
+		return nil, fmt.Errorf("%w: %w", errFailedDecodingUTXOIDIndex, err)
 	}
 
 	return &UTXOID{
@@ -91,16 +92,11 @@ func (utxo *UTXOID) Verify() error {
 	}
 }
 
-func (utxo *UTXOID) Less(other *UTXOID) bool {
+func (utxo *UTXOID) Compare(other *UTXOID) int {
 	utxoID, utxoIndex := utxo.InputSource()
 	otherID, otherIndex := other.InputSource()
-
-	switch bytes.Compare(utxoID[:], otherID[:]) {
-	case -1:
-		return true
-	case 0:
-		return utxoIndex < otherIndex
-	default:
-		return false
+	if txIDComp := bytes.Compare(utxoID[:], otherID[:]); txIDComp != 0 {
+		return txIDComp
 	}
+	return cmp.Compare(utxoIndex, otherIndex)
 }

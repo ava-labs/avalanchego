@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -62,7 +62,7 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 		return errNameTooLong
 	case tx.VMID == ids.Empty:
 		return errInvalidVMID
-	case !utils.IsSortedAndUniqueSortable(tx.FxIDs):
+	case !utils.IsSortedAndUnique(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
 	case len(tx.GenesisData) > MaxGenesisLen:
 		return errGenesisTooLong

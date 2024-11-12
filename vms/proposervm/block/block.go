@@ -1,15 +1,15 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
 
 import (
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -17,9 +17,8 @@ import (
 var (
 	_ SignedBlock = (*statelessBlock)(nil)
 
-	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
-	errMissingProposer    = errors.New("expected proposer but none was provided")
-	errInvalidCertificate = errors.New("invalid certificate")
+	errUnexpectedSignature = errors.New("signature provided when none was expected")
+	errInvalidCertificate  = errors.New("invalid certificate")
 )
 
 type Block interface {
@@ -29,6 +28,7 @@ type Block interface {
 	Bytes() []byte
 
 	initialize(bytes []byte) error
+	verify(chainID ids.ID) error
 }
 
 type SignedBlock interface {
@@ -36,9 +36,10 @@ type SignedBlock interface {
 
 	PChainHeight() uint64
 	Timestamp() time.Time
-	Proposer() ids.NodeID
 
-	Verify(shouldHaveProposer bool, chainID ids.ID) error
+	// Proposer returns the ID of the node that proposed this block. If no node
+	// signed this block, [ids.EmptyNodeID] will be returned.
+	Proposer() ids.NodeID
 }
 
 type statelessUnsignedBlock struct {
@@ -55,7 +56,7 @@ type statelessBlock struct {
 
 	id        ids.ID
 	timestamp time.Time
-	cert      *x509.Certificate
+	cert      *staking.Certificate
 	proposer  ids.NodeID
 	bytes     []byte
 }
@@ -91,14 +92,35 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 		return nil
 	}
 
-	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
+	var err error
+	b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
+		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}
 
-	b.cert = cert
-	b.proposer = ids.NodeIDFromCert(cert)
+	b.proposer = ids.NodeIDFromCert(b.cert)
 	return nil
+}
+
+func (b *statelessBlock) verify(chainID ids.ID) error {
+	if len(b.StatelessBlock.Certificate) == 0 {
+		if len(b.Signature) > 0 {
+			return errUnexpectedSignature
+		}
+		return nil
+	}
+
+	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
+	if err != nil {
+		return err
+	}
+
+	headerBytes := header.Bytes()
+	return staking.CheckSignature(
+		b.cert,
+		headerBytes,
+		b.Signature,
+	)
 }
 
 func (b *statelessBlock) PChainHeight() uint64 {
@@ -111,23 +133,4 @@ func (b *statelessBlock) Timestamp() time.Time {
 
 func (b *statelessBlock) Proposer() ids.NodeID {
 	return b.proposer
-}
-
-func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
-	if !shouldHaveProposer {
-		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
-			return errUnexpectedProposer
-		}
-		return nil
-	} else if b.cert == nil {
-		return errMissingProposer
-	}
-
-	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
-	if err != nil {
-		return err
-	}
-
-	headerBytes := header.Bytes()
-	return b.cert.CheckSignature(b.cert.SignatureAlgorithm, headerBytes, b.Signature)
 }

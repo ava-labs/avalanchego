@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -23,7 +23,6 @@ func Test_newMsgBuilder(t *testing.T) {
 
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
-		"test",
 		prometheus.NewRegistry(),
 		10*time.Second,
 	)
@@ -33,18 +32,18 @@ func Test_newMsgBuilder(t *testing.T) {
 
 func TestInboundMsgBuilder(t *testing.T) {
 	var (
-		chainID                     = ids.GenerateTestID()
-		requestID            uint32 = 12345
-		deadline                    = time.Hour
-		nodeID                      = ids.GenerateTestNodeID()
-		summary                     = []byte{9, 8, 7}
-		appBytes                    = []byte{1, 3, 3, 7}
-		container                   = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
-		containerIDs                = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-		acceptedContainerIDs        = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-		summaryIDs                  = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-		heights                     = []uint64{1000, 2000}
-		engineType                  = p2p.EngineType_ENGINE_TYPE_SNOWMAN
+		chainID                    = ids.GenerateTestID()
+		requestID           uint32 = 12345
+		deadline                   = time.Hour
+		nodeID                     = ids.GenerateTestNodeID()
+		summary                    = []byte{9, 8, 7}
+		appBytes                   = []byte{1, 3, 3, 7}
+		container                  = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
+		containerIDs               = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+		requestedHeight     uint64 = 999
+		acceptedContainerID        = ids.GenerateTestID()
+		summaryIDs                 = []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+		heights                    = []uint64{1000, 2000}
 	)
 
 	t.Run(
@@ -65,8 +64,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.GetStateSummaryFrontier)
-			require.True(ok)
+			require.IsType(&p2p.GetStateSummaryFrontier{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.GetStateSummaryFrontier)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 		},
@@ -87,8 +86,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(StateSummaryFrontierOp, msg.Op())
 			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
-			innerMsg, ok := msg.Message().(*p2p.StateSummaryFrontier)
-			require.True(ok)
+			require.IsType(&p2p.StateSummaryFrontier{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.StateSummaryFrontier)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(summary, innerMsg.Summary)
@@ -114,8 +113,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.GetAcceptedStateSummary)
-			require.True(ok)
+			require.IsType(&p2p.GetAcceptedStateSummary{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.GetAcceptedStateSummary)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(heights, innerMsg.Heights)
@@ -137,8 +136,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(AcceptedStateSummaryOp, msg.Op())
 			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
-			innerMsg, ok := msg.Message().(*p2p.AcceptedStateSummary)
-			require.True(ok)
+			require.IsType(&p2p.AcceptedStateSummary{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.AcceptedStateSummary)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			summaryIDsBytes := make([][]byte, len(summaryIDs))
@@ -161,7 +160,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				deadline,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -169,11 +167,10 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.GetAcceptedFrontier)
-			require.True(ok)
+			require.IsType(&p2p.GetAcceptedFrontier{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.GetAcceptedFrontier)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -185,23 +182,18 @@ func TestInboundMsgBuilder(t *testing.T) {
 			msg := InboundAcceptedFrontier(
 				chainID,
 				requestID,
-				containerIDs,
+				containerIDs[0],
 				nodeID,
 			)
 
 			require.Equal(AcceptedFrontierOp, msg.Op())
 			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
-			innerMsg, ok := msg.Message().(*p2p.AcceptedFrontier)
-			require.True(ok)
+			require.IsType(&p2p.AcceptedFrontier{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.AcceptedFrontier)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			containerIDsBytes := make([][]byte, len(containerIDs))
-			for i, id := range containerIDs {
-				id := id
-				containerIDsBytes[i] = id[:]
-			}
-			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
+			require.Equal(containerIDs[0][:], innerMsg.ContainerId)
 		},
 	)
 
@@ -217,7 +209,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 				deadline,
 				containerIDs,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -225,11 +216,10 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.GetAccepted)
-			require.True(ok)
+			require.IsType(&p2p.GetAccepted{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.GetAccepted)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			require.Equal(engineType, innerMsg.EngineType)
 		},
 	)
 
@@ -248,8 +238,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(AcceptedOp, msg.Op())
 			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
-			innerMsg, ok := msg.Message().(*p2p.Accepted)
-			require.True(ok)
+			require.IsType(&p2p.Accepted{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.Accepted)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			containerIDsBytes := make([][]byte, len(containerIDs))
@@ -272,8 +262,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				deadline,
 				container,
+				requestedHeight,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -281,12 +271,12 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.PushQuery)
-			require.True(ok)
+			require.IsType(&p2p.PushQuery{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.PushQuery)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(container, innerMsg.Container)
-			require.Equal(engineType, innerMsg.EngineType)
+			require.Equal(requestedHeight, innerMsg.RequestedHeight)
 		},
 	)
 
@@ -301,8 +291,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 				requestID,
 				deadline,
 				containerIDs[0],
+				requestedHeight,
 				nodeID,
-				engineType,
 			)
 			end := time.Now()
 
@@ -310,12 +300,12 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.PullQuery)
-			require.True(ok)
+			require.IsType(&p2p.PullQuery{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.PullQuery)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(containerIDs[0][:], innerMsg.ContainerId)
-			require.Equal(engineType, innerMsg.EngineType)
+			require.Equal(requestedHeight, innerMsg.RequestedHeight)
 		},
 	)
 
@@ -327,30 +317,22 @@ func TestInboundMsgBuilder(t *testing.T) {
 			msg := InboundChits(
 				chainID,
 				requestID,
-				containerIDs,
-				acceptedContainerIDs,
+				containerIDs[0],
+				containerIDs[1],
+				acceptedContainerID,
 				nodeID,
 			)
 
 			require.Equal(ChitsOp, msg.Op())
 			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
-			innerMsg, ok := msg.Message().(*p2p.Chits)
-			require.True(ok)
+			require.IsType(&p2p.Chits{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.Chits)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			containerIDsBytes := make([][]byte, len(containerIDs))
-			for i, id := range containerIDs {
-				id := id
-				containerIDsBytes[i] = id[:]
-			}
-			require.Equal(containerIDsBytes, innerMsg.PreferredContainerIds)
-			acceptedContainerIDsBytes := make([][]byte, len(acceptedContainerIDs))
-			for i, id := range acceptedContainerIDs {
-				id := id
-				acceptedContainerIDsBytes[i] = id[:]
-			}
-			require.Equal(acceptedContainerIDsBytes, innerMsg.AcceptedContainerIds)
+			require.Equal(containerIDs[0][:], innerMsg.PreferredId)
+			require.Equal(containerIDs[1][:], innerMsg.PreferredIdAtHeight)
+			require.Equal(acceptedContainerID[:], innerMsg.AcceptedId)
 		},
 	)
 
@@ -373,8 +355,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(nodeID, msg.NodeID())
 			require.False(msg.Expiration().Before(start.Add(deadline)))
 			require.False(end.Add(deadline).Before(msg.Expiration()))
-			innerMsg, ok := msg.Message().(*p2p.AppRequest)
-			require.True(ok)
+			require.IsType(&p2p.AppRequest{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.AppRequest)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(appBytes, innerMsg.AppBytes)
@@ -396,11 +378,53 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(AppResponseOp, msg.Op())
 			require.Equal(nodeID, msg.NodeID())
 			require.Equal(mockable.MaxTime, msg.Expiration())
-			innerMsg, ok := msg.Message().(*p2p.AppResponse)
-			require.True(ok)
+			require.IsType(&p2p.AppResponse{}, msg.Message())
+			innerMsg := msg.Message().(*p2p.AppResponse)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
 			require.Equal(appBytes, innerMsg.AppBytes)
 		},
 	)
+}
+
+func TestAppError(t *testing.T) {
+	require := require.New(t)
+
+	mb, err := newMsgBuilder(
+		logging.NoLog{},
+		prometheus.NewRegistry(),
+		time.Second,
+	)
+	require.NoError(err)
+
+	nodeID := ids.GenerateTestNodeID()
+	chainID := ids.GenerateTestID()
+	requestID := uint32(1)
+	errorCode := int32(2)
+	errorMessage := "hello world"
+
+	want := &p2p.Message{
+		Message: &p2p.Message_AppError{
+			AppError: &p2p.AppError{
+				ChainId:      chainID[:],
+				RequestId:    requestID,
+				ErrorCode:    errorCode,
+				ErrorMessage: errorMessage,
+			},
+		},
+	}
+
+	outMsg, err := mb.createOutbound(want, compression.TypeNone, false)
+	require.NoError(err)
+
+	got, err := mb.parseInbound(outMsg.Bytes(), nodeID, func() {})
+	require.NoError(err)
+
+	require.Equal(nodeID, got.NodeID())
+	require.Equal(AppErrorOp, got.Op())
+
+	msg, ok := got.Message().(*p2p.AppError)
+	require.True(ok)
+	require.Equal(errorCode, msg.ErrorCode)
+	require.Equal(errorMessage, msg.ErrorMessage)
 }

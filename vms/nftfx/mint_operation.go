@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -6,11 +6,10 @@ package nftfx
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/vms/types"
-
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 var errNilMintOperation = errors.New("nil mint operation")

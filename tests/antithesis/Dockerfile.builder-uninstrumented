@@ -1,0 +1,17 @@
+# The version is supplied as a build argument rather than hard-coded
+# to minimize the cost of version changes.
+ARG GO_VERSION
+
+FROM golang:$GO_VERSION-bullseye
+
+WORKDIR /build
+# Copy and download dependencies using go mod
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+# Copy the code into the container
+COPY . .
+
+# Ensure pre-existing builds are not available for inclusion in the final image
+RUN [ -d ./build ] && rm -rf ./build/* || true

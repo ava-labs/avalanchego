@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -8,18 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 )
 
@@ -31,23 +28,20 @@ var (
 	blkID1 = ids.ID{1}
 	blkID2 = ids.ID{2}
 
-	status1 = choices.Accepted
-	status2 = choices.Processing
-
 	time1 = time.Unix(1, 0)
 	time2 = time.Unix(2, 0)
 )
 
-func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "batchedParseBlockCachingTestKey"
 
 	// create mock
 	ctrl := gomock.NewController(t)
-	vm := mocks.NewMockChainVM(ctrl)
+	vm := blockmock.NewChainVM(ctrl)
 
 	if loadExpectations {
-		blk1 := snowman.NewMockBlock(ctrl)
-		blk2 := snowman.NewMockBlock(ctrl)
+		blk1 := snowmanmock.NewBlock(ctrl)
+		blk2 := snowmanmock.NewBlock(ctrl)
 		gomock.InOrder(
 			// Initialize
 			vm.EXPECT().Initialize(
@@ -62,7 +56,6 @@ func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) (bl
 			vm.EXPECT().ParseBlock(gomock.Any(), blkBytes1).Return(blk1, nil).Times(1),
 			blk1.EXPECT().ID().Return(blkID1).Times(1),
 			blk1.EXPECT().Parent().Return(blkID0).Times(1),
-			blk1.EXPECT().Status().Return(status1).Times(1),
 			blk1.EXPECT().Height().Return(uint64(1)).Times(1),
 			blk1.EXPECT().Timestamp().Return(time1).Times(1),
 
@@ -70,13 +63,12 @@ func batchedParseBlockCachingTestPlugin(t *testing.T, loadExpectations bool) (bl
 			vm.EXPECT().ParseBlock(gomock.Any(), blkBytes2).Return(blk2, nil).Times(1),
 			blk2.EXPECT().ID().Return(blkID2).Times(1),
 			blk2.EXPECT().Parent().Return(blkID1).Times(1),
-			blk2.EXPECT().Status().Return(status2).Times(1),
 			blk2.EXPECT().Height().Return(uint64(2)).Times(1),
 			blk2.EXPECT().Timestamp().Return(time2).Times(1),
 		)
 	}
 
-	return vm, ctrl
+	return vm
 }
 
 func TestBatchedParseBlockCaching(t *testing.T) {
@@ -84,22 +76,19 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	testKey := batchedParseBlockCachingTestKey
 
 	// Create and start the plugin
-	vm, stopper := buildClientHelper(require, testKey)
-	defer stopper.Stop(context.Background())
+	vm := buildClientHelper(require, testKey)
+	defer vm.runtime.Stop(context.Background())
 
-	ctx := snow.DefaultContextTest()
-	dbManager := manager.NewMemDB(version.Semantic1_0_0)
+	ctx := snowtest.Context(t, snowtest.CChainID)
 
-	err := vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil)
-	require.NoError(err)
+	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil, nil))
 
 	// Call should parse the first block
 	blk, err := vm.ParseBlock(context.Background(), blkBytes1)
 	require.NoError(err)
 	require.Equal(blkID1, blk.ID())
 
-	_, typeChecked := blk.(*chain.BlockWrapper)
-	require.True(typeChecked)
+	require.IsType(&chain.BlockWrapper{}, blk)
 
 	// Call should cache the first block and parse the second block
 	blks, err := vm.BatchedParseBlock(context.Background(), [][]byte{blkBytes1, blkBytes2})
@@ -108,11 +97,8 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	require.Equal(blkID1, blks[0].ID())
 	require.Equal(blkID2, blks[1].ID())
 
-	_, typeChecked = blks[0].(*chain.BlockWrapper)
-	require.True(typeChecked)
-
-	_, typeChecked = blks[1].(*chain.BlockWrapper)
-	require.True(typeChecked)
+	require.IsType(&chain.BlockWrapper{}, blks[0])
+	require.IsType(&chain.BlockWrapper{}, blks[1])
 
 	// Call should be fully cached and not result in a grpc call
 	blks, err = vm.BatchedParseBlock(context.Background(), [][]byte{blkBytes1, blkBytes2})
@@ -121,9 +107,6 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	require.Equal(blkID1, blks[0].ID())
 	require.Equal(blkID2, blks[1].ID())
 
-	_, typeChecked = blks[0].(*chain.BlockWrapper)
-	require.True(typeChecked)
-
-	_, typeChecked = blks[1].(*chain.BlockWrapper)
-	require.True(typeChecked)
+	require.IsType(&chain.BlockWrapper{}, blks[0])
+	require.IsType(&chain.BlockWrapper{}, blks[1])
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -12,41 +12,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ AtomicUTXOManager = (*atomicUTXOManager)(nil)
-
-type AtomicUTXOManager interface {
-	// GetAtomicUTXOs returns exported UTXOs such that at least one of the
-	// addresses in [addrs] is referenced.
-	//
-	// Returns at most [limit] UTXOs.
-	//
-	// Returns:
-	// * The fetched UTXOs
-	// * The address associated with the last UTXO fetched
-	// * The ID of the last UTXO fetched
-	// * Any error that may have occurred upstream.
-	GetAtomicUTXOs(
-		chainID ids.ID,
-		addrs set.Set[ids.ShortID],
-		startAddr ids.ShortID,
-		startUTXOID ids.ID,
-		limit int,
-	) ([]*UTXO, ids.ShortID, ids.ID, error)
-}
-
-type atomicUTXOManager struct {
-	sm    atomic.SharedMemory
-	codec codec.Manager
-}
-
-func NewAtomicUTXOManager(sm atomic.SharedMemory, codec codec.Manager) AtomicUTXOManager {
-	return &atomicUTXOManager{
-		sm:    sm,
-		codec: codec,
-	}
-}
-
-func (a *atomicUTXOManager) GetAtomicUTXOs(
+// GetAtomicUTXOs returns exported UTXOs such that at least one of the
+// addresses in [addrs] is referenced.
+//
+// Returns at most [limit] UTXOs.
+//
+// Returns:
+// * The fetched UTXOs
+// * The address associated with the last UTXO fetched
+// * The ID of the last UTXO fetched
+// * Any error that may have occurred upstream.
+func GetAtomicUTXOs(
+	sharedMemory atomic.SharedMemory,
+	codec codec.Manager,
 	chainID ids.ID,
 	addrs set.Set[ids.ShortID],
 	startAddr ids.ShortID,
@@ -61,7 +39,7 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 		i++
 	}
 
-	allUTXOBytes, lastAddr, lastUTXO, err := a.sm.Indexed(
+	allUTXOBytes, lastAddr, lastUTXO, err := sharedMemory.Indexed(
 		chainID,
 		addrsList,
 		startAddr.Bytes(),
@@ -69,7 +47,7 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 		limit,
 	)
 	if err != nil {
-		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
+		return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("error fetching atomic UTXOs: %w", err)
 	}
 
 	lastAddrID, err := ids.ToShortID(lastAddr)
@@ -84,8 +62,8 @@ func (a *atomicUTXOManager) GetAtomicUTXOs(
 	utxos := make([]*UTXO, len(allUTXOBytes))
 	for i, utxoBytes := range allUTXOBytes {
 		utxo := &UTXO{}
-		if _, err := a.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
+		if _, err := codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return nil, ids.ShortID{}, ids.Empty, fmt.Errorf("error parsing UTXO: %w", err)
 		}
 		utxos[i] = utxo
 	}

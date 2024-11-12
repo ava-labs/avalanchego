@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -203,7 +203,7 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]byte, ids.ID, error) {
 	switch networkID {
 	case constants.MainnetID, constants.TestnetID, constants.LocalID:
-		return nil, ids.ID{}, fmt.Errorf(
+		return nil, ids.Empty, fmt.Errorf(
 			"%w: %s",
 			errOverridesStandardNetworkConfig,
 			constants.NetworkName(networkID),
@@ -212,11 +212,11 @@ func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]b
 
 	config, err := GetConfigFile(filepath)
 	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
+		return nil, ids.Empty, fmt.Errorf("unable to load provided genesis config at %s: %w", filepath, err)
 	}
 
 	if err := validateConfig(networkID, config, stakingCfg); err != nil {
-		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
+		return nil, ids.Empty, fmt.Errorf("genesis config validation failed: %w", err)
 	}
 
 	return FromConfig(config)
@@ -245,7 +245,7 @@ func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]b
 func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig) ([]byte, ids.ID, error) {
 	switch networkID {
 	case constants.MainnetID, constants.TestnetID, constants.LocalID:
-		return nil, ids.ID{}, fmt.Errorf(
+		return nil, ids.Empty, fmt.Errorf(
 			"%w: %s",
 			errOverridesStandardNetworkConfig,
 			constants.NetworkName(networkID),
@@ -254,11 +254,11 @@ func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig
 
 	customConfig, err := GetConfigContent(genesisContent)
 	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("unable to load genesis content from flag: %w", err)
+		return nil, ids.Empty, fmt.Errorf("unable to load genesis content from flag: %w", err)
 	}
 
 	if err := validateConfig(networkID, customConfig, stakingCfg); err != nil {
-		return nil, ids.ID{}, fmt.Errorf("genesis config validation failed: %w", err)
+		return nil, ids.Empty, fmt.Errorf("genesis config validation failed: %w", err)
 	}
 
 	return FromConfig(customConfig)
@@ -298,7 +298,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		for _, allocation := range xAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
-				return nil, ids.ID{}, err
+				return nil, ids.Empty, err
 			}
 
 			avax.InitialState["fixedCap"] = append(avax.InitialState["fixedCap"], avm.Holder{
@@ -323,26 +323,25 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	avmSS := avm.CreateStaticService()
 	err := avmSS.BuildGenesis(nil, &avmArgs, &avmReply)
 	if err != nil {
-		return nil, ids.ID{}, err
+		return nil, ids.Empty, err
 	}
 
 	bytes, err := formatting.Decode(defaultEncoding, avmReply.Bytes)
 	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
+		return nil, ids.Empty, fmt.Errorf("couldn't parse avm genesis reply: %w", err)
 	}
 	avaxAssetID, err := AVAXAssetID(bytes)
 	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
+		return nil, ids.Empty, fmt.Errorf("couldn't generate AVAX asset ID: %w", err)
 	}
 
 	genesisTime := time.Unix(int64(config.StartTime), 0)
 	initialSupply, err := config.InitialSupply()
 	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("couldn't calculate the initial supply: %w", err)
+		return nil, ids.Empty, fmt.Errorf("couldn't calculate the initial supply: %w", err)
 	}
 
-	initiallyStaked := set.Set[ids.ShortID]{}
-	initiallyStaked.Add(config.InitialStakedFunds...)
+	initiallyStaked := set.Of(config.InitialStakedFunds...)
 	skippedAllocations := []Allocation(nil)
 
 	// Specify the initial state of the Platform Chain
@@ -361,7 +360,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 		if err != nil {
-			return nil, ids.ID{}, err
+			return nil, ids.Empty, err
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
@@ -392,14 +391,14 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 
 		destAddrStr, err := address.FormatBech32(hrp, staker.RewardAddress.Bytes())
 		if err != nil {
-			return nil, ids.ID{}, err
+			return nil, ids.Empty, err
 		}
 
 		utxos := []api.UTXO(nil)
 		for _, allocation := range nodeAllocations {
 			addr, err := address.FormatBech32(hrp, allocation.AVAXAddr.Bytes())
 			if err != nil {
-				return nil, ids.ID{}, err
+				return nil, ids.Empty, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
 				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
@@ -419,8 +418,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		delegationFee := json.Uint32(staker.DelegationFee)
 
 		platformvmArgs.Validators = append(platformvmArgs.Validators,
-			api.PermissionlessValidator{
-				Staker: api.Staker{
+			api.GenesisPermissionlessValidator{
+				GenesisValidator: api.GenesisValidator{
 					StartTime: json.Uint64(genesisTime.Unix()),
 					EndTime:   json.Uint64(endStakingTime.Unix()),
 					NodeID:    staker.NodeID,
@@ -431,6 +430,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				},
 				Staked:             utxos,
 				ExactDelegationFee: &delegationFee,
+				Signer:             staker.Signer,
 			},
 		)
 	}
@@ -463,12 +463,12 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	platformvmReply := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
 	if err := platformvmSS.BuildGenesis(nil, &platformvmArgs, &platformvmReply); err != nil {
-		return nil, ids.ID{}, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
+		return nil, ids.Empty, fmt.Errorf("problem while building platform chain's genesis state: %w", err)
 	}
 
 	genesisBytes, err := formatting.Decode(platformvmReply.Encoding, platformvmReply.Bytes)
 	if err != nil {
-		return nil, ids.ID{}, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
+		return nil, ids.Empty, fmt.Errorf("problem parsing platformvm genesis bytes: %w", err)
 	}
 
 	return genesisBytes, avaxAssetID, nil
@@ -552,9 +552,11 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
 }
 
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
-	parser, err := xchaintxs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
+	parser, err := xchaintxs.NewParser(
+		[]fxs.Fx{
+			&secp256k1fx.Fx{},
+		},
+	)
 	if err != nil {
 		return ids.Empty, err
 	}
@@ -571,7 +573,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	genesisTx := genesis.Txs[0]
 
 	tx := xchaintxs.Tx{Unsigned: &genesisTx.CreateAssetTx}
-	if err := parser.InitializeGenesisTx(&tx); err != nil {
+	if err := tx.Initialize(genesisCodec); err != nil {
 		return ids.Empty, err
 	}
 	return tx.ID(), nil

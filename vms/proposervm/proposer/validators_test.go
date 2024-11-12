@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposer
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,16 +12,31 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestValidatorDataLess(t *testing.T) {
-	require := require.New(t)
-
-	var v1, v2 validatorData
-	require.False(v1.Less(v2))
-	require.False(v2.Less(v1))
-
-	v1 = validatorData{
-		id: ids.NodeID{1},
+func TestValidatorDataCompare(t *testing.T) {
+	tests := []struct {
+		a        validatorData
+		b        validatorData
+		expected int
+	}{
+		{
+			a:        validatorData{},
+			b:        validatorData{},
+			expected: 0,
+		},
+		{
+			a: validatorData{
+				id: ids.BuildTestNodeID([]byte{1}),
+			},
+			b:        validatorData{},
+			expected: 1,
+		},
 	}
-	require.False(v1.Less(v2))
-	require.True(v2.Less(v1))
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s_%s_%d", test.a.id, test.b.id, test.expected), func(t *testing.T) {
+			require := require.New(t)
+
+			require.Equal(test.expected, test.a.Compare(test.b))
+			require.Equal(-test.expected, test.b.Compare(test.a))
+		})
+	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -37,6 +37,10 @@ func (NoLog) Debug(string, ...zap.Field) {}
 func (NoLog) Verbo(string, ...zap.Field) {}
 
 func (NoLog) SetLevel(Level) {}
+
+func (NoLog) Enabled(Level) bool {
+	return false
+}
 
 func (NoLog) StopOnPanic() {}
 

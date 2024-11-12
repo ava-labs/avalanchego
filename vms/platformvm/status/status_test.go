@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package status
@@ -26,8 +26,7 @@ func TestStatusJSON(t *testing.T) {
 		require.NoError(err)
 
 		var parsedStatus Status
-		err = json.Unmarshal(statusJSON, &parsedStatus)
-		require.NoError(err)
+		require.NoError(json.Unmarshal(statusJSON, &parsedStatus))
 		require.Equal(status, parsedStatus)
 	}
 
@@ -39,8 +38,7 @@ func TestStatusJSON(t *testing.T) {
 
 	{
 		status := Committed
-		err := json.Unmarshal([]byte("null"), &status)
-		require.NoError(err)
+		require.NoError(json.Unmarshal([]byte("null"), &status))
 		require.Equal(Committed, status)
 	}
 

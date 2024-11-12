@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -6,39 +6,40 @@ package snowball
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/stretchr/testify/require"
+	"gonum.org/v1/gonum/mathext/prng"
 )
 
 func TestSnowballGovernance(t *testing.T) {
-	numColors := 2
-	numNodes := 100
-	numByzantine := 10
-	numRed := 55
-	params := Parameters{
-		K: 20, Alpha: 15, BetaVirtuous: 20, BetaRogue: 30,
-	}
-	seed := int64(0)
+	require := require.New(t)
 
-	nBitwise := Network{}
-	nBitwise.Initialize(params, numColors)
+	var (
+		numColors           = 2
+		numNodes            = 100
+		numByzantine        = 10
+		numRed              = 55
+		params              = DefaultParameters
+		seed         uint64 = 0
+		source              = prng.NewMT19937()
+	)
 
-	sampler.Seed(seed)
+	nBitwise := NewNetwork(SnowballFactory, params, numColors, source)
+
+	source.Seed(seed)
 	for i := 0; i < numRed; i++ {
-		nBitwise.AddNodeSpecificColor(&Tree{}, 0, []int{1})
+		nBitwise.AddNodeSpecificColor(NewTree, 0, []int{1})
 	}
 
 	for _, node := range nBitwise.nodes {
-		if node.Preference() != nBitwise.colors[0] {
-			t.Fatalf("Wrong preferences")
-		}
+		require.Equal(nBitwise.colors[0], node.Preference())
 	}
 
 	for i := 0; i < numNodes-numByzantine-numRed; i++ {
-		nBitwise.AddNodeSpecificColor(&Tree{}, 1, []int{0})
+		nBitwise.AddNodeSpecificColor(NewTree, 1, []int{0})
 	}
 
 	for i := 0; i < numByzantine; i++ {
-		nBitwise.AddNodeSpecificColor(&Byzantine{}, 1, []int{0})
+		nBitwise.AddNodeSpecificColor(NewByzantine, 1, []int{0})
 	}
 
 	for !nBitwise.Finalized() {
@@ -49,8 +50,6 @@ func TestSnowballGovernance(t *testing.T) {
 		if _, ok := node.(*Byzantine); ok {
 			continue
 		}
-		if node.Preference() != nBitwise.colors[0] {
-			t.Fatalf("Wrong preferences")
-		}
+		require.Equal(nBitwise.colors[0], node.Preference())
 	}
 }

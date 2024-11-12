@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package atomic
@@ -107,7 +107,7 @@ func sharedID(id1, id2 ids.ID) ids.ID {
 		id1, id2 = id2, id1
 	}
 
-	combinedBytes, err := codecManager.Marshal(codecVersion, [2]ids.ID{id1, id2})
+	combinedBytes, err := Codec.Marshal(CodecVersion, [2]ids.ID{id1, id2})
 	if err != nil {
 		panic(err)
 	}

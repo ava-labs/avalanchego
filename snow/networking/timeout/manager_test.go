@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timeout
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -26,20 +27,19 @@ func TestManagerFire(t *testing.T) {
 			TimeoutHalflife:    5 * time.Minute,
 		},
 		benchlist,
-		"",
+		prometheus.NewRegistry(),
 		prometheus.NewRegistry(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	go manager.Dispatch()
+	defer manager.Stop()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	manager.RegisterRequest(
-		ids.NodeID{},
-		ids.ID{},
+		ids.EmptyNodeID,
+		ids.Empty,
 		true,
 		ids.RequestID{},
 		wg.Done,

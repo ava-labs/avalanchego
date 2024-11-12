@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package wrappers
@@ -348,7 +348,7 @@ func TestPackerUnpackBool(t *testing.T) {
 
 	p := Packer{Bytes: []byte{0x01}, Offset: 0}
 
-	require.Equal(true, p.UnpackBool())
+	require.True(p.UnpackBool())
 	require.False(p.Errored())
 	require.NoError(p.Err)
 	require.Equal(BoolLen, p.Offset)
@@ -358,7 +358,7 @@ func TestPackerUnpackBool(t *testing.T) {
 	require.ErrorIs(p.Err, ErrInsufficientLength)
 
 	p = Packer{Bytes: []byte{0x42}, Offset: 0}
-	require.Equal(false, p.UnpackBool())
+	require.False(p.UnpackBool())
 	require.True(p.Errored())
 	require.ErrorIs(p.Err, errBadBool)
 }

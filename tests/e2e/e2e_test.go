@@ -1,117 +1,76 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e_test
 
 import (
-	"flag"
+	"encoding/base64"
+	"encoding/json"
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/onsi/gomega"
-
-	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/stretchr/testify/require"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/etna"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
+
+	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/tests/e2e/vms"
+	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 func TestE2E(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
-var (
-	// helpers to parse test flags
-	logLevel string
-
-	networkRunnerGRPCEp              string
-	networkRunnerAvalancheGoExecPath string
-	networkRunnerAvalancheGoLogLevel string
-
-	uris string
-
-	testKeysFile string
-)
+var flagVars *e2e.FlagVars
 
 func init() {
-	flag.StringVar(
-		&logLevel,
-		"log-level",
-		"info",
-		"log level",
-	)
-
-	flag.StringVar(
-		&networkRunnerGRPCEp,
-		"network-runner-grpc-endpoint",
-		"",
-		"[optional] gRPC server endpoint for network-runner (only required for local network-runner tests)",
-	)
-	flag.StringVar(
-		&networkRunnerAvalancheGoExecPath,
-		"network-runner-avalanchego-path",
-		"",
-		"[optional] avalanchego executable path (only required for local network-runner tests)",
-	)
-	flag.StringVar(
-		&networkRunnerAvalancheGoLogLevel,
-		"network-runner-avalanchego-log-level",
-		"INFO",
-		"[optional] avalanchego log-level (only required for local network-runner tests)",
-	)
-
-	// e.g., custom network HTTP RPC endpoints
-	flag.StringVar(
-		&uris,
-		"uris",
-		"",
-		"HTTP RPC endpoint URIs for avalanche node (comma-separated, required to run against existing cluster)",
-	)
-
-	// file that contains a list of new-line separated secp256k1 private keys
-	flag.StringVar(
-		&testKeysFile,
-		"test-keys-file",
-		"",
-		"file that contains a list of new-line separated hex-encoded secp256k1 private keys (assume test keys are pre-funded, for test networks)",
-	)
+	flagVars = e2e.RegisterFlags()
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	err := e2e.Env.ConfigCluster(
-		logLevel,
-		networkRunnerGRPCEp,
-		networkRunnerAvalancheGoExecPath,
-		networkRunnerAvalancheGoLogLevel,
-		uris,
-		testKeysFile,
-	)
-	gomega.Expect(err).Should(gomega.BeNil())
+var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+	// Run only once in the first ginkgo process
 
-	// check cluster can be started
-	err = e2e.Env.StartCluster()
-	gomega.Expect(err).Should(gomega.BeNil())
+	tc := e2e.NewTestContext()
 
-	// load keys
-	err = e2e.Env.LoadKeys()
-	gomega.Expect(err).Should(gomega.BeNil())
+	nodes := tmpnet.NewNodesOrPanic(flagVars.NodeCount())
+	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
-	// take initial snapshot. cluster will be switched off
-	err = e2e.Env.SnapInitialState()
-	gomega.Expect(err).Should(gomega.BeNil())
+	upgrades := upgrade.Default
+	if flagVars.ActivateEtna() {
+		upgrades.EtnaTime = upgrade.InitiallyActiveTime
+	} else {
+		upgrades.EtnaTime = upgrade.UnscheduledActivationTime
+	}
 
-	// restart cluster
-	err = e2e.Env.RestoreInitialState(false /*switchOffNetworkFirst*/)
-	gomega.Expect(err).Should(gomega.BeNil())
-})
+	upgradeJSON, err := json.Marshal(upgrades)
+	require.NoError(tc, err)
 
-var _ = ginkgo.AfterSuite(func() {
-	err := e2e.Env.ShutdownCluster()
-	gomega.Expect(err).Should(gomega.BeNil())
+	upgradeBase64 := base64.StdEncoding.EncodeToString(upgradeJSON)
+	return e2e.NewTestEnvironment(
+		tc,
+		flagVars,
+		&tmpnet.Network{
+			Owner: "avalanchego-e2e",
+			DefaultFlags: tmpnet.FlagsMap{
+				config.UpgradeFileContentKey: upgradeBase64,
+			},
+			Nodes:   nodes,
+			Subnets: subnets,
+		},
+	).Marshal()
+}, func(envBytes []byte) {
+	// Run in every ginkgo process
+
+	// Initialize the local test environment from the global state
+	e2e.InitSharedTestEnvironment(ginkgo.GinkgoT(), envBytes)
 })

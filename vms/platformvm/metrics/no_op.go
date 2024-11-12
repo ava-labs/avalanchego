@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
 var Noop Metrics = noopMetrics{}
@@ -21,7 +21,7 @@ func (noopMetrics) MarkOptionVoteWon() {}
 
 func (noopMetrics) MarkOptionVoteLost() {}
 
-func (noopMetrics) MarkAccepted(blocks.Block) error {
+func (noopMetrics) MarkAccepted(block.Block) error {
 	return nil
 }
 

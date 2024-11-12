@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -11,9 +11,7 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
 	"golang.org/x/exp/maps"
-
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -27,16 +25,16 @@ type Factory interface {
 	// MakeChain creates a new logger to log the events of chain [chainID]
 	MakeChain(chainID string) (Logger, error)
 
-	// SetLogLevels sets log levels for all loggers in factory with given logger name, level pairs.
+	// SetLogLevel sets log levels for all loggers in factory with given logger name, level pairs.
 	SetLogLevel(name string, level Level) error
 
-	// SetDisplayLevels sets log display levels for all loggers in factory with given logger name, level pairs.
+	// SetDisplayLevel sets log display levels for all loggers in factory with given logger name, level pairs.
 	SetDisplayLevel(name string, level Level) error
 
-	// GetLogLevels returns all log levels in factory as name, level pairs
+	// GetLogLevel returns all log levels in factory as name, level pairs
 	GetLogLevel(name string) (Level, error)
 
-	// GetDisplayLevels returns all log display levels in factory as name, level pairs
+	// GetDisplayLevel returns all log display levels in factory as name, level pairs
 	GetDisplayLevel(name string) (Level, error)
 
 	// GetLoggerNames returns the names of all logs created by this factory

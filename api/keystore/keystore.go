@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -28,8 +27,11 @@ const (
 )
 
 var (
-	errEmptyUsername = errors.New("empty username")
-	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+	errEmptyUsername     = errors.New("empty username")
+	errUserMaxLength     = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+	errUserAlreadyExists = errors.New("user already exists")
+	errIncorrectPassword = errors.New("incorrect password")
+	errNonexistentUser   = errors.New("user doesn't exist")
 
 	usersPrefix = []byte("users")
 	bcsPrefix   = []byte("bcs")
@@ -100,22 +102,14 @@ type keystore struct {
 	// Used to persist users and their data
 	userDB database.Database
 	bcDB   database.Database
-	//           BaseDB
-	//          /      \
-	//    UserDB        BlockchainDB
-	//                 /      |     \
-	//               Usr     Usr    Usr
-	//             /  |  \
-	//          BID  BID  BID
 }
 
-func New(log logging.Logger, dbManager manager.Manager) Keystore {
-	currentDB := dbManager.Current()
+func New(log logging.Logger, db database.Database) Keystore {
 	return &keystore{
 		log:                log,
 		usernameToPassword: make(map[string]*password.Hash),
-		userDB:             prefixdb.New(usersPrefix, currentDB.Database),
-		bcDB:               prefixdb.New(bcsPrefix, currentDB.Database),
+		userDB:             prefixdb.New(usersPrefix, db),
+		bcDB:               prefixdb.New(bcsPrefix, db),
 	}
 }
 
@@ -158,7 +152,7 @@ func (ks *keystore) GetRawDatabase(bID ids.ID, username, pw string) (database.Da
 		return nil, err
 	}
 	if passwordHash == nil || !passwordHash.Check(pw) {
-		return nil, fmt.Errorf("incorrect password for user %q", username)
+		return nil, fmt.Errorf("%w: user %q", errIncorrectPassword, username)
 	}
 
 	userDB := prefixdb.New([]byte(username), ks.bcDB)
@@ -182,7 +176,7 @@ func (ks *keystore) CreateUser(username, pw string) error {
 		return err
 	}
 	if passwordHash != nil {
-		return fmt.Errorf("user already exists: %s", username)
+		return fmt.Errorf("%w: %s", errUserAlreadyExists, username)
 	}
 
 	if err := password.IsValid(pw, password.OK); err != nil {
@@ -194,7 +188,7 @@ func (ks *keystore) CreateUser(username, pw string) error {
 		return err
 	}
 
-	passwordBytes, err := c.Marshal(codecVersion, passwordHash)
+	passwordBytes, err := Codec.Marshal(CodecVersion, passwordHash)
 	if err != nil {
 		return err
 	}
@@ -224,9 +218,9 @@ func (ks *keystore) DeleteUser(username, pw string) error {
 	case err != nil:
 		return err
 	case passwordHash == nil:
-		return fmt.Errorf("user doesn't exist: %s", username)
+		return fmt.Errorf("%w: %s", errNonexistentUser, username)
 	case !passwordHash.Check(pw):
-		return fmt.Errorf("incorrect password for user %q", username)
+		return fmt.Errorf("%w: user %q", errIncorrectPassword, username)
 	}
 
 	userNameBytes := []byte(username)
@@ -290,18 +284,18 @@ func (ks *keystore) ImportUser(username, pw string, userBytes []byte) error {
 		return err
 	}
 	if passwordHash != nil {
-		return fmt.Errorf("user already exists: %s", username)
+		return fmt.Errorf("%w: %s", errUserAlreadyExists, username)
 	}
 
 	userData := user{}
-	if _, err := c.Unmarshal(userBytes, &userData); err != nil {
+	if _, err := Codec.Unmarshal(userBytes, &userData); err != nil {
 		return err
 	}
 	if !userData.Hash.Check(pw) {
-		return fmt.Errorf("incorrect password for user %q", username)
+		return fmt.Errorf("%w: user %q", errIncorrectPassword, username)
 	}
 
-	usrBytes, err := c.Marshal(codecVersion, &userData.Hash)
+	usrBytes, err := Codec.Marshal(CodecVersion, &userData.Hash)
 	if err != nil {
 		return err
 	}
@@ -342,7 +336,7 @@ func (ks *keystore) ExportUser(username, pw string) ([]byte, error) {
 		return nil, err
 	}
 	if passwordHash == nil || !passwordHash.Check(pw) {
-		return nil, fmt.Errorf("incorrect password for user %q", username)
+		return nil, fmt.Errorf("%w: user %q", errIncorrectPassword, username)
 	}
 
 	userDB := prefixdb.New([]byte(username), ks.bcDB)
@@ -361,7 +355,7 @@ func (ks *keystore) ExportUser(username, pw string) ([]byte, error) {
 	}
 
 	// Return the byte representation of the user
-	return c.Marshal(codecVersion, &userData)
+	return Codec.Marshal(CodecVersion, &userData)
 }
 
 func (ks *keystore) getPassword(username string) (*password.Hash, error) {
@@ -383,6 +377,6 @@ func (ks *keystore) getPassword(username string) (*password.Hash, error) {
 	}
 
 	passwordHash = &password.Hash{}
-	_, err = c.Unmarshal(userBytes, passwordHash)
+	_, err = Codec.Unmarshal(userBytes, passwordHash)
 	return passwordHash, err
 }

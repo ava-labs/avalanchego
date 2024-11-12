@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
 
+# First argument is the time, in seconds, to run each fuzz test for.
+# If not provided, defaults to 1 second.
+#
+# Second argument is the directory to run fuzz tests in.
+# If not provided, defaults to the current directory.
+
+set -euo pipefail
+
 # Mostly taken from https://github.com/golang/go/issues/46312#issuecomment-1153345129
 
+# Directory above this script
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Load the constants
+source "$AVALANCHE_PATH"/scripts/constants.sh
+
 fuzzTime=${1:-1}
-files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' .)
+fuzzDir=${2:-.}
+
+files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' "$fuzzDir")
 failed=false
 for file in ${files}
 do
-    funcs=$(grep -oP 'func \K(Fuzz\w*)' $file)
+    funcs=$(grep -oP 'func \K(Fuzz\w*)' "$file")
     for func in ${funcs}
     do
         echo "Fuzzing $func in $file"
-        parentDir=$(dirname $file)
-        go test $parentDir -run=$func -fuzz=$func -fuzztime=${fuzzTime}s
+        parentDir=$(dirname "$file")
         # If any of the fuzz tests fail, return exit code 1
-        if [ $? -ne 0 ]; then
+        if ! go test -tags test "$parentDir" -run="$func" -fuzz="$func" -fuzztime="${fuzzTime}"s; then
             failed=true
         fi
     done

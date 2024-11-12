@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -97,8 +98,8 @@ func TestStakerDiffIterator(t *testing.T) {
 	}
 
 	it := NewStakerDiffIterator(
-		NewSliceIterator(currentStakers...),
-		NewSliceIterator(pendingStakers...),
+		iterator.FromSlice(currentStakers...),
+		iterator.FromSlice(pendingStakers...),
 	)
 	for _, expectedStaker := range stakerDiffs {
 		require.True(it.Next())
@@ -134,7 +135,7 @@ func TestMutableStakerIterator(t *testing.T) {
 		},
 	}
 
-	it := newMutableStakerIterator(NewSliceIterator(initialStakers...))
+	it := newMutableStakerIterator(iterator.FromSlice(initialStakers...))
 
 	addedStakers := []*Staker{
 		{

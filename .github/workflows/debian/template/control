@@ -4,5 +4,5 @@ Section: misc
 Priority: optional
 Architecture: arm64 
 Depends:
-Maintainer: Fabio Barone <fabio@avalabs.org>
+Maintainer: Stephen Buttolph <stephen@avalabs.org>
 Description: The Avalanche platform binaries 

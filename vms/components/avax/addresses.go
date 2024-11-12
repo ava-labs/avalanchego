@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ AddressManager = (*addressManager)(nil)
+var (
+	_ AddressManager = (*addressManager)(nil)
+
+	ErrMismatchedChainIDs = errors.New("mismatched chainIDs")
+)
 
 type AddressManager interface {
 	// ParseLocalAddress takes in an address for this chain and produces the ID
@@ -49,7 +54,8 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 	}
 	if chainID != a.ctx.ChainID {
 		return ids.ShortID{}, fmt.Errorf(
-			"expected chainID to be %q but was %q",
+			"%w: expected %q but got %q",
+			ErrMismatchedChainIDs,
 			a.ctx.ChainID,
 			chainID,
 		)
@@ -60,17 +66,17 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	chainIDAlias, hrp, addrBytes, err := address.Parse(addrStr)
 	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
+		return ids.Empty, ids.ShortID{}, err
 	}
 
 	chainID, err := a.ctx.BCLookup.Lookup(chainIDAlias)
 	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
+		return ids.Empty, ids.ShortID{}, err
 	}
 
 	expectedHRP := constants.GetHRP(a.ctx.NetworkID)
 	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf(
+		return ids.Empty, ids.ShortID{}, fmt.Errorf(
 			"expected hrp %q but got %q",
 			expectedHRP,
 			hrp,
@@ -79,7 +85,7 @@ func (a *addressManager) ParseAddress(addrStr string) (ids.ID, ids.ShortID, erro
 
 	addr, err := ids.ToShortID(addrBytes)
 	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
+		return ids.Empty, ids.ShortID{}, err
 	}
 	return chainID, addr, nil
 }
@@ -125,7 +131,7 @@ func ParseServiceAddress(a AddressManager, addrStr string) (ids.ShortID, error) 
 	return addr, nil
 }
 
-// ParseServiceAddress get addresses IDs from addresses strings, being them either localized or not
+// ParseServiceAddresses get addresses IDs from addresses strings, being them either localized or not
 func ParseServiceAddresses(a AddressManager, addrStrs []string) (set.Set[ids.ShortID], error) {
 	addrs := set.NewSet[ids.ShortID](len(addrStrs))
 	for _, addrStr := range addrStrs {
