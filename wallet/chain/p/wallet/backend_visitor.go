@@ -11,6 +11,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
@@ -51,7 +55,7 @@ func (b *backendVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 }
 
 func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
-	b.b.setSubnetOwner(
+	b.b.setOwner(
 		b.txID,
 		tx.Owner,
 	)
@@ -108,7 +112,7 @@ func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 }
 
 func (b *backendVisitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	b.b.setSubnetOwner(
+	b.b.setOwner(
 		tx.Subnet,
 		tx.Owner,
 	)
@@ -120,10 +124,39 @@ func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+	for i, vdr := range tx.Validators {
+		b.b.setOwner(
+			tx.Subnet.Append(uint32(i)),
+			&secp256k1fx.OutputOwners{
+				Threshold: vdr.DeactivationOwner.Threshold,
+				Addrs:     vdr.DeactivationOwner.Addresses,
+			},
+		)
+	}
 	return b.baseTx(&tx.BaseTx)
 }
 
 func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+	warpMessage, err := warp.ParseMessage(tx.Message)
+	if err != nil {
+		return err
+	}
+	addressedCallPayload, err := payload.ParseAddressedCall(warpMessage.Payload)
+	if err != nil {
+		return err
+	}
+	registerSubnetValidatorMessage, err := message.ParseRegisterSubnetValidator(addressedCallPayload.Payload)
+	if err != nil {
+		return err
+	}
+
+	b.b.setOwner(
+		registerSubnetValidatorMessage.ValidationID(),
+		&secp256k1fx.OutputOwners{
+			Threshold: registerSubnetValidatorMessage.DisableOwner.Threshold,
+			Addrs:     registerSubnetValidatorMessage.DisableOwner.Addresses,
+		},
+	)
 	return b.baseTx(&tx.BaseTx)
 }
 
