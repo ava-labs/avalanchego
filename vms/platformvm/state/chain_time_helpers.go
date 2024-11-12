@@ -137,7 +137,7 @@ func getNextSoVEvictionTime(
 // depending on the active upgrade.
 //
 // PickFeeCalculator does not modify [state].
-func PickFeeCalculator(config *config.Config, state Chain) txfee.Calculator {
+func PickFeeCalculator(config *config.Internal, state Chain) txfee.Calculator {
 	timestamp := state.GetTimestamp()
 	if !config.UpgradeConfig.IsEtnaActivated(timestamp) {
 		return NewStaticFeeCalculator(config, timestamp)
@@ -157,7 +157,7 @@ func PickFeeCalculator(config *config.Config, state Chain) txfee.Calculator {
 
 // NewStaticFeeCalculator creates a static fee calculator, with the config set
 // to either the pre-AP3 or post-AP3 config.
-func NewStaticFeeCalculator(config *config.Config, timestamp time.Time) txfee.Calculator {
+func NewStaticFeeCalculator(config *config.Internal, timestamp time.Time) txfee.Calculator {
 	feeConfig := config.StaticFeeConfig
 	if !config.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
 		feeConfig.CreateSubnetTxFee = config.CreateAssetTxFee

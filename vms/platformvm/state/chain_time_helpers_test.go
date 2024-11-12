@@ -243,7 +243,7 @@ func TestPickFeeCalculator(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.fork.String(), func(t *testing.T) {
 			var (
-				config = &config.Config{
+				config = &config.Internal{
 					CreateAssetTxFee: createAssetTxFee,
 					StaticFeeConfig:  staticFeeConfig,
 					DynamicFeeConfig: dynamicFeeConfig,
