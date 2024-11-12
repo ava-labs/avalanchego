@@ -278,13 +278,17 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				sov.Balance = 0
 				require.Equal(
 					platformvm.SubnetOnlyValidator{
-						SubnetID:              subnetID,
-						NodeID:                subnetGenesisNode.NodeID,
-						PublicKey:             genesisNodePK,
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
-						DeactivationOwner:     &secp256k1fx.OutputOwners{},
-						Weight:                genesisWeight,
-						MinNonce:              0,
+						SubnetID:  subnetID,
+						NodeID:    subnetGenesisNode.NodeID,
+						PublicKey: genesisNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   genesisWeight,
+						MinNonce: 0,
 					},
 					sov,
 				)
@@ -398,14 +402,18 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				sov.StartTime = 0
 				require.Equal(
 					platformvm.SubnetOnlyValidator{
-						SubnetID:              subnetID,
-						NodeID:                subnetRegisterNode.NodeID,
-						PublicKey:             registerNodePK,
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
-						DeactivationOwner:     &secp256k1fx.OutputOwners{},
-						Weight:                registerWeight,
-						MinNonce:              0,
-						Balance:               0,
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   registerWeight,
+						MinNonce: 0,
+						Balance:  0,
 					},
 					sov,
 				)
@@ -491,14 +499,18 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				sov.StartTime = 0
 				require.Equal(
 					platformvm.SubnetOnlyValidator{
-						SubnetID:              subnetID,
-						NodeID:                subnetRegisterNode.NodeID,
-						PublicKey:             registerNodePK,
-						RemainingBalanceOwner: &secp256k1fx.OutputOwners{},
-						DeactivationOwner:     &secp256k1fx.OutputOwners{},
-						Weight:                updatedWeight,
-						MinNonce:              nextNonce,
-						Balance:               0,
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   updatedWeight,
+						MinNonce: nextNonce,
+						Balance:  0,
 					},
 					sov,
 				)
