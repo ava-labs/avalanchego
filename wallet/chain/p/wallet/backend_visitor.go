@@ -164,10 +164,6 @@ func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWe
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
-	return b.baseTx(&tx.BaseTx)
-}
-
 func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
