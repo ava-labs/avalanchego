@@ -99,7 +99,7 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 	return err
 }
 
-func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply api.GetHeightResponse) error {
+func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getProposedHeight"),
