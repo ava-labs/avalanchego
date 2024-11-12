@@ -76,13 +76,27 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 	require.NoError(tc, err)
 	wallet := primary.NewWalletWithOptions(
 		baseWallet,
-		common.WithPostIssuanceFunc(
-			func(id ids.ID) {
+		common.WithPostIssuanceHandler(
+			func(walletID rune, txID ids.ID, duration time.Duration) {
 				tc.Log().Info("issued transaction",
-					zap.Stringer("txID", id),
+					zap.String("walletID", string(walletID)),
+					zap.Stringer("txID", txID),
+					zap.Duration("duration", duration),
 				)
 			},
 		),
+		common.WithPostConfirmationHandler(
+			func(walletID rune, txID ids.ID, totalDuration time.Duration, issuanceToConfirmationDuration time.Duration) {
+				tc.Log().Info("confirmed transaction",
+					zap.String("walletID", string(walletID)),
+					zap.Stringer("txID", txID),
+					zap.Duration("totalDuration", totalDuration),
+					zap.Duration("issuanceToConfirmationDuration", issuanceToConfirmationDuration),
+				)
+			},
+		),
+		// Use a low poll frequency to ensure more accurate determination of confirmation duration
+		common.WithPollFrequency(10*time.Millisecond),
 	)
 	OutputWalletBalances(tc, wallet)
 	return wallet

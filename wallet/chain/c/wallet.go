@@ -21,6 +21,8 @@ import (
 
 var _ Wallet = (*wallet)(nil)
 
+const WalletID = 'C'
+
 type Wallet interface {
 	// Builder returns the builder that will be used to create the transactions.
 	Builder() Builder
@@ -149,13 +151,15 @@ func (w *wallet) IssueAtomicTx(
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
+	startTime := time.Now()
 	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
+	issuanceDuration := time.Since(startTime)
 	if err != nil {
 		return err
 	}
 
-	if f := ops.PostIssuanceFunc(); f != nil {
-		f(txID)
+	if f := ops.PostIssuanceHandler(); f != nil {
+		f(WalletID, txID, issuanceDuration)
 	}
 
 	if ops.AssumeDecided() {
@@ -164,6 +168,12 @@ func (w *wallet) IssueAtomicTx(
 
 	if err := awaitTxAccepted(w.avaxClient, ctx, txID, ops.PollFrequency()); err != nil {
 		return err
+	}
+	totalDuration := time.Since(startTime)
+	issuanceToConfirmationDuration := totalDuration - issuanceDuration
+
+	if f := ops.PostConfirmationHandler(); f != nil {
+		f(WalletID, txID, totalDuration, issuanceToConfirmationDuration)
 	}
 
 	return w.Backend.AcceptAtomicTx(ctx, tx)

@@ -17,9 +17,27 @@ import (
 
 const defaultPollFrequency = 100 * time.Millisecond
 
-// Signature of the function that will be called after a transaction
-// has been issued with the ID of the issued transaction.
-type PostIssuanceFunc func(ids.ID)
+// Signature of the function that will be called after a transaction has been issued.
+type TxIssuanceHandler func(
+	// Identifies the primary chain ('P', 'X' or 'C')
+	chainChar rune,
+	// ID of the confirmed transaction
+	txID ids.ID,
+	// The time from initiation to issuance
+	duration time.Duration,
+)
+
+// Signature of the function that will be called after a transaction has been confirmed.
+type TxConfirmationHandler func(
+	// Identifies the primary chain ('P', 'X' or 'C')
+	chainChar rune,
+	// ID of the confirmed transaction
+	txID ids.ID,
+	// The time from initiation to confirmation (includes duration of issuance)
+	totalDuration time.Duration,
+	// The time from issuance to confirmation (does not include duration of issuance)
+	issuanceToConfirmationDuration time.Duration,
+)
 
 type Option func(*Options)
 
@@ -48,7 +66,8 @@ type Options struct {
 	pollFrequencySet bool
 	pollFrequency    time.Duration
 
-	postIssuanceFunc PostIssuanceFunc
+	postIssuanceHandler     TxIssuanceHandler
+	postConfirmationHandler TxConfirmationHandler
 }
 
 func NewOptions(ops []Option) *Options {
@@ -132,8 +151,12 @@ func (o *Options) PollFrequency() time.Duration {
 	return defaultPollFrequency
 }
 
-func (o *Options) PostIssuanceFunc() PostIssuanceFunc {
-	return o.postIssuanceFunc
+func (o *Options) PostIssuanceHandler() TxIssuanceHandler {
+	return o.postIssuanceHandler
+}
+
+func (o *Options) PostConfirmationHandler() TxConfirmationHandler {
+	return o.postConfirmationHandler
 }
 
 func WithContext(ctx context.Context) Option {
@@ -200,8 +223,14 @@ func WithPollFrequency(pollFrequency time.Duration) Option {
 	}
 }
 
-func WithPostIssuanceFunc(f PostIssuanceFunc) Option {
+func WithPostIssuanceHandler(f TxIssuanceHandler) Option {
 	return func(o *Options) {
-		o.postIssuanceFunc = f
+		o.postIssuanceHandler = f
+	}
+}
+
+func WithPostConfirmationHandler(f TxConfirmationHandler) Option {
+	return func(o *Options) {
+		o.postConfirmationHandler = f
 	}
 }
