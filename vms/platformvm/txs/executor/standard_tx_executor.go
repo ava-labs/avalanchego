@@ -197,7 +197,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend, e.state, e.tx, tx.SubnetID, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.SubnetID, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -510,7 +510,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return errMaxStakeDurationTooLarge
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -689,7 +689,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
