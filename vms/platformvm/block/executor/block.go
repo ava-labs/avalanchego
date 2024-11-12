@@ -31,6 +31,7 @@ const ActivationLog = `
 
 `
 
+// TODO: Remove after Etna is activated
 var EtnaActivationWasLogged = utils.NewAtomic(false)
 
 var (
