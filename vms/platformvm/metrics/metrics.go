@@ -105,7 +105,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		}),
 		activeSoVs: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "active_sovs",
-			Help: "Number of active Subnet only Validators",
+			Help: "Number of active SoVs",
 		}),
 		excess: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
