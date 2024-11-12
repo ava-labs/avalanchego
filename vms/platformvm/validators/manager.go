@@ -106,7 +106,7 @@ type State interface {
 
 func NewManager(
 	log logging.Logger,
-	cfg config.Config,
+	cfg config.Internal,
 	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
@@ -133,7 +133,7 @@ func NewManager(
 // calling exported functions.
 type manager struct {
 	log     logging.Logger
-	cfg     config.Config
+	cfg     config.Internal
 	state   State
 	metrics metrics.Metrics
 	clk     *mockable.Clock

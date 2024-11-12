@@ -61,7 +61,7 @@ func newTestState(t testing.TB, db database.Database) *state {
 		prometheus.NewRegistry(),
 		validators.NewManager(),
 		upgradetest.GetConfig(upgradetest.Latest),
-		&config.DefaultExecutionConfig,
+		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
 			NodeID:    ids.GenerateTestNodeID(),

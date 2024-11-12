@@ -179,6 +179,15 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.RegisterSubnetValidatorTx, error)
 
+	// NewSetSubnetValidatorWeightTx sets the weight of a validator on an L1.
+	//
+	// - [message] is the Warp message that authorizes this validator's weight
+	//   to be changed
+	NewSetSubnetValidatorWeightTx(
+		message []byte,
+		options ...common.Option,
+	) (*txs.SetSubnetValidatorWeightTx, error)
+
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
 	//
@@ -931,6 +940,56 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 		Balance:           balance,
 		ProofOfPossession: proofOfPossession,
 		Message:           message,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewSetSubnetValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.SetSubnetValidatorWeightTx, error) {
+	var (
+		toBurn         = map[ids.ID]uint64{}
+		toStake        = map[ids.ID]uint64{}
+		ops            = common.NewOptions(options)
+		memo           = ops.Memo()
+		memoComplexity = gas.Dimensions{
+			gas.Bandwidth: uint64(len(memo)),
+		}
+	)
+	warpComplexity, err := fee.WarpComplexity(message)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicSetSubnetValidatorWeightTxComplexities.Add(
+		&memoComplexity,
+		&warpComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.SetSubnetValidatorWeightTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		Message: message,
 	}
 	return tx, b.initCtx(tx)
 }
