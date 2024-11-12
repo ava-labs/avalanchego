@@ -827,9 +827,9 @@ platform.getSubnetOnlyValidator({
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getCurrentValidators",
+    "method": "platform.getSubnetOnlyValidator",
     "params": {
-      "nodeIDs": ["NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD"]
+      "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
     },
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
@@ -839,50 +839,28 @@ curl -X POST --data '{
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "result": {
-    "validators": [
-      {
-        "txID": "2NNkpYTGfTFLSGXJcHtVv6drwVU2cczhmjK2uhvwDyxwsjzZMm",
-        "startTime": "1600368632",
-        "endTime": "1602960455",
-        "stakeAmount": "2000000000000",
-        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
-        "validationRewardOwner": {
-          "locktime": "0",
-          "threshold": "1",
-          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+    "jsonrpc": "2.0",
+    "result": {
+        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
+        "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+        "remainingBalanceOwner": {
+            "locktime": "0",
+            "threshold": "0",
+            "addresses": []
         },
-        "delegationRewardOwner": {
-          "locktime": "0",
-          "threshold": "1",
-          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        "deactivationOwner": {
+            "locktime": "0",
+            "threshold": "0",
+            "addresses": []
         },
-        "potentialReward": "117431493426",
-        "delegationFee": "10.0000",
-        "uptime": "0.0000",
-        "connected": false,
-        "delegatorCount": "1",
-        "delegatorWeight": "25000000000",
-        "delegators": [
-          {
-            "txID": "Bbai8nzGVcyn2VmeYcbS74zfjJLjDacGNVuzuvAQkHn1uWfoV",
-            "startTime": "1600368523",
-            "endTime": "1602960342",
-            "stakeAmount": "25000000000",
-            "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
-            "rewardOwner": {
-              "locktime": "0",
-              "threshold": "1",
-              "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
-            },
-            "potentialReward": "11743144774"
-          }
-        ]
-      }
-    ]
-  },
-  "id": 1
+        "startTime": "1731445206",
+        "weight": "49463",
+        "minNonce": "0",
+        "balance": "1000000000",
+        "height": "3"
+    },
+    "id": 1
 }
 ```
 

@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 
@@ -1005,20 +1006,26 @@ func (s *Service) GetSubnetOnlyValidator(r *http.Request, args *GetSubnetOnlyVal
 		return fmt.Errorf("fetching SoV %q failed: %w", args.ValidationID, err)
 	}
 
-	var remainingBalanceOwner secp256k1fx.OutputOwners
+	var remainingBalanceOwner message.PChainOwner
 	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
 	}
-	remainingBalanceAPIOwner, err := s.getAPIOwner(&remainingBalanceOwner)
+	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
+		Threshold: remainingBalanceOwner.Threshold,
+		Addrs:     remainingBalanceOwner.Addresses,
+	})
 	if err != nil {
 		return fmt.Errorf("failed formatting remaining balance owner: %w", err)
 	}
 
-	var deactivationOwner secp256k1fx.OutputOwners
+	var deactivationOwner message.PChainOwner
 	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &deactivationOwner); err != nil {
 		return fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
 	}
-	deactivationAPIOwner, err := s.getAPIOwner(&deactivationOwner)
+	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
+		Threshold: deactivationOwner.Threshold,
+		Addrs:     deactivationOwner.Addresses,
+	})
 	if err != nil {
 		return fmt.Errorf("failed formatting deactivation owner: %w", err)
 	}
