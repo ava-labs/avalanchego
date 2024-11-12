@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ava-labs/libevm/common"
-	gethtypes "github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -62,7 +62,7 @@ func TestStatefulPrecompile(t *testing.T) {
 		Time:        0,
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
-		Header: &gethtypes.Header{
+		Header: &ethtypes.Header{
 			Number: big.NewInt(0),
 		},
 	}

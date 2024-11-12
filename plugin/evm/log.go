@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/ava-labs/coreth/log"
-	gethlog "github.com/ava-labs/libevm/log"
+	ethlog "github.com/ava-labs/libevm/log"
 	"golang.org/x/exp/slog"
 )
 
 type CorethLogger struct {
-	gethlog.Logger
+	ethlog.Logger
 
 	logLevel *slog.LevelVar
 }
@@ -47,14 +47,14 @@ func InitLogger(alias string, level string, jsonFormat bool, writer io.Writer) (
 
 	// Create handler
 	c := CorethLogger{
-		Logger:   gethlog.NewLogger(handler),
+		Logger:   ethlog.NewLogger(handler),
 		logLevel: logLevel,
 	}
 
 	if err := c.SetLogLevel(level); err != nil {
 		return CorethLogger{}, err
 	}
-	gethlog.SetDefault(c.Logger)
+	ethlog.SetDefault(c.Logger)
 	return c, nil
 }
 

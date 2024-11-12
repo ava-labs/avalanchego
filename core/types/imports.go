@@ -4,73 +4,73 @@
 package types
 
 import (
-	gethtypes "github.com/ava-labs/libevm/core/types"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // The following types are used directly as their upstream definitions.
 // So we list them all here to avoid having many individual files.
 type (
-	AccessList        = gethtypes.AccessList
-	AccessTuple       = gethtypes.AccessTuple
-	AccessListTx      = gethtypes.AccessListTx
-	Bloom             = gethtypes.Bloom
-	Receipt           = gethtypes.Receipt
-	Receipts          = gethtypes.Receipts
-	ReceiptForStorage = gethtypes.ReceiptForStorage
-	LegacyTx          = gethtypes.LegacyTx
-	DynamicFeeTx      = gethtypes.DynamicFeeTx
-	BlobTx            = gethtypes.BlobTx
-	BlobTxSidecar     = gethtypes.BlobTxSidecar
-	Signer            = gethtypes.Signer
-	HomesteadSigner   = gethtypes.HomesteadSigner
+	AccessList        = ethtypes.AccessList
+	AccessTuple       = ethtypes.AccessTuple
+	AccessListTx      = ethtypes.AccessListTx
+	Bloom             = ethtypes.Bloom
+	Receipt           = ethtypes.Receipt
+	Receipts          = ethtypes.Receipts
+	ReceiptForStorage = ethtypes.ReceiptForStorage
+	LegacyTx          = ethtypes.LegacyTx
+	DynamicFeeTx      = ethtypes.DynamicFeeTx
+	BlobTx            = ethtypes.BlobTx
+	BlobTxSidecar     = ethtypes.BlobTxSidecar
+	Signer            = ethtypes.Signer
+	HomesteadSigner   = ethtypes.HomesteadSigner
 
-	Transaction  = gethtypes.Transaction
-	Transactions = gethtypes.Transactions
-	TxByNonce    = gethtypes.TxByNonce
-	TxData       = gethtypes.TxData
+	Transaction  = ethtypes.Transaction
+	Transactions = ethtypes.Transactions
+	TxByNonce    = ethtypes.TxByNonce
+	TxData       = ethtypes.TxData
 )
 
 // The following constants are used directly as their upstream definitions.
 const (
-	BloomBitLength          = gethtypes.BloomBitLength
-	BloomByteLength         = gethtypes.BloomByteLength
-	ReceiptStatusFailed     = gethtypes.ReceiptStatusFailed
-	ReceiptStatusSuccessful = gethtypes.ReceiptStatusSuccessful
+	BloomBitLength          = ethtypes.BloomBitLength
+	BloomByteLength         = ethtypes.BloomByteLength
+	ReceiptStatusFailed     = ethtypes.ReceiptStatusFailed
+	ReceiptStatusSuccessful = ethtypes.ReceiptStatusSuccessful
 
 	// Transaction types.
-	LegacyTxType     = gethtypes.LegacyTxType
-	AccessListTxType = gethtypes.AccessListTxType
-	DynamicFeeTxType = gethtypes.DynamicFeeTxType
-	BlobTxType       = gethtypes.BlobTxType
+	LegacyTxType     = ethtypes.LegacyTxType
+	AccessListTxType = ethtypes.AccessListTxType
+	DynamicFeeTxType = ethtypes.DynamicFeeTxType
+	BlobTxType       = ethtypes.BlobTxType
 )
 
 // The following functions are used directly as their upstream definitions.
 var (
-	BloomLookup         = gethtypes.BloomLookup
-	BytesToBloom        = gethtypes.BytesToBloom
-	CreateBloom         = gethtypes.CreateBloom
-	NewReceipt          = gethtypes.NewReceipt
-	NewContractCreation = gethtypes.NewContractCreation
-	NewTransaction      = gethtypes.NewTransaction
+	BloomLookup         = ethtypes.BloomLookup
+	BytesToBloom        = ethtypes.BytesToBloom
+	CreateBloom         = ethtypes.CreateBloom
+	NewReceipt          = ethtypes.NewReceipt
+	NewContractCreation = ethtypes.NewContractCreation
+	NewTransaction      = ethtypes.NewTransaction
 
 	// Signers
-	NewEIP155Signer        = gethtypes.NewEIP155Signer
-	NewEIP2930Signer       = gethtypes.NewEIP2930Signer
-	NewLondonSigner        = gethtypes.NewLondonSigner
-	NewCancunSigner        = gethtypes.NewCancunSigner
-	MakeSigner             = gethtypes.MakeSigner
-	LatestSigner           = gethtypes.LatestSigner
-	LatestSignerForChainID = gethtypes.LatestSignerForChainID
-	SignTx                 = gethtypes.SignTx
-	SignNewTx              = gethtypes.SignNewTx
-	MustSignNewTx          = gethtypes.MustSignNewTx
-	Sender                 = gethtypes.Sender
+	NewEIP155Signer        = ethtypes.NewEIP155Signer
+	NewEIP2930Signer       = ethtypes.NewEIP2930Signer
+	NewLondonSigner        = ethtypes.NewLondonSigner
+	NewCancunSigner        = ethtypes.NewCancunSigner
+	MakeSigner             = ethtypes.MakeSigner
+	LatestSigner           = ethtypes.LatestSigner
+	LatestSignerForChainID = ethtypes.LatestSignerForChainID
+	SignTx                 = ethtypes.SignTx
+	SignNewTx              = ethtypes.SignNewTx
+	MustSignNewTx          = ethtypes.MustSignNewTx
+	Sender                 = ethtypes.Sender
 
 	// Transactions
-	NewTx        = gethtypes.NewTx
-	TxDifference = gethtypes.TxDifference
+	NewTx        = ethtypes.NewTx
+	TxDifference = ethtypes.TxDifference
 
 	// Errors
-	ErrTxTypeNotSupported = gethtypes.ErrTxTypeNotSupported
-	ErrGasFeeCapTooLow    = gethtypes.ErrGasFeeCapTooLow
+	ErrTxTypeNotSupported = ethtypes.ErrTxTypeNotSupported
+	ErrGasFeeCapTooLow    = ethtypes.ErrGasFeeCapTooLow
 )

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
-	gethparams "github.com/ava-labs/libevm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 const (
@@ -236,7 +236,7 @@ func configTimestampEqual(x, y *uint64) bool {
 
 // ConfigCompatError is raised if the locally-stored blockchain is initialised with a
 // ChainConfig that would alter the past.
-type ConfigCompatError = gethparams.ConfigCompatError
+type ConfigCompatError = ethparams.ConfigCompatError
 
 func newTimestampCompatError(what string, storedtime, newtime *uint64) *ConfigCompatError {
 	var rew *uint64
