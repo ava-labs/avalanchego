@@ -603,6 +603,30 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 			})
 
+			tc.By("verifying the SoV can be fetched", func() {
+				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+				require.NoError(err)
+
+				sov.StartTime = 0
+				require.Equal(
+					platformvm.SubnetOnlyValidator{
+						SubnetID:  subnetID,
+						NodeID:    subnetRegisterNode.NodeID,
+						PublicKey: registerNodePK,
+						RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						DeactivationOwner: &secp256k1fx.OutputOwners{
+							Addrs: []ids.ShortID{},
+						},
+						Weight:   updatedWeight,
+						MinNonce: nextNonce,
+						Balance:  0,
+					},
+					sov,
+				)
+			})
+
 			tc.By("fetching the validator weight change attestation", func() {
 				unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 					networkID,
