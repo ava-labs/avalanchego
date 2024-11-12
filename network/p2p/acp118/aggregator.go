@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	// ErrDuplicateValidator is returned if the provided validator set contains
+	// duplicate validators
 	ErrDuplicateValidator = errors.New("duplicate validator")
 	// ErrInsufficientSignatures is returned if it's not possible for us to
 	// generate a signature due to too many unsuccessful requests to peers
