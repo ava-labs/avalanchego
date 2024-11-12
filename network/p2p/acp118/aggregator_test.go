@@ -54,7 +54,7 @@ func TestVerifier_Verify(t *testing.T) {
 		wantVerifyErr              error
 	}{
 		{
-			name:    "pass - gets signatures from sufficient stake",
+			name:    "gets signatures from sufficient stake",
 			handler: NewHandler(&testVerifier{}, signer),
 			ctx:     context.Background(),
 			validators: []Validator{
@@ -84,7 +84,7 @@ func TestVerifier_Verify(t *testing.T) {
 			quorumDen: 1,
 		},
 		{
-			name:    "fail - gets signatures from insufficient stake",
+			name:    "gets signatures from insufficient stake",
 			handler: NewHandler(&testVerifier{}, signer),
 			ctx:     context.Background(),
 			validators: []Validator{
@@ -169,10 +169,9 @@ func TestVerifier_Verify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			ctx := context.Background()
 			message, err := warp.NewUnsignedMessage(networkID, chainID, []byte("payload"))
 			require.NoError(err)
-			client := p2ptest.NewClient(t, ctx, tt.handler, ids.GenerateTestNodeID(), nodeID0)
+			client := p2ptest.NewClient(t, context.Background(), tt.handler, ids.GenerateTestNodeID(), nodeID0)
 			verifier := NewSignatureAggregator(logging.NoLog{}, client, 1)
 
 			signedMessage, err := verifier.AggregateSignatures(
@@ -184,12 +183,12 @@ func TestVerifier_Verify(t *testing.T) {
 			)
 			require.ErrorIs(err, tt.wantAggregateSignaturesErr)
 
-			if signedMessage == nil {
+			if tt.wantAggregateSignaturesErr != nil {
 				return
 			}
 
 			err = signedMessage.Signature.Verify(
-				ctx,
+				context.Background(),
 				&signedMessage.UnsignedMessage,
 				networkID,
 				tt.pChainState,

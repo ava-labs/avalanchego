@@ -71,15 +71,12 @@ type SignatureAggregator struct {
 // provided message. Validators are issued requests in the caller-specified
 // order.
 func (s *SignatureAggregator) AggregateSignatures(
-	parentCtx context.Context,
+	ctx context.Context,
 	message *warp.UnsignedMessage,
 	justification []byte,
 	validators []Validator,
 	stakeWeightThreshold uint64,
 ) (*warp.Message, error) {
-	ctx, cancel := context.WithCancel(parentCtx)
-	defer cancel()
-
 	request := &sdk.SignatureRequest{
 		Message:       message.Bytes(),
 		Justification: justification,
