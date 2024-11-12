@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -30,7 +31,7 @@ const ActivationLog = `
 
 `
 
-var EtnaActivationWasLogged bool
+var EtnaActivationWasLogged = utils.NewAtomic(false)
 
 var (
 	_ snowman.Block             = (*Block)(nil)
@@ -111,10 +112,10 @@ func (b *Block) Accept(context.Context) error {
 		return nil
 	}
 
-	if !EtnaActivationWasLogged && b.manager.txExecutorBackend.Bootstrapped.Get() {
+	if !EtnaActivationWasLogged.Get() && b.manager.txExecutorBackend.Bootstrapped.Get() {
 		fmt.Print(ActivationLog)
 	}
-	EtnaActivationWasLogged = true
+	EtnaActivationWasLogged.Set(true)
 	return nil
 }
 

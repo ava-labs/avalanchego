@@ -151,7 +151,7 @@ func (vm *VM) Initialize(
 	}
 
 	if currentTime := vm.state.GetTimestamp(); vm.Config.UpgradeConfig.IsEtnaActivated(currentTime) {
-		blockexecutor.EtnaActivationWasLogged = true
+		blockexecutor.EtnaActivationWasLogged.Set(true)
 	}
 
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
