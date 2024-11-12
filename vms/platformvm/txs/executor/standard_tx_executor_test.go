@@ -3125,20 +3125,19 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				nil, // chainIDs
 			)
 
-			message := test.message
-			if message == nil {
-				message = warpMessage.Bytes()
-			}
 			registerSubnetValidatorTx, err := wallet.IssueRegisterSubnetValidatorTx(
 				test.balance,
 				pop.ProofOfPossession,
-				message,
+				warpMessage.Bytes(),
 				test.builderOptions...,
 			)
 			require.NoError(err)
 
+			unsignedTx := registerSubnetValidatorTx.Unsigned.(*txs.RegisterSubnetValidatorTx)
+			if test.message != nil {
+				unsignedTx.Message = test.message
+			}
 			if test.updateTx != nil {
-				unsignedTx := registerSubnetValidatorTx.Unsigned.(*txs.RegisterSubnetValidatorTx)
 				test.updateTx(unsignedTx)
 			}
 

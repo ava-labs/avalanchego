@@ -80,3 +80,53 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
+	sk, err := NewSecretKey()
+	require.NoError(b, err)
+
+	pk := PublicFromSecretKey(sk)
+
+	b.ResetTimer()
+	for range b.N {
+		PublicKeyToCompressedBytes(pk)
+	}
+}
+
+func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
+	sk, err := NewSecretKey()
+	require.NoError(b, err)
+
+	pk := PublicFromSecretKey(sk)
+	pkBytes := PublicKeyToCompressedBytes(pk)
+
+	b.ResetTimer()
+	for range b.N {
+		_, _ = PublicKeyFromCompressedBytes(pkBytes)
+	}
+}
+
+func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
+	sk, err := NewSecretKey()
+	require.NoError(b, err)
+
+	pk := PublicFromSecretKey(sk)
+
+	b.ResetTimer()
+	for range b.N {
+		PublicKeyToUncompressedBytes(pk)
+	}
+}
+
+func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
+	sk, err := NewSecretKey()
+	require.NoError(b, err)
+
+	pk := PublicFromSecretKey(sk)
+	pkBytes := PublicKeyToUncompressedBytes(pk)
+
+	b.ResetTimer()
+	for range b.N {
+		_ = PublicKeyFromValidUncompressedBytes(pkBytes)
+	}
+}
