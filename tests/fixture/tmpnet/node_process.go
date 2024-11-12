@@ -346,6 +346,10 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 // its lines for the string 'FATAL' until such a line is observed or the provided context
 // is canceled. If line containing 'FATAL' is encountered, it will be provided as an error
 // to the provided cancelWithCause function.
+//
+// Errors encountered while looking for FATAL log entries are considered potential rather
+// than positive indications of failure and are printed to the provided writer instead of
+// being provided to the cancelWithCause function.
 func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCauseFunc, w io.Writer, path string) {
 	waitInterval := 100 * time.Millisecond
 	// Wait for the file to exist
