@@ -272,6 +272,10 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			tc.By("verifying the SoV can be fetched", func() {
 				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), genesisValidationID)
 				require.NoError(err)
+				require.LessOrEqual(sov.Balance, genesisBalance)
+
+				sov.StartTime = 0
+				sov.Balance = 0
 				require.Equal(
 					platformvm.SubnetOnlyValidator{
 						SubnetID:              subnetID,
@@ -282,17 +286,8 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight:                genesisWeight,
 						MinNonce:              0,
 					},
-					platformvm.SubnetOnlyValidator{
-						SubnetID:              sov.SubnetID,
-						NodeID:                sov.NodeID,
-						PublicKey:             sov.PublicKey,
-						RemainingBalanceOwner: sov.RemainingBalanceOwner,
-						DeactivationOwner:     sov.DeactivationOwner,
-						Weight:                sov.Weight,
-						MinNonce:              sov.MinNonce,
-					},
+					sov,
 				)
-				require.LessOrEqual(sov.Balance, genesisBalance)
 			})
 		})
 
@@ -399,6 +394,8 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			tc.By("verifying the SoV can be fetched", func() {
 				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
 				require.NoError(err)
+
+				sov.StartTime = 0
 				require.Equal(
 					platformvm.SubnetOnlyValidator{
 						SubnetID:              subnetID,
@@ -410,16 +407,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						MinNonce:              0,
 						Balance:               0,
 					},
-					platformvm.SubnetOnlyValidator{
-						SubnetID:              sov.SubnetID,
-						NodeID:                sov.NodeID,
-						PublicKey:             sov.PublicKey,
-						RemainingBalanceOwner: sov.RemainingBalanceOwner,
-						DeactivationOwner:     sov.DeactivationOwner,
-						Weight:                sov.Weight,
-						MinNonce:              sov.MinNonce,
-						Balance:               sov.Balance,
-					},
+					sov,
 				)
 			})
 		})
@@ -499,6 +487,8 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			tc.By("verifying the SoV can be fetched", func() {
 				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
 				require.NoError(err)
+
+				sov.StartTime = 0
 				require.Equal(
 					platformvm.SubnetOnlyValidator{
 						SubnetID:              subnetID,
@@ -510,16 +500,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						MinNonce:              nextNonce,
 						Balance:               0,
 					},
-					platformvm.SubnetOnlyValidator{
-						SubnetID:              sov.SubnetID,
-						NodeID:                sov.NodeID,
-						PublicKey:             sov.PublicKey,
-						RemainingBalanceOwner: sov.RemainingBalanceOwner,
-						DeactivationOwner:     sov.DeactivationOwner,
-						Weight:                sov.Weight,
-						MinNonce:              sov.MinNonce,
-						Balance:               sov.Balance,
-					},
+					sov,
 				)
 			})
 		})
