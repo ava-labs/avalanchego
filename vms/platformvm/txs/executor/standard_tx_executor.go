@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // TODO: Before Etna, ensure that the maximum number of expiries to track is
@@ -55,6 +56,10 @@ var (
 	errWarpMessageExpired            = errors.New("warp message expired")
 	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
 	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
+	errCouldNotLoadSoV               = errors.New("could not load SoV")
+	errWarpMessageContainsStaleNonce = errors.New("warp message contains stale nonce")
+	errRemovingLastValidator         = errors.New("attempting to remove the last SoV from a converted subnet")
+	errStateCorruption               = errors.New("state corruption")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -859,15 +864,8 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 
 	// Verify that the warp message was sent from the expected chain and
 	// address.
-	subnetConversion, err := e.state.GetSubnetConversion(msg.SubnetID)
-	if err != nil {
-		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, msg.SubnetID, err)
-	}
-	if warpMessage.SourceChainID != subnetConversion.ChainID {
-		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, warpMessage.SourceChainID)
-	}
-	if !bytes.Equal(addressedCall.SourceAddress, subnetConversion.Addr) {
-		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, addressedCall.SourceAddress)
+	if err := verifyL1Conversion(e.state, msg.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
+		return err
 	}
 
 	// Verify that the message contains a valid expiry time.
@@ -959,6 +957,142 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	return nil
 }
 
+func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		upgrades         = e.backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	if err := e.backend.FlowChecker.VerifySpend(
+		tx,
+		e.state,
+		tx.Ins,
+		tx.Outs,
+		e.tx.Creds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	// Parse the warp message.
+	warpMessage, err := warp.ParseMessage(tx.Message)
+	if err != nil {
+		return err
+	}
+	addressedCall, err := payload.ParseAddressedCall(warpMessage.Payload)
+	if err != nil {
+		return err
+	}
+	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
+	if err != nil {
+		return err
+	}
+	if err := msg.Verify(); err != nil {
+		return err
+	}
+
+	// Verify that the message contains a valid nonce for a current validator.
+	sov, err := e.state.GetSubnetOnlyValidator(msg.ValidationID)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
+	}
+	if msg.Nonce < sov.MinNonce {
+		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, sov.MinNonce)
+	}
+
+	// Verify that the warp message was sent from the expected chain and
+	// address.
+	if err := verifyL1Conversion(e.state, sov.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+
+	// Check if we are removing the validator.
+	if msg.Weight == 0 {
+		// Verify that we are not removing the last validator.
+		weight, err := e.state.WeightOfSubnetOnlyValidators(sov.SubnetID)
+		if err != nil {
+			return fmt.Errorf("could not load SoV weights: %w", err)
+		}
+		if weight == sov.Weight {
+			return errRemovingLastValidator
+		}
+
+		// If the validator is currently active, we need to refund the remaining
+		// balance.
+		if sov.EndAccumulatedFee != 0 {
+			var remainingBalanceOwner message.PChainOwner
+			if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+				return fmt.Errorf("%w: remaining balance owner is malformed", errStateCorruption)
+			}
+
+			accruedFees := e.state.GetAccruedFees()
+			if sov.EndAccumulatedFee <= accruedFees {
+				// This check should be unreachable. However, it prevents AVAX
+				// from being minted due to state corruption. This also prevents
+				// invalid UTXOs from being created (with 0 value).
+				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
+			}
+			remainingBalance := sov.EndAccumulatedFee - accruedFees
+
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        txID,
+					OutputIndex: uint32(len(tx.Outs)),
+				},
+				Asset: avax.Asset{
+					ID: e.backend.Ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: remainingBalance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: remainingBalanceOwner.Threshold,
+						Addrs:     remainingBalanceOwner.Addresses,
+					},
+				},
+			}
+			e.state.AddUTXO(utxo)
+		}
+	}
+
+	// If the weight is being set to 0, it is possible for the nonce increment
+	// to overflow. However, the validator is being removed and the nonce
+	// doesn't matter. If weight is not 0, [msg.Nonce] is enforced by
+	// [msg.Verify()] to be less than MaxUInt64 and can therefore be incremented
+	// without overflow.
+	sov.MinNonce = msg.Nonce + 1
+	sov.Weight = msg.Weight
+	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	// Consume the UTXOS
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.state, txID, tx.Outs)
+	return nil
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (
@@ -1027,6 +1161,27 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 		e.state.PutPendingDelegator(staker)
 	default:
 		return fmt.Errorf("staker %s, unexpected priority %d", staker.TxID, priority)
+	}
+	return nil
+}
+
+// verifyL1Conversion verifies that the L1 conversion of [subnetID] references
+// the [expectedChainID] and [expectedAddress].
+func verifyL1Conversion(
+	state state.Chain,
+	subnetID ids.ID,
+	expectedChainID ids.ID,
+	expectedAddress []byte,
+) error {
+	subnetConversion, err := state.GetSubnetConversion(subnetID)
+	if err != nil {
+		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, subnetID, err)
+	}
+	if expectedChainID != subnetConversion.ChainID {
+		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, expectedChainID)
+	}
+	if !bytes.Equal(expectedAddress, subnetConversion.Addr) {
+		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, expectedAddress)
 	}
 	return nil
 }

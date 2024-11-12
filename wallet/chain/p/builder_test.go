@@ -849,6 +849,88 @@ func TestRegisterSubnetValidatorTx(t *testing.T) {
 	}
 }
 
+func TestSetSubnetValidatorWeightTx(t *testing.T) {
+	const (
+		nonce  = 1
+		weight = 7905001371
+	)
+	var (
+		validationID = ids.GenerateTestID()
+		chainID      = ids.GenerateTestID()
+		address      = utils.RandomBytes(20)
+	)
+
+	addressedCallPayload, err := message.NewSubnetValidatorWeight(
+		validationID,
+		nonce,
+		weight,
+	)
+	require.NoError(t, err)
+
+	addressedCall, err := payload.NewAddressedCall(
+		address,
+		addressedCallPayload.Bytes(),
+	)
+	require.NoError(t, err)
+
+	unsignedWarp, err := warp.NewUnsignedMessage(
+		constants.UnitTestID,
+		chainID,
+		addressedCall.Bytes(),
+	)
+	require.NoError(t, err)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	warp, err := warp.NewMessage(
+		unsignedWarp,
+		&warp.BitSetSignature{
+			Signers: set.NewBits(0).Bytes(),
+			Signature: ([bls.SignatureLen]byte)(
+				bls.SignatureToBytes(
+					bls.Sign(
+						sk,
+						unsignedWarp.Bytes(),
+					),
+				),
+			),
+		},
+	)
+	require.NoError(t, err)
+
+	warpMessageBytes := warp.Bytes()
+	for _, e := range testEnvironmentPostEtna {
+		t.Run(e.name, func(t *testing.T) {
+			var (
+				require    = require.New(t)
+				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+					constants.PlatformChainID: utxos,
+				})
+				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				builder = builder.New(set.Of(utxoAddr), e.context, backend)
+			)
+
+			utx, err := builder.NewSetSubnetValidatorWeightTx(
+				warpMessageBytes,
+				common.WithMemo(e.memo),
+			)
+			require.NoError(err)
+			require.Equal(types.JSONByteSlice(warpMessageBytes), utx.Message)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				nil,
+			)
+		})
+	}
+}
+
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs
 	// won't change run by run. This simplifies checking what utxos are included

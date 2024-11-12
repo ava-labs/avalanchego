@@ -3212,6 +3212,509 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 	}
 }
 
+func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
+	var (
+		fx = &secp256k1fx.Fx{}
+		vm = &secp256k1fx.TestVM{
+			Log: logging.NoLog{},
+		}
+	)
+	require.NoError(t, fx.InitializeVM(vm))
+
+	var (
+		ctx           = snowtest.Context(t, constants.PlatformChainID)
+		defaultConfig = &config.Internal{
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+		}
+		baseState = statetest.New(t, statetest.Config{
+			Upgrades: defaultConfig.UpgradeConfig,
+			Context:  ctx,
+		})
+		wallet = txstest.NewWallet(
+			t,
+			ctx,
+			defaultConfig,
+			baseState,
+			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+			nil, // subnetIDs
+			nil, // chainIDs
+		)
+		flowChecker = utxo.NewVerifier(
+			ctx,
+			&vm.Clk,
+			fx,
+		)
+
+		backend = &Backend{
+			Config:       defaultConfig,
+			Bootstrapped: utils.NewAtomic(true),
+			Fx:           fx,
+			FlowChecker:  flowChecker,
+			Ctx:          ctx,
+		}
+		feeCalculator = state.PickFeeCalculator(defaultConfig, baseState)
+	)
+
+	// Create the initial state
+	diff, err := state.NewDiffOn(baseState)
+	require.NoError(t, err)
+
+	// Create the subnet
+	createSubnetTx, err := wallet.IssueCreateSubnetTx(
+		&secp256k1fx.OutputOwners{},
+	)
+	require.NoError(t, err)
+
+	// Execute the subnet creation
+	_, _, _, err = StandardTx(
+		backend,
+		feeCalculator,
+		createSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
+
+	// Create the subnet conversion
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	const (
+		initialWeight = 1
+		balance       = units.Avax
+	)
+	var (
+		subnetID  = createSubnetTx.ID()
+		chainID   = ids.GenerateTestID()
+		address   = utils.RandomBytes(32)
+		validator = &txs.ConvertSubnetValidator{
+			NodeID:  ids.GenerateTestNodeID().Bytes(),
+			Weight:  initialWeight,
+			Balance: balance,
+			Signer:  *signer.NewProofOfPossession(sk),
+			// RemainingBalanceOwner and DeactivationOwner are initialized so
+			// that later reflect based equality checks pass.
+			RemainingBalanceOwner: message.PChainOwner{
+				Threshold: 0,
+				Addresses: []ids.ShortID{},
+			},
+			DeactivationOwner: message.PChainOwner{
+				Threshold: 0,
+				Addresses: []ids.ShortID{},
+			},
+		}
+		validationID = subnetID.Append(0)
+	)
+
+	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+		subnetID,
+		chainID,
+		address,
+		[]*txs.ConvertSubnetValidator{
+			validator,
+		},
+	)
+	require.NoError(t, err)
+
+	// Execute the subnet conversion
+	_, _, _, err = StandardTx(
+		backend,
+		feeCalculator,
+		convertSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
+	require.NoError(t, diff.Apply(baseState))
+	require.NoError(t, baseState.Commit())
+
+	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	require.NoError(t, err)
+
+	// Create the Warp messages
+	const (
+		nonce  = 1
+		weight = initialWeight + 1
+	)
+	unsignedIncreaseWeightWarpMessage := must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+		ctx.NetworkID,
+		chainID,
+		must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+			address,
+			must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+				validationID,
+				nonce,
+				weight,
+			)).Bytes(),
+		)).Bytes(),
+	))
+	warpSignature := &warp.BitSetSignature{
+		Signers: set.NewBits(0).Bytes(),
+		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
+			bls.Sign(
+				sk,
+				unsignedIncreaseWeightWarpMessage.Bytes(),
+			),
+		)),
+	}
+	increaseWeightWarpMessage := must[*warp.Message](t)(warp.NewMessage(
+		unsignedIncreaseWeightWarpMessage,
+		warpSignature,
+	))
+	removeValidatorWarpMessage := must[*warp.Message](t)(warp.NewMessage(
+		must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+			ctx.NetworkID,
+			chainID,
+			must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+				address,
+				must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+					validationID,
+					nonce,
+					0,
+				)).Bytes(),
+			)).Bytes(),
+		)),
+		warpSignature,
+	))
+
+	increaseL1Weight := func(weight uint64) func(*standardTxExecutor) error {
+		return func(e *standardTxExecutor) error {
+			sov := initialSoV
+			sov.ValidationID = ids.GenerateTestID()
+			sov.NodeID = ids.GenerateTestNodeID()
+			sov.Weight = weight
+			return e.state.PutSubnetOnlyValidator(sov)
+		}
+	}
+
+	tests := []struct {
+		name                       string
+		message                    []byte
+		builderOptions             []common.Option
+		updateExecutor             func(*standardTxExecutor) error
+		expectedNonce              uint64
+		expectedWeight             uint64
+		expectedRemainingFundsUTXO *avax.UTXO
+		expectedErr                error
+	}{
+		{
+			name: "invalid prior to E-Upgrade",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Internal{
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+				}
+				return nil
+			},
+			expectedErr: errEtnaUpgradeNotActive,
+		},
+		{
+			name: "tx fails syntactic verification",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+				return nil
+			},
+			expectedErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid memo length",
+			builderOptions: []common.Option{
+				common.WithMemo([]byte("memo!")),
+			},
+			expectedErr: avax.ErrMemoTooLarge,
+		},
+		{
+			name: "invalid fee calculation",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
+				return nil
+			},
+			expectedErr: txfee.ErrUnsupportedTx,
+		},
+		{
+			name: "insufficient fee",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewDynamicCalculator(
+					e.backend.Config.DynamicFeeConfig.Weights,
+					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
+				)
+				return nil
+			},
+			expectedErr: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name:        "invalid warp message",
+			message:     []byte{},
+			expectedErr: codec.ErrCantUnpackVersion,
+		},
+		{
+			name: "invalid warp payload",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.Hash](t)(payload.NewHash(ids.Empty)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: payload.ErrWrongType,
+		},
+		{
+			name: "invalid addressed call",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetConversion](t)(message.NewSubnetConversion(ids.Empty)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: message.ErrWrongType,
+		},
+		{
+			name: "invalid addressed call payload",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							validationID,
+							math.MaxUint64,
+							1,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: message.ErrNonceReservedForRemoval,
+		},
+		{
+			name: "SoV not found",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							ids.GenerateTestID(), // invalid initialValidationID
+							nonce,
+							weight,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: errCouldNotLoadSoV,
+		},
+		{
+			name: "nonce too low",
+			updateExecutor: func(e *standardTxExecutor) error {
+				sov := initialSoV
+				sov.MinNonce = nonce + 1
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+			expectedErr: errWarpMessageContainsStaleNonce,
+		},
+		{
+			name: "invalid source chain",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{})
+				return nil
+			},
+			expectedErr: errWrongWarpMessageSourceChainID,
+		},
+		{
+			name: "invalid source address",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{
+					ChainID: chainID,
+				})
+				return nil
+			},
+			expectedErr: errWrongWarpMessageSourceAddress,
+		},
+		{
+			name:        "remove last validator",
+			message:     removeValidatorWarpMessage.Bytes(),
+			expectedErr: errRemovingLastValidator,
+		},
+		{
+			name:    "remove deactivated validator",
+			message: removeValidatorWarpMessage.Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				// Add another validator to allow removal
+				if err := increaseL1Weight(1)(e); err != nil {
+					return err
+				}
+
+				sov := initialSoV
+				sov.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+		},
+		{
+			name: "remove deactivated validator with nonce overflow",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							validationID,
+							math.MaxUint64,
+							0,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				// Add another validator to allow removal
+				if err := increaseL1Weight(1)(e); err != nil {
+					return err
+				}
+
+				sov := initialSoV
+				sov.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+		},
+		{
+			name:    "should have been previously deactivated",
+			message: removeValidatorWarpMessage.Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetAccruedFees(initialSoV.EndAccumulatedFee)
+				return increaseL1Weight(1)(e)
+			},
+			expectedErr: errStateCorruption,
+		},
+		{
+			name:           "remove active validator",
+			message:        removeValidatorWarpMessage.Bytes(),
+			updateExecutor: increaseL1Weight(1),
+			expectedRemainingFundsUTXO: &avax.UTXO{
+				Asset: avax.Asset{
+					ID: ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: balance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: validator.RemainingBalanceOwner.Threshold,
+						Addrs:     validator.RemainingBalanceOwner.Addresses,
+					},
+				},
+			},
+		},
+		{
+			name:           "L1 weight overflow",
+			updateExecutor: increaseL1Weight(math.MaxUint64 - initialWeight),
+			expectedErr:    safemath.ErrOverflow,
+		},
+		{
+			name:           "update validator",
+			expectedNonce:  nonce + 1,
+			expectedWeight: weight,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Create the SetSubnetValidatorWeightTx
+			wallet := txstest.NewWallet(
+				t,
+				ctx,
+				defaultConfig,
+				baseState,
+				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+				nil, // subnetIDs
+				nil, // chainIDs
+			)
+
+			message := test.message
+			if message == nil {
+				message = increaseWeightWarpMessage.Bytes()
+			}
+			setSubnetValidatorWeightTx, err := wallet.IssueSetSubnetValidatorWeightTx(
+				message,
+				test.builderOptions...,
+			)
+			require.NoError(err)
+
+			diff, err := state.NewDiffOn(baseState)
+			require.NoError(err)
+
+			executor := &standardTxExecutor{
+				backend: &Backend{
+					Config:       defaultConfig,
+					Bootstrapped: utils.NewAtomic(true),
+					Fx:           fx,
+					FlowChecker:  flowChecker,
+					Ctx:          ctx,
+				},
+				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+				tx:            setSubnetValidatorWeightTx,
+				state:         diff,
+			}
+			if test.updateExecutor != nil {
+				require.NoError(test.updateExecutor(executor))
+			}
+
+			err = setSubnetValidatorWeightTx.Unsigned.Visit(executor)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				return
+			}
+
+			for utxoID := range setSubnetValidatorWeightTx.InputIDs() {
+				_, err := diff.GetUTXO(utxoID)
+				require.ErrorIs(err, database.ErrNotFound)
+			}
+
+			baseTxOutputUTXOs := setSubnetValidatorWeightTx.UTXOs()
+			for _, expectedUTXO := range baseTxOutputUTXOs {
+				utxoID := expectedUTXO.InputID()
+				utxo, err := diff.GetUTXO(utxoID)
+				require.NoError(err)
+				require.Equal(expectedUTXO, utxo)
+			}
+
+			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			if test.expectedWeight != 0 {
+				require.NoError(err)
+
+				expectedSoV := initialSoV
+				expectedSoV.MinNonce = test.expectedNonce
+				expectedSoV.Weight = test.expectedWeight
+				require.Equal(expectedSoV, sov)
+				return
+			}
+			require.ErrorIs(err, database.ErrNotFound)
+
+			utxoID := avax.UTXOID{
+				TxID:        setSubnetValidatorWeightTx.ID(),
+				OutputIndex: uint32(len(baseTxOutputUTXOs)),
+			}
+			inputID := utxoID.InputID()
+			utxo, err := diff.GetUTXO(inputID)
+			if test.expectedRemainingFundsUTXO == nil {
+				require.ErrorIs(err, database.ErrNotFound)
+				return
+			}
+			require.NoError(err)
+
+			test.expectedRemainingFundsUTXO.UTXOID = utxoID
+			require.Equal(test.expectedRemainingFundsUTXO, utxo)
+		})
+	}
+}
+
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {
 		require.NoError(t, err)
