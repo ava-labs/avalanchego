@@ -92,13 +92,13 @@ func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentV
 	}
 
 	resp := &pb.GetCurrentValidatorSetResponse{
-		Validators:    make([]*pb.CurrentValidator, len(vdrs)),
+		Validators:    make([]*pb.Validator, len(vdrs)),
 		CurrentHeight: currentHeight,
 	}
 
 	i := 0
 	for _, vdr := range vdrs {
-		vdrPB := &pb.CurrentValidator{
+		vdrPB := &pb.Validator{
 			NodeId:       vdr.NodeID.Bytes(),
 			StartTime:    vdr.StartTime,
 			IsActive:     vdr.IsActive,
