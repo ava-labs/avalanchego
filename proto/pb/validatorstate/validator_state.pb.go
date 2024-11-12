@@ -318,12 +318,12 @@ type Validator struct {
 
 	NodeId       []byte `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	Weight       uint64 `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
-	PublicKey    []byte `protobuf:"bytes,3,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
-	StartTime    uint64 `protobuf:"varint,4,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
-	MinNonce     uint64 `protobuf:"varint,5,opt,name=min_nonce,json=minNonce,proto3" json:"min_nonce,omitempty"`
-	IsActive     bool   `protobuf:"varint,6,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
-	ValidationId []byte `protobuf:"bytes,7,opt,name=validation_id,json=validationId,proto3" json:"validation_id,omitempty"`
-	IsSov        bool   `protobuf:"varint,8,opt,name=is_sov,json=isSov,proto3" json:"is_sov,omitempty"`
+	PublicKey    []byte `protobuf:"bytes,3,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`          // Uncompressed public key, can be empty
+	StartTime    uint64 `protobuf:"varint,4,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`         // can be empty
+	MinNonce     uint64 `protobuf:"varint,5,opt,name=min_nonce,json=minNonce,proto3" json:"min_nonce,omitempty"`            // can be empty
+	IsActive     bool   `protobuf:"varint,6,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`            // can be empty
+	ValidationId []byte `protobuf:"bytes,7,opt,name=validation_id,json=validationId,proto3" json:"validation_id,omitempty"` // can be empty
+	IsSov        bool   `protobuf:"varint,8,opt,name=is_sov,json=isSov,proto3" json:"is_sov,omitempty"`                     // can be empty
 }
 
 func (x *Validator) Reset() {
