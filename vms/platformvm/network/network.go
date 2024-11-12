@@ -56,7 +56,7 @@ func New(
 	state state.Chain,
 	signer warp.Signer,
 	registerer prometheus.Registerer,
-	config config.NetworkConfig,
+	config config.Network,
 ) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {

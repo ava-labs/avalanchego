@@ -177,8 +177,7 @@ type Wallet interface {
 	) (*txs.Tx, error)
 
 	// IssueIncreaseBalanceTx creates, signs, and issues a transaction that
-	// increases the balance of a validator on Permissionless L1 for the
-	// continuous fee.
+	// increases the balance of a validator on an L1 for the continuous fee.
 	//
 	// - [validationID] of the validator
 	// - [balance] amount to increase the validator's balance by
@@ -189,8 +188,8 @@ type Wallet interface {
 	) (*txs.Tx, error)
 
 	// IssueDisableSubnetValidatorTx creates, signs, and issues a transaction
-	// that disables a validator and returns the continuous fee to the
-	// remaining balance owner.
+	// that disables an L1 validator and returns the remaining funds allocated
+	// to the  continuous fee to the remaining balance owner.
 	//
 	// - [validationID] of the validator to disable
 	IssueDisableSubnetValidatorTx(

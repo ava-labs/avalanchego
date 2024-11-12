@@ -35,7 +35,7 @@ type backend struct {
 	context *builder.Context
 
 	ownersLock sync.RWMutex
-	owners     map[ids.ID]fx.Owner // subnetID -> owner
+	owners     map[ids.ID]fx.Owner // subnetID or validationID -> owner
 }
 
 func NewBackend(context *builder.Context, utxos common.ChainUTXOs, owners map[ids.ID]fx.Owner) Backend {

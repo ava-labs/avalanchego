@@ -46,7 +46,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -73,7 +73,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -109,7 +109,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -147,7 +147,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -188,7 +188,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -239,7 +239,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -295,7 +295,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -351,7 +351,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -413,7 +413,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: .8,
 						},
 						Uptimes: uptimes,
@@ -475,7 +475,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: .8,
 						},
 						Uptimes: uptimes,

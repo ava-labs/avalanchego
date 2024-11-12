@@ -29,29 +29,29 @@ func verifyInitializedStruct(tb testing.TB, s interface{}) {
 	}
 }
 
-func TestExecutionConfigUnmarshal(t *testing.T) {
+func TestConfigUnmarshal(t *testing.T) {
 	t.Run("default values from empty json", func(t *testing.T) {
 		require := require.New(t)
 		b := []byte(`{}`)
-		ec, err := GetExecutionConfig(b)
+		ec, err := GetConfig(b)
 		require.NoError(err)
-		require.Equal(&DefaultExecutionConfig, ec)
+		require.Equal(&Default, ec)
 	})
 
 	t.Run("default values from empty bytes", func(t *testing.T) {
 		require := require.New(t)
 		b := []byte(``)
-		ec, err := GetExecutionConfig(b)
+		ec, err := GetConfig(b)
 		require.NoError(err)
-		require.Equal(&DefaultExecutionConfig, ec)
+		require.Equal(&Default, ec)
 	})
 
 	t.Run("mix default and extracted values from json", func(t *testing.T) {
 		require := require.New(t)
 		b := []byte(`{"block-cache-size":1}`)
-		ec, err := GetExecutionConfig(b)
+		ec, err := GetConfig(b)
 		require.NoError(err)
-		expected := DefaultExecutionConfig
+		expected := Default
 		expected.BlockCacheSize = 1
 		require.Equal(&expected, ec)
 	})
@@ -59,8 +59,8 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 	t.Run("all values extracted from json", func(t *testing.T) {
 		require := require.New(t)
 
-		expected := &ExecutionConfig{
-			Network: NetworkConfig{
+		expected := &Config{
+			Network: Network{
 				MaxValidatorSetStaleness:                    1,
 				TargetGossipSize:                            2,
 				PushGossipPercentStake:                      .3,
@@ -100,7 +100,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		b, err := json.Marshal(expected)
 		require.NoError(err)
 
-		actual, err := GetExecutionConfig(b)
+		actual, err := GetConfig(b)
 		require.NoError(err)
 		require.Equal(expected, actual)
 	})

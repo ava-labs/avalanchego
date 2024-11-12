@@ -96,7 +96,7 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 			ctx:          c.Context,
 		},
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
 				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
@@ -460,10 +460,11 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	}
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
-			Clk: &mockable.Clock{},
+			Clk:          &mockable.Clock{},
+			Bootstrapped: utils.NewAtomic(true),
 		},
 		backend: backend,
 	}
@@ -527,10 +528,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	}
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
-			Clk: &mockable.Clock{},
+			Clk:          &mockable.Clock{},
+			Bootstrapped: utils.NewAtomic(true),
 		},
 		backend: backend,
 	}
@@ -582,7 +584,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -654,7 +656,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 					},
 					Clk: &mockable.Clock{},
@@ -754,7 +756,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 					},
 					Clk: &mockable.Clock{},
@@ -831,7 +833,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -888,7 +890,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
@@ -925,7 +927,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -968,7 +970,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	timestamp := time.Unix(12345, 0)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
@@ -1012,7 +1014,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -1055,7 +1057,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	timestamp := time.Unix(12345, 0)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
