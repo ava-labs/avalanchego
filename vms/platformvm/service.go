@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 
@@ -965,6 +966,91 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 		reply.Validators[i] = vdr
 	}
+
+	return nil
+}
+
+type GetSubnetOnlyValidatorArgs struct {
+	ValidationID ids.ID `json:"validationID"`
+}
+
+type GetSubnetOnlyValidatorReply struct {
+	SubnetID ids.ID     `json:"subnetID"`
+	NodeID   ids.NodeID `json:"nodeID"`
+	// PublicKey is the compressed BLS public key of the validator
+	PublicKey             types.JSONByteSlice `json:"publicKey"`
+	RemainingBalanceOwner platformapi.Owner   `json:"remainingBalanceOwner"`
+	DeactivationOwner     platformapi.Owner   `json:"deactivationOwner"`
+	StartTime             avajson.Uint64      `json:"startTime"`
+	Weight                avajson.Uint64      `json:"weight"`
+	MinNonce              avajson.Uint64      `json:"minNonce"`
+	// Balance is the remaining amount of AVAX this SoV has to pay the
+	// continuous fee, according to the last accepted state.
+	Balance avajson.Uint64 `json:"balance"`
+	// Height is the height of the last accepted block
+	Height avajson.Uint64 `json:"height"`
+}
+
+// GetSubnetOnlyValidator returns the SoV if it exists
+func (s *Service) GetSubnetOnlyValidator(r *http.Request, args *GetSubnetOnlyValidatorArgs, reply *GetSubnetOnlyValidatorReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getSubnetOnlyValidator"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	sov, err := s.vm.state.GetSubnetOnlyValidator(args.ValidationID)
+	if err != nil {
+		return fmt.Errorf("fetching SoV %q failed: %w", args.ValidationID, err)
+	}
+
+	var remainingBalanceOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+		return fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
+	}
+	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
+		Threshold: remainingBalanceOwner.Threshold,
+		Addrs:     remainingBalanceOwner.Addresses,
+	})
+	if err != nil {
+		return fmt.Errorf("failed formatting remaining balance owner: %w", err)
+	}
+
+	var deactivationOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &deactivationOwner); err != nil {
+		return fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
+	}
+	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
+		Threshold: deactivationOwner.Threshold,
+		Addrs:     deactivationOwner.Addresses,
+	})
+	if err != nil {
+		return fmt.Errorf("failed formatting deactivation owner: %w", err)
+	}
+
+	ctx := r.Context()
+	height, err := s.vm.GetCurrentHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("failed getting current height: %w", err)
+	}
+
+	reply.SubnetID = sov.SubnetID
+	reply.NodeID = sov.NodeID
+	reply.PublicKey = bls.PublicKeyToCompressedBytes(
+		bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey),
+	)
+	reply.RemainingBalanceOwner = *remainingBalanceAPIOwner
+	reply.DeactivationOwner = *deactivationAPIOwner
+	reply.StartTime = avajson.Uint64(sov.StartTime)
+	reply.Weight = avajson.Uint64(sov.Weight)
+	reply.MinNonce = avajson.Uint64(sov.MinNonce)
+	if sov.EndAccumulatedFee != 0 {
+		accruedFees := s.vm.state.GetAccruedFees()
+		reply.Balance = avajson.Uint64(sov.EndAccumulatedFee - accruedFees)
+	}
+	reply.Height = avajson.Uint64(height)
 
 	return nil
 }
