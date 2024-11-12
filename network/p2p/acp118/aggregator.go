@@ -68,8 +68,7 @@ type SignatureAggregator struct {
 }
 
 // AggregateSignatures blocks until stakeWeightThreshold of validators signs the
-// provided message. Validators are issued requests in the caller-specified
-// order.
+// provided message.
 func (s *SignatureAggregator) AggregateSignatures(
 	ctx context.Context,
 	message *warp.UnsignedMessage,
