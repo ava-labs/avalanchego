@@ -4180,7 +4180,7 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 			expectedErr:  errCouldNotLoadSoV,
 		},
 		{
-			name:         "Not authorized",
+			name:         "not authorized",
 			validationID: validationID,
 			updateTx: func(tx *txs.DisableSubnetValidatorTx) {
 				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
