@@ -14,10 +14,16 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/validatorstest"
 	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ava-labs/subnet-evm/warp/messages"
 	"github.com/ava-labs/subnet-evm/warp/warptest"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -56,7 +62,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 			},
 		},
 		"offchain message": {
@@ -65,7 +71,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 			},
 		},
 		"unknown message": {
@@ -78,7 +84,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
 				require.EqualValues(t, 1, stats.messageParseFail.Snapshot().Count())
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: ParseErrCode},
 		},
@@ -98,7 +104,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
-				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, database, sigCache, [][]byte{offchainMessage.Bytes()})
+				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, uptime.NoOpCalculator, validatorstest.NoOpState, snowCtx.Lock.RLocker(), database, sigCache, [][]byte{offchainMessage.Bytes()})
 				require.NoError(t, err)
 				handler := acp118.NewCachedHandler(sigCache, warpBackend, warpSigner)
 
@@ -177,7 +183,7 @@ func TestBlockSignatures(t *testing.T) {
 				return toMessageBytes(knownBlkID), signature[:]
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
 			},
 		},
@@ -187,7 +193,7 @@ func TestBlockSignatures(t *testing.T) {
 				return toMessageBytes(unknownBlockID), nil
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.EqualValues(t, 1, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 1, stats.blockValidationFail.Snapshot().Count())
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: VerifyErrCode},
@@ -213,6 +219,9 @@ func TestBlockSignatures(t *testing.T) {
 					snowCtx.ChainID,
 					warpSigner,
 					blockClient,
+					uptime.NoOpCalculator,
+					validatorstest.NoOpState,
+					snowCtx.Lock.RLocker(),
 					database,
 					sigCache,
 					nil,
@@ -251,5 +260,92 @@ func TestBlockSignatures(t *testing.T) {
 				require.Equal(t, expectedResponse, response.Signature)
 			})
 		}
+	}
+}
+
+func TestUptimeSignatures(t *testing.T) {
+	database := memdb.New()
+	snowCtx := utils.TestSnowContext()
+	blsSecretKey, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
+
+	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID, totalUptime uint64) ([]byte, *avalancheWarp.UnsignedMessage) {
+		uptimePayload, err := messages.NewValidatorUptime(vID, 80)
+		require.NoError(t, err)
+		addressedCall, err := payload.NewAddressedCall(sourceAddress, uptimePayload.Bytes())
+		require.NoError(t, err)
+		unsignedMessage, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())
+		require.NoError(t, err)
+
+		protoMsg := &sdk.SignatureRequest{Message: unsignedMessage.Bytes()}
+		protoBytes, err := proto.Marshal(protoMsg)
+		require.NoError(t, err)
+		return protoBytes, unsignedMessage
+	}
+
+	for _, withCache := range []bool{true, false} {
+		var sigCache cache.Cacher[ids.ID, []byte]
+		if withCache {
+			sigCache = &cache.LRU[ids.ID, []byte]{Size: 100}
+		} else {
+			sigCache = &cache.Empty[ids.ID, []byte]{}
+		}
+		state, err := validators.NewState(memdb.New())
+		require.NoError(t, err)
+		clk := &mockable.Clock{}
+		uptimeManager := uptime.NewManager(state, clk)
+		uptimeManager.StartTracking([]ids.NodeID{})
+		warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, uptimeManager, state, snowCtx.Lock.RLocker(), database, sigCache, nil)
+		require.NoError(t, err)
+		handler := acp118.NewCachedHandler(sigCache, warpBackend, warpSigner)
+
+		// sourceAddress nonZero
+		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID(), 80)
+		_, appErr := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+		require.Contains(t, appErr.Error(), "source address should be empty")
+
+		// not existing validationID
+		vID := ids.GenerateTestID()
+		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID, 80)
+		_, appErr = handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+		require.Contains(t, appErr.Error(), "failed to get validator")
+
+		// uptime is less than requested (not connected)
+		validationID := ids.GenerateTestID()
+		nodeID := ids.GenerateTestNodeID()
+		require.NoError(t, state.AddValidator(interfaces.Validator{
+			ValidationID:   validationID,
+			NodeID:         nodeID,
+			Weight:         1,
+			StartTimestamp: clk.Unix(),
+			IsActive:       true,
+			IsSoV:          true,
+		}))
+		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID, 80)
+		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
+		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+		require.Contains(t, appErr.Error(), "current uptime 0 is less than queried uptime 80")
+
+		// uptime is less than requested (not enough)
+		require.NoError(t, uptimeManager.Connect(nodeID))
+		clk.Set(clk.Time().Add(40 * time.Second))
+		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID, 80)
+		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
+		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
+		require.Contains(t, appErr.Error(), "current uptime 40 is less than queried uptime 80")
+
+		// valid uptime
+		clk.Set(clk.Time().Add(40 * time.Second))
+		protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID, 80)
+		responseBytes, appErr := handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
+		require.Nil(t, appErr)
+		expectedSignature, err := warpSigner.Sign(msg)
+		require.NoError(t, err)
+		response := &sdk.SignatureResponse{}
+		require.NoError(t, proto.Unmarshal(responseBytes, response))
+		require.Equal(t, expectedSignature[:], response.Signature)
 	}
 }

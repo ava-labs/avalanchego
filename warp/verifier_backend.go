@@ -7,6 +7,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/subnet-evm/warp/messages"
+
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -24,6 +27,11 @@ func (b *backend) Verify(ctx context.Context, unsignedMessage *avalancheWarp.Uns
 	// Known on-chain messages should be signed
 	if _, err := b.GetMessage(messageID); err == nil {
 		return nil
+	} else if err != database.ErrNotFound {
+		return &common.AppError{
+			Code:    ParseErrCode,
+			Message: fmt.Sprintf("failed to get message %s: %s", messageID, err.Error()),
+		}
 	}
 
 	parsed, err := payload.Parse(unsignedMessage.Payload)
@@ -36,6 +44,8 @@ func (b *backend) Verify(ctx context.Context, unsignedMessage *avalancheWarp.Uns
 	}
 
 	switch p := parsed.(type) {
+	case *payload.AddressedCall:
+		return b.verifyOffchainAddressedCall(p)
 	case *payload.Hash:
 		return b.verifyBlockMessage(ctx, p)
 	default:
@@ -53,10 +63,80 @@ func (b *backend) verifyBlockMessage(ctx context.Context, blockHashPayload *payl
 	blockID := blockHashPayload.Hash
 	_, err := b.blockClient.GetAcceptedBlock(ctx, blockID)
 	if err != nil {
-		b.stats.IncBlockSignatureValidationFail()
+		b.stats.IncBlockValidationFail()
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err.Error()),
+		}
+	}
+
+	return nil
+}
+
+// verifyOffchainAddressedCall verifies the addressed call message
+func (b *backend) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
+	// Further, parse the payload to see if it is a known type.
+	parsed, err := messages.Parse(addressedCall.Payload)
+	if err != nil {
+		b.stats.IncMessageParseFail()
+		return &common.AppError{
+			Code:    ParseErrCode,
+			Message: "failed to parse addressed call message: " + err.Error(),
+		}
+	}
+
+	if len(addressedCall.SourceAddress) != 0 {
+		return &common.AppError{
+			Code:    VerifyErrCode,
+			Message: "source address should be empty for offchain addressed messages",
+		}
+	}
+
+	switch p := parsed.(type) {
+	case *messages.ValidatorUptime:
+		if err := b.verifyUptimeMessage(p); err != nil {
+			b.stats.IncUptimeValidationFail()
+			return err
+		}
+	default:
+		b.stats.IncMessageParseFail()
+		return &common.AppError{
+			Code:    ParseErrCode,
+			Message: fmt.Sprintf("unknown message type: %T", p),
+		}
+	}
+
+	return nil
+}
+
+func (b *backend) verifyUptimeMessage(uptimeMsg *messages.ValidatorUptime) *common.AppError {
+	b.stateLock.Lock()
+	defer b.stateLock.Unlock()
+	// first get the validator's nodeID
+	vdr, err := b.validatorState.GetValidator(uptimeMsg.ValidationID)
+	if err != nil {
+		return &common.AppError{
+			Code:    VerifyErrCode,
+			Message: fmt.Sprintf("failed to get validator for validationID %s: %s", uptimeMsg.ValidationID, err.Error()),
+		}
+	}
+	nodeID := vdr.NodeID
+
+	// then get the current uptime
+	currentUptime, _, err := b.uptimeCalculator.CalculateUptime(nodeID)
+	if err != nil {
+		return &common.AppError{
+			Code:    VerifyErrCode,
+			Message: fmt.Sprintf("failed to calculate uptime for nodeID %s: %s", nodeID, err.Error()),
+		}
+	}
+
+	currentUptimeSeconds := uint64(currentUptime.Seconds())
+	// verify the current uptime against the total uptime in the message
+	if currentUptimeSeconds < uptimeMsg.TotalUptime {
+		return &common.AppError{
+			Code:    VerifyErrCode,
+			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for nodeID %s", currentUptimeSeconds, uptimeMsg.TotalUptime, nodeID),
 		}
 	}
 

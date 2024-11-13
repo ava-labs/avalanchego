@@ -20,12 +20,6 @@ type Payload interface {
 	initialize(b []byte)
 }
 
-// Signable is an optional interface that payloads can implement to allow
-// on-the-fly signing of incoming messages by the warp backend.
-type Signable interface {
-	VerifyMesssage(sourceAddress []byte) error
-}
-
 func Parse(bytes []byte) (Payload, error) {
 	var payload Payload
 	if _, err := Codec.Unmarshal(bytes, &payload); err != nil {
