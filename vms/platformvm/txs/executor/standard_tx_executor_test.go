@@ -793,7 +793,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -830,7 +830,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -1962,7 +1962,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			expectedErr: errUnauthorizedSubnetModification,
+			expectedErr: errUnauthorizedModification,
 		},
 		{
 			name: "flow checker failed",
@@ -2464,7 +2464,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				})
 				return nil
 			},
-			expectedErr: errUnauthorizedSubnetModification,
+			expectedErr: errUnauthorizedModification,
 		},
 		{
 			name: "invalid if subnet is transformed",
