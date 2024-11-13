@@ -58,7 +58,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		tx,
 		stateDiff,
 	)
-	require.ErrorIs(err, errUnauthorizedSubnetModification)
+	require.ErrorIs(err, errUnauthorizedModification)
 }
 
 // Ensure Execute fails when an incorrect control signature is given
@@ -101,7 +101,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		tx,
 		stateDiff,
 	)
-	require.ErrorIs(err, errUnauthorizedSubnetModification)
+	require.ErrorIs(err, errUnauthorizedModification)
 }
 
 // Ensure Execute fails when the Subnet the blockchain specifies as
