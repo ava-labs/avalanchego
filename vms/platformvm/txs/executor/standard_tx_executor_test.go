@@ -3943,7 +3943,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Create the SetSubnetValidatorWeightTx
+			// Create the IncreaseBalanceTx
 			wallet := txstest.NewWallet(
 				t,
 				ctx,
