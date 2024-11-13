@@ -4,7 +4,6 @@
 package p
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"math"
@@ -517,7 +516,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		var nextNonce uint64
-		setWeight := func(validationID ids.ID, weight uint64, genesisValidatorBit int) {
+		setWeight := func(validationID ids.ID, weight uint64) {
 			tc.By("creating the unsigned SubnetValidatorWeightMessage")
 			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 				networkID,
@@ -551,7 +550,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			setSubnetValidatorWeight, err := warp.NewMessage(
 				unsignedSubnetValidatorWeight,
 				&warp.BitSetSignature{
-					Signers: set.NewBits(genesisValidatorBit).Bytes(), // [signers] has weight from the genesis validator
+					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis validator
 					Signature: ([bls.SignatureLen]byte)(
 						bls.SignatureToBytes(setSubnetValidatorWeightSignature),
 					),
@@ -586,9 +585,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		}
 
 		tc.By("increasing the weight of the validator", func() {
-			// Because registerValidationID is not active, the genesis validator
-			// is guaranteed to be index 0.
-			setWeight(registerValidationID, updatedWeight, 0)
+			setWeight(registerValidationID, updatedWeight)
 		})
 
 		tc.By("verifying the validator weight was increased", func() {
@@ -710,17 +707,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("removing the registered validator", func() {
-			// Because registerValidationID is active, we must calculate which
-			// bit the genesis validator should be in the warp message.
-			var (
-				genesisValidatorPKBytes  = bls.PublicKeyToUncompressedBytes(genesisNodePK)
-				registerValidatorPKBytes = bls.PublicKeyToUncompressedBytes(registerNodePK)
-				genesisValidatorBit      int
-			)
-			if bytes.Compare(genesisValidatorPKBytes, registerValidatorPKBytes) > 0 {
-				genesisValidatorBit = 1
-			}
-			setWeight(registerValidationID, 0, genesisValidatorBit)
+			setWeight(registerValidationID, 0)
 		})
 
 		tc.By("verifying the validator was removed", func() {
