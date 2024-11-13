@@ -267,5 +267,17 @@ var (
 			},
 			expectedDynamicFee: 113_900,
 		},
+		{
+			name:                 "DisableSubnetValidatorTx",
+			tx:                   "00000000002700003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f1f88b4b9e000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001fd91c5c421468b13b09dda413bdbe1316c7c9417f2468b893071d4cb608a01da00000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f1f88b4e5200000001000000000000000038e6e9fe31c6d070a8c792dbacf6d0aefb8eac2aded49cc0aa9f422d1fdd9ecd0000000a00000000000000020000000900000001ff99bb626d898907a660701e2febaa311b4e644fe71add2d1a3f71748102c73f54d73c8370a9ae33e09c984bb8c03da4922bf208af836ec2daaa31cb42788bee010000000900000000",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 347, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicDisableSubnetValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicDisableSubnetValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   0, // TODO: implement
+			},
+			expectedDynamicFee: 114_700,
+		},
 	}
 )

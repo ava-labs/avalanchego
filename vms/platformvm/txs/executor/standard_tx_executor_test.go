@@ -4015,6 +4015,317 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 	}
 }
 
+func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
+	var (
+		fx = &secp256k1fx.Fx{}
+		vm = &secp256k1fx.TestVM{
+			Log: logging.NoLog{},
+		}
+	)
+	require.NoError(t, fx.InitializeVM(vm))
+	require.NoError(t, fx.Bootstrapped())
+
+	var (
+		ctx           = snowtest.Context(t, constants.PlatformChainID)
+		defaultConfig = &config.Internal{
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+		}
+		baseState = statetest.New(t, statetest.Config{
+			Upgrades: defaultConfig.UpgradeConfig,
+			Context:  ctx,
+		})
+		wallet = txstest.NewWallet(
+			t,
+			ctx,
+			defaultConfig,
+			baseState,
+			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+			nil, // subnetIDs
+			nil, // validationIDs
+			nil, // chainIDs
+		)
+		flowChecker = utxo.NewVerifier(
+			ctx,
+			&vm.Clk,
+			fx,
+		)
+
+		backend = &Backend{
+			Config:       defaultConfig,
+			Bootstrapped: utils.NewAtomic(true),
+			Fx:           fx,
+			FlowChecker:  flowChecker,
+			Ctx:          ctx,
+		}
+		feeCalculator = state.PickFeeCalculator(defaultConfig, baseState)
+	)
+
+	// Create the initial state
+	diff, err := state.NewDiffOn(baseState)
+	require.NoError(t, err)
+
+	// Create the subnet
+	createSubnetTx, err := wallet.IssueCreateSubnetTx(
+		&secp256k1fx.OutputOwners{},
+	)
+	require.NoError(t, err)
+
+	// Execute the subnet creation
+	_, _, _, err = StandardTx(
+		backend,
+		feeCalculator,
+		createSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
+
+	// Create the subnet conversion
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	const (
+		weight         = 1
+		initialBalance = units.Avax
+	)
+	var (
+		subnetID  = createSubnetTx.ID()
+		chainID   = ids.GenerateTestID()
+		address   = utils.RandomBytes(32)
+		validator = &txs.ConvertSubnetValidator{
+			NodeID:  ids.GenerateTestNodeID().Bytes(),
+			Weight:  weight,
+			Balance: initialBalance,
+			Signer:  *signer.NewProofOfPossession(sk),
+			// RemainingBalanceOwner and DeactivationOwner are initialized so
+			// that later reflect based equality checks pass.
+			RemainingBalanceOwner: message.PChainOwner{
+				Threshold: 1,
+				Addresses: []ids.ShortID{
+					ids.GenerateTestShortID(),
+				},
+			},
+			DeactivationOwner: message.PChainOwner{
+				Threshold: 1,
+				Addresses: []ids.ShortID{
+					genesistest.DefaultFundedKeys[0].Address(),
+				},
+			},
+		}
+		validationID = subnetID.Append(0)
+	)
+
+	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+		subnetID,
+		chainID,
+		address,
+		[]*txs.ConvertSubnetValidator{
+			validator,
+		},
+	)
+	require.NoError(t, err)
+
+	// Execute the subnet conversion
+	_, _, _, err = StandardTx(
+		backend,
+		feeCalculator,
+		convertSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
+	require.NoError(t, diff.Apply(baseState))
+	require.NoError(t, baseState.Commit())
+
+	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name            string
+		validationID    ids.ID
+		builderOptions  []common.Option
+		updateTx        func(*txs.DisableSubnetValidatorTx)
+		updateExecutor  func(*standardTxExecutor) error
+		expectedBalance uint64
+		expectedErr     error
+	}{
+		{
+			name: "invalid prior to E-Upgrade",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Internal{
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+				}
+				return nil
+			},
+			expectedErr: errEtnaUpgradeNotActive,
+		},
+		{
+			name: "tx fails syntactic verification",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+				return nil
+			},
+			expectedErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid memo length",
+			builderOptions: []common.Option{
+				common.WithMemo([]byte("memo!")),
+			},
+			expectedErr: avax.ErrMemoTooLarge,
+		},
+		{
+			name:         "sov not found",
+			validationID: ids.GenerateTestID(),
+			expectedErr:  errCouldNotLoadSoV,
+		},
+		{
+			name:         "not authorized",
+			validationID: validationID,
+			updateTx: func(tx *txs.DisableSubnetValidatorTx) {
+				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
+			},
+			expectedErr: errUnauthorizedModification,
+		},
+		{
+			name:         "invalid fee calculation",
+			validationID: validationID,
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
+				return nil
+			},
+			expectedErr: txfee.ErrUnsupportedTx,
+		},
+		{
+			name:         "already deactivated",
+			validationID: validationID,
+			updateExecutor: func(e *standardTxExecutor) error {
+				sov := initialSoV
+				sov.EndAccumulatedFee = 0
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+			expectedBalance: 0,
+		},
+		{
+			name:         "state corruption",
+			validationID: validationID,
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetAccruedFees(math.MaxUint64)
+				return nil
+			},
+			expectedErr: errStateCorruption,
+		},
+		{
+			name:            "deactivate validator",
+			validationID:    validationID,
+			expectedBalance: initialBalance,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Create the DisableSubnetValidatorTx
+			wallet := txstest.NewWallet(
+				t,
+				ctx,
+				defaultConfig,
+				baseState,
+				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+				nil, // subnetIDs
+				[]ids.ID{validationID},
+				nil, // chainIDs
+			)
+
+			disableSubnetValidatorTx, err := wallet.IssueDisableSubnetValidatorTx(
+				validationID,
+				test.builderOptions...,
+			)
+			require.NoError(err)
+
+			unsignedTx := disableSubnetValidatorTx.Unsigned.(*txs.DisableSubnetValidatorTx)
+			unsignedTx.ValidationID = test.validationID
+			if test.updateTx != nil {
+				test.updateTx(unsignedTx)
+			}
+
+			diff, err := state.NewDiffOn(baseState)
+			require.NoError(err)
+
+			executor := &standardTxExecutor{
+				backend: &Backend{
+					Config:       defaultConfig,
+					Bootstrapped: utils.NewAtomic(true),
+					Fx:           fx,
+					FlowChecker:  flowChecker,
+					Ctx:          ctx,
+				},
+				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+				tx:            disableSubnetValidatorTx,
+				state:         diff,
+			}
+			if test.updateExecutor != nil {
+				require.NoError(test.updateExecutor(executor))
+			}
+
+			err = unsignedTx.Visit(executor)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				return
+			}
+
+			for utxoID := range disableSubnetValidatorTx.InputIDs() {
+				_, err := diff.GetUTXO(utxoID)
+				require.ErrorIs(err, database.ErrNotFound)
+			}
+
+			baseTxOutputUTXOs := disableSubnetValidatorTx.UTXOs()
+			for _, expectedUTXO := range baseTxOutputUTXOs {
+				utxoID := expectedUTXO.InputID()
+				utxo, err := diff.GetUTXO(utxoID)
+				require.NoError(err)
+				require.Equal(expectedUTXO, utxo)
+			}
+
+			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			require.NoError(err)
+
+			expectedSoV := initialSoV
+			expectedSoV.EndAccumulatedFee = 0
+			require.Equal(expectedSoV, sov)
+
+			utxoID := avax.UTXOID{
+				TxID:        disableSubnetValidatorTx.ID(),
+				OutputIndex: uint32(len(baseTxOutputUTXOs)),
+			}
+			inputID := utxoID.InputID()
+			utxo, err := diff.GetUTXO(inputID)
+			if test.expectedBalance == 0 {
+				require.ErrorIs(err, database.ErrNotFound)
+				return
+			}
+			require.NoError(err)
+
+			require.Equal(
+				&avax.UTXO{
+					UTXOID: utxoID,
+					Asset: avax.Asset{
+						ID: ctx.AVAXAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: test.expectedBalance,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: validator.RemainingBalanceOwner.Threshold,
+							Addrs:     validator.RemainingBalanceOwner.Addresses,
+						},
+					},
+				},
+				utxo,
+			)
+		})
+	}
+}
+
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {
 		require.NoError(t, err)

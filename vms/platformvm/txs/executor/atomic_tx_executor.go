@@ -124,6 +124,10 @@ func (*atomicTxExecutor) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
 	return ErrWrongTxType
 }
 
+func (*atomicTxExecutor) DisableSubnetValidatorTx(*txs.DisableSubnetValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
 	return e.atomicTx()
 }

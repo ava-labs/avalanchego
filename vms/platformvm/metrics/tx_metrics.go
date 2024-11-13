@@ -166,3 +166,10 @@ func (m *txMetrics) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) DisableSubnetValidatorTx(*txs.DisableSubnetValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "disable_subnet_validator",
+	}).Inc()
+	return nil
+}
