@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -125,7 +126,7 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to fetch P-chain height: %w", err)
 	}
 	err = executor.VerifyWarpMessages(
 		context.TODO(),
@@ -135,12 +136,12 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		tx.Unsigned,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed verifying warp messages: %w", err)
 	}
 
 	stateDiff, err := state.NewDiff(m.preferred, m)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating state diff: %w", err)
 	}
 
 	nextBlkTime, _, err := state.NextBlockTime(
@@ -149,12 +150,12 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		m.txExecutorBackend.Clk,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed selecting next block time: %w", err)
 	}
 
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to advance the chain time: %w", err)
 	}
 
 	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)
@@ -164,7 +165,10 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		tx,
 		stateDiff,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed execution: %w", err)
+	}
+	return nil
 }
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {

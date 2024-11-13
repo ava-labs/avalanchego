@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
@@ -32,4 +33,5 @@ type blockState struct {
 	timestamp       time.Time
 	atomicRequests  map[ids.ID]*atomic.Requests
 	verifiedHeights set.Set[uint64]
+	metrics         metrics.Block
 }
