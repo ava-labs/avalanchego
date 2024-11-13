@@ -36,7 +36,6 @@ type State interface {
 	// GetCurrentValidatorSet returns the current validators of the provided subnet
 	// and the current P-Chain height.
 	// Map is keyed by ValidationID.
-	// The returned map should not be modified.
 	GetCurrentValidatorSet(
 		ctx context.Context,
 		subnetID ids.ID,
