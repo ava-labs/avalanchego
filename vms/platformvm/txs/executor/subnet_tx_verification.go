@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	errWrongNumberOfCredentials       = errors.New("should have the same number of credentials as inputs")
-	errIsImmutable                    = errors.New("is immutable")
-	errUnauthorizedSubnetModification = errors.New("unauthorized subnet modification")
+	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
+	errIsImmutable              = errors.New("is immutable")
+	errUnauthorizedModification = errors.New("unauthorized modification")
 )
 
 // verifyPoASubnetAuthorization carries out the validation for modifying a PoA
@@ -93,7 +93,7 @@ func verifyAuthorization(
 	authCred := tx.Creds[baseTxCredsLen]
 
 	if err := fx.VerifyPermission(tx.Unsigned, auth, authCred, owner); err != nil {
-		return nil, fmt.Errorf("%w: %w", errUnauthorizedSubnetModification, err)
+		return nil, fmt.Errorf("%w: %w", errUnauthorizedModification, err)
 	}
 
 	return tx.Creds[:baseTxCredsLen], nil
