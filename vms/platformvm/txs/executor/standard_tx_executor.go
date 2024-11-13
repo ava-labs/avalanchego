@@ -1165,6 +1165,114 @@ func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 	return nil
 }
 
+func (e *standardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		upgrades         = e.backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	sov, err := e.state.GetSubnetOnlyValidator(tx.ValidationID)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
+	}
+
+	var disableOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &disableOwner); err != nil {
+		return err
+	}
+
+	baseTxCreds, err := verifyAuthorization(
+		e.backend.Fx,
+		e.tx,
+		&secp256k1fx.OutputOwners{
+			Threshold: disableOwner.Threshold,
+			Addrs:     disableOwner.Addresses,
+		},
+		tx.DisableAuth,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	if err := e.backend.FlowChecker.VerifySpend(
+		tx,
+		e.state,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.state, txID, tx.Outs)
+
+	// If the validator is already disabled, there is nothing to do.
+	if sov.EndAccumulatedFee == 0 {
+		return nil
+	}
+
+	var remainingBalanceOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+		return err
+	}
+
+	accruedFees := e.state.GetAccruedFees()
+	if sov.EndAccumulatedFee <= accruedFees {
+		// This check should be unreachable. However, including it ensures
+		// that AVAX can't get minted out of thin air due to state
+		// corruption.
+		return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
+	}
+	remainingBalance := sov.EndAccumulatedFee - accruedFees
+
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(tx.Outs)),
+		},
+		Asset: avax.Asset{
+			ID: e.backend.Ctx.AVAXAssetID,
+		},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: remainingBalance,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: remainingBalanceOwner.Threshold,
+				Addrs:     remainingBalanceOwner.Addresses,
+			},
+		},
+	}
+	e.state.AddUTXO(utxo)
+
+	// Disable the validator
+	sov.EndAccumulatedFee = 0
+	return e.state.PutSubnetOnlyValidator(sov)
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (

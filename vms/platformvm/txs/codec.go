@@ -126,5 +126,6 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&RegisterSubnetValidatorTx{}),
 		targetCodec.RegisterType(&SetSubnetValidatorWeightTx{}),
 		targetCodec.RegisterType(&IncreaseBalanceTx{}),
+		targetCodec.RegisterType(&DisableSubnetValidatorTx{}),
 	)
 }

@@ -194,6 +194,10 @@ func TestVerifyWarpMessages(t *testing.T) {
 			name: "IncreaseBalanceTx",
 			tx:   &txs.IncreaseBalanceTx{},
 		},
+		{
+			name: "DisableSubnetValidatorTx",
+			tx:   &txs.DisableSubnetValidatorTx{},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

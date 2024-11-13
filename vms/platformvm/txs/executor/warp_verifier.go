@@ -110,6 +110,10 @@ func (*warpVerifier) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
 	return nil
 }
 
+func (*warpVerifier) DisableSubnetValidatorTx(*txs.DisableSubnetValidatorTx) error {
+	return nil
+}
+
 func (w *warpVerifier) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
 	return w.verify(tx.Message)
 }
