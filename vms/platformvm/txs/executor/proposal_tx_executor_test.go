@@ -268,14 +268,13 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			require.NoError(err)
 
 			feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-			executor := ProposalTxExecutor{
-				OnCommitState: onCommitState,
-				OnAbortState:  onAbortState,
-				Backend:       &env.backend,
-				FeeCalculator: feeCalculator,
-				Tx:            tx,
-			}
-			err = tx.Unsigned.Visit(&executor)
+			err = ProposalTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				onCommitState,
+				onAbortState,
+			)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -316,14 +315,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
@@ -355,14 +353,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&executor))
+		require.NoError(ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		))
 	}
 
 	// Add a validator to pending validator set of primary network
@@ -414,14 +411,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrNotValidator)
 	}
 
@@ -468,14 +464,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
@@ -505,14 +500,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
@@ -542,14 +536,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&executor))
+		require.NoError(ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		))
 	}
 
 	// Case: Proposed validator start validating at/before current timestamp
@@ -581,14 +574,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
 	}
 
@@ -652,14 +644,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            duplicateSubnetTx,
-		}
-		err = duplicateSubnetTx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			duplicateSubnetTx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 
@@ -699,15 +690,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -740,15 +730,14 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -791,14 +780,13 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrDuplicateValidator)
 	}
 }
@@ -838,14 +826,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrTimestampNotBeforeStartTime)
 	}
 
@@ -873,14 +860,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrAlreadyValidator)
 	}
 
@@ -922,14 +908,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrAlreadyValidator)
 	}
 
@@ -965,14 +950,13 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-		executor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			FeeCalculator: feeCalculator,
-			Tx:            tx,
-		}
-		err = tx.Unsigned.Visit(&executor)
+		err = ProposalTx(
+			&env.backend,
+			feeCalculator,
+			tx,
+			onCommitState,
+			onAbortState,
+		)
 		require.ErrorIs(err, ErrFlowCheckFailed)
 	}
 }

@@ -61,14 +61,13 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onAbortState)
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
+	err = ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
@@ -84,14 +83,13 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
+	err = ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
@@ -104,16 +102,15 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
 
-	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
+	onCommitStakerIterator, err := onCommitState.GetCurrentStakerIterator()
 	require.NoError(err)
 	require.True(onCommitStakerIterator.Next())
 
@@ -128,7 +125,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
 
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+	require.NoError(onCommitState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -165,14 +162,13 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onAbortState)
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
+	err = ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
 
 	// Advance chain timestamp to time that next validator leaves
@@ -182,14 +178,13 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err = newRewardValidatorTx(t, ids.GenerateTestID())
 	require.NoError(err)
 
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
+	err = ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
@@ -202,16 +197,15 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
 
-	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
+	onAbortStakerIterator, err := onAbortState.GetCurrentStakerIterator()
 	require.NoError(err)
 	require.True(onAbortStakerIterator.Next())
 
@@ -226,7 +220,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	oldBalance, err := avax.GetBalance(env.state, stakeOwners)
 	require.NoError(err)
 
-	require.NoError(txExecutor.OnAbortState.Apply(env.state))
+	require.NoError(onAbortState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -322,14 +316,13 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
 
 	vdrDestSet := set.Of(vdrRewardAddress)
 	delDestSet := set.Of(delRewardAddress)
@@ -341,7 +334,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+	require.NoError(onCommitState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -464,14 +457,13 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
 
 	// The delegator should be rewarded if the ProposalTx is committed. Since the
 	// delegatee's share is 25%, we expect the delegator to receive 75% of the reward.
@@ -498,7 +490,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Commit Delegator Diff
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+	require.NoError(onCommitState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -513,14 +505,13 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
 
 	require.NotEqual(vdrStaker.TxID, delStaker.TxID)
 
@@ -569,7 +560,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Commit Validator Diff
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+	require.NoError(onCommitState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -687,14 +678,13 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, delOnCommitState)
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: delOnCommitState,
-		OnAbortState:  delOnAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		delOnCommitState,
+		delOnAbortState,
+	))
 
 	// Create Validator Diffs
 	testID := ids.GenerateTestID()
@@ -709,14 +699,13 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	tx, err = newRewardValidatorTx(t, vdrTx.ID())
 	require.NoError(err)
 
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: vdrOnCommitState,
-		OnAbortState:  vdrOnAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		vdrOnCommitState,
+		vdrOnAbortState,
+	))
 
 	// aborted validator tx should still distribute accrued delegator rewards
 	numVdrStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
@@ -849,14 +838,13 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
 
 	vdrDestSet := set.Of(vdrRewardAddress)
 	delDestSet := set.Of(delRewardAddress)
@@ -868,7 +856,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	require.NoError(txExecutor.OnAbortState.Apply(env.state))
+	require.NoError(onAbortState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())

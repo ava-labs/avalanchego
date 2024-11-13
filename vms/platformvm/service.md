@@ -780,6 +780,90 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getSubnetOnlyValidator`
+
+Returns a current L1 validator.
+
+**Signature:**
+
+```sh
+platform.getSubnetOnlyValidator({
+    validationID: string,
+}) -> {
+    subnetID: string,
+    nodeID: string,
+    publicKey: string,
+    remainingBalanceOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    deactivationOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    startTime: string,
+    weight: string,
+    minNonce: string,
+    balance: string,
+    height: string
+}
+```
+
+- `subnetID` is the L1 this validator is validating.
+- `nodeID` is the node ID of the validator.
+- `publicKey` is the compressed BLS public key of the validator.
+- `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance.
+- `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
+- `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
+- `weight` is weight of this validator used for consensus voting and ICM.
+- `minNonce` is minimum nonce that must be included in a `SetSubnetValidatorWeightTx` for the transaction to be valid.
+- `balance` is current remaining balance that can be used to pay for the validators continuous fee.
+- `height` is height of the last accepted block.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getSubnetOnlyValidator",
+    "params": {
+      "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
+        "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+        "remainingBalanceOwner": {
+            "locktime": "0",
+            "threshold": "0",
+            "addresses": []
+        },
+        "deactivationOwner": {
+            "locktime": "0",
+            "threshold": "0",
+            "addresses": []
+        },
+        "startTime": "1731445206",
+        "weight": "49463",
+        "minNonce": "0",
+        "balance": "1000000000",
+        "height": "3"
+    },
+    "id": 1
+}
+```
+
 ### `platform.getHeight`
 
 Returns the height of the last accepted block.

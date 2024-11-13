@@ -2,16 +2,15 @@
 
 set -euo pipefail
 
-# Starts a promtail instance to collect logs from temporary networks
-# running locally and in CI.
+# - Starts a promtail instance to collect logs from nodes running locally and in CI.
 #
-# The promtail instance will remain running in the background and will forward
-# logs to the central instance for all tmpnet networks.
+# - promtail will remain running in the background and will forward logs to the
+#   specified Loki endpoint.
 #
-# To stop it:
+# - Each node is configured with a file written to ~/.tmpnet/promtail/file_sd_configs/
 #
-#   $ kill -9 `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid
-#
+# - To stop the running instance:
+#     $ kill -9 `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
 # LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
@@ -44,7 +43,7 @@ fi
 
 LOKI_PASSWORD="${LOKI_PASSWORD:-}"
 if [[ -z "${LOKI_PASSWORD}" ]]; then
-  echo "Plase provide a value for LOKI_PASSWORD"
+  echo "Please provide a value for LOKI_PASSWORD"
   exit 1
 fi
 
@@ -86,8 +85,8 @@ fi
 FILE_SD_PATH="${PROMTAIL_WORKING_DIR}/file_sd_configs"
 mkdir -p "${FILE_SD_PATH}"
 
-echo "writing configuration..."
-cat >"${PROMTAIL_WORKING_DIR}"/promtail.yaml <<EOL
+CONFIG_PATH="${PROMTAIL_WORKING_DIR}/promtail.yaml"
+cat > "${CONFIG_PATH}" <<EOL
 server:
   http_listen_port: 0
   grpc_listen_port: 0
@@ -107,9 +106,12 @@ scrape_configs:
       - files:
           - '${FILE_SD_PATH}/*.json'
 EOL
+echo "Wrote configuration to ${CONFIG_PATH}"
 
-echo "starting promtail..."
+echo "Starting promtail..."
 cd "${PROMTAIL_WORKING_DIR}"
 nohup "${CMD}" -config.file=promtail.yaml > promtail.log 2>&1 &
 echo $! > "${PIDFILE}"
-echo "running with pid $(cat "${PIDFILE}")"
+echo "promtail started with pid $(cat "${PIDFILE}")"
+# shellcheck disable=SC2016
+echo 'To stop promtail: "kill -SIGTERM `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid"'

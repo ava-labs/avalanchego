@@ -33,10 +33,10 @@ func TestParseWrongPayloadType(t *testing.T) {
 	require.NoError(err)
 
 	_, err = ParseAddressedCall(hashPayload.Bytes())
-	require.ErrorIs(err, errWrongType)
+	require.ErrorIs(err, ErrWrongType)
 
 	_, err = ParseHash(addressedPayload.Bytes())
-	require.ErrorIs(err, errWrongType)
+	require.ErrorIs(err, ErrWrongType)
 }
 
 func TestParse(t *testing.T) {

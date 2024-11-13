@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -166,6 +167,30 @@ func (w *withOptions) NewConvertSubnetTx(
 		chainID,
 		address,
 		validators,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewRegisterSubnetValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	message []byte,
+	options ...common.Option,
+) (*txs.RegisterSubnetValidatorTx, error) {
+	return w.builder.NewRegisterSubnetValidatorTx(
+		balance,
+		proofOfPossession,
+		message,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewSetSubnetValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.SetSubnetValidatorWeightTx, error) {
+	return w.builder.NewSetSubnetValidatorWeightTx(
+		message,
 		common.UnionOptions(w.options, options)...,
 	)
 }

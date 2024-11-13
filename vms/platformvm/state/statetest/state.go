@@ -30,15 +30,15 @@ import (
 var DefaultNodeID = ids.GenerateTestNodeID()
 
 type Config struct {
-	DB              database.Database
-	Genesis         []byte
-	Registerer      prometheus.Registerer
-	Validators      validators.Manager
-	Upgrades        upgrade.Config
-	ExecutionConfig config.ExecutionConfig
-	Context         *snow.Context
-	Metrics         metrics.Metrics
-	Rewards         reward.Calculator
+	DB         database.Database
+	Genesis    []byte
+	Registerer prometheus.Registerer
+	Validators validators.Manager
+	Upgrades   upgrade.Config
+	Config     config.Config
+	Context    *snow.Context
+	Metrics    metrics.Metrics
+	Rewards    reward.Calculator
 }
 
 func New(t testing.TB, c Config) state.State {
@@ -57,8 +57,8 @@ func New(t testing.TB, c Config) state.State {
 	if c.Upgrades == (upgrade.Config{}) {
 		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
 	}
-	if c.ExecutionConfig == (config.ExecutionConfig{}) {
-		c.ExecutionConfig = config.DefaultExecutionConfig
+	if c.Config == (config.Config{}) {
+		c.Config = config.Default
 	}
 	if c.Context == nil {
 		c.Context = &snow.Context{
@@ -85,7 +85,7 @@ func New(t testing.TB, c Config) state.State {
 		c.Registerer,
 		c.Validators,
 		c.Upgrades,
-		&c.ExecutionConfig,
+		&c.Config,
 		c.Context,
 		c.Metrics,
 		c.Rewards,

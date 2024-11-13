@@ -1207,7 +1207,7 @@ func (n *Node) initVMs() error {
 	// Register the VMs that Avalanche supports
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
-			Config: platformconfig.Config{
+			Internal: platformconfig.Internal{
 				Chains:                    n.chainManager,
 				Validators:                vdrs,
 				UptimeLockedCalculator:    n.uptimeCalculator,

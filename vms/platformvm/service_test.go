@@ -374,7 +374,7 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t, upgradetest.Durango)
 
-	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
+	feeCalculator := state.PickFeeCalculator(&service.vm.Internal, service.vm.state)
 	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
 	require.NoError(err)
 
@@ -896,7 +896,7 @@ func TestGetBlock(t *testing.T) {
 			service, _ := defaultService(t, upgradetest.Latest)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.Internal.CreateAssetTxFee = 100 * defaultTxFee
 
 			subnetID := testSubnet1.ID()
 			wallet := newWallet(t, service.vm, walletConfig{
@@ -1256,7 +1256,7 @@ func TestGetFeeConfig(t *testing.T) {
 			require := require.New(t)
 
 			service, _ := defaultService(t, upgradetest.Latest)
-			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
+			service.vm.Internal.UpgradeConfig.EtnaTime = test.etnaTime
 
 			var reply gas.Config
 			require.NoError(service.GetFeeConfig(nil, nil, &reply))

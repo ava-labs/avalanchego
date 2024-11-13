@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -71,6 +72,9 @@ type Client interface {
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
+	// GetSubnetOnlyValidator returns the requested SoV with [validationID] and
+	// the height at which it was calculated.
+	GetSubnetOnlyValidator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (SubnetOnlyValidator, uint64, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system along with the P-chain height
 	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
@@ -325,6 +329,72 @@ func (c *client) GetCurrentValidators(
 		return nil, err
 	}
 	return getClientPermissionlessValidators(res.Validators)
+}
+
+// SubnetOnlyValidator is the response from calling GetSubnetOnlyValidator on
+// the API client.
+type SubnetOnlyValidator struct {
+	SubnetID              ids.ID
+	NodeID                ids.NodeID
+	PublicKey             *bls.PublicKey
+	RemainingBalanceOwner *secp256k1fx.OutputOwners
+	DeactivationOwner     *secp256k1fx.OutputOwners
+	StartTime             uint64
+	Weight                uint64
+	MinNonce              uint64
+	// Balance is the remaining amount of AVAX this SoV has for paying the
+	// continuous fee.
+	Balance uint64
+}
+
+func (c *client) GetSubnetOnlyValidator(
+	ctx context.Context,
+	validationID ids.ID,
+	options ...rpc.Option,
+) (SubnetOnlyValidator, uint64, error) {
+	res := &GetSubnetOnlyValidatorReply{}
+	err := c.requester.SendRequest(ctx, "platform.getSubnetOnlyValidator",
+		&GetSubnetOnlyValidatorArgs{
+			ValidationID: validationID,
+		},
+		res, options...,
+	)
+	if err != nil {
+		return SubnetOnlyValidator{}, 0, err
+	}
+
+	pk, err := bls.PublicKeyFromCompressedBytes(res.PublicKey)
+	if err != nil {
+		return SubnetOnlyValidator{}, 0, err
+	}
+	remainingBalanceOwnerAddrs, err := address.ParseToIDs(res.RemainingBalanceOwner.Addresses)
+	if err != nil {
+		return SubnetOnlyValidator{}, 0, err
+	}
+	deactivationOwnerAddrs, err := address.ParseToIDs(res.DeactivationOwner.Addresses)
+	if err != nil {
+		return SubnetOnlyValidator{}, 0, err
+	}
+
+	return SubnetOnlyValidator{
+		SubnetID:  res.SubnetID,
+		NodeID:    res.NodeID,
+		PublicKey: pk,
+		RemainingBalanceOwner: &secp256k1fx.OutputOwners{
+			Locktime:  uint64(res.RemainingBalanceOwner.Locktime),
+			Threshold: uint32(res.RemainingBalanceOwner.Threshold),
+			Addrs:     remainingBalanceOwnerAddrs,
+		},
+		DeactivationOwner: &secp256k1fx.OutputOwners{
+			Locktime:  uint64(res.DeactivationOwner.Locktime),
+			Threshold: uint32(res.DeactivationOwner.Threshold),
+			Addrs:     deactivationOwnerAddrs,
+		},
+		StartTime: uint64(res.StartTime),
+		Weight:    uint64(res.Weight),
+		MinNonce:  uint64(res.MinNonce),
+		Balance:   uint64(res.Balance),
+	}, uint64(res.Height), err
 }
 
 func (c *client) GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
