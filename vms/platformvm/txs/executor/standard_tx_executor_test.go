@@ -3747,6 +3747,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -3942,7 +3943,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Create the SetSubnetValidatorWeightTx
+			// Create the IncreaseBalanceTx
 			wallet := txstest.NewWallet(
 				t,
 				ctx,
@@ -3950,6 +3951,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 				baseState,
 				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 				nil, // subnetIDs
+				nil, // validationIDs
 				nil, // chainIDs
 			)
 
