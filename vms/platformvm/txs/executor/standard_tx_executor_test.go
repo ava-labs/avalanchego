@@ -793,7 +793,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -830,7 +830,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			tx,
 			onAcceptState,
 		)
-		require.ErrorIs(err, errUnauthorizedSubnetModification)
+		require.ErrorIs(err, errUnauthorizedModification)
 	}
 
 	{
@@ -1762,7 +1762,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					nil,
 				).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
 				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
@@ -1791,7 +1791,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1820,7 +1820,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 				env.state.EXPECT().GetPendingValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(nil, database.ErrNotFound)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1852,7 +1852,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(&staker, nil).Times(1)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1873,36 +1873,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			expectedErr: ErrRemovePermissionlessValidator,
 		},
 		{
-			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				// Remove credentials
-				env.tx.Creds = nil
-				env.state = state.NewMockDiff(ctrl)
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
-
-				cfg := &config.Config{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
-			},
-			expectedErr: errWrongNumberOfCredentials,
-		},
-		{
 			name: "can't find subnet",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
@@ -1911,7 +1881,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1932,17 +1902,18 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 			expectedErr: database.ErrNotFound,
 		},
 		{
-			name: "no permission to remove validator",
+			name: "tx has no credentials",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				// Remove credentials
+				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
 				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
-				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -1960,7 +1931,38 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				}
 				return env.unsignedTx, e
 			},
-			expectedErr: errUnauthorizedSubnetModification,
+			expectedErr: errWrongNumberOfCredentials,
+		},
+		{
+			name: "no permission to remove validator",
+			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
+				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
+				env.state = state.NewMockDiff(ctrl)
+				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil)
+				subnetOwner := fxmock.NewOwner(ctrl)
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
+				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
+
+				cfg := &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+				}
+				feeCalculator := state.PickFeeCalculator(cfg, env.state)
+				e := &standardTxExecutor{
+					backend: &Backend{
+						Config:       cfg,
+						Bootstrapped: utils.NewAtomic(true),
+						Fx:           env.fx,
+						FlowChecker:  env.flowChecker,
+						Ctx:          &snow.Context{},
+					},
+					feeCalculator: feeCalculator,
+					tx:            env.tx,
+					state:         env.state,
+				}
+				return env.unsignedTx, e
+			},
+			expectedErr: errUnauthorizedModification,
 		},
 		{
 			name: "flow checker failed",
@@ -1976,7 +1978,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(errTest)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2135,7 +2137,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2163,7 +2165,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state = state.NewMockDiff(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2190,9 +2192,11 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				// Remove credentials
 				env.tx.Creds = nil
 				env.state = state.NewMockDiff(ctrl)
+				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
+				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).AnyTimes()
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2232,7 +2236,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2274,7 +2278,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2318,7 +2322,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
 				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
 
-				cfg := &config.Config{
+				cfg := &config.Internal{
 					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
@@ -2364,7 +2368,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
-		defaultConfig = &config.Config{
+		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
@@ -2426,7 +2430,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
 				return nil
@@ -2459,7 +2463,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				})
 				return nil
 			},
-			expectedErr: errUnauthorizedSubnetModification,
+			expectedErr: errUnauthorizedModification,
 		},
 		{
 			name: "invalid if subnet is transformed",
@@ -2497,7 +2501,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "too many active validators",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
 					ValidatorFeeConfig: validatorfee.Config{
 						Capacity:                 0,
@@ -2687,7 +2691,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 
 	var (
 		ctx           = snowtest.Context(t, constants.PlatformChainID)
-		defaultConfig = &config.Config{
+		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
 			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
@@ -2852,7 +2856,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		{
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
 				}
 				return nil
@@ -3066,7 +3070,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			name:    "too many active validators",
 			balance: 1,
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Config{
+				e.backend.Config = &config.Internal{
 					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
 					ValidatorFeeConfig: validatorfee.Config{
 						Capacity:                 0,
@@ -3204,6 +3208,509 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			})
 			require.NoError(err)
 			require.True(hasExpiry)
+		})
+	}
+}
+
+func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
+	var (
+		fx = &secp256k1fx.Fx{}
+		vm = &secp256k1fx.TestVM{
+			Log: logging.NoLog{},
+		}
+	)
+	require.NoError(t, fx.InitializeVM(vm))
+
+	var (
+		ctx           = snowtest.Context(t, constants.PlatformChainID)
+		defaultConfig = &config.Internal{
+			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
+			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+		}
+		baseState = statetest.New(t, statetest.Config{
+			Upgrades: defaultConfig.UpgradeConfig,
+			Context:  ctx,
+		})
+		wallet = txstest.NewWallet(
+			t,
+			ctx,
+			defaultConfig,
+			baseState,
+			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+			nil, // subnetIDs
+			nil, // chainIDs
+		)
+		flowChecker = utxo.NewVerifier(
+			ctx,
+			&vm.Clk,
+			fx,
+		)
+
+		backend = &Backend{
+			Config:       defaultConfig,
+			Bootstrapped: utils.NewAtomic(true),
+			Fx:           fx,
+			FlowChecker:  flowChecker,
+			Ctx:          ctx,
+		}
+		feeCalculator = state.PickFeeCalculator(defaultConfig, baseState)
+	)
+
+	// Create the initial state
+	diff, err := state.NewDiffOn(baseState)
+	require.NoError(t, err)
+
+	// Create the subnet
+	createSubnetTx, err := wallet.IssueCreateSubnetTx(
+		&secp256k1fx.OutputOwners{},
+	)
+	require.NoError(t, err)
+
+	// Execute the subnet creation
+	_, _, _, err = StandardTx(
+		backend,
+		feeCalculator,
+		createSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
+
+	// Create the subnet conversion
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	const (
+		initialWeight = 1
+		balance       = units.Avax
+	)
+	var (
+		subnetID  = createSubnetTx.ID()
+		chainID   = ids.GenerateTestID()
+		address   = utils.RandomBytes(32)
+		validator = &txs.ConvertSubnetValidator{
+			NodeID:  ids.GenerateTestNodeID().Bytes(),
+			Weight:  initialWeight,
+			Balance: balance,
+			Signer:  *signer.NewProofOfPossession(sk),
+			// RemainingBalanceOwner and DeactivationOwner are initialized so
+			// that later reflect based equality checks pass.
+			RemainingBalanceOwner: message.PChainOwner{
+				Threshold: 0,
+				Addresses: []ids.ShortID{},
+			},
+			DeactivationOwner: message.PChainOwner{
+				Threshold: 0,
+				Addresses: []ids.ShortID{},
+			},
+		}
+		validationID = subnetID.Append(0)
+	)
+
+	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+		subnetID,
+		chainID,
+		address,
+		[]*txs.ConvertSubnetValidator{
+			validator,
+		},
+	)
+	require.NoError(t, err)
+
+	// Execute the subnet conversion
+	_, _, _, err = StandardTx(
+		backend,
+		feeCalculator,
+		convertSubnetTx,
+		diff,
+	)
+	require.NoError(t, err)
+	require.NoError(t, diff.Apply(baseState))
+	require.NoError(t, baseState.Commit())
+
+	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	require.NoError(t, err)
+
+	// Create the Warp messages
+	const (
+		nonce  = 1
+		weight = initialWeight + 1
+	)
+	unsignedIncreaseWeightWarpMessage := must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+		ctx.NetworkID,
+		chainID,
+		must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+			address,
+			must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+				validationID,
+				nonce,
+				weight,
+			)).Bytes(),
+		)).Bytes(),
+	))
+	warpSignature := &warp.BitSetSignature{
+		Signers: set.NewBits(0).Bytes(),
+		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
+			bls.Sign(
+				sk,
+				unsignedIncreaseWeightWarpMessage.Bytes(),
+			),
+		)),
+	}
+	increaseWeightWarpMessage := must[*warp.Message](t)(warp.NewMessage(
+		unsignedIncreaseWeightWarpMessage,
+		warpSignature,
+	))
+	removeValidatorWarpMessage := must[*warp.Message](t)(warp.NewMessage(
+		must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+			ctx.NetworkID,
+			chainID,
+			must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+				address,
+				must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+					validationID,
+					nonce,
+					0,
+				)).Bytes(),
+			)).Bytes(),
+		)),
+		warpSignature,
+	))
+
+	increaseL1Weight := func(weight uint64) func(*standardTxExecutor) error {
+		return func(e *standardTxExecutor) error {
+			sov := initialSoV
+			sov.ValidationID = ids.GenerateTestID()
+			sov.NodeID = ids.GenerateTestNodeID()
+			sov.Weight = weight
+			return e.state.PutSubnetOnlyValidator(sov)
+		}
+	}
+
+	tests := []struct {
+		name                       string
+		message                    []byte
+		builderOptions             []common.Option
+		updateExecutor             func(*standardTxExecutor) error
+		expectedNonce              uint64
+		expectedWeight             uint64
+		expectedRemainingFundsUTXO *avax.UTXO
+		expectedErr                error
+	}{
+		{
+			name: "invalid prior to E-Upgrade",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Config = &config.Internal{
+					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+				}
+				return nil
+			},
+			expectedErr: errEtnaUpgradeNotActive,
+		},
+		{
+			name: "tx fails syntactic verification",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
+				return nil
+			},
+			expectedErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid memo length",
+			builderOptions: []common.Option{
+				common.WithMemo([]byte("memo!")),
+			},
+			expectedErr: avax.ErrMemoTooLarge,
+		},
+		{
+			name: "invalid fee calculation",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
+				return nil
+			},
+			expectedErr: txfee.ErrUnsupportedTx,
+		},
+		{
+			name: "insufficient fee",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.feeCalculator = txfee.NewDynamicCalculator(
+					e.backend.Config.DynamicFeeConfig.Weights,
+					100*genesis.LocalParams.DynamicFeeConfig.MinPrice,
+				)
+				return nil
+			},
+			expectedErr: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name:        "invalid warp message",
+			message:     []byte{},
+			expectedErr: codec.ErrCantUnpackVersion,
+		},
+		{
+			name: "invalid warp payload",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.Hash](t)(payload.NewHash(ids.Empty)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: payload.ErrWrongType,
+		},
+		{
+			name: "invalid addressed call",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetConversion](t)(message.NewSubnetConversion(ids.Empty)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: message.ErrWrongType,
+		},
+		{
+			name: "invalid addressed call payload",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							validationID,
+							math.MaxUint64,
+							1,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: message.ErrNonceReservedForRemoval,
+		},
+		{
+			name: "SoV not found",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							ids.GenerateTestID(), // invalid initialValidationID
+							nonce,
+							weight,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			expectedErr: errCouldNotLoadSoV,
+		},
+		{
+			name: "nonce too low",
+			updateExecutor: func(e *standardTxExecutor) error {
+				sov := initialSoV
+				sov.MinNonce = nonce + 1
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+			expectedErr: errWarpMessageContainsStaleNonce,
+		},
+		{
+			name: "invalid source chain",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{})
+				return nil
+			},
+			expectedErr: errWrongWarpMessageSourceChainID,
+		},
+		{
+			name: "invalid source address",
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{
+					ChainID: chainID,
+				})
+				return nil
+			},
+			expectedErr: errWrongWarpMessageSourceAddress,
+		},
+		{
+			name:        "remove last validator",
+			message:     removeValidatorWarpMessage.Bytes(),
+			expectedErr: errRemovingLastValidator,
+		},
+		{
+			name:    "remove deactivated validator",
+			message: removeValidatorWarpMessage.Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				// Add another validator to allow removal
+				if err := increaseL1Weight(1)(e); err != nil {
+					return err
+				}
+
+				sov := initialSoV
+				sov.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+		},
+		{
+			name: "remove deactivated validator with nonce overflow",
+			message: must[*warp.Message](t)(warp.NewMessage(
+				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+					ctx.NetworkID,
+					chainID,
+					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+						address,
+						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+							validationID,
+							math.MaxUint64,
+							0,
+						)).Bytes(),
+					)).Bytes(),
+				)),
+				warpSignature,
+			)).Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				// Add another validator to allow removal
+				if err := increaseL1Weight(1)(e); err != nil {
+					return err
+				}
+
+				sov := initialSoV
+				sov.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutSubnetOnlyValidator(sov)
+			},
+		},
+		{
+			name:    "should have been previously deactivated",
+			message: removeValidatorWarpMessage.Bytes(),
+			updateExecutor: func(e *standardTxExecutor) error {
+				e.state.SetAccruedFees(initialSoV.EndAccumulatedFee)
+				return increaseL1Weight(1)(e)
+			},
+			expectedErr: errStateCorruption,
+		},
+		{
+			name:           "remove active validator",
+			message:        removeValidatorWarpMessage.Bytes(),
+			updateExecutor: increaseL1Weight(1),
+			expectedRemainingFundsUTXO: &avax.UTXO{
+				Asset: avax.Asset{
+					ID: ctx.AVAXAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: balance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: validator.RemainingBalanceOwner.Threshold,
+						Addrs:     validator.RemainingBalanceOwner.Addresses,
+					},
+				},
+			},
+		},
+		{
+			name:           "L1 weight overflow",
+			updateExecutor: increaseL1Weight(math.MaxUint64 - initialWeight),
+			expectedErr:    safemath.ErrOverflow,
+		},
+		{
+			name:           "update validator",
+			expectedNonce:  nonce + 1,
+			expectedWeight: weight,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Create the SetSubnetValidatorWeightTx
+			wallet := txstest.NewWallet(
+				t,
+				ctx,
+				defaultConfig,
+				baseState,
+				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
+				nil, // subnetIDs
+				nil, // chainIDs
+			)
+
+			message := test.message
+			if message == nil {
+				message = increaseWeightWarpMessage.Bytes()
+			}
+			setSubnetValidatorWeightTx, err := wallet.IssueSetSubnetValidatorWeightTx(
+				message,
+				test.builderOptions...,
+			)
+			require.NoError(err)
+
+			diff, err := state.NewDiffOn(baseState)
+			require.NoError(err)
+
+			executor := &standardTxExecutor{
+				backend: &Backend{
+					Config:       defaultConfig,
+					Bootstrapped: utils.NewAtomic(true),
+					Fx:           fx,
+					FlowChecker:  flowChecker,
+					Ctx:          ctx,
+				},
+				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
+				tx:            setSubnetValidatorWeightTx,
+				state:         diff,
+			}
+			if test.updateExecutor != nil {
+				require.NoError(test.updateExecutor(executor))
+			}
+
+			err = setSubnetValidatorWeightTx.Unsigned.Visit(executor)
+			require.ErrorIs(err, test.expectedErr)
+			if err != nil {
+				return
+			}
+
+			for utxoID := range setSubnetValidatorWeightTx.InputIDs() {
+				_, err := diff.GetUTXO(utxoID)
+				require.ErrorIs(err, database.ErrNotFound)
+			}
+
+			baseTxOutputUTXOs := setSubnetValidatorWeightTx.UTXOs()
+			for _, expectedUTXO := range baseTxOutputUTXOs {
+				utxoID := expectedUTXO.InputID()
+				utxo, err := diff.GetUTXO(utxoID)
+				require.NoError(err)
+				require.Equal(expectedUTXO, utxo)
+			}
+
+			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			if test.expectedWeight != 0 {
+				require.NoError(err)
+
+				expectedSoV := initialSoV
+				expectedSoV.MinNonce = test.expectedNonce
+				expectedSoV.Weight = test.expectedWeight
+				require.Equal(expectedSoV, sov)
+				return
+			}
+			require.ErrorIs(err, database.ErrNotFound)
+
+			utxoID := avax.UTXOID{
+				TxID:        setSubnetValidatorWeightTx.ID(),
+				OutputIndex: uint32(len(baseTxOutputUTXOs)),
+			}
+			inputID := utxoID.InputID()
+			utxo, err := diff.GetUTXO(inputID)
+			if test.expectedRemainingFundsUTXO == nil {
+				require.ErrorIs(err, database.ErrNotFound)
+				return
+			}
+			require.NoError(err)
+
+			test.expectedRemainingFundsUTXO.UTXOID = utxoID
+			require.Equal(test.expectedRemainingFundsUTXO, utxo)
 		})
 	}
 }

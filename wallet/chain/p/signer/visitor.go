@@ -206,6 +206,14 @@ func (s *visitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) e
 	return sign(s.tx, true, txSigners)
 }
 
+func (s *visitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
 func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {

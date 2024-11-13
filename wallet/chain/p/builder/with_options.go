@@ -185,6 +185,16 @@ func (w *withOptions) NewRegisterSubnetValidatorTx(
 	)
 }
 
+func (w *withOptions) NewSetSubnetValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.SetSubnetValidatorWeightTx, error) {
+	return w.builder.NewSetSubnetValidatorWeightTx(
+		message,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *withOptions) NewImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
