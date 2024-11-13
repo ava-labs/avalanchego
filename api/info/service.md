@@ -539,7 +539,7 @@ info.peers({
 - `version` shows which version the peer runs on.
 - `lastSent` is the timestamp of last message sent to the peer.
 - `lastReceived` is the timestamp of last message received from the peer.
-- `benched` shows chain IDs that the peer is being benched.
+- `benched` shows chain IDs that the peer is currently benched on.
 - `observedUptime` is this node's primary network uptime, observed by the peer.
 
 **Example Call:**
