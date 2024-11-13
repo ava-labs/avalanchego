@@ -241,6 +241,7 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 		vm.state,
 		secp256k1fx.NewKeychain(c.keys...),
 		c.subnetIDs,
+		nil, // validationIDs
 		[]ids.ID{vm.ctx.CChainID, vm.ctx.XChainID},
 	)
 }
