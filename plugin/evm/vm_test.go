@@ -34,10 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
-	avalancheConstants "github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -63,17 +60,14 @@ import (
 	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
-	testNetworkID   uint32 = avagoconstants.UnitTestID
-	testCChainID           = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
-	testXChainID           = ids.ID{'t', 'e', 's', 't', 'x'}
-	testMinGasPrice int64  = 225_000_000_000
+	testNetworkID uint32 = avagoconstants.UnitTestID
+
+	testMinGasPrice int64 = 225_000_000_000
 	testKeys        []*ecdsa.PrivateKey
 	testEthAddrs    []common.Address // testEthAddrs[i] corresponds to testKeys[i]
-	testAvaxAssetID = ids.ID{1, 2, 3}
 	username        = "Johns"
 	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 
@@ -139,40 +133,6 @@ func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
 	return genesisBytes
 }
 
-func NewContext() *snow.Context {
-	ctx := utils.TestSnowContext()
-	ctx.NodeID = ids.GenerateTestNodeID()
-	ctx.NetworkID = testNetworkID
-	ctx.ChainID = testCChainID
-	ctx.AVAXAssetID = testAvaxAssetID
-	ctx.XChainID = testXChainID
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-	_ = aliaser.Alias(testCChainID, "C")
-	_ = aliaser.Alias(testCChainID, testCChainID.String())
-	_ = aliaser.Alias(testXChainID, "X")
-	_ = aliaser.Alias(testXChainID, testXChainID.String())
-	ctx.ValidatorState = &validatorstest.State{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				avalancheConstants.PlatformChainID: avalancheConstants.PrimaryNetworkID,
-				testXChainID:                       avalancheConstants.PrimaryNetworkID,
-				testCChainID:                       avalancheConstants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errors.New("unknown chain")
-			}
-			return subnetID, nil
-		},
-	}
-	blsSecretKey, err := bls.NewSecretKey()
-	if err != nil {
-		panic(err)
-	}
-	ctx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, ctx.NetworkID, ctx.ChainID)
-	ctx.PublicKey = bls.PublicFromSecretKey(blsSecretKey)
-	return ctx
-}
-
 // setupGenesis sets up the genesis
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func setupGenesis(
@@ -188,7 +148,7 @@ func setupGenesis(
 		genesisJSON = genesisJSONLatest
 	}
 	genesisBytes := buildGenesisTest(t, genesisJSON)
-	ctx := NewContext()
+	ctx := utils.TestSnowContext()
 
 	baseDB := memdb.New()
 
@@ -494,7 +454,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	if err := restartedVM.Initialize(
 		context.Background(),
-		NewContext(),
+		utils.TestSnowContext(),
 		dbManager,
 		genesisBytes,
 		[]byte(""),
@@ -3155,7 +3115,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 
 func TestStandaloneDB(t *testing.T) {
 	vm := &VM{}
-	ctx := NewContext()
+	ctx := utils.TestSnowContext()
 	baseDB := memdb.New()
 	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
 	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)

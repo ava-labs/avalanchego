@@ -58,16 +58,10 @@ func (p *pausableManager) Disconnect(nodeID ids.NodeID) error {
 	return nil
 }
 
-// StartTracking starts tracking uptime for the nodes with the given IDs
-// If a node is paused, it will not be tracked
-func (p *pausableManager) StartTracking(nodeIDs []ids.NodeID) error {
-	activeNodeIDs := make([]ids.NodeID, 0, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-		if !p.IsPaused(nodeID) {
-			activeNodeIDs = append(activeNodeIDs, nodeID)
-		}
-	}
-	return p.Manager.StartTracking(activeNodeIDs)
+// IsConnected returns true if the node with the given ID is connected to this manager
+// Note: Inner manager may have a different view of the connection status due to pausing
+func (p *pausableManager) IsConnected(nodeID ids.NodeID) bool {
+	return p.connectedVdrs.Contains(nodeID)
 }
 
 // OnValidatorAdded is called when a validator is added.

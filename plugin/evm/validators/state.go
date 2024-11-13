@@ -18,19 +18,24 @@ var _ uptime.State = &state{}
 
 type dbUpdateStatus bool
 
-var ErrAlreadyExists = fmt.Errorf("validator already exists")
+var (
+	ErrAlreadyExists  = fmt.Errorf("validator already exists")
+	ErrImmutableField = fmt.Errorf("immutable field cannot be updated")
+)
 
 const (
-	updated dbUpdateStatus = true
-	deleted dbUpdateStatus = false
+	updatedStatus dbUpdateStatus = true
+	deletedStatus dbUpdateStatus = false
 )
 
 type validatorData struct {
 	UpDuration  time.Duration `serialize:"true"`
 	LastUpdated uint64        `serialize:"true"`
 	NodeID      ids.NodeID    `serialize:"true"`
+	Weight      uint64        `serialize:"true"`
 	StartTime   uint64        `serialize:"true"`
 	IsActive    bool          `serialize:"true"`
+	IsSoV       bool          `serialize:"true"`
 
 	validationID ids.ID // database key
 }
@@ -83,7 +88,7 @@ func (s *state) SetUptime(
 	data.UpDuration = upDuration
 	data.setLastUpdated(lastUpdated)
 
-	s.updatedData[data.validationID] = updated
+	s.updatedData[data.validationID] = updatedStatus
 	return nil
 }
 
@@ -98,23 +103,57 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 
 // AddValidator adds a new validator to the state
 // the new validator is marked as updated and will be written to the disk when WriteState is called
-func (s *state) AddValidator(vID ids.ID, nodeID ids.NodeID, startTimestamp uint64, isActive bool) error {
+func (s *state) AddValidator(vdr interfaces.Validator) error {
 	data := &validatorData{
-		NodeID:       nodeID,
-		validationID: vID,
-		IsActive:     isActive,
-		StartTime:    startTimestamp,
+		NodeID:       vdr.NodeID,
+		validationID: vdr.ValidationID,
+		IsActive:     vdr.IsActive,
+		StartTime:    vdr.StartTimestamp,
 		UpDuration:   0,
-		LastUpdated:  startTimestamp,
+		LastUpdated:  vdr.StartTimestamp,
+		IsSoV:        vdr.IsSoV,
+		Weight:       vdr.Weight,
 	}
-	if err := s.addData(vID, data); err != nil {
+	if err := s.addData(vdr.ValidationID, data); err != nil {
 		return err
 	}
 
-	s.updatedData[vID] = updated
+	s.updatedData[vdr.ValidationID] = updatedStatus
 
 	for _, listener := range s.listeners {
-		listener.OnValidatorAdded(vID, nodeID, startTimestamp, isActive)
+		listener.OnValidatorAdded(vdr.ValidationID, vdr.NodeID, vdr.StartTimestamp, vdr.IsActive)
+	}
+	return nil
+}
+
+// UpdateValidator updates the validator in the state
+// returns an error if the validator does not exist or if the immutable fields are modified
+func (s *state) UpdateValidator(vdr interfaces.Validator) error {
+	data, exists := s.data[vdr.ValidationID]
+	if !exists {
+		return database.ErrNotFound
+	}
+	// check immutable fields
+	if !data.constantsAreUnmodified(vdr) {
+		return ErrImmutableField
+	}
+	// check if mutable fields have changed
+	updated := false
+	if data.IsActive != vdr.IsActive {
+		data.IsActive = vdr.IsActive
+		updated = true
+		for _, listener := range s.listeners {
+			listener.OnValidatorStatusUpdated(data.validationID, data.NodeID, data.IsActive)
+		}
+	}
+
+	if data.Weight != vdr.Weight {
+		data.Weight = vdr.Weight
+		updated = true
+	}
+
+	if updated {
+		s.updatedData[vdr.ValidationID] = updatedStatus
 	}
 	return nil
 }
@@ -130,7 +169,7 @@ func (s *state) DeleteValidator(vID ids.ID) error {
 	delete(s.index, data.NodeID)
 
 	// mark as deleted for WriteValidator
-	s.updatedData[data.validationID] = deleted
+	s.updatedData[data.validationID] = deletedStatus
 
 	for _, listener := range s.listeners {
 		listener.OnValidatorRemoved(vID, data.NodeID)
@@ -144,7 +183,7 @@ func (s *state) WriteState() error {
 	batch := s.db.NewBatch()
 	for vID, updateStatus := range s.updatedData {
 		switch updateStatus {
-		case updated:
+		case updatedStatus:
 			data := s.data[vID]
 
 			dataBytes, err := vdrCodec.Marshal(codecVersion, data)
@@ -154,7 +193,7 @@ func (s *state) WriteState() error {
 			if err := batch.Put(vID[:], dataBytes); err != nil {
 				return err
 			}
-		case deleted:
+		case deletedStatus:
 			if err := batch.Delete(vID[:]); err != nil {
 				return err
 			}
@@ -174,21 +213,12 @@ func (s *state) SetStatus(vID ids.ID, isActive bool) error {
 		return database.ErrNotFound
 	}
 	data.IsActive = isActive
-	s.updatedData[vID] = updated
+	s.updatedData[vID] = updatedStatus
 
 	for _, listener := range s.listeners {
 		listener.OnValidatorStatusUpdated(vID, data.NodeID, isActive)
 	}
 	return nil
-}
-
-// GetStatus returns the active status of the validator with the given vID
-func (s *state) GetStatus(vID ids.ID) (bool, error) {
-	data, exists := s.data[vID]
-	if !exists {
-		return false, database.ErrNotFound
-	}
-	return data.IsActive, nil
 }
 
 // GetValidationIDs returns the validation IDs in the state
@@ -200,13 +230,29 @@ func (s *state) GetValidationIDs() set.Set[ids.ID] {
 	return ids
 }
 
-// GetValidatorIDs returns the validator IDs in the state
-func (s *state) GetValidatorIDs() set.Set[ids.NodeID] {
+// GetNodeIDs returns the node IDs of validators in the state
+func (s *state) GetNodeIDs() set.Set[ids.NodeID] {
 	ids := set.NewSet[ids.NodeID](len(s.index))
 	for nodeID := range s.index {
 		ids.Add(nodeID)
 	}
 	return ids
+}
+
+// GetValidator returns the validator data for the given validationID
+func (s *state) GetValidator(vID ids.ID) (interfaces.Validator, error) {
+	data, ok := s.data[vID]
+	if !ok {
+		return interfaces.Validator{}, database.ErrNotFound
+	}
+	return interfaces.Validator{
+		ValidationID:   data.validationID,
+		NodeID:         data.NodeID,
+		StartTimestamp: data.StartTime,
+		IsActive:       data.IsActive,
+		Weight:         data.Weight,
+		IsSoV:          data.IsSoV,
+	}, nil
 }
 
 // RegisterListener registers a listener to the state
@@ -292,4 +338,13 @@ func (v *validatorData) getLastUpdated() time.Time {
 
 func (v *validatorData) getStartTime() time.Time {
 	return time.Unix(int64(v.StartTime), 0)
+}
+
+// constantsAreUnmodified returns true if the constants of this validator have
+// not been modified compared to the updated validator.
+func (v *validatorData) constantsAreUnmodified(u interfaces.Validator) bool {
+	return v.validationID == u.ValidationID &&
+		v.NodeID == u.NodeID &&
+		v.IsSoV == u.IsSoV &&
+		v.StartTime == u.StartTimestamp
 }

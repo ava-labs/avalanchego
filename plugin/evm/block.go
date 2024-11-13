@@ -199,7 +199,7 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 	// If the chain is still bootstrapping, we can assume that all blocks we are verifying have
 	// been accepted by the network (so the predicate was validated by the network when the
 	// block was originally verified).
-	if b.vm.bootstrapped {
+	if b.vm.bootstrapped.Get() {
 		if err := b.verifyPredicates(predicateContext); err != nil {
 			return fmt.Errorf("failed to verify predicates: %w", err)
 		}

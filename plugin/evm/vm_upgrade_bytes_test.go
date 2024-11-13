@@ -111,6 +111,9 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 		}
 	}()
 	// Set the VM's state to NormalOp to initialize the tx pool.
+	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
+		t.Fatal(err)
+	}
 	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}

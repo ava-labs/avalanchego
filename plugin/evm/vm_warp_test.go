@@ -481,7 +481,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 		},
 		{
 			name:          "C-Chain message should be signed by subnet without RequirePrimaryNetworkSigners",
-			sourceChainID: testCChainID,
+			sourceChainID: vm.ctx.CChainID,
 			msgFrom:       fromPrimary,
 			useSigners:    signersSubnet,
 			blockTime:     upgrade.InitiallyActiveTime.Add(2 * blockGap),
@@ -504,7 +504,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 		},
 		{
 			name:          "C-Chain message should be signed by primary with RequirePrimaryNetworkSigners (impacted)",
-			sourceChainID: testCChainID,
+			sourceChainID: vm.ctx.CChainID,
 			msgFrom:       fromPrimary,
 			useSigners:    signersPrimary,
 			blockTime:     reEnableTime.Add(2 * blockGap),
