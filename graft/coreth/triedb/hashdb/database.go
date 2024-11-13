@@ -97,8 +97,9 @@ type cache interface {
 
 // Config contains the settings for database.
 type Config struct {
-	CleanCacheSize int    // Maximum memory allowance (in bytes) for caching clean nodes
-	StatsPrefix    string // Prefix for cache stats (disabled if empty)
+	CleanCacheSize                  int    // Maximum memory allowance (in bytes) for caching clean nodes
+	StatsPrefix                     string // Prefix for cache stats (disabled if empty)
+	ReferenceRootAtomicallyOnUpdate bool   // Whether to reference the root node on update
 }
 
 // Defaults is the default setting for database if it's not specified.
@@ -137,6 +138,8 @@ type Database struct {
 	childrenSize common.StorageSize // Storage size of the external children tracking
 
 	lock sync.RWMutex
+
+	referenceRoot bool
 }
 
 // cachedNode is all the information we know about a single cached trie node
@@ -174,10 +177,11 @@ func New(diskdb ethdb.Database, config *Config, resolver ChildResolver) *Databas
 		cleans = utils.NewMeteredCache(config.CleanCacheSize, config.StatsPrefix, cacheStatsUpdateFrequency)
 	}
 	return &Database{
-		diskdb:   diskdb,
-		resolver: resolver,
-		cleans:   cleans,
-		dirties:  make(map[common.Hash]*cachedNode),
+		diskdb:        diskdb,
+		resolver:      resolver,
+		cleans:        cleans,
+		dirties:       make(map[common.Hash]*cachedNode),
+		referenceRoot: config.ReferenceRootAtomicallyOnUpdate,
 	}
 }
 
@@ -627,23 +631,9 @@ func (db *Database) Initialized(genesisRoot common.Hash) bool {
 
 // Update inserts the dirty nodes in provided nodeset into database and link the
 // account trie with multiple storage tries if necessary.
+// If ReferenceRootAtomicallyOnUpdate was enabled in the config, it will also add a reference from
+// the root to the metaroot while holding the db's lock.
 func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
-	// Ensure the parent state is present and signal a warning if not.
-	if parent != types.EmptyRootHash {
-		if blob, _ := db.node(parent); len(blob) == 0 {
-			log.Error("parent state is not present")
-		}
-	}
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
-	return db.update(root, parent, nodes)
-}
-
-// UpdateAndReferenceRoot inserts the dirty nodes in provided nodeset into
-// database and links the account trie with multiple storage tries if necessary,
-// then adds a reference [from] root to the metaroot while holding the db's lock.
-func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	// Ensure the parent state is present and signal a warning if not.
 	if parent != types.EmptyRootHash {
 		if blob, _ := db.node(parent); len(blob) == 0 {
@@ -656,7 +646,10 @@ func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash,
 	if err := db.update(root, parent, nodes); err != nil {
 		return err
 	}
-	db.reference(root, common.Hash{})
+
+	if db.referenceRoot {
+		db.reference(root, common.Hash{})
+	}
 	return nil
 }
 

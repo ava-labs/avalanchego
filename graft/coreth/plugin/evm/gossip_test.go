@@ -189,7 +189,7 @@ func TestGossipSubscribe(t *testing.T) {
 			defer gossipTxPool.lock.RUnlock()
 
 			for i, tx := range ethTxs {
-				require.Truef(gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}), "expected tx[%d] to be in bloom filter", i)
+				assert.Truef(c, gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}), "expected tx[%d] to be in bloom filter", i)
 			}
 		},
 		30*time.Second,

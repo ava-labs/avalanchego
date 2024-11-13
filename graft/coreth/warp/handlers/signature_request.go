@@ -16,7 +16,7 @@ import (
 )
 
 // SignatureRequestHandler serves warp signature requests. It is a peer.RequestHandler for message.MessageSignatureRequest.
-// TODO: After E-Upgrade, this handler can be removed and SignatureRequestHandlerP2P is sufficient.
+// TODO: After Etna, this handler can be removed and SignatureRequestHandlerP2P is sufficient.
 type SignatureRequestHandler struct {
 	backend warp.Backend
 	codec   codec.Manager
@@ -45,13 +45,20 @@ func (s *SignatureRequestHandler) OnMessageSignatureRequest(ctx context.Context,
 		s.stats.UpdateMessageSignatureRequestTime(time.Since(startTime))
 	}()
 
-	signature, err := s.backend.GetMessageSignature(signatureRequest.MessageID)
+	var signature [bls.SignatureLen]byte
+	unsignedMessage, err := s.backend.GetMessage(signatureRequest.MessageID)
 	if err != nil {
-		log.Debug("Unknown warp signature requested", "messageID", signatureRequest.MessageID)
+		log.Debug("Unknown warp message requested", "messageID", signatureRequest.MessageID)
 		s.stats.IncMessageSignatureMiss()
-		signature = [bls.SignatureLen]byte{}
 	} else {
-		s.stats.IncMessageSignatureHit()
+		sig, err := s.backend.GetMessageSignature(ctx, unsignedMessage)
+		if err != nil {
+			log.Debug("Unknown warp signature requested", "messageID", signatureRequest.MessageID)
+			s.stats.IncMessageSignatureMiss()
+		} else {
+			s.stats.IncMessageSignatureHit()
+			copy(signature[:], sig)
+		}
 	}
 
 	response := message.SignatureResponse{Signature: signature}
@@ -73,13 +80,14 @@ func (s *SignatureRequestHandler) OnBlockSignatureRequest(ctx context.Context, n
 		s.stats.UpdateBlockSignatureRequestTime(time.Since(startTime))
 	}()
 
-	signature, err := s.backend.GetBlockSignature(request.BlockID)
+	var signature [bls.SignatureLen]byte
+	sig, err := s.backend.GetBlockSignature(ctx, request.BlockID)
 	if err != nil {
 		log.Debug("Unknown warp signature requested", "blockID", request.BlockID)
 		s.stats.IncBlockSignatureMiss()
-		signature = [bls.SignatureLen]byte{}
 	} else {
 		s.stats.IncBlockSignatureHit()
+		copy(signature[:], sig)
 	}
 
 	response := message.SignatureResponse{Signature: signature}

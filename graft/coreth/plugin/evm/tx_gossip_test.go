@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -43,7 +42,7 @@ func TestEthTxGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 	snowCtx := utils.TestSnowContext()
-	validatorState := &validatorstest.State{}
+	validatorState := utils.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 
 	pk, err := secp256k1.NewPrivateKey()
@@ -169,15 +168,10 @@ func TestAtomicTxGossip(t *testing.T) {
 	ctx := context.Background()
 	snowCtx := utils.TestSnowContext()
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
-	snowCtx.XChainID = ids.GenerateTestID()
-	validatorState := &validatorstest.State{
-		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-			return ids.Empty, nil
-		},
-	}
+	validatorState := utils.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 	memory := atomic.NewMemory(memdb.New())
-	snowCtx.SharedMemory = memory.NewSharedMemory(ids.Empty)
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
 
 	pk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -308,14 +302,6 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 	snowCtx := utils.TestSnowContext()
-	snowCtx.ValidatorState = &validatorstest.State{
-		GetCurrentHeightF: func(context.Context) (uint64, error) {
-			return 0, nil
-		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return nil, nil
-		},
-	}
 	sender := &enginetest.SenderStub{
 		SentAppGossip: make(chan []byte, 1),
 	}
@@ -440,15 +426,10 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	ctx := context.Background()
 	snowCtx := utils.TestSnowContext()
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
-	snowCtx.XChainID = ids.GenerateTestID()
-	validatorState := &validatorstest.State{
-		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-			return ids.Empty, nil
-		},
-	}
+	validatorState := utils.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 	memory := atomic.NewMemory(memdb.New())
-	snowCtx.SharedMemory = memory.NewSharedMemory(ids.Empty)
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
 
 	pk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -518,15 +499,10 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	ctx := context.Background()
 	snowCtx := utils.TestSnowContext()
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
-	snowCtx.XChainID = ids.GenerateTestID()
-	validatorState := &validatorstest.State{
-		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
-			return ids.Empty, nil
-		},
-	}
+	validatorState := utils.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 	memory := atomic.NewMemory(memdb.New())
-	snowCtx.SharedMemory = memory.NewSharedMemory(ids.Empty)
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
 
 	pk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)

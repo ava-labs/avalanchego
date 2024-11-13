@@ -17,7 +17,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/upgrade"
 	avalanchegoConstants "github.com/ava-labs/avalanchego/utils/constants"
@@ -49,7 +51,6 @@ import (
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/client/stats"
 	"github.com/ava-labs/coreth/warp"
-	"github.com/ava-labs/coreth/warp/handlers"
 
 	// Force-load tracer engine to trigger registration
 	//
@@ -316,7 +317,7 @@ type VM struct {
 	// Metrics
 	sdkMetrics *prometheus.Registry
 
-	bootstrapped bool
+	bootstrapped avalancheUtils.Atomic[bool]
 	IsPlugin     bool
 
 	logger CorethLogger
@@ -336,6 +337,10 @@ type VM struct {
 	atomicTxGossipHandler p2p.Handler
 	atomicTxPushGossiper  *gossip.PushGossiper[*GossipAtomicTx]
 	atomicTxPullGossiper  gossip.Gossiper
+
+	chainAlias string
+	// RPC handlers (should be stopped before closing chaindb)
+	rpcHandlers []interface{ Stop() }
 }
 
 // CodecRegistry implements the secp256k1fx interface
@@ -392,13 +397,14 @@ func (vm *VM) Initialize(
 		// fallback to ChainID string instead of erroring
 		alias = vm.ctx.ChainID.String()
 	}
+	vm.chainAlias = alias
 
 	var writer io.Writer = vm.ctx.Log
 	if vm.IsPlugin {
 		writer = originalStderr
 	}
 
-	corethLogger, err := InitLogger(alias, vm.config.LogLevel, vm.config.LogJSONFormat, writer)
+	corethLogger, err := InitLogger(vm.chainAlias, vm.config.LogLevel, vm.config.LogJSONFormat, writer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger due to: %w ", err)
 	}
@@ -419,16 +425,15 @@ func (vm *VM) Initialize(
 
 	vm.toEngine = toEngine
 	vm.shutdownChan = make(chan struct{}, 1)
-	// Use NewNested rather than New so that the structure of the database
-	// remains the same regardless of the provided baseDB type.
-	vm.chaindb = rawdb.NewDatabase(Database{prefixdb.NewNested(ethDBPrefix, db)})
-	vm.db = versiondb.New(db)
-	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
-	// Note warpDB is not part of versiondb because it is not necessary
-	// that warp signatures are committed to the database atomically with
-	// the last accepted block.
-	vm.warpDB = prefixdb.New(warpPrefix, db)
+
+	if err := vm.initializeMetrics(); err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	// Initialize the database
+	if err := vm.initializeDBs(db); err != nil {
+		return fmt.Errorf("failed to initialize databases: %w", err)
+	}
 
 	if vm.config.InspectDatabase {
 		start := time.Now()
@@ -571,10 +576,6 @@ func (vm *VM) Initialize(
 
 	vm.codec = Codec
 
-	if err := vm.initializeMetrics(); err != nil {
-		return err
-	}
-
 	// TODO: read size from settings
 	vm.mempool, err = NewMempool(chainCtx, vm.sdkMetrics, defaultMempoolSize, vm.verifyTxAtTip)
 	if err != nil {
@@ -600,26 +601,31 @@ func (vm *VM) Initialize(
 	for i, hexMsg := range vm.config.WarpOffChainMessages {
 		offchainWarpMessages[i] = []byte(hexMsg)
 	}
+	warpSignatureCache := &cache.LRU[ids.ID, []byte]{Size: warpSignatureCacheSize}
+	meteredCache, err := metercacher.New("warp_signature_cache", vm.sdkMetrics, warpSignatureCache)
+	if err != nil {
+		return fmt.Errorf("failed to create warp signature cache: %w", err)
+	}
+
+	// clear warpdb on initialization if config enabled
+	if vm.config.PruneWarpDB {
+		if err := database.Clear(vm.warpDB, ethdb.IdealBatchSize); err != nil {
+			return fmt.Errorf("failed to prune warpDB: %w", err)
+		}
+	}
+
 	vm.warpBackend, err = warp.NewBackend(
 		vm.ctx.NetworkID,
 		vm.ctx.ChainID,
 		vm.ctx.WarpSigner,
 		vm,
 		vm.warpDB,
-		warpSignatureCacheSize,
+		meteredCache,
 		offchainWarpMessages,
 	)
 	if err != nil {
 		return err
 	}
-
-	// clear warpdb on initialization if config enabled
-	if vm.config.PruneWarpDB {
-		if err := vm.warpBackend.Clear(); err != nil {
-			return fmt.Errorf("failed to prune warpDB: %w", err)
-		}
-	}
-
 	if err := vm.initializeChain(lastAcceptedHash); err != nil {
 		return err
 	}
@@ -660,7 +666,17 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.initializeHandlers()
+	// Add p2p warp message warpHandler
+	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
+	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
+
+	vm.setAppRequestHandlers()
+
+	vm.StateSyncServer = NewStateSyncServer(&stateSyncServerConfig{
+		Chain:            vm.blockChain,
+		AtomicTrie:       vm.atomicTrie,
+		SyncableInterval: vm.config.StateSyncCommitInterval,
+	})
 	return vm.initializeStateSyncClient(lastAcceptedHeight)
 }
 
@@ -797,21 +813,6 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 	}
 
 	return nil
-}
-
-// initializeHandlers should be called after [vm.chain] is initialized.
-func (vm *VM) initializeHandlers() {
-	vm.StateSyncServer = NewStateSyncServer(&stateSyncServerConfig{
-		Chain:            vm.blockChain,
-		AtomicTrie:       vm.atomicTrie,
-		SyncableInterval: vm.config.StateSyncCommitInterval,
-	})
-
-	// Add p2p warp message warpHandler
-	warpHandler := handlers.NewSignatureRequestHandlerP2P(vm.warpBackend, vm.networkCodec)
-	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
-
-	vm.setAppRequestHandlers()
 }
 
 func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
@@ -1076,31 +1077,46 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.StateSyncing:
-		vm.bootstrapped = false
+		vm.bootstrapped.Set(false)
 		return nil
 	case snow.Bootstrapping:
-		vm.bootstrapped = false
-		if err := vm.StateSyncClient.Error(); err != nil {
-			return err
-		}
-		// After starting bootstrapping, do not attempt to resume a previous state sync.
-		if err := vm.StateSyncClient.ClearOngoingSummary(); err != nil {
-			return err
-		}
-		// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
-		// Note calling this function has no effect if snapshots are already initialized.
-		vm.blockChain.InitializeSnapshots()
-		return vm.fx.Bootstrapping()
+		return vm.onBootstrapStarted()
 	case snow.NormalOp:
-		// Initialize goroutines related to block building once we enter normal operation as there is no need to handle mempool gossip before this point.
-		if err := vm.initBlockBuilding(); err != nil {
-			return fmt.Errorf("failed to initialize block building: %w", err)
-		}
-		vm.bootstrapped = true
-		return vm.fx.Bootstrapped()
+		return vm.onNormalOperationsStarted()
 	default:
 		return snow.ErrUnknownState
 	}
+}
+
+// onBootstrapStarted marks this VM as bootstrapping
+func (vm *VM) onBootstrapStarted() error {
+	vm.bootstrapped.Set(false)
+	if err := vm.StateSyncClient.Error(); err != nil {
+		return err
+	}
+	// After starting bootstrapping, do not attempt to resume a previous state sync.
+	if err := vm.StateSyncClient.ClearOngoingSummary(); err != nil {
+		return err
+	}
+	// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
+	// Note calling this function has no effect if snapshots are already initialized.
+	vm.blockChain.InitializeSnapshots()
+
+	return vm.fx.Bootstrapping()
+}
+
+// onNormalOperationsStarted marks this VM as bootstrapped
+func (vm *VM) onNormalOperationsStarted() error {
+	if vm.bootstrapped.Get() {
+		return nil
+	}
+	vm.bootstrapped.Set(true)
+	if err := vm.fx.Bootstrapped(); err != nil {
+		return err
+	}
+	// Initialize goroutines related to block building
+	// once we enter normal operation as there is no need to handle mempool gossip before this point.
+	return vm.initBlockBuilding()
 }
 
 // initBlockBuilding starts goroutines to manage block building
@@ -1116,7 +1132,7 @@ func (vm *VM) initBlockBuilding() error {
 	}
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
 	}
 	vm.shutdownWg.Add(1)
 	go func() {
@@ -1199,7 +1215,7 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, vm.ethTxGossipHandler); err != nil {
-		return err
+		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
 	}
 
 	if vm.atomicTxGossipHandler == nil {
@@ -1216,7 +1232,7 @@ func (vm *VM) initBlockBuilding() error {
 	}
 
 	if err := vm.Network.AddHandler(p2p.AtomicTxGossipHandlerID, vm.atomicTxGossipHandler); err != nil {
-		return err
+		return fmt.Errorf("failed to add atomic tx gossip handler: %w", err)
 	}
 
 	if vm.ethTxPullGossiper == nil {
@@ -1279,8 +1295,8 @@ func (vm *VM) initBlockBuilding() error {
 // setAppRequestHandlers sets the request handlers for the VM to serve state sync
 // requests.
 func (vm *VM) setAppRequestHandlers() {
-	// Create separate EVM TrieDB (read only) for serving leafs requests.
-	// We create a separate TrieDB here, so that it has a separate cache from the one
+	// Create standalone EVM TrieDB (read only) for serving leafs requests.
+	// We create a standalone TrieDB here, so that it has a standalone cache from the one
 	// used by the node when processing blocks.
 	evmTrieDB := triedb.NewDatabase(
 		vm.chaindb,
@@ -1314,6 +1330,10 @@ func (vm *VM) Shutdown(context.Context) error {
 		log.Error("error stopping state syncer", "err", err)
 	}
 	close(vm.shutdownChan)
+	// Stop RPC handlers before eth.Stop which will close the database
+	for _, handler := range vm.rpcHandlers {
+		handler.Stop()
+	}
 	vm.eth.Stop()
 	vm.shutdownWg.Wait()
 	return nil
@@ -1500,10 +1520,6 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		return nil, err
 	}
 
-	primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
-	}
 	apis := make(map[string]http.Handler)
 	avaxAPI, err := newHandler("avax", &AvaxAPI{vm})
 	if err != nil {
@@ -1513,7 +1529,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	apis[avaxEndpoint] = avaxAPI
 
 	if vm.config.AdminAPIEnabled {
-		adminAPI, err := newHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.AdminAPIDir, primaryAlias))))
+		adminAPI, err := newHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.AdminAPIDir, vm.chainAlias))))
 		if err != nil {
 			return nil, fmt.Errorf("failed to register service for admin API due to %w", err)
 		}
@@ -1544,7 +1560,24 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		vm.config.WSCPUMaxStored.Duration,
 	)
 
+	vm.rpcHandlers = append(vm.rpcHandlers, handler)
 	return apis, nil
+}
+
+// initializeDBs initializes the databases used by the VM.
+// coreth always uses the avalanchego provided database.
+func (vm *VM) initializeDBs(db database.Database) error {
+	// Use NewNested rather than New so that the structure of the database
+	// remains the same regardless of the provided baseDB type.
+	vm.chaindb = rawdb.NewDatabase(Database{prefixdb.NewNested(ethDBPrefix, db)})
+	vm.db = versiondb.New(db)
+	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
+	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
+	// Note warpDB is not part of versiondb because it is not necessary
+	// that warp signatures are committed to the database atomically with
+	// the last accepted block.
+	vm.warpDB = prefixdb.New(warpPrefix, db)
+	return nil
 }
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
@@ -1557,6 +1590,7 @@ func (vm *VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, er
 		return nil, err
 	}
 
+	vm.rpcHandlers = append(vm.rpcHandlers, handler)
 	return map[string]http.Handler{
 		"/rpc": handler,
 	}, nil

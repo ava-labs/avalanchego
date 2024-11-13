@@ -148,17 +148,6 @@ func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, n
 	return db.backend.Update(root, parent, block, nodes, states)
 }
 
-func (db *Database) UpdateAndReferenceRoot(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
-	if db.preimages != nil {
-		db.preimages.commit(false)
-	}
-	hdb, ok := db.backend.(*hashdb.Database)
-	if ok {
-		return hdb.UpdateAndReferenceRoot(root, parent, block, nodes, states)
-	}
-	return db.backend.Update(root, parent, block, nodes, states)
-}
-
 // Commit iterates over all the children of a particular node, writes them out
 // to disk. As a side effect, all pre-images accumulated up to this point are
 // also written.
