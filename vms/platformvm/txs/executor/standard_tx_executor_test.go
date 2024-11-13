@@ -4175,7 +4175,7 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name:         "SoV not found",
+			name:         "sov not found",
 			validationID: ids.GenerateTestID(),
 			expectedErr:  errCouldNotLoadSoV,
 		},
