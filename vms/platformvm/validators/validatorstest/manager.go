@@ -33,3 +33,7 @@ func (manager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]
 }
 
 func (manager) OnAcceptedBlockID(ids.ID) {}
+
+func (manager) GetCurrentValidatorSet(context.Context, ids.ID) (map[ids.ID]*snowvalidators.GetCurrentValidatorOutput, uint64, error) {
+	return nil, 0, nil
+}
