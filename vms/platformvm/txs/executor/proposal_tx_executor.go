@@ -139,6 +139,10 @@ func (*proposalTxExecutor) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWei
 	return ErrWrongTxType
 }
 
+func (*proposalTxExecutor) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
+	return ErrWrongTxType
+}
+
 func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into

@@ -120,6 +120,10 @@ func (*atomicTxExecutor) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeigh
 	return ErrWrongTxType
 }
 
+func (*atomicTxExecutor) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
+	return ErrWrongTxType
+}
+
 func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
 	return e.atomicTx()
 }

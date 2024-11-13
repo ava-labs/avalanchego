@@ -164,6 +164,10 @@ func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWe
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) baseTx(tx *txs.BaseTx) error {
 	return b.b.removeUTXOs(
 		b.ctx,
