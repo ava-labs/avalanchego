@@ -99,6 +99,7 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 	return err
 }
 
+// GetProposedHeight returns the current ProposerVM height
 func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
