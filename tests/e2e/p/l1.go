@@ -4,6 +4,7 @@
 package p
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"math"
@@ -516,7 +517,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		})
 
 		var nextNonce uint64
-		setWeight := func(validationID ids.ID, weight uint64) {
+		setWeight := func(validationID ids.ID, weight uint64, genesisValidatorBit int) {
 			tc.By("creating the unsigned SubnetValidatorWeightMessage")
 			unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
 				networkID,
@@ -550,7 +551,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			setSubnetValidatorWeight, err := warp.NewMessage(
 				unsignedSubnetValidatorWeight,
 				&warp.BitSetSignature{
-					Signers: set.NewBits(0).Bytes(), // [signers] has weight from the genesis peer
+					Signers: set.NewBits(genesisValidatorBit).Bytes(), // [signers] has weight from the genesis validator
 					Signature: ([bls.SignatureLen]byte)(
 						bls.SignatureToBytes(setSubnetValidatorWeightSignature),
 					),
@@ -585,7 +586,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		}
 
 		tc.By("increasing the weight of the validator", func() {
-			setWeight(registerValidationID, updatedWeight)
+			// Because registerValidationID is not active, the genesis validator
+			// is guaranteed to be index 0.
+			setWeight(registerValidationID, updatedWeight, 0)
 		})
 
 		tc.By("verifying the validator weight was increased", func() {
@@ -660,10 +663,43 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
+		tc.By("issuing an IncreaseBalanceTx", func() {
+			_, err := pWallet.IssueIncreaseBalanceTx(
+				registerValidationID,
+				units.Avax,
+			)
+			require.NoError(err)
+		})
+
+		tc.By("verifying the validator was activated", func() {
+			verifyValidatorSet(map[ids.NodeID]*snowvalidators.GetValidatorOutput{
+				subnetGenesisNode.NodeID: {
+					NodeID:    subnetGenesisNode.NodeID,
+					PublicKey: genesisNodePK,
+					Weight:    genesisWeight,
+				},
+				subnetRegisterNode.NodeID: {
+					NodeID:    subnetRegisterNode.NodeID,
+					PublicKey: registerNodePK,
+					Weight:    updatedWeight,
+				},
+			})
+		})
+
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("removing the registered validator", func() {
-			setWeight(registerValidationID, 0)
+			// Because registerValidationID is active, we must calculate which
+			// bit the genesis validator should be in the warp message.
+			var (
+				genesisValidatorPKBytes  = bls.PublicKeyToUncompressedBytes(genesisNodePK)
+				registerValidatorPKBytes = bls.PublicKeyToUncompressedBytes(registerNodePK)
+				genesisValidatorBit      int
+			)
+			if bytes.Compare(genesisValidatorPKBytes, registerValidatorPKBytes) > 0 {
+				genesisValidatorBit = 1
+			}
+			setWeight(registerValidationID, 0, genesisValidatorBit)
 		})
 
 		tc.By("verifying the validator was removed", func() {

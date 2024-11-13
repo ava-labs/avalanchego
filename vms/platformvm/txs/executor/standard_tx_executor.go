@@ -1093,6 +1093,78 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	return nil
 }
 
+func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+	var (
+		currentTimestamp = e.state.GetTimestamp()
+		upgrades         = e.backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsEtnaActivated(currentTimestamp) {
+		return errEtnaUpgradeNotActive
+	}
+
+	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	// Verify the flowcheck
+	fee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	fee, err = math.Add(fee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.backend.FlowChecker.VerifySpend(
+		tx,
+		e.state,
+		tx.Ins,
+		tx.Outs,
+		e.tx.Creds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return err
+	}
+
+	sov, err := e.state.GetSubnetOnlyValidator(tx.ValidationID)
+	if err != nil {
+		return err
+	}
+
+	// If the validator is currently inactive, we are activating it.
+	if sov.EndAccumulatedFee == 0 {
+		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+			return errMaxNumActiveValidators
+		}
+
+		sov.EndAccumulatedFee = e.state.GetAccruedFees()
+	}
+	sov.EndAccumulatedFee, err = math.Add(sov.EndAccumulatedFee, tx.Balance)
+	if err != nil {
+		return err
+	}
+
+	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+
+	// Consume the UTXOS
+	avax.Consume(e.state, tx.Ins)
+	// Produce the UTXOS
+	avax.Produce(e.state, txID, tx.Outs)
+	return nil
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (

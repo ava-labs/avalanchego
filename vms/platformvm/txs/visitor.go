@@ -30,4 +30,5 @@ type Visitor interface {
 	ConvertSubnetTx(*ConvertSubnetTx) error
 	RegisterSubnetValidatorTx(*RegisterSubnetValidatorTx) error
 	SetSubnetValidatorWeightTx(*SetSubnetValidatorWeightTx) error
+	IncreaseBalanceTx(*IncreaseBalanceTx) error
 }
