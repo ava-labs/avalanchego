@@ -192,6 +192,7 @@ func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
 		e.state,
 		secp256k1fx.NewKeychain(c.keys...),
 		c.subnetIDs,
+		nil, // validationIDs
 		c.chainIDs,
 	)
 }

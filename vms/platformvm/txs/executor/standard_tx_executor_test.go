@@ -2383,6 +2383,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -2562,6 +2563,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					baseState,
 					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 					[]ids.ID{subnetID},
+					nil, // validationIDs
 					nil, // chainIDs
 				)
 				chainID   = ids.GenerateTestID()
@@ -2707,6 +2709,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -3122,6 +3125,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				baseState,
 				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 				nil, // subnetIDs
+				nil, // validationIDs
 				nil, // chainIDs
 			)
 
@@ -3238,6 +3242,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -3633,6 +3638,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 				baseState,
 				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 				nil, // subnetIDs
+				nil, // validationIDs
 				nil, // chainIDs
 			)
 
