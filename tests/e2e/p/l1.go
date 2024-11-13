@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils"
@@ -41,6 +42,7 @@ import (
 	p2pmessage "github.com/ava-labs/avalanchego/message"
 	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
+	platformvmpb "github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
 	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -208,7 +210,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetTx", func() {
-			_, err := pWallet.IssueConvertSubnetTx(
+			tx, err := pWallet.IssueConvertSubnetTx(
 				subnetID,
 				chainID,
 				address,
@@ -223,6 +225,22 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				tc.WithDefaultContext(),
 			)
 			require.NoError(err)
+
+			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+				var (
+					client = platformvm.NewClient(subnetGenesisNode.URI)
+					txID   = tx.ID()
+				)
+				tc.Eventually(
+					func() bool {
+						_, err := client.GetTx(tc.DefaultContext(), txID)
+						return err == nil
+					},
+					tests.DefaultTimeout,
+					e2e.DefaultPollingInterval,
+					"transaction not accepted",
+				)
+			})
 		})
 		genesisValidationID := subnetID.Append(0)
 
@@ -292,6 +310,36 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					},
 					sov,
 				)
+			})
+
+			tc.By("fetching the subnet conversion attestation", func() {
+				unsignedSubnetConversion := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					constants.PlatformChainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						nil,
+						must[*warpmessage.SubnetConversion](tc)(warpmessage.NewSubnetConversion(
+							expectedConversionID,
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				tc.By("sending the request to sign the warp message", func() {
+					registerSubnetValidatorRequest, err := wrapWarpSignatureRequest(
+						unsignedSubnetConversion,
+						subnetID[:],
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), registerSubnetValidatorRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetConversion.Bytes()))
+				})
 			})
 		})
 
@@ -371,12 +419,28 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.NoError(err)
 
 			tc.By("issuing a RegisterSubnetValidatorTx", func() {
-				_, err := pWallet.IssueRegisterSubnetValidatorTx(
+				tx, err := pWallet.IssueRegisterSubnetValidatorTx(
 					registerBalance,
 					registerNodePoP.ProofOfPossession,
 					registerSubnetValidator.Bytes(),
 				)
 				require.NoError(err)
+
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+					var (
+						client = platformvm.NewClient(subnetGenesisNode.URI)
+						txID   = tx.ID()
+					)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
+				})
 			})
 		})
 
@@ -417,6 +481,37 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					},
 					sov,
 				)
+			})
+
+			tc.By("fetching the validator registration attestation", func() {
+				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					constants.PlatformChainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						nil,
+						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
+							registerValidationID,
+							true, // registered
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				tc.By("sending the request to sign the warp message", func() {
+					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
+						unsignedSubnetValidatorRegistration,
+						nil,
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), subnetValidatorRegistrationRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
+				})
 			})
 		})
 
@@ -464,10 +559,26 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.NoError(err)
 
 			tc.By("issuing a SetSubnetValidatorWeightTx", func() {
-				_, err := pWallet.IssueSetSubnetValidatorWeightTx(
+				tx, err := pWallet.IssueSetSubnetValidatorWeightTx(
 					setSubnetValidatorWeight.Bytes(),
 				)
 				require.NoError(err)
+
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+					var (
+						client = platformvm.NewClient(subnetGenesisNode.URI)
+						txID   = tx.ID()
+					)
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
+				})
 			})
 
 			nextNonce++
@@ -515,6 +626,38 @@ var _ = e2e.DescribePChain("[L1]", func() {
 					sov,
 				)
 			})
+
+			tc.By("fetching the validator weight change attestation", func() {
+				unsignedSubnetValidatorWeight := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					constants.PlatformChainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						nil,
+						must[*warpmessage.SubnetValidatorWeight](tc)(warpmessage.NewSubnetValidatorWeight(
+							registerValidationID,
+							nextNonce-1, // Use the prior nonce
+							updatedWeight,
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				tc.By("sending the request to sign the warp message", func() {
+					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
+						unsignedSubnetValidatorWeight,
+						nil,
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), subnetValidatorRegistrationRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorWeight.Bytes()))
+				})
+			})
 		})
 
 		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
@@ -531,6 +674,45 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						PublicKey: genesisNodePK,
 						Weight:    genesisWeight,
 					},
+				})
+			})
+
+			tc.By("fetching the validator removal attestation", func() {
+				unsignedSubnetValidatorRegistration := must[*warp.UnsignedMessage](tc)(warp.NewUnsignedMessage(
+					networkID,
+					constants.PlatformChainID,
+					must[*payload.AddressedCall](tc)(payload.NewAddressedCall(
+						nil,
+						must[*warpmessage.SubnetValidatorRegistration](tc)(warpmessage.NewSubnetValidatorRegistration(
+							registerValidationID,
+							false, // removed
+						)).Bytes(),
+					)).Bytes(),
+				))
+
+				justification := platformvmpb.SubnetValidatorRegistrationJustification{
+					Preimage: &platformvmpb.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
+						RegisterSubnetValidatorMessage: registerSubnetValidatorMessage.Bytes(),
+					},
+				}
+				justificationBytes, err := proto.Marshal(&justification)
+				require.NoError(err)
+
+				tc.By("sending the request to sign the warp message", func() {
+					subnetValidatorRegistrationRequest, err := wrapWarpSignatureRequest(
+						unsignedSubnetValidatorRegistration,
+						justificationBytes,
+					)
+					require.NoError(err)
+
+					require.True(genesisPeer.Send(tc.DefaultContext(), subnetValidatorRegistrationRequest))
+				})
+
+				tc.By("getting the signature response", func() {
+					signature, ok, err := findMessage(genesisPeerMessages, unwrapWarpSignature)
+					require.NoError(err)
+					require.True(ok)
+					require.True(bls.Verify(genesisNodePK, signature, unsignedSubnetValidatorRegistration.Bytes()))
 				})
 			})
 		})
