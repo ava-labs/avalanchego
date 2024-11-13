@@ -341,7 +341,7 @@ type SubnetOnlyValidator struct {
 	StartTime             uint64
 	Weight                uint64
 	MinNonce              uint64
-	// Balance is the remaining amount of AVAX this SoV has to pay the
+	// Balance is the remaining amount of AVAX this SoV has for paying the
 	// continuous fee.
 	Balance uint64
 }
@@ -352,9 +352,12 @@ func (c *client) GetSubnetOnlyValidator(
 	options ...rpc.Option,
 ) (SubnetOnlyValidator, uint64, error) {
 	res := &GetSubnetOnlyValidatorReply{}
-	err := c.requester.SendRequest(ctx, "platform.getSubnetOnlyValidator", &GetSubnetOnlyValidatorArgs{
-		ValidationID: validationID,
-	}, res, options...)
+	err := c.requester.SendRequest(ctx, "platform.getSubnetOnlyValidator",
+		&GetSubnetOnlyValidatorArgs{
+			ValidationID: validationID,
+		},
+		res, options...,
+	)
 	if err != nil {
 		return SubnetOnlyValidator{}, 0, err
 	}
