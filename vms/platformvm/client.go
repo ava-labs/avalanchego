@@ -646,7 +646,7 @@ func GetSubnetOwners(
 	ctx context.Context,
 	subnetIDs ...ids.ID,
 ) (map[ids.ID]fx.Owner, error) {
-	subnetOwners := map[ids.ID]fx.Owner{}
+	subnetOwners := make(map[ids.ID]fx.Owner, len(subnetIDs))
 	for _, subnetID := range subnetIDs {
 		subnetInfo, err := c.GetSubnet(ctx, subnetID)
 		if err != nil {
@@ -659,4 +659,22 @@ func GetSubnetOwners(
 		}
 	}
 	return subnetOwners, nil
+}
+
+// GetDeactivationOwners returns a map of validation ID to subnet-only
+// validation deactivation owner
+func GetDeactivationOwners(
+	c Client,
+	ctx context.Context,
+	validationIDs ...ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	deactivationOwners := make(map[ids.ID]fx.Owner, len(validationIDs))
+	for _, validationID := range validationIDs {
+		sov, _, err := c.GetSubnetOnlyValidator(ctx, validationID)
+		if err != nil {
+			return nil, err
+		}
+		deactivationOwners[validationID] = sov.DeactivationOwner
+	}
+	return deactivationOwners, nil
 }

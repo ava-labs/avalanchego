@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -73,9 +74,12 @@ type WalletConfig struct {
 	// Keys to use for signing all transactions.
 	AVAXKeychain keychain.Keychain // required
 	EthKeychain  c.EthKeychain     // required
-	// Subnet IDs that the wallet should know about to be able to
-	// generate transactions.
+	// Subnet IDs that the wallet should know about to be able to generate
+	// transactions.
 	SubnetIDs []ids.ID // optional
+	// Validation IDs that the wallet should know about to be able to generate
+	// transactions.
+	ValidationIDs []ids.ID // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
@@ -105,8 +109,21 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	if err != nil {
 		return nil, err
 	}
+	deactivationOwners, err := platformvm.GetDeactivationOwners(avaxState.PClient, ctx, config.ValidationIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	for id, owner := range subnetOwners {
+		owners[id] = owner
+	}
+	for id, owner := range deactivationOwners {
+		owners[id] = owner
+	}
+
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
-	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, subnetOwners)
+	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
 	pSigner := psigner.New(config.AVAXKeychain, pBackend)

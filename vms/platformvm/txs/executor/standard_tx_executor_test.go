@@ -2383,6 +2383,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -2562,6 +2563,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					baseState,
 					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 					[]ids.ID{subnetID},
+					nil, // validationIDs
 					nil, // chainIDs
 				)
 				chainID   = ids.GenerateTestID()
@@ -2707,6 +2709,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -3122,23 +3125,23 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				baseState,
 				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 				nil, // subnetIDs
+				nil, // validationIDs
 				nil, // chainIDs
 			)
 
-			message := test.message
-			if message == nil {
-				message = warpMessage.Bytes()
-			}
 			registerSubnetValidatorTx, err := wallet.IssueRegisterSubnetValidatorTx(
 				test.balance,
 				pop.ProofOfPossession,
-				message,
+				warpMessage.Bytes(),
 				test.builderOptions...,
 			)
 			require.NoError(err)
 
+			unsignedTx := registerSubnetValidatorTx.Unsigned.(*txs.RegisterSubnetValidatorTx)
+			if test.message != nil {
+				unsignedTx.Message = test.message
+			}
 			if test.updateTx != nil {
-				unsignedTx := registerSubnetValidatorTx.Unsigned.(*txs.RegisterSubnetValidatorTx)
 				test.updateTx(unsignedTx)
 			}
 
@@ -3239,6 +3242,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 			baseState,
 			secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		flowChecker = utxo.NewVerifier(
@@ -3634,6 +3638,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 				baseState,
 				secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
 				nil, // subnetIDs
+				nil, // validationIDs
 				nil, // chainIDs
 			)
 
