@@ -44,7 +44,7 @@ type Validator struct {
 
 type indexedValidator struct {
 	Validator
-	I int
+	Index int
 }
 
 // NewSignatureAggregator returns an instance of SignatureAggregator
@@ -105,7 +105,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		}
 
 		nodeIDsToValidator[v.NodeID] = indexedValidator{
-			I:         i,
+			Index:     i,
 			Validator: v,
 		}
 	}
