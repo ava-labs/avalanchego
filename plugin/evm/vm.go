@@ -1255,8 +1255,7 @@ func (vm *VM) initializeDBs(avaDB database.Database) error {
 	// skip standalone database initialization if we are running in unit tests
 	if vm.ctx.NetworkID != avalancheconstants.UnitTestID {
 		// first initialize the accepted block database to check if we need to use a standalone database
-		verDB := versiondb.New(avaDB)
-		acceptedDB := prefixdb.New(acceptedPrefix, verDB)
+		acceptedDB := prefixdb.New(acceptedPrefix, avaDB)
 		useStandAloneDB, err := vm.useStandaloneDatabase(acceptedDB)
 		if err != nil {
 			return err

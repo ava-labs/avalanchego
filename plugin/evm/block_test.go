@@ -93,5 +93,5 @@ func TestHandlePrecompileAccept(t *testing.T) {
 			precompileAddr: mockAccepter,
 		},
 	}
-	require.NoError(blk.handlePrecompileAccept(rules, nil))
+	require.NoError(blk.handlePrecompileAccept(rules))
 }
