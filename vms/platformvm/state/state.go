@@ -816,6 +816,7 @@ func (s *state) GetExpiryIterator() (iterator.Iterator[ExpiryEntry], error) {
 	), nil
 }
 
+// HasExpiry allows for concurrent reads.
 func (s *state) HasExpiry(entry ExpiryEntry) (bool, error) {
 	if has, modified := s.expiryDiff.modified[entry]; modified {
 		return has, nil
@@ -859,6 +860,7 @@ func (s *state) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 	return weight, nil
 }
 
+// GetSubnetOnlyValidator allows for concurrent reads.
 func (s *state) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
 	if sov, modified := s.sovDiff.modified[validationID]; modified {
 		if sov.isDeleted() {
@@ -1047,6 +1049,7 @@ func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
 }
 
+// GetSubnetConversion allows for concurrent reads.
 func (s *state) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
 	if c, ok := s.subnetConversions[subnetID]; ok {
 		return c, nil
@@ -1267,6 +1270,7 @@ func (s *state) GetEtnaHeight() (uint64, error) {
 	return database.GetUInt64(s.singletonDB, EtnaHeightKey)
 }
 
+// GetTimestamp allows for concurrent reads.
 func (s *state) GetTimestamp() time.Time {
 	return s.timestamp
 }

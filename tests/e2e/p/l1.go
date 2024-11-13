@@ -663,7 +663,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("issuing an IncreaseBalanceTx", func() {
 			_, err := pWallet.IssueIncreaseBalanceTx(
 				registerValidationID,
-				units.NanoAvax,
+				units.Avax,
 			)
 			require.NoError(err)
 		})
