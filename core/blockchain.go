@@ -177,10 +177,11 @@ type CacheConfig struct {
 // triedbConfig derives the configures for trie database.
 func (c *CacheConfig) triedbConfig() *triedb.Config {
 	config := &triedb.Config{Preimages: c.Preimages}
-	if c.StateScheme == rawdb.HashScheme {
+	if c.StateScheme == rawdb.HashScheme || c.StateScheme == "" {
 		config.HashDB = &hashdb.Config{
-			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
-			StatsPrefix:    trieCleanCacheStatsNamespace,
+			CleanCacheSize:                  c.TrieCleanLimit * 1024 * 1024,
+			StatsPrefix:                     trieCleanCacheStatsNamespace,
+			ReferenceRootAtomicallyOnUpdate: true,
 		}
 	}
 	if c.StateScheme == rawdb.PathScheme {
@@ -1161,9 +1162,9 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// diff layer for the block.
 	var err error
 	if bc.snaps == nil {
-		_, err = state.Commit(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()), true)
+		_, err = state.Commit(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()))
 	} else {
-		_, err = state.CommitWithSnap(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()), bc.snaps, block.Hash(), block.ParentHash(), true)
+		_, err = state.CommitWithSnap(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()), bc.snaps, block.Hash(), block.ParentHash())
 	}
 	if err != nil {
 		return err
@@ -1695,9 +1696,9 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	// If snapshots are enabled, call CommitWithSnaps to explicitly create a snapshot
 	// diff layer for the block.
 	if bc.snaps == nil {
-		return statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), false)
+		return statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()))
 	}
-	return statedb.CommitWithSnap(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), bc.snaps, current.Hash(), current.ParentHash(), false)
+	return statedb.CommitWithSnap(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), bc.snaps, current.Hash(), current.ParentHash())
 }
 
 // initSnapshot instantiates a Snapshot instance and adds it to [bc]
@@ -1838,8 +1839,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		// Flatten snapshot if initialized, holding a reference to the state root until the next block
 		// is processed.
 		if err := bc.flattenSnapshot(func() error {
-			triedb.Reference(root, common.Hash{})
-			if previousRoot != (common.Hash{}) {
+			if previousRoot != (common.Hash{}) && previousRoot != root {
 				triedb.Dereference(previousRoot)
 			}
 			previousRoot = root

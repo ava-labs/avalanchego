@@ -5,8 +5,6 @@
 package precompileconfig
 
 import (
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -53,21 +51,14 @@ type Predicater interface {
 	VerifyPredicate(predicateContext *PredicateContext, predicateBytes []byte) error
 }
 
-// SharedMemoryWriter defines an interface to allow a precompile's Accepter to write operations
-// into shared memory to be committed atomically on block accept.
-type SharedMemoryWriter interface {
-	AddSharedMemoryRequests(chainID ids.ID, requests *atomic.Requests)
-}
-
 type WarpMessageWriter interface {
 	AddMessage(unsignedMessage *warp.UnsignedMessage) error
 }
 
 // AcceptContext defines the context passed in to a precompileconfig's Accepter
 type AcceptContext struct {
-	SnowCtx      *snow.Context
-	SharedMemory SharedMemoryWriter
-	Warp         WarpMessageWriter
+	SnowCtx *snow.Context
+	Warp    WarpMessageWriter
 }
 
 // Accepter is an optional interface for StatefulPrecompiledContracts to implement.
