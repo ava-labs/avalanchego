@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -179,6 +180,11 @@ func TestVerifierVisitProposalBlock(t *testing.T) {
 
 			timestamp:       initialTimestamp,
 			verifiedHeights: set.Of[uint64](0),
+			metrics: metrics.Block{
+				Block:          proposalBlock,
+				GasPrice:       verifier.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+				ValidatorPrice: verifier.txExecutorBackend.Config.ValidatorFeeConfig.MinPrice,
+			},
 		},
 		executedBlockState,
 	)
@@ -278,6 +284,11 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 				},
 			},
 			verifiedHeights: set.Of[uint64](0),
+			metrics: metrics.Block{
+				Block:          atomicBlock,
+				GasPrice:       verifier.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+				ValidatorPrice: verifier.txExecutorBackend.Config.ValidatorFeeConfig.MinPrice,
+			},
 		},
 		atomicBlockState,
 	)
@@ -408,6 +419,11 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 					},
 				},
 				verifiedHeights: set.Of[uint64](0),
+				metrics: metrics.Block{
+					Block:          firstBlock,
+					GasPrice:       verifier.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+					ValidatorPrice: verifier.txExecutorBackend.Config.ValidatorFeeConfig.MinPrice,
+				},
 			},
 			atomicBlockState,
 		)
@@ -482,6 +498,11 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		// Allow metrics to be calculated.
+		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
+		parentOnCommitState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
+		parentOnCommitState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
@@ -550,6 +571,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		// Allow metrics to be calculated.
+		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
+		parentOnAbortState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
+		parentOnAbortState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
