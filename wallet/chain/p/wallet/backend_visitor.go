@@ -123,7 +123,7 @@ func (b *backendVisitor) BaseTx(tx *txs.BaseTx) error {
 	return b.baseTx(tx)
 }
 
-func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+func (b *backendVisitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	for i, vdr := range tx.Validators {
 		b.b.setOwner(
 			tx.Subnet.Append(uint32(i)),
@@ -136,7 +136,7 @@ func (b *backendVisitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+func (b *backendVisitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
 		return err
@@ -145,30 +145,30 @@ func (b *backendVisitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidat
 	if err != nil {
 		return err
 	}
-	registerSubnetValidatorMessage, err := message.ParseRegisterSubnetValidator(addressedCallPayload.Payload)
+	registerL1ValidatorMessage, err := message.ParseRegisterL1Validator(addressedCallPayload.Payload)
 	if err != nil {
 		return err
 	}
 
 	b.b.setOwner(
-		registerSubnetValidatorMessage.ValidationID(),
+		registerL1ValidatorMessage.ValidationID(),
 		&secp256k1fx.OutputOwners{
-			Threshold: registerSubnetValidatorMessage.DisableOwner.Threshold,
-			Addrs:     registerSubnetValidatorMessage.DisableOwner.Addresses,
+			Threshold: registerL1ValidatorMessage.DisableOwner.Threshold,
+			Addrs:     registerL1ValidatorMessage.DisableOwner.Addresses,
 		},
 	)
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+func (b *backendVisitor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+func (b *backendVisitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
-func (b *backendVisitor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
+func (b *backendVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 

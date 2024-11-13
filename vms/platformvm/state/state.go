@@ -82,7 +82,7 @@ var (
 	UTXOPrefix                    = []byte("utxo")
 	SubnetPrefix                  = []byte("subnet")
 	SubnetOwnerPrefix             = []byte("subnetOwner")
-	SubnetConversionPrefix        = []byte("subnetConversion")
+	SubnetToL1ConversionPrefix    = []byte("subnetToL1Conversion")
 	TransformedSubnetPrefix       = []byte("transformedSubnet")
 	SupplyPrefix                  = []byte("supply")
 	ChainPrefix                   = []byte("chain")
@@ -140,8 +140,8 @@ type Chain interface {
 	GetSubnetOwner(subnetID ids.ID) (fx.Owner, error)
 	SetSubnetOwner(subnetID ids.ID, owner fx.Owner)
 
-	GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error)
-	SetSubnetConversion(subnetID ids.ID, c SubnetConversion)
+	GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error)
+	SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion)
 
 	GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	AddSubnetTransformation(transformSubnetTx *txs.Tx)
@@ -308,7 +308,7 @@ type stateBlk struct {
  * |   '-- txID -> nil
  * |-. subnetOwners
  * | '-- subnetID -> owner
- * |-. subnetConversions
+ * |-. subnetToL1Conversions
  * | '-- subnetID -> conversionID + chainID + addr
  * |-. chains
  * | '-. subnetID
@@ -411,9 +411,9 @@ type state struct {
 	subnetOwnerCache cache.Cacher[ids.ID, fxOwnerAndSize] // cache of subnetID -> owner; if the entry is nil, it is not in the database
 	subnetOwnerDB    database.Database
 
-	subnetConversions     map[ids.ID]SubnetConversion            // map of subnetID -> conversion of the subnet
-	subnetConversionCache cache.Cacher[ids.ID, SubnetConversion] // cache of subnetID -> conversion
-	subnetConversionDB    database.Database
+	subnetToL1Conversions     map[ids.ID]SubnetToL1Conversion            // map of subnetID -> conversion of the subnet
+	subnetToL1ConversionCache cache.Cacher[ids.ID, SubnetToL1Conversion] // cache of subnetID -> conversion
+	subnetToL1ConversionDB    database.Database
 
 	transformedSubnets     map[ids.ID]*txs.Tx            // map of subnetID -> transformSubnetTx
 	transformedSubnetCache cache.Cacher[ids.ID, *txs.Tx] // cache of subnetID -> transformSubnetTx; if the entry is nil, it is not in the database
@@ -495,7 +495,7 @@ type fxOwnerAndSize struct {
 	size  int
 }
 
-type SubnetConversion struct {
+type SubnetToL1Conversion struct {
 	ConversionID ids.ID `serialize:"true"`
 	ChainID      ids.ID `serialize:"true"`
 	Addr         []byte `serialize:"true"`
@@ -657,11 +657,11 @@ func New(
 		return nil, err
 	}
 
-	subnetConversionDB := prefixdb.New(SubnetConversionPrefix, baseDB)
-	subnetConversionCache, err := metercacher.New[ids.ID, SubnetConversion](
+	subnetToL1ConversionDB := prefixdb.New(SubnetToL1ConversionPrefix, baseDB)
+	subnetToL1ConversionCache, err := metercacher.New[ids.ID, SubnetToL1Conversion](
 		"subnet_conversion_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, SubnetConversion](execCfg.SubnetConversionCacheSize, func(_ ids.ID, c SubnetConversion) int {
+		cache.NewSizedLRU[ids.ID, SubnetToL1Conversion](execCfg.SubnetToL1ConversionCacheSize, func(_ ids.ID, c SubnetToL1Conversion) int {
 			return 3*ids.IDLen + len(c.Addr)
 		}),
 	)
@@ -782,9 +782,9 @@ func New(
 		subnetOwnerDB:    subnetOwnerDB,
 		subnetOwnerCache: subnetOwnerCache,
 
-		subnetConversions:     make(map[ids.ID]SubnetConversion),
-		subnetConversionDB:    subnetConversionDB,
-		subnetConversionCache: subnetConversionCache,
+		subnetToL1Conversions:     make(map[ids.ID]SubnetToL1Conversion),
+		subnetToL1ConversionDB:    subnetToL1ConversionDB,
+		subnetToL1ConversionCache: subnetToL1ConversionCache,
 
 		transformedSubnets:     make(map[ids.ID]*txs.Tx),
 		transformedSubnetCache: transformedSubnetCache,
@@ -1109,31 +1109,31 @@ func (s *state) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	s.subnetOwners[subnetID] = owner
 }
 
-// GetSubnetConversion allows for concurrent reads.
-func (s *state) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
-	if c, ok := s.subnetConversions[subnetID]; ok {
+// GetSubnetToL1Conversion allows for concurrent reads.
+func (s *state) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error) {
+	if c, ok := s.subnetToL1Conversions[subnetID]; ok {
 		return c, nil
 	}
 
-	if c, ok := s.subnetConversionCache.Get(subnetID); ok {
+	if c, ok := s.subnetToL1ConversionCache.Get(subnetID); ok {
 		return c, nil
 	}
 
-	bytes, err := s.subnetConversionDB.Get(subnetID[:])
+	bytes, err := s.subnetToL1ConversionDB.Get(subnetID[:])
 	if err != nil {
-		return SubnetConversion{}, err
+		return SubnetToL1Conversion{}, err
 	}
 
-	var c SubnetConversion
+	var c SubnetToL1Conversion
 	if _, err := block.GenesisCodec.Unmarshal(bytes, &c); err != nil {
-		return SubnetConversion{}, err
+		return SubnetToL1Conversion{}, err
 	}
-	s.subnetConversionCache.Put(subnetID, c)
+	s.subnetToL1ConversionCache.Put(subnetID, c)
 	return c, nil
 }
 
-func (s *state) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
-	s.subnetConversions[subnetID] = c
+func (s *state) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion) {
+	s.subnetToL1Conversions[subnetID] = c
 }
 
 func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -2123,7 +2123,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeUTXOs(),
 		s.writeSubnets(),
 		s.writeSubnetOwners(),
-		s.writeSubnetConversions(),
+		s.writeSubnetToL1Conversions(),
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
@@ -2154,7 +2154,7 @@ func (s *state) Close() error {
 		s.rewardUTXODB.Close(),
 		s.utxoDB.Close(),
 		s.subnetBaseDB.Close(),
-		s.subnetConversionDB.Close(),
+		s.subnetToL1ConversionDB.Close(),
 		s.transformedSubnetDB.Close(),
 		s.supplyDB.Close(),
 		s.chainDB.Close(),
@@ -2986,18 +2986,18 @@ func (s *state) writeSubnetOwners() error {
 	return nil
 }
 
-func (s *state) writeSubnetConversions() error {
-	for subnetID, c := range s.subnetConversions {
-		delete(s.subnetConversions, subnetID)
+func (s *state) writeSubnetToL1Conversions() error {
+	for subnetID, c := range s.subnetToL1Conversions {
+		delete(s.subnetToL1Conversions, subnetID)
 
 		bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &c)
 		if err != nil {
 			return fmt.Errorf("failed to marshal subnet conversion: %w", err)
 		}
 
-		s.subnetConversionCache.Put(subnetID, c)
+		s.subnetToL1ConversionCache.Put(subnetID, c)
 
-		if err := s.subnetConversionDB.Put(subnetID[:], bytes); err != nil {
+		if err := s.subnetToL1ConversionDB.Put(subnetID[:], bytes); err != nil {
 			return fmt.Errorf("failed to write subnet conversion: %w", err)
 		}
 	}

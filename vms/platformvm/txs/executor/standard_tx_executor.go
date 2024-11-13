@@ -34,32 +34,32 @@ import (
 // TODO: Before Etna, ensure that the maximum number of expiries to track is
 // limited to a reasonable number by this window.
 const (
-	second                                = 1
-	minute                                = 60 * second
-	hour                                  = 60 * minute
-	day                                   = 24 * hour
-	RegisterSubnetValidatorTxExpiryWindow = day
+	second                            = 1
+	minute                            = 60 * second
+	hour                              = 60 * minute
+	day                               = 24 * hour
+	RegisterL1ValidatorTxExpiryWindow = day
 )
 
 var (
 	_ txs.Visitor = (*standardTxExecutor)(nil)
 
-	errEmptyNodeID                   = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge      = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango    = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive          = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errTransformSubnetTxPostEtna     = errors.New("TransformSubnetTx is not permitted post-Etna")
-	errMaxNumActiveValidators        = errors.New("already at the max number of active validators")
-	errCouldNotLoadSubnetConversion  = errors.New("could not load subnet conversion")
-	errWrongWarpMessageSourceChainID = errors.New("wrong warp message source chain ID")
-	errWrongWarpMessageSourceAddress = errors.New("wrong warp message source address")
-	errWarpMessageExpired            = errors.New("warp message expired")
-	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
-	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
-	errCouldNotLoadSoV               = errors.New("could not load SoV")
-	errWarpMessageContainsStaleNonce = errors.New("warp message contains stale nonce")
-	errRemovingLastValidator         = errors.New("attempting to remove the last SoV from a converted subnet")
-	errStateCorruption               = errors.New("state corruption")
+	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
+	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
+	errWrongWarpMessageSourceChainID    = errors.New("wrong warp message source chain ID")
+	errWrongWarpMessageSourceAddress    = errors.New("wrong warp message source address")
+	errWarpMessageExpired               = errors.New("warp message expired")
+	errWarpMessageNotYetAllowed         = errors.New("warp message not yet allowed")
+	errWarpMessageAlreadyIssued         = errors.New("warp message already issued")
+	errCouldNotLoadSoV                  = errors.New("could not load SoV")
+	errWarpMessageContainsStaleNonce    = errors.New("warp message contains stale nonce")
+	errRemovingLastValidator            = errors.New("attempting to remove the last SoV from a converted subnet")
+	errStateCorruption                  = errors.New("state corruption")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -677,7 +677,7 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -706,13 +706,13 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	}
 
 	var (
-		startTime            = uint64(currentTimestamp.Unix())
-		currentFees          = e.state.GetAccruedFees()
-		subnetConversionData = message.SubnetConversionData{
+		startTime                = uint64(currentTimestamp.Unix())
+		currentFees              = e.state.GetAccruedFees()
+		subnetToL1ConversionData = message.SubnetToL1ConversionData{
 			SubnetID:       tx.Subnet,
 			ManagerChainID: tx.ChainID,
 			ManagerAddress: tx.Address,
-			Validators:     make([]message.SubnetConversionValidatorData, len(tx.Validators)),
+			Validators:     make([]message.SubnetToL1ConverstionValidatorData, len(tx.Validators)),
 		}
 	)
 	for i, vdr := range tx.Validators {
@@ -763,7 +763,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			return err
 		}
 
-		subnetConversionData.Validators[i] = message.SubnetConversionValidatorData{
+		subnetToL1ConversionData.Validators[i] = message.SubnetToL1ConverstionValidatorData{
 			NodeID:       vdr.NodeID,
 			BLSPublicKey: vdr.Signer.PublicKey,
 			Weight:       vdr.Weight,
@@ -782,7 +782,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
-	conversionID, err := message.SubnetConversionID(subnetConversionData)
+	conversionID, err := message.SubnetToL1ConversionID(subnetToL1ConversionData)
 	if err != nil {
 		return err
 	}
@@ -794,9 +794,9 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.state, txID, tx.Outs)
 	// Track the subnet conversion in the database
-	e.state.SetSubnetConversion(
+	e.state.SetSubnetToL1Conversion(
 		tx.Subnet,
-		state.SubnetConversion{
+		state.SubnetToL1Conversion{
 			ConversionID: conversionID,
 			ChainID:      tx.ChainID,
 			Addr:         tx.Address,
@@ -805,7 +805,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -854,7 +854,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
-	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
+	msg, err := message.ParseRegisterL1Validator(addressedCall.Payload)
 	if err != nil {
 		return err
 	}
@@ -873,8 +873,8 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterSubnetValidatorTxExpiryWindow {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterSubnetValidatorTxExpiryWindow)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterL1ValidatorTxExpiryWindow {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterL1ValidatorTxExpiryWindow)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -957,7 +957,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	return nil
 }
 
-func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1002,7 +1002,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	if err != nil {
 		return err
 	}
-	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
+	msg, err := message.ParseL1ValidatorWeight(addressedCall.Payload)
 	if err != nil {
 		return err
 	}
@@ -1093,7 +1093,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	return nil
 }
 
-func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1165,7 +1165,7 @@ func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 	return nil
 }
 
-func (e *standardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
+func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1353,15 +1353,15 @@ func verifyL1Conversion(
 	expectedChainID ids.ID,
 	expectedAddress []byte,
 ) error {
-	subnetConversion, err := state.GetSubnetConversion(subnetID)
+	subnetToL1Conversion, err := state.GetSubnetToL1Conversion(subnetID)
 	if err != nil {
-		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, subnetID, err)
+		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetToL1Conversion, subnetID, err)
 	}
-	if expectedChainID != subnetConversion.ChainID {
-		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, expectedChainID)
+	if expectedChainID != subnetToL1Conversion.ChainID {
+		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetToL1Conversion.ChainID, expectedChainID)
 	}
-	if !bytes.Equal(expectedAddress, subnetConversion.Addr) {
-		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, expectedAddress)
+	if !bytes.Equal(expectedAddress, subnetToL1Conversion.Addr) {
+		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetToL1Conversion.Addr, expectedAddress)
 	}
 	return nil
 }

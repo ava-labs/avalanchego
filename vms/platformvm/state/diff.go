@@ -56,7 +56,7 @@ type diff struct {
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
 	// Subnet ID --> Conversion of the subnet
-	subnetConversions map[ids.ID]SubnetConversion
+	subnetToL1Conversions map[ids.ID]SubnetToL1Conversion
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 
@@ -79,17 +79,17 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:            parentID,
-		stateVersions:       stateVersions,
-		timestamp:           parentState.GetTimestamp(),
-		feeState:            parentState.GetFeeState(),
-		sovExcess:           parentState.GetSoVExcess(),
-		accruedFees:         parentState.GetAccruedFees(),
-		parentNumActiveSOVs: parentState.NumActiveSubnetOnlyValidators(),
-		expiryDiff:          newExpiryDiff(),
-		sovDiff:             newSubnetOnlyValidatorsDiff(),
-		subnetOwners:        make(map[ids.ID]fx.Owner),
-		subnetConversions:   make(map[ids.ID]SubnetConversion),
+		parentID:              parentID,
+		stateVersions:         stateVersions,
+		timestamp:             parentState.GetTimestamp(),
+		feeState:              parentState.GetFeeState(),
+		sovExcess:             parentState.GetSoVExcess(),
+		accruedFees:           parentState.GetAccruedFees(),
+		parentNumActiveSOVs:   parentState.NumActiveSubnetOnlyValidators(),
+		expiryDiff:            newExpiryDiff(),
+		sovDiff:               newSubnetOnlyValidatorsDiff(),
+		subnetOwners:          make(map[ids.ID]fx.Owner),
+		subnetToL1Conversions: make(map[ids.ID]SubnetToL1Conversion),
 	}, nil
 }
 
@@ -435,21 +435,21 @@ func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	d.subnetOwners[subnetID] = owner
 }
 
-func (d *diff) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
-	if c, ok := d.subnetConversions[subnetID]; ok {
+func (d *diff) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error) {
+	if c, ok := d.subnetToL1Conversions[subnetID]; ok {
 		return c, nil
 	}
 
 	// If the subnet conversion was not assigned in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return SubnetConversion{}, ErrMissingParentState
+		return SubnetToL1Conversion{}, ErrMissingParentState
 	}
-	return parentState.GetSubnetConversion(subnetID)
+	return parentState.GetSubnetToL1Conversion(subnetID)
 }
 
-func (d *diff) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
-	d.subnetConversions[subnetID] = c
+func (d *diff) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion) {
+	d.subnetToL1Conversions[subnetID] = c
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -672,8 +672,8 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
 	}
-	for subnetID, c := range d.subnetConversions {
-		baseState.SetSubnetConversion(subnetID, c)
+	for subnetID, c := range d.subnetToL1Conversions {
+		baseState.SetSubnetToL1Conversion(subnetID, c)
 	}
 	return nil
 }

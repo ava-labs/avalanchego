@@ -127,23 +127,23 @@ func (*proposalTxExecutor) BaseTx(*txs.BaseTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (*proposalTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) error {
+func (*proposalTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeightTx) error {
+func (*proposalTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
+func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) DisableSubnetValidatorTx(*txs.DisableSubnetValidatorTx) error {
+func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 

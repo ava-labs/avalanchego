@@ -1204,21 +1204,21 @@ func TestStateSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
-func TestStateSubnetConversion(t *testing.T) {
+func TestStateSubnetToL1Conversion(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(s *state, subnetID ids.ID, c SubnetConversion)
+		setup func(s *state, subnetID ids.ID, c SubnetToL1Conversion)
 	}{
 		{
 			name: "in-memory",
-			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
-				s.SetSubnetConversion(subnetID, c)
+			setup: func(s *state, subnetID ids.ID, c SubnetToL1Conversion) {
+				s.SetSubnetToL1Conversion(subnetID, c)
 			},
 		},
 		{
 			name: "cache",
-			setup: func(s *state, subnetID ids.ID, c SubnetConversion) {
-				s.subnetConversionCache.Put(subnetID, c)
+			setup: func(s *state, subnetID ids.ID, c SubnetToL1Conversion) {
+				s.subnetToL1ConversionCache.Put(subnetID, c)
 			},
 		},
 	}
@@ -1228,20 +1228,20 @@ func TestStateSubnetConversion(t *testing.T) {
 				require            = require.New(t)
 				state              = newTestState(t, memdb.New())
 				subnetID           = ids.GenerateTestID()
-				expectedConversion = SubnetConversion{
+				expectedConversion = SubnetToL1Conversion{
 					ConversionID: ids.GenerateTestID(),
 					ChainID:      ids.GenerateTestID(),
 					Addr:         []byte{'a', 'd', 'd', 'r'},
 				}
 			)
 
-			actualConversion, err := state.GetSubnetConversion(subnetID)
+			actualConversion, err := state.GetSubnetToL1Conversion(subnetID)
 			require.ErrorIs(err, database.ErrNotFound)
 			require.Zero(actualConversion)
 
 			test.setup(state, subnetID, expectedConversion)
 
-			actualConversion, err = state.GetSubnetConversion(subnetID)
+			actualConversion, err = state.GetSubnetToL1Conversion(subnetID)
 			require.NoError(err)
 			require.Equal(expectedConversion, actualConversion)
 		})

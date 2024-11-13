@@ -396,19 +396,19 @@ func (mr *MockDiffMockRecorder) GetSoVExcess() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSoVExcess", reflect.TypeOf((*MockDiff)(nil).GetSoVExcess))
 }
 
-// GetSubnetConversion mocks base method.
-func (m *MockDiff) GetSubnetConversion(subnetID ids.ID) (SubnetConversion, error) {
+// GetSubnetToL1Conversion mocks base method.
+func (m *MockDiff) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnetConversion", subnetID)
-	ret0, _ := ret[0].(SubnetConversion)
+	ret := m.ctrl.Call(m, "GetSubnetToL1Conversion", subnetID)
+	ret0, _ := ret[0].(SubnetToL1Conversion)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetSubnetConversion indicates an expected call of GetSubnetConversion.
-func (mr *MockDiffMockRecorder) GetSubnetConversion(subnetID any) *gomock.Call {
+// GetSubnetToL1Conversion indicates an expected call of GetSubnetToL1Conversion.
+func (mr *MockDiffMockRecorder) GetSubnetToL1Conversion(subnetID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetConversion", reflect.TypeOf((*MockDiff)(nil).GetSubnetConversion), subnetID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetToL1Conversion", reflect.TypeOf((*MockDiff)(nil).GetSubnetToL1Conversion), subnetID)
 }
 
 // GetSubnetOnlyValidator mocks base method.
@@ -685,16 +685,16 @@ func (mr *MockDiffMockRecorder) SetSoVExcess(e any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSoVExcess", reflect.TypeOf((*MockDiff)(nil).SetSoVExcess), e)
 }
 
-// SetSubnetConversion mocks base method.
-func (m *MockDiff) SetSubnetConversion(subnetID ids.ID, c SubnetConversion) {
+// SetSubnetToL1Conversion mocks base method.
+func (m *MockDiff) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetSubnetConversion", subnetID, c)
+	m.ctrl.Call(m, "SetSubnetToL1Conversion", subnetID, c)
 }
 
-// SetSubnetConversion indicates an expected call of SetSubnetConversion.
-func (mr *MockDiffMockRecorder) SetSubnetConversion(subnetID, c any) *gomock.Call {
+// SetSubnetToL1Conversion indicates an expected call of SetSubnetToL1Conversion.
+func (mr *MockDiffMockRecorder) SetSubnetToL1Conversion(subnetID, c any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetConversion", reflect.TypeOf((*MockDiff)(nil).SetSubnetConversion), subnetID, c)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSubnetToL1Conversion", reflect.TypeOf((*MockDiff)(nil).SetSubnetToL1Conversion), subnetID, c)
 }
 
 // SetSubnetOwner mocks base method.

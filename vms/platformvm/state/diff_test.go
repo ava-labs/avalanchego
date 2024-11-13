@@ -911,42 +911,42 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner2, owner)
 }
 
-func TestDiffSubnetConversion(t *testing.T) {
+func TestDiffSubnetToL1Conversion(t *testing.T) {
 	var (
 		require            = require.New(t)
 		state              = newTestState(t, memdb.New())
 		subnetID           = ids.GenerateTestID()
-		expectedConversion = SubnetConversion{
+		expectedConversion = SubnetToL1Conversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte{1, 2, 3, 4},
 		}
 	)
 
-	actualConversion, err := state.GetSubnetConversion(subnetID)
+	actualConversion, err := state.GetSubnetToL1Conversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(actualConversion)
 
 	d, err := NewDiffOn(state)
 	require.NoError(err)
 
-	actualConversion, err = d.GetSubnetConversion(subnetID)
+	actualConversion, err = d.GetSubnetToL1Conversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(actualConversion)
 
 	// Setting a subnet conversion should be reflected on diff not state
-	d.SetSubnetConversion(subnetID, expectedConversion)
-	actualConversion, err = d.GetSubnetConversion(subnetID)
+	d.SetSubnetToL1Conversion(subnetID, expectedConversion)
+	actualConversion, err = d.GetSubnetToL1Conversion(subnetID)
 	require.NoError(err)
 	require.Equal(expectedConversion, actualConversion)
 
-	actualConversion, err = state.GetSubnetConversion(subnetID)
+	actualConversion, err = state.GetSubnetToL1Conversion(subnetID)
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(actualConversion)
 
 	// State should reflect new subnet conversion after diff is applied
 	require.NoError(d.Apply(state))
-	actualConversion, err = state.GetSubnetConversion(subnetID)
+	actualConversion, err = state.GetSubnetToL1Conversion(subnetID)
 	require.NoError(err)
 	require.Equal(expectedConversion, actualConversion)
 }

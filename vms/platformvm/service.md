@@ -818,7 +818,7 @@ platform.getSubnetOnlyValidator({
 - `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
 - `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
 - `weight` is weight of this validator used for consensus voting and ICM.
-- `minNonce` is minimum nonce that must be included in a `SetSubnetValidatorWeightTx` for the transaction to be valid.
+- `minNonce` is minimum nonce that must be included in a `SetL1ValidatorWeightTx` for the transaction to be valid.
 - `balance` is current remaining balance that can be used to pay for the validators continuous fee.
 - `height` is height of the last accepted block.
 

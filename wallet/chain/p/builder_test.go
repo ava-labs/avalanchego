@@ -681,7 +681,7 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 	}
 }
 
-func TestConvertSubnetTx(t *testing.T) {
+func TestConvertSubnetToL1Tx(t *testing.T) {
 	sk0, err := bls.NewSecretKey()
 	require.NoError(t, err)
 	sk1, err := bls.NewSecretKey()
@@ -690,7 +690,7 @@ func TestConvertSubnetTx(t *testing.T) {
 	var (
 		chainID    = ids.GenerateTestID()
 		address    = utils.RandomBytes(32)
-		validators = []*txs.ConvertSubnetValidator{
+		validators = []*txs.ConvertSubnetToL1Validator{
 			{
 				NodeID:  utils.RandomBytes(ids.NodeIDLen),
 				Weight:  rand.Uint64(), //#nosec G404
@@ -730,7 +730,7 @@ func TestConvertSubnetTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewConvertSubnetTx(
+			utx, err := builder.NewConvertSubnetToL1Tx(
 				subnetID,
 				chainID,
 				address,
@@ -759,7 +759,7 @@ func TestConvertSubnetTx(t *testing.T) {
 	}
 }
 
-func TestRegisterSubnetValidatorTx(t *testing.T) {
+func TestRegisterL1ValidatorTx(t *testing.T) {
 	const (
 		expiry = 1731005097
 		weight = 7905001371
@@ -771,7 +771,7 @@ func TestRegisterSubnetValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 
-	addressedCallPayload, err := message.NewRegisterSubnetValidator(
+	addressedCallPayload, err := message.NewRegisterL1Validator(
 		subnetID,
 		nodeID,
 		pop.PublicKey,
@@ -833,7 +833,7 @@ func TestRegisterSubnetValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewRegisterSubnetValidatorTx(
+			utx, err := builder.NewRegisterL1ValidatorTx(
 				balance,
 				pop.ProofOfPossession,
 				warpMessageBytes,
@@ -859,7 +859,7 @@ func TestRegisterSubnetValidatorTx(t *testing.T) {
 	}
 }
 
-func TestSetSubnetValidatorWeightTx(t *testing.T) {
+func TestSetL1ValidatorWeightTx(t *testing.T) {
 	const (
 		nonce  = 1
 		weight = 7905001371
@@ -870,7 +870,7 @@ func TestSetSubnetValidatorWeightTx(t *testing.T) {
 		address      = utils.RandomBytes(20)
 	)
 
-	addressedCallPayload, err := message.NewSubnetValidatorWeight(
+	addressedCallPayload, err := message.NewL1ValidatorWeight(
 		validationID,
 		nonce,
 		weight,
@@ -921,7 +921,7 @@ func TestSetSubnetValidatorWeightTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewSetSubnetValidatorWeightTx(
+			utx, err := builder.NewSetL1ValidatorWeightTx(
 				warpMessageBytes,
 				common.WithMemo(e.memo),
 			)
@@ -941,7 +941,7 @@ func TestSetSubnetValidatorWeightTx(t *testing.T) {
 	}
 }
 
-func TestIncreaseIncreaseBalanceTx(t *testing.T) {
+func TestIncreaseIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	const balance = units.Avax
 	validationID := ids.GenerateTestID()
 	for _, e := range testEnvironmentPostEtna {
@@ -955,7 +955,7 @@ func TestIncreaseIncreaseBalanceTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewIncreaseBalanceTx(
+			utx, err := builder.NewIncreaseL1ValidatorBalanceTx(
 				validationID,
 				balance,
 				common.WithMemo(e.memo),
@@ -979,7 +979,7 @@ func TestIncreaseIncreaseBalanceTx(t *testing.T) {
 	}
 }
 
-func TestDisableSubnetValidatorTx(t *testing.T) {
+func TestDisableL1ValidatorTx(t *testing.T) {
 	for _, e := range testEnvironmentPostEtna {
 		t.Run(e.name, func(t *testing.T) {
 			var (
@@ -991,7 +991,7 @@ func TestDisableSubnetValidatorTx(t *testing.T) {
 				builder = builder.New(set.Of(utxoAddr, validationAuthAddr), e.context, backend)
 			)
 
-			utx, err := builder.NewDisableSubnetValidatorTx(
+			utx, err := builder.NewDisableL1ValidatorTx(
 				validationID,
 				common.WithMemo(e.memo),
 			)

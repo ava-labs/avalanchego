@@ -492,7 +492,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return err
 	}
 
-	switch c, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
+	switch c, err := s.vm.state.GetSubnetToL1Conversion(args.SubnetID); err {
 	case nil:
 		response.IsPermissioned = false
 		response.ConversionID = c.ConversionID

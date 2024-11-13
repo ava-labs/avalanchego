@@ -87,7 +87,7 @@ func TestConfigUnmarshal(t *testing.T) {
 			ChainDBCacheSize:              7,
 			BlockIDCacheSize:              8,
 			FxOwnerCacheSize:              9,
-			SubnetConversionCacheSize:     10,
+			SubnetToL1ConversionCacheSize: 10,
 			L1WeightsCacheSize:            11,
 			L1InactiveValidatorsCacheSize: 12,
 			L1SubnetIDNodeIDCacheSize:     13,
