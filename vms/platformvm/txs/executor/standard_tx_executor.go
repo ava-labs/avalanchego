@@ -56,9 +56,9 @@ var (
 	errWarpMessageExpired               = errors.New("warp message expired")
 	errWarpMessageNotYetAllowed         = errors.New("warp message not yet allowed")
 	errWarpMessageAlreadyIssued         = errors.New("warp message already issued")
-	errCouldNotLoadSoV                  = errors.New("could not load SoV")
+	errCouldNotLoadL1Validator          = errors.New("could not load L1 validator")
 	errWarpMessageContainsStaleNonce    = errors.New("warp message contains stale nonce")
-	errRemovingLastValidator            = errors.New("attempting to remove the last SoV from a converted subnet")
+	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
 	errStateCorruption                  = errors.New("state corruption")
 )
 
@@ -730,7 +730,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			return err
 		}
 
-		sov := state.SubnetOnlyValidator{
+		l1validator := state.L1Validator{
 			ValidationID:          tx.Subnet.Append(uint32(i)),
 			SubnetID:              tx.Subnet,
 			NodeID:                nodeID,
@@ -744,11 +744,11 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 		}
 		if vdr.Balance != 0 {
 			// We are attempting to add an active validator
-			if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+			if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 				return errMaxNumActiveValidators
 			}
 
-			sov.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			l1validator.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
 			if err != nil {
 				return err
 			}
@@ -759,7 +759,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			}
 		}
 
-		if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+		if err := e.state.PutL1Validator(l1validator); err != nil {
 			return err
 		}
 
@@ -901,7 +901,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 		return err
 	}
 
-	// Create the SoV.
+	// Create the L1 validator.
 	nodeID, err := ids.ToNodeID(msg.NodeID)
 	if err != nil {
 		return err
@@ -914,7 +914,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 	if err != nil {
 		return err
 	}
-	sov := state.SubnetOnlyValidator{
+	l1validator := state.L1Validator{
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
 		NodeID:                nodeID,
@@ -930,19 +930,19 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 	// If the balance is non-zero, this validator should be initially active.
 	if tx.Balance != 0 {
 		// Verify that there is space for an active validator.
-		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+		if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
 		// Mark the validator as active.
 		currentFees := e.state.GetAccruedFees()
-		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
+		l1validator.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+	if err := e.state.PutL1Validator(l1validator); err != nil {
 		return err
 	}
 
@@ -1011,17 +1011,17 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	}
 
 	// Verify that the message contains a valid nonce for a current validator.
-	sov, err := e.state.GetSubnetOnlyValidator(msg.ValidationID)
+	l1validator, err := e.state.GetL1Validator(msg.ValidationID)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
+		return fmt.Errorf("%w: %w", errCouldNotLoadL1Validator, err)
 	}
-	if msg.Nonce < sov.MinNonce {
-		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, sov.MinNonce)
+	if msg.Nonce < l1validator.MinNonce {
+		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, l1validator.MinNonce)
 	}
 
 	// Verify that the warp message was sent from the expected chain and
 	// address.
-	if err := verifyL1Conversion(e.state, sov.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
+	if err := verifyL1Conversion(e.state, l1validator.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
 		return err
 	}
 
@@ -1030,30 +1030,30 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	// Check if we are removing the validator.
 	if msg.Weight == 0 {
 		// Verify that we are not removing the last validator.
-		weight, err := e.state.WeightOfSubnetOnlyValidators(sov.SubnetID)
+		weight, err := e.state.WeightOfL1Validators(l1validator.SubnetID)
 		if err != nil {
-			return fmt.Errorf("could not load SoV weights: %w", err)
+			return fmt.Errorf("could not load L1 validator weights: %w", err)
 		}
-		if weight == sov.Weight {
+		if weight == l1validator.Weight {
 			return errRemovingLastValidator
 		}
 
 		// If the validator is currently active, we need to refund the remaining
 		// balance.
-		if sov.EndAccumulatedFee != 0 {
+		if l1validator.EndAccumulatedFee != 0 {
 			var remainingBalanceOwner message.PChainOwner
-			if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+			if _, err := txs.Codec.Unmarshal(l1validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 				return fmt.Errorf("%w: remaining balance owner is malformed", errStateCorruption)
 			}
 
 			accruedFees := e.state.GetAccruedFees()
-			if sov.EndAccumulatedFee <= accruedFees {
+			if l1validator.EndAccumulatedFee <= accruedFees {
 				// This check should be unreachable. However, it prevents AVAX
 				// from being minted due to state corruption. This also prevents
 				// invalid UTXOs from being created (with 0 value).
 				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 			}
-			remainingBalance := sov.EndAccumulatedFee - accruedFees
+			remainingBalance := l1validator.EndAccumulatedFee - accruedFees
 
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -1080,9 +1080,9 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	// doesn't matter. If weight is not 0, [msg.Nonce] is enforced by
 	// [msg.Verify()] to be less than MaxUInt64 and can therefore be incremented
 	// without overflow.
-	sov.MinNonce = msg.Nonce + 1
-	sov.Weight = msg.Weight
-	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+	l1validator.MinNonce = msg.Nonce + 1
+	l1validator.Weight = msg.Weight
+	if err := e.state.PutL1Validator(l1validator); err != nil {
 		return err
 	}
 
@@ -1134,25 +1134,25 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 		return err
 	}
 
-	sov, err := e.state.GetSubnetOnlyValidator(tx.ValidationID)
+	l1validator, err := e.state.GetL1Validator(tx.ValidationID)
 	if err != nil {
 		return err
 	}
 
 	// If the validator is currently inactive, we are activating it.
-	if sov.EndAccumulatedFee == 0 {
-		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+	if l1validator.EndAccumulatedFee == 0 {
+		if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
-		sov.EndAccumulatedFee = e.state.GetAccruedFees()
+		l1validator.EndAccumulatedFee = e.state.GetAccruedFees()
 	}
-	sov.EndAccumulatedFee, err = math.Add(sov.EndAccumulatedFee, tx.Balance)
+	l1validator.EndAccumulatedFee, err = math.Add(l1validator.EndAccumulatedFee, tx.Balance)
 	if err != nil {
 		return err
 	}
 
-	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+	if err := e.state.PutL1Validator(l1validator); err != nil {
 		return err
 	}
 
@@ -1182,13 +1182,13 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 		return err
 	}
 
-	sov, err := e.state.GetSubnetOnlyValidator(tx.ValidationID)
+	l1validator, err := e.state.GetL1Validator(tx.ValidationID)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
+		return fmt.Errorf("%w: %w", errCouldNotLoadL1Validator, err)
 	}
 
 	var disableOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &disableOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1validator.DeactivationOwner, &disableOwner); err != nil {
 		return err
 	}
 
@@ -1232,23 +1232,23 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	avax.Produce(e.state, txID, tx.Outs)
 
 	// If the validator is already disabled, there is nothing to do.
-	if sov.EndAccumulatedFee == 0 {
+	if l1validator.EndAccumulatedFee == 0 {
 		return nil
 	}
 
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return err
 	}
 
 	accruedFees := e.state.GetAccruedFees()
-	if sov.EndAccumulatedFee <= accruedFees {
+	if l1validator.EndAccumulatedFee <= accruedFees {
 		// This check should be unreachable. However, including it ensures
 		// that AVAX can't get minted out of thin air due to state
 		// corruption.
 		return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 	}
-	remainingBalance := sov.EndAccumulatedFee - accruedFees
+	remainingBalance := l1validator.EndAccumulatedFee - accruedFees
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -1269,8 +1269,8 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	e.state.AddUTXO(utxo)
 
 	// Disable the validator
-	sov.EndAccumulatedFee = 0
-	return e.state.PutSubnetOnlyValidator(sov)
+	l1validator.EndAccumulatedFee = 0
+	return e.state.PutL1Validator(l1validator)
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

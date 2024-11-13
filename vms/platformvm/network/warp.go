@@ -171,7 +171,7 @@ func (s signatureRequestVerifier) verifyL1ValidatorRegistered(
 	defer s.stateLock.Unlock()
 
 	// Verify that the validator exists
-	_, err := s.state.GetSubnetOnlyValidator(validationID)
+	_, err := s.state.GetL1Validator(validationID)
 	if err == database.ErrNotFound {
 		return &common.AppError{
 			Code:    ErrValidationDoesNotExist,
@@ -229,7 +229,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	}
 
 	// Verify that the validator is not in the current state
-	_, err = s.state.GetSubnetOnlyValidator(validationID)
+	_, err = s.state.GetL1Validator(validationID)
 	if err == nil {
 		return &common.AppError{
 			Code:    ErrValidationExists,
@@ -274,7 +274,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	defer s.stateLock.Unlock()
 
 	// Verify that the validator does not currently exist
-	_, err = s.state.GetSubnetOnlyValidator(validationID)
+	_, err = s.state.GetL1Validator(validationID)
 	if err == nil {
 		return &common.AppError{
 			Code:    ErrValidationExists,
@@ -328,7 +328,7 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	sov, err := s.state.GetSubnetOnlyValidator(msg.ValidationID)
+	l1validator, err := s.state.GetL1Validator(msg.ValidationID)
 	switch {
 	case err == database.ErrNotFound:
 		return &common.AppError{
@@ -340,15 +340,15 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 			Code:    common.ErrUndefined.Code,
 			Message: "failed to get subnet only validator: " + err.Error(),
 		}
-	case msg.Nonce+1 != sov.MinNonce:
+	case msg.Nonce+1 != l1validator.MinNonce:
 		return &common.AppError{
 			Code:    ErrWrongNonce,
-			Message: fmt.Sprintf("provided nonce %d != expected nonce (%d - 1)", msg.Nonce, sov.MinNonce),
+			Message: fmt.Sprintf("provided nonce %d != expected nonce (%d - 1)", msg.Nonce, l1validator.MinNonce),
 		}
-	case msg.Weight != sov.Weight:
+	case msg.Weight != l1validator.Weight:
 		return &common.AppError{
 			Code:    ErrWrongWeight,
-			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, sov.Weight),
+			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, l1validator.Weight),
 		}
 	default:
 		return nil // The nonce and weight are correct

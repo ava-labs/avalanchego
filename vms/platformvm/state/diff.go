@@ -35,17 +35,17 @@ type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
 
-	timestamp           time.Time
-	feeState            gas.State
-	sovExcess           gas.Gas
-	accruedFees         uint64
-	parentNumActiveSOVs int
+	timestamp                   time.Time
+	feeState                    gas.State
+	l1ValidatorExcess           gas.Gas
+	accruedFees                 uint64
+	parentNumActiveL1Validators int
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
 
-	expiryDiff *expiryDiff
-	sovDiff    *subnetOnlyValidatorsDiff
+	expiryDiff       *expiryDiff
+	l1ValidatorsDiff *l1ValidatorsDiff
 
 	currentStakerDiffs diffStakers
 	// map of subnetID -> nodeID -> total accrued delegatee rewards
@@ -79,17 +79,17 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:              parentID,
-		stateVersions:         stateVersions,
-		timestamp:             parentState.GetTimestamp(),
-		feeState:              parentState.GetFeeState(),
-		sovExcess:             parentState.GetSoVExcess(),
-		accruedFees:           parentState.GetAccruedFees(),
-		parentNumActiveSOVs:   parentState.NumActiveSubnetOnlyValidators(),
-		expiryDiff:            newExpiryDiff(),
-		sovDiff:               newSubnetOnlyValidatorsDiff(),
-		subnetOwners:          make(map[ids.ID]fx.Owner),
-		subnetToL1Conversions: make(map[ids.ID]SubnetToL1Conversion),
+		parentID:                    parentID,
+		stateVersions:               stateVersions,
+		timestamp:                   parentState.GetTimestamp(),
+		feeState:                    parentState.GetFeeState(),
+		l1ValidatorExcess:           parentState.GetL1ValidatorExcess(),
+		accruedFees:                 parentState.GetAccruedFees(),
+		parentNumActiveL1Validators: parentState.NumActiveL1Validators(),
+		expiryDiff:                  newExpiryDiff(),
+		l1ValidatorsDiff:            newL1ValidatorsDiff(),
+		subnetOwners:                make(map[ids.ID]fx.Owner),
+		subnetToL1Conversions:       make(map[ids.ID]SubnetToL1Conversion),
 	}, nil
 }
 
@@ -123,12 +123,12 @@ func (d *diff) SetFeeState(feeState gas.State) {
 	d.feeState = feeState
 }
 
-func (d *diff) GetSoVExcess() gas.Gas {
-	return d.sovExcess
+func (d *diff) GetL1ValidatorExcess() gas.Gas {
+	return d.l1ValidatorExcess
 }
 
-func (d *diff) SetSoVExcess(excess gas.Gas) {
-	d.sovExcess = excess
+func (d *diff) SetL1ValidatorExcess(excess gas.Gas) {
+	d.l1ValidatorExcess = excess
 }
 
 func (d *diff) GetAccruedFees() uint64 {
@@ -198,26 +198,26 @@ func (d *diff) DeleteExpiry(entry ExpiryEntry) {
 	d.expiryDiff.DeleteExpiry(entry)
 }
 
-func (d *diff) GetActiveSubnetOnlyValidatorsIterator() (iterator.Iterator[SubnetOnlyValidator], error) {
+func (d *diff) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	parentIterator, err := parentState.GetActiveSubnetOnlyValidatorsIterator()
+	parentIterator, err := parentState.GetActiveL1ValidatorsIterator()
 	if err != nil {
 		return nil, err
 	}
 
-	return d.sovDiff.getActiveSubnetOnlyValidatorsIterator(parentIterator), nil
+	return d.l1ValidatorsDiff.getActiveL1ValidatorsIterator(parentIterator), nil
 }
 
-func (d *diff) NumActiveSubnetOnlyValidators() int {
-	return d.parentNumActiveSOVs + d.sovDiff.netAddedActive
+func (d *diff) NumActiveL1Validators() int {
+	return d.parentNumActiveL1Validators + d.l1ValidatorsDiff.netAddedActive
 }
 
-func (d *diff) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
-	if weight, modified := d.sovDiff.modifiedTotalWeight[subnetID]; modified {
+func (d *diff) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
+	if weight, modified := d.l1ValidatorsDiff.modifiedTotalWeight[subnetID]; modified {
 		return weight, nil
 	}
 
@@ -226,27 +226,27 @@ func (d *diff) WeightOfSubnetOnlyValidators(subnetID ids.ID) (uint64, error) {
 		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.WeightOfSubnetOnlyValidators(subnetID)
+	return parentState.WeightOfL1Validators(subnetID)
 }
 
-func (d *diff) GetSubnetOnlyValidator(validationID ids.ID) (SubnetOnlyValidator, error) {
-	if sov, modified := d.sovDiff.modified[validationID]; modified {
-		if sov.isDeleted() {
-			return SubnetOnlyValidator{}, database.ErrNotFound
+func (d *diff) GetL1Validator(validationID ids.ID) (L1Validator, error) {
+	if l1validator, modified := d.l1ValidatorsDiff.modified[validationID]; modified {
+		if l1validator.isDeleted() {
+			return L1Validator{}, database.ErrNotFound
 		}
-		return sov, nil
+		return l1validator, nil
 	}
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return SubnetOnlyValidator{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+		return L1Validator{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.GetSubnetOnlyValidator(validationID)
+	return parentState.GetL1Validator(validationID)
 }
 
-func (d *diff) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
-	if has, modified := d.sovDiff.hasSubnetOnlyValidator(subnetID, nodeID); modified {
+func (d *diff) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+	if has, modified := d.l1ValidatorsDiff.hasL1Validator(subnetID, nodeID); modified {
 		return has, nil
 	}
 
@@ -255,11 +255,11 @@ func (d *diff) HasSubnetOnlyValidator(subnetID ids.ID, nodeID ids.NodeID) (bool,
 		return false, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	return parentState.HasSubnetOnlyValidator(subnetID, nodeID)
+	return parentState.HasL1Validator(subnetID, nodeID)
 }
 
-func (d *diff) PutSubnetOnlyValidator(sov SubnetOnlyValidator) error {
-	return d.sovDiff.putSubnetOnlyValidator(d, sov)
+func (d *diff) PutL1Validator(l1validator L1Validator) error {
+	return d.l1ValidatorsDiff.putL1Validator(d, l1validator)
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -560,7 +560,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetFeeState(d.feeState)
-	baseState.SetSoVExcess(d.sovExcess)
+	baseState.SetL1ValidatorExcess(d.l1ValidatorExcess)
 	baseState.SetAccruedFees(d.accruedFees)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
@@ -572,23 +572,23 @@ func (d *diff) Apply(baseState Chain) error {
 			baseState.DeleteExpiry(entry)
 		}
 	}
-	// Ensure that all sov deletions happen before any sov additions. This
+	// Ensure that all l1validator deletions happen before any l1validator additions. This
 	// ensures that a subnetID+nodeID pair that was deleted and then re-added in
 	// a single diff can't get reordered into the addition happening first;
 	// which would return an error.
-	for _, sov := range d.sovDiff.modified {
-		if !sov.isDeleted() {
+	for _, l1validator := range d.l1ValidatorsDiff.modified {
+		if !l1validator.isDeleted() {
 			continue
 		}
-		if err := baseState.PutSubnetOnlyValidator(sov); err != nil {
+		if err := baseState.PutL1Validator(l1validator); err != nil {
 			return err
 		}
 	}
-	for _, sov := range d.sovDiff.modified {
-		if sov.isDeleted() {
+	for _, l1validator := range d.l1ValidatorsDiff.modified {
+		if l1validator.isDeleted() {
 			continue
 		}
-		if err := baseState.PutSubnetOnlyValidator(sov); err != nil {
+		if err := baseState.PutL1Validator(l1validator); err != nil {
 			return err
 		}
 	}

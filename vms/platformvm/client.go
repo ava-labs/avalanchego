@@ -72,9 +72,9 @@ type Client interface {
 	GetStakingAssetID(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (ids.ID, error)
 	// GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID, nodeIDs []ids.NodeID, options ...rpc.Option) ([]ClientPermissionlessValidator, error)
-	// GetSubnetOnlyValidator returns the requested SoV with [validationID] and
+	// GetL1Validator returns the requested L1 validator with [validationID] and
 	// the height at which it was calculated.
-	GetSubnetOnlyValidator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (SubnetOnlyValidator, uint64, error)
+	GetL1Validator(ctx context.Context, validationID ids.ID, options ...rpc.Option) (L1Validator, uint64, error)
 	// GetCurrentSupply returns an upper bound on the supply of AVAX in the system along with the P-chain height
 	GetCurrentSupply(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error)
 	// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
@@ -330,9 +330,9 @@ func (c *client) GetCurrentValidators(
 	return getClientPermissionlessValidators(res.Validators)
 }
 
-// SubnetOnlyValidator is the response from calling GetSubnetOnlyValidator on
+// L1Validator is the response from calling GetL1Validator on
 // the API client.
-type SubnetOnlyValidator struct {
+type L1Validator struct {
 	SubnetID              ids.ID
 	NodeID                ids.NodeID
 	PublicKey             *bls.PublicKey
@@ -341,41 +341,41 @@ type SubnetOnlyValidator struct {
 	StartTime             uint64
 	Weight                uint64
 	MinNonce              uint64
-	// Balance is the remaining amount of AVAX this SoV has for paying the
+	// Balance is the remaining amount of AVAX this L1 validator has for paying the
 	// continuous fee.
 	Balance uint64
 }
 
-func (c *client) GetSubnetOnlyValidator(
+func (c *client) GetL1Validator(
 	ctx context.Context,
 	validationID ids.ID,
 	options ...rpc.Option,
-) (SubnetOnlyValidator, uint64, error) {
-	res := &GetSubnetOnlyValidatorReply{}
-	err := c.requester.SendRequest(ctx, "platform.getSubnetOnlyValidator",
-		&GetSubnetOnlyValidatorArgs{
+) (L1Validator, uint64, error) {
+	res := &GetL1ValidatorReply{}
+	err := c.requester.SendRequest(ctx, "platform.getL1Validator",
+		&GetL1ValidatorArgs{
 			ValidationID: validationID,
 		},
 		res, options...,
 	)
 	if err != nil {
-		return SubnetOnlyValidator{}, 0, err
+		return L1Validator{}, 0, err
 	}
 
 	pk, err := bls.PublicKeyFromCompressedBytes(res.PublicKey)
 	if err != nil {
-		return SubnetOnlyValidator{}, 0, err
+		return L1Validator{}, 0, err
 	}
 	remainingBalanceOwnerAddrs, err := address.ParseToIDs(res.RemainingBalanceOwner.Addresses)
 	if err != nil {
-		return SubnetOnlyValidator{}, 0, err
+		return L1Validator{}, 0, err
 	}
 	deactivationOwnerAddrs, err := address.ParseToIDs(res.DeactivationOwner.Addresses)
 	if err != nil {
-		return SubnetOnlyValidator{}, 0, err
+		return L1Validator{}, 0, err
 	}
 
-	return SubnetOnlyValidator{
+	return L1Validator{
 		SubnetID:  res.SubnetID,
 		NodeID:    res.NodeID,
 		PublicKey: pk,
@@ -670,11 +670,11 @@ func GetDeactivationOwners(
 ) (map[ids.ID]fx.Owner, error) {
 	deactivationOwners := make(map[ids.ID]fx.Owner, len(validationIDs))
 	for _, validationID := range validationIDs {
-		sov, _, err := c.GetSubnetOnlyValidator(ctx, validationID)
+		l1validator, _, err := c.GetL1Validator(ctx, validationID)
 		if err != nil {
 			return nil, err
 		}
-		deactivationOwners[validationID] = sov.DeactivationOwner
+		deactivationOwners[validationID] = l1validator.DeactivationOwner
 	}
 	return deactivationOwners, nil
 }

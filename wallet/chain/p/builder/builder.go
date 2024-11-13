@@ -156,7 +156,7 @@ type Builder interface {
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
-	// - [validators] specifies the initial SoVs of the L1
+	// - [validators] specifies the initial L1 validators of the L1
 	NewConvertSubnetToL1Tx(
 		subnetID ids.ID,
 		chainID ids.ID,

@@ -352,15 +352,15 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 
 // ConvertSubnetToL1ValidatorComplexity returns the complexity the validators add to
 // a transaction.
-func ConvertSubnetToL1ValidatorComplexity(sovs ...*txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
+func ConvertSubnetToL1ValidatorComplexity(l1validators ...*txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	var complexity gas.Dimensions
-	for _, sov := range sovs {
-		sovComplexity, err := convertSubnetToL1ValidatorComplexity(sov)
+	for _, l1validator := range l1validators {
+		l1ValidatorComplexity, err := convertSubnetToL1ValidatorComplexity(l1validator)
 		if err != nil {
 			return gas.Dimensions{}, err
 		}
 
-		complexity, err = complexity.Add(&sovComplexity)
+		complexity, err = complexity.Add(&l1ValidatorComplexity)
 		if err != nil {
 			return gas.Dimensions{}, err
 		}
@@ -368,7 +368,7 @@ func ConvertSubnetToL1ValidatorComplexity(sovs ...*txs.ConvertSubnetToL1Validato
 	return complexity, nil
 }
 
-func convertSubnetToL1ValidatorComplexity(sov *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
+func convertSubnetToL1ValidatorComplexity(l1validator *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetToL1ValidatorBandwidth,
 		gas.DBRead:    0,
@@ -376,19 +376,19 @@ func convertSubnetToL1ValidatorComplexity(sov *txs.ConvertSubnetToL1Validator) (
 		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
-	signerComplexity, err := SignerComplexity(&sov.Signer)
+	signerComplexity, err := SignerComplexity(&l1validator.Signer)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
 
-	numAddresses := uint64(len(sov.RemainingBalanceOwner.Addresses) + len(sov.DeactivationOwner.Addresses))
+	numAddresses := uint64(len(l1validator.RemainingBalanceOwner.Addresses) + len(l1validator.DeactivationOwner.Addresses))
 	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
 	return complexity.Add(
 		&gas.Dimensions{
-			gas.Bandwidth: uint64(len(sov.NodeID)),
+			gas.Bandwidth: uint64(len(l1validator.NodeID)),
 		},
 		&signerComplexity,
 		&gas.Dimensions{

@@ -287,15 +287,15 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 			})
 
-			tc.By("verifying the SoV can be fetched", func() {
-				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), genesisValidationID)
+			tc.By("verifying the L1 validator can be fetched", func() {
+				l1Validator, _, err := pClient.GetL1Validator(tc.DefaultContext(), genesisValidationID)
 				require.NoError(err)
-				require.LessOrEqual(sov.Balance, genesisBalance)
+				require.LessOrEqual(l1Validator.Balance, genesisBalance)
 
-				sov.StartTime = 0
-				sov.Balance = 0
+				l1Validator.StartTime = 0
+				l1Validator.Balance = 0
 				require.Equal(
-					platformvm.SubnetOnlyValidator{
+					platformvm.L1Validator{
 						SubnetID:  subnetID,
 						NodeID:    subnetGenesisNode.NodeID,
 						PublicKey: genesisNodePK,
@@ -308,7 +308,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						Weight:   genesisWeight,
 						MinNonce: 0,
 					},
-					sov,
+					l1Validator,
 				)
 			})
 
@@ -459,13 +459,13 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 			})
 
-			tc.By("verifying the SoV can be fetched", func() {
-				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+			tc.By("verifying the L1 validator can be fetched", func() {
+				l1Validator, _, err := pClient.GetL1Validator(tc.DefaultContext(), registerValidationID)
 				require.NoError(err)
 
-				sov.StartTime = 0
+				l1Validator.StartTime = 0
 				require.Equal(
-					platformvm.SubnetOnlyValidator{
+					platformvm.L1Validator{
 						SubnetID:  subnetID,
 						NodeID:    subnetRegisterNode.NodeID,
 						PublicKey: registerNodePK,
@@ -479,7 +479,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						MinNonce: 0,
 						Balance:  0,
 					},
-					sov,
+					l1Validator,
 				)
 			})
 
@@ -603,13 +603,13 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 			})
 
-			tc.By("verifying the SoV can be fetched", func() {
-				sov, _, err := pClient.GetSubnetOnlyValidator(tc.DefaultContext(), registerValidationID)
+			tc.By("verifying the L1 validator can be fetched", func() {
+				l1validator, _, err := pClient.GetL1Validator(tc.DefaultContext(), registerValidationID)
 				require.NoError(err)
 
-				sov.StartTime = 0
+				l1validator.StartTime = 0
 				require.Equal(
-					platformvm.SubnetOnlyValidator{
+					platformvm.L1Validator{
 						SubnetID:  subnetID,
 						NodeID:    subnetRegisterNode.NodeID,
 						PublicKey: registerNodePK,
@@ -623,7 +623,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						MinNonce: nextNonce,
 						Balance:  0,
 					},
-					sov,
+					l1validator,
 				)
 			})
 

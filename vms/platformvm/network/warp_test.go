@@ -181,7 +181,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		sov = state.SubnetOnlyValidator{
+		l1validator = state.L1Validator{
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
@@ -195,7 +195,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 		}
 	)
 
-	require.NoError(t, state.PutSubnetOnlyValidator(sov))
+	require.NoError(t, state.PutL1Validator(l1validator))
 
 	tests := []struct {
 		name         string
@@ -211,7 +211,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 		},
 		{
 			name:         "validation exists",
-			validationID: sov.ValidationID,
+			validationID: l1validator.ValidationID,
 		},
 	}
 	for _, test := range tests {
@@ -302,7 +302,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 	var (
 		conversion                      = state.SubnetToL1Conversion{}
 		registerL1ValidatorValidationID = registerL1ValidatorToRegister.ValidationID()
-		registerL1ValidatorSoV          = state.SubnetOnlyValidator{
+		registerL1ValidatorValidator    = state.L1Validator{
 			ValidationID: registerL1ValidatorValidationID,
 			SubnetID:     registerL1ValidatorToRegister.SubnetID,
 			NodeID:       ids.NodeID(registerL1ValidatorToRegister.NodeID),
@@ -310,7 +310,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 			Weight:       registerL1ValidatorToRegister.Weight,
 		}
 		convertSubnetToL1ValidatorValidationID = registerL1ValidatorToRegister.SubnetID.Append(0)
-		convertSubnetToL1ValidatorSoV          = state.SubnetOnlyValidator{
+		convertSubnetToL1Validator             = state.L1Validator{
 			ValidationID: convertSubnetToL1ValidatorValidationID,
 			SubnetID:     registerL1ValidatorToRegister.SubnetID,
 			NodeID:       ids.GenerateTestNodeID(),
@@ -330,8 +330,8 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 	)
 
 	state.SetSubnetToL1Conversion(convertedSubnetID, conversion)
-	require.NoError(t, state.PutSubnetOnlyValidator(registerL1ValidatorSoV))
-	require.NoError(t, state.PutSubnetOnlyValidator(convertSubnetToL1ValidatorSoV))
+	require.NoError(t, state.PutL1Validator(registerL1ValidatorValidator))
+	require.NoError(t, state.PutL1Validator(convertSubnetToL1Validator))
 	state.PutExpiry(expiryEntry)
 
 	tests := []struct {
@@ -552,7 +552,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		nonce  = 10
 	)
 	var (
-		sov = state.SubnetOnlyValidator{
+		l1validator = state.L1Validator{
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
@@ -568,7 +568,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		}
 	)
 
-	require.NoError(t, state.PutSubnetOnlyValidator(sov))
+	require.NoError(t, state.PutL1Validator(l1validator))
 
 	tests := []struct {
 		name         string
@@ -594,7 +594,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "wrong nonce",
-			validationID: sov.ValidationID,
+			validationID: l1validator.ValidationID,
 			expectedErr: &common.AppError{
 				Code:    ErrWrongNonce,
 				Message: "provided nonce 0 != expected nonce (11 - 1)",
@@ -602,7 +602,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "wrong weight",
-			validationID: sov.ValidationID,
+			validationID: l1validator.ValidationID,
 			nonce:        nonce,
 			expectedErr: &common.AppError{
 				Code:    ErrWrongWeight,
@@ -611,7 +611,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "valid",
-			validationID: sov.ValidationID,
+			validationID: l1validator.ValidationID,
 			nonce:        nonce,
 			weight:       weight,
 		},

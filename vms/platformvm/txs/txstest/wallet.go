@@ -83,11 +83,11 @@ func NewWallet(
 		owners[subnetID] = owner
 	}
 	for _, validationID := range validationIDs {
-		sov, err := state.GetSubnetOnlyValidator(validationID)
+		l1validator, err := state.GetL1Validator(validationID)
 		require.NoError(err)
 
 		var owner message.PChainOwner
-		_, err = txs.Codec.Unmarshal(sov.DeactivationOwner, &owner)
+		_, err = txs.Codec.Unmarshal(l1validator.DeactivationOwner, &owner)
 		require.NoError(err)
 		owners[validationID] = &secp256k1fx.OutputOwners{
 			Threshold: owner.Threshold,

@@ -2519,14 +2519,14 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		{
 			name: "invalid subnet only validator",
 			updateExecutor: func(e *standardTxExecutor) error {
-				return e.state.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
+				return e.state.PutL1Validator(state.L1Validator{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
 					Weight:       1,
 				})
 			},
-			expectedErr: state.ErrDuplicateSubnetOnlyValidator,
+			expectedErr: state.ErrDuplicateL1Validator,
 		},
 		{
 			name: "insufficient fee",
@@ -2661,10 +2661,10 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
 			require.NoError(err)
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 			require.Equal(
-				state.SubnetOnlyValidator{
+				state.L1Validator{
 					ValidationID:          validationID,
 					SubnetID:              subnetID,
 					NodeID:                nodeID,
@@ -2676,7 +2676,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 					MinNonce:              0,
 					EndAccumulatedFee:     validator.Balance + diff.GetAccruedFees(),
 				},
-				sov,
+				l1validator,
 			)
 		})
 	}
@@ -3035,7 +3035,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 			expectedErr: errWarpMessageNotYetAllowed,
 		},
 		{
-			name:    "SoV previously registered",
+			name:    "L1 Validator previously registered",
 			balance: 1,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.PutExpiry(state.ExpiryEntry{
@@ -3099,7 +3099,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		{
 			name: "duplicate subnetID + nodeID pair",
 			updateExecutor: func(e *standardTxExecutor) error {
-				return e.state.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
+				return e.state.PutL1Validator(state.L1Validator{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
@@ -3107,7 +3107,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 					Weight:       1,
 				})
 			},
-			expectedErr: state.ErrDuplicateSubnetOnlyValidator,
+			expectedErr: state.ErrDuplicateL1Validator,
 		},
 		{
 			name: "valid tx",
@@ -3182,7 +3182,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
 			var expectedEndAccumulatedFee uint64
@@ -3190,7 +3190,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				expectedEndAccumulatedFee = test.balance + diff.GetAccruedFees()
 			}
 			require.Equal(
-				state.SubnetOnlyValidator{
+				state.L1Validator{
 					ValidationID:          validationID,
 					SubnetID:              subnetID,
 					NodeID:                nodeID,
@@ -3202,7 +3202,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 					MinNonce:              0,
 					EndAccumulatedFee:     expectedEndAccumulatedFee,
 				},
-				sov,
+				l1validator,
 			)
 
 			hasExpiry, err := diff.HasExpiry(state.ExpiryEntry{
@@ -3332,7 +3332,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	initialL1Validator, err := baseState.GetL1Validator(validationID)
 	require.NoError(t, err)
 
 	// Create the Warp messages
@@ -3383,11 +3383,11 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 
 	increaseL1Weight := func(weight uint64) func(*standardTxExecutor) error {
 		return func(e *standardTxExecutor) error {
-			sov := initialSoV
-			sov.ValidationID = ids.GenerateTestID()
-			sov.NodeID = ids.GenerateTestNodeID()
-			sov.Weight = weight
-			return e.state.PutSubnetOnlyValidator(sov)
+			l1validator := initialL1Validator
+			l1validator.ValidationID = ids.GenerateTestID()
+			l1validator.NodeID = ids.GenerateTestNodeID()
+			l1validator.Weight = weight
+			return e.state.PutL1Validator(l1validator)
 		}
 	}
 
@@ -3497,7 +3497,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			expectedErr: message.ErrNonceReservedForRemoval,
 		},
 		{
-			name: "SoV not found",
+			name: "L1 validator not found",
 			message: must[*warp.Message](t)(warp.NewMessage(
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					ctx.NetworkID,
@@ -3513,14 +3513,14 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				)),
 				warpSignature,
 			)).Bytes(),
-			expectedErr: errCouldNotLoadSoV,
+			expectedErr: errCouldNotLoadL1Validator,
 		},
 		{
 			name: "nonce too low",
 			updateExecutor: func(e *standardTxExecutor) error {
-				sov := initialSoV
-				sov.MinNonce = nonce + 1
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1validator := initialL1Validator
+				l1validator.MinNonce = nonce + 1
+				return e.state.PutL1Validator(l1validator)
 			},
 			expectedErr: errWarpMessageContainsStaleNonce,
 		},
@@ -3556,9 +3556,9 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 					return err
 				}
 
-				sov := initialSoV
-				sov.EndAccumulatedFee = 0 // Deactivate the validator
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1validator := initialL1Validator
+				l1validator.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutL1Validator(l1validator)
 			},
 		},
 		{
@@ -3584,16 +3584,16 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 					return err
 				}
 
-				sov := initialSoV
-				sov.EndAccumulatedFee = 0 // Deactivate the validator
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1validator := initialL1Validator
+				l1validator.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutL1Validator(l1validator)
 			},
 		},
 		{
 			name:    "should have been previously deactivated",
 			message: removeValidatorWarpMessage.Bytes(),
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetAccruedFees(initialSoV.EndAccumulatedFee)
+				e.state.SetAccruedFees(initialL1Validator.EndAccumulatedFee)
 				return increaseL1Weight(1)(e)
 			},
 			expectedErr: errStateCorruption,
@@ -3690,14 +3690,14 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1validator, err := diff.GetL1Validator(validationID)
 			if test.expectedWeight != 0 {
 				require.NoError(err)
 
-				expectedSoV := initialSoV
-				expectedSoV.MinNonce = test.expectedNonce
-				expectedSoV.Weight = test.expectedWeight
-				require.Equal(expectedSoV, sov)
+				expectedL1Validator := initialL1Validator
+				expectedL1Validator.MinNonce = test.expectedNonce
+				expectedL1Validator.Weight = test.expectedWeight
+				require.Equal(expectedL1Validator, l1validator)
 				return
 			}
 			require.ErrorIs(err, database.ErrNotFound)
@@ -3837,7 +3837,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	initialL1Validator, err := baseState.GetL1Validator(validationID)
 	require.NoError(t, err)
 
 	const balanceIncrease = units.NanoAvax
@@ -4005,12 +4005,12 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
-			expectedSoV := initialSoV
-			expectedSoV.EndAccumulatedFee = test.expectedBalance
-			require.Equal(expectedSoV, sov)
+			expectedL1Validator := initialL1Validator
+			expectedL1Validator.EndAccumulatedFee = test.expectedBalance
+			require.Equal(expectedL1Validator, l1validator)
 		})
 	}
 }
@@ -4137,7 +4137,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	initialL1Validator, err := baseState.GetL1Validator(validationID)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -4175,9 +4175,9 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name:         "sov not found",
+			name:         "l1validator not found",
 			validationID: ids.GenerateTestID(),
-			expectedErr:  errCouldNotLoadSoV,
+			expectedErr:  errCouldNotLoadL1Validator,
 		},
 		{
 			name:         "not authorized",
@@ -4200,9 +4200,9 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			name:         "already deactivated",
 			validationID: validationID,
 			updateExecutor: func(e *standardTxExecutor) error {
-				sov := initialSoV
-				sov.EndAccumulatedFee = 0
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1validator := initialL1Validator
+				l1validator.EndAccumulatedFee = 0
+				return e.state.PutL1Validator(l1validator)
 			},
 			expectedBalance: 0,
 		},
@@ -4287,12 +4287,12 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
-			expectedSoV := initialSoV
-			expectedSoV.EndAccumulatedFee = 0
-			require.Equal(expectedSoV, sov)
+			expectedL1Validator := initialL1Validator
+			expectedL1Validator.EndAccumulatedFee = 0
+			require.Equal(expectedL1Validator, l1validator)
 
 			utxoID := avax.UTXOID{
 				TxID:        disableL1ValidatorTx.ID(),

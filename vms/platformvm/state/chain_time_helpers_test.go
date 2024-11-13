@@ -94,11 +94,11 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		pending  []*Staker
-		sovs     []SubnetOnlyValidator
-		maxTime  time.Time
-		expected time.Time
+		name         string
+		pending      []*Staker
+		l1validators []L1Validator
+		maxTime      time.Time
+		expected     time.Time
 	}{
 		{
 			name:     "only current validators",
@@ -125,7 +125,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "subnet only validator with less than 1 second of fees",
-			sovs: []SubnetOnlyValidator{
+			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -139,7 +139,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "subnet only validator with 1 second of fees",
-			sovs: []SubnetOnlyValidator{
+			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -153,7 +153,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "subnet only validator with less than 2 seconds of fees",
-			sovs: []SubnetOnlyValidator{
+			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -167,7 +167,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "current and subnet only validator with high balance",
-			sovs: []SubnetOnlyValidator{
+			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -194,8 +194,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			for _, staker := range test.pending {
 				require.NoError(s.PutPendingValidator(staker))
 			}
-			for _, sov := range test.sovs {
-				require.NoError(s.PutSubnetOnlyValidator(sov))
+			for _, l1validator := range test.l1validators {
+				require.NoError(s.PutL1Validator(l1validator))
 			}
 
 			actual, err := GetNextStakerChangeTime(

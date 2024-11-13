@@ -780,14 +780,14 @@ curl -X POST --data '{
 }
 ```
 
-### `platform.getSubnetOnlyValidator`
+### `platform.getL1Validator`
 
 Returns a current L1 validator.
 
 **Signature:**
 
 ```sh
-platform.getSubnetOnlyValidator({
+platform.getL1Validator({
     validationID: string,
 }) -> {
     subnetID: string,
@@ -827,7 +827,7 @@ platform.getSubnetOnlyValidator({
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getSubnetOnlyValidator",
+    "method": "platform.getL1Validator",
     "params": {
       "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
     },
