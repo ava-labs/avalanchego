@@ -1855,7 +1855,7 @@ Get the validators and their weights of a Subnet or the Primary Network at a giv
 ```sh
 platform.getValidatorsAt(
     {
-        height: string,
+        height: [num|string],
         subnetID: string, // optional
     }
 )

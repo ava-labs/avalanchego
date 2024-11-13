@@ -5,6 +5,7 @@
 ### APIs
 
 - Added `platform.getSubnetOnlyValidator`
+- Updated `platform.getValidatorsAt` to accept `"proposed"` as valid `height` input
 
 ### Configs
 
