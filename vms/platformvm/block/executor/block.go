@@ -5,13 +5,34 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
+
+const ActivationLog = `
+   _____               .__                       .__             .____    ____
+  /  _  \___  _______  |  | _____    ____   ____ |  |__   ____   |    |  /_   | ______
+ /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \  |    |   |   |/  ___/
+/    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/  |    |___|   |\___ \
+\____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  > |_______ \___/____  >
+        \/           \/          \/     \/     \/     \/     \/          \/        \/
+  ___        _____          __  .__               __             .___   ___
+ / _ \_/\   /  _  \   _____/  |_|__|__  _______ _/  |_  ____   __| _/  / _ \_/\
+ \/ \___/  /  /_\  \_/ ___\   __\  \  \/ /\__  \\   __\/ __ \ / __ |   \/ \___/ ,_ o
+          /    |    \  \___|  | |  |\   /  / __ \|  | \  ___// /_/ |            / //\,
+          \____|__  /\___  >__| |__| \_/  (____  /__|  \___  >____ |             \>> |
+                  \/     \/                    \/          \/     \/              \\
+
+`
+
+// TODO: Remove after Etna is activated
+var EtnaActivationWasLogged = utils.NewAtomic(false)
 
 var (
 	_ snowman.Block             = (*Block)(nil)
@@ -75,7 +96,20 @@ func (b *Block) Verify(ctx context.Context) error {
 }
 
 func (b *Block) Accept(context.Context) error {
-	return b.Visit(b.manager.acceptor)
+	if err := b.Visit(b.manager.acceptor); err != nil {
+		return err
+	}
+
+	currentTime := b.manager.state.GetTimestamp()
+	if !b.manager.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(currentTime) {
+		return nil
+	}
+
+	if !EtnaActivationWasLogged.Get() && b.manager.txExecutorBackend.Bootstrapped.Get() {
+		fmt.Print(ActivationLog)
+	}
+	EtnaActivationWasLogged.Set(true)
+	return nil
 }
 
 func (b *Block) Reject(context.Context) error {
