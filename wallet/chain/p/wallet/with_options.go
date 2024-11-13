@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -35,7 +36,7 @@ type withOptions struct {
 }
 
 func (w *withOptions) Builder() builder.Builder {
-	return builder.NewWithOptions(
+	return builder.WithOptions(
 		w.wallet.Builder(),
 		w.options...,
 	)
@@ -147,12 +148,38 @@ func (w *withOptions) IssueConvertSubnetTx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
+	validators []*txs.ConvertSubnetValidator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
 	return w.wallet.IssueConvertSubnetTx(
 		subnetID,
 		chainID,
 		address,
+		validators,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) IssueRegisterSubnetValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueRegisterSubnetValidatorTx(
+		balance,
+		proofOfPossession,
+		message,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) IssueSetSubnetValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueSetSubnetValidatorWeightTx(
+		message,
 		common.UnionOptions(w.options, options)...,
 	)
 }

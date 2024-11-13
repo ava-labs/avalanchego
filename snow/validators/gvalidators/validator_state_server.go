@@ -70,8 +70,9 @@ func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetReq
 			Weight: vdr.Weight,
 		}
 		if vdr.PublicKey != nil {
-			// This is a performance optimization to avoid the cost of compression
-			// from PublicKeyToCompressedBytes.
+			// Passing in the uncompressed bytes is a performance optimization
+			// to avoid the cost of calling PublicKeyFromCompressedBytes on the
+			// client side.
 			vdrPB.PublicKey = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 		}
 		resp.Validators[i] = vdrPB

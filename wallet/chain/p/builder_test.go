@@ -4,6 +4,7 @@
 package p
 
 import (
+	"math/rand"
 	"slices"
 	"testing"
 	"time"
@@ -25,6 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -668,9 +672,42 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetTx(t *testing.T) {
+	sk0, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	sk1, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
 	var (
-		chainID = ids.GenerateTestID()
-		address = utils.RandomBytes(32)
+		chainID    = ids.GenerateTestID()
+		address    = utils.RandomBytes(32)
+		validators = []*txs.ConvertSubnetValidator{
+			{
+				NodeID:  utils.RandomBytes(ids.NodeIDLen),
+				Weight:  rand.Uint64(), //#nosec G404
+				Balance: units.Avax,
+				Signer:  *signer.NewProofOfPossession(sk0),
+				RemainingBalanceOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			{
+				NodeID:                utils.RandomBytes(ids.NodeIDLen),
+				Weight:                rand.Uint64(), //#nosec G404
+				Balance:               2 * units.Avax,
+				Signer:                *signer.NewProofOfPossession(sk1),
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
+			},
+		}
 	)
 	for _, e := range testEnvironmentPostEtna {
 		t.Run(e.name, func(t *testing.T) {
@@ -687,12 +724,199 @@ func TestConvertSubnetTx(t *testing.T) {
 				subnetID,
 				chainID,
 				address,
+				validators,
 				common.WithMemo(e.memo),
 			)
 			require.NoError(err)
 			require.Equal(subnetID, utx.Subnet)
 			require.Equal(chainID, utx.ChainID)
 			require.Equal(types.JSONByteSlice(address), utx.Address)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			require.True(utils.IsSortedAndUnique(utx.Validators))
+			require.Equal(validators, utx.Validators)
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				map[ids.ID]uint64{
+					e.context.AVAXAssetID: 3 * units.Avax, // Balance of the validators
+				},
+			)
+		})
+	}
+}
+
+func TestRegisterSubnetValidatorTx(t *testing.T) {
+	const (
+		expiry = 1731005097
+		weight = 7905001371
+
+		balance = units.Avax
+	)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	pop := signer.NewProofOfPossession(sk)
+
+	addressedCallPayload, err := message.NewRegisterSubnetValidator(
+		subnetID,
+		nodeID,
+		pop.PublicKey,
+		expiry,
+		message.PChainOwner{
+			Threshold: 1,
+			Addresses: []ids.ShortID{
+				ids.GenerateTestShortID(),
+			},
+		},
+		message.PChainOwner{
+			Threshold: 1,
+			Addresses: []ids.ShortID{
+				ids.GenerateTestShortID(),
+			},
+		},
+		weight,
+	)
+	require.NoError(t, err)
+
+	addressedCall, err := payload.NewAddressedCall(
+		utils.RandomBytes(20),
+		addressedCallPayload.Bytes(),
+	)
+	require.NoError(t, err)
+
+	unsignedWarp, err := warp.NewUnsignedMessage(
+		constants.UnitTestID,
+		ids.GenerateTestID(),
+		addressedCall.Bytes(),
+	)
+	require.NoError(t, err)
+
+	signers := set.NewBits(0)
+
+	unsignedBytes := unsignedWarp.Bytes()
+	sig := bls.Sign(sk, unsignedBytes)
+	sigBytes := [bls.SignatureLen]byte{}
+	copy(sigBytes[:], bls.SignatureToBytes(sig))
+
+	warp, err := warp.NewMessage(
+		unsignedWarp,
+		&warp.BitSetSignature{
+			Signers:   signers.Bytes(),
+			Signature: sigBytes,
+		},
+	)
+	require.NoError(t, err)
+	warpMessageBytes := warp.Bytes()
+
+	for _, e := range testEnvironmentPostEtna {
+		t.Run(e.name, func(t *testing.T) {
+			var (
+				require    = require.New(t)
+				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+					constants.PlatformChainID: utxos,
+				})
+				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				builder = builder.New(set.Of(utxoAddr), e.context, backend)
+			)
+
+			utx, err := builder.NewRegisterSubnetValidatorTx(
+				balance,
+				pop.ProofOfPossession,
+				warpMessageBytes,
+				common.WithMemo(e.memo),
+			)
+			require.NoError(err)
+			require.Equal(balance, utx.Balance)
+			require.Equal(pop.ProofOfPossession, utx.ProofOfPossession)
+			require.Equal(types.JSONByteSlice(warpMessageBytes), utx.Message)
+			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
+			requireFeeIsCorrect(
+				require,
+				e.feeCalculator,
+				utx,
+				&utx.BaseTx.BaseTx,
+				nil,
+				nil,
+				map[ids.ID]uint64{
+					e.context.AVAXAssetID: balance, // Balance of the validator
+				},
+			)
+		})
+	}
+}
+
+func TestSetSubnetValidatorWeightTx(t *testing.T) {
+	const (
+		nonce  = 1
+		weight = 7905001371
+	)
+	var (
+		validationID = ids.GenerateTestID()
+		chainID      = ids.GenerateTestID()
+		address      = utils.RandomBytes(20)
+	)
+
+	addressedCallPayload, err := message.NewSubnetValidatorWeight(
+		validationID,
+		nonce,
+		weight,
+	)
+	require.NoError(t, err)
+
+	addressedCall, err := payload.NewAddressedCall(
+		address,
+		addressedCallPayload.Bytes(),
+	)
+	require.NoError(t, err)
+
+	unsignedWarp, err := warp.NewUnsignedMessage(
+		constants.UnitTestID,
+		chainID,
+		addressedCall.Bytes(),
+	)
+	require.NoError(t, err)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	warp, err := warp.NewMessage(
+		unsignedWarp,
+		&warp.BitSetSignature{
+			Signers: set.NewBits(0).Bytes(),
+			Signature: ([bls.SignatureLen]byte)(
+				bls.SignatureToBytes(
+					bls.Sign(
+						sk,
+						unsignedWarp.Bytes(),
+					),
+				),
+			),
+		},
+	)
+	require.NoError(t, err)
+
+	warpMessageBytes := warp.Bytes()
+	for _, e := range testEnvironmentPostEtna {
+		t.Run(e.name, func(t *testing.T) {
+			var (
+				require    = require.New(t)
+				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+					constants.PlatformChainID: utxos,
+				})
+				backend = wallet.NewBackend(e.context, chainUTXOs, nil)
+				builder = builder.New(set.Of(utxoAddr), e.context, backend)
+			)
+
+			utx, err := builder.NewSetSubnetValidatorWeightTx(
+				warpMessageBytes,
+				common.WithMemo(e.memo),
+			)
+			require.NoError(err)
+			require.Equal(types.JSONByteSlice(warpMessageBytes), utx.Message)
 			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
 			requireFeeIsCorrect(
 				require,

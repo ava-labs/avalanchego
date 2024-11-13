@@ -33,7 +33,7 @@ func ParseHash(b []byte) (*Hash, error) {
 	}
 	payload, ok := payloadIntf.(*Hash)
 	if !ok {
-		return nil, fmt.Errorf("%w: %T", errWrongType, payloadIntf)
+		return nil, fmt.Errorf("%w: %T", ErrWrongType, payloadIntf)
 	}
 	return payload, nil
 }

@@ -600,7 +600,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	}
 
 	n.onSufficientlyConnected = make(chan struct{})
-	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
+	numBootstrappers := n.bootstrappers.NumValidators(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
@@ -1207,7 +1207,7 @@ func (n *Node) initVMs() error {
 	// Register the VMs that Avalanche supports
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
-			Config: platformconfig.Config{
+			Internal: platformconfig.Internal{
 				Chains:                    n.chainManager,
 				Validators:                vdrs,
 				UptimeLockedCalculator:    n.uptimeCalculator,

@@ -93,6 +93,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
 
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(
 		iterator.FromSlice(&state.Staker{
@@ -165,6 +166,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
 	onParentAccept.EXPECT().GetSoVExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().NumActiveSubnetOnlyValidators().Return(0).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
@@ -217,6 +219,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		), nil
 	}).AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
+	onParentAccept.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(iterator.Empty[state.SubnetOnlyValidator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
@@ -1376,7 +1379,11 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 
 	// Advance time until next staker change time is [validatorEndTime]
 	for {
-		nextStakerChangeTime, err := state.GetNextStakerChangeTime(env.state, mockable.MaxTime)
+		nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+			env.config.ValidatorFeeConfig,
+			env.state,
+			mockable.MaxTime,
+		)
 		require.NoError(err)
 		if nextStakerChangeTime.Equal(validatorEndTime) {
 			break

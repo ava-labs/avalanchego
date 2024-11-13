@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -48,7 +49,7 @@ func New(
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	registerer prometheus.Registerer,
-	config Config,
+	config config.Network,
 ) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {

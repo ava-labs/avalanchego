@@ -300,7 +300,7 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 	if numAccepted == 0 {
 		b.Ctx.Log.Debug("restarting bootstrap",
 			zap.String("reason", "no blocks accepted"),
-			zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
+			zap.Int("numBeacons", b.Beacons.NumValidators(b.Ctx.SubnetID)),
 		)
 		// Invariant: These functions are mutualy recursive. However, when
 		// [startBootstrapping] calls [sendMessagesOrFinish], it is guaranteed

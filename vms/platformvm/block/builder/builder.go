@@ -182,7 +182,11 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 
 	now := b.txExecutorBackend.Clk.Time()
 	maxTimeToAwake := now.Add(maxTimeToSleep)
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(preferredState, maxTimeToAwake)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		maxTimeToAwake,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("%w of %s: %w", errCalculatingNextStakerTime, preferredID, err)
 	}
@@ -226,7 +230,11 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp, timeWasCapped, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -253,7 +261,11 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 		return nil, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	timestamp, _, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, _, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
@@ -504,32 +516,29 @@ func executeTx(
 		return false, err
 	}
 
-	executor := &txexecutor.StandardTxExecutor{
-		Backend:       backend,
-		State:         txDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-
-	err = tx.Unsigned.Visit(executor)
+	txInputs, _, _, err := txexecutor.StandardTx(
+		backend,
+		feeCalculator,
+		tx,
+		txDiff,
+	)
 	if err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
 
-	if inputs.Overlaps(executor.Inputs) {
+	if inputs.Overlaps(txInputs) {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 		return false, nil
 	}
-	err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
-	if err != nil {
+	if err := manager.VerifyUniqueInputs(parentID, txInputs); err != nil {
 		txID := tx.ID()
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
-	inputs.Union(executor.Inputs)
+	inputs.Union(txInputs)
 
 	txDiff.AddTx(tx, status.Committed)
 	return true, txDiff.Apply(stateDiff)
