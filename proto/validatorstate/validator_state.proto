@@ -17,8 +17,8 @@ service ValidatorState {
   // GetValidatorSet returns the weights of the nodeIDs for the provided
   // subnet at the requested P-chain height.
   rpc GetValidatorSet(GetValidatorSetRequest) returns (GetValidatorSetResponse);
-  // GetCurrentValidatorSet returnsthe  validator set for the provided
-  // subnet at the current P-chain height.
+  // GetCurrentValidatorSet returns the validator set for the provided subnet at
+  // the current P-chain height.
   rpc GetCurrentValidatorSet(GetCurrentValidatorSetRequest) returns (GetCurrentValidatorSetResponse);
 }
 
