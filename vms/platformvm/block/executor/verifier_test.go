@@ -203,6 +203,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 			verifier.state,
 			secp256k1fx.NewKeychain(genesis.EWOQKey),
 			nil, // subnetIDs
+			nil, // validationIDs
 			nil, // chainIDs
 		)
 		exportedOutput = &avax.TransferableOutput{
@@ -357,6 +358,7 @@ func TestVerifierVisitStandardBlock(t *testing.T) {
 			verifier.state,
 			secp256k1fx.NewKeychain(genesis.EWOQKey),
 			nil,                    // subnetIDs
+			nil,                    // validationIDs
 			[]ids.ID{ctx.XChainID}, // Read the UTXO to import
 		)
 		initialTimestamp = verifier.state.GetTimestamp()
@@ -1126,6 +1128,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 		verifier.state,
 		secp256k1fx.NewKeychain(genesis.EWOQKey),
 		nil, // subnetIDs
+		nil, // validationIDs
 		nil, // chainIDs
 	)
 

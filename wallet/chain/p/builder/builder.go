@@ -200,7 +200,7 @@ type Builder interface {
 	) (*txs.IncreaseBalanceTx, error)
 
 	// NewDisableSubnetValidatorTx disables an L1 validator and returns the
-	// remaining funds allocated to the  continuous fee to the remaining balance
+	// remaining funds allocated to the continuous fee to the remaining balance
 	// owner.
 	//
 	// - [validationID] of the validator to disable
