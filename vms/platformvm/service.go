@@ -984,8 +984,9 @@ type GetSubnetOnlyValidatorReply struct {
 	StartTime             avajson.Uint64      `json:"startTime"`
 	Weight                avajson.Uint64      `json:"weight"`
 	MinNonce              avajson.Uint64      `json:"minNonce"`
-	// Balance is the remaining amount of AVAX this SoV has to pay the
-	// continuous fee, according to the last accepted state.
+	// Balance is the remaining amount of AVAX this SoV has for paying the
+	// continuous fee, according to the last accepted state. If the validator is
+	// inactive, the balance will be 0.
 	Balance avajson.Uint64 `json:"balance"`
 	// Height is the height of the last accepted block
 	Height avajson.Uint64 `json:"height"`
@@ -996,6 +997,7 @@ func (s *Service) GetSubnetOnlyValidator(r *http.Request, args *GetSubnetOnlyVal
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getSubnetOnlyValidator"),
+		zap.Stringer("validationID", args.ValidationID),
 	)
 
 	s.vm.ctx.Lock.Lock()
