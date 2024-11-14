@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Signature verification costs were conservatively based on benchmarks run on
+// an AWS c5.xlarge instance.
 const (
 	intrinsicValidatorBandwidth = ids.NodeIDLen + // nodeID
 		wrappers.LongLen + // start
