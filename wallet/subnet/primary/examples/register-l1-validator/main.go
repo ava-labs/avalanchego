@@ -137,5 +137,5 @@ func main() {
 	}
 
 	validationID := addressedCallPayload.ValidationID()
-	log.Printf("registered new subnet validator %s to subnet %s with txID %s as validationID %s in %s\n", nodeID, subnetID, registerL1ValidatorTx.ID(), validationID, time.Since(registerL1ValidatorStartTime))
+	log.Printf("registered new L1 validator %s to subnetID %s with txID %s as validationID %s in %s\n", nodeID, subnetID, registerL1ValidatorTx.ID(), validationID, time.Since(registerL1ValidatorStartTime))
 }
