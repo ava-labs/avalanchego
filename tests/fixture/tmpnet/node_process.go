@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -98,6 +99,15 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return err
 	}
 
+	// Watch the node's main.log file in the background for FATAL log entries that indicate
+	// a configuration error preventing startup. Such a log entry will be provided to the
+	// cancelWithCause function so that waitForProcessContext can exit early with an error
+	// that includes the log entry.
+	ctx, cancelWithCause := context.WithCancelCause(context.Background())
+	defer cancelWithCause(nil)
+	logPath := p.node.GetDataDir() + "/logs/main.log"
+	go watchLogFileForFatal(ctx, cancelWithCause, w, logPath)
+
 	// Determine appropriate level of node description detail
 	dataDir := p.node.GetDataDir()
 	nodeDescription := fmt.Sprintf("node %q", p.node.NodeID)
@@ -113,7 +123,7 @@ func (p *NodeProcess) Start(w io.Writer) error {
 	// A node writes a process context file on start. If the file is not
 	// found in a reasonable amount of time, the node is unlikely to have
 	// started successfully.
-	if err := p.waitForProcessContext(context.Background()); err != nil {
+	if err := p.waitForProcessContext(ctx); err != nil {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
@@ -199,7 +209,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to load process context for node %q before timeout: %w", p.node.NodeID, ctx.Err())
+			return fmt.Errorf("failed to load process context for node %q: %w", p.node.NodeID, context.Cause(ctx))
 		case <-ticker.C:
 		}
 	}
@@ -330,4 +340,65 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 	}
 
 	return nil
+}
+
+// watchLogFileForFatal waits for the specified file path to exist and then checks each of
+// its lines for the string 'FATAL' until such a line is observed or the provided context
+// is canceled. If line containing 'FATAL' is encountered, it will be provided as an error
+// to the provided cancelWithCause function.
+//
+// Errors encountered while looking for FATAL log entries are considered potential rather
+// than positive indications of failure and are printed to the provided writer instead of
+// being provided to the cancelWithCause function.
+func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCauseFunc, w io.Writer, path string) {
+	waitInterval := 100 * time.Millisecond
+	// Wait for the file to exist
+	fileExists := false
+	for !fileExists {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				// File does not exist yet - wait and try again
+				time.Sleep(waitInterval)
+			} else {
+				fileExists = true
+			}
+		}
+	}
+
+	// Open the file
+	file, err := os.Open(path)
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "failed to open %s: %v", path, err)
+		return
+	}
+	defer file.Close()
+
+	// Scan for lines in the file containing 'FATAL'
+	reader := bufio.NewReader(file)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// Read a line from the file
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					// If end of file is reached, wait and try again
+					time.Sleep(waitInterval)
+					continue
+				} else {
+					_, _ = fmt.Fprintf(w, "error reading %s: %v\n", path, err)
+					return
+				}
+			}
+			if strings.Contains(line, "FATAL") {
+				cancelWithCause(errors.New(line))
+				return
+			}
+		}
+	}
 }
