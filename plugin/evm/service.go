@@ -14,23 +14,19 @@ type ValidatorsAPI struct {
 	vm *VM
 }
 
-type GetCurrentValidatorsRequest struct {
-	NodeIDs []ids.NodeID `json:"nodeIDs"`
-}
-
 type GetCurrentValidatorsResponse struct {
 	Validators []CurrentValidator `json:"validators"`
 }
 
 type CurrentValidator struct {
-	ValidationID ids.ID        `json:"validationID"`
-	NodeID       ids.NodeID    `json:"nodeID"`
-	Weight       uint64        `json:"weight"`
-	StartTime    time.Time     `json:"startTime"`
-	IsActive     bool          `json:"isActive"`
-	IsSoV        bool          `json:"isSoV"`
-	IsConnected  bool          `json:"isConnected"`
-	Uptime       time.Duration `json:"uptime"`
+	ValidationID   ids.ID        `json:"validationID"`
+	NodeID         ids.NodeID    `json:"nodeID"`
+	Weight         uint64        `json:"weight"`
+	StartTimestamp uint64        `json:"startTimestamp"`
+	IsActive       bool          `json:"isActive"`
+	IsSoV          bool          `json:"isSoV"`
+	IsConnected    bool          `json:"isConnected"`
+	Uptime         time.Duration `json:"uptime"`
 }
 
 func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, _ *struct{}, reply *GetCurrentValidatorsResponse) error {
@@ -55,14 +51,14 @@ func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, _ *struct{}, rep
 		}
 
 		reply.Validators = append(reply.Validators, CurrentValidator{
-			ValidationID: validator.ValidationID,
-			NodeID:       validator.NodeID,
-			StartTime:    validator.StartTime(),
-			Weight:       validator.Weight,
-			IsActive:     validator.IsActive,
-			IsSoV:        validator.IsSoV,
-			IsConnected:  isConnected,
-			Uptime:       time.Duration(uptime.Seconds()),
+			ValidationID:   validator.ValidationID,
+			NodeID:         validator.NodeID,
+			StartTimestamp: validator.StartTimestamp,
+			Weight:         validator.Weight,
+			IsActive:       validator.IsActive,
+			IsSoV:          validator.IsSoV,
+			IsConnected:    isConnected,
+			Uptime:         time.Duration(uptime.Seconds()),
 		})
 	}
 	return nil
