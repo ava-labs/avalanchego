@@ -114,7 +114,7 @@ func main() {
 		warp.Bytes(),
 	)
 	if err != nil {
-		log.Fatalf("failed to issue set subnet validator weight transaction: %s\n", err)
+		log.Fatalf("failed to issue set L1 validator weight transaction: %s\n", err)
 	}
 	log.Printf("issued set weight of validationID %s to %d with nonce %d and txID %s in %s\n", validationID, weight, nonce, setWeightTx.ID(), time.Since(setWeightStartTime))
 }

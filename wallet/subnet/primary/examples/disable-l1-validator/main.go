@@ -44,7 +44,7 @@ func main() {
 		validationID,
 	)
 	if err != nil {
-		log.Fatalf("failed to issue disable subnet validator transaction: %s\n", err)
+		log.Fatalf("failed to issue disable L1 validator transaction: %s\n", err)
 	}
 	log.Printf("disabled %s with %s in %s\n",
 		validationID,

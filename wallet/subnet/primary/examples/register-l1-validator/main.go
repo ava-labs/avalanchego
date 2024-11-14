@@ -133,7 +133,7 @@ func main() {
 		warp.Bytes(),
 	)
 	if err != nil {
-		log.Fatalf("failed to issue register subnet validator transaction: %s\n", err)
+		log.Fatalf("failed to issue register L1 validator transaction: %s\n", err)
 	}
 
 	validationID := addressedCallPayload.ValidationID()

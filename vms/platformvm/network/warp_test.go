@@ -429,7 +429,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 			)),
 		},
 		{
-			name: "failed to parse register subnet validator",
+			name: "failed to parse register L1 validator",
 			justification: must[[]byte](t)(proto.Marshal(
 				&platformvm.L1ValidatorRegistrationJustification{
 					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{},
