@@ -335,6 +335,7 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 		gas.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
 		gas.DBRead:    intrinsicInputDBRead,
 		gas.DBWrite:   intrinsicInputDBWrite,
+		gas.Compute:   0,
 	}
 
 	inIntf := in.In
