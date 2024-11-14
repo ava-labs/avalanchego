@@ -682,27 +682,27 @@ func deactivateLowBalanceL1Validators(
 
 	var l1ValidatorsToDeactivate []state.L1Validator
 	for l1ValidatorIterator.Next() {
-		l1validator := l1ValidatorIterator.Value()
+		l1Validator := l1ValidatorIterator.Value()
 		// If the validator has exactly the right amount of fee for the next
 		// second we should not remove them here.
 		//
 		// GetActiveL1ValidatorsIterator iterates in order of increasing
 		// EndAccumulatedFee, so we can break early.
-		if l1validator.EndAccumulatedFee >= potentialAccruedFees {
+		if l1Validator.EndAccumulatedFee >= potentialAccruedFees {
 			break
 		}
 
-		l1ValidatorsToDeactivate = append(l1ValidatorsToDeactivate, l1validator)
+		l1ValidatorsToDeactivate = append(l1ValidatorsToDeactivate, l1Validator)
 	}
 
 	// The iterator must be released prior to attempting to write to the
 	// diff.
 	l1ValidatorIterator.Release()
 
-	for _, l1validator := range l1ValidatorsToDeactivate {
-		l1validator.EndAccumulatedFee = 0
-		if err := diff.PutL1Validator(l1validator); err != nil {
-			return fmt.Errorf("could not deactivate L1 validator %s: %w", l1validator.ValidationID, err)
+	for _, l1Validator := range l1ValidatorsToDeactivate {
+		l1Validator.EndAccumulatedFee = 0
+		if err := diff.PutL1Validator(l1Validator); err != nil {
+			return fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
 	}
 	return nil

@@ -284,7 +284,7 @@ func TestDiffExpiry(t *testing.T) {
 }
 
 func TestDiffL1ValidatorsErrors(t *testing.T) {
-	l1validator := L1Validator{
+	l1Validator := L1Validator{
 		ValidationID: ids.GenerateTestID(),
 		SubnetID:     ids.GenerateTestID(),
 		NodeID:       ids.GenerateTestNodeID(),
@@ -294,14 +294,14 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 	tests := []struct {
 		name                     string
 		initialEndAccumulatedFee uint64
-		l1validator              L1Validator
+		l1Validator              L1Validator
 		expectedErr              error
 	}{
 		{
 			name:                     "mutate active constants",
 			initialEndAccumulatedFee: 1,
-			l1validator: L1Validator{
-				ValidationID: l1validator.ValidationID,
+			l1Validator: L1Validator{
+				ValidationID: l1Validator.ValidationID,
 				NodeID:       ids.GenerateTestNodeID(),
 			},
 			expectedErr: ErrMutatedL1Validator,
@@ -309,8 +309,8 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 		{
 			name:                     "mutate inactive constants",
 			initialEndAccumulatedFee: 0,
-			l1validator: L1Validator{
-				ValidationID: l1validator.ValidationID,
+			l1Validator: L1Validator{
+				ValidationID: l1Validator.ValidationID,
 				NodeID:       ids.GenerateTestNodeID(),
 			},
 			expectedErr: ErrMutatedL1Validator,
@@ -318,7 +318,7 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 		{
 			name:                     "conflicting legacy subnetID and nodeID pair",
 			initialEndAccumulatedFee: 1,
-			l1validator: L1Validator{
+			l1Validator: L1Validator{
 				ValidationID: ids.GenerateTestID(),
 				NodeID:       defaultValidatorNodeID,
 			},
@@ -327,18 +327,18 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 		{
 			name:                     "duplicate active subnetID and nodeID pair",
 			initialEndAccumulatedFee: 1,
-			l1validator: L1Validator{
+			l1Validator: L1Validator{
 				ValidationID: ids.GenerateTestID(),
-				NodeID:       l1validator.NodeID,
+				NodeID:       l1Validator.NodeID,
 			},
 			expectedErr: ErrDuplicateL1Validator,
 		},
 		{
 			name:                     "duplicate inactive subnetID and nodeID pair",
 			initialEndAccumulatedFee: 0,
-			l1validator: L1Validator{
+			l1Validator: L1Validator{
 				ValidationID: ids.GenerateTestID(),
-				NodeID:       l1validator.NodeID,
+				NodeID:       l1Validator.NodeID,
 			},
 			expectedErr: ErrDuplicateL1Validator,
 		},
@@ -352,22 +352,22 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 
 			require.NoError(state.PutCurrentValidator(&Staker{
 				TxID:     ids.GenerateTestID(),
-				SubnetID: l1validator.SubnetID,
+				SubnetID: l1Validator.SubnetID,
 				NodeID:   defaultValidatorNodeID,
 			}))
 
-			l1validator.EndAccumulatedFee = test.initialEndAccumulatedFee
-			require.NoError(state.PutL1Validator(l1validator))
+			l1Validator.EndAccumulatedFee = test.initialEndAccumulatedFee
+			require.NoError(state.PutL1Validator(l1Validator))
 
 			d, err := NewDiffOn(state)
 			require.NoError(err)
 
 			// Initialize subnetID, weight, and endAccumulatedFee as they are
 			// constant among all tests.
-			test.l1validator.SubnetID = l1validator.SubnetID
-			test.l1validator.Weight = 1                        // Not removed
-			test.l1validator.EndAccumulatedFee = rand.Uint64() //#nosec G404
-			err = d.PutL1Validator(test.l1validator)
+			test.l1Validator.SubnetID = l1Validator.SubnetID
+			test.l1Validator.Weight = 1                        // Not removed
+			test.l1Validator.EndAccumulatedFee = rand.Uint64() //#nosec G404
+			err = d.PutL1Validator(test.l1Validator)
 			require.ErrorIs(err, test.expectedErr)
 
 			// The invalid addition should not have modified the diff.

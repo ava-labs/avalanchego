@@ -604,10 +604,10 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 
 			tc.By("verifying the L1 validator can be fetched", func() {
-				l1validator, _, err := pClient.GetL1Validator(tc.DefaultContext(), registerValidationID)
+				l1Validator, _, err := pClient.GetL1Validator(tc.DefaultContext(), registerValidationID)
 				require.NoError(err)
 
-				l1validator.StartTime = 0
+				l1Validator.StartTime = 0
 				require.Equal(
 					platformvm.L1Validator{
 						SubnetID:  subnetID,
@@ -623,7 +623,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 						MinNonce: nextNonce,
 						Balance:  0,
 					},
-					l1validator,
+					l1Validator,
 				)
 			})
 

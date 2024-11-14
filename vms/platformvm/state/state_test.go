@@ -1355,8 +1355,8 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	require.Equal(expectedFeeState, s.GetFeeState())
 }
 
-// Verify that committing the state writes the l1validator excess to the database and
-// that loading the state fetches the l1validator excess from the database.
+// Verify that committing the state writes the l1 validator excess to the database and
+// that loading the state fetches the l1Validator excess from the database.
 func TestStateL1ValidatorExcessCommitAndLoad(t *testing.T) {
 	require := require.New(t)
 
@@ -1507,7 +1507,7 @@ func TestStateExpiryCommitAndLoad(t *testing.T) {
 }
 
 func TestL1Validators(t *testing.T) {
-	l1validator := L1Validator{
+	l1Validator := L1Validator{
 		ValidationID: ids.GenerateTestID(),
 		SubnetID:     ids.GenerateTestID(),
 		NodeID:       ids.GenerateTestNodeID(),
@@ -1535,9 +1535,9 @@ func TestL1Validators(t *testing.T) {
 			name: "initially active not modified",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1561,9 +1561,9 @@ func TestL1Validators(t *testing.T) {
 			name: "initially active removed",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1571,9 +1571,9 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID: l1validator.ValidationID,
-					SubnetID:     l1validator.SubnetID,
-					NodeID:       l1validator.NodeID,
+					ValidationID: l1Validator.ValidationID,
+					SubnetID:     l1Validator.SubnetID,
+					NodeID:       l1Validator.NodeID,
 					PublicKey:    pkBytes,
 					Weight:       0, // Removed
 				},
@@ -1583,9 +1583,9 @@ func TestL1Validators(t *testing.T) {
 			name: "initially inactive removed",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 0, // Inactive
@@ -1593,9 +1593,9 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID: l1validator.ValidationID,
-					SubnetID:     l1validator.SubnetID,
-					NodeID:       l1validator.NodeID,
+					ValidationID: l1Validator.ValidationID,
+					SubnetID:     l1Validator.SubnetID,
+					NodeID:       l1Validator.NodeID,
 					PublicKey:    pkBytes,
 					Weight:       0, // Removed
 				},
@@ -1605,9 +1605,9 @@ func TestL1Validators(t *testing.T) {
 			name: "increase active weight",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1615,9 +1615,9 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            2, // Increased
 					EndAccumulatedFee: 1, // Active
@@ -1628,9 +1628,9 @@ func TestL1Validators(t *testing.T) {
 			name: "decrease active weight",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            2, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1638,9 +1638,9 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Decreased
 					EndAccumulatedFee: 1, // Active
@@ -1651,9 +1651,9 @@ func TestL1Validators(t *testing.T) {
 			name: "deactivate",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1661,9 +1661,9 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 0, // Inactive
@@ -1674,9 +1674,9 @@ func TestL1Validators(t *testing.T) {
 			name: "reactivate",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 0, // Inactive
@@ -1684,9 +1684,9 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1697,9 +1697,9 @@ func TestL1Validators(t *testing.T) {
 			name: "update multiple times",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1707,17 +1707,17 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            2, // Not removed
 					EndAccumulatedFee: 1, // Active
 				},
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            3, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1728,9 +1728,9 @@ func TestL1Validators(t *testing.T) {
 			name: "change validationID",
 			initial: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1738,16 +1738,16 @@ func TestL1Validators(t *testing.T) {
 			},
 			l1validators: []L1Validator{
 				{
-					ValidationID: l1validator.ValidationID,
-					SubnetID:     l1validator.SubnetID,
-					NodeID:       l1validator.NodeID,
+					ValidationID: l1Validator.ValidationID,
+					SubnetID:     l1Validator.SubnetID,
+					NodeID:       l1Validator.NodeID,
 					PublicKey:    pkBytes,
 					Weight:       0, // Removed
 				},
 				{
 					ValidationID:      ids.GenerateTestID(),
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         otherPKBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
@@ -1758,17 +1758,17 @@ func TestL1Validators(t *testing.T) {
 			name: "added and removed",
 			l1validators: []L1Validator{
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 1, // Active
 				},
 				{
-					ValidationID: l1validator.ValidationID,
-					SubnetID:     l1validator.SubnetID,
-					NodeID:       l1validator.NodeID,
+					ValidationID: l1Validator.ValidationID,
+					SubnetID:     l1Validator.SubnetID,
+					NodeID:       l1Validator.NodeID,
 					PublicKey:    pkBytes,
 					Weight:       0, // Removed
 				},
@@ -1779,16 +1779,16 @@ func TestL1Validators(t *testing.T) {
 			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
-					SubnetID:          l1validator.SubnetID,
+					SubnetID:          l1Validator.SubnetID,
 					NodeID:            ids.GenerateTestNodeID(),
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 0, // Inactive
 				},
 				{
-					ValidationID:      l1validator.ValidationID,
-					SubnetID:          l1validator.SubnetID,
-					NodeID:            l1validator.NodeID,
+					ValidationID:      l1Validator.ValidationID,
+					SubnetID:          l1Validator.SubnetID,
+					NodeID:            l1Validator.NodeID,
 					PublicKey:         pkBytes,
 					Weight:            1, // Not removed
 					EndAccumulatedFee: 0, // Inactive
@@ -1808,16 +1808,16 @@ func TestL1Validators(t *testing.T) {
 				initialL1Validators = make(map[ids.ID]L1Validator)
 				subnetIDs           set.Set[ids.ID]
 			)
-			for _, l1validator := range test.initial {
+			for _, l1Validator := range test.initial {
 				// The codec creates zero length slices rather than leaving them
 				// as nil, so we need to populate the slices for later reflect
 				// based equality checks.
-				l1validator.RemainingBalanceOwner = []byte{}
-				l1validator.DeactivationOwner = []byte{}
+				l1Validator.RemainingBalanceOwner = []byte{}
+				l1Validator.DeactivationOwner = []byte{}
 
-				require.NoError(state.PutL1Validator(l1validator))
-				initialL1Validators[l1validator.ValidationID] = l1validator
-				subnetIDs.Add(l1validator.SubnetID)
+				require.NoError(state.PutL1Validator(l1Validator))
+				initialL1Validators[l1Validator.ValidationID] = l1Validator
+				subnetIDs.Add(l1Validator.SubnetID)
 			}
 
 			state.SetHeight(0)
@@ -1827,13 +1827,13 @@ func TestL1Validators(t *testing.T) {
 			require.NoError(err)
 
 			expectedL1Validators := maps.Clone(initialL1Validators)
-			for _, l1validator := range test.l1validators {
-				l1validator.RemainingBalanceOwner = []byte{}
-				l1validator.DeactivationOwner = []byte{}
+			for _, l1Validator := range test.l1validators {
+				l1Validator.RemainingBalanceOwner = []byte{}
+				l1Validator.DeactivationOwner = []byte{}
 
-				require.NoError(d.PutL1Validator(l1validator))
-				expectedL1Validators[l1validator.ValidationID] = l1validator
-				subnetIDs.Add(l1validator.SubnetID)
+				require.NoError(d.PutL1Validator(l1Validator))
+				expectedL1Validators[l1Validator.ValidationID] = l1Validator
+				subnetIDs.Add(l1Validator.SubnetID)
 			}
 
 			verifyChain := func(chain Chain) {
@@ -1842,9 +1842,9 @@ func TestL1Validators(t *testing.T) {
 						continue
 					}
 
-					l1validator, err := chain.GetL1Validator(expectedL1Validator.ValidationID)
+					l1Validator, err := chain.GetL1Validator(expectedL1Validator.ValidationID)
 					require.ErrorIs(err, database.ErrNotFound)
-					require.Zero(l1validator)
+					require.Zero(l1Validator)
 				}
 
 				var (
@@ -1856,15 +1856,15 @@ func TestL1Validators(t *testing.T) {
 						continue
 					}
 
-					l1validator, err := chain.GetL1Validator(expectedL1Validator.ValidationID)
+					l1Validator, err := chain.GetL1Validator(expectedL1Validator.ValidationID)
 					require.NoError(err)
-					require.Equal(expectedL1Validator, l1validator)
+					require.Equal(expectedL1Validator, l1Validator)
 
 					has, err := chain.HasL1Validator(expectedL1Validator.SubnetID, expectedL1Validator.NodeID)
 					require.NoError(err)
 					require.True(has)
 
-					weights[l1validator.SubnetID] += l1validator.Weight
+					weights[l1Validator.SubnetID] += l1Validator.Weight
 					if expectedL1Validator.isActive() {
 						expectedActive = append(expectedActive, expectedL1Validator)
 					}
@@ -1901,30 +1901,30 @@ func TestL1Validators(t *testing.T) {
 
 			// Verify that the subnetID+nodeID -> validationID mapping is correct.
 			var populatedSubnetIDNodeIDs set.Set[subnetIDNodeID]
-			for _, l1validator := range expectedL1Validators {
-				if l1validator.isDeleted() {
+			for _, l1Validator := range expectedL1Validators {
+				if l1Validator.isDeleted() {
 					continue
 				}
 
 				subnetIDNodeID := subnetIDNodeID{
-					subnetID: l1validator.SubnetID,
-					nodeID:   l1validator.NodeID,
+					subnetID: l1Validator.SubnetID,
+					nodeID:   l1Validator.NodeID,
 				}
 				populatedSubnetIDNodeIDs.Add(subnetIDNodeID)
 
 				subnetIDNodeIDKey := subnetIDNodeID.Marshal()
 				validatorID, err := database.GetID(state.subnetIDNodeIDDB, subnetIDNodeIDKey)
 				require.NoError(err)
-				require.Equal(l1validator.ValidationID, validatorID)
+				require.Equal(l1Validator.ValidationID, validatorID)
 			}
-			for _, l1validator := range expectedL1Validators {
-				if !l1validator.isDeleted() {
+			for _, l1Validator := range expectedL1Validators {
+				if !l1Validator.isDeleted() {
 					continue
 				}
 
 				subnetIDNodeID := subnetIDNodeID{
-					subnetID: l1validator.SubnetID,
-					nodeID:   l1validator.NodeID,
+					subnetID: l1Validator.SubnetID,
+					nodeID:   l1Validator.NodeID,
 				}
 				if populatedSubnetIDNodeIDs.Contains(subnetIDNodeID) {
 					continue
@@ -1941,21 +1941,21 @@ func TestL1Validators(t *testing.T) {
 				subnetID ids.ID,
 			) map[ids.NodeID]*validators.GetValidatorOutput {
 				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
-				for _, l1validator := range l1validators {
-					if l1validator.SubnetID != subnetID || l1validator.isDeleted() {
+				for _, l1Validator := range l1validators {
+					if l1Validator.SubnetID != subnetID || l1Validator.isDeleted() {
 						continue
 					}
 
-					nodeID := l1validator.effectiveNodeID()
+					nodeID := l1Validator.effectiveNodeID()
 					vdr, ok := validatorSet[nodeID]
 					if !ok {
 						vdr = &validators.GetValidatorOutput{
 							NodeID:    nodeID,
-							PublicKey: l1validator.effectivePublicKey(),
+							PublicKey: l1Validator.effectivePublicKey(),
 						}
 						validatorSet[nodeID] = vdr
 					}
-					vdr.Weight += l1validator.Weight
+					vdr.Weight += l1Validator.Weight
 				}
 				return validatorSet
 			}
@@ -1980,7 +1980,7 @@ func TestL1Validators(t *testing.T) {
 }
 
 // TestLoadL1ValidatorAndLegacy tests that the state can be loaded when
-// there is a mix of legacy validators and subnet-only validators in the same
+// there is a mix of legacy validators and L1 validators in the same
 // subnet.
 func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	var (
@@ -2021,7 +2021,7 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	l1validator := L1Validator{
+	l1Validator := L1Validator{
 		ValidationID:          ids.GenerateTestID(),
 		SubnetID:              legacyStaker.SubnetID,
 		NodeID:                ids.GenerateTestNodeID(),
@@ -2033,7 +2033,7 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 		MinNonce:              3,
 		EndAccumulatedFee:     4,
 	}
-	require.NoError(state.PutL1Validator(l1validator))
+	require.NoError(state.PutL1Validator(l1Validator))
 
 	state.SetHeight(1)
 	require.NoError(state.Commit())
@@ -2071,7 +2071,7 @@ func TestL1ValidatorAfterLegacyRemoval(t *testing.T) {
 
 	state.DeleteCurrentValidator(legacyStaker)
 
-	l1validator := L1Validator{
+	l1Validator := L1Validator{
 		ValidationID:          ids.GenerateTestID(),
 		SubnetID:              legacyStaker.SubnetID,
 		NodeID:                legacyStaker.NodeID,
@@ -2083,7 +2083,7 @@ func TestL1ValidatorAfterLegacyRemoval(t *testing.T) {
 		MinNonce:              3,
 		EndAccumulatedFee:     4,
 	}
-	require.NoError(state.PutL1Validator(l1validator))
+	require.NoError(state.PutL1Validator(l1Validator))
 
 	state.SetHeight(2)
 	require.NoError(state.Commit())
@@ -2288,14 +2288,14 @@ func TestGetCurrentValidators(t *testing.T) {
 				require.NoError(state.PutCurrentValidator(staker))
 			}
 
-			for _, l1validator := range test.l1validators {
+			for _, l1Validator := range test.l1validators {
 				// The codec creates zero length slices rather than leaving them
 				// as nil, so we need to populate the slices for later reflect
 				// based equality checks.
-				l1validator.RemainingBalanceOwner = []byte{}
-				l1validator.DeactivationOwner = []byte{}
+				l1Validator.RemainingBalanceOwner = []byte{}
+				l1Validator.DeactivationOwner = []byte{}
 
-				require.NoError(state.PutL1Validator(l1validator))
+				require.NoError(state.PutL1Validator(l1Validator))
 			}
 
 			state.SetHeight(0)
@@ -2308,12 +2308,12 @@ func TestGetCurrentValidators(t *testing.T) {
 			}
 
 			l1ValidatorsBySubnetID := make(map[ids.ID][]L1Validator)
-			for _, l1validator := range test.l1validators {
-				if l1validator.Weight == 0 {
+			for _, l1Validator := range test.l1validators {
+				if l1Validator.Weight == 0 {
 					continue
 				}
-				l1validators := l1ValidatorsBySubnetID[l1validator.SubnetID]
-				l1ValidatorsBySubnetID[l1validator.SubnetID] = append(l1validators, l1validator)
+				l1validators := l1ValidatorsBySubnetID[l1Validator.SubnetID]
+				l1ValidatorsBySubnetID[l1Validator.SubnetID] = append(l1validators, l1Validator)
 			}
 
 			for _, subnetID := range subnetIDs {

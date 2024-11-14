@@ -730,7 +730,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			return err
 		}
 
-		l1validator := state.L1Validator{
+		l1Validator := state.L1Validator{
 			ValidationID:          tx.Subnet.Append(uint32(i)),
 			SubnetID:              tx.Subnet,
 			NodeID:                nodeID,
@@ -748,7 +748,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 				return errMaxNumActiveValidators
 			}
 
-			l1validator.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			l1Validator.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
 			if err != nil {
 				return err
 			}
@@ -759,7 +759,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			}
 		}
 
-		if err := e.state.PutL1Validator(l1validator); err != nil {
+		if err := e.state.PutL1Validator(l1Validator); err != nil {
 			return err
 		}
 
@@ -914,7 +914,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 	if err != nil {
 		return err
 	}
-	l1validator := state.L1Validator{
+	l1Validator := state.L1Validator{
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
 		NodeID:                nodeID,
@@ -936,13 +936,13 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 
 		// Mark the validator as active.
 		currentFees := e.state.GetAccruedFees()
-		l1validator.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
+		l1Validator.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := e.state.PutL1Validator(l1validator); err != nil {
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
 
@@ -1011,17 +1011,17 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	}
 
 	// Verify that the message contains a valid nonce for a current validator.
-	l1validator, err := e.state.GetL1Validator(msg.ValidationID)
+	l1Validator, err := e.state.GetL1Validator(msg.ValidationID)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errCouldNotLoadL1Validator, err)
 	}
-	if msg.Nonce < l1validator.MinNonce {
-		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, l1validator.MinNonce)
+	if msg.Nonce < l1Validator.MinNonce {
+		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, l1Validator.MinNonce)
 	}
 
 	// Verify that the warp message was sent from the expected chain and
 	// address.
-	if err := verifyL1Conversion(e.state, l1validator.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
+	if err := verifyL1Conversion(e.state, l1Validator.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
 		return err
 	}
 
@@ -1030,30 +1030,30 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	// Check if we are removing the validator.
 	if msg.Weight == 0 {
 		// Verify that we are not removing the last validator.
-		weight, err := e.state.WeightOfL1Validators(l1validator.SubnetID)
+		weight, err := e.state.WeightOfL1Validators(l1Validator.SubnetID)
 		if err != nil {
 			return fmt.Errorf("could not load L1 validator weights: %w", err)
 		}
-		if weight == l1validator.Weight {
+		if weight == l1Validator.Weight {
 			return errRemovingLastValidator
 		}
 
 		// If the validator is currently active, we need to refund the remaining
 		// balance.
-		if l1validator.EndAccumulatedFee != 0 {
+		if l1Validator.EndAccumulatedFee != 0 {
 			var remainingBalanceOwner message.PChainOwner
-			if _, err := txs.Codec.Unmarshal(l1validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+			if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 				return fmt.Errorf("%w: remaining balance owner is malformed", errStateCorruption)
 			}
 
 			accruedFees := e.state.GetAccruedFees()
-			if l1validator.EndAccumulatedFee <= accruedFees {
+			if l1Validator.EndAccumulatedFee <= accruedFees {
 				// This check should be unreachable. However, it prevents AVAX
 				// from being minted due to state corruption. This also prevents
 				// invalid UTXOs from being created (with 0 value).
 				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 			}
-			remainingBalance := l1validator.EndAccumulatedFee - accruedFees
+			remainingBalance := l1Validator.EndAccumulatedFee - accruedFees
 
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -1080,9 +1080,9 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 	// doesn't matter. If weight is not 0, [msg.Nonce] is enforced by
 	// [msg.Verify()] to be less than MaxUInt64 and can therefore be incremented
 	// without overflow.
-	l1validator.MinNonce = msg.Nonce + 1
-	l1validator.Weight = msg.Weight
-	if err := e.state.PutL1Validator(l1validator); err != nil {
+	l1Validator.MinNonce = msg.Nonce + 1
+	l1Validator.Weight = msg.Weight
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
 
@@ -1134,25 +1134,25 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 		return err
 	}
 
-	l1validator, err := e.state.GetL1Validator(tx.ValidationID)
+	l1Validator, err := e.state.GetL1Validator(tx.ValidationID)
 	if err != nil {
 		return err
 	}
 
 	// If the validator is currently inactive, we are activating it.
-	if l1validator.EndAccumulatedFee == 0 {
+	if l1Validator.EndAccumulatedFee == 0 {
 		if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
-		l1validator.EndAccumulatedFee = e.state.GetAccruedFees()
+		l1Validator.EndAccumulatedFee = e.state.GetAccruedFees()
 	}
-	l1validator.EndAccumulatedFee, err = math.Add(l1validator.EndAccumulatedFee, tx.Balance)
+	l1Validator.EndAccumulatedFee, err = math.Add(l1Validator.EndAccumulatedFee, tx.Balance)
 	if err != nil {
 		return err
 	}
 
-	if err := e.state.PutL1Validator(l1validator); err != nil {
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
 
@@ -1182,13 +1182,13 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 		return err
 	}
 
-	l1validator, err := e.state.GetL1Validator(tx.ValidationID)
+	l1Validator, err := e.state.GetL1Validator(tx.ValidationID)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errCouldNotLoadL1Validator, err)
 	}
 
 	var disableOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(l1validator.DeactivationOwner, &disableOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &disableOwner); err != nil {
 		return err
 	}
 
@@ -1232,23 +1232,23 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	avax.Produce(e.state, txID, tx.Outs)
 
 	// If the validator is already disabled, there is nothing to do.
-	if l1validator.EndAccumulatedFee == 0 {
+	if l1Validator.EndAccumulatedFee == 0 {
 		return nil
 	}
 
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(l1validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return err
 	}
 
 	accruedFees := e.state.GetAccruedFees()
-	if l1validator.EndAccumulatedFee <= accruedFees {
+	if l1Validator.EndAccumulatedFee <= accruedFees {
 		// This check should be unreachable. However, including it ensures
 		// that AVAX can't get minted out of thin air due to state
 		// corruption.
 		return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 	}
-	remainingBalance := l1validator.EndAccumulatedFee - accruedFees
+	remainingBalance := l1Validator.EndAccumulatedFee - accruedFees
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -1269,8 +1269,8 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	e.state.AddUTXO(utxo)
 
 	// Disable the validator
-	l1validator.EndAccumulatedFee = 0
-	return e.state.PutL1Validator(l1validator)
+	l1Validator.EndAccumulatedFee = 0
+	return e.state.PutL1Validator(l1Validator)
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

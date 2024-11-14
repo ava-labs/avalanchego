@@ -584,17 +584,17 @@ func (mr *MockDiffMockRecorder) PutExpiry(arg0 any) *gomock.Call {
 }
 
 // PutL1Validator mocks base method.
-func (m *MockDiff) PutL1Validator(l1validator L1Validator) error {
+func (m *MockDiff) PutL1Validator(l1Validator L1Validator) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutL1Validator", l1validator)
+	ret := m.ctrl.Call(m, "PutL1Validator", l1Validator)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PutL1Validator indicates an expected call of PutL1Validator.
-func (mr *MockDiffMockRecorder) PutL1Validator(l1validator any) *gomock.Call {
+func (mr *MockDiffMockRecorder) PutL1Validator(l1Validator any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutL1Validator", reflect.TypeOf((*MockDiff)(nil).PutL1Validator), l1validator)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutL1Validator", reflect.TypeOf((*MockDiff)(nil).PutL1Validator), l1Validator)
 }
 
 // PutPendingDelegator mocks base method.

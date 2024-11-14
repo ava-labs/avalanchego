@@ -1003,13 +1003,13 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	l1validator, err := s.vm.state.GetL1Validator(args.ValidationID)
+	l1Validator, err := s.vm.state.GetL1Validator(args.ValidationID)
 	if err != nil {
 		return fmt.Errorf("fetching L1 validator %q failed: %w", args.ValidationID, err)
 	}
 
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(l1validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
 	}
 	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
@@ -1021,7 +1021,7 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 	}
 
 	var deactivationOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(l1validator.DeactivationOwner, &deactivationOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &deactivationOwner); err != nil {
 		return fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
 	}
 	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
@@ -1038,19 +1038,19 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 		return fmt.Errorf("failed getting current height: %w", err)
 	}
 
-	reply.SubnetID = l1validator.SubnetID
-	reply.NodeID = l1validator.NodeID
+	reply.SubnetID = l1Validator.SubnetID
+	reply.NodeID = l1Validator.NodeID
 	reply.PublicKey = bls.PublicKeyToCompressedBytes(
-		bls.PublicKeyFromValidUncompressedBytes(l1validator.PublicKey),
+		bls.PublicKeyFromValidUncompressedBytes(l1Validator.PublicKey),
 	)
 	reply.RemainingBalanceOwner = *remainingBalanceAPIOwner
 	reply.DeactivationOwner = *deactivationAPIOwner
-	reply.StartTime = avajson.Uint64(l1validator.StartTime)
-	reply.Weight = avajson.Uint64(l1validator.Weight)
-	reply.MinNonce = avajson.Uint64(l1validator.MinNonce)
-	if l1validator.EndAccumulatedFee != 0 {
+	reply.StartTime = avajson.Uint64(l1Validator.StartTime)
+	reply.Weight = avajson.Uint64(l1Validator.Weight)
+	reply.MinNonce = avajson.Uint64(l1Validator.MinNonce)
+	if l1Validator.EndAccumulatedFee != 0 {
 		accruedFees := s.vm.state.GetAccruedFees()
-		reply.Balance = avajson.Uint64(l1validator.EndAccumulatedFee - accruedFees)
+		reply.Balance = avajson.Uint64(l1Validator.EndAccumulatedFee - accruedFees)
 	}
 	reply.Height = avajson.Uint64(height)
 

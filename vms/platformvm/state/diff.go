@@ -230,11 +230,11 @@ func (d *diff) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 }
 
 func (d *diff) GetL1Validator(validationID ids.ID) (L1Validator, error) {
-	if l1validator, modified := d.l1ValidatorsDiff.modified[validationID]; modified {
-		if l1validator.isDeleted() {
+	if l1Validator, modified := d.l1ValidatorsDiff.modified[validationID]; modified {
+		if l1Validator.isDeleted() {
 			return L1Validator{}, database.ErrNotFound
 		}
-		return l1validator, nil
+		return l1Validator, nil
 	}
 
 	parentState, ok := d.stateVersions.GetState(d.parentID)
@@ -258,8 +258,8 @@ func (d *diff) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) 
 	return parentState.HasL1Validator(subnetID, nodeID)
 }
 
-func (d *diff) PutL1Validator(l1validator L1Validator) error {
-	return d.l1ValidatorsDiff.putL1Validator(d, l1validator)
+func (d *diff) PutL1Validator(l1Validator L1Validator) error {
+	return d.l1ValidatorsDiff.putL1Validator(d, l1Validator)
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -572,23 +572,23 @@ func (d *diff) Apply(baseState Chain) error {
 			baseState.DeleteExpiry(entry)
 		}
 	}
-	// Ensure that all l1validator deletions happen before any l1validator additions. This
+	// Ensure that all l1Validator deletions happen before any l1Validator additions. This
 	// ensures that a subnetID+nodeID pair that was deleted and then re-added in
 	// a single diff can't get reordered into the addition happening first;
 	// which would return an error.
-	for _, l1validator := range d.l1ValidatorsDiff.modified {
-		if !l1validator.isDeleted() {
+	for _, l1Validator := range d.l1ValidatorsDiff.modified {
+		if !l1Validator.isDeleted() {
 			continue
 		}
-		if err := baseState.PutL1Validator(l1validator); err != nil {
+		if err := baseState.PutL1Validator(l1Validator); err != nil {
 			return err
 		}
 	}
-	for _, l1validator := range d.l1ValidatorsDiff.modified {
-		if l1validator.isDeleted() {
+	for _, l1Validator := range d.l1ValidatorsDiff.modified {
+		if l1Validator.isDeleted() {
 			continue
 		}
-		if err := baseState.PutL1Validator(l1validator); err != nil {
+		if err := baseState.PutL1Validator(l1Validator); err != nil {
 			return err
 		}
 	}

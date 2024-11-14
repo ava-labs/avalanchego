@@ -26,14 +26,14 @@ var (
 	_ btree.LessFunc[L1Validator] = L1Validator.Less
 	_ utils.Sortable[L1Validator] = L1Validator{}
 
-	ErrMutatedL1Validator     = errors.New("subnet-only validator contains mutated constant fields")
-	ErrConflictingL1Validator = errors.New("subnet-only validator contains conflicting subnetID + nodeID pair")
-	ErrDuplicateL1Validator   = errors.New("subnet-only validator contains duplicate subnetID + nodeID pair")
+	ErrMutatedL1Validator     = errors.New("L1 validator contains mutated constant fields")
+	ErrConflictingL1Validator = errors.New("L1 validator contains conflicting subnetID + nodeID pair")
+	ErrDuplicateL1Validator   = errors.New("L1 validator contains duplicate subnetID + nodeID pair")
 )
 
 type L1Validators interface {
 	// GetActiveL1ValidatorsIterator returns an iterator of all the
-	// active subnet-only validators in increasing order of EndAccumulatedFee.
+	// active L1 validators in increasing order of EndAccumulatedFee.
 	//
 	// It is the caller's responsibility to call [Release] on the iterator after
 	// use.
@@ -43,11 +43,11 @@ type L1Validators interface {
 	GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error)
 
 	// NumActiveL1Validators returns the number of currently active
-	// subnet-only validators.
+	// L1 validators.
 	NumActiveL1Validators() int
 
 	// WeightOfL1Validators returns the total active and inactive weight
-	// of subnet-only validators on [subnetID].
+	// of L1 validators on [subnetID].
 	WeightOfL1Validators(subnetID ids.ID) (uint64, error)
 
 	// GetL1Validator returns the validator with [validationID] if it
@@ -59,22 +59,22 @@ type L1Validators interface {
 	// exists.
 	HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
 
-	// PutL1Validator inserts [l1validator] as a validator. If the weight of the
+	// PutL1Validator inserts [l1Validator] as a validator. If the weight of the
 	// validator is 0, the validator is removed.
 	//
 	// If inserting this validator attempts to modify any of the constant fields
-	// of the subnet-only validator struct, an error will be returned.
+	// of the L1 validator struct, an error will be returned.
 	//
-	// If inserting this validator would cause the total weight of subnet-only
+	// If inserting this validator would cause the total weight of L1
 	// validators on a subnet to overflow MaxUint64, an error will be returned.
 	//
 	// If inserting this validator would cause there to be multiple validators
 	// with the same subnetID and nodeID pair to exist at the same time, an
 	// error will be returned.
 	//
-	// If an L1 validator with the same validationID as a previously removed L1
-	// validator is added, the behavior is undefined.
-	PutL1Validator(l1validator L1Validator) error
+	// If an L1 validator is added with the same validationID as a previously
+	// removed L1 validator, the behavior is undefined.
+	PutL1Validator(l1Validator L1Validator) error
 }
 
 // L1Validator defines an ACP-77 validator. For a given ValidationID, it
@@ -216,31 +216,31 @@ func getL1Validator(
 		return L1Validator{}, err
 	}
 
-	l1validator := L1Validator{
+	l1Validator := L1Validator{
 		ValidationID: validationID,
 	}
-	if _, err := block.GenesisCodec.Unmarshal(bytes, &l1validator); err != nil {
+	if _, err := block.GenesisCodec.Unmarshal(bytes, &l1Validator); err != nil {
 		return L1Validator{}, fmt.Errorf("failed to unmarshal L1 validator: %w", err)
 	}
 
-	cache.Put(validationID, maybe.Some(l1validator))
-	return l1validator, nil
+	cache.Put(validationID, maybe.Some(l1Validator))
+	return l1Validator, nil
 }
 
 func putL1Validator(
 	db database.KeyValueWriter,
 	cache cache.Cacher[ids.ID, maybe.Maybe[L1Validator]],
-	l1validator L1Validator,
+	l1Validator L1Validator,
 ) error {
-	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, l1validator)
+	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, l1Validator)
 	if err != nil {
 		return fmt.Errorf("failed to marshal L1 validator: %w", err)
 	}
-	if err := db.Put(l1validator.ValidationID[:], bytes); err != nil {
+	if err := db.Put(l1Validator.ValidationID[:], bytes); err != nil {
 		return err
 	}
 
-	cache.Put(l1validator.ValidationID, maybe.Some(l1validator))
+	cache.Put(l1Validator.ValidationID, maybe.Some(l1Validator))
 	return nil
 }
 
@@ -279,8 +279,8 @@ func newL1ValidatorsDiff() *l1ValidatorsDiff {
 func (d *l1ValidatorsDiff) getActiveL1ValidatorsIterator(parentIterator iterator.Iterator[L1Validator]) iterator.Iterator[L1Validator] {
 	return iterator.Merge(
 		L1Validator.Less,
-		iterator.Filter(parentIterator, func(l1validator L1Validator) bool {
-			_, ok := d.modified[l1validator.ValidationID]
+		iterator.Filter(parentIterator, func(l1Validator L1Validator) bool {
+			_, ok := d.modified[l1Validator.ValidationID]
 			return ok
 		}),
 		iterator.FromTree(d.active),
@@ -296,15 +296,15 @@ func (d *l1ValidatorsDiff) hasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (b
 	return has, modified
 }
 
-func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1validator L1Validator) error {
+func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) error {
 	var (
 		prevWeight uint64
 		prevActive bool
-		newActive  = l1validator.isActive()
+		newActive  = l1Validator.isActive()
 	)
-	switch priorL1Validator, err := state.GetL1Validator(l1validator.ValidationID); err {
+	switch priorL1Validator, err := state.GetL1Validator(l1Validator.ValidationID); err {
 	case nil:
-		if !priorL1Validator.immutableFieldsAreUnmodified(l1validator) {
+		if !priorL1Validator.immutableFieldsAreUnmodified(l1Validator) {
 			return ErrMutatedL1Validator
 		}
 
@@ -313,7 +313,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1validator L1Validator) 
 	case database.ErrNotFound:
 		// Verify that there is not a legacy subnet validator with the same
 		// subnetID+nodeID as this L1 validator.
-		_, err := state.GetCurrentValidator(l1validator.SubnetID, l1validator.NodeID)
+		_, err := state.GetCurrentValidator(l1Validator.SubnetID, l1Validator.NodeID)
 		if err == nil {
 			return ErrConflictingL1Validator
 		}
@@ -321,7 +321,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1validator L1Validator) 
 			return err
 		}
 
-		has, err := state.HasL1Validator(l1validator.SubnetID, l1validator.NodeID)
+		has, err := state.HasL1Validator(l1Validator.SubnetID, l1Validator.NodeID)
 		if err != nil {
 			return err
 		}
@@ -332,8 +332,8 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1validator L1Validator) 
 		return err
 	}
 
-	if prevWeight != l1validator.Weight {
-		weight, err := state.WeightOfL1Validators(l1validator.SubnetID)
+	if prevWeight != l1Validator.Weight {
+		weight, err := state.WeightOfL1Validators(l1Validator.SubnetID)
 		if err != nil {
 			return err
 		}
@@ -342,12 +342,12 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1validator L1Validator) 
 		if err != nil {
 			return err
 		}
-		weight, err = math.Add(weight, l1validator.Weight)
+		weight, err = math.Add(weight, l1Validator.Weight)
 		if err != nil {
 			return err
 		}
 
-		d.modifiedTotalWeight[l1validator.SubnetID] = weight
+		d.modifiedTotalWeight[l1Validator.SubnetID] = weight
 	}
 
 	switch {
@@ -357,18 +357,18 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1validator L1Validator) 
 		d.netAddedActive++
 	}
 
-	if prevL1Validator, ok := d.modified[l1validator.ValidationID]; ok {
+	if prevL1Validator, ok := d.modified[l1Validator.ValidationID]; ok {
 		d.active.Delete(prevL1Validator)
 	}
-	d.modified[l1validator.ValidationID] = l1validator
+	d.modified[l1Validator.ValidationID] = l1Validator
 
 	subnetIDNodeID := subnetIDNodeID{
-		subnetID: l1validator.SubnetID,
-		nodeID:   l1validator.NodeID,
+		subnetID: l1Validator.SubnetID,
+		nodeID:   l1Validator.NodeID,
 	}
-	d.modifiedHasNodeIDs[subnetIDNodeID] = !l1validator.isDeleted()
-	if l1validator.isActive() {
-		d.active.ReplaceOrInsert(l1validator)
+	d.modifiedHasNodeIDs[subnetIDNodeID] = !l1Validator.isDeleted()
+	if l1Validator.isActive() {
+		d.active.ReplaceOrInsert(l1Validator)
 	}
 	return nil
 }
@@ -386,23 +386,23 @@ func newActiveL1Validators() *activeL1Validators {
 }
 
 func (a *activeL1Validators) get(validationID ids.ID) (L1Validator, bool) {
-	l1validator, ok := a.lookup[validationID]
-	return l1validator, ok
+	l1Validator, ok := a.lookup[validationID]
+	return l1Validator, ok
 }
 
-func (a *activeL1Validators) put(l1validator L1Validator) {
-	a.lookup[l1validator.ValidationID] = l1validator
-	a.tree.ReplaceOrInsert(l1validator)
+func (a *activeL1Validators) put(l1Validator L1Validator) {
+	a.lookup[l1Validator.ValidationID] = l1Validator
+	a.tree.ReplaceOrInsert(l1Validator)
 }
 
 func (a *activeL1Validators) delete(validationID ids.ID) bool {
-	l1validator, ok := a.lookup[validationID]
+	l1Validator, ok := a.lookup[validationID]
 	if !ok {
 		return false
 	}
 
 	delete(a.lookup, validationID)
-	a.tree.Delete(l1validator)
+	a.tree.Delete(l1Validator)
 	return true
 }
 
@@ -415,25 +415,25 @@ func (a *activeL1Validators) newIterator() iterator.Iterator[L1Validator] {
 }
 
 func (a *activeL1Validators) addStakersToValidatorManager(vdrs validators.Manager) error {
-	for validationID, l1validator := range a.lookup {
-		pk := bls.PublicKeyFromValidUncompressedBytes(l1validator.PublicKey)
-		if err := vdrs.AddStaker(l1validator.SubnetID, l1validator.NodeID, pk, validationID, l1validator.Weight); err != nil {
+	for validationID, l1Validator := range a.lookup {
+		pk := bls.PublicKeyFromValidUncompressedBytes(l1Validator.PublicKey)
+		if err := vdrs.AddStaker(l1Validator.SubnetID, l1Validator.NodeID, pk, validationID, l1Validator.Weight); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addL1ValidatorsToValidatorManager(vdrs validators.Manager, l1validator L1Validator) error {
-	nodeID := l1validator.effectiveNodeID()
-	if vdrs.GetWeight(l1validator.SubnetID, nodeID) != 0 {
-		return vdrs.AddWeight(l1validator.SubnetID, nodeID, l1validator.Weight)
+func addL1ValidatorToValidatorManager(vdrs validators.Manager, l1Validator L1Validator) error {
+	nodeID := l1Validator.effectiveNodeID()
+	if vdrs.GetWeight(l1Validator.SubnetID, nodeID) != 0 {
+		return vdrs.AddWeight(l1Validator.SubnetID, nodeID, l1Validator.Weight)
 	}
 	return vdrs.AddStaker(
-		l1validator.SubnetID,
+		l1Validator.SubnetID,
 		nodeID,
-		l1validator.effectivePublicKey(),
-		l1validator.effectiveValidationID(),
-		l1validator.Weight,
+		l1Validator.effectivePublicKey(),
+		l1Validator.effectiveValidationID(),
+		l1Validator.Weight,
 	)
 }

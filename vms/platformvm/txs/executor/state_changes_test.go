@@ -329,8 +329,8 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 				s       = statetest.New(t, statetest.Config{})
 			)
 
-			for _, l1validator := range test.initialL1Validators {
-				require.NoError(s.PutL1Validator(l1validator))
+			for _, l1Validator := range test.initialL1Validators {
+				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
 			// Ensure the invariant that [newTime <= nextStakerChangeTime] on

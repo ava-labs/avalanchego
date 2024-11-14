@@ -181,7 +181,7 @@ func (s signatureRequestVerifier) verifyL1ValidatorRegistered(
 	if err != nil {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to get subnet only validator: " + err.Error(),
+			Message: "failed to get L1 validator: " + err.Error(),
 		}
 	}
 	return nil
@@ -239,7 +239,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	if err != database.ErrNotFound {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to lookup subnet only validator: " + err.Error(),
+			Message: "failed to lookup L1 validator: " + err.Error(),
 		}
 	}
 
@@ -284,7 +284,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	if err != database.ErrNotFound {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to lookup subnet only validator: " + err.Error(),
+			Message: "failed to lookup L1 validator: " + err.Error(),
 		}
 	}
 
@@ -328,7 +328,7 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	l1validator, err := s.state.GetL1Validator(msg.ValidationID)
+	l1Validator, err := s.state.GetL1Validator(msg.ValidationID)
 	switch {
 	case err == database.ErrNotFound:
 		return &common.AppError{
@@ -338,17 +338,17 @@ func (s signatureRequestVerifier) verifyL1ValidatorWeight(
 	case err != nil:
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to get subnet only validator: " + err.Error(),
+			Message: "failed to get L1 validator: " + err.Error(),
 		}
-	case msg.Nonce+1 != l1validator.MinNonce:
+	case msg.Nonce+1 != l1Validator.MinNonce:
 		return &common.AppError{
 			Code:    ErrWrongNonce,
-			Message: fmt.Sprintf("provided nonce %d != expected nonce (%d - 1)", msg.Nonce, l1validator.MinNonce),
+			Message: fmt.Sprintf("provided nonce %d != expected nonce (%d - 1)", msg.Nonce, l1Validator.MinNonce),
 		}
-	case msg.Weight != l1validator.Weight:
+	case msg.Weight != l1Validator.Weight:
 		return &common.AppError{
 			Code:    ErrWrongWeight,
-			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, l1validator.Weight),
+			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, l1Validator.Weight),
 		}
 	default:
 		return nil // The nonce and weight are correct

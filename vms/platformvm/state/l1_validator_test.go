@@ -77,67 +77,67 @@ func TestL1Validator_Compare(t *testing.T) {
 
 func TestL1Validator_immutableFieldsAreUnmodified(t *testing.T) {
 	var (
-		randomizeL1Validator = func(l1validator L1Validator) L1Validator {
+		randomizeL1Validator = func(l1Validator L1Validator) L1Validator {
 			// Randomize unrelated fields
-			l1validator.Weight = rand.Uint64()            // #nosec G404
-			l1validator.MinNonce = rand.Uint64()          // #nosec G404
-			l1validator.EndAccumulatedFee = rand.Uint64() // #nosec G404
-			return l1validator
+			l1Validator.Weight = rand.Uint64()            // #nosec G404
+			l1Validator.MinNonce = rand.Uint64()          // #nosec G404
+			l1Validator.EndAccumulatedFee = rand.Uint64() // #nosec G404
+			return l1Validator
 		}
-		l1validator = newL1Validator()
+		l1Validator = newL1Validator()
 	)
 
 	t.Run("equal", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
-		require.True(t, l1validator.immutableFieldsAreUnmodified(v))
+		v := randomizeL1Validator(l1Validator)
+		require.True(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("everything is different", func(t *testing.T) {
 		v := randomizeL1Validator(newL1Validator())
-		require.True(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.True(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different subnetID", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
+		v := randomizeL1Validator(l1Validator)
 		v.SubnetID = ids.GenerateTestID()
-		require.False(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different nodeID", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
+		v := randomizeL1Validator(l1Validator)
 		v.NodeID = ids.GenerateTestNodeID()
-		require.False(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different publicKey", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
+		v := randomizeL1Validator(l1Validator)
 		v.PublicKey = utils.RandomBytes(bls.PublicKeyLen)
-		require.False(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different remainingBalanceOwner", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
+		v := randomizeL1Validator(l1Validator)
 		v.RemainingBalanceOwner = utils.RandomBytes(32)
-		require.False(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different deactivationOwner", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
+		v := randomizeL1Validator(l1Validator)
 		v.DeactivationOwner = utils.RandomBytes(32)
-		require.False(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 	t.Run("different startTime", func(t *testing.T) {
-		v := randomizeL1Validator(l1validator)
+		v := randomizeL1Validator(l1Validator)
 		v.StartTime = rand.Uint64() // #nosec G404
-		require.False(t, l1validator.immutableFieldsAreUnmodified(v))
+		require.False(t, l1Validator.immutableFieldsAreUnmodified(v))
 	})
 }
 
 func TestGetL1Validator(t *testing.T) {
 	var (
-		l1validator             = newL1Validator()
+		l1Validator             = newL1Validator()
 		dbWithL1Validator       = memdb.New()
 		dbWithoutL1Validator    = memdb.New()
 		cacheWithL1Validator    = &cache.LRU[ids.ID, maybe.Maybe[L1Validator]]{Size: 10}
 		cacheWithoutL1Validator = &cache.LRU[ids.ID, maybe.Maybe[L1Validator]]{Size: 10}
 	)
 
-	require.NoError(t, putL1Validator(dbWithL1Validator, cacheWithL1Validator, l1validator))
-	require.NoError(t, deleteL1Validator(dbWithoutL1Validator, cacheWithoutL1Validator, l1validator.ValidationID))
+	require.NoError(t, putL1Validator(dbWithL1Validator, cacheWithL1Validator, l1Validator))
+	require.NoError(t, deleteL1Validator(dbWithoutL1Validator, cacheWithoutL1Validator, l1Validator.ValidationID))
 
 	tests := []struct {
 		name                string
@@ -151,15 +151,15 @@ func TestGetL1Validator(t *testing.T) {
 			name:                "cached with validator",
 			cache:               cacheWithL1Validator,
 			db:                  dbWithoutL1Validator,
-			expectedL1Validator: l1validator,
-			expectedEntry:       maybe.Some(l1validator),
+			expectedL1Validator: l1Validator,
+			expectedEntry:       maybe.Some(l1Validator),
 		},
 		{
 			name:                "from disk with validator",
 			cache:               &cache.LRU[ids.ID, maybe.Maybe[L1Validator]]{Size: 10},
 			db:                  dbWithL1Validator,
-			expectedL1Validator: l1validator,
-			expectedEntry:       maybe.Some(l1validator),
+			expectedL1Validator: l1Validator,
+			expectedEntry:       maybe.Some(l1Validator),
 		},
 		{
 			name:        "cached without validator",
@@ -178,11 +178,11 @@ func TestGetL1Validator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			gotL1Validator, err := getL1Validator(test.cache, test.db, l1validator.ValidationID)
+			gotL1Validator, err := getL1Validator(test.cache, test.db, l1Validator.ValidationID)
 			require.ErrorIs(err, test.expectedErr)
 			require.Equal(test.expectedL1Validator, gotL1Validator)
 
-			cachedL1Validator, ok := test.cache.Get(l1validator.ValidationID)
+			cachedL1Validator, ok := test.cache.Get(l1Validator.ValidationID)
 			require.True(ok)
 			require.Equal(test.expectedEntry, cachedL1Validator)
 		})
@@ -192,22 +192,22 @@ func TestGetL1Validator(t *testing.T) {
 func TestPutL1Validator(t *testing.T) {
 	var (
 		require     = require.New(t)
-		l1validator = newL1Validator()
+		l1Validator = newL1Validator()
 		db          = memdb.New()
 		cache       = &cache.LRU[ids.ID, maybe.Maybe[L1Validator]]{Size: 10}
 	)
-	expectedL1ValidatorBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, l1validator)
+	expectedL1ValidatorBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, l1Validator)
 	require.NoError(err)
 
-	require.NoError(putL1Validator(db, cache, l1validator))
+	require.NoError(putL1Validator(db, cache, l1Validator))
 
-	l1ValidatorBytes, err := db.Get(l1validator.ValidationID[:])
+	l1ValidatorBytes, err := db.Get(l1Validator.ValidationID[:])
 	require.NoError(err)
 	require.Equal(expectedL1ValidatorBytes, l1ValidatorBytes)
 
-	l1ValidatorFromCache, ok := cache.Get(l1validator.ValidationID)
+	l1ValidatorFromCache, ok := cache.Get(l1Validator.ValidationID)
 	require.True(ok)
-	require.Equal(maybe.Some(l1validator), l1ValidatorFromCache)
+	require.Equal(maybe.Some(l1Validator), l1ValidatorFromCache)
 }
 
 func TestDeleteL1Validator(t *testing.T) {

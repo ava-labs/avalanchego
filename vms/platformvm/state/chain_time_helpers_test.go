@@ -124,7 +124,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "subnet only validator with less than 1 second of fees",
+			name: "L1 validator with less than 1 second of fees",
 			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
@@ -138,7 +138,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime,
 		},
 		{
-			name: "subnet only validator with 1 second of fees",
+			name: "L1 validator with 1 second of fees",
 			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
@@ -152,7 +152,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "subnet only validator with less than 2 seconds of fees",
+			name: "L1 validator with less than 2 seconds of fees",
 			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
@@ -166,7 +166,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			expected: genesistest.DefaultValidatorStartTime.Add(time.Second),
 		},
 		{
-			name: "current and subnet only validator with high balance",
+			name: "current and L1 validator with high balance",
 			l1validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
@@ -194,8 +194,8 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			for _, staker := range test.pending {
 				require.NoError(s.PutPendingValidator(staker))
 			}
-			for _, l1validator := range test.l1validators {
-				require.NoError(s.PutL1Validator(l1validator))
+			for _, l1Validator := range test.l1validators {
+				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
 			actual, err := GetNextStakerChangeTime(

@@ -97,7 +97,7 @@ var (
 	EtnaHeightKey        = []byte("etna height")
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
-	L1ValidatorExcessKey = []byte("l1validator excess")
+	L1ValidatorExcessKey = []byte("l1Validator excess")
 	AccruedFeesKey       = []byte("accrued fees")
 	CurrentSupplyKey     = []byte("current supply")
 	LastAcceptedKey      = []byte("last accepted")
@@ -588,18 +588,18 @@ func New(
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, maybe.Maybe[L1Validator]](
 			execCfg.L1InactiveValidatorsCacheSize,
-			func(_ ids.ID, maybel1Validator maybe.Maybe[L1Validator]) int {
+			func(_ ids.ID, maybeL1Validator maybe.Maybe[L1Validator]) int {
 				const (
 					l1ValidatorOverhead      = ids.IDLen + ids.NodeIDLen + 4*wrappers.LongLen + 3*constants.PointerOverhead
 					maybeL1ValidatorOverhead = wrappers.BoolLen + l1ValidatorOverhead
 					entryOverhead            = ids.IDLen + maybeL1ValidatorOverhead
 				)
-				if maybel1Validator.IsNothing() {
+				if maybeL1Validator.IsNothing() {
 					return entryOverhead
 				}
 
-				l1validator := maybel1Validator.Value()
-				return entryOverhead + len(l1validator.PublicKey) + len(l1validator.RemainingBalanceOwner) + len(l1validator.DeactivationOwner)
+				l1Validator := maybeL1Validator.Value()
+				return entryOverhead + len(l1Validator.PublicKey) + len(l1Validator.RemainingBalanceOwner) + len(l1Validator.DeactivationOwner)
 			},
 		),
 	)
@@ -922,11 +922,11 @@ func (s *state) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
 
 // GetL1Validator allows for concurrent reads.
 func (s *state) GetL1Validator(validationID ids.ID) (L1Validator, error) {
-	if l1validator, modified := s.l1ValidatorsDiff.modified[validationID]; modified {
-		if l1validator.isDeleted() {
+	if l1Validator, modified := s.l1ValidatorsDiff.modified[validationID]; modified {
+		if l1Validator.isDeleted() {
 			return L1Validator{}, database.ErrNotFound
 		}
-		return l1validator, nil
+		return l1Validator, nil
 	}
 
 	return s.getPersistedL1Validator(validationID)
@@ -936,8 +936,8 @@ func (s *state) GetL1Validator(validationID ids.ID) (L1Validator, error) {
 // L1Validator with the given validationID. It is guaranteed that any
 // returned validator is either active or inactive (not deleted).
 func (s *state) getPersistedL1Validator(validationID ids.ID) (L1Validator, error) {
-	if l1validator, ok := s.activeL1Validators.get(validationID); ok {
-		return l1validator, nil
+	if l1Validator, ok := s.activeL1Validators.get(validationID); ok {
+		return l1Validator, nil
 	}
 
 	return getL1Validator(s.inactiveCache, s.inactiveDB, validationID)
@@ -966,8 +966,8 @@ func (s *state) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
 	return has, nil
 }
 
-func (s *state) PutL1Validator(l1validator L1Validator) error {
-	return s.l1ValidatorsDiff.putL1Validator(s, l1validator)
+func (s *state) PutL1Validator(l1Validator L1Validator) error {
+	return s.l1ValidatorsDiff.putL1Validator(s, l1Validator)
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -1743,15 +1743,15 @@ func (s *state) loadActiveL1Validators() error {
 
 		var (
 			value       = it.Value()
-			l1validator = L1Validator{
+			l1Validator = L1Validator{
 				ValidationID: validationID,
 			}
 		)
-		if _, err := block.GenesisCodec.Unmarshal(value, &l1validator); err != nil {
+		if _, err := block.GenesisCodec.Unmarshal(value, &l1Validator); err != nil {
 			return fmt.Errorf("failed to unmarshal L1 validator: %w", err)
 		}
 
-		s.activeL1Validators.put(l1validator)
+		s.activeL1Validators.put(l1Validator)
 	}
 
 	return nil
@@ -2445,8 +2445,8 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 	// Remove all deleted L1 validators. This must be done before adding new
 	// L1 validators to support the case where a validator is removed and then
 	// immediately re-added with a different validationID.
-	for validationID, l1validator := range s.l1ValidatorsDiff.modified {
-		if !l1validator.isDeleted() {
+	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
+		if !l1Validator.isDeleted() {
 			continue
 		}
 
@@ -2467,8 +2467,8 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 
 	// Now that the removed L1 validators have been deleted, perform additions
 	// and modifications.
-	for validationID, l1validator := range s.l1ValidatorsDiff.modified {
-		if l1validator.isDeleted() {
+	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
+		if l1Validator.isDeleted() {
 			continue
 		}
 
@@ -2476,25 +2476,25 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		switch err {
 		case nil:
 			// Modifying an existing validator
-			if priorL1Validator.isActive() == l1validator.isActive() {
+			if priorL1Validator.isActive() == l1Validator.isActive() {
 				// This validator's active status isn't changing. This means
 				// the effectiveNodeIDs are equal.
-				nodeID := l1validator.effectiveNodeID()
-				if priorL1Validator.Weight < l1validator.Weight {
-					err = s.validators.AddWeight(l1validator.SubnetID, nodeID, l1validator.Weight-priorL1Validator.Weight)
-				} else if priorL1Validator.Weight > l1validator.Weight {
-					err = s.validators.RemoveWeight(l1validator.SubnetID, nodeID, priorL1Validator.Weight-l1validator.Weight)
+				nodeID := l1Validator.effectiveNodeID()
+				if priorL1Validator.Weight < l1Validator.Weight {
+					err = s.validators.AddWeight(l1Validator.SubnetID, nodeID, l1Validator.Weight-priorL1Validator.Weight)
+				} else if priorL1Validator.Weight > l1Validator.Weight {
+					err = s.validators.RemoveWeight(l1Validator.SubnetID, nodeID, priorL1Validator.Weight-l1Validator.Weight)
 				}
 			} else {
 				// This validator's active status is changing.
 				err = errors.Join(
-					s.validators.RemoveWeight(l1validator.SubnetID, priorL1Validator.effectiveNodeID(), priorL1Validator.Weight),
-					addL1ValidatorsToValidatorManager(s.validators, l1validator),
+					s.validators.RemoveWeight(l1Validator.SubnetID, priorL1Validator.effectiveNodeID(), priorL1Validator.Weight),
+					addL1ValidatorToValidatorManager(s.validators, l1Validator),
 				)
 			}
 		case database.ErrNotFound:
 			// Adding a new validator
-			err = addL1ValidatorsToValidatorManager(s.validators, l1validator)
+			err = addL1ValidatorToValidatorManager(s.validators, l1Validator)
 		}
 		if err != nil {
 			return err
@@ -2562,7 +2562,7 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 	}
 
 	// Calculate the changes to the ACP-77 validator set
-	for validationID, l1validator := range s.l1ValidatorsDiff.modified {
+	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
 		priorL1Validator, err := s.getPersistedL1Validator(validationID)
 		if err == nil {
 			// Delete the prior validator
@@ -2581,20 +2581,20 @@ func (s *state) calculateValidatorDiffs() (map[subnetIDNodeID]*validatorDiff, er
 		}
 
 		// If the validator is being removed, we shouldn't work to re-add it.
-		if l1validator.isDeleted() {
+		if l1Validator.isDeleted() {
 			continue
 		}
 
 		// Add the new validator
 		subnetIDNodeID := subnetIDNodeID{
-			subnetID: l1validator.SubnetID,
-			nodeID:   l1validator.effectiveNodeID(),
+			subnetID: l1Validator.SubnetID,
+			nodeID:   l1Validator.effectiveNodeID(),
 		}
 		diff := getOrSetDefault(changes, subnetIDNodeID)
-		if err := diff.weightDiff.Add(l1validator.Weight); err != nil {
+		if err := diff.weightDiff.Add(l1Validator.Weight); err != nil {
 			return nil, err
 		}
-		diff.newPublicKey = l1validator.effectivePublicKeyBytes()
+		diff.newPublicKey = l1Validator.effectivePublicKeyBytes()
 	}
 
 	return changes, nil
@@ -2821,7 +2821,7 @@ func (s *state) writeL1Validators() error {
 	// deletions to the subnetIDNodeIDDB happen prior to any additions.
 	// Otherwise replacing an L1 validator by deleting it and then re-adding it with a
 	// different validationID could result in an inconsistent state.
-	for validationID, l1validator := range s.l1ValidatorsDiff.modified {
+	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
 		// Delete the prior validator if it exists
 		var err error
 		if s.activeL1Validators.delete(validationID) {
@@ -2833,14 +2833,14 @@ func (s *state) writeL1Validators() error {
 			return err
 		}
 
-		if !l1validator.isDeleted() {
+		if !l1Validator.isDeleted() {
 			continue
 		}
 
 		var (
 			subnetIDNodeID = subnetIDNodeID{
-				subnetID: l1validator.SubnetID,
-				nodeID:   l1validator.NodeID,
+				subnetID: l1Validator.SubnetID,
+				nodeID:   l1Validator.NodeID,
 			}
 			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
 		)
@@ -2851,16 +2851,16 @@ func (s *state) writeL1Validators() error {
 		s.subnetIDNodeIDCache.Put(subnetIDNodeID, false)
 	}
 
-	for validationID, l1validator := range s.l1ValidatorsDiff.modified {
-		if l1validator.isDeleted() {
+	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
+		if l1Validator.isDeleted() {
 			continue
 		}
 
 		// Update the subnetIDNodeID mapping
 		var (
 			subnetIDNodeID = subnetIDNodeID{
-				subnetID: l1validator.SubnetID,
-				nodeID:   l1validator.NodeID,
+				subnetID: l1Validator.SubnetID,
+				nodeID:   l1Validator.NodeID,
 			}
 			subnetIDNodeIDKey = subnetIDNodeID.Marshal()
 		)
@@ -2872,11 +2872,11 @@ func (s *state) writeL1Validators() error {
 
 		// Add the new validator
 		var err error
-		if l1validator.isActive() {
-			s.activeL1Validators.put(l1validator)
-			err = putL1Validator(s.activeDB, emptyL1ValidatorCache, l1validator)
+		if l1Validator.isActive() {
+			s.activeL1Validators.put(l1Validator)
+			err = putL1Validator(s.activeDB, emptyL1ValidatorCache, l1Validator)
 		} else {
-			err = putL1Validator(s.inactiveDB, s.inactiveCache, l1validator)
+			err = putL1Validator(s.inactiveDB, s.inactiveCache, l1Validator)
 		}
 		if err != nil {
 			return err
@@ -3068,7 +3068,7 @@ func (s *state) writeMetadata(height uint64) error {
 	}
 	if s.l1ValidatorExcess != s.persistedL1ValidatorExcess {
 		if err := database.PutUInt64(s.singletonDB, L1ValidatorExcessKey, uint64(s.l1ValidatorExcess)); err != nil {
-			return fmt.Errorf("failed to write l1validator excess: %w", err)
+			return fmt.Errorf("failed to write l1Validator excess: %w", err)
 		}
 		s.persistedL1ValidatorExcess = s.l1ValidatorExcess
 	}

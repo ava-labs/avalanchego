@@ -354,8 +354,8 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 // a transaction.
 func ConvertSubnetToL1ValidatorComplexity(l1validators ...*txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	var complexity gas.Dimensions
-	for _, l1validator := range l1validators {
-		l1ValidatorComplexity, err := convertSubnetToL1ValidatorComplexity(l1validator)
+	for _, l1Validator := range l1validators {
+		l1ValidatorComplexity, err := convertSubnetToL1ValidatorComplexity(l1Validator)
 		if err != nil {
 			return gas.Dimensions{}, err
 		}
@@ -368,7 +368,7 @@ func ConvertSubnetToL1ValidatorComplexity(l1validators ...*txs.ConvertSubnetToL1
 	return complexity, nil
 }
 
-func convertSubnetToL1ValidatorComplexity(l1validator *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
+func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetToL1ValidatorBandwidth,
 		gas.DBRead:    0,
@@ -376,19 +376,19 @@ func convertSubnetToL1ValidatorComplexity(l1validator *txs.ConvertSubnetToL1Vali
 		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
-	signerComplexity, err := SignerComplexity(&l1validator.Signer)
+	signerComplexity, err := SignerComplexity(&l1Validator.Signer)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
 
-	numAddresses := uint64(len(l1validator.RemainingBalanceOwner.Addresses) + len(l1validator.DeactivationOwner.Addresses))
+	numAddresses := uint64(len(l1Validator.RemainingBalanceOwner.Addresses) + len(l1Validator.DeactivationOwner.Addresses))
 	addressBandwidth, err := math.Mul(numAddresses, ids.ShortIDLen)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
 	return complexity.Add(
 		&gas.Dimensions{
-			gas.Bandwidth: uint64(len(l1validator.NodeID)),
+			gas.Bandwidth: uint64(len(l1Validator.NodeID)),
 		},
 		&signerComplexity,
 		&gas.Dimensions{

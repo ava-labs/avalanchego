@@ -103,10 +103,10 @@ func getNextL1ValidatorEvictionTime(
 	var (
 		// GetActiveL1ValidatorsIterator iterates in order of increasing
 		// EndAccumulatedFee, so the first L1 validator is the next L1 validator to evict.
-		l1validator = l1ValidatorIterator.Value()
+		l1Validator = l1ValidatorIterator.Value()
 		accruedFees = state.GetAccruedFees()
 	)
-	remainingFunds, err := math.Sub(l1validator.EndAccumulatedFee, accruedFees)
+	remainingFunds, err := math.Sub(l1Validator.EndAccumulatedFee, accruedFees)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("could not calculate remaining funds: %w", err)
 	}

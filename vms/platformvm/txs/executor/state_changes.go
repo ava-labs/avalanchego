@@ -332,16 +332,16 @@ func advanceValidatorFeeState(
 
 	var changed bool
 	for l1ValidatorIterator.Next() {
-		l1validator := l1ValidatorIterator.Value()
+		l1Validator := l1ValidatorIterator.Value()
 		// GetActiveL1ValidatorsIterator iterates in order of increasing
 		// EndAccumulatedFee, so we can break early.
-		if l1validator.EndAccumulatedFee > accruedFees {
+		if l1Validator.EndAccumulatedFee > accruedFees {
 			break
 		}
 
-		l1validator.EndAccumulatedFee = 0 // Deactivate the validator
-		if err := changes.PutL1Validator(l1validator); err != nil {
-			return false, fmt.Errorf("could not deactivate L1 validator %s: %w", l1validator.ValidationID, err)
+		l1Validator.EndAccumulatedFee = 0 // Deactivate the validator
+		if err := changes.PutL1Validator(l1Validator); err != nil {
+			return false, fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
 		changed = true
 	}

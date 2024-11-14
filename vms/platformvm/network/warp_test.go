@@ -181,7 +181,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		l1validator = state.L1Validator{
+		l1Validator = state.L1Validator{
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
@@ -195,7 +195,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 		}
 	)
 
-	require.NoError(t, state.PutL1Validator(l1validator))
+	require.NoError(t, state.PutL1Validator(l1Validator))
 
 	tests := []struct {
 		name         string
@@ -211,7 +211,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 		},
 		{
 			name:         "validation exists",
-			validationID: l1validator.ValidationID,
+			validationID: l1Validator.ValidationID,
 		},
 	}
 	for _, test := range tests {
@@ -309,9 +309,9 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 			PublicKey:    bls.PublicKeyToUncompressedBytes(pk),
 			Weight:       registerL1ValidatorToRegister.Weight,
 		}
-		convertSubnetToL1ValidatorValidationID = registerL1ValidatorToRegister.SubnetID.Append(0)
-		convertSubnetToL1Validator             = state.L1Validator{
-			ValidationID: convertSubnetToL1ValidatorValidationID,
+		convertSubnetToL1ValidationID = registerL1ValidatorToRegister.SubnetID.Append(0)
+		convertSubnetToL1Validator    = state.L1Validator{
+			ValidationID: convertSubnetToL1ValidationID,
 			SubnetID:     registerL1ValidatorToRegister.SubnetID,
 			NodeID:       ids.GenerateTestNodeID(),
 			PublicKey:    bls.PublicKeyToUncompressedBytes(pk),
@@ -380,7 +380,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 		},
 		{
 			name:         "convert subnet validation exists",
-			validationID: convertSubnetToL1ValidatorValidationID,
+			validationID: convertSubnetToL1ValidationID,
 			justification: must[[]byte](t)(proto.Marshal(
 				&platformvm.L1ValidatorRegistrationJustification{
 					Preimage: &platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData{
@@ -552,7 +552,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		nonce  = 10
 	)
 	var (
-		l1validator = state.L1Validator{
+		l1Validator = state.L1Validator{
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
@@ -568,7 +568,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		}
 	)
 
-	require.NoError(t, state.PutL1Validator(l1validator))
+	require.NoError(t, state.PutL1Validator(l1Validator))
 
 	tests := []struct {
 		name         string
@@ -594,7 +594,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "wrong nonce",
-			validationID: l1validator.ValidationID,
+			validationID: l1Validator.ValidationID,
 			expectedErr: &common.AppError{
 				Code:    ErrWrongNonce,
 				Message: "provided nonce 0 != expected nonce (11 - 1)",
@@ -602,7 +602,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "wrong weight",
-			validationID: l1validator.ValidationID,
+			validationID: l1Validator.ValidationID,
 			nonce:        nonce,
 			expectedErr: &common.AppError{
 				Code:    ErrWrongWeight,
@@ -611,7 +611,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "valid",
-			validationID: l1validator.ValidationID,
+			validationID: l1Validator.ValidationID,
 			nonce:        nonce,
 			weight:       weight,
 		},

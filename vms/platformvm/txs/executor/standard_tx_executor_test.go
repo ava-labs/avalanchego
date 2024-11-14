@@ -2517,7 +2517,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			expectedErr: errMaxNumActiveValidators,
 		},
 		{
-			name: "invalid subnet only validator",
+			name: "invalid L1 validator",
 			updateExecutor: func(e *standardTxExecutor) error {
 				return e.state.PutL1Validator(state.L1Validator{
 					ValidationID: ids.GenerateTestID(),
@@ -2661,7 +2661,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
 			require.NoError(err)
 
-			l1validator, err := diff.GetL1Validator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 			require.Equal(
 				state.L1Validator{
@@ -2676,7 +2676,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 					MinNonce:              0,
 					EndAccumulatedFee:     validator.Balance + diff.GetAccruedFees(),
 				},
-				l1validator,
+				l1Validator,
 			)
 		})
 	}
@@ -3182,7 +3182,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			l1validator, err := diff.GetL1Validator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
 			var expectedEndAccumulatedFee uint64
@@ -3202,7 +3202,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 					MinNonce:              0,
 					EndAccumulatedFee:     expectedEndAccumulatedFee,
 				},
-				l1validator,
+				l1Validator,
 			)
 
 			hasExpiry, err := diff.HasExpiry(state.ExpiryEntry{
@@ -3383,11 +3383,11 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 
 	increaseL1Weight := func(weight uint64) func(*standardTxExecutor) error {
 		return func(e *standardTxExecutor) error {
-			l1validator := initialL1Validator
-			l1validator.ValidationID = ids.GenerateTestID()
-			l1validator.NodeID = ids.GenerateTestNodeID()
-			l1validator.Weight = weight
-			return e.state.PutL1Validator(l1validator)
+			l1Validator := initialL1Validator
+			l1Validator.ValidationID = ids.GenerateTestID()
+			l1Validator.NodeID = ids.GenerateTestNodeID()
+			l1Validator.Weight = weight
+			return e.state.PutL1Validator(l1Validator)
 		}
 	}
 
@@ -3518,9 +3518,9 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		{
 			name: "nonce too low",
 			updateExecutor: func(e *standardTxExecutor) error {
-				l1validator := initialL1Validator
-				l1validator.MinNonce = nonce + 1
-				return e.state.PutL1Validator(l1validator)
+				l1Validator := initialL1Validator
+				l1Validator.MinNonce = nonce + 1
+				return e.state.PutL1Validator(l1Validator)
 			},
 			expectedErr: errWarpMessageContainsStaleNonce,
 		},
@@ -3556,9 +3556,9 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 					return err
 				}
 
-				l1validator := initialL1Validator
-				l1validator.EndAccumulatedFee = 0 // Deactivate the validator
-				return e.state.PutL1Validator(l1validator)
+				l1Validator := initialL1Validator
+				l1Validator.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutL1Validator(l1Validator)
 			},
 		},
 		{
@@ -3584,9 +3584,9 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 					return err
 				}
 
-				l1validator := initialL1Validator
-				l1validator.EndAccumulatedFee = 0 // Deactivate the validator
-				return e.state.PutL1Validator(l1validator)
+				l1Validator := initialL1Validator
+				l1Validator.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutL1Validator(l1Validator)
 			},
 		},
 		{
@@ -3690,14 +3690,14 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			l1validator, err := diff.GetL1Validator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			if test.expectedWeight != 0 {
 				require.NoError(err)
 
 				expectedL1Validator := initialL1Validator
 				expectedL1Validator.MinNonce = test.expectedNonce
 				expectedL1Validator.Weight = test.expectedWeight
-				require.Equal(expectedL1Validator, l1validator)
+				require.Equal(expectedL1Validator, l1Validator)
 				return
 			}
 			require.ErrorIs(err, database.ErrNotFound)
@@ -4005,12 +4005,12 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			l1validator, err := diff.GetL1Validator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
 			expectedL1Validator := initialL1Validator
 			expectedL1Validator.EndAccumulatedFee = test.expectedBalance
-			require.Equal(expectedL1Validator, l1validator)
+			require.Equal(expectedL1Validator, l1Validator)
 		})
 	}
 }
@@ -4175,7 +4175,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name:         "l1validator not found",
+			name:         "l1Validator not found",
 			validationID: ids.GenerateTestID(),
 			expectedErr:  errCouldNotLoadL1Validator,
 		},
@@ -4200,9 +4200,9 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			name:         "already deactivated",
 			validationID: validationID,
 			updateExecutor: func(e *standardTxExecutor) error {
-				l1validator := initialL1Validator
-				l1validator.EndAccumulatedFee = 0
-				return e.state.PutL1Validator(l1validator)
+				l1Validator := initialL1Validator
+				l1Validator.EndAccumulatedFee = 0
+				return e.state.PutL1Validator(l1Validator)
 			},
 			expectedBalance: 0,
 		},
@@ -4287,12 +4287,12 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			l1validator, err := diff.GetL1Validator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
 			expectedL1Validator := initialL1Validator
 			expectedL1Validator.EndAccumulatedFee = 0
-			require.Equal(expectedL1Validator, l1validator)
+			require.Equal(expectedL1Validator, l1Validator)
 
 			utxoID := avax.UTXOID{
 				TxID:        disableL1ValidatorTx.ID(),
