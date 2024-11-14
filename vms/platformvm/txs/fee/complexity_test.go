@@ -262,7 +262,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 92,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -282,7 +282,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 161,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   150,
 			},
 			expectedErr: nil,
 		},
@@ -302,7 +302,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 299,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   450,
 			},
 			expectedErr: nil,
 		},
@@ -324,7 +324,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 311,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   450,
 			},
 			expectedErr: nil,
 		},
@@ -385,8 +385,8 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 200,
 				gas.DBRead:    0,
-				gas.DBWrite:   4,
-				gas.Compute:   0, // TODO: implement
+				gas.DBWrite:   5,
+				gas.Compute:   800,
 			},
 		},
 		{
@@ -405,8 +405,8 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
 				gas.DBRead:    0,
-				gas.DBWrite:   4,
-				gas.Compute:   0, // TODO: implement
+				gas.DBWrite:   5,
+				gas.Compute:   800,
 			},
 		},
 		{
@@ -425,8 +425,8 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
 				gas.DBRead:    0,
-				gas.DBWrite:   4,
-				gas.Compute:   0, // TODO: implement
+				gas.DBWrite:   5,
+				gas.Compute:   800,
 			},
 		},
 	}
@@ -541,7 +541,7 @@ func TestAuthComplexity(t *testing.T) {
 				gas.Bandwidth: 8,
 				gas.DBRead:    0,
 				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -557,7 +557,7 @@ func TestAuthComplexity(t *testing.T) {
 				gas.Bandwidth: 77,
 				gas.DBRead:    0,
 				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   150,
 			},
 			expectedErr: nil,
 		},
@@ -573,7 +573,7 @@ func TestAuthComplexity(t *testing.T) {
 				gas.Bandwidth: 215,
 				gas.DBRead:    0,
 				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   450,
 			},
 			expectedErr: nil,
 		},
@@ -585,7 +585,7 @@ func TestAuthComplexity(t *testing.T) {
 				gas.Bandwidth: 0,
 				gas.DBRead:    0,
 				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   0,
 			},
 			expectedErr: errUnsupportedAuth,
 		},
@@ -639,7 +639,7 @@ func TestSignerComplexity(t *testing.T) {
 				gas.Bandwidth: 144,
 				gas.DBRead:    0,
 				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   800,
 			},
 			expectedErr: nil,
 		},
