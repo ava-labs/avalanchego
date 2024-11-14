@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,7 +43,6 @@ func TestVerifier_Verify(t *testing.T) {
 
 		ctx        context.Context
 		validators []Validator
-		threshold  uint64
 
 		pChainState  validators.State
 		pChainHeight uint64
@@ -63,7 +63,6 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			threshold: 1,
 			pChainState: &validatorstest.State{
 				T: t,
 				GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
@@ -93,7 +92,6 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			threshold: 1,
 			pChainState: &validatorstest.State{
 				T: t,
 				GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
@@ -106,17 +104,49 @@ func TestVerifier_Verify(t *testing.T) {
 							PublicKey: pk0,
 							Weight:    1,
 						},
+					}, nil
+				},
+			},
+		},
+		{
+			name:    "overflow",
+			handler: NewHandler(&testVerifier{}, signer),
+			ctx:     context.Background(),
+			validators: []Validator{
+				{
+					NodeID:    nodeID0,
+					PublicKey: pk0,
+					Weight:    math.MaxUint[uint64](),
+				},
+				{
+					NodeID:    nodeID1,
+					PublicKey: pk1,
+					Weight:    math.MaxUint[uint64](),
+				},
+			},
+			pChainState: &validatorstest.State{
+				T: t,
+				GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
+					return ids.Empty, nil
+				},
+				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return map[ids.NodeID]*validators.GetValidatorOutput{
+						nodeID0: {
+							NodeID:    nodeID0,
+							PublicKey: pk0,
+							Weight:    math.MaxUint[uint64](),
+						},
 						nodeID1: {
 							NodeID:    nodeID1,
 							PublicKey: pk1,
-							Weight:    1,
+							Weight:    math.MaxUint[uint64](),
 						},
 					}, nil
 				},
 			},
-			quorumNum:     2,
-			quorumDen:     2,
-			wantVerifyErr: warp.ErrInsufficientWeight,
+			quorumNum:                  1,
+			quorumDen:                  2,
+			wantAggregateSignaturesErr: math.ErrOverflow,
 		},
 		{
 			name: "fails attestation",
@@ -132,8 +162,7 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			threshold:                  1,
-			wantAggregateSignaturesErr: ErrInsufficientSignatures,
+			wantAggregateSignaturesErr: ErrFailedAggregation,
 		},
 		{
 			name: "invalid validator set",
@@ -178,7 +207,6 @@ func TestVerifier_Verify(t *testing.T) {
 				message,
 				[]byte("justification"),
 				tt.validators,
-				tt.threshold,
 			)
 			require.ErrorIs(err, tt.wantAggregateSignaturesErr)
 
