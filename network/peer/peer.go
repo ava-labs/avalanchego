@@ -626,11 +626,14 @@ func (p *peer) sendNetworkMessages() {
 		select {
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
-			_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+			requestAllPeers := p.Config.RequestAllPeers
+			if !requestAllPeers {
+				_, requestAllPeers = p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+			}
 			msg, err := p.Config.MessageCreator.GetPeerList(
 				knownPeersFilter,
 				knownPeersSalt,
-				areWeAPrimaryNetworkValidator,
+				requestAllPeers,
 			)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,

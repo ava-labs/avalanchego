@@ -58,4 +58,7 @@ type Config struct {
 
 	// Signs my IP so I can send my signed IP address in the Handshake message
 	IPSigner *IPSigner
+
+	// Whether to peers requests should request all peers
+	RequestAllPeers bool
 }

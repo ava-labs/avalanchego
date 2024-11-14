@@ -177,4 +177,7 @@ type Config struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	DiskTargeter tracker.Targeter `json:"-"`
+
+	// Whether peer requests should request all peers across all L1's
+	RequestAllPeers bool `json:"-"`
 }

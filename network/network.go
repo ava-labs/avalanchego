@@ -280,6 +280,7 @@ func NewNetwork(
 		ResourceTracker:      config.ResourceTracker,
 		UptimeCalculator:     config.UptimeCalculator,
 		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		RequestAllPeers:      config.RequestAllPeers,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
