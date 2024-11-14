@@ -941,7 +941,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 	}
 }
 
-func TestIncreaseIncreaseL1ValidatorBalanceTx(t *testing.T) {
+func TestIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	const balance = units.Avax
 	validationID := ids.GenerateTestID()
 	for _, e := range testEnvironmentPostEtna {
