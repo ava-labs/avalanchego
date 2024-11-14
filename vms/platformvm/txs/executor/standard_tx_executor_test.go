@@ -3648,8 +3648,8 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			unsignedTx := setSubnetValidatorWeightTx.Unsigned.(*txs.SetSubnetValidatorWeightTx)
 			if test.message != nil {
+				unsignedTx := setSubnetValidatorWeightTx.Unsigned.(*txs.SetSubnetValidatorWeightTx)
 				unsignedTx.Message = test.message
 			}
 
