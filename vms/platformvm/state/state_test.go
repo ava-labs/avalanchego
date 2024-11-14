@@ -1355,8 +1355,8 @@ func TestStateFeeStateCommitAndLoad(t *testing.T) {
 	require.Equal(expectedFeeState, s.GetFeeState())
 }
 
-// Verify that committing the state writes the l1 validator excess to the database and
-// that loading the state fetches the l1Validator excess from the database.
+// Verify that committing the state writes the L1 validator excess to the database and
+// that loading the state fetches the L1 validator excess from the database.
 func TestStateL1ValidatorExcessCommitAndLoad(t *testing.T) {
 	require := require.New(t)
 
