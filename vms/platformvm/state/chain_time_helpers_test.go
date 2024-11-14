@@ -96,7 +96,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 	tests := []struct {
 		name         string
 		pending      []*Staker
-		l1validators []L1Validator
+		l1Validators []L1Validator
 		maxTime      time.Time
 		expected     time.Time
 	}{
@@ -125,7 +125,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "L1 validator with less than 1 second of fees",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -139,7 +139,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "L1 validator with 1 second of fees",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -153,7 +153,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "L1 validator with less than 2 seconds of fees",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -167,7 +167,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 		},
 		{
 			name: "current and L1 validator with high balance",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          ids.GenerateTestID(),
@@ -194,7 +194,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 			for _, staker := range test.pending {
 				require.NoError(s.PutPendingValidator(staker))
 			}
-			for _, l1Validator := range test.l1validators {
+			for _, l1Validator := range test.l1Validators {
 				require.NoError(s.PutL1Validator(l1Validator))
 			}
 

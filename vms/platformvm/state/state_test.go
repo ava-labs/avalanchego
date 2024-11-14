@@ -1526,7 +1526,7 @@ func TestL1Validators(t *testing.T) {
 	tests := []struct {
 		name         string
 		initial      []L1Validator
-		l1validators []L1Validator
+		l1Validators []L1Validator
 	}{
 		{
 			name: "empty noop",
@@ -1569,7 +1569,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 1, // Active
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID: l1Validator.ValidationID,
 					SubnetID:     l1Validator.SubnetID,
@@ -1591,7 +1591,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 0, // Inactive
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID: l1Validator.ValidationID,
 					SubnetID:     l1Validator.SubnetID,
@@ -1613,7 +1613,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 1, // Active
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      l1Validator.ValidationID,
 					SubnetID:          l1Validator.SubnetID,
@@ -1636,7 +1636,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 1, // Active
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      l1Validator.ValidationID,
 					SubnetID:          l1Validator.SubnetID,
@@ -1659,7 +1659,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 1, // Active
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      l1Validator.ValidationID,
 					SubnetID:          l1Validator.SubnetID,
@@ -1682,7 +1682,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 0, // Inactive
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      l1Validator.ValidationID,
 					SubnetID:          l1Validator.SubnetID,
@@ -1705,7 +1705,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 1, // Active
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      l1Validator.ValidationID,
 					SubnetID:          l1Validator.SubnetID,
@@ -1736,7 +1736,7 @@ func TestL1Validators(t *testing.T) {
 					EndAccumulatedFee: 1, // Active
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID: l1Validator.ValidationID,
 					SubnetID:     l1Validator.SubnetID,
@@ -1756,7 +1756,7 @@ func TestL1Validators(t *testing.T) {
 		},
 		{
 			name: "added and removed",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      l1Validator.ValidationID,
 					SubnetID:          l1Validator.SubnetID,
@@ -1776,7 +1776,7 @@ func TestL1Validators(t *testing.T) {
 		},
 		{
 			name: "add multiple inactive",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          l1Validator.SubnetID,
@@ -1827,7 +1827,7 @@ func TestL1Validators(t *testing.T) {
 			require.NoError(err)
 
 			expectedL1Validators := maps.Clone(initialL1Validators)
-			for _, l1Validator := range test.l1validators {
+			for _, l1Validator := range test.l1Validators {
 				l1Validator.RemainingBalanceOwner = []byte{}
 				l1Validator.DeactivationOwner = []byte{}
 
@@ -1937,11 +1937,11 @@ func TestL1Validators(t *testing.T) {
 			}
 
 			l1ValdiatorsToValidatorSet := func(
-				l1validators map[ids.ID]L1Validator,
+				l1Validators map[ids.ID]L1Validator,
 				subnetID ids.ID,
 			) map[ids.NodeID]*validators.GetValidatorOutput {
 				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
-				for _, l1Validator := range l1validators {
+				for _, l1Validator := range l1Validators {
 					if l1Validator.SubnetID != subnetID || l1Validator.isDeleted() {
 						continue
 					}
@@ -2108,7 +2108,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	tests := []struct {
 		name         string
 		initial      []*Staker
-		l1validators []L1Validator
+		l1Validators []L1Validator
 	}{
 		{
 			name: "empty noop",
@@ -2157,7 +2157,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		},
 		{
 			name: "L1 validators only in same subnet",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID1,
@@ -2178,7 +2178,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		},
 		{
 			name: "L1 validators only in different subnets",
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID1,
@@ -2225,7 +2225,7 @@ func TestGetCurrentValidators(t *testing.T) {
 					StartTime: now,
 				},
 			},
-			l1validators: []L1Validator{
+			l1Validators: []L1Validator{
 				{
 					ValidationID:      ids.GenerateTestID(),
 					SubnetID:          subnetID1,
@@ -2288,7 +2288,7 @@ func TestGetCurrentValidators(t *testing.T) {
 				require.NoError(state.PutCurrentValidator(staker))
 			}
 
-			for _, l1Validator := range test.l1validators {
+			for _, l1Validator := range test.l1Validators {
 				// The codec creates zero length slices rather than leaving them
 				// as nil, so we need to populate the slices for later reflect
 				// based equality checks.
@@ -2308,12 +2308,12 @@ func TestGetCurrentValidators(t *testing.T) {
 			}
 
 			l1ValidatorsBySubnetID := make(map[ids.ID][]L1Validator)
-			for _, l1Validator := range test.l1validators {
+			for _, l1Validator := range test.l1Validators {
 				if l1Validator.Weight == 0 {
 					continue
 				}
-				l1validators := l1ValidatorsBySubnetID[l1Validator.SubnetID]
-				l1ValidatorsBySubnetID[l1Validator.SubnetID] = append(l1validators, l1Validator)
+				l1Validators := l1ValidatorsBySubnetID[l1Validator.SubnetID]
+				l1ValidatorsBySubnetID[l1Validator.SubnetID] = append(l1Validators, l1Validator)
 			}
 
 			for _, subnetID := range subnetIDs {

@@ -352,9 +352,9 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 
 // ConvertSubnetToL1ValidatorComplexity returns the complexity the validators add to
 // a transaction.
-func ConvertSubnetToL1ValidatorComplexity(l1validators ...*txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
+func ConvertSubnetToL1ValidatorComplexity(l1Validators ...*txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	var complexity gas.Dimensions
-	for _, l1Validator := range l1validators {
+	for _, l1Validator := range l1Validators {
 		l1ValidatorComplexity, err := convertSubnetToL1ValidatorComplexity(l1Validator)
 		if err != nil {
 			return gas.Dimensions{}, err
