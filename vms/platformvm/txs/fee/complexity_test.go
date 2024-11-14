@@ -366,7 +366,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 200,
 				gas.DBWrite:   4,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 		},
 		{
@@ -385,7 +385,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
 				gas.DBWrite:   4,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 		},
 		{
@@ -404,7 +404,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
 				gas.DBWrite:   4,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 		},
 	}
@@ -589,7 +589,7 @@ func TestSignerComplexity(t *testing.T) {
 			signer: &signer.ProofOfPossession{},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 144,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 			expectedErr: nil,
 		},

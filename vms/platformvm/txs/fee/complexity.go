@@ -77,8 +77,10 @@ const (
 		wrappers.IntLen + // deactivation owner threshold
 		wrappers.IntLen // deactivation owner num addresses
 
-	intrinsicBLSAggregateCompute = 5     // BLS public key aggregation time is around 5us
-	intrinsicBLSVerifyCompute    = 1_000 // BLS verification time is around 1000us
+	intrinsicBLSAggregateCompute           = 5     // BLS public key aggregation time is around 5us
+	intrinsicBLSVerifyCompute              = 1_000 // BLS verification time is around 1000us
+	intrinsicBLSPublicKeyValidationCompute = 50    // BLS public key validation time is around 50us
+	intrinsicBLSPoPVerifyCompute           = intrinsicBLSPublicKeyValidationCompute + intrinsicBLSVerifyCompute
 
 	intrinsicWarpDBReads = 3 + 20 // chainID -> subnetID mapping + apply weight diffs + apply pk diffs + diff application reads
 
@@ -197,7 +199,7 @@ var (
 			wrappers.IntLen, // message length
 		gas.DBRead:  5, // conversion owner + expiry lookup + sov lookup + subnetID/nodeID lookup + weight lookup
 		gas.DBWrite: 6, // write current staker + expiry + write weight diff + write pk diff + subnetID/nodeID lookup + weight lookup
-		gas.Compute: intrinsicBLSVerifyCompute,
+		gas.Compute: intrinsicBLSPoPVerifyCompute,
 	}
 	IntrinsicSetSubnetValidatorWeightTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -454,11 +456,9 @@ func SignerComplexity(s signer.Signer) (gas.Dimensions, error) {
 	case *signer.Empty:
 		return gas.Dimensions{}, nil
 	case *signer.ProofOfPossession:
-		// The PoP also decompresses and validates the public key, but that is
-		// insignificant compared to the signature verification.
 		return gas.Dimensions{
 			gas.Bandwidth: intrinsicPoPBandwidth,
-			gas.Compute:   intrinsicBLSVerifyCompute,
+			gas.Compute:   intrinsicBLSPoPVerifyCompute,
 		}, nil
 	default:
 		return gas.Dimensions{}, errUnsupportedSigner

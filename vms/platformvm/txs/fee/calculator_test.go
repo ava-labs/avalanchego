@@ -76,9 +76,9 @@ var (
 				gas.Bandwidth: 691, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   intrinsicBLSVerifyCompute + intrinsicSECP256k1FxSignatureCompute,
+				gas.Compute:   intrinsicBLSPoPVerifyCompute + intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 136_691 * units.NanoAvax,
+			expectedDynamicFee: 137_191 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessValidatorTx for subnet",
@@ -227,9 +227,9 @@ var (
 				gas.Bandwidth: 656, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicConvertSubnetTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicConvertSubnetTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite + intrinsicConvertSubnetValidatorDBWrite,
-				gas.Compute:   2*intrinsicSECP256k1FxSignatureCompute + intrinsicBLSVerifyCompute,
+				gas.Compute:   2*intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute,
 			},
-			expectedDynamicFee: 182_656 * units.NanoAvax,
+			expectedDynamicFee: 183_156 * units.NanoAvax,
 		},
 		{
 			name:                 "RegisterSubnetValidatorTx",
@@ -239,9 +239,9 @@ var (
 				gas.Bandwidth: 710, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicRegisterSubnetValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead + intrinsicWarpDBReads,
 				gas.DBWrite:   IntrinsicRegisterSubnetValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSAggregateCompute + 2*intrinsicBLSVerifyCompute,
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute + intrinsicBLSAggregateCompute + intrinsicBLSVerifyCompute,
 			},
-			expectedDynamicFee: 240_760 * units.NanoAvax,
+			expectedDynamicFee: 241_260 * units.NanoAvax,
 		},
 		{
 			name:                 "SetSubnetValidatorWeightTx",
