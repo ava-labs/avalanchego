@@ -55,13 +55,13 @@ var (
 			DynamicFeeConfig: gas.Config{
 				Weights: gas.Dimensions{
 					gas.Bandwidth: 1,     // Max block size ~1MB
-					gas.DBRead:    1_000, // Target reads per second ~50
-					gas.DBWrite:   1_000, // Target writes per second ~50
+					gas.DBRead:    1_000, // Max reads per block 1,000
+					gas.DBWrite:   1_000, // Max writes per block 1,000
 					gas.Compute:   4,     // Max compute time per block ~250ms
 				},
 				MaxCapacity:     1_000_000,
-				MaxPerSecond:    100_000,
-				TargetPerSecond: 50_000,
+				MaxPerSecond:    100_000, // Refill time 10s
+				TargetPerSecond: 50_000,  // Target is half of max
 				MinPrice:        1,
 				// ExcessConversionConstant = (MaxPerSecond - TargetPerSecond) * NumberOfSecondsPerDoubling / ln(2)
 				//
