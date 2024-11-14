@@ -454,6 +454,8 @@ func SignerComplexity(s signer.Signer) (gas.Dimensions, error) {
 	case *signer.Empty:
 		return gas.Dimensions{}, nil
 	case *signer.ProofOfPossession:
+		// The PoP also decompresses and validates the public key, but that is
+		// insignificant compared to the signature verification.
 		return gas.Dimensions{
 			gas.Bandwidth: intrinsicPoPBandwidth,
 			gas.Compute:   intrinsicBLSVerifyCompute,
