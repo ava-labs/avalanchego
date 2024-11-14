@@ -87,7 +87,7 @@ const (
 
 	intrinsicInputDBWrite                  = 1
 	intrinsicOutputDBWrite                 = 1
-	intrinsicConvertSubnetValidatorDBWrite = 5 // weight diff + pub key diff + subnetID/nodeID + validationID + l1 weight
+	intrinsicConvertSubnetValidatorDBWrite = 4 // weight diff + pub key diff + subnetID/nodeID + validationID
 )
 
 var (
@@ -203,7 +203,7 @@ var (
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
 		gas.DBRead:  3, // subnet auth + transformation lookup + conversion lookup
-		gas.DBWrite: 1, // write conversion manager
+		gas.DBWrite: 2, // write conversion manager + total weight
 		gas.Compute: 0,
 	}
 	IntrinsicRegisterSubnetValidatorTxComplexities = gas.Dimensions{
