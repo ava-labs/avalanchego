@@ -65,7 +65,7 @@ const (
 	intrinsicSECP256k1FxSignatureBandwidth = wrappers.IntLen + // signature index
 		secp256k1.SignatureLen // signature length
 
-	intrinsicSECP256k1FxSignatureCompute = 150 // secp256k1 signature verification time is around 150us
+	intrinsicSECP256k1FxSignatureCompute = 200 // secp256k1 signature verification time is around 200us
 
 	intrinsicConvertSubnetValidatorBandwidth = wrappers.IntLen + // nodeID length
 		wrappers.LongLen + // weight
@@ -75,8 +75,8 @@ const (
 		wrappers.IntLen + // deactivation owner threshold
 		wrappers.IntLen // deactivation owner num addresses
 
-	intrinsicBLSAggregateCompute = 4   // BLS public key aggregation time is around 4us
-	intrinsicBLSVerifyCompute    = 800 // BLS verification time is around 800us
+	intrinsicBLSAggregateCompute = 5     // BLS public key aggregation time is around 5us
+	intrinsicBLSVerifyCompute    = 1_000 // BLS verification time is around 1000us
 
 	intrinsicWarpDBReads = 3 + 20 // chainID -> subnetID mapping + apply weight diffs + apply pk diffs + diff application reads
 
