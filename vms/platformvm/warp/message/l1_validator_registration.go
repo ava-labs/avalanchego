@@ -9,8 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// L1ValidatorRegistration reports if a validator is registered on the
-// P-chain.
+// L1ValidatorRegistration reports if a validator is registered on the P-chain.
 type L1ValidatorRegistration struct {
 	payload
 
