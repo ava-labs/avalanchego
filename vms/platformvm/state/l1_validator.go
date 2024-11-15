@@ -42,8 +42,8 @@ type L1Validators interface {
 	// iterator. After releasing the iterator, the state may be safely modified.
 	GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error)
 
-	// NumActiveL1Validators returns the number of currently active
-	// L1 validators.
+	// NumActiveL1Validators returns the number of currently active L1
+	// validators.
 	NumActiveL1Validators() int
 
 	// WeightOfL1Validators returns the total active and inactive weight of L1
