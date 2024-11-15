@@ -97,7 +97,7 @@ func TestState(t *testing.T) {
 	vdr.StartTimestamp = vdr.StartTimestamp + 100
 	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
 
-	// set SoV should fail
+	// set IsL1Validator should fail
 	vdr.IsL1Validator = false
 	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
 
@@ -221,7 +221,7 @@ func TestParseValidator(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x5B, 0x8D, 0x80,
 				// status
 				0x01,
-				// is SoV
+				// IsL1Validator
 				0x01,
 			},
 			expected: &validatorData{

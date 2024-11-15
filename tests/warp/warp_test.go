@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -402,9 +403,9 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	// If the destination turns out to be the Primary Network as well, then this is a no-op.
 	var validators map[ids.NodeID]*validators.GetValidatorOutput
 	if w.sendingSubnet.SubnetID == constants.PrimaryNetworkID {
-		validators, err = pChainClient.GetValidatorsAt(ctx, w.receivingSubnet.SubnetID, pChainHeight)
+		validators, err = pChainClient.GetValidatorsAt(ctx, w.receivingSubnet.SubnetID, api.Height(pChainHeight))
 	} else {
-		validators, err = pChainClient.GetValidatorsAt(ctx, w.sendingSubnet.SubnetID, pChainHeight)
+		validators, err = pChainClient.GetValidatorsAt(ctx, w.sendingSubnet.SubnetID, api.Height(pChainHeight))
 	}
 	require.NoError(err)
 	require.NotZero(len(validators))

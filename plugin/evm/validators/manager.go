@@ -145,7 +145,7 @@ func loadValidators(validatorState stateinterfaces.State, newValidators map[ids.
 			Weight:         newVdr.Weight,
 			StartTimestamp: newVdr.StartTime,
 			IsActive:       newVdr.IsActive,
-			IsL1Validator:  newVdr.IsSoV,
+			IsL1Validator:  newVdr.IsL1Validator,
 		}
 		if currentValidationIDs.Contains(newVID) {
 			if err := validatorState.UpdateValidator(currentVdr); err != nil {
