@@ -2046,8 +2046,8 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	require.Equal(expectedValidatorSet, validatorSet)
 }
 
-// TestL1ValidatorAfterLegacyRemoval verifies that a legacy validator
-// can be replaced by an L1 validator in the same block.
+// TestL1ValidatorAfterLegacyRemoval verifies that a legacy validator can be
+// replaced by an L1 validator in the same block.
 func TestL1ValidatorAfterLegacyRemoval(t *testing.T) {
 	require := require.New(t)
 
