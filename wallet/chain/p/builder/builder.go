@@ -188,7 +188,8 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.SetL1ValidatorWeightTx, error)
 
-	// NewIncreaseL1ValidatorBalanceTx increases the balance of a validator on an L1 for
+	// NewIncreaseL1ValidatorBalanceTx increases the balance of a validator on
+	// an L1 for the continuous fee.
 	// the continuous fee.
 	//
 	// - [validationID] of the validator
