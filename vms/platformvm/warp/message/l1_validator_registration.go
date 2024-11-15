@@ -36,7 +36,8 @@ func NewL1ValidatorRegistration(
 	return msg, Initialize(msg)
 }
 
-// ParseL1ValidatorRegistration parses bytes into an initialized L1ValidatorRegistration.
+// ParseL1ValidatorRegistration parses bytes into an initialized
+// L1ValidatorRegistration.
 func ParseL1ValidatorRegistration(b []byte) (*L1ValidatorRegistration, error) {
 	payloadIntf, err := Parse(b)
 	if err != nil {
