@@ -145,9 +145,11 @@ func TestBifurcationsWithCommonPrefix(t *testing.T) {
 		{{0, 1, 1}, {0, 0, 1}},
 	}
 
+	actualOrder := make([][]ids.ID, 0, 2)
+
 	pg.bifurcationsWithCommonPrefix(func(actual []ids.ID) {
-		next, rest := expectedTraversalOrder[0], expectedTraversalOrder[1:]
-		require.Equal(t, next, actual)
-		expectedTraversalOrder = rest
+		actualOrder = append(actualOrder, actual)
 	})
+
+	require.Equal(t, expectedTraversalOrder, actualOrder)
 }
