@@ -236,7 +236,7 @@ func advanceTimeTo(
 	seconds := uint64(newChainTime.Sub(previousChainTime) / time.Second)
 
 	advanceDynamicFeeState(backend.Config.DynamicFeeConfig, changes, seconds)
-	sovsChanged, err := advanceValidatorFeeState(
+	l1ValidatorsChanged, err := advanceValidatorFeeState(
 		backend.Config.ValidatorFeeConfig,
 		parentState,
 		changes,
@@ -245,7 +245,7 @@ func advanceTimeTo(
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to advance validator fee state: %w", err)
 	}
-	changed = changed || sovsChanged
+	changed = changed || l1ValidatorsChanged
 
 	changes.SetTimestamp(newChainTime)
 	return changes, changed, nil
@@ -300,9 +300,9 @@ func advanceDynamicFeeState(
 	changes.SetFeeState(dynamicFeeState)
 }
 
-// advanceValidatorFeeState advances the validator fee state by [seconds]. SoVs
-// are read from [parentState] and written to [changes] to avoid modifying state
-// while an iterator is held.
+// advanceValidatorFeeState advances the validator fee state by [seconds]. L1
+// validators are read from [parentState] and written to [changes] to avoid
+// modifying state while an iterator is held.
 func advanceValidatorFeeState(
 	config fee.Config,
 	parentState state.Chain,
@@ -310,8 +310,8 @@ func advanceValidatorFeeState(
 	seconds uint64,
 ) (bool, error) {
 	validatorFeeState := fee.State{
-		Current: gas.Gas(changes.NumActiveSubnetOnlyValidators()),
-		Excess:  changes.GetSoVExcess(),
+		Current: gas.Gas(changes.NumActiveL1Validators()),
+		Excess:  changes.GetL1ValidatorExcess(),
 	}
 	validatorCost := validatorFeeState.CostOf(config, seconds)
 
@@ -324,30 +324,30 @@ func advanceValidatorFeeState(
 	// Invariant: It is not safe to modify the state while iterating over it,
 	// so we use the parentState's iterator rather than the changes iterator.
 	// ParentState must not be modified before this iterator is released.
-	sovIterator, err := parentState.GetActiveSubnetOnlyValidatorsIterator()
+	l1ValidatorIterator, err := parentState.GetActiveL1ValidatorsIterator()
 	if err != nil {
-		return false, fmt.Errorf("could not iterate over active SoVs: %w", err)
+		return false, fmt.Errorf("could not iterate over active L1 validators: %w", err)
 	}
-	defer sovIterator.Release()
+	defer l1ValidatorIterator.Release()
 
 	var changed bool
-	for sovIterator.Next() {
-		sov := sovIterator.Value()
-		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
+	for l1ValidatorIterator.Next() {
+		l1Validator := l1ValidatorIterator.Value()
+		// GetActiveL1ValidatorsIterator iterates in order of increasing
 		// EndAccumulatedFee, so we can break early.
-		if sov.EndAccumulatedFee > accruedFees {
+		if l1Validator.EndAccumulatedFee > accruedFees {
 			break
 		}
 
-		sov.EndAccumulatedFee = 0 // Deactivate the validator
-		if err := changes.PutSubnetOnlyValidator(sov); err != nil {
-			return false, fmt.Errorf("could not deactivate SoV %s: %w", sov.ValidationID, err)
+		l1Validator.EndAccumulatedFee = 0 // Deactivate the validator
+		if err := changes.PutL1Validator(l1Validator); err != nil {
+			return false, fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
 		changed = true
 	}
 
 	validatorFeeState = validatorFeeState.AdvanceTime(config.Target, seconds)
-	changes.SetSoVExcess(validatorFeeState.Excess)
+	changes.SetL1ValidatorExcess(validatorFeeState.Excess)
 	changes.SetAccruedFees(accruedFees)
 	return changed, nil
 }

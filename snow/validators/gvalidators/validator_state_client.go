@@ -130,14 +130,14 @@ func (c *Client) GetCurrentValidatorSet(
 		}
 
 		vdrs[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID: validationID,
-			NodeID:       nodeID,
-			PublicKey:    publicKey,
-			Weight:       validator.Weight,
-			StartTime:    validator.StartTime,
-			MinNonce:     validator.MinNonce,
-			IsActive:     validator.IsActive,
-			IsSoV:        validator.IsSov,
+			ValidationID:  validationID,
+			NodeID:        nodeID,
+			PublicKey:     publicKey,
+			Weight:        validator.Weight,
+			StartTime:     validator.StartTime,
+			MinNonce:      validator.MinNonce,
+			IsActive:      validator.IsActive,
+			IsL1Validator: validator.IsL1Validator,
 		}
 	}
 	return vdrs, resp.GetCurrentHeight(), nil

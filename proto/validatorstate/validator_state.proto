@@ -55,7 +55,7 @@ message Validator {
   uint64 min_nonce = 5; // can be empty
   bool is_active = 6; // can be empty
   bytes validation_id = 7; // can be empty
-  bool is_sov = 8; // can be empty
+  bool is_l1_validator = 8; // can be empty
 }
 
 message GetValidatorSetResponse {

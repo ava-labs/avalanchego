@@ -4,7 +4,8 @@
 
 ### APIs
 
-- Added `platform.getSubnetOnlyValidator`
+- Added `platform.getL1Validator`
+- Added `platform.getProposedHeight`
 
 ### Configs
 

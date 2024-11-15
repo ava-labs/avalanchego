@@ -349,15 +349,15 @@ func TestInputComplexity(t *testing.T) {
 	}
 }
 
-func TestConvertSubnetValidatorComplexity(t *testing.T) {
+func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 	tests := []struct {
 		name     string
-		vdr      txs.ConvertSubnetValidator
+		vdr      txs.ConvertSubnetToL1Validator
 		expected gas.Dimensions
 	}{
 		{
 			name: "any can spend",
-			vdr: txs.ConvertSubnetValidator{
+			vdr: txs.ConvertSubnetToL1Validator{
 				NodeID:                make([]byte, ids.NodeIDLen),
 				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
@@ -371,7 +371,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 		},
 		{
 			name: "single remaining balance owner",
-			vdr: txs.ConvertSubnetValidator{
+			vdr: txs.ConvertSubnetToL1Validator{
 				NodeID: make([]byte, ids.NodeIDLen),
 				Signer: signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{
@@ -390,7 +390,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 		},
 		{
 			name: "single deactivation owner",
-			vdr: txs.ConvertSubnetValidator{
+			vdr: txs.ConvertSubnetToL1Validator{
 				NodeID:                make([]byte, ids.NodeIDLen),
 				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
@@ -412,7 +412,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := ConvertSubnetValidatorComplexity(&test.vdr)
+			actual, err := ConvertSubnetToL1ValidatorComplexity(&test.vdr)
 			require.NoError(err)
 			require.Equal(test.expected, actual)
 

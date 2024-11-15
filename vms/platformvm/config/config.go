@@ -20,7 +20,7 @@ var Default = Config{
 	ChainDBCacheSize:              2048,
 	BlockIDCacheSize:              8192,
 	FxOwnerCacheSize:              4 * units.MiB,
-	SubnetConversionCacheSize:     4 * units.MiB,
+	SubnetToL1ConversionCacheSize: 4 * units.MiB,
 	L1WeightsCacheSize:            16 * units.KiB,
 	L1InactiveValidatorsCacheSize: 256 * units.KiB,
 	L1SubnetIDNodeIDCacheSize:     16 * units.KiB,
@@ -39,7 +39,7 @@ type Config struct {
 	ChainDBCacheSize              int           `json:"chain-db-cache-size"`
 	BlockIDCacheSize              int           `json:"block-id-cache-size"`
 	FxOwnerCacheSize              int           `json:"fx-owner-cache-size"`
-	SubnetConversionCacheSize     int           `json:"subnet-conversion-cache-size"`
+	SubnetToL1ConversionCacheSize int           `json:"subnet-to-l1-conversion-cache-size"`
 	L1WeightsCacheSize            int           `json:"l1-weights-cache-size"`
 	L1InactiveValidatorsCacheSize int           `json:"l1-inactive-validators-cache-size"`
 	L1SubnetIDNodeIDCacheSize     int           `json:"l1-subnet-id-node-id-cache-size"`

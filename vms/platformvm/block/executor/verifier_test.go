@@ -500,8 +500,8 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 		// Allow metrics to be calculated.
 		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
-		parentOnCommitState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
-		parentOnCommitState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnCommitState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
+		parentOnCommitState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
 		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
@@ -573,8 +573,8 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
 		// Allow metrics to be calculated.
 		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
-		parentOnAbortState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1),
-		parentOnAbortState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1),
+		parentOnAbortState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
+		parentOnAbortState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
 		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
@@ -702,9 +702,9 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(3)
+			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
 			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(3)
+			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -802,9 +802,9 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(3)
+			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
 			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(3)
+			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -1217,7 +1217,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	}
 }
 
-func TestDeactivateLowBalanceSoVs(t *testing.T) {
+func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -1225,8 +1225,8 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 		pk      = bls.PublicFromSecretKey(sk)
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
-		newSoV = func(endAccumulatedFee uint64) state.SubnetOnlyValidator {
-			return state.SubnetOnlyValidator{
+		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {
+			return state.L1Validator{
 				ValidationID:      ids.GenerateTestID(),
 				SubnetID:          ids.GenerateTestID(),
 				NodeID:            ids.GenerateTestNodeID(),
@@ -1235,49 +1235,49 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 				EndAccumulatedFee: endAccumulatedFee,
 			}
 		}
-		fractionalTimeSoV0 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
-		fractionalTimeSoV1 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
-		wholeTimeSoV       = newSoV(2 * units.NanoAvax) // lasts 1 second
+		fractionalTimeL1Validator0 = newL1Validator(1 * units.NanoAvax) // lasts .5 seconds
+		fractionalTimeL1Validator1 = newL1Validator(1 * units.NanoAvax) // lasts .5 seconds
+		wholeTimeL1Validator       = newL1Validator(2 * units.NanoAvax) // lasts 1 second
 	)
 
 	tests := []struct {
-		name         string
-		initialSoVs  []state.SubnetOnlyValidator
-		expectedSoVs []state.SubnetOnlyValidator
+		name                 string
+		initialL1Validators  []state.L1Validator
+		expectedL1Validators []state.L1Validator
 	}{
 		{
-			name: "no SoVs",
+			name: "no L1 validators",
 		},
 		{
-			name: "fractional SoV is not undercharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
+			name: "fractional L1 validator is not undercharged",
+			initialL1Validators: []state.L1Validator{
+				fractionalTimeL1Validator0,
 			},
 		},
 		{
-			name: "fractional SoVs are not undercharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
-				fractionalTimeSoV1,
+			name: "fractional L1 validators are not undercharged",
+			initialL1Validators: []state.L1Validator{
+				fractionalTimeL1Validator0,
+				fractionalTimeL1Validator1,
 			},
 		},
 		{
-			name: "whole SoVs are not overcharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
+			name: "whole L1 validators are not overcharged",
+			initialL1Validators: []state.L1Validator{
+				wholeTimeL1Validator,
 			},
-			expectedSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
+			expectedL1Validators: []state.L1Validator{
+				wholeTimeL1Validator,
 			},
 		},
 		{
 			name: "partial eviction",
-			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
-				wholeTimeSoV,
+			initialL1Validators: []state.L1Validator{
+				fractionalTimeL1Validator0,
+				wholeTimeL1Validator,
 			},
-			expectedSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
+			expectedL1Validators: []state.L1Validator{
+				wholeTimeL1Validator,
 			},
 		},
 	}
@@ -1286,8 +1286,8 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 			require := require.New(t)
 
 			s := statetest.New(t, statetest.Config{})
-			for _, sov := range test.initialSoVs {
-				require.NoError(s.PutSubnetOnlyValidator(sov))
+			for _, l1Validator := range test.initialL1Validators {
+				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
 			diff, err := state.NewDiffOn(s)
@@ -1299,13 +1299,13 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
 				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 			}
-			require.NoError(deactivateLowBalanceSoVs(config, diff))
+			require.NoError(deactivateLowBalanceL1Validators(config, diff))
 
-			sovs, err := diff.GetActiveSubnetOnlyValidatorsIterator()
+			l1Validators, err := diff.GetActiveL1ValidatorsIterator()
 			require.NoError(err)
 			require.Equal(
-				test.expectedSoVs,
-				iterator.ToSlice(sovs),
+				test.expectedL1Validators,
+				iterator.ToSlice(l1Validators),
 			)
 		})
 	}

@@ -605,16 +605,16 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		}
 	}
 
-	// After processing all the transactions, deactivate any SoVs that might not
-	// have sufficient fee to pay for the next second.
+	// After processing all the transactions, deactivate any L1 validators that
+	// might not have sufficient fee to pay for the next second.
 	//
-	// This ensures that SoVs are not undercharged for the next second.
-	err := deactivateLowBalanceSoVs(
+	// This ensures that L1 validators are not undercharged for the next second.
+	err := deactivateLowBalanceL1Validators(
 		v.txExecutorBackend.Config.ValidatorFeeConfig,
 		diff,
 	)
 	if err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("failed to deactivate low balance SoVs: %w", err)
+		return nil, nil, nil, 0, fmt.Errorf("failed to deactivate low balance L1 validators: %w", err)
 	}
 
 	return inputs, atomicRequests, onAcceptFunc, gasConsumed, nil
@@ -628,7 +628,7 @@ func calculateBlockMetrics(
 ) metrics.Block {
 	var (
 		gasState        = s.GetFeeState()
-		validatorExcess = s.GetSoVExcess()
+		validatorExcess = s.GetL1ValidatorExcess()
 	)
 	return metrics.Block{
 		Block: blk,
@@ -641,8 +641,8 @@ func calculateBlockMetrics(
 			config.DynamicFeeConfig.ExcessConversionConstant,
 		),
 
-		ActiveSoVs:      s.NumActiveSubnetOnlyValidators(),
-		ValidatorExcess: validatorExcess,
+		ActiveL1Validators: s.NumActiveL1Validators(),
+		ValidatorExcess:    validatorExcess,
 		ValidatorPrice: gas.CalculatePrice(
 			config.ValidatorFeeConfig.MinPrice,
 			validatorExcess,
@@ -652,17 +652,17 @@ func calculateBlockMetrics(
 	}
 }
 
-// deactivateLowBalanceSoVs deactivates any SoVs that might not have sufficient
-// fees to pay for the next second.
-func deactivateLowBalanceSoVs(
+// deactivateLowBalanceL1Validators deactivates any L1 validators that might not
+// have sufficient fees to pay for the next second.
+func deactivateLowBalanceL1Validators(
 	config validatorfee.Config,
 	diff state.Diff,
 ) error {
 	var (
 		accruedFees       = diff.GetAccruedFees()
 		validatorFeeState = validatorfee.State{
-			Current: gas.Gas(diff.NumActiveSubnetOnlyValidators()),
-			Excess:  diff.GetSoVExcess(),
+			Current: gas.Gas(diff.NumActiveL1Validators()),
+			Excess:  diff.GetL1ValidatorExcess(),
 		}
 		potentialCost = validatorFeeState.CostOf(
 			config,
@@ -674,35 +674,35 @@ func deactivateLowBalanceSoVs(
 		return fmt.Errorf("could not calculate potentially accrued fees: %w", err)
 	}
 
-	// Invariant: Proposal transactions do not impact SoV state.
-	sovIterator, err := diff.GetActiveSubnetOnlyValidatorsIterator()
+	// Invariant: Proposal transactions do not impact L1 validator state.
+	l1ValidatorIterator, err := diff.GetActiveL1ValidatorsIterator()
 	if err != nil {
-		return fmt.Errorf("could not iterate over active SoVs: %w", err)
+		return fmt.Errorf("could not iterate over active L1 validators: %w", err)
 	}
 
-	var sovsToDeactivate []state.SubnetOnlyValidator
-	for sovIterator.Next() {
-		sov := sovIterator.Value()
+	var l1ValidatorsToDeactivate []state.L1Validator
+	for l1ValidatorIterator.Next() {
+		l1Validator := l1ValidatorIterator.Value()
 		// If the validator has exactly the right amount of fee for the next
 		// second we should not remove them here.
 		//
-		// GetActiveSubnetOnlyValidatorsIterator iterates in order of increasing
+		// GetActiveL1ValidatorsIterator iterates in order of increasing
 		// EndAccumulatedFee, so we can break early.
-		if sov.EndAccumulatedFee >= potentialAccruedFees {
+		if l1Validator.EndAccumulatedFee >= potentialAccruedFees {
 			break
 		}
 
-		sovsToDeactivate = append(sovsToDeactivate, sov)
+		l1ValidatorsToDeactivate = append(l1ValidatorsToDeactivate, l1Validator)
 	}
 
 	// The iterator must be released prior to attempting to write to the
 	// diff.
-	sovIterator.Release()
+	l1ValidatorIterator.Release()
 
-	for _, sov := range sovsToDeactivate {
-		sov.EndAccumulatedFee = 0
-		if err := diff.PutSubnetOnlyValidator(sov); err != nil {
-			return fmt.Errorf("could not deactivate SoV %s: %w", sov.ValidationID, err)
+	for _, l1Validator := range l1ValidatorsToDeactivate {
+		l1Validator.EndAccumulatedFee = 0
+		if err := diff.PutL1Validator(l1Validator); err != nil {
+			return fmt.Errorf("could not deactivate L1 validator %s: %w", l1Validator.ValidationID, err)
 		}
 	}
 	return nil

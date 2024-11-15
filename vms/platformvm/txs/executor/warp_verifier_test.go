@@ -151,52 +151,52 @@ func TestVerifyWarpMessages(t *testing.T) {
 			tx:   &txs.BaseTx{},
 		},
 		{
-			name: "ConvertSubnetTx",
-			tx:   &txs.ConvertSubnetTx{},
+			name: "ConvertSubnetToL1Tx",
+			tx:   &txs.ConvertSubnetToL1Tx{},
 		},
 		{
-			name:        "RegisterSubnetValidatorTx with unparsable message",
-			tx:          &txs.RegisterSubnetValidatorTx{},
+			name:        "RegisterL1ValidatorTx with unparsable message",
+			tx:          &txs.RegisterL1ValidatorTx{},
 			expectedErr: codec.ErrCantUnpackVersion,
 		},
 		{
-			name: "RegisterSubnetValidatorTx with invalid message",
-			tx: &txs.RegisterSubnetValidatorTx{
+			name: "RegisterL1ValidatorTx with invalid message",
+			tx: &txs.RegisterL1ValidatorTx{
 				Message: invalidWarpMessage.Bytes(),
 			},
 			expectedErr: warp.ErrWrongNetworkID,
 		},
 		{
-			name: "RegisterSubnetValidatorTx with valid message",
-			tx: &txs.RegisterSubnetValidatorTx{
+			name: "RegisterL1ValidatorTx with valid message",
+			tx: &txs.RegisterL1ValidatorTx{
 				Message: validWarpMessage.Bytes(),
 			},
 		},
 		{
-			name:        "SetSubnetValidatorWeightTx with unparsable message",
-			tx:          &txs.SetSubnetValidatorWeightTx{},
+			name:        "SetL1ValidatorWeightTx with unparsable message",
+			tx:          &txs.SetL1ValidatorWeightTx{},
 			expectedErr: codec.ErrCantUnpackVersion,
 		},
 		{
-			name: "SetSubnetValidatorWeightTx with invalid message",
-			tx: &txs.SetSubnetValidatorWeightTx{
+			name: "SetL1ValidatorWeightTx with invalid message",
+			tx: &txs.SetL1ValidatorWeightTx{
 				Message: invalidWarpMessage.Bytes(),
 			},
 			expectedErr: warp.ErrWrongNetworkID,
 		},
 		{
-			name: "SetSubnetValidatorWeightTx with valid message",
-			tx: &txs.SetSubnetValidatorWeightTx{
+			name: "SetL1ValidatorWeightTx with valid message",
+			tx: &txs.SetL1ValidatorWeightTx{
 				Message: validWarpMessage.Bytes(),
 			},
 		},
 		{
-			name: "IncreaseBalanceTx",
-			tx:   &txs.IncreaseBalanceTx{},
+			name: "IncreaseL1ValidatorBalanceTx",
+			tx:   &txs.IncreaseL1ValidatorBalanceTx{},
 		},
 		{
-			name: "DisableSubnetValidatorTx",
-			tx:   &txs.DisableSubnetValidatorTx{},
+			name: "DisableL1ValidatorTx",
+			tx:   &txs.DisableL1ValidatorTx{},
 		},
 	}
 	for _, test := range tests {
