@@ -4,6 +4,7 @@
 package api
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 
@@ -31,11 +32,14 @@ func TestUnmarshallHeight(t *testing.T) {
 	require.NoError(h.UnmarshalJSON([]byte("56")))
 	require.Equal(Height(56), h)
 
-	require.NoError(h.UnmarshalJSON([]byte(ProposedHeightFlag)))
+	marshalledFlagBytes, err := json.Marshal(ProposedHeightFlag)
+	require.NoError(err)
+
+	require.NoError(h.UnmarshalJSON(marshalledFlagBytes))
 	require.Equal(Height(ProposedHeight), h)
 	require.True(h.IsProposed())
 
-	err := h.UnmarshalJSON([]byte("invalid"))
+	err = h.UnmarshalJSON([]byte("invalid"))
 	require.ErrorIs(err, errInvalidHeight)
 	require.Equal(Height(0), h)
 
