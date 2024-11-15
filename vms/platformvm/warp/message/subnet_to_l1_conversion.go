@@ -53,7 +53,8 @@ func NewSubnetToL1Conversion(id ids.ID) (*SubnetToL1Conversion, error) {
 	return msg, Initialize(msg)
 }
 
-// ParseSubnetToL1Conversion parses bytes into an initialized SubnetToL1Conversion.
+// ParseSubnetToL1Conversion parses bytes into an initialized
+// SubnetToL1Conversion.
 func ParseSubnetToL1Conversion(b []byte) (*SubnetToL1Conversion, error) {
 	payloadIntf, err := Parse(b)
 	if err != nil {
