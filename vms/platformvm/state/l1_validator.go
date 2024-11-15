@@ -63,8 +63,8 @@ type L1Validators interface {
 	// If inserting this validator attempts to modify any of the constant fields
 	// of the L1 validator struct, an error will be returned.
 	//
-	// If inserting this validator would cause the total weight of L1
-	// validators on a subnet to overflow MaxUint64, an error will be returned.
+	// If inserting this validator would cause the total weight of L1 validators
+	// on a subnet to overflow MaxUint64, an error will be returned.
 	//
 	// If inserting this validator would cause there to be multiple validators
 	// with the same subnetID and nodeID pair to exist at the same time, an
