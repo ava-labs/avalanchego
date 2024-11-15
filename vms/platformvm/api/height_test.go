@@ -28,19 +28,18 @@ func TestUnmarshallHeight(t *testing.T) {
 
 	var h Height
 
-	err := h.UnmarshalJSON([]byte("56"))
-	require.NoError(err)
+	require.NoError(h.UnmarshalJSON([]byte("56")))
 	require.Equal(Height(56), h)
 
-	err = h.UnmarshalJSON([]byte(ProposedHeightFlag))
-	require.NoError(err)
+	require.NoError(h.UnmarshalJSON([]byte(ProposedHeightFlag)))
 	require.Equal(Height(ProposedHeight), h)
 	require.True(h.IsProposed())
 
-	err = h.UnmarshalJSON([]byte("invalid"))
-	require.Error(err)
+	err := h.UnmarshalJSON([]byte("invalid"))
+	require.ErrorIs(err, errInvalidHeight)
+	require.Equal(Height(0), h)
 
 	err = h.UnmarshalJSON([]byte(`"` + strconv.FormatUint(uint64(ProposedHeight), 10) + `"`))
-	require.Error(err)
-	require.Equal(err, errInvalidHeight)
+	require.ErrorIs(err, errInvalidHeight)
+	require.Equal(Height(0), h)
 }

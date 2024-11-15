@@ -33,7 +33,7 @@ func (h *Height) UnmarshalJSON(b []byte) error {
 	}
 	err := (*avajson.Uint64)(h).UnmarshalJSON(b)
 	if err != nil {
-		return err
+		return errInvalidHeight
 	}
 	// MaxUint64 is reserved for proposed height
 	// return an error if supplied numerically
