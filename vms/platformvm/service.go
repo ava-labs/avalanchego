@@ -100,6 +100,21 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 	return err
 }
 
+// GetProposedHeight returns the current ProposerVM height
+func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getProposedHeight"),
+	)
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	ctx := r.Context()
+	proposerHeight, err := s.vm.GetMinimumHeight(ctx)
+	reply.Height = avajson.Uint64(proposerHeight)
+	return err
+}
+
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
 	api.UserPass

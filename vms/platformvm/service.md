@@ -900,6 +900,42 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getProposedHeight`
+
+Returns this node's current proposer VM height
+
+**Signature:**
+
+```sh
+platform.getProposedHeight() ->
+{
+    height: int,
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getProposedHeight",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "height": "56"
+  },
+  "id": 1
+}
+```
+
 ### `platform.getMaxStakeAmount`
 
 :::caution
