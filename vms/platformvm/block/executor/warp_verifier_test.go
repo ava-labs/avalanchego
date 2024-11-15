@@ -21,7 +21,7 @@ func TestVerifyWarpMessages(t *testing.T) {
 			Unsigned: &txs.BaseTx{},
 		}
 		invalidTx = &txs.Tx{
-			Unsigned: &txs.RegisterSubnetValidatorTx{},
+			Unsigned: &txs.RegisterL1ValidatorTx{},
 		}
 	)
 

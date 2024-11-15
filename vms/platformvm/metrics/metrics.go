@@ -39,7 +39,7 @@ type Block struct {
 	GasState    gas.State
 	GasPrice    gas.Price
 
-	ActiveSoVs           int
+	ActiveL1Validators   int
 	ValidatorExcess      gas.Gas
 	ValidatorPrice       gas.Price
 	AccruedValidatorFees uint64
@@ -103,9 +103,9 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "gas_capacity",
 			Help: "Minimum amount of gas that can be consumed in the next block",
 		}),
-		activeSoVs: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "active_sovs",
-			Help: "Number of active SoVs",
+		activeL1Validators: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "active_l1_validators",
+			Help: "Number of active L1 validators",
 		}),
 		excess: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -123,7 +123,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		),
 		accruedValidatorFees: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "accrued_validator_fees",
-			Help: "The total cost of running an active SoV since Etna activation",
+			Help: "The total cost of running an active L1 validator since Etna activation",
 		}),
 
 		validatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
@@ -156,7 +156,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 
 		registerer.Register(m.gasConsumed),
 		registerer.Register(m.gasCapacity),
-		registerer.Register(m.activeSoVs),
+		registerer.Register(m.activeL1Validators),
 		registerer.Register(m.excess),
 		registerer.Register(m.price),
 		registerer.Register(m.accruedValidatorFees),
@@ -183,7 +183,7 @@ type metrics struct {
 
 	gasConsumed          prometheus.Counter
 	gasCapacity          prometheus.Gauge
-	activeSoVs           prometheus.Gauge
+	activeL1Validators   prometheus.Gauge
 	excess               *prometheus.GaugeVec
 	price                *prometheus.GaugeVec
 	accruedValidatorFees prometheus.Gauge
@@ -201,7 +201,7 @@ func (m *metrics) MarkAccepted(b Block) error {
 	m.excess.With(gasLabels).Set(float64(b.GasState.Excess))
 	m.price.With(gasLabels).Set(float64(b.GasPrice))
 
-	m.activeSoVs.Set(float64(b.ActiveSoVs))
+	m.activeL1Validators.Set(float64(b.ActiveL1Validators))
 	m.excess.With(validatorsLabels).Set(float64(b.ValidatorExcess))
 	m.price.With(validatorsLabels).Set(float64(b.ValidatorPrice))
 	m.accruedValidatorFees.Set(float64(b.AccruedValidatorFees))

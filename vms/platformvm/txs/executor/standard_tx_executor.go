@@ -34,32 +34,32 @@ import (
 // TODO: Before Etna, ensure that the maximum number of expiries to track is
 // limited to a reasonable number by this window.
 const (
-	second                                = 1
-	minute                                = 60 * second
-	hour                                  = 60 * minute
-	day                                   = 24 * hour
-	RegisterSubnetValidatorTxExpiryWindow = day
+	second                            = 1
+	minute                            = 60 * second
+	hour                              = 60 * minute
+	day                               = 24 * hour
+	RegisterL1ValidatorTxExpiryWindow = day
 )
 
 var (
 	_ txs.Visitor = (*standardTxExecutor)(nil)
 
-	errEmptyNodeID                   = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge      = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango    = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive          = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errTransformSubnetTxPostEtna     = errors.New("TransformSubnetTx is not permitted post-Etna")
-	errMaxNumActiveValidators        = errors.New("already at the max number of active validators")
-	errCouldNotLoadSubnetConversion  = errors.New("could not load subnet conversion")
-	errWrongWarpMessageSourceChainID = errors.New("wrong warp message source chain ID")
-	errWrongWarpMessageSourceAddress = errors.New("wrong warp message source address")
-	errWarpMessageExpired            = errors.New("warp message expired")
-	errWarpMessageNotYetAllowed      = errors.New("warp message not yet allowed")
-	errWarpMessageAlreadyIssued      = errors.New("warp message already issued")
-	errCouldNotLoadSoV               = errors.New("could not load SoV")
-	errWarpMessageContainsStaleNonce = errors.New("warp message contains stale nonce")
-	errRemovingLastValidator         = errors.New("attempting to remove the last SoV from a converted subnet")
-	errStateCorruption               = errors.New("state corruption")
+	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
+	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
+	errWrongWarpMessageSourceChainID    = errors.New("wrong warp message source chain ID")
+	errWrongWarpMessageSourceAddress    = errors.New("wrong warp message source address")
+	errWarpMessageExpired               = errors.New("warp message expired")
+	errWarpMessageNotYetAllowed         = errors.New("warp message not yet allowed")
+	errWarpMessageAlreadyIssued         = errors.New("warp message already issued")
+	errCouldNotLoadL1Validator          = errors.New("could not load L1 validator")
+	errWarpMessageContainsStaleNonce    = errors.New("warp message contains stale nonce")
+	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
+	errStateCorruption                  = errors.New("state corruption")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -677,7 +677,7 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -706,13 +706,13 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	}
 
 	var (
-		startTime            = uint64(currentTimestamp.Unix())
-		currentFees          = e.state.GetAccruedFees()
-		subnetConversionData = message.SubnetConversionData{
+		startTime                = uint64(currentTimestamp.Unix())
+		currentFees              = e.state.GetAccruedFees()
+		subnetToL1ConversionData = message.SubnetToL1ConversionData{
 			SubnetID:       tx.Subnet,
 			ManagerChainID: tx.ChainID,
 			ManagerAddress: tx.Address,
-			Validators:     make([]message.SubnetConversionValidatorData, len(tx.Validators)),
+			Validators:     make([]message.SubnetToL1ConverstionValidatorData, len(tx.Validators)),
 		}
 	)
 	for i, vdr := range tx.Validators {
@@ -730,7 +730,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			return err
 		}
 
-		sov := state.SubnetOnlyValidator{
+		l1Validator := state.L1Validator{
 			ValidationID:          tx.Subnet.Append(uint32(i)),
 			SubnetID:              tx.Subnet,
 			NodeID:                nodeID,
@@ -744,11 +744,11 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		}
 		if vdr.Balance != 0 {
 			// We are attempting to add an active validator
-			if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+			if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 				return errMaxNumActiveValidators
 			}
 
-			sov.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
+			l1Validator.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
 			if err != nil {
 				return err
 			}
@@ -759,11 +759,11 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 			}
 		}
 
-		if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+		if err := e.state.PutL1Validator(l1Validator); err != nil {
 			return err
 		}
 
-		subnetConversionData.Validators[i] = message.SubnetConversionValidatorData{
+		subnetToL1ConversionData.Validators[i] = message.SubnetToL1ConverstionValidatorData{
 			NodeID:       vdr.NodeID,
 			BLSPublicKey: vdr.Signer.PublicKey,
 			Weight:       vdr.Weight,
@@ -782,7 +782,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 		return err
 	}
 
-	conversionID, err := message.SubnetConversionID(subnetConversionData)
+	conversionID, err := message.SubnetToL1ConversionID(subnetToL1ConversionData)
 	if err != nil {
 		return err
 	}
@@ -794,9 +794,9 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.state, txID, tx.Outs)
 	// Track the subnet conversion in the database
-	e.state.SetSubnetConversion(
+	e.state.SetSubnetToL1Conversion(
 		tx.Subnet,
-		state.SubnetConversion{
+		state.SubnetToL1Conversion{
 			ConversionID: conversionID,
 			ChainID:      tx.ChainID,
 			Addr:         tx.Address,
@@ -805,7 +805,7 @@ func (e *standardTxExecutor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -854,7 +854,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
-	msg, err := message.ParseRegisterSubnetValidator(addressedCall.Payload)
+	msg, err := message.ParseRegisterL1Validator(addressedCall.Payload)
 	if err != nil {
 		return err
 	}
@@ -873,8 +873,8 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterSubnetValidatorTxExpiryWindow {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterSubnetValidatorTxExpiryWindow)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterL1ValidatorTxExpiryWindow {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterL1ValidatorTxExpiryWindow)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -901,7 +901,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 		return err
 	}
 
-	// Create the SoV.
+	// Create the L1 validator.
 	nodeID, err := ids.ToNodeID(msg.NodeID)
 	if err != nil {
 		return err
@@ -914,7 +914,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	if err != nil {
 		return err
 	}
-	sov := state.SubnetOnlyValidator{
+	l1Validator := state.L1Validator{
 		ValidationID:          validationID,
 		SubnetID:              msg.SubnetID,
 		NodeID:                nodeID,
@@ -930,19 +930,19 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	// If the balance is non-zero, this validator should be initially active.
 	if tx.Balance != 0 {
 		// Verify that there is space for an active validator.
-		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+		if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
 		// Mark the validator as active.
 		currentFees := e.state.GetAccruedFees()
-		sov.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
+		l1Validator.EndAccumulatedFee, err = math.Add(tx.Balance, currentFees)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
 
@@ -957,7 +957,7 @@ func (e *standardTxExecutor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetVal
 	return nil
 }
 
-func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1002,7 +1002,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	if err != nil {
 		return err
 	}
-	msg, err := message.ParseSubnetValidatorWeight(addressedCall.Payload)
+	msg, err := message.ParseL1ValidatorWeight(addressedCall.Payload)
 	if err != nil {
 		return err
 	}
@@ -1011,17 +1011,17 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	}
 
 	// Verify that the message contains a valid nonce for a current validator.
-	sov, err := e.state.GetSubnetOnlyValidator(msg.ValidationID)
+	l1Validator, err := e.state.GetL1Validator(msg.ValidationID)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
+		return fmt.Errorf("%w: %w", errCouldNotLoadL1Validator, err)
 	}
-	if msg.Nonce < sov.MinNonce {
-		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, sov.MinNonce)
+	if msg.Nonce < l1Validator.MinNonce {
+		return fmt.Errorf("%w %d must be at least %d", errWarpMessageContainsStaleNonce, msg.Nonce, l1Validator.MinNonce)
 	}
 
 	// Verify that the warp message was sent from the expected chain and
 	// address.
-	if err := verifyL1Conversion(e.state, sov.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
+	if err := verifyL1Conversion(e.state, l1Validator.SubnetID, warpMessage.SourceChainID, addressedCall.SourceAddress); err != nil {
 		return err
 	}
 
@@ -1030,30 +1030,30 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	// Check if we are removing the validator.
 	if msg.Weight == 0 {
 		// Verify that we are not removing the last validator.
-		weight, err := e.state.WeightOfSubnetOnlyValidators(sov.SubnetID)
+		weight, err := e.state.WeightOfL1Validators(l1Validator.SubnetID)
 		if err != nil {
-			return fmt.Errorf("could not load SoV weights: %w", err)
+			return fmt.Errorf("could not load L1 validator weights: %w", err)
 		}
-		if weight == sov.Weight {
+		if weight == l1Validator.Weight {
 			return errRemovingLastValidator
 		}
 
 		// If the validator is currently active, we need to refund the remaining
 		// balance.
-		if sov.EndAccumulatedFee != 0 {
+		if l1Validator.EndAccumulatedFee != 0 {
 			var remainingBalanceOwner message.PChainOwner
-			if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+			if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 				return fmt.Errorf("%w: remaining balance owner is malformed", errStateCorruption)
 			}
 
 			accruedFees := e.state.GetAccruedFees()
-			if sov.EndAccumulatedFee <= accruedFees {
+			if l1Validator.EndAccumulatedFee <= accruedFees {
 				// This check should be unreachable. However, it prevents AVAX
 				// from being minted due to state corruption. This also prevents
 				// invalid UTXOs from being created (with 0 value).
 				return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 			}
-			remainingBalance := sov.EndAccumulatedFee - accruedFees
+			remainingBalance := l1Validator.EndAccumulatedFee - accruedFees
 
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
@@ -1080,9 +1080,9 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	// doesn't matter. If weight is not 0, [msg.Nonce] is enforced by
 	// [msg.Verify()] to be less than MaxUInt64 and can therefore be incremented
 	// without overflow.
-	sov.MinNonce = msg.Nonce + 1
-	sov.Weight = msg.Weight
-	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+	l1Validator.MinNonce = msg.Nonce + 1
+	l1Validator.Weight = msg.Weight
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
 
@@ -1093,7 +1093,7 @@ func (e *standardTxExecutor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidat
 	return nil
 }
 
-func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1134,25 +1134,25 @@ func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 		return err
 	}
 
-	sov, err := e.state.GetSubnetOnlyValidator(tx.ValidationID)
+	l1Validator, err := e.state.GetL1Validator(tx.ValidationID)
 	if err != nil {
 		return err
 	}
 
 	// If the validator is currently inactive, we are activating it.
-	if sov.EndAccumulatedFee == 0 {
-		if gas.Gas(e.state.NumActiveSubnetOnlyValidators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+	if l1Validator.EndAccumulatedFee == 0 {
+		if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
 			return errMaxNumActiveValidators
 		}
 
-		sov.EndAccumulatedFee = e.state.GetAccruedFees()
+		l1Validator.EndAccumulatedFee = e.state.GetAccruedFees()
 	}
-	sov.EndAccumulatedFee, err = math.Add(sov.EndAccumulatedFee, tx.Balance)
+	l1Validator.EndAccumulatedFee, err = math.Add(l1Validator.EndAccumulatedFee, tx.Balance)
 	if err != nil {
 		return err
 	}
 
-	if err := e.state.PutSubnetOnlyValidator(sov); err != nil {
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
 
@@ -1165,7 +1165,7 @@ func (e *standardTxExecutor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error 
 	return nil
 }
 
-func (e *standardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
+func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 	var (
 		currentTimestamp = e.state.GetTimestamp()
 		upgrades         = e.backend.Config.UpgradeConfig
@@ -1182,13 +1182,13 @@ func (e *standardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValid
 		return err
 	}
 
-	sov, err := e.state.GetSubnetOnlyValidator(tx.ValidationID)
+	l1Validator, err := e.state.GetL1Validator(tx.ValidationID)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errCouldNotLoadSoV, err)
+		return fmt.Errorf("%w: %w", errCouldNotLoadL1Validator, err)
 	}
 
 	var disableOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &disableOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &disableOwner); err != nil {
 		return err
 	}
 
@@ -1232,23 +1232,23 @@ func (e *standardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValid
 	avax.Produce(e.state, txID, tx.Outs)
 
 	// If the validator is already disabled, there is nothing to do.
-	if sov.EndAccumulatedFee == 0 {
+	if l1Validator.EndAccumulatedFee == 0 {
 		return nil
 	}
 
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return err
 	}
 
 	accruedFees := e.state.GetAccruedFees()
-	if sov.EndAccumulatedFee <= accruedFees {
+	if l1Validator.EndAccumulatedFee <= accruedFees {
 		// This check should be unreachable. However, including it ensures
 		// that AVAX can't get minted out of thin air due to state
 		// corruption.
 		return fmt.Errorf("%w: validator should have already been disabled", errStateCorruption)
 	}
-	remainingBalance := sov.EndAccumulatedFee - accruedFees
+	remainingBalance := l1Validator.EndAccumulatedFee - accruedFees
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -1269,8 +1269,8 @@ func (e *standardTxExecutor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValid
 	e.state.AddUTXO(utxo)
 
 	// Disable the validator
-	sov.EndAccumulatedFee = 0
-	return e.state.PutSubnetOnlyValidator(sov)
+	l1Validator.EndAccumulatedFee = 0
+	return e.state.PutL1Validator(l1Validator)
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
@@ -1353,15 +1353,15 @@ func verifyL1Conversion(
 	expectedChainID ids.ID,
 	expectedAddress []byte,
 ) error {
-	subnetConversion, err := state.GetSubnetConversion(subnetID)
+	subnetToL1Conversion, err := state.GetSubnetToL1Conversion(subnetID)
 	if err != nil {
-		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetConversion, subnetID, err)
+		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetToL1Conversion, subnetID, err)
 	}
-	if expectedChainID != subnetConversion.ChainID {
-		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetConversion.ChainID, expectedChainID)
+	if expectedChainID != subnetToL1Conversion.ChainID {
+		return fmt.Errorf("%w expected %s but had %s", errWrongWarpMessageSourceChainID, subnetToL1Conversion.ChainID, expectedChainID)
 	}
-	if !bytes.Equal(expectedAddress, subnetConversion.Addr) {
-		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetConversion.Addr, expectedAddress)
+	if !bytes.Equal(expectedAddress, subnetToL1Conversion.Addr) {
+		return fmt.Errorf("%w expected 0x%x but got 0x%x", errWrongWarpMessageSourceAddress, subnetToL1Conversion.Addr, expectedAddress)
 	}
 	return nil
 }

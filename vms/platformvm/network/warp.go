@@ -37,7 +37,7 @@ const (
 	ErrMismatchedValidationID
 	ErrValidationDoesNotExist
 	ErrValidationExists
-	ErrFailedToParseRegisterSubnetValidator
+	ErrFailedToParseRegisterL1Validator
 	ErrValidationCouldBeRegistered
 
 	ErrImpossibleNonce
@@ -80,12 +80,12 @@ func (s signatureRequestVerifier) Verify(
 	}
 
 	switch payload := payloadIntf.(type) {
-	case *message.SubnetConversion:
-		return s.verifySubnetConversion(payload, justification)
-	case *message.SubnetValidatorRegistration:
-		return s.verifySubnetValidatorRegistration(payload, justification)
-	case *message.SubnetValidatorWeight:
-		return s.verifySubnetValidatorWeight(payload)
+	case *message.SubnetToL1Conversion:
+		return s.verifySubnetToL1Conversion(payload, justification)
+	case *message.L1ValidatorRegistration:
+		return s.verifyL1ValidatorRegistration(payload, justification)
+	case *message.L1ValidatorWeight:
+		return s.verifyL1ValidatorWeight(payload)
 	default:
 		return &common.AppError{
 			Code:    ErrUnsupportedWarpAddressedCallPayloadType,
@@ -94,8 +94,8 @@ func (s signatureRequestVerifier) Verify(
 	}
 }
 
-func (s signatureRequestVerifier) verifySubnetConversion(
-	msg *message.SubnetConversion,
+func (s signatureRequestVerifier) verifySubnetToL1Conversion(
+	msg *message.SubnetToL1Conversion,
 	justification []byte,
 ) *common.AppError {
 	subnetID, err := ids.ToID(justification)
@@ -109,7 +109,7 @@ func (s signatureRequestVerifier) verifySubnetConversion(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	conversion, err := s.state.GetSubnetConversion(subnetID)
+	conversion, err := s.state.GetSubnetToL1Conversion(subnetID)
 	if err == database.ErrNotFound {
 		return &common.AppError{
 			Code:    ErrConversionDoesNotExist,
@@ -133,15 +133,15 @@ func (s signatureRequestVerifier) verifySubnetConversion(
 	return nil
 }
 
-func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
-	msg *message.SubnetValidatorRegistration,
+func (s signatureRequestVerifier) verifyL1ValidatorRegistration(
+	msg *message.L1ValidatorRegistration,
 	justificationBytes []byte,
 ) *common.AppError {
 	if msg.Registered {
-		return s.verifySubnetValidatorRegistered(msg.ValidationID)
+		return s.verifyL1ValidatorRegistered(msg.ValidationID)
 	}
 
-	var justification platformvm.SubnetValidatorRegistrationJustification
+	var justification platformvm.L1ValidatorRegistrationJustification
 	if err := proto.Unmarshal(justificationBytes, &justification); err != nil {
 		return &common.AppError{
 			Code:    ErrFailedToParseJustification,
@@ -150,10 +150,10 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	}
 
 	switch preimage := justification.GetPreimage().(type) {
-	case *platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData:
-		return s.verifySubnetValidatorNotCurrentlyRegistered(msg.ValidationID, preimage.ConvertSubnetTxData)
-	case *platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage:
-		return s.verifySubnetValidatorCanNotValidate(msg.ValidationID, preimage.RegisterSubnetValidatorMessage)
+	case *platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData:
+		return s.verifySubnetValidatorNotCurrentlyRegistered(msg.ValidationID, preimage.ConvertSubnetToL1TxData)
+	case *platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage:
+		return s.verifySubnetValidatorCanNotValidate(msg.ValidationID, preimage.RegisterL1ValidatorMessage)
 	default:
 		return &common.AppError{
 			Code:    ErrInvalidJustificationType,
@@ -162,16 +162,16 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistration(
 	}
 }
 
-// verifySubnetValidatorRegistered verifies that the validationID is currently a
+// verifyL1ValidatorRegistered verifies that the validationID is currently a
 // validator.
-func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
+func (s signatureRequestVerifier) verifyL1ValidatorRegistered(
 	validationID ids.ID,
 ) *common.AppError {
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
 	// Verify that the validator exists
-	_, err := s.state.GetSubnetOnlyValidator(validationID)
+	_, err := s.state.GetL1Validator(validationID)
 	if err == database.ErrNotFound {
 		return &common.AppError{
 			Code:    ErrValidationDoesNotExist,
@@ -181,15 +181,15 @@ func (s signatureRequestVerifier) verifySubnetValidatorRegistered(
 	if err != nil {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to get subnet only validator: " + err.Error(),
+			Message: "failed to get L1 validator: " + err.Error(),
 		}
 	}
 	return nil
 }
 
 // verifySubnetValidatorNotCurrentlyRegistered verifies that the validationID
-// could only correspond to a validator from a ConvertSubnetTx and that it is
-// not currently a validator.
+// could only correspond to a validator from a ConvertSubnetToL1Tx and that it
+// is not currently a validator.
 func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	validationID ids.ID,
 	justification *platformvm.SubnetIDIndex,
@@ -214,7 +214,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	defer s.stateLock.Unlock()
 
 	// Verify that the provided subnetID has been converted.
-	_, err = s.state.GetSubnetConversion(subnetID)
+	_, err = s.state.GetSubnetToL1Conversion(subnetID)
 	if err == database.ErrNotFound {
 		return &common.AppError{
 			Code:    ErrConversionDoesNotExist,
@@ -229,7 +229,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	}
 
 	// Verify that the validator is not in the current state
-	_, err = s.state.GetSubnetOnlyValidator(validationID)
+	_, err = s.state.GetL1Validator(validationID)
 	if err == nil {
 		return &common.AppError{
 			Code:    ErrValidationExists,
@@ -239,7 +239,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	if err != database.ErrNotFound {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to lookup subnet only validator: " + err.Error(),
+			Message: "failed to lookup L1 validator: " + err.Error(),
 		}
 	}
 
@@ -254,11 +254,11 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	validationID ids.ID,
 	justificationBytes []byte,
 ) *common.AppError {
-	justification, err := message.ParseRegisterSubnetValidator(justificationBytes)
+	justification, err := message.ParseRegisterL1Validator(justificationBytes)
 	if err != nil {
 		return &common.AppError{
-			Code:    ErrFailedToParseRegisterSubnetValidator,
-			Message: "failed to parse RegisterSubnetValidator justification: " + err.Error(),
+			Code:    ErrFailedToParseRegisterL1Validator,
+			Message: "failed to parse RegisterL1Validator justification: " + err.Error(),
 		}
 	}
 
@@ -274,7 +274,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	defer s.stateLock.Unlock()
 
 	// Verify that the validator does not currently exist
-	_, err = s.state.GetSubnetOnlyValidator(validationID)
+	_, err = s.state.GetL1Validator(validationID)
 	if err == nil {
 		return &common.AppError{
 			Code:    ErrValidationExists,
@@ -284,7 +284,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	if err != database.ErrNotFound {
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to lookup subnet only validator: " + err.Error(),
+			Message: "failed to lookup L1 validator: " + err.Error(),
 		}
 	}
 
@@ -315,8 +315,8 @@ func (s signatureRequestVerifier) verifySubnetValidatorCanNotValidate(
 	return nil // The validator has been removed
 }
 
-func (s signatureRequestVerifier) verifySubnetValidatorWeight(
-	msg *message.SubnetValidatorWeight,
+func (s signatureRequestVerifier) verifyL1ValidatorWeight(
+	msg *message.L1ValidatorWeight,
 ) *common.AppError {
 	if msg.Nonce == math.MaxUint64 {
 		return &common.AppError{
@@ -328,7 +328,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorWeight(
 	s.stateLock.Lock()
 	defer s.stateLock.Unlock()
 
-	sov, err := s.state.GetSubnetOnlyValidator(msg.ValidationID)
+	l1Validator, err := s.state.GetL1Validator(msg.ValidationID)
 	switch {
 	case err == database.ErrNotFound:
 		return &common.AppError{
@@ -338,17 +338,17 @@ func (s signatureRequestVerifier) verifySubnetValidatorWeight(
 	case err != nil:
 		return &common.AppError{
 			Code:    common.ErrUndefined.Code,
-			Message: "failed to get subnet only validator: " + err.Error(),
+			Message: "failed to get L1 validator: " + err.Error(),
 		}
-	case msg.Nonce+1 != sov.MinNonce:
+	case msg.Nonce+1 != l1Validator.MinNonce:
 		return &common.AppError{
 			Code:    ErrWrongNonce,
-			Message: fmt.Sprintf("provided nonce %d != expected nonce (%d - 1)", msg.Nonce, sov.MinNonce),
+			Message: fmt.Sprintf("provided nonce %d != expected nonce (%d - 1)", msg.Nonce, l1Validator.MinNonce),
 		}
-	case msg.Weight != sov.Weight:
+	case msg.Weight != l1Validator.Weight:
 		return &common.AppError{
 			Code:    ErrWrongWeight,
-			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, sov.Weight),
+			Message: fmt.Sprintf("provided weight %d != expected weight %d", msg.Weight, l1Validator.Weight),
 		}
 	default:
 		return nil // The nonce and weight are correct
