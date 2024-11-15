@@ -166,8 +166,8 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	// IssueSetL1ValidatorWeightTx creates, signs, and issues a transaction
-	// that sets the weight of a validator on an L1.
+	// IssueSetL1ValidatorWeightTx creates, signs, and issues a transaction that
+	// sets the weight of a validator on an L1.
 	//
 	// - [message] is the Warp message that authorizes this validator's weight
 	//   to be changed
