@@ -188,8 +188,8 @@ func (s signatureRequestVerifier) verifyL1ValidatorRegistered(
 }
 
 // verifySubnetValidatorNotCurrentlyRegistered verifies that the validationID
-// could only correspond to a validator from a ConvertSubnetToL1Tx and that it is
-// not currently a validator.
+// could only correspond to a validator from a ConvertSubnetToL1Tx and that it
+// is not currently a validator.
 func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 	validationID ids.ID,
 	justification *platformvm.SubnetIDIndex,
