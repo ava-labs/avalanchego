@@ -128,9 +128,9 @@ func (v L1Validator) Less(o L1Validator) bool {
 	return v.Compare(o) == -1
 }
 
-// Compare determines a canonical ordering of L1 validators based on
-// their EndAccumulatedFees and ValidationIDs. Lower EndAccumulatedFees result
-// in an earlier ordering.
+// Compare determines a canonical ordering of L1 validators based on their
+// EndAccumulatedFees and ValidationIDs. Lower EndAccumulatedFees result in an
+// earlier ordering.
 func (v L1Validator) Compare(o L1Validator) int {
 	switch {
 	case v.EndAccumulatedFee < o.EndAccumulatedFee:
