@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ = e2e.DescribePChain("[Validator Sets]", func() {
@@ -101,7 +103,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 					validatorSet, err := pvmClient.GetValidatorsAt(
 						tc.DefaultContext(),
 						constants.PrimaryNetworkID,
-						height,
+						platformapi.Height(height),
 					)
 					require.NoError(err)
 					if observedValidatorSet == nil {
