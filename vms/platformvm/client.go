@@ -660,8 +660,7 @@ func GetSubnetOwners(
 	return subnetOwners, nil
 }
 
-// GetDeactivationOwners returns a map of validation ID to L1
-// validation deactivation owner
+// GetDeactivationOwners returns a map of validation ID to deactivation owners
 func GetDeactivationOwners(
 	c Client,
 	ctx context.Context,
