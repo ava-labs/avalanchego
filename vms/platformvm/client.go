@@ -340,8 +340,8 @@ type L1Validator struct {
 	StartTime             uint64
 	Weight                uint64
 	MinNonce              uint64
-	// Balance is the remaining amount of AVAX this L1 validator has for paying the
-	// continuous fee.
+	// Balance is the remaining amount of AVAX this L1 validator has for paying
+	// the continuous fee.
 	Balance uint64
 }
 
