@@ -49,8 +49,7 @@ func NewL1ValidatorWeight(
 	return msg, Initialize(msg)
 }
 
-// ParseL1ValidatorWeight parses bytes into an initialized
-// L1ValidatorWeight.
+// ParseL1ValidatorWeight parses bytes into an initialized L1ValidatorWeight.
 func ParseL1ValidatorWeight(b []byte) (*L1ValidatorWeight, error) {
 	payloadIntf, err := Parse(b)
 	if err != nil {
