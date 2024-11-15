@@ -12,20 +12,27 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var sizes = []int{
-	2,
-	4,
-	8,
-	16,
-	32,
-	64,
-	128,
-	256,
-	512,
-	1024,
-	2048,
-	4096,
-}
+var (
+	sizes = []int{
+		1,
+		2,
+		4,
+		8,
+		16,
+		32,
+		64,
+		128,
+		256,
+		512,
+		1024,
+		2048,
+		4096,
+		8192,
+		16384,
+		32768,
+	}
+	biggestSize = sizes[len(sizes)-1]
+)
 
 func BenchmarkSign(b *testing.B) {
 	privateKey, err := NewSecretKey()
@@ -63,7 +70,7 @@ func BenchmarkVerify(b *testing.B) {
 }
 
 func BenchmarkAggregatePublicKeys(b *testing.B) {
-	keys := make([]*PublicKey, 4096)
+	keys := make([]*PublicKey, biggestSize)
 	for i := range keys {
 		privateKey, err := NewSecretKey()
 		require.NoError(b, err)
@@ -128,5 +135,19 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		_ = PublicKeyFromValidUncompressedBytes(pkBytes)
+	}
+}
+
+func BenchmarkSignatureFromBytes(b *testing.B) {
+	privateKey, err := NewSecretKey()
+	require.NoError(b, err)
+
+	message := utils.RandomBytes(32)
+	signature := Sign(privateKey, message)
+	signatureBytes := SignatureToBytes(signature)
+
+	b.ResetTimer()
+	for range b.N {
+		_, _ = SignatureFromBytes(signatureBytes)
 	}
 }

@@ -144,9 +144,7 @@ func TestOutputComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 60,
-				gas.DBRead:    0,
 				gas.DBWrite:   1,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -161,9 +159,7 @@ func TestOutputComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 80,
-				gas.DBRead:    0,
 				gas.DBWrite:   1,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -178,9 +174,7 @@ func TestOutputComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 120,
-				gas.DBRead:    0,
 				gas.DBWrite:   1,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -197,9 +191,7 @@ func TestOutputComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 132,
-				gas.DBRead:    0,
 				gas.DBWrite:   1,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -208,12 +200,7 @@ func TestOutputComplexity(t *testing.T) {
 			out: &avax.TransferableOutput{
 				Out: nil,
 			},
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
-			},
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedOutput,
 		},
 	}
@@ -262,7 +249,6 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 92,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
 			},
 			expectedErr: nil,
 		},
@@ -282,7 +268,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 161,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   200,
 			},
 			expectedErr: nil,
 		},
@@ -302,7 +288,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 299,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   600,
 			},
 			expectedErr: nil,
 		},
@@ -324,7 +310,7 @@ func TestInputComplexity(t *testing.T) {
 				gas.Bandwidth: 311,
 				gas.DBRead:    1,
 				gas.DBWrite:   1,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   600,
 			},
 			expectedErr: nil,
 		},
@@ -333,13 +319,8 @@ func TestInputComplexity(t *testing.T) {
 			in: &avax.TransferableInput{
 				In: nil,
 			},
-			cred: nil,
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
-			},
+			cred:        nil,
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedInput,
 		},
 	}
@@ -384,9 +365,8 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 200,
-				gas.DBRead:    0,
 				gas.DBWrite:   4,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   1050,
 			},
 		},
 		{
@@ -404,9 +384,8 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
-				gas.DBRead:    0,
 				gas.DBWrite:   4,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   1050,
 			},
 		},
 		{
@@ -424,9 +403,8 @@ func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
-				gas.DBRead:    0,
 				gas.DBWrite:   4,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   1050,
 			},
 		},
 	}
@@ -461,9 +439,6 @@ func TestOwnerComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 16,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -474,9 +449,6 @@ func TestOwnerComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 36,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -487,9 +459,6 @@ func TestOwnerComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 76,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
 			},
 			expectedErr: nil,
 		},
@@ -539,9 +508,6 @@ func TestAuthComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 8,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
 			},
 			expectedErr: nil,
 		},
@@ -555,9 +521,7 @@ func TestAuthComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 77,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   200,
 			},
 			expectedErr: nil,
 		},
@@ -571,22 +535,15 @@ func TestAuthComplexity(t *testing.T) {
 			},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 215,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   600,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "invalid auth type",
-			auth: nil,
-			cred: nil,
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
-			},
+			name:        "invalid auth type",
+			auth:        nil,
+			cred:        nil,
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedAuth,
 		},
 	}
@@ -622,14 +579,9 @@ func TestSignerComplexity(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:   "empty",
-			signer: &signer.Empty{},
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
-			},
+			name:        "empty",
+			signer:      &signer.Empty{},
+			expected:    gas.Dimensions{},
 			expectedErr: nil,
 		},
 		{
@@ -637,21 +589,14 @@ func TestSignerComplexity(t *testing.T) {
 			signer: &signer.ProofOfPossession{},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 144,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   1050,
 			},
 			expectedErr: nil,
 		},
 		{
-			name:   "invalid signer type",
-			signer: nil,
-			expected: gas.Dimensions{
-				gas.Bandwidth: 0,
-				gas.DBRead:    0,
-				gas.DBWrite:   0,
-				gas.Compute:   0,
-			},
+			name:        "invalid signer type",
+			signer:      nil,
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedSigner,
 		},
 	}

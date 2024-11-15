@@ -3642,15 +3642,16 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				nil, // chainIDs
 			)
 
-			message := test.message
-			if message == nil {
-				message = increaseWeightWarpMessage.Bytes()
-			}
 			setL1ValidatorWeightTx, err := wallet.IssueSetL1ValidatorWeightTx(
-				message,
+				increaseWeightWarpMessage.Bytes(),
 				test.builderOptions...,
 			)
 			require.NoError(err)
+
+			if test.message != nil {
+				unsignedTx := setL1ValidatorWeightTx.Unsigned.(*txs.SetL1ValidatorWeightTx)
+				unsignedTx.Message = test.message
+			}
 
 			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
