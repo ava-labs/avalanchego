@@ -97,12 +97,15 @@ func determineDescendant(pg *prefixGroup) *prefixGroup {
 	return descendant
 }
 
-// bifurcationsWithCommonPrefix invokes f() on this and descendant prefixGroups
-// which represent common prefixes and not an ID in its entirety.
-func (pg *prefixGroup) bifurcationsWithCommonPrefix(f func([]ids.ID, []uint8)) {
+// bifurcationsWithCommonPrefix traverses the transitive descendants of this prefix group,
+// and applies f() on the block IDs of each prefix group.
+// Prefix groups with no descendants are skipped, as they do not represent any prefix.
+// Prefix group without a prefix (root prefix group) are also skipped as they do not correspond
+// to any instance of snowflake.
+func (pg *prefixGroup) bifurcationsWithCommonPrefix(f func([]ids.ID)) {
 	pg.traverse(func(prefixGroup *prefixGroup) {
 		if prefixGroup.isBifurcation() && len(prefixGroup.prefix) > 0 {
-			f(prefixGroup.members, prefixGroup.prefix)
+			f(prefixGroup.members)
 		}
 	})
 }

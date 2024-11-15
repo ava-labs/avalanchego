@@ -230,7 +230,7 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	// should terminate, as it cannot be improved by further voting.
 	weCantImproveVoteForSomeIDOrPrefix := make(booleans, len(voteCountsForIDsOrPrefixes))
 	for i, completedVotes := range voteCountsForIDsOrPrefixes {
-		shouldTerminate := p.shouldTerminateDueToConfidence(completedVotes, maxPossibleVotes, remaining)
+		shouldTerminate := p.shouldTerminateDueToConfidence(completedVotes, remaining)
 		weCantImproveVoteForSomeIDOrPrefix[i] = shouldTerminate
 	}
 
@@ -242,8 +242,9 @@ func (p *earlyTermTraversalPoll) Finished() bool {
 	return p.finished
 }
 
-func (p *earlyTermTraversalPoll) shouldTerminateDueToConfidence(freq int, maxPossibleVotes, remaining int) bool {
-	if freq+remaining < p.alphaPreference {
+func (p *earlyTermTraversalPoll) shouldTerminateDueToConfidence(freq int, remaining int) bool {
+	maxPossibleVotes := freq + remaining
+	if maxPossibleVotes < p.alphaPreference {
 		return true // Case 2
 	}
 
@@ -300,7 +301,7 @@ func computeTransitiveVotesForPrefixes(votesGraph *voteGraph, transitiveVotes ba
 		// Each shared prefix is associated with a bunch of IDs.
 		// Sum up all the transitive votes for these blocks,
 		// and return all such shared prefixes indexed by the underlying transitive descendant IDs.
-		pg.bifurcationsWithCommonPrefix(func(ids []ids.ID, _ []uint8) {
+		pg.bifurcationsWithCommonPrefix(func(ids []ids.ID) {
 			key := concatIDs(ids)
 			count := sumVotesFromIDs(ids, transitiveVotes)
 			votesForPrefix[key] = count
