@@ -50,9 +50,8 @@ type L1Validators interface {
 	// of L1 validators on [subnetID].
 	WeightOfL1Validators(subnetID ids.ID) (uint64, error)
 
-	// GetL1Validator returns the validator with [validationID] if it
-	// exists. If the validator does not exist, [err] will equal
-	// [database.ErrNotFound].
+	// GetL1Validator returns the validator with [validationID] if it exists. If
+	// the validator does not exist, [err] will equal [database.ErrNotFound].
 	GetL1Validator(validationID ids.ID) (L1Validator, error)
 
 	// HasL1Validator returns the validator with [validationID] if it
