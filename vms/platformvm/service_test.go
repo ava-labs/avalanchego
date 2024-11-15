@@ -92,6 +92,70 @@ func defaultService(t *testing.T, fork upgradetest.Fork) (*Service, *mutableShar
 	}, mutableSharedMemory
 }
 
+func TestGetProposedHeight(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t, upgradetest.Latest)
+
+	reply := api.GetHeightResponse{}
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
+
+	minHeight, err := service.vm.GetMinimumHeight(context.Background())
+	require.NoError(err)
+	require.Equal(minHeight, uint64(reply.Height))
+
+	service.vm.ctx.Lock.Lock()
+
+	// issue any transaction to put into the new block
+	subnetID := testSubnet1.ID()
+	wallet := newWallet(t, service.vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
+	tx, err := wallet.IssueCreateChainTx(
+		subnetID,
+		[]byte{},
+		constants.AVMID,
+		[]ids.ID{},
+		"chain name",
+		common.WithMemo([]byte{}),
+	)
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+
+	// Get the last accepted block which should be genesis
+	genesisBlockID := service.vm.manager.LastAccepted()
+
+	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	service.vm.ctx.Lock.Lock()
+
+	block, err := service.vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	blk := block.(*blockexecutor.Block)
+	require.NoError(blk.Verify(context.Background()))
+
+	require.NoError(blk.Accept(context.Background()))
+
+	service.vm.ctx.Lock.Unlock()
+
+	latestBlockID := service.vm.manager.LastAccepted()
+	latestBlock, err := service.vm.manager.GetBlock(latestBlockID)
+	require.NoError(err)
+	require.NotEqual(genesisBlockID, latestBlockID)
+
+	// Confirm that the proposed height hasn't changed with the new block being accepted.
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
+	require.Equal(minHeight, uint64(reply.Height))
+
+	// Set the clock to beyond the proposer VM height of the most recent accepted block
+	service.vm.clock.Set(latestBlock.Timestamp().Add(31 * time.Second))
+
+	// Confirm that the proposed height has updated to the latest block height
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
+	require.Equal(latestBlock.Height(), uint64(reply.Height))
+}
+
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 

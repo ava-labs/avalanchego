@@ -166,6 +166,9 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.mempool,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
+		&res.ctx.Lock,
+		res.state,
+		res.ctx.WarpSigner,
 		registerer,
 		config.DefaultNetwork,
 	)
@@ -218,6 +221,7 @@ func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
 		e.state,
 		secp256k1fx.NewKeychain(c.keys...),
 		c.subnetIDs,
+		nil, // validationIDs
 		[]ids.ID{e.ctx.CChainID, e.ctx.XChainID},
 	)
 }

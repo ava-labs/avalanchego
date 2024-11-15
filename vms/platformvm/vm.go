@@ -52,9 +52,10 @@ import (
 )
 
 var (
-	_ snowmanblock.ChainVM = (*VM)(nil)
-	_ secp256k1fx.VM       = (*VM)(nil)
-	_ validators.State     = (*VM)(nil)
+	_ snowmanblock.ChainVM                      = (*VM)(nil)
+	_ snowmanblock.BuildBlockWithContextChainVM = (*VM)(nil)
+	_ secp256k1fx.VM                            = (*VM)(nil)
+	_ validators.State                          = (*VM)(nil)
 )
 
 type VM struct {
@@ -149,6 +150,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	if currentTime := vm.state.GetTimestamp(); vm.Internal.UpgradeConfig.IsEtnaActivated(currentTime) {
+		blockexecutor.EtnaActivationWasLogged.Set(true)
+	}
+
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
@@ -192,6 +197,9 @@ func (vm *VM) Initialize(
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		chainCtx.Lock.RLocker(),
+		vm.state,
+		chainCtx.WarpSigner,
 		registerer,
 		execConfig.Network,
 	)

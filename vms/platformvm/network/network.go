@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,13 +14,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var errMempoolDisabledWithPartialSync = errors.New("mempool is disabled partial syncing")
@@ -48,6 +52,9 @@ func New(
 	mempool mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
+	stateLock sync.Locker,
+	state state.Chain,
+	signer warp.Signer,
 	registerer prometheus.Registerer,
 	config config.Network,
 ) (*Network, error) {
@@ -154,6 +161,17 @@ func New(
 	}
 
 	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
+		return nil, err
+	}
+
+	// We allow all peers to request warp messaging signatures
+	signatureRequestVerifier := signatureRequestVerifier{
+		stateLock: stateLock,
+		state:     state,
+	}
+	signatureRequestHandler := acp118.NewHandler(signatureRequestVerifier, signer)
+
+	if err := p2pNetwork.AddHandler(acp118.HandlerID, signatureRequestHandler); err != nil {
 		return nil, err
 	}
 

@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	errMinimumHeight   = errors.New("unexpectedly called GetMinimumHeight")
-	errCurrentHeight   = errors.New("unexpectedly called GetCurrentHeight")
-	errSubnetID        = errors.New("unexpectedly called GetSubnetID")
-	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
+	errMinimumHeight          = errors.New("unexpectedly called GetMinimumHeight")
+	errCurrentHeight          = errors.New("unexpectedly called GetCurrentHeight")
+	errSubnetID               = errors.New("unexpectedly called GetSubnetID")
+	errGetValidatorSet        = errors.New("unexpectedly called GetValidatorSet")
+	errGetCurrentValidatorSet = errors.New("unexpectedly called GetCurrentValidatorSet")
 )
 
 var _ validators.State = (*State)(nil)
@@ -30,11 +31,13 @@ type State struct {
 	CantGetCurrentHeight,
 	CantGetSubnetID,
 	CantGetValidatorSet bool
+	CantGetCurrentValidatorSet bool
 
-	GetMinimumHeightF func(ctx context.Context) (uint64, error)
-	GetCurrentHeightF func(ctx context.Context) (uint64, error)
-	GetSubnetIDF      func(ctx context.Context, chainID ids.ID) (ids.ID, error)
-	GetValidatorSetF  func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+	GetMinimumHeightF       func(ctx context.Context) (uint64, error)
+	GetCurrentHeightF       func(ctx context.Context) (uint64, error)
+	GetSubnetIDF            func(ctx context.Context, chainID ids.ID) (ids.ID, error)
+	GetValidatorSetF        func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+	GetCurrentValidatorSetF func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 }
 
 func (vm *State) GetMinimumHeight(ctx context.Context) (uint64, error) {
@@ -79,4 +82,17 @@ func (vm *State) GetValidatorSet(
 		require.FailNow(vm.T, errGetValidatorSet.Error())
 	}
 	return nil, errGetValidatorSet
+}
+
+func (vm *State) GetCurrentValidatorSet(
+	ctx context.Context,
+	subnetID ids.ID,
+) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+	if vm.GetCurrentValidatorSetF != nil {
+		return vm.GetCurrentValidatorSetF(ctx, subnetID)
+	}
+	if vm.CantGetCurrentValidatorSet && vm.T != nil {
+		require.FailNow(vm.T, errGetCurrentValidatorSet.Error())
+	}
+	return nil, 0, errGetCurrentValidatorSet
 }
