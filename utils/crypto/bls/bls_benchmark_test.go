@@ -137,3 +137,17 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 		_ = PublicKeyFromValidUncompressedBytes(pkBytes)
 	}
 }
+
+func BenchmarkSignatureFromBytes(b *testing.B) {
+	privateKey, err := NewSecretKey()
+	require.NoError(b, err)
+
+	message := utils.RandomBytes(32)
+	signature := Sign(privateKey, message)
+	signatureBytes := SignatureToBytes(signature)
+
+	b.ResetTimer()
+	for range b.N {
+		_, _ = SignatureFromBytes(signatureBytes)
+	}
+}
