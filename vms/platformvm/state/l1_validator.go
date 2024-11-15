@@ -54,8 +54,7 @@ type L1Validators interface {
 	// the validator does not exist, [err] will equal [database.ErrNotFound].
 	GetL1Validator(validationID ids.ID) (L1Validator, error)
 
-	// HasL1Validator returns the validator with [validationID] if it
-	// exists.
+	// HasL1Validator returns the validator with [validationID] if it exists.
 	HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error)
 
 	// PutL1Validator inserts [l1Validator] as a validator. If the weight of the
