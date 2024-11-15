@@ -464,7 +464,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	msg := message.InternalConnected(nodeID, nodeVersion)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
-	// set, disconnect. we cannot put a L1 validator check here since
+	// set, disconnect. we cannot put an L1 validator check here since
 	// Disconnected would not be handled properly.
 	//
 	// When sybil protection is disabled, we only want this clause to happen
