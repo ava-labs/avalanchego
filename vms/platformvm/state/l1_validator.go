@@ -32,8 +32,8 @@ var (
 )
 
 type L1Validators interface {
-	// GetActiveL1ValidatorsIterator returns an iterator of all the
-	// active L1 validators in increasing order of EndAccumulatedFee.
+	// GetActiveL1ValidatorsIterator returns an iterator of all the active L1
+	// validators in increasing order of EndAccumulatedFee.
 	//
 	// It is the caller's responsibility to call [Release] on the iterator after
 	// use.
