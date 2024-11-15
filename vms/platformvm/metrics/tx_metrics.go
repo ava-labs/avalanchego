@@ -162,7 +162,7 @@ func (m *txMetrics) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
 
 func (m *txMetrics) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "increase_balance",
+		txLabel: "increase_l1_validator_balance",
 	}).Inc()
 	return nil
 }
