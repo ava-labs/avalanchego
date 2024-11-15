@@ -1876,15 +1876,12 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 
 	ctx := r.Context()
 	var err error
-	var height uint64
-
+	height := uint64(args.Height)
 	if args.Height.IsProposed() {
 		height, err = s.vm.GetMinimumHeight(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get proposed height: %w", err)
 		}
-	} else {
-		height = uint64(args.Height)
 	}
 
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
