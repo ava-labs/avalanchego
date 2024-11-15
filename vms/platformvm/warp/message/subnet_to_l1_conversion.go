@@ -35,8 +35,8 @@ func SubnetToL1ConversionID(data SubnetToL1ConversionData) (ids.ID, error) {
 	return hashing.ComputeHash256Array(bytes), nil
 }
 
-// SubnetToL1Conversion reports the summary of the subnet conversation that occurred
-// on the P-chain.
+// SubnetToL1Conversion reports the summary of the subnet conversation that
+// occurred on the P-chain.
 type SubnetToL1Conversion struct {
 	payload
 
