@@ -151,8 +151,8 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	// IssueRegisterL1ValidatorTx creates, signs, and issues a transaction
-	// that adds a validator to an L1.
+	// IssueRegisterL1ValidatorTx creates, signs, and issues a transaction that
+	// adds a validator to an L1.
 	//
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
