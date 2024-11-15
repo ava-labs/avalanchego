@@ -46,8 +46,8 @@ type L1Validators interface {
 	// L1 validators.
 	NumActiveL1Validators() int
 
-	// WeightOfL1Validators returns the total active and inactive weight
-	// of L1 validators on [subnetID].
+	// WeightOfL1Validators returns the total active and inactive weight of L1
+	// validators on [subnetID].
 	WeightOfL1Validators(subnetID ids.ID) (uint64, error)
 
 	// GetL1Validator returns the validator with [validationID] if it exists. If
