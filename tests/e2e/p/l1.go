@@ -683,7 +683,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
-		tc.By("issuing an DisableL1ValidatorTx", func() {
+		tc.By("issuing a DisableL1ValidatorTx", func() {
 			_, err := pWallet.IssueDisableL1ValidatorTx(
 				registerValidationID,
 			)
