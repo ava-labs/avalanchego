@@ -281,3 +281,50 @@ func TestEarlyTermYesTraversal(t *testing.T) {
 	poll.Vote(vdr4, blkID4)
 	require.False(poll.Finished())
 }
+
+func TestEarlyTermYesTraversalII(t *testing.T) {
+	require := require.New(t)
+
+	vdrs := bag.Of(vdr1, vdr2, vdr3, vdr4, vdr5) // k = 5
+	alphaPreference := 2
+	alphaConfidence := 3
+
+	blkID0 := ids.ID{0x00, 0x00}
+	blkID1 := ids.ID{0xf0, 0xff}
+	blkID2 := ids.ID{0xff, 0xf0}
+	blkID3 := ids.ID{0x0f, 0xff}
+
+	//          blkID0
+	//    blkID1  blkID2  blkID3
+	g := ancestryGraph{
+		blkID3: blkID0,
+		blkID2: blkID0,
+		blkID1: blkID0,
+	}
+
+	factory, err := NewEarlyTermTraversalFactory(alphaPreference, alphaConfidence, prometheus.NewRegistry(), g)
+	require.NoError(err)
+	poll := factory.New(vdrs)
+
+	poll.Vote(vdr1, blkID2)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr2, blkID3)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr3, blkID3)
+	require.False(poll.Finished())
+
+	poll.Vote(vdr4, blkID3)
+	require.False(poll.Finished())
+
+	//
+	//        blkID0                       blk0: {0x00, 0x00}
+	//     0/       \4                     blk1: {0xf0, 0xff}
+	// blkID1      {0x?f}                  blk2: {0xff, 0xf0}
+	//            1/     \3                blk3: {0x0f, 0xff}
+	//           blkID2  blkID3
+
+	poll.Vote(vdr5, blkID2)
+	require.True(poll.Finished())
+}
