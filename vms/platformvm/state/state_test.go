@@ -2177,7 +2177,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			},
 		},
 		{
-			name: "L1 validators only with different SubnetIDs",
+			name: "L1 validators with different SubnetIDs",
 			l1Validators: []L1Validator{
 				{
 					ValidationID: ids.GenerateTestID(),
