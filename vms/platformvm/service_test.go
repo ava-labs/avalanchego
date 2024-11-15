@@ -825,10 +825,7 @@ func TestGetValidatorsAt(t *testing.T) {
 
 	genesis := genesistest.New(t, genesistest.Config{})
 
-	args := GetValidatorsAtArgs{
-		Height:   avajson.Height{},
-		SubnetID: constants.PrimaryNetworkID,
-	}
+	args := GetValidatorsAtArgs{}
 	response := GetValidatorsAtReply{}
 
 	service.vm.ctx.Lock.Lock()
@@ -839,7 +836,7 @@ func TestGetValidatorsAt(t *testing.T) {
 	service.vm.ctx.Lock.Unlock()
 
 	// Confirm that it returns the genesis validators given the latest height
-	args.Height.Numeric = avajson.Uint64(lastAcceptedBlk.Height())
+	args.Height = pchainapi.Height(lastAcceptedBlk.Height())
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
@@ -893,16 +890,12 @@ func TestGetValidatorsAt(t *testing.T) {
 	require.NotEqual(newLastAccepted, lastAccepted)
 
 	// Confirm that it returns the genesis validators + the new validator given the latest height
-	args.Height.Numeric = avajson.Uint64(newLastAcceptedBlk.Height())
+	args.Height = pchainapi.Height(newLastAcceptedBlk.Height())
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators)+1)
 
 	// Confirm that [IsProposed] works. The proposed height should be the genesis height
-	// and the [newLastAcceptedBlk] should be ignored since [IsProposed] is true
-	args.Height = avajson.Height{
-		Numeric:    avajson.Uint64(newLastAcceptedBlk.Height()),
-		IsProposed: true,
-	}
+	args.Height = pchainapi.Height(pchainapi.ProposedHeight)
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 

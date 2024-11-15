@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ Client = (*client)(nil)
@@ -124,7 +126,6 @@ type Client interface {
 		ctx context.Context,
 		subnetID ids.ID,
 		height uint64,
-		isProposed bool,
 		options ...rpc.Option,
 	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
@@ -574,13 +575,12 @@ func (c *client) GetValidatorsAt(
 	ctx context.Context,
 	subnetID ids.ID,
 	height uint64,
-	isProposed bool,
 	options ...rpc.Option,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
-		Height:   json.Height{Numeric: json.Uint64(height), IsProposed: isProposed},
+		Height:   platformapi.Height(height),
 	}, res, options...)
 	return res.Validators, err
 }

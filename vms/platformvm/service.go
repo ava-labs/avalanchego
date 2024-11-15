@@ -1792,8 +1792,8 @@ func (s *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestamp
 
 // GetValidatorsAtArgs is the response from GetValidatorsAt
 type GetValidatorsAtArgs struct {
-	Height   avajson.Height `json:"height"`
-	SubnetID ids.ID         `json:"subnetID"`
+	Height   platformapi.Height `json:"height"`
+	SubnetID ids.ID             `json:"subnetID"`
 }
 
 type jsonGetValidatorOutput struct {
@@ -1863,12 +1863,11 @@ type GetValidatorsAtReply struct {
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
 func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
-	height := uint64(args.Height.Numeric)
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getValidatorsAt"),
-		zap.Uint64("height", height),
-		zap.Bool("isProposed", args.Height.IsProposed),
+		zap.Uint64("height", uint64(args.Height)),
+		zap.Bool("isProposed", args.Height.IsProposed()),
 		zap.Stringer("subnetID", args.SubnetID),
 	)
 
@@ -1877,12 +1876,15 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 
 	ctx := r.Context()
 	var err error
+	var height uint64
 
-	if args.Height.IsProposed {
+	if args.Height.IsProposed() {
 		height, err = s.vm.GetMinimumHeight(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get proposed height: %w", err)
 		}
+	} else {
+		height = uint64(args.Height)
 	}
 
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
