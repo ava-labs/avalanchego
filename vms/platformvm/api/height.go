@@ -4,6 +4,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
 
@@ -27,11 +28,15 @@ func (h Height) MarshalJSON() ([]byte, error) {
 }
 
 func (h *Height) UnmarshalJSON(b []byte) error {
-	if string(b) == ProposedHeightFlag {
+	// First try to unmarshal as a string
+	// and check if it is the proposed height flag
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err == nil && s == ProposedHeightFlag {
 		*h = ProposedHeight
 		return nil
 	}
-	err := (*avajson.Uint64)(h).UnmarshalJSON(b)
+	err = (*avajson.Uint64)(h).UnmarshalJSON(b)
 	if err != nil {
 		return errInvalidHeight
 	}

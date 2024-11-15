@@ -906,10 +906,34 @@ func TestGetValidatorsAt(t *testing.T) {
 	service.vm.clock.Set(newLastAcceptedBlk.Timestamp().Add(40 * time.Second))
 	service.vm.ctx.Lock.Unlock()
 
-	// Resending the same request with [IsProposed] set to true should now
+	// Resending the same request with [Height] set to [platformapi.ProposedHeight] should now
 	// include the new validator
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators)+1)
+}
+
+func TestGetValidatorsAtArgsMarshalling(t *testing.T) {
+	require := require.New(t)
+
+	args := GetValidatorsAtArgs{
+		SubnetID: ids.GenerateTestID(),
+		Height:   pchainapi.Height(12345),
+	}
+
+	argsJSON, err := json.Marshal(args)
+	require.NoError(err)
+
+	var parsedArgs GetValidatorsAtArgs
+	require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
+	require.Equal(args, parsedArgs)
+
+	// confirm that "proposed" height unmarshals correctly as well
+	args.Height = pchainapi.ProposedHeight
+	argsJSON, err = json.Marshal(args)
+	require.NoError(err)
+
+	require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
+	require.Equal(args, parsedArgs)
 }
 
 func TestGetTimestamp(t *testing.T) {
