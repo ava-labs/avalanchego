@@ -1980,9 +1980,8 @@ func TestL1Validators(t *testing.T) {
 	}
 }
 
-// TestLoadL1ValidatorAndLegacy tests that the state can be loaded when
-// there is a mix of legacy validators and L1 validators in the same
-// subnet.
+// TestLoadL1ValidatorAndLegacy tests that the state can be loaded when there is
+// a mix of legacy validators and L1 validators in the same subnet.
 func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	var (
 		require         = require.New(t)
