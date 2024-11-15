@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
-const testDynamicPrice = 100
+const testDynamicPrice = gas.Price(units.NanoAvax)
 
 var (
 	testStaticConfig = StaticConfig{
@@ -23,9 +23,9 @@ var (
 	}
 	testDynamicWeights = gas.Dimensions{
 		gas.Bandwidth: 1,
-		gas.DBRead:    200,
-		gas.DBWrite:   300,
-		gas.Compute:   0, // TODO: Populate
+		gas.DBRead:    2000,
+		gas.DBWrite:   20000,
+		gas.Compute:   10,
 	}
 
 	// TODO: Rather than hardcoding transactions, consider implementing and
@@ -76,9 +76,9 @@ var (
 				gas.Bandwidth: 691, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicBLSPoPVerifyCompute + intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 229_100,
+			expectedDynamicFee: 137_191 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessValidatorTx for subnet",
@@ -88,9 +88,9 @@ var (
 				gas.Bandwidth: 748, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBRead] + 2*intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBWrite] + 2*intrinsicInputDBWrite + 3*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 314_800,
+			expectedDynamicFee: 170_748 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessDelegatorTx for primary network",
@@ -100,9 +100,9 @@ var (
 				gas.Bandwidth: 499, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBRead] + 1*intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBWrite] + 1*intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 209_900,
+			expectedDynamicFee: 106_499 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessDelegatorTx for subnet",
@@ -112,9 +112,9 @@ var (
 				gas.Bandwidth: 720, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBRead] + 2*intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBWrite] + 2*intrinsicInputDBWrite + 3*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 312_000,
+			expectedDynamicFee: 150_720 * units.NanoAvax,
 		},
 		{
 			name:              "AddSubnetValidatorTx",
@@ -124,9 +124,9 @@ var (
 				gas.Bandwidth: 460, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddSubnetValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddSubnetValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 196_000,
+			expectedDynamicFee: 112_460 * units.NanoAvax,
 		},
 		{
 			name:              "BaseTx",
@@ -136,9 +136,9 @@ var (
 				gas.Bandwidth: 399, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicBaseTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicBaseTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 149_900,
+			expectedDynamicFee: 64_399 * units.NanoAvax,
 		},
 		{
 			name:              "CreateChainTx",
@@ -148,9 +148,9 @@ var (
 				gas.Bandwidth: 509, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicCreateChainTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicCreateChainTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 180_900,
+			expectedDynamicFee: 72_509 * units.NanoAvax,
 		},
 		{
 			name:              "CreateSubnetTx",
@@ -160,9 +160,9 @@ var (
 				gas.Bandwidth: 339, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicCreateSubnetTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicCreateSubnetTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 143_900,
+			expectedDynamicFee: 64_339 * units.NanoAvax,
 		},
 		{
 			name:              "ExportTx",
@@ -172,9 +172,9 @@ var (
 				gas.Bandwidth: 435, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicExportTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicExportTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 153_500,
+			expectedDynamicFee: 64_435 * units.NanoAvax,
 		},
 		{
 			name:              "ImportTx",
@@ -184,9 +184,9 @@ var (
 				gas.Bandwidth: 335, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicImportTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicImportTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 113_500,
+			expectedDynamicFee: 44_335 * units.NanoAvax,
 		},
 		{
 			name:              "RemoveSubnetValidatorTx",
@@ -196,9 +196,9 @@ var (
 				gas.Bandwidth: 436, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicRemoveSubnetValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicRemoveSubnetValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 193_600,
+			expectedDynamicFee: 108_436 * units.NanoAvax,
 		},
 		{
 			name:                  "TransformSubnetTx",
@@ -215,9 +215,9 @@ var (
 				gas.Bandwidth: 436, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicTransferSubnetOwnershipTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicTransferSubnetOwnershipTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 173_600,
+			expectedDynamicFee: 68_436 * units.NanoAvax,
 		},
 		{
 			name:                 "ConvertSubnetToL1Tx",
@@ -227,9 +227,9 @@ var (
 				gas.Bandwidth: 656, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicConvertSubnetToL1TxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicConvertSubnetToL1TxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite + intrinsicConvertSubnetToL1ValidatorDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2*intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute,
 			},
-			expectedDynamicFee: 365_600,
+			expectedDynamicFee: 183_156 * units.NanoAvax,
 		},
 		{
 			name:                 "RegisterL1ValidatorTx",
@@ -237,11 +237,11 @@ var (
 			expectedStaticFeeErr: ErrUnsupportedTx,
 			expectedComplexity: gas.Dimensions{
 				gas.Bandwidth: 710, // The length of the tx in bytes
-				gas.DBRead:    IntrinsicRegisterL1ValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBRead:    IntrinsicRegisterL1ValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead + intrinsicWarpDBReads,
 				gas.DBWrite:   IntrinsicRegisterL1ValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute + intrinsicBLSAggregateCompute + intrinsicBLSVerifyCompute,
 			},
-			expectedDynamicFee: 151_000,
+			expectedDynamicFee: 241_260 * units.NanoAvax,
 		},
 		{
 			name:                 "SetL1ValidatorWeightTx",
@@ -249,11 +249,11 @@ var (
 			expectedStaticFeeErr: ErrUnsupportedTx,
 			expectedComplexity: gas.Dimensions{
 				gas.Bandwidth: 518, // The length of the tx in bytes
-				gas.DBRead:    IntrinsicSetL1ValidatorWeightTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBRead:    IntrinsicSetL1ValidatorWeightTxComplexities[gas.DBRead] + intrinsicInputDBRead + intrinsicWarpDBReads,
 				gas.DBWrite:   IntrinsicSetL1ValidatorWeightTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSAggregateCompute + intrinsicBLSVerifyCompute,
 			},
-			expectedDynamicFee: 131_800,
+			expectedDynamicFee: 206_568 * units.NanoAvax,
 		},
 		{
 			name:                 "IncreaseL1ValidatorBalanceTx",
@@ -263,9 +263,9 @@ var (
 				gas.Bandwidth: 339, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicIncreaseL1ValidatorBalanceTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicIncreaseL1ValidatorBalanceTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 113_900,
+			expectedDynamicFee: 146_339 * units.NanoAvax,
 		},
 		{
 			name:                 "DisableL1ValidatorTx",
@@ -275,9 +275,9 @@ var (
 				gas.Bandwidth: 347, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicDisableL1ValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicDisableL1ValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 114_700,
+			expectedDynamicFee: 166_347 * units.NanoAvax,
 		},
 	}
 )

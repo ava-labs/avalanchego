@@ -49,6 +49,16 @@ func TestNewProofOfPossessionDeterministic(t *testing.T) {
 	require.Equal(blsPOP0, blsPOP1)
 }
 
+func BenchmarkProofOfPossessionVerify(b *testing.B) {
+	pop, err := newProofOfPossession()
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for range b.N {
+		_ = pop.Verify()
+	}
+}
+
 func newProofOfPossession() (*ProofOfPossession, error) {
 	sk, err := bls.NewSecretKey()
 	if err != nil {
