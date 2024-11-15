@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -101,7 +102,7 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 					validatorSet, err := pvmClient.GetValidatorsAt(
 						tc.DefaultContext(),
 						constants.PrimaryNetworkID,
-						height,
+						platformapi.Height(height),
 					)
 					require.NoError(err)
 					if observedValidatorSet == nil {
