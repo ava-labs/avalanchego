@@ -102,23 +102,23 @@ func (*warpVerifier) BaseTx(*txs.BaseTx) error {
 	return nil
 }
 
-func (*warpVerifier) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (*warpVerifier) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return nil
 }
 
-func (*warpVerifier) IncreaseBalanceTx(*txs.IncreaseBalanceTx) error {
+func (*warpVerifier) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
 	return nil
 }
 
-func (*warpVerifier) DisableSubnetValidatorTx(*txs.DisableSubnetValidatorTx) error {
+func (*warpVerifier) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	return nil
 }
 
-func (w *warpVerifier) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+func (w *warpVerifier) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	return w.verify(tx.Message)
 }
 
-func (w *warpVerifier) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+func (w *warpVerifier) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	return w.verify(tx.Message)
 }
 

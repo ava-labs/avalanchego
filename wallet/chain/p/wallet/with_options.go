@@ -144,14 +144,14 @@ func (w *withOptions) IssueTransferSubnetOwnershipTx(
 	)
 }
 
-func (w *withOptions) IssueConvertSubnetTx(
+func (w *withOptions) IssueConvertSubnetToL1Tx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetValidator,
+	validators []*txs.ConvertSubnetToL1Validator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	return w.wallet.IssueConvertSubnetTx(
+	return w.wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
@@ -160,13 +160,13 @@ func (w *withOptions) IssueConvertSubnetTx(
 	)
 }
 
-func (w *withOptions) IssueRegisterSubnetValidatorTx(
+func (w *withOptions) IssueRegisterL1ValidatorTx(
 	balance uint64,
 	proofOfPossession [bls.SignatureLen]byte,
 	message []byte,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	return w.wallet.IssueRegisterSubnetValidatorTx(
+	return w.wallet.IssueRegisterL1ValidatorTx(
 		balance,
 		proofOfPossession,
 		message,
@@ -174,33 +174,33 @@ func (w *withOptions) IssueRegisterSubnetValidatorTx(
 	)
 }
 
-func (w *withOptions) IssueSetSubnetValidatorWeightTx(
+func (w *withOptions) IssueSetL1ValidatorWeightTx(
 	message []byte,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	return w.wallet.IssueSetSubnetValidatorWeightTx(
+	return w.wallet.IssueSetL1ValidatorWeightTx(
 		message,
 		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (w *withOptions) IssueIncreaseBalanceTx(
+func (w *withOptions) IssueIncreaseL1ValidatorBalanceTx(
 	validationID ids.ID,
 	balance uint64,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	return w.wallet.IssueIncreaseBalanceTx(
+	return w.wallet.IssueIncreaseL1ValidatorBalanceTx(
 		validationID,
 		balance,
 		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (w *withOptions) IssueDisableSubnetValidatorTx(
+func (w *withOptions) IssueDisableL1ValidatorTx(
 	validationID ids.ID,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	return w.wallet.IssueDisableSubnetValidatorTx(
+	return w.wallet.IssueDisableL1ValidatorTx(
 		validationID,
 		common.UnionOptions(w.options, options)...,
 	)

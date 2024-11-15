@@ -507,7 +507,7 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 		return err
 	}
 
-	switch c, err := s.vm.state.GetSubnetConversion(args.SubnetID); err {
+	switch c, err := s.vm.state.GetSubnetToL1Conversion(args.SubnetID); err {
 	case nil:
 		response.IsPermissioned = false
 		response.ConversionID = c.ConversionID
@@ -985,11 +985,11 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 	return nil
 }
 
-type GetSubnetOnlyValidatorArgs struct {
+type GetL1ValidatorArgs struct {
 	ValidationID ids.ID `json:"validationID"`
 }
 
-type GetSubnetOnlyValidatorReply struct {
+type GetL1ValidatorReply struct {
 	SubnetID ids.ID     `json:"subnetID"`
 	NodeID   ids.NodeID `json:"nodeID"`
 	// PublicKey is the compressed BLS public key of the validator
@@ -999,32 +999,32 @@ type GetSubnetOnlyValidatorReply struct {
 	StartTime             avajson.Uint64      `json:"startTime"`
 	Weight                avajson.Uint64      `json:"weight"`
 	MinNonce              avajson.Uint64      `json:"minNonce"`
-	// Balance is the remaining amount of AVAX this SoV has for paying the
-	// continuous fee, according to the last accepted state. If the validator is
-	// inactive, the balance will be 0.
+	// Balance is the remaining amount of AVAX this L1 validator has for paying
+	// the continuous fee, according to the last accepted state. If the
+	// validator is inactive, the balance will be 0.
 	Balance avajson.Uint64 `json:"balance"`
 	// Height is the height of the last accepted block
 	Height avajson.Uint64 `json:"height"`
 }
 
-// GetSubnetOnlyValidator returns the SoV if it exists
-func (s *Service) GetSubnetOnlyValidator(r *http.Request, args *GetSubnetOnlyValidatorArgs, reply *GetSubnetOnlyValidatorReply) error {
+// GetL1Validator returns the L1 validator if it exists
+func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, reply *GetL1ValidatorReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getSubnetOnlyValidator"),
+		zap.String("method", "getL1Validator"),
 		zap.Stringer("validationID", args.ValidationID),
 	)
 
 	s.vm.ctx.Lock.Lock()
 	defer s.vm.ctx.Lock.Unlock()
 
-	sov, err := s.vm.state.GetSubnetOnlyValidator(args.ValidationID)
+	l1Validator, err := s.vm.state.GetL1Validator(args.ValidationID)
 	if err != nil {
-		return fmt.Errorf("fetching SoV %q failed: %w", args.ValidationID, err)
+		return fmt.Errorf("fetching L1 validator %q failed: %w", args.ValidationID, err)
 	}
 
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(sov.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
 	}
 	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
@@ -1036,7 +1036,7 @@ func (s *Service) GetSubnetOnlyValidator(r *http.Request, args *GetSubnetOnlyVal
 	}
 
 	var deactivationOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(sov.DeactivationOwner, &deactivationOwner); err != nil {
+	if _, err := txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &deactivationOwner); err != nil {
 		return fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
 	}
 	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
@@ -1053,19 +1053,19 @@ func (s *Service) GetSubnetOnlyValidator(r *http.Request, args *GetSubnetOnlyVal
 		return fmt.Errorf("failed getting current height: %w", err)
 	}
 
-	reply.SubnetID = sov.SubnetID
-	reply.NodeID = sov.NodeID
+	reply.SubnetID = l1Validator.SubnetID
+	reply.NodeID = l1Validator.NodeID
 	reply.PublicKey = bls.PublicKeyToCompressedBytes(
-		bls.PublicKeyFromValidUncompressedBytes(sov.PublicKey),
+		bls.PublicKeyFromValidUncompressedBytes(l1Validator.PublicKey),
 	)
 	reply.RemainingBalanceOwner = *remainingBalanceAPIOwner
 	reply.DeactivationOwner = *deactivationAPIOwner
-	reply.StartTime = avajson.Uint64(sov.StartTime)
-	reply.Weight = avajson.Uint64(sov.Weight)
-	reply.MinNonce = avajson.Uint64(sov.MinNonce)
-	if sov.EndAccumulatedFee != 0 {
+	reply.StartTime = avajson.Uint64(l1Validator.StartTime)
+	reply.Weight = avajson.Uint64(l1Validator.Weight)
+	reply.MinNonce = avajson.Uint64(l1Validator.MinNonce)
+	if l1Validator.EndAccumulatedFee != 0 {
 		accruedFees := s.vm.state.GetAccruedFees()
-		reply.Balance = avajson.Uint64(sov.EndAccumulatedFee - accruedFees)
+		reply.Balance = avajson.Uint64(l1Validator.EndAccumulatedFee - accruedFees)
 	}
 	reply.Height = avajson.Uint64(height)
 
