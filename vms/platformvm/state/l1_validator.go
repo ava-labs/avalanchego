@@ -272,8 +272,8 @@ func newL1ValidatorsDiff() *l1ValidatorsDiff {
 	}
 }
 
-// getActiveL1ValidatorsIterator takes in the parent iterator, removes
-// all modified validators, and then adds all modified active validators.
+// getActiveL1ValidatorsIterator takes in the parent iterator, removes all
+// modified validators, and then adds all modified active validators.
 func (d *l1ValidatorsDiff) getActiveL1ValidatorsIterator(parentIterator iterator.Iterator[L1Validator]) iterator.Iterator[L1Validator] {
 	return iterator.Merge(
 		L1Validator.Less,
