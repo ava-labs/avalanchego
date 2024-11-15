@@ -25,8 +25,8 @@ type SubnetToL1ConversionData struct {
 	Validators     []SubnetToL1ConverstionValidatorData `serialize:"true" json:"validators"`
 }
 
-// SubnetToL1ConversionID creates a subnet conversion ID from the provided subnet
-// conversion data.
+// SubnetToL1ConversionID creates a subnet conversion ID from the provided
+// subnet conversion data.
 func SubnetToL1ConversionID(data SubnetToL1ConversionData) (ids.ID, error) {
 	bytes, err := Codec.Marshal(CodecVersion, &data)
 	if err != nil {
