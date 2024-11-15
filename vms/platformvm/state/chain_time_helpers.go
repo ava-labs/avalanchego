@@ -102,7 +102,8 @@ func getNextL1ValidatorEvictionTime(
 	// Calculate the remaining funds that the next validator to evict has.
 	var (
 		// GetActiveL1ValidatorsIterator iterates in order of increasing
-		// EndAccumulatedFee, so the first L1 validator is the next L1 validator to evict.
+		// EndAccumulatedFee, so the first L1 validator is the next L1 validator
+		// to evict.
 		l1Validator = l1ValidatorIterator.Value()
 		accruedFees = state.GetAccruedFees()
 	)
