@@ -75,9 +75,9 @@ type L1Validators interface {
 	PutL1Validator(l1Validator L1Validator) error
 }
 
-// L1Validator defines an ACP-77 validator. For a given ValidationID, it
-// is expected for SubnetID, NodeID, PublicKey, RemainingBalanceOwner, and
-// StartTime to be constant.
+// L1Validator defines an ACP-77 validator. For a given ValidationID, it is
+// expected for SubnetID, NodeID, PublicKey, RemainingBalanceOwner,
+// DeactivationOwner, and StartTime to be constant.
 type L1Validator struct {
 	// ValidationID is not serialized because it is used as the key in the
 	// database, so it doesn't need to be stored in the value.
