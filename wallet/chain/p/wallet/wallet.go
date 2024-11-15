@@ -176,8 +176,9 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	// IssueIncreaseL1ValidatorBalanceTx creates, signs, and issues a transaction that
-	// increases the balance of a validator on an L1 for the continuous fee.
+	// IssueIncreaseL1ValidatorBalanceTx creates, signs, and issues a
+	// transaction that increases the balance of a validator on an L1 for the
+	// continuous fee.
 	//
 	// - [validationID] of the validator
 	// - [balance] amount to increase the validator's balance by
