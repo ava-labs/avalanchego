@@ -6,7 +6,7 @@ package uptime
 import (
 	"errors"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/uptime/interfaces"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/uptime/interfaces"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ava-labs/avalanchego/ids"

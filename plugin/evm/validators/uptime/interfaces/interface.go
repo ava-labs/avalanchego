@@ -6,11 +6,11 @@ package interfaces
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	validatorsinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
+	validatorsstateinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 )
 
 type PausableManager interface {
 	uptime.Manager
-	validatorsinterfaces.StateCallbackListener
+	validatorsstateinterfaces.StateCallbackListener
 	IsPaused(nodeID ids.NodeID) bool
 }

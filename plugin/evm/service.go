@@ -33,19 +33,19 @@ func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, _ *struct{}, rep
 	api.vm.ctx.Lock.RLock()
 	defer api.vm.ctx.Lock.RUnlock()
 
-	vIDs := api.vm.validatorState.GetValidationIDs()
+	vIDs := api.vm.validatorsManager.GetValidationIDs()
 
 	reply.Validators = make([]CurrentValidator, 0, vIDs.Len())
 
 	for _, vID := range vIDs.List() {
-		validator, err := api.vm.validatorState.GetValidator(vID)
+		validator, err := api.vm.validatorsManager.GetValidator(vID)
 		if err != nil {
 			return err
 		}
 
-		isConnected := api.vm.uptimeManager.IsConnected(validator.NodeID)
+		isConnected := api.vm.validatorsManager.IsConnected(validator.NodeID)
 
-		uptime, _, err := api.vm.uptimeManager.CalculateUptime(validator.NodeID)
+		uptime, _, err := api.vm.validatorsManager.CalculateUptime(validator.NodeID)
 		if err != nil {
 			return err
 		}

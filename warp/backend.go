@@ -7,14 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/uptime"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
@@ -59,9 +57,7 @@ type backend struct {
 	db                        database.Database
 	warpSigner                avalancheWarp.Signer
 	blockClient               BlockClient
-	uptimeCalculator          uptime.Calculator
-	validatorState            interfaces.State
-	stateLock                 sync.Locker
+	validatorReader           interfaces.ValidatorReader
 	signatureCache            cache.Cacher[ids.ID, []byte]
 	messageCache              *cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]
 	offchainAddressedCallMsgs map[ids.ID]*avalancheWarp.UnsignedMessage
@@ -74,9 +70,7 @@ func NewBackend(
 	sourceChainID ids.ID,
 	warpSigner avalancheWarp.Signer,
 	blockClient BlockClient,
-	uptimeCalculator uptime.Calculator,
-	validatorsState interfaces.State,
-	stateLock sync.Locker,
+	validatorReader interfaces.ValidatorReader,
 	db database.Database,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	offchainMessages [][]byte,
@@ -88,9 +82,7 @@ func NewBackend(
 		warpSigner:                warpSigner,
 		blockClient:               blockClient,
 		signatureCache:            signatureCache,
-		uptimeCalculator:          uptimeCalculator,
-		validatorState:            validatorsState,
-		stateLock:                 stateLock,
+		validatorReader:           validatorReader,
 		messageCache:              &cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]{Size: messageCacheSize},
 		stats:                     newVerifierStats(),
 		offchainAddressedCallMsgs: make(map[ids.ID]*avalancheWarp.UnsignedMessage),

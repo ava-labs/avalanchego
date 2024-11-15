@@ -39,10 +39,8 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/plugin/evm/uptime"
-	uptimeinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/uptime/interfaces"
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
-	validatorsinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
 	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 
@@ -77,8 +75,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	avalancheUptime "github.com/ava-labs/avalanchego/snow/uptime"
-	avalancheValidators "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -126,8 +122,6 @@ const (
 	txGossipThrottlingPeriod             = 10 * time.Second
 	txGossipThrottlingLimit              = 2
 	txGossipPollSize                     = 1
-
-	loadValidatorsFrequency = 1 * time.Minute
 )
 
 // Define the API endpoints for the VM
@@ -237,7 +231,7 @@ type VM struct {
 	client       peer.NetworkClient
 	networkCodec codec.Manager
 
-	validators *p2p.Validators
+	p2pValidators *p2p.Validators
 
 	// Metrics
 	sdkMetrics *prometheus.Registry
@@ -259,8 +253,7 @@ type VM struct {
 	ethTxPushGossiper  avalancheUtils.Atomic[*gossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper  gossip.Gossiper
 
-	uptimeManager  uptimeinterfaces.PausableManager
-	validatorState validatorsinterfaces.State
+	validatorsManager interfaces.Manager
 
 	chainAlias string
 	// RPC handlers (should be stopped before closing chaindb)
@@ -489,19 +482,15 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to initialize p2p network: %w", err)
 	}
-	vm.validators = p2p.NewValidators(p2pNetwork.Peers, vm.ctx.Log, vm.ctx.SubnetID, vm.ctx.ValidatorState, maxValidatorSetStaleness)
+	vm.p2pValidators = p2p.NewValidators(p2pNetwork.Peers, vm.ctx.Log, vm.ctx.SubnetID, vm.ctx.ValidatorState, maxValidatorSetStaleness)
 	vm.networkCodec = message.Codec
 	vm.Network = peer.NewNetwork(p2pNetwork, appSender, vm.networkCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests)
 	vm.client = peer.NewNetworkClient(vm.Network)
 
-	vm.validatorState, err = validators.NewState(vm.validatorsDB)
+	vm.validatorsManager, err = validators.NewManager(vm.ctx, vm.validatorsDB, &vm.clock)
 	if err != nil {
-		return fmt.Errorf("failed to initialize validator state: %w", err)
+		return fmt.Errorf("failed to initialize validators manager: %w", err)
 	}
-
-	// Initialize uptime manager
-	vm.uptimeManager = uptime.NewPausableManager(avalancheUptime.NewManager(vm.validatorState, &vm.clock))
-	vm.validatorState.RegisterListener(vm.uptimeManager)
 
 	// Initialize warp backend
 	offchainWarpMessages := make([][]byte, len(vm.config.WarpOffChainMessages))
@@ -526,9 +515,7 @@ func (vm *VM) Initialize(
 		vm.ctx.ChainID,
 		vm.ctx.WarpSigner,
 		vm,
-		vm.uptimeManager,
-		vm.validatorState,
-		vm.ctx.Lock.RLocker(),
+		vm.validatorsManager,
 		vm.warpDB,
 		meteredCache,
 		offchainWarpMessages,
@@ -727,28 +714,28 @@ func (vm *VM) onNormalOperationsStarted() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
-	// update validators first
-	if err := vm.performValidatorUpdate(ctx); err != nil {
+	// sync validators first
+	if err := vm.validatorsManager.Sync(ctx); err != nil {
 		return fmt.Errorf("failed to update validators: %w", err)
 	}
-	vdrIDs := vm.validatorState.GetNodeIDs().List()
+	vdrIDs := vm.validatorsManager.GetNodeIDs().List()
 	// Then start tracking with updated validators
 	// StartTracking initializes the uptime tracking with the known validators
 	// and update their uptime to account for the time we were being offline.
-	if err := vm.uptimeManager.StartTracking(vdrIDs); err != nil {
+	if err := vm.validatorsManager.StartTracking(vdrIDs); err != nil {
 		return fmt.Errorf("failed to start tracking uptime: %w", err)
 	}
 	// dispatch validator set update
 	vm.shutdownWg.Add(1)
 	go func() {
-		vm.dispatchUpdateValidators(ctx)
+		vm.validatorsManager.DispatchSync(ctx)
 		vm.shutdownWg.Done()
 	}()
 
 	// Initialize goroutines related to block building
 	// once we enter normal operation as there is no need to handle mempool gossip before this point.
 	ethTxGossipMarshaller := GossipEthTxMarshaller{}
-	ethTxGossipClient := vm.Network.NewClient(p2p.TxGossipHandlerID, p2p.WithValidatorSampling(vm.validators))
+	ethTxGossipClient := vm.Network.NewClient(p2p.TxGossipHandlerID, p2p.WithValidatorSampling(vm.p2pValidators))
 	ethTxGossipMetrics, err := gossip.NewMetrics(vm.sdkMetrics, ethTxGossipNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to initialize eth tx gossip metrics: %w", err)
@@ -778,7 +765,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		ethTxPushGossiper, err = gossip.NewPushGossiper[*GossipEthTx](
 			ethTxGossipMarshaller,
 			ethTxPool,
-			vm.validators,
+			vm.p2pValidators,
 			ethTxGossipClient,
 			ethTxGossipMetrics,
 			pushGossipParams,
@@ -808,7 +795,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 			txGossipTargetMessageSize,
 			txGossipThrottlingPeriod,
 			txGossipThrottlingLimit,
-			vm.validators,
+			vm.p2pValidators,
 		)
 	}
 
@@ -829,7 +816,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		vm.ethTxPullGossiper = gossip.ValidatorGossiper{
 			Gossiper:   ethTxPullGossiper,
 			NodeID:     vm.ctx.NodeID,
-			Validators: vm.validators,
+			Validators: vm.p2pValidators,
 		}
 	}
 
@@ -874,11 +861,11 @@ func (vm *VM) Shutdown(context.Context) error {
 		vm.cancel()
 	}
 	if vm.bootstrapped.Get() {
-		vdrIDs := vm.validatorState.GetNodeIDs().List()
-		if err := vm.uptimeManager.StopTracking(vdrIDs); err != nil {
+		vdrIDs := vm.validatorsManager.GetNodeIDs().List()
+		if err := vm.validatorsManager.StopTracking(vdrIDs); err != nil {
 			return fmt.Errorf("failed to stop tracking uptime: %w", err)
 		}
-		if err := vm.validatorState.WriteState(); err != nil {
+		if err := vm.validatorsManager.WriteState(); err != nil {
 			return fmt.Errorf("failed to write validator: %w", err)
 		}
 	}
@@ -1256,95 +1243,16 @@ func attachEthService(handler *rpc.Server, apis []rpc.API, names []string) error
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
-	if err := vm.uptimeManager.Connect(nodeID); err != nil {
+	if err := vm.validatorsManager.Connect(nodeID); err != nil {
 		return fmt.Errorf("uptime manager failed to connect node %s: %w", nodeID, err)
 	}
 	return vm.Network.Connected(ctx, nodeID, version)
 }
 
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
-	if err := vm.uptimeManager.Disconnect(nodeID); err != nil {
+	if err := vm.validatorsManager.Disconnect(nodeID); err != nil {
 		return fmt.Errorf("uptime manager failed to disconnect node %s: %w", nodeID, err)
 	}
 
 	return vm.Network.Disconnected(ctx, nodeID)
-}
-
-func (vm *VM) dispatchUpdateValidators(ctx context.Context) {
-	ticker := time.NewTicker(loadValidatorsFrequency)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			vm.ctx.Lock.Lock()
-			if err := vm.performValidatorUpdate(ctx); err != nil {
-				log.Error("failed to update validators", "error", err)
-			}
-			vm.ctx.Lock.Unlock()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-// performValidatorUpdate updates the validator state with the current validator set
-// and writes the state to the database.
-func (vm *VM) performValidatorUpdate(ctx context.Context) error {
-	now := time.Now()
-	log.Debug("performing validator update")
-	// get current validator set
-	currentValidatorSet, _, err := vm.ctx.ValidatorState.GetCurrentValidatorSet(ctx, vm.ctx.SubnetID)
-	if err != nil {
-		return fmt.Errorf("failed to get current validator set: %w", err)
-	}
-
-	// load the current validator set into the validator state
-	if err := loadValidators(vm.validatorState, currentValidatorSet); err != nil {
-		return fmt.Errorf("failed to load current validators: %w", err)
-	}
-
-	// write validators to the database
-	if err := vm.validatorState.WriteState(); err != nil {
-		return fmt.Errorf("failed to write validator state: %w", err)
-	}
-
-	// TODO: add metrics
-	log.Debug("validator update complete", "duration", time.Since(now))
-	return nil
-}
-
-// loadValidators loads the [validators] into the validator state [validatorState]
-func loadValidators(validatorState validatorsinterfaces.State, newValidators map[ids.ID]*avalancheValidators.GetCurrentValidatorOutput) error {
-	currentValidationIDs := validatorState.GetValidationIDs()
-	// first check if we need to delete any existing validators
-	for vID := range currentValidationIDs {
-		// if the validator is not in the new set of validators
-		// delete the validator
-		if _, exists := newValidators[vID]; !exists {
-			validatorState.DeleteValidator(vID)
-		}
-	}
-
-	// then load the new validators
-	for newVID, newVdr := range newValidators {
-		currentVdr := validatorsinterfaces.Validator{
-			ValidationID:   newVID,
-			NodeID:         newVdr.NodeID,
-			Weight:         newVdr.Weight,
-			StartTimestamp: newVdr.StartTime,
-			IsActive:       newVdr.IsActive,
-			IsSoV:          newVdr.IsSoV,
-		}
-		if currentValidationIDs.Contains(newVID) {
-			if err := validatorState.UpdateValidator(currentVdr); err != nil {
-				return err
-			}
-		} else {
-			if err := validatorState.AddValidator(currentVdr); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
