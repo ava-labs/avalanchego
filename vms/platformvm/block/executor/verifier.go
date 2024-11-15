@@ -605,8 +605,8 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 		}
 	}
 
-	// After processing all the transactions, deactivate any L1 validators that might not
-	// have sufficient fee to pay for the next second.
+	// After processing all the transactions, deactivate any L1 validators that
+	// might not have sufficient fee to pay for the next second.
 	//
 	// This ensures that L1 validators are not undercharged for the next second.
 	err := deactivateLowBalanceL1Validators(
