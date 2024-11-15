@@ -330,8 +330,7 @@ func (c *client) GetCurrentValidators(
 	return getClientPermissionlessValidators(res.Validators)
 }
 
-// L1Validator is the response from calling GetL1Validator on
-// the API client.
+// L1Validator is the response from calling GetL1Validator on the API client.
 type L1Validator struct {
 	SubnetID              ids.ID
 	NodeID                ids.NodeID
