@@ -572,10 +572,10 @@ func (d *diff) Apply(baseState Chain) error {
 			baseState.DeleteExpiry(entry)
 		}
 	}
-	// Ensure that all l1Validator deletions happen before any l1Validator additions. This
-	// ensures that a subnetID+nodeID pair that was deleted and then re-added in
-	// a single diff can't get reordered into the addition happening first;
-	// which would return an error.
+	// Ensure that all l1Validator deletions happen before any l1Validator
+	// additions. This ensures that a subnetID+nodeID pair that was deleted and
+	// then re-added in a single diff can't get reordered into the addition
+	// happening first; which would return an error.
 	for _, l1Validator := range d.l1ValidatorsDiff.modified {
 		if !l1Validator.isDeleted() {
 			continue
