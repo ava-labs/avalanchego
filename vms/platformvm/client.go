@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ Client = (*client)(nil)
@@ -119,11 +121,12 @@ type Client interface {
 	// GetTimestamp returns the current chain timestamp
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
 	// GetValidatorsAt returns the weights of the validator set of a provided
-	// subnet at the specified height.
+	// subnet at the specified height or at proposerVM height if set to
+	// [platformapi.ProposedHeight]
 	GetValidatorsAt(
 		ctx context.Context,
 		subnetID ids.ID,
-		height uint64,
+		height platformapi.Height,
 		options ...rpc.Option,
 	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
@@ -572,13 +575,13 @@ func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 func (c *client) GetValidatorsAt(
 	ctx context.Context,
 	subnetID ids.ID,
-	height uint64,
+	height platformapi.Height,
 	options ...rpc.Option,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
-		Height:   json.Uint64(height),
+		Height:   height,
 	}, res, options...)
 	return res.Validators, err
 }

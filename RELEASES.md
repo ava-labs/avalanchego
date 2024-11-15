@@ -6,6 +6,7 @@
 
 - Added `platform.getL1Validator`
 - Added `platform.getProposedHeight`
+- Updated `platform.getValidatorsAt` to accept `"proposed"` as valid `height` input
 
 ### Configs
 
