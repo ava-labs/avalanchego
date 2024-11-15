@@ -185,7 +185,7 @@ func (s *visitor) BaseTx(tx *txs.BaseTx) error {
 	return sign(s.tx, false, txSigners)
 }
 
-func (s *visitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
+func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (s *visitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *visitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) error {
+func (s *visitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func (s *visitor) RegisterSubnetValidatorTx(tx *txs.RegisterSubnetValidatorTx) e
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *visitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx) error {
+func (s *visitor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -214,7 +214,7 @@ func (s *visitor) SetSubnetValidatorWeightTx(tx *txs.SetSubnetValidatorWeightTx)
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *visitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
+func (s *visitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
@@ -222,7 +222,7 @@ func (s *visitor) IncreaseBalanceTx(tx *txs.IncreaseBalanceTx) error {
 	return sign(s.tx, true, txSigners)
 }
 
-func (s *visitor) DisableSubnetValidatorTx(tx *txs.DisableSubnetValidatorTx) error {
+func (s *visitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

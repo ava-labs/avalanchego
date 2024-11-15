@@ -282,9 +282,9 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
-	stateDiff.SetSubnetConversion(
+	stateDiff.SetSubnetToL1Conversion(
 		subnetID,
-		state.SubnetConversion{
+		state.SubnetToL1Conversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte("address"),

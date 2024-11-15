@@ -69,7 +69,7 @@ func TestSignatureRequestVerify(t *testing.T) {
 			name: "unsupported warp addressed call payload type",
 			payload: must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 				nil,
-				must[*message.RegisterSubnetValidator](t)(message.NewRegisterSubnetValidator(
+				must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 					ids.GenerateTestID(),
 					ids.GenerateTestNodeID(),
 					[bls.PublicKeyLen]byte{},
@@ -81,7 +81,7 @@ func TestSignatureRequestVerify(t *testing.T) {
 			)).Bytes(),
 			expectedErr: &common.AppError{
 				Code:    ErrUnsupportedWarpAddressedCallPayloadType,
-				Message: "unsupported warp addressed call payload type: *message.RegisterSubnetValidator",
+				Message: "unsupported warp addressed call payload type: *message.RegisterL1Validator",
 			},
 		},
 	}
@@ -102,10 +102,10 @@ func TestSignatureRequestVerify(t *testing.T) {
 	}
 }
 
-func TestSignatureRequestVerifySubnetConversion(t *testing.T) {
+func TestSignatureRequestVerifySubnetToL1Conversion(t *testing.T) {
 	var (
 		subnetID   = ids.GenerateTestID()
-		conversion = state.SubnetConversion{
+		conversion = state.SubnetToL1Conversion{
 			ConversionID: ids.ID{1, 2, 3, 4, 5, 6, 7, 8},
 			ChainID:      ids.GenerateTestID(),
 			Addr:         utils.RandomBytes(20),
@@ -117,7 +117,7 @@ func TestSignatureRequestVerifySubnetConversion(t *testing.T) {
 		}
 	)
 
-	state.SetSubnetConversion(subnetID, conversion)
+	state.SetSubnetToL1Conversion(subnetID, conversion)
 
 	tests := []struct {
 		name         string
@@ -164,7 +164,7 @@ func TestSignatureRequestVerifySubnetConversion(t *testing.T) {
 					constants.PlatformChainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						nil,
-						must[*message.SubnetConversion](t)(message.NewSubnetConversion(
+						must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(
 							test.conversionID,
 						)).Bytes(),
 					)).Bytes(),
@@ -176,12 +176,12 @@ func TestSignatureRequestVerifySubnetConversion(t *testing.T) {
 	}
 }
 
-func TestSignatureRequestVerifySubnetValidatorRegistrationRegistered(t *testing.T) {
+func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
 	var (
-		sov = state.SubnetOnlyValidator{
+		l1Validator = state.L1Validator{
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
@@ -195,7 +195,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationRegistered(t *testing.
 		}
 	)
 
-	require.NoError(t, state.PutSubnetOnlyValidator(sov))
+	require.NoError(t, state.PutL1Validator(l1Validator))
 
 	tests := []struct {
 		name         string
@@ -211,7 +211,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationRegistered(t *testing.
 		},
 		{
 			name:         "validation exists",
-			validationID: sov.ValidationID,
+			validationID: l1Validator.ValidationID,
 		},
 	}
 	for _, test := range tests {
@@ -223,7 +223,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationRegistered(t *testing.
 					constants.PlatformChainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						nil,
-						must[*message.SubnetValidatorRegistration](t)(message.NewSubnetValidatorRegistration(
+						must[*message.L1ValidatorRegistration](t)(message.NewL1ValidatorRegistration(
 							test.validationID,
 							true,
 						)).Bytes(),
@@ -236,7 +236,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationRegistered(t *testing.
 	}
 }
 
-func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testing.T) {
+func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T) {
 	skBytes, err := hex.DecodeString("36a33c536d283dfa599d0a70839c67ded6c954e346c5e8e5b4794e2299907887")
 	require.NoError(t, err)
 
@@ -255,7 +255,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		weight              uint64 = 1
 	)
 
-	registerSubnetValidatorToRegister, err := message.NewRegisterSubnetValidator(
+	registerL1ValidatorToRegister, err := message.NewRegisterL1Validator(
 		convertedSubnetID,
 		nodeID0,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
@@ -266,7 +266,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	)
 	require.NoError(t, err)
 
-	registerSubnetValidatorNotToRegister, err := message.NewRegisterSubnetValidator(
+	registerL1ValidatorNotToRegister, err := message.NewRegisterL1Validator(
 		convertedSubnetID,
 		nodeID1,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
@@ -277,7 +277,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	)
 	require.NoError(t, err)
 
-	registerSubnetValidatorExpired, err := message.NewRegisterSubnetValidator(
+	registerL1ValidatorExpired, err := message.NewRegisterL1Validator(
 		convertedSubnetID,
 		nodeID2,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
@@ -288,7 +288,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	)
 	require.NoError(t, err)
 
-	registerSubnetValidatorToMarkExpired, err := message.NewRegisterSubnetValidator(
+	registerL1ValidatorToMarkExpired, err := message.NewRegisterL1Validator(
 		convertedSubnetID,
 		nodeID3,
 		[bls.PublicKeyLen]byte(bls.PublicKeyToCompressedBytes(pk)),
@@ -300,26 +300,26 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	require.NoError(t, err)
 
 	var (
-		conversion                          = state.SubnetConversion{}
-		registerSubnetValidatorValidationID = registerSubnetValidatorToRegister.ValidationID()
-		registerSubnetValidatorSoV          = state.SubnetOnlyValidator{
-			ValidationID: registerSubnetValidatorValidationID,
-			SubnetID:     registerSubnetValidatorToRegister.SubnetID,
-			NodeID:       ids.NodeID(registerSubnetValidatorToRegister.NodeID),
+		conversion                      = state.SubnetToL1Conversion{}
+		registerL1ValidatorValidationID = registerL1ValidatorToRegister.ValidationID()
+		registerL1ValidatorValidator    = state.L1Validator{
+			ValidationID: registerL1ValidatorValidationID,
+			SubnetID:     registerL1ValidatorToRegister.SubnetID,
+			NodeID:       ids.NodeID(registerL1ValidatorToRegister.NodeID),
 			PublicKey:    bls.PublicKeyToUncompressedBytes(pk),
-			Weight:       registerSubnetValidatorToRegister.Weight,
+			Weight:       registerL1ValidatorToRegister.Weight,
 		}
-		convertSubnetValidatorValidationID = registerSubnetValidatorToRegister.SubnetID.Append(0)
-		convertSubnetValidatorSoV          = state.SubnetOnlyValidator{
-			ValidationID: convertSubnetValidatorValidationID,
-			SubnetID:     registerSubnetValidatorToRegister.SubnetID,
+		convertSubnetToL1ValidationID = registerL1ValidatorToRegister.SubnetID.Append(0)
+		convertSubnetToL1Validator    = state.L1Validator{
+			ValidationID: convertSubnetToL1ValidationID,
+			SubnetID:     registerL1ValidatorToRegister.SubnetID,
 			NodeID:       ids.GenerateTestNodeID(),
 			PublicKey:    bls.PublicKeyToUncompressedBytes(pk),
-			Weight:       registerSubnetValidatorToRegister.Weight,
+			Weight:       registerL1ValidatorToRegister.Weight,
 		}
 		expiryEntry = state.ExpiryEntry{
 			Timestamp:    expiry,
-			ValidationID: registerSubnetValidatorToMarkExpired.ValidationID(),
+			ValidationID: registerL1ValidatorToMarkExpired.ValidationID(),
 		}
 
 		state = statetest.New(t, statetest.Config{})
@@ -329,9 +329,9 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		}
 	)
 
-	state.SetSubnetConversion(convertedSubnetID, conversion)
-	require.NoError(t, state.PutSubnetOnlyValidator(registerSubnetValidatorSoV))
-	require.NoError(t, state.PutSubnetOnlyValidator(convertSubnetValidatorSoV))
+	state.SetSubnetToL1Conversion(convertedSubnetID, conversion)
+	require.NoError(t, state.PutL1Validator(registerL1ValidatorValidator))
+	require.NoError(t, state.PutL1Validator(convertSubnetToL1Validator))
 	state.PutExpiry(expiryEntry)
 
 	tests := []struct {
@@ -351,8 +351,8 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		{
 			name: "failed to parse subnetID",
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{},
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData{},
 				},
 			)),
 			expectedErr: &common.AppError{
@@ -362,11 +362,11 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		},
 		{
 			name:         "mismatched convert subnet validationID",
-			validationID: registerSubnetValidatorNotToRegister.ValidationID(),
+			validationID: registerL1ValidatorNotToRegister.ValidationID(),
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
-						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData{
+						ConvertSubnetToL1TxData: &platformvm.SubnetIDIndex{
 							SubnetId: convertedSubnetID[:],
 							Index:    0,
 						},
@@ -380,11 +380,11 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		},
 		{
 			name:         "convert subnet validation exists",
-			validationID: convertSubnetValidatorValidationID,
+			validationID: convertSubnetToL1ValidationID,
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
-						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData{
+						ConvertSubnetToL1TxData: &platformvm.SubnetIDIndex{
 							SubnetId: convertedSubnetID[:],
 							Index:    0,
 						},
@@ -400,9 +400,9 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 			name:         "conversion does not exist",
 			validationID: unconvertedSubnetID.Append(0),
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
-						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData{
+						ConvertSubnetToL1TxData: &platformvm.SubnetIDIndex{
 							SubnetId: unconvertedSubnetID[:],
 							Index:    0,
 						},
@@ -418,9 +418,9 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 			name:         "valid convert subnet data",
 			validationID: convertedSubnetID.Append(1),
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_ConvertSubnetTxData{
-						ConvertSubnetTxData: &platformvm.SubnetIDIndex{
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_ConvertSubnetToL1TxData{
+						ConvertSubnetToL1TxData: &platformvm.SubnetIDIndex{
 							SubnetId: convertedSubnetID[:],
 							Index:    1,
 						},
@@ -429,24 +429,24 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 			)),
 		},
 		{
-			name: "failed to parse register subnet validator",
+			name: "failed to parse register L1 validator",
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{},
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{},
 				},
 			)),
 			expectedErr: &common.AppError{
-				Code:    ErrFailedToParseRegisterSubnetValidator,
-				Message: "failed to parse RegisterSubnetValidator justification: couldn't unpack codec version",
+				Code:    ErrFailedToParseRegisterL1Validator,
+				Message: "failed to parse RegisterL1Validator justification: couldn't unpack codec version",
 			},
 		},
 		{
 			name:         "mismatched registration validationID",
-			validationID: registerSubnetValidatorValidationID,
+			validationID: registerL1ValidatorValidationID,
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
-						RegisterSubnetValidatorMessage: registerSubnetValidatorNotToRegister.Bytes(),
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{
+						RegisterL1ValidatorMessage: registerL1ValidatorNotToRegister.Bytes(),
 					},
 				},
 			)),
@@ -457,11 +457,11 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		},
 		{
 			name:         "registration validation exists",
-			validationID: registerSubnetValidatorValidationID,
+			validationID: registerL1ValidatorValidationID,
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
-						RegisterSubnetValidatorMessage: registerSubnetValidatorToRegister.Bytes(),
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{
+						RegisterL1ValidatorMessage: registerL1ValidatorToRegister.Bytes(),
 					},
 				},
 			)),
@@ -472,22 +472,22 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		},
 		{
 			name:         "valid expired registration",
-			validationID: registerSubnetValidatorExpired.ValidationID(),
+			validationID: registerL1ValidatorExpired.ValidationID(),
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
-						RegisterSubnetValidatorMessage: registerSubnetValidatorExpired.Bytes(),
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{
+						RegisterL1ValidatorMessage: registerL1ValidatorExpired.Bytes(),
 					},
 				},
 			)),
 		},
 		{
 			name:         "validation could be registered",
-			validationID: registerSubnetValidatorNotToRegister.ValidationID(),
+			validationID: registerL1ValidatorNotToRegister.ValidationID(),
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
-						RegisterSubnetValidatorMessage: registerSubnetValidatorNotToRegister.Bytes(),
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{
+						RegisterL1ValidatorMessage: registerL1ValidatorNotToRegister.Bytes(),
 					},
 				},
 			)),
@@ -498,11 +498,11 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 		},
 		{
 			name:         "validation removed",
-			validationID: registerSubnetValidatorToMarkExpired.ValidationID(),
+			validationID: registerL1ValidatorToMarkExpired.ValidationID(),
 			justification: must[[]byte](t)(proto.Marshal(
-				&platformvm.SubnetValidatorRegistrationJustification{
-					Preimage: &platformvm.SubnetValidatorRegistrationJustification_RegisterSubnetValidatorMessage{
-						RegisterSubnetValidatorMessage: registerSubnetValidatorToMarkExpired.Bytes(),
+				&platformvm.L1ValidatorRegistrationJustification{
+					Preimage: &platformvm.L1ValidatorRegistrationJustification_RegisterL1ValidatorMessage{
+						RegisterL1ValidatorMessage: registerL1ValidatorToMarkExpired.Bytes(),
 					},
 				},
 			)),
@@ -524,7 +524,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 					constants.PlatformChainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						nil,
-						must[*message.SubnetValidatorRegistration](t)(message.NewSubnetValidatorRegistration(
+						must[*message.L1ValidatorRegistration](t)(message.NewL1ValidatorRegistration(
 							test.validationID,
 							false,
 						)).Bytes(),
@@ -543,7 +543,7 @@ func TestSignatureRequestVerifySubnetValidatorRegistrationNotRegistered(t *testi
 	}
 }
 
-func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
+func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -552,7 +552,7 @@ func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
 		nonce  = 10
 	)
 	var (
-		sov = state.SubnetOnlyValidator{
+		l1Validator = state.L1Validator{
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
@@ -568,7 +568,7 @@ func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
 		}
 	)
 
-	require.NoError(t, state.PutSubnetOnlyValidator(sov))
+	require.NoError(t, state.PutL1Validator(l1Validator))
 
 	tests := []struct {
 		name         string
@@ -594,7 +594,7 @@ func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "wrong nonce",
-			validationID: sov.ValidationID,
+			validationID: l1Validator.ValidationID,
 			expectedErr: &common.AppError{
 				Code:    ErrWrongNonce,
 				Message: "provided nonce 0 != expected nonce (11 - 1)",
@@ -602,7 +602,7 @@ func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "wrong weight",
-			validationID: sov.ValidationID,
+			validationID: l1Validator.ValidationID,
 			nonce:        nonce,
 			expectedErr: &common.AppError{
 				Code:    ErrWrongWeight,
@@ -611,7 +611,7 @@ func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
 		},
 		{
 			name:         "valid",
-			validationID: sov.ValidationID,
+			validationID: l1Validator.ValidationID,
 			nonce:        nonce,
 			weight:       weight,
 		},
@@ -625,7 +625,7 @@ func TestSignatureRequestVerifySubnetValidatorWeight(t *testing.T) {
 					constants.PlatformChainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						nil,
-						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+						must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 							test.validationID,
 							test.nonce,
 							test.weight,

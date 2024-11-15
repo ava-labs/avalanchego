@@ -349,15 +349,15 @@ func TestInputComplexity(t *testing.T) {
 	}
 }
 
-func TestConvertSubnetValidatorComplexity(t *testing.T) {
+func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
 	tests := []struct {
 		name     string
-		vdr      txs.ConvertSubnetValidator
+		vdr      txs.ConvertSubnetToL1Validator
 		expected gas.Dimensions
 	}{
 		{
 			name: "any can spend",
-			vdr: txs.ConvertSubnetValidator{
+			vdr: txs.ConvertSubnetToL1Validator{
 				NodeID:                make([]byte, ids.NodeIDLen),
 				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
@@ -366,12 +366,12 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 200,
 				gas.DBWrite:   4,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 		},
 		{
 			name: "single remaining balance owner",
-			vdr: txs.ConvertSubnetValidator{
+			vdr: txs.ConvertSubnetToL1Validator{
 				NodeID: make([]byte, ids.NodeIDLen),
 				Signer: signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{
@@ -385,12 +385,12 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
 				gas.DBWrite:   4,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 		},
 		{
 			name: "single deactivation owner",
-			vdr: txs.ConvertSubnetValidator{
+			vdr: txs.ConvertSubnetToL1Validator{
 				NodeID:                make([]byte, ids.NodeIDLen),
 				Signer:                signer.ProofOfPossession{},
 				RemainingBalanceOwner: message.PChainOwner{},
@@ -404,7 +404,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 			expected: gas.Dimensions{
 				gas.Bandwidth: 220,
 				gas.DBWrite:   4,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 		},
 	}
@@ -412,7 +412,7 @@ func TestConvertSubnetValidatorComplexity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			actual, err := ConvertSubnetValidatorComplexity(&test.vdr)
+			actual, err := ConvertSubnetToL1ValidatorComplexity(&test.vdr)
 			require.NoError(err)
 			require.Equal(test.expected, actual)
 
@@ -589,7 +589,7 @@ func TestSignerComplexity(t *testing.T) {
 			signer: &signer.ProofOfPossession{},
 			expected: gas.Dimensions{
 				gas.Bandwidth: 144,
-				gas.Compute:   1000,
+				gas.Compute:   1050,
 			},
 			expectedErr: nil,
 		},

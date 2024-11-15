@@ -909,9 +909,9 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
-	onAcceptState.SetSubnetConversion(
+	onAcceptState.SetSubnetToL1Conversion(
 		subnetID,
-		state.SubnetConversion{
+		state.SubnetToL1Conversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte("address"),
@@ -1753,8 +1753,8 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				// This isn't actually called, but is added here as a regression
 				// test to ensure that converted subnets can still remove
 				// permissioned validators.
-				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(
-					state.SubnetConversion{
+				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+					state.SubnetToL1Conversion{
 						ConversionID: ids.GenerateTestID(),
 						ChainID:      ids.GenerateTestID(),
 						Addr:         []byte("address"),
@@ -2226,8 +2226,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil)
-				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(
-					state.SubnetConversion{},
+				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+					state.SubnetToL1Conversion{},
 					database.ErrNotFound,
 				).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
@@ -2267,8 +2267,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(
-					state.SubnetConversion{
+				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+					state.SubnetToL1Conversion{
 						ConversionID: ids.GenerateTestID(),
 						ChainID:      ids.GenerateTestID(),
 						Addr:         make([]byte, 20),
@@ -2308,8 +2308,8 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				subnetOwner := fxmock.NewOwner(ctrl)
 				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
 				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.state.EXPECT().GetSubnetConversion(env.unsignedTx.Subnet).Return(
-					state.SubnetConversion{},
+				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
+					state.SubnetToL1Conversion{},
 					database.ErrNotFound,
 				).Times(1)
 				env.state.EXPECT().GetSubnetTransformation(env.unsignedTx.Subnet).Return(nil, database.ErrNotFound).Times(1)
@@ -2357,7 +2357,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	}
 }
 
-func TestStandardExecutorConvertSubnetTx(t *testing.T) {
+func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	var (
 		fx = &secp256k1fx.Fx{}
 		vm = &secp256k1fx.TestVM{
@@ -2479,9 +2479,9 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 		{
 			name: "invalid if subnet is converted",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetSubnetConversion(
+				e.state.SetSubnetToL1Conversion(
 					subnetID,
-					state.SubnetConversion{
+					state.SubnetToL1Conversion{
 						ConversionID: ids.GenerateTestID(),
 						ChainID:      ids.GenerateTestID(),
 						Addr:         utils.RandomBytes(32),
@@ -2517,16 +2517,16 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			expectedErr: errMaxNumActiveValidators,
 		},
 		{
-			name: "invalid subnet only validator",
+			name: "invalid L1 validator",
 			updateExecutor: func(e *standardTxExecutor) error {
-				return e.state.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
+				return e.state.PutL1Validator(state.L1Validator{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
 					Weight:       1,
 				})
 			},
-			expectedErr: state.ErrDuplicateSubnetOnlyValidator,
+			expectedErr: state.ErrDuplicateL1Validator,
 		},
 		{
 			name: "insufficient fee",
@@ -2550,7 +2550,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			sk, err := bls.NewSecretKey()
 			require.NoError(err)
 
-			// Create the ConvertSubnetTx
+			// Create the ConvertSubnetToL1Tx
 			const (
 				weight  = 1
 				balance = 1
@@ -2569,7 +2569,7 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 				chainID   = ids.GenerateTestID()
 				address   = utils.RandomBytes(32)
 				pop       = signer.NewProofOfPossession(sk)
-				validator = &txs.ConvertSubnetValidator{
+				validator = &txs.ConvertSubnetToL1Validator{
 					NodeID:                nodeID.Bytes(),
 					Weight:                weight,
 					Balance:               balance,
@@ -2578,11 +2578,11 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					DeactivationOwner:     message.PChainOwner{},
 				}
 			)
-			convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+			convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 				subnetID,
 				chainID,
 				address,
-				[]*txs.ConvertSubnetValidator{
+				[]*txs.ConvertSubnetToL1Validator{
 					validator,
 				},
 				test.builderOptions...,
@@ -2601,36 +2601,36 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					Ctx:          ctx,
 				},
 				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				tx:            convertSubnetTx,
+				tx:            convertSubnetToL1Tx,
 				state:         diff,
 			}
 			if test.updateExecutor != nil {
 				require.NoError(test.updateExecutor(executor))
 			}
 
-			err = convertSubnetTx.Unsigned.Visit(executor)
+			err = convertSubnetToL1Tx.Unsigned.Visit(executor)
 			require.ErrorIs(err, test.expectedErr)
 			if err != nil {
 				return
 			}
 
-			for utxoID := range convertSubnetTx.InputIDs() {
+			for utxoID := range convertSubnetToL1Tx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			for _, expectedUTXO := range convertSubnetTx.UTXOs() {
+			for _, expectedUTXO := range convertSubnetToL1Tx.UTXOs() {
 				utxoID := expectedUTXO.InputID()
 				utxo, err := diff.GetUTXO(utxoID)
 				require.NoError(err)
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			expectedConversionID, err := message.SubnetConversionID(message.SubnetConversionData{
+			expectedConversionID, err := message.SubnetToL1ConversionID(message.SubnetToL1ConversionData{
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
 				ManagerAddress: address,
-				Validators: []message.SubnetConversionValidatorData{
+				Validators: []message.SubnetToL1ConverstionValidatorData{
 					{
 						NodeID:       nodeID.Bytes(),
 						BLSPublicKey: pop.PublicKey,
@@ -2640,10 +2640,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			})
 			require.NoError(err)
 
-			stateConversion, err := diff.GetSubnetConversion(subnetID)
+			stateConversion, err := diff.GetSubnetToL1Conversion(subnetID)
 			require.NoError(err)
 			require.Equal(
-				state.SubnetConversion{
+				state.SubnetToL1Conversion{
 					ConversionID: expectedConversionID,
 					ChainID:      chainID,
 					Addr:         address,
@@ -2661,10 +2661,10 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 			deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
 			require.NoError(err)
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 			require.Equal(
-				state.SubnetOnlyValidator{
+				state.L1Validator{
 					ValidationID:          validationID,
 					SubnetID:              subnetID,
 					NodeID:                nodeID,
@@ -2676,13 +2676,13 @@ func TestStandardExecutorConvertSubnetTx(t *testing.T) {
 					MinNonce:              0,
 					EndAccumulatedFee:     validator.Balance + diff.GetAccruedFees(),
 				},
-				sov,
+				l1Validator,
 			)
 		})
 	}
 }
 
-func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
+func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	var (
 		fx = &secp256k1fx.Fx{}
 		vm = &secp256k1fx.TestVM{
@@ -2761,7 +2761,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		address       = utils.RandomBytes(32)
 		initialNodeID = ids.GenerateTestNodeID()
 		initialPoP    = signer.NewProofOfPossession(initialSK)
-		validator     = &txs.ConvertSubnetValidator{
+		validator     = &txs.ConvertSubnetToL1Validator{
 			NodeID:                initialNodeID.Bytes(),
 			Weight:                initialWeight,
 			Balance:               initialBalance,
@@ -2770,11 +2770,11 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			DeactivationOwner:     message.PChainOwner{},
 		}
 	)
-	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetValidator{
+		[]*txs.ConvertSubnetToL1Validator{
 			validator,
 		},
 	)
@@ -2784,7 +2784,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 	_, _, _, err = StandardTx(
 		backend,
 		feeCalculator,
-		convertSubnetTx,
+		convertSubnetToL1Tx,
 		diff,
 	)
 	require.NoError(t, err)
@@ -2815,7 +2815,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 	deactivationOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, &deactivationOwner)
 	require.NoError(t, err)
 
-	addressedCallPayload := must[*message.RegisterSubnetValidator](t)(message.NewRegisterSubnetValidator(
+	addressedCallPayload := must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 		subnetID,
 		nodeID,
 		pop.PublicKey,
@@ -2852,7 +2852,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		balance        uint64
 		message        []byte
 		builderOptions []common.Option
-		updateTx       func(*txs.RegisterSubnetValidatorTx)
+		updateTx       func(*txs.RegisterL1ValidatorTx)
 		updateExecutor func(*standardTxExecutor) error
 		expectedErr    error
 	}{
@@ -2891,7 +2891,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "fee calculation overflow",
-			updateTx: func(tx *txs.RegisterSubnetValidatorTx) {
+			updateTx: func(tx *txs.RegisterL1ValidatorTx) {
 				tx.Balance = math.MaxUint64
 			},
 			expectedErr: safemath.ErrOverflow,
@@ -2932,7 +2932,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.SubnetConversion](t)(message.NewSubnetConversion(ids.Empty)).Bytes(),
+						must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(ids.Empty)).Bytes(),
 					)).Bytes(),
 				)),
 				warpSignature,
@@ -2947,7 +2947,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.RegisterSubnetValidator](t)(message.NewRegisterSubnetValidator(
+						must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 							subnetID,
 							nodeID,
 							pop.PublicKey,
@@ -2970,7 +2970,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.RegisterSubnetValidator](t)(message.NewRegisterSubnetValidator(
+						must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 							ids.GenerateTestID(), // invalid subnetID
 							nodeID,
 							pop.PublicKey,
@@ -2983,12 +2983,12 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				)),
 				warpSignature,
 			)).Bytes(),
-			expectedErr: errCouldNotLoadSubnetConversion,
+			expectedErr: errCouldNotLoadSubnetToL1Conversion,
 		},
 		{
 			name: "invalid source chain",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{})
+				e.state.SetSubnetToL1Conversion(subnetID, state.SubnetToL1Conversion{})
 				return nil
 			},
 			expectedErr: errWrongWarpMessageSourceChainID,
@@ -2996,7 +2996,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		{
 			name: "invalid source address",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{
+				e.state.SetSubnetToL1Conversion(subnetID, state.SubnetToL1Conversion{
 					ChainID: chainID,
 				})
 				return nil
@@ -3019,7 +3019,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.RegisterSubnetValidator](t)(message.NewRegisterSubnetValidator(
+						must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 							subnetID,
 							nodeID,
 							pop.PublicKey,
@@ -3035,7 +3035,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			expectedErr: errWarpMessageNotYetAllowed,
 		},
 		{
-			name:    "SoV previously registered",
+			name:    "L1 Validator previously registered",
 			balance: 1,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.PutExpiry(state.ExpiryEntry{
@@ -3054,7 +3054,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.RegisterSubnetValidator](t)(message.NewRegisterSubnetValidator(
+						must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 							subnetID,
 							nodeID,
 							initialPoP.PublicKey, // Wrong public key
@@ -3099,7 +3099,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		{
 			name: "duplicate subnetID + nodeID pair",
 			updateExecutor: func(e *standardTxExecutor) error {
-				return e.state.PutSubnetOnlyValidator(state.SubnetOnlyValidator{
+				return e.state.PutL1Validator(state.L1Validator{
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
@@ -3107,7 +3107,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					Weight:       1,
 				})
 			},
-			expectedErr: state.ErrDuplicateSubnetOnlyValidator,
+			expectedErr: state.ErrDuplicateL1Validator,
 		},
 		{
 			name: "valid tx",
@@ -3117,7 +3117,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Create the RegisterSubnetValidatorTx
+			// Create the RegisterL1ValidatorTx
 			wallet := txstest.NewWallet(
 				t,
 				ctx,
@@ -3129,7 +3129,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				nil, // chainIDs
 			)
 
-			registerSubnetValidatorTx, err := wallet.IssueRegisterSubnetValidatorTx(
+			registerL1ValidatorTx, err := wallet.IssueRegisterL1ValidatorTx(
 				test.balance,
 				pop.ProofOfPossession,
 				warpMessage.Bytes(),
@@ -3137,7 +3137,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			unsignedTx := registerSubnetValidatorTx.Unsigned.(*txs.RegisterSubnetValidatorTx)
+			unsignedTx := registerL1ValidatorTx.Unsigned.(*txs.RegisterL1ValidatorTx)
 			if test.message != nil {
 				unsignedTx.Message = test.message
 			}
@@ -3157,32 +3157,32 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					Ctx:          ctx,
 				},
 				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				tx:            registerSubnetValidatorTx,
+				tx:            registerL1ValidatorTx,
 				state:         diff,
 			}
 			if test.updateExecutor != nil {
 				require.NoError(test.updateExecutor(executor))
 			}
 
-			err = registerSubnetValidatorTx.Unsigned.Visit(executor)
+			err = registerL1ValidatorTx.Unsigned.Visit(executor)
 			require.ErrorIs(err, test.expectedErr)
 			if err != nil {
 				return
 			}
 
-			for utxoID := range registerSubnetValidatorTx.InputIDs() {
+			for utxoID := range registerL1ValidatorTx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			for _, expectedUTXO := range registerSubnetValidatorTx.UTXOs() {
+			for _, expectedUTXO := range registerL1ValidatorTx.UTXOs() {
 				utxoID := expectedUTXO.InputID()
 				utxo, err := diff.GetUTXO(utxoID)
 				require.NoError(err)
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
 			var expectedEndAccumulatedFee uint64
@@ -3190,7 +3190,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 				expectedEndAccumulatedFee = test.balance + diff.GetAccruedFees()
 			}
 			require.Equal(
-				state.SubnetOnlyValidator{
+				state.L1Validator{
 					ValidationID:          validationID,
 					SubnetID:              subnetID,
 					NodeID:                nodeID,
@@ -3202,7 +3202,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 					MinNonce:              0,
 					EndAccumulatedFee:     expectedEndAccumulatedFee,
 				},
-				sov,
+				l1Validator,
 			)
 
 			hasExpiry, err := diff.HasExpiry(state.ExpiryEntry{
@@ -3215,7 +3215,7 @@ func TestStandardExecutorRegisterSubnetValidatorTx(t *testing.T) {
 	}
 }
 
-func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
+func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	var (
 		fx = &secp256k1fx.Fx{}
 		vm = &secp256k1fx.TestVM{
@@ -3292,7 +3292,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		subnetID  = createSubnetTx.ID()
 		chainID   = ids.GenerateTestID()
 		address   = utils.RandomBytes(32)
-		validator = &txs.ConvertSubnetValidator{
+		validator = &txs.ConvertSubnetToL1Validator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  initialWeight,
 			Balance: balance,
@@ -3311,11 +3311,11 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		validationID = subnetID.Append(0)
 	)
 
-	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetValidator{
+		[]*txs.ConvertSubnetToL1Validator{
 			validator,
 		},
 	)
@@ -3325,14 +3325,14 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 	_, _, _, err = StandardTx(
 		backend,
 		feeCalculator,
-		convertSubnetTx,
+		convertSubnetToL1Tx,
 		diff,
 	)
 	require.NoError(t, err)
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	initialL1Validator, err := baseState.GetL1Validator(validationID)
 	require.NoError(t, err)
 
 	// Create the Warp messages
@@ -3345,7 +3345,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		chainID,
 		must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 			address,
-			must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+			must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 				validationID,
 				nonce,
 				weight,
@@ -3371,7 +3371,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 			chainID,
 			must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 				address,
-				must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+				must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 					validationID,
 					nonce,
 					0,
@@ -3383,11 +3383,11 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 
 	increaseL1Weight := func(weight uint64) func(*standardTxExecutor) error {
 		return func(e *standardTxExecutor) error {
-			sov := initialSoV
-			sov.ValidationID = ids.GenerateTestID()
-			sov.NodeID = ids.GenerateTestNodeID()
-			sov.Weight = weight
-			return e.state.PutSubnetOnlyValidator(sov)
+			l1Validator := initialL1Validator
+			l1Validator.ValidationID = ids.GenerateTestID()
+			l1Validator.NodeID = ids.GenerateTestNodeID()
+			l1Validator.Weight = weight
+			return e.state.PutL1Validator(l1Validator)
 		}
 	}
 
@@ -3470,7 +3470,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.SubnetConversion](t)(message.NewSubnetConversion(ids.Empty)).Bytes(),
+						must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(ids.Empty)).Bytes(),
 					)).Bytes(),
 				)),
 				warpSignature,
@@ -3485,7 +3485,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+						must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 							validationID,
 							math.MaxUint64,
 							1,
@@ -3497,14 +3497,14 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 			expectedErr: message.ErrNonceReservedForRemoval,
 		},
 		{
-			name: "SoV not found",
+			name: "L1 validator not found",
 			message: must[*warp.Message](t)(warp.NewMessage(
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					ctx.NetworkID,
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+						must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 							ids.GenerateTestID(), // invalid initialValidationID
 							nonce,
 							weight,
@@ -3513,21 +3513,21 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 				)),
 				warpSignature,
 			)).Bytes(),
-			expectedErr: errCouldNotLoadSoV,
+			expectedErr: errCouldNotLoadL1Validator,
 		},
 		{
 			name: "nonce too low",
 			updateExecutor: func(e *standardTxExecutor) error {
-				sov := initialSoV
-				sov.MinNonce = nonce + 1
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1Validator := initialL1Validator
+				l1Validator.MinNonce = nonce + 1
+				return e.state.PutL1Validator(l1Validator)
 			},
 			expectedErr: errWarpMessageContainsStaleNonce,
 		},
 		{
 			name: "invalid source chain",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{})
+				e.state.SetSubnetToL1Conversion(subnetID, state.SubnetToL1Conversion{})
 				return nil
 			},
 			expectedErr: errWrongWarpMessageSourceChainID,
@@ -3535,7 +3535,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		{
 			name: "invalid source address",
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetSubnetConversion(subnetID, state.SubnetConversion{
+				e.state.SetSubnetToL1Conversion(subnetID, state.SubnetToL1Conversion{
 					ChainID: chainID,
 				})
 				return nil
@@ -3556,9 +3556,9 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					return err
 				}
 
-				sov := initialSoV
-				sov.EndAccumulatedFee = 0 // Deactivate the validator
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1Validator := initialL1Validator
+				l1Validator.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutL1Validator(l1Validator)
 			},
 		},
 		{
@@ -3569,7 +3569,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					chainID,
 					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
 						address,
-						must[*message.SubnetValidatorWeight](t)(message.NewSubnetValidatorWeight(
+						must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 							validationID,
 							math.MaxUint64,
 							0,
@@ -3584,16 +3584,16 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					return err
 				}
 
-				sov := initialSoV
-				sov.EndAccumulatedFee = 0 // Deactivate the validator
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1Validator := initialL1Validator
+				l1Validator.EndAccumulatedFee = 0 // Deactivate the validator
+				return e.state.PutL1Validator(l1Validator)
 			},
 		},
 		{
 			name:    "should have been previously deactivated",
 			message: removeValidatorWarpMessage.Bytes(),
 			updateExecutor: func(e *standardTxExecutor) error {
-				e.state.SetAccruedFees(initialSoV.EndAccumulatedFee)
+				e.state.SetAccruedFees(initialL1Validator.EndAccumulatedFee)
 				return increaseL1Weight(1)(e)
 			},
 			expectedErr: errStateCorruption,
@@ -3630,7 +3630,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Create the SetSubnetValidatorWeightTx
+			// Create the SetL1ValidatorWeightTx
 			wallet := txstest.NewWallet(
 				t,
 				ctx,
@@ -3642,14 +3642,14 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 				nil, // chainIDs
 			)
 
-			setSubnetValidatorWeightTx, err := wallet.IssueSetSubnetValidatorWeightTx(
+			setL1ValidatorWeightTx, err := wallet.IssueSetL1ValidatorWeightTx(
 				increaseWeightWarpMessage.Bytes(),
 				test.builderOptions...,
 			)
 			require.NoError(err)
 
 			if test.message != nil {
-				unsignedTx := setSubnetValidatorWeightTx.Unsigned.(*txs.SetSubnetValidatorWeightTx)
+				unsignedTx := setL1ValidatorWeightTx.Unsigned.(*txs.SetL1ValidatorWeightTx)
 				unsignedTx.Message = test.message
 			}
 
@@ -3665,25 +3665,25 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 					Ctx:          ctx,
 				},
 				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				tx:            setSubnetValidatorWeightTx,
+				tx:            setL1ValidatorWeightTx,
 				state:         diff,
 			}
 			if test.updateExecutor != nil {
 				require.NoError(test.updateExecutor(executor))
 			}
 
-			err = setSubnetValidatorWeightTx.Unsigned.Visit(executor)
+			err = setL1ValidatorWeightTx.Unsigned.Visit(executor)
 			require.ErrorIs(err, test.expectedErr)
 			if err != nil {
 				return
 			}
 
-			for utxoID := range setSubnetValidatorWeightTx.InputIDs() {
+			for utxoID := range setL1ValidatorWeightTx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			baseTxOutputUTXOs := setSubnetValidatorWeightTx.UTXOs()
+			baseTxOutputUTXOs := setL1ValidatorWeightTx.UTXOs()
 			for _, expectedUTXO := range baseTxOutputUTXOs {
 				utxoID := expectedUTXO.InputID()
 				utxo, err := diff.GetUTXO(utxoID)
@@ -3691,20 +3691,20 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			if test.expectedWeight != 0 {
 				require.NoError(err)
 
-				expectedSoV := initialSoV
-				expectedSoV.MinNonce = test.expectedNonce
-				expectedSoV.Weight = test.expectedWeight
-				require.Equal(expectedSoV, sov)
+				expectedL1Validator := initialL1Validator
+				expectedL1Validator.MinNonce = test.expectedNonce
+				expectedL1Validator.Weight = test.expectedWeight
+				require.Equal(expectedL1Validator, l1Validator)
 				return
 			}
 			require.ErrorIs(err, database.ErrNotFound)
 
 			utxoID := avax.UTXOID{
-				TxID:        setSubnetValidatorWeightTx.ID(),
+				TxID:        setL1ValidatorWeightTx.ID(),
 				OutputIndex: uint32(len(baseTxOutputUTXOs)),
 			}
 			inputID := utxoID.InputID()
@@ -3721,7 +3721,7 @@ func TestStandardExecutorSetSubnetValidatorWeightTx(t *testing.T) {
 	}
 }
 
-func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
+func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	var (
 		fx = &secp256k1fx.Fx{}
 		vm = &secp256k1fx.TestVM{
@@ -3798,7 +3798,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		subnetID  = createSubnetTx.ID()
 		chainID   = ids.GenerateTestID()
 		address   = utils.RandomBytes(32)
-		validator = &txs.ConvertSubnetValidator{
+		validator = &txs.ConvertSubnetToL1Validator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  weight,
 			Balance: initialBalance,
@@ -3817,11 +3817,11 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		validationID = subnetID.Append(0)
 	)
 
-	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetValidator{
+		[]*txs.ConvertSubnetToL1Validator{
 			validator,
 		},
 	)
@@ -3831,14 +3831,14 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 	_, _, _, err = StandardTx(
 		backend,
 		feeCalculator,
-		convertSubnetTx,
+		convertSubnetToL1Tx,
 		diff,
 	)
 	require.NoError(t, err)
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	initialL1Validator, err := baseState.GetL1Validator(validationID)
 	require.NoError(t, err)
 
 	const balanceIncrease = units.NanoAvax
@@ -3846,7 +3846,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		name            string
 		validationID    ids.ID
 		builderOptions  []common.Option
-		updateTx        func(*txs.IncreaseBalanceTx)
+		updateTx        func(*txs.IncreaseL1ValidatorBalanceTx)
 		updateExecutor  func(*standardTxExecutor) error
 		expectedBalance uint64
 		expectedErr     error
@@ -3886,7 +3886,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		},
 		{
 			name: "fee overflow",
-			updateTx: func(tx *txs.IncreaseBalanceTx) {
+			updateTx: func(tx *txs.IncreaseL1ValidatorBalanceTx) {
 				tx.Balance = math.MaxUint64
 			},
 			expectedErr: safemath.ErrOverflow,
@@ -3944,7 +3944,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Create the IncreaseBalanceTx
+			// Create the IncreaseL1ValidatorBalanceTx
 			wallet := txstest.NewWallet(
 				t,
 				ctx,
@@ -3956,14 +3956,14 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 				nil, // chainIDs
 			)
 
-			increaseBalanceTx, err := wallet.IssueIncreaseBalanceTx(
+			increaseL1ValidatorBalanceTx, err := wallet.IssueIncreaseL1ValidatorBalanceTx(
 				test.validationID,
 				balanceIncrease,
 				test.builderOptions...,
 			)
 			require.NoError(err)
 
-			unsignedTx := increaseBalanceTx.Unsigned.(*txs.IncreaseBalanceTx)
+			unsignedTx := increaseL1ValidatorBalanceTx.Unsigned.(*txs.IncreaseL1ValidatorBalanceTx)
 			if test.updateTx != nil {
 				test.updateTx(unsignedTx)
 			}
@@ -3980,7 +3980,7 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 					Ctx:          ctx,
 				},
 				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				tx:            increaseBalanceTx,
+				tx:            increaseL1ValidatorBalanceTx,
 				state:         diff,
 			}
 			if test.updateExecutor != nil {
@@ -3993,12 +3993,12 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 				return
 			}
 
-			for utxoID := range increaseBalanceTx.InputIDs() {
+			for utxoID := range increaseL1ValidatorBalanceTx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			baseTxOutputUTXOs := increaseBalanceTx.UTXOs()
+			baseTxOutputUTXOs := increaseL1ValidatorBalanceTx.UTXOs()
 			for _, expectedUTXO := range baseTxOutputUTXOs {
 				utxoID := expectedUTXO.InputID()
 				utxo, err := diff.GetUTXO(utxoID)
@@ -4006,17 +4006,17 @@ func TestStandardExecutorIncreaseBalanceTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
-			expectedSoV := initialSoV
-			expectedSoV.EndAccumulatedFee = test.expectedBalance
-			require.Equal(expectedSoV, sov)
+			expectedL1Validator := initialL1Validator
+			expectedL1Validator.EndAccumulatedFee = test.expectedBalance
+			require.Equal(expectedL1Validator, l1Validator)
 		})
 	}
 }
 
-func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
+func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	var (
 		fx = &secp256k1fx.Fx{}
 		vm = &secp256k1fx.TestVM{
@@ -4094,7 +4094,7 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 		subnetID  = createSubnetTx.ID()
 		chainID   = ids.GenerateTestID()
 		address   = utils.RandomBytes(32)
-		validator = &txs.ConvertSubnetValidator{
+		validator = &txs.ConvertSubnetToL1Validator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  weight,
 			Balance: initialBalance,
@@ -4117,11 +4117,11 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 		validationID = subnetID.Append(0)
 	)
 
-	convertSubnetTx, err := wallet.IssueConvertSubnetTx(
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetValidator{
+		[]*txs.ConvertSubnetToL1Validator{
 			validator,
 		},
 	)
@@ -4131,21 +4131,21 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 	_, _, _, err = StandardTx(
 		backend,
 		feeCalculator,
-		convertSubnetTx,
+		convertSubnetToL1Tx,
 		diff,
 	)
 	require.NoError(t, err)
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	initialSoV, err := baseState.GetSubnetOnlyValidator(validationID)
+	initialL1Validator, err := baseState.GetL1Validator(validationID)
 	require.NoError(t, err)
 
 	tests := []struct {
 		name            string
 		validationID    ids.ID
 		builderOptions  []common.Option
-		updateTx        func(*txs.DisableSubnetValidatorTx)
+		updateTx        func(*txs.DisableL1ValidatorTx)
 		updateExecutor  func(*standardTxExecutor) error
 		expectedBalance uint64
 		expectedErr     error
@@ -4176,14 +4176,14 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name:         "sov not found",
+			name:         "l1Validator not found",
 			validationID: ids.GenerateTestID(),
-			expectedErr:  errCouldNotLoadSoV,
+			expectedErr:  errCouldNotLoadL1Validator,
 		},
 		{
 			name:         "not authorized",
 			validationID: validationID,
-			updateTx: func(tx *txs.DisableSubnetValidatorTx) {
+			updateTx: func(tx *txs.DisableL1ValidatorTx) {
 				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
 			},
 			expectedErr: errUnauthorizedModification,
@@ -4201,9 +4201,9 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 			name:         "already deactivated",
 			validationID: validationID,
 			updateExecutor: func(e *standardTxExecutor) error {
-				sov := initialSoV
-				sov.EndAccumulatedFee = 0
-				return e.state.PutSubnetOnlyValidator(sov)
+				l1Validator := initialL1Validator
+				l1Validator.EndAccumulatedFee = 0
+				return e.state.PutL1Validator(l1Validator)
 			},
 			expectedBalance: 0,
 		},
@@ -4226,7 +4226,7 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Create the DisableSubnetValidatorTx
+			// Create the DisableL1ValidatorTx
 			wallet := txstest.NewWallet(
 				t,
 				ctx,
@@ -4238,13 +4238,13 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 				nil, // chainIDs
 			)
 
-			disableSubnetValidatorTx, err := wallet.IssueDisableSubnetValidatorTx(
+			disableL1ValidatorTx, err := wallet.IssueDisableL1ValidatorTx(
 				validationID,
 				test.builderOptions...,
 			)
 			require.NoError(err)
 
-			unsignedTx := disableSubnetValidatorTx.Unsigned.(*txs.DisableSubnetValidatorTx)
+			unsignedTx := disableL1ValidatorTx.Unsigned.(*txs.DisableL1ValidatorTx)
 			unsignedTx.ValidationID = test.validationID
 			if test.updateTx != nil {
 				test.updateTx(unsignedTx)
@@ -4262,7 +4262,7 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 					Ctx:          ctx,
 				},
 				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				tx:            disableSubnetValidatorTx,
+				tx:            disableL1ValidatorTx,
 				state:         diff,
 			}
 			if test.updateExecutor != nil {
@@ -4275,12 +4275,12 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 				return
 			}
 
-			for utxoID := range disableSubnetValidatorTx.InputIDs() {
+			for utxoID := range disableL1ValidatorTx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			baseTxOutputUTXOs := disableSubnetValidatorTx.UTXOs()
+			baseTxOutputUTXOs := disableL1ValidatorTx.UTXOs()
 			for _, expectedUTXO := range baseTxOutputUTXOs {
 				utxoID := expectedUTXO.InputID()
 				utxo, err := diff.GetUTXO(utxoID)
@@ -4288,15 +4288,15 @@ func TestStandardExecutorDisableSubnetValidatorTx(t *testing.T) {
 				require.Equal(expectedUTXO, utxo)
 			}
 
-			sov, err := diff.GetSubnetOnlyValidator(validationID)
+			l1Validator, err := diff.GetL1Validator(validationID)
 			require.NoError(err)
 
-			expectedSoV := initialSoV
-			expectedSoV.EndAccumulatedFee = 0
-			require.Equal(expectedSoV, sov)
+			expectedL1Validator := initialL1Validator
+			expectedL1Validator.EndAccumulatedFee = 0
+			require.Equal(expectedL1Validator, l1Validator)
 
 			utxoID := avax.UTXOID{
-				TxID:        disableSubnetValidatorTx.ID(),
+				TxID:        disableL1ValidatorTx.ID(),
 				OutputIndex: uint32(len(baseTxOutputUTXOs)),
 			}
 			inputID := utxoID.InputID()
