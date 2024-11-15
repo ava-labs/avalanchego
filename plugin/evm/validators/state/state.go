@@ -29,13 +29,13 @@ const (
 )
 
 type validatorData struct {
-	UpDuration  time.Duration `serialize:"true"`
-	LastUpdated uint64        `serialize:"true"`
-	NodeID      ids.NodeID    `serialize:"true"`
-	Weight      uint64        `serialize:"true"`
-	StartTime   uint64        `serialize:"true"`
-	IsActive    bool          `serialize:"true"`
-	IsSoV       bool          `serialize:"true"`
+	UpDuration    time.Duration `serialize:"true"`
+	LastUpdated   uint64        `serialize:"true"`
+	NodeID        ids.NodeID    `serialize:"true"`
+	Weight        uint64        `serialize:"true"`
+	StartTime     uint64        `serialize:"true"`
+	IsActive      bool          `serialize:"true"`
+	IsL1Validator bool          `serialize:"true"`
 
 	validationID ids.ID // database key
 }
@@ -105,14 +105,14 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 // the new validator is marked as updated and will be written to the disk when WriteState is called
 func (s *state) AddValidator(vdr interfaces.Validator) error {
 	data := &validatorData{
-		NodeID:       vdr.NodeID,
-		validationID: vdr.ValidationID,
-		IsActive:     vdr.IsActive,
-		StartTime:    vdr.StartTimestamp,
-		UpDuration:   0,
-		LastUpdated:  vdr.StartTimestamp,
-		IsSoV:        vdr.IsSoV,
-		Weight:       vdr.Weight,
+		NodeID:        vdr.NodeID,
+		validationID:  vdr.ValidationID,
+		IsActive:      vdr.IsActive,
+		StartTime:     vdr.StartTimestamp,
+		UpDuration:    0,
+		LastUpdated:   vdr.StartTimestamp,
+		IsL1Validator: vdr.IsL1Validator,
+		Weight:        vdr.Weight,
 	}
 	if err := s.addData(vdr.ValidationID, data); err != nil {
 		return err
@@ -251,7 +251,7 @@ func (s *state) GetValidator(vID ids.ID) (interfaces.Validator, error) {
 		StartTimestamp: data.StartTime,
 		IsActive:       data.IsActive,
 		Weight:         data.Weight,
-		IsSoV:          data.IsSoV,
+		IsL1Validator:  data.IsL1Validator,
 	}, nil
 }
 
@@ -345,6 +345,6 @@ func (v *validatorData) getStartTime() time.Time {
 func (v *validatorData) constantsAreUnmodified(u interfaces.Validator) bool {
 	return v.validationID == u.ValidationID &&
 		v.NodeID == u.NodeID &&
-		v.IsSoV == u.IsSoV &&
+		v.IsL1Validator == u.IsL1Validator &&
 		v.StartTime == u.StartTimestamp
 }

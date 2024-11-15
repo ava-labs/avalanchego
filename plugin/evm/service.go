@@ -24,7 +24,7 @@ type CurrentValidator struct {
 	Weight         uint64        `json:"weight"`
 	StartTimestamp uint64        `json:"startTimestamp"`
 	IsActive       bool          `json:"isActive"`
-	IsSoV          bool          `json:"isSoV"`
+	IsL1Validator  bool          `json:"isL1Validator"`
 	IsConnected    bool          `json:"isConnected"`
 	Uptime         time.Duration `json:"uptime"`
 }
@@ -56,7 +56,7 @@ func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, _ *struct{}, rep
 			StartTimestamp: validator.StartTimestamp,
 			Weight:         validator.Weight,
 			IsActive:       validator.IsActive,
-			IsSoV:          validator.IsSoV,
+			IsL1Validator:  validator.IsL1Validator,
 			IsConnected:    isConnected,
 			Uptime:         time.Duration(uptime.Seconds()),
 		})

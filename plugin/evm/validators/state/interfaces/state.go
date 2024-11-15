@@ -49,5 +49,5 @@ type Validator struct {
 	Weight         uint64     `json:"weight"`
 	StartTimestamp uint64     `json:"startTimestamp"`
 	IsActive       bool       `json:"isActive"`
-	IsSoV          bool       `json:"isSoV"`
+	IsL1Validator  bool       `json:"isL1Validator"`
 }

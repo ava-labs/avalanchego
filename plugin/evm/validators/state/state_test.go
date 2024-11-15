@@ -42,7 +42,7 @@ func TestState(t *testing.T) {
 		Weight:         1,
 		StartTimestamp: uint64(startTime.Unix()),
 		IsActive:       true,
-		IsSoV:          true,
+		IsL1Validator:  true,
 	}
 	state.AddValidator(vdr)
 
@@ -98,7 +98,7 @@ func TestState(t *testing.T) {
 	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
 
 	// set SoV should fail
-	vdr.IsSoV = false
+	vdr.IsL1Validator = false
 	require.ErrorIs(state.UpdateValidator(vdr), ErrImmutableField)
 
 	// set validation ID should result in not found
@@ -131,7 +131,7 @@ func TestWriteValidator(t *testing.T) {
 		Weight:         1,
 		StartTimestamp: uint64(startTime.Unix()),
 		IsActive:       true,
-		IsSoV:          true,
+		IsL1Validator:  true,
 	}))
 
 	// write state, should reflect to DB
@@ -176,14 +176,14 @@ func TestParseValidator(t *testing.T) {
 			name:  "nil",
 			bytes: nil,
 			expected: &validatorData{
-				LastUpdated:  0,
-				StartTime:    0,
-				validationID: ids.Empty,
-				NodeID:       ids.EmptyNodeID,
-				UpDuration:   0,
-				Weight:       0,
-				IsActive:     false,
-				IsSoV:        false,
+				LastUpdated:   0,
+				StartTime:     0,
+				validationID:  ids.Empty,
+				NodeID:        ids.EmptyNodeID,
+				UpDuration:    0,
+				Weight:        0,
+				IsActive:      false,
+				IsL1Validator: false,
 			},
 			expectedErr: nil,
 		},
@@ -191,14 +191,14 @@ func TestParseValidator(t *testing.T) {
 			name:  "empty",
 			bytes: []byte{},
 			expected: &validatorData{
-				LastUpdated:  0,
-				StartTime:    0,
-				validationID: ids.Empty,
-				NodeID:       ids.EmptyNodeID,
-				UpDuration:   0,
-				Weight:       0,
-				IsActive:     false,
-				IsSoV:        false,
+				LastUpdated:   0,
+				StartTime:     0,
+				validationID:  ids.Empty,
+				NodeID:        ids.EmptyNodeID,
+				UpDuration:    0,
+				Weight:        0,
+				IsActive:      false,
+				IsL1Validator: false,
 			},
 			expectedErr: nil,
 		},
@@ -225,13 +225,13 @@ func TestParseValidator(t *testing.T) {
 				0x01,
 			},
 			expected: &validatorData{
-				UpDuration:  time.Duration(6000000),
-				LastUpdated: 900000,
-				NodeID:      testNodeID,
-				StartTime:   6000000,
-				IsActive:    true,
-				Weight:      1,
-				IsSoV:       true,
+				UpDuration:    time.Duration(6000000),
+				LastUpdated:   900000,
+				NodeID:        testNodeID,
+				StartTime:     6000000,
+				IsActive:      true,
+				Weight:        1,
+				IsL1Validator: true,
 			},
 		},
 		{
@@ -299,7 +299,7 @@ func TestStateListener(t *testing.T) {
 		Weight:         1,
 		StartTimestamp: uint64(initialStartTime.Unix()),
 		IsActive:       true,
-		IsSoV:          true,
+		IsL1Validator:  true,
 	}))
 
 	// register listener
@@ -314,7 +314,7 @@ func TestStateListener(t *testing.T) {
 		Weight:         1,
 		StartTimestamp: uint64(expectedStartTime.Unix()),
 		IsActive:       true,
-		IsSoV:          true,
+		IsL1Validator:  true,
 	}
 	require.NoError(state.AddValidator(vdr))
 

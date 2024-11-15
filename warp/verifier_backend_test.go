@@ -318,7 +318,7 @@ func TestUptimeSignatures(t *testing.T) {
 			Weight:         1,
 			StartTimestamp: clk.Unix(),
 			IsActive:       true,
-			IsSoV:          true,
+			IsL1Validator:  true,
 		}))
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID, 80)
 		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
