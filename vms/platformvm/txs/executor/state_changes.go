@@ -300,9 +300,9 @@ func advanceDynamicFeeState(
 	changes.SetFeeState(dynamicFeeState)
 }
 
-// advanceValidatorFeeState advances the validator fee state by [seconds]. L1 validators
-// are read from [parentState] and written to [changes] to avoid modifying state
-// while an iterator is held.
+// advanceValidatorFeeState advances the validator fee state by [seconds]. L1
+// validators are read from [parentState] and written to [changes] to avoid
+// modifying state while an iterator is held.
 func advanceValidatorFeeState(
 	config fee.Config,
 	parentState state.Chain,
