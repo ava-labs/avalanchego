@@ -169,7 +169,7 @@ func (m *txMetrics) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalance
 
 func (m *txMetrics) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "disable_subnet_validator",
+		txLabel: "disable_l1_validator",
 	}).Inc()
 	return nil
 }
