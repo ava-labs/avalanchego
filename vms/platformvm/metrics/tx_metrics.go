@@ -148,7 +148,7 @@ func (m *txMetrics) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 
 func (m *txMetrics) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "register_subnet_validator",
+		txLabel: "register_l1_validator",
 	}).Inc()
 	return nil
 }
