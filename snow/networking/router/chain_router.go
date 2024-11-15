@@ -509,7 +509,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	msg := message.InternalDisconnected(nodeID)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
-	// set, disconnect. we cannot put a L1 validator check here since
+	// set, disconnect. we cannot put an L1 validator check here since
 	// if a validator connects then it leaves validator-set, it would not be
 	// disconnected properly.
 	for _, chain := range cr.chainHandlers {
