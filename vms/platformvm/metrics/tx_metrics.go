@@ -155,7 +155,7 @@ func (m *txMetrics) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 
 func (m *txMetrics) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "set_subnet_validator_weight",
+		txLabel: "set_l1_validator_weight",
 	}).Inc()
 	return nil
 }
