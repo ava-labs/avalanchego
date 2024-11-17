@@ -56,7 +56,7 @@ KIND_VERSION=v0.23.0
 ensure_command kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
 
 # Ensure the kind-with-registry command is available
-ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubernetes-sigs/kind/7cb9e6be25b48a0e248097eef29d496ab1a044d0/site/static/examples/kind-with-registry.sh"
+ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubernetes-sigs/kind/c0371cf3ca729a9da1cd538e4514606d3061361b/site/static/examples/kind-with-registry.sh"
 
 # Deploy a kind cluster with a local registry. Include the local bin in the path to
 # ensure locally installed kind and kubectl are available since the script expects to
