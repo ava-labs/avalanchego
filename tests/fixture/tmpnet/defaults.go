@@ -58,9 +58,8 @@ func DefaultProcessFlags() FlagsMap {
 }
 
 // Flags appropriate for a node running as a local process
-func DefaultKubeFlags(dataDir string) FlagsMap {
+func DefaultKubeFlags() FlagsMap {
 	return FlagsMap{
-		config.DataDirKey:         dataDir,
 		config.HTTPHostKey:        "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for readiness check
 		config.LogDisplayLevelKey: logging.Info.String(),
 		config.LogLevelKey:        logging.Off.String(), // Assume collection of stdout logs

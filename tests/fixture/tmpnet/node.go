@@ -43,6 +43,7 @@ var (
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
 	readState() error
+	SetDefaultFlags()
 	Start(log logging.Logger) error
 	InitiateStop() error
 	WaitForStopped(ctx context.Context) error
@@ -247,21 +248,6 @@ func (n *Node) Stop(ctx context.Context) error {
 		return err
 	}
 	return n.WaitForStopped(ctx)
-}
-
-// Sets networking configuration for the node.
-// Convenience method for setting networking flags.
-func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
-	if _, ok := n.Flags[config.HTTPPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.HTTPPortKey] = 0
-	}
-	if _, ok := n.Flags[config.StakingPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.StakingPortKey] = 0
-	}
-	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 }
 
 // Ensures staking and signing keys are generated if not already present and
