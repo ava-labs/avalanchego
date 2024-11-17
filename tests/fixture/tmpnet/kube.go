@@ -123,7 +123,7 @@ func NewNodeStatefulSet(
 								PeriodSeconds:    1,
 								SuccessThreshold: 1,
 							},
-							Env: stringMapToEnvVarSlice(flags),
+							Env: flagsToEnvVarSlice(flags),
 						},
 					},
 				},
@@ -133,13 +133,13 @@ func NewNodeStatefulSet(
 }
 
 // stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.
-func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
-	envVars := make([]corev1.EnvVar, len(mapping))
+func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
+	envVars := make([]corev1.EnvVar, len(flags))
 	var i int
-	for k, v := range mapping {
+	for k, v := range flags {
 		envVars[i] = corev1.EnvVar{
 			Name:  config.EnvVarName(config.EnvPrefix, k),
-			Value: v,
+			Value: fmt.Sprintf("%v", v),
 		}
 		i++
 	}

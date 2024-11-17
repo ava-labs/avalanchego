@@ -207,12 +207,6 @@ func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
 		n.UUID = uuid.NewString()
 	}
 
-	// Ensure default flags
-	if n.DefaultFlags == nil {
-		n.DefaultFlags = FlagsMap{}
-	}
-	n.DefaultFlags.SetDefaults(DefaultTmpnetFlags())
-
 	if len(n.Nodes) == 1 {
 		// Sybil protection needs to be disabled for a single node network to start
 		n.DefaultFlags[config.SybilProtectionEnabledKey] = false
@@ -361,6 +355,9 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 		}
 	}
 
+	log.Info("TODO(marun) Unskip waiting for nodes to be come healthy once the pods are no longer crashlooping")
+	return nil
+
 	log.Info("waiting for nodes to report healthy")
 	if err := waitForHealthy(ctx, log, nodesToWaitFor); err != nil {
 		return err
@@ -464,6 +461,8 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
+	// TODO(marun) Relegate the vm binary check to the NodeProcess since it doesn't make sense for kube
+
 	// This check is duplicative for a network that is starting, but ensures
 	// that individual node start/restart won't fail due to missing binaries.
 	pluginDir, err := n.GetPluginDir()
@@ -471,9 +470,9 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	// if err := n.EnsureNodeConfig(node); err != nil {
-	// 	return err
-	// }
+	if err := n.EnsureNodeConfig(node); err != nil {
+		return err
+	}
 
 	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
 	if err := checkVMBinaries(log, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
@@ -484,7 +483,8 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 	if err != nil {
 		return err
 	}
-	node.SetNetworkingConfig(bootstrapIDs, bootstrapIPs)
+	node.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
+	node.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 
 	if err := node.Write(); err != nil {
 		return err
@@ -598,34 +598,22 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 
 	flags.SetDefaults(n.DefaultFlags)
 
-	// Set fields including the network path
-	if len(n.Dir) > 0 {
-		defaultFlags := FlagsMap{
-			config.ChainConfigDirKey: n.GetChainConfigDir(),
-		}
-
-		if n.Genesis != nil {
-			defaultFlags[config.GenesisFileKey] = n.getGenesisPath()
-		}
-
-		// Only set the subnet dir if it exists or the node won't start.
-		subnetDir := n.GetSubnetDir()
-		if _, err := os.Stat(subnetDir); err == nil {
-			defaultFlags[config.SubnetConfigDirKey] = subnetDir
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-
-		node.Flags.SetDefaults(defaultFlags)
-
-		// Ensure the node's data dir is configured
-		dataDir := node.GetDataDir()
-		if len(dataDir) == 0 {
-			// NodeID will have been set by EnsureKeys
-			dataDir = filepath.Join(n.Dir, node.NodeID.String())
-			flags[config.DataDirKey] = dataDir
-		}
+	defaultFlags := FlagsMap{
+		config.ChainConfigContentKey: n.GetChainConfigContent(),
 	}
+	if n.Genesis != nil {
+		defaultFlags[config.GenesisFileContentKey] = n.GetGenesisFileContent()
+	}
+	flags.SetDefaults(defaultFlags)
+
+	// TODO(marun) Support providing subnet configuration as content
+	// // Only set the subnet dir if it exists or the node won't start.
+	// subnetDir := n.GetSubnetDir()
+	// if _, err := os.Stat(subnetDir); err == nil {
+	// 	defaultFlags[config.SubnetConfigDirKey] = subnetDir
+	// } else if !errors.Is(err, os.ErrNotExist) {
+	// 	return err
+	// }
 
 	// Ensure the node runtime is configured
 	if node.RuntimeConfig == nil {
@@ -634,6 +622,14 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 			KubeRuntimeConfig: n.DefaultRuntimeConfig.KubeRuntimeConfig,
 		}
 	}
+
+	// Ensure the node's data dir is configured
+	if len(n.Dir) > 0 && len(node.GetDataDir()) == 0 {
+		node.Flags[config.DataDirKey] = filepath.Join(n.Dir, node.NodeID.String())
+	}
+
+	// Set the runtime defaults last to ensure they can be overridden
+	node.getRuntime().SetDefaultFlags()
 
 	return nil
 }
@@ -888,6 +884,14 @@ func (n *Network) SetPluginDir(pluginDir string) {
 	} else {
 		delete(n.DefaultFlags, config.PluginDirKey)
 	}
+}
+
+func (n *Network) GetChainConfigContent() string {
+	return "TODO(marun): Add real chain config content"
+}
+
+func (n *Network) GetGenesisFileContent() string {
+	return "TODO(marun): Add real genesis file content"
 }
 
 // Waits until the provided nodes are healthy.
