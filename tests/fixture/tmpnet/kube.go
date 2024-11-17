@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,14 +35,14 @@ import (
 )
 
 // DefaultPodFlags defines common flags for avalanchego nodes running in a pod.
-func DefaultPodFlags(networkName string, dataDir string) map[string]string {
+func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled bool) map[string]string {
 	return map[string]string{
 		config.DataDirKey:                dataDir,
 		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: "false",
+		config.SybilProtectionEnabledKey: strconv.FormatBool(sybilProtectionEnabled),
 		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
-		config.LogDisplayLevelKey:        logging.Debug.String(),
-		config.LogLevelKey:               logging.Debug.String(),
+		config.LogDisplayLevelKey:        logging.Info.String(),
+		config.LogLevelKey:               logging.Off.String(),
 		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness check
 	}
 }
@@ -54,7 +55,7 @@ func NewNodeStatefulSet(
 	volumeName string,
 	volumeSize string,
 	volumeMountPath string,
-	flags map[string]string,
+	flags FlagsMap,
 ) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

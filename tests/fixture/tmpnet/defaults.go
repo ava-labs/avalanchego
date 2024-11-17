@@ -40,28 +40,39 @@ func DefaultTestFlags() FlagsMap {
 	return FlagsMap{
 		config.NetworkPeerListPullGossipFreqKey: "250ms",
 		config.NetworkMaxReconnectDelayKey:      "1s",
-		config.HealthCheckFreqKey:               "2s",
+		config.HealthCheckFreqKey:               "500ms",
 		config.AdminAPIEnabledKey:               true,
 		config.IndexEnabledKey:                  true,
 	}
 }
 
-// Flags appropriate for tmpnet networks.
-func DefaultTmpnetFlags() FlagsMap {
-	// Supply only non-default configuration to ensure that default values will be used.
-	flags := FlagsMap{
-		// Specific to tmpnet deployment
+// Flags appropriate for a node running as a local process
+func DefaultProcessFlags() FlagsMap {
+	return FlagsMap{
 		config.PublicIPKey:        "127.0.0.1",
 		config.HTTPHostKey:        "127.0.0.1",
 		config.StakingHostKey:     "127.0.0.1",
 		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:        logging.Debug.String(),
-		// Specific to e2e testing
+	}
+}
+
+// Flags appropriate for a node running as a local process
+func DefaultKubeFlags(dataDir string) FlagsMap {
+	return FlagsMap{
+		config.DataDirKey:         dataDir,
+		config.HTTPHostKey:        "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for readiness check
+		config.LogDisplayLevelKey: logging.Info.String(),
+		config.LogLevelKey:        logging.Off.String(), // Assume collection of stdout logs
+	}
+}
+
+// Flags required by e2e testing
+func DefaultE2EFlags() FlagsMap {
+	return FlagsMap{
 		config.MinStakeDurationKey:           DefaultMinStakeDuration.String(),
 		config.ProposerVMUseCurrentHeightKey: true,
 	}
-	flags.SetDefaults(DefaultTestFlags())
-	return flags
 }
 
 // A set of chain configurations appropriate for testing.

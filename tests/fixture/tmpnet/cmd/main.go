@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -57,16 +58,43 @@ func main() {
 	var (
 		rootDir         string
 		networkOwner    string
+		runtime         string
 		avalancheGoPath string
 		pluginDir       string
+		kubeconfig      string
+		namespace       string
+		imageName       string
 		nodeCount       uint8
 	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
 		Short: "Start a new temporary network",
 		RunE: func(*cobra.Command, []string) error {
-			if len(avalancheGoPath) == 0 {
-				return errAvalancheGoRequired
+			// TODO(marun) Make all errors constants
+			runtimeConfig := tmpnet.NodeRuntimeConfig{}
+			switch runtime {
+			case "process":
+				if len(avalancheGoPath) == 0 {
+					return errAvalancheGoRequired
+				}
+				runtimeConfig.AvalancheGoPath = avalancheGoPath
+			case "kube":
+				if len(kubeconfig) == 0 {
+					return errors.New("--kubeconfig is required")
+				}
+				if len(namespace) == 0 {
+					return errors.New("--namespace is required")
+				}
+				if len(imageName) == 0 {
+					return errors.New("--image-name is required")
+				}
+				runtimeConfig.KubeRuntimeConfig = tmpnet.KubeRuntimeConfig{
+					Kubeconfig: kubeconfig,
+					Namespace:  namespace,
+					ImageName:  imageName,
+				}
+			default:
+				return errors.New("invalid runtime")
 			}
 
 			log, err := tests.LoggerForFormat("", rawLogFormat)
@@ -77,8 +105,12 @@ func main() {
 			// Root dir will be defaulted on start if not provided
 
 			network := &tmpnet.Network{
-				Owner: networkOwner,
-				Nodes: tmpnet.NewNodesOrPanic(int(nodeCount)),
+				Owner:                networkOwner,
+				Nodes:                tmpnet.NewNodesOrPanic(int(nodeCount)),
+				DefaultRuntimeConfig: runtimeConfig,
+				DefaultFlags: tmpnet.FlagsMap{
+					config.PluginDirKey: pluginDir,
+				},
 			}
 
 			// Extreme upper bound, should never take this long
@@ -91,8 +123,6 @@ func main() {
 				log,
 				network,
 				rootDir,
-				avalancheGoPath,
-				pluginDir,
 			); err != nil {
 				log.Error("failed to bootstrap network", zap.Error(err))
 				return err
@@ -118,8 +148,12 @@ func main() {
 		},
 	}
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
+	startNetworkCmd.PersistentFlags().StringVar(&runtime, "runtime", "process", "[optional] the runtime to use to deploy nodes for the network. Valid options are 'process' and 'kube'.")
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().StringVar(&pluginDir, "plugin-dir", os.ExpandEnv("$HOME/.avalanchego/plugins"), "[optional] the dir containing VM plugins")
+	startNetworkCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", os.Getenv("KUBECONFIG"), "The path to a kubernetes configuration file for the target cluster")
+	startNetworkCmd.PersistentFlags().StringVar(&namespace, "namespace", "tmpnet", "The namespace in the target cluster to create nodes in")
+	startNetworkCmd.PersistentFlags().StringVar(&imageName, "image-name", "avaplatform/avalanchego:latest", "The name of the docker image to use for creating nodes")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", tmpnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
 	startNetworkCmd.PersistentFlags().StringVar(&networkOwner, "network-owner", "", "The string identifying the intended owner of the network")
 	rootCmd.AddCommand(startNetworkCmd)

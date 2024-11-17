@@ -235,6 +235,8 @@ The details required to configure a node's execution are written to
 runtime-specific details like the path of the avalanchego binary to
 start the node with.
 
+TODO(marun) Separate process from kube-based network deployment
+
 #### Flags
 
 All flags used to configure a node are written to
@@ -250,6 +252,12 @@ The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).
+
+## Kube-based networks
+
+- `tmpnet` supports deploying nodes to kubernetes.
+- Each node will be deployed as a stateful set.
+- The naming convention for statefulsets will be [network uuid]-[first 8 characters of node ID excluding NodeID-]
 
 ## Monitoring
 
