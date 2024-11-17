@@ -72,6 +72,18 @@ func (p *NodeProcess) readState() error {
 	return nil
 }
 
+// SetDefaultFlags sets flag defaults for unset keys appropriate for a node running as a regular process.
+func (p *NodeProcess) SetDefaultFlags() {
+	if _, ok := p.node.Flags[config.HTTPPortKey]; !ok {
+		// Default to dynamic port allocation
+		p.node.Flags[config.HTTPPortKey] = 0
+	}
+	if _, ok := p.node.Flags[config.StakingPortKey]; !ok {
+		// Default to dynamic port allocation
+		p.node.Flags[config.StakingPortKey] = 0
+	}
+}
+
 // Start waits for the process context to be written which
 // indicates that the node will be accepting connections on
 // its staking port. The network will start faster with this
