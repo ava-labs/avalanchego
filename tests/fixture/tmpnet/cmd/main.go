@@ -104,13 +104,17 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
+			var flags tmpnet.FlagsMap
+			if len(pluginDir) > 0 {
+				// Only set the plugin dir if one was provided since a missing dir is FATAL
+				flags[config.PluginDirKey] = pluginDir
+			}
+
 			network := &tmpnet.Network{
 				Owner:                networkOwner,
 				Nodes:                tmpnet.NewNodesOrPanic(int(nodeCount)),
 				DefaultRuntimeConfig: runtimeConfig,
-				DefaultFlags: tmpnet.FlagsMap{
-					config.PluginDirKey: pluginDir,
-				},
+				DefaultFlags:         flags,
 			}
 
 			// Extreme upper bound, should never take this long
@@ -150,7 +154,7 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
 	startNetworkCmd.PersistentFlags().StringVar(&runtime, "runtime", "process", "[optional] the runtime to use to deploy nodes for the network. Valid options are 'process' and 'kube'.")
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
-	startNetworkCmd.PersistentFlags().StringVar(&pluginDir, "plugin-dir", os.ExpandEnv("$HOME/.avalanchego/plugins"), "[optional] the dir containing VM plugins")
+	startNetworkCmd.PersistentFlags().StringVar(&pluginDir, "plugin-dir", "", "[optional] the dir containing VM plugins. Defaults to ~/.avalanchego/plugins")
 	startNetworkCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", os.Getenv("KUBECONFIG"), "The path to a kubernetes configuration file for the target cluster")
 	startNetworkCmd.PersistentFlags().StringVar(&namespace, "namespace", "tmpnet", "The namespace in the target cluster to create nodes in")
 	startNetworkCmd.PersistentFlags().StringVar(&imageName, "image-name", "avaplatform/avalanchego:latest", "The name of the docker image to use for creating nodes")
