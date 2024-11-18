@@ -46,8 +46,10 @@ func TestVerifier_Verify(t *testing.T) {
 
 		pChainState  validators.State
 		pChainHeight uint64
-		quorumNum    uint64
-		quorumDen    uint64
+		quorumNumMin uint64
+		quorumDenMin uint64
+		quorumNumMax uint64
+		quorumDenMax uint64
 
 		wantAggregateSignaturesErr error
 		wantVerifyErr              error
@@ -78,8 +80,10 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
-			quorumNum: 1,
-			quorumDen: 1,
+			quorumNumMin: 1,
+			quorumDenMin: 1,
+			quorumNumMax: 1,
+			quorumDenMax: 1,
 		},
 		{
 			name:    "gets signatures from insufficient stake",
@@ -107,6 +111,10 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
+			quorumNumMin: 1,
+			quorumDenMin: 1,
+			quorumNumMax: 1,
+			quorumDenMax: 1,
 		},
 		{
 			name:    "overflow",
@@ -144,8 +152,10 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
-			quorumNum:                  1,
-			quorumDen:                  2,
+			quorumNumMin:               1,
+			quorumDenMin:               2,
+			quorumNumMax:               1,
+			quorumDenMax:               2,
 			wantAggregateSignaturesErr: math.ErrOverflow,
 		},
 		{
@@ -163,6 +173,10 @@ func TestVerifier_Verify(t *testing.T) {
 				},
 			},
 			wantAggregateSignaturesErr: ErrFailedAggregation,
+			quorumNumMin:               1,
+			quorumDenMin:               1,
+			quorumNumMax:               1,
+			quorumDenMax:               1,
 		},
 		{
 			name: "invalid validator set",
@@ -180,6 +194,10 @@ func TestVerifier_Verify(t *testing.T) {
 				},
 			},
 			wantAggregateSignaturesErr: ErrDuplicateValidator,
+			quorumNumMin:               1,
+			quorumDenMin:               1,
+			quorumNumMax:               1,
+			quorumDenMax:               1,
 		},
 		{
 			name: "context canceled",
@@ -189,7 +207,18 @@ func TestVerifier_Verify(t *testing.T) {
 
 				return ctx
 			}(),
-			wantAggregateSignaturesErr: context.Canceled,
+			validators: []Validator{
+				{
+					NodeID:    nodeID0,
+					PublicKey: pk0,
+					Weight:    1,
+				},
+			},
+			wantAggregateSignaturesErr: ErrFailedAggregation,
+			quorumNumMin:               1,
+			quorumDenMin:               1,
+			quorumNumMax:               1,
+			quorumDenMax:               1,
 		},
 	}
 
@@ -207,6 +236,10 @@ func TestVerifier_Verify(t *testing.T) {
 				message,
 				[]byte("justification"),
 				tt.validators,
+				tt.quorumNumMin,
+				tt.quorumDenMin,
+				tt.quorumNumMax,
+				tt.quorumDenMax,
 			)
 			require.ErrorIs(err, tt.wantAggregateSignaturesErr)
 
@@ -220,8 +253,8 @@ func TestVerifier_Verify(t *testing.T) {
 				networkID,
 				tt.pChainState,
 				0,
-				tt.quorumNum,
-				tt.quorumDen,
+				tt.quorumNumMin,
+				tt.quorumDenMin,
 			)
 			require.ErrorIs(err, tt.wantVerifyErr)
 		})
