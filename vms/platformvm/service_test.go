@@ -906,10 +906,53 @@ func TestGetValidatorsAt(t *testing.T) {
 	service.vm.clock.Set(newLastAcceptedBlk.Timestamp().Add(40 * time.Second))
 	service.vm.ctx.Lock.Unlock()
 
-	// Resending the same request with [IsProposed] set to true should now
+	// Resending the same request with [Height] set to [platformapi.ProposedHeight] should now
 	// include the new validator
 	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators)+1)
+}
+
+func TestGetValidatorsAtArgsMarshalling(t *testing.T) {
+	subnetID, err := ids.FromString("u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		args GetValidatorsAtArgs
+		json string
+	}{
+		{
+			name: "specific height",
+			args: GetValidatorsAtArgs{
+				Height:   pchainapi.Height(12345),
+				SubnetID: subnetID,
+			},
+			json: `{"height":"12345","subnetID":"u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H"}`,
+		},
+		{
+			name: "proposed height",
+			args: GetValidatorsAtArgs{
+				Height:   pchainapi.ProposedHeight,
+				SubnetID: subnetID,
+			},
+			json: `{"height":"proposed","subnetID":"u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H"}`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Test that marshalling produces the expected JSON
+			argsJSON, err := json.Marshal(test.args)
+			require.NoError(err)
+			require.JSONEq(test.json, string(argsJSON))
+
+			// Test that unmarshalling produces the expected args
+			var parsedArgs GetValidatorsAtArgs
+			require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
+			require.Equal(test.args, parsedArgs)
+		})
+	}
 }
 
 func TestGetTimestamp(t *testing.T) {
