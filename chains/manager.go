@@ -710,7 +710,7 @@ func (m *manager) createAvalancheChain(
 			VM:          vm,
 			DB:          vertexDB,
 			Log:         ctx.Log,
-			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
+			CortinaTime: version.GetPreCortinaTime(ctx.NetworkID),
 		},
 	)
 

@@ -441,7 +441,7 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
  */
 
 func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- common.Message) error {
-	time := version.GetCortinaTime(vm.ctx.NetworkID)
+	time := version.GetPreCortinaTime(vm.ctx.NetworkID)
 	err := vm.state.InitializeChainState(stopVertexID, time)
 	if err != nil {
 		return err
