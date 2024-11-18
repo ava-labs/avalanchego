@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::time::Instant;
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, PartialEq)]
 pub struct Args {
     #[arg(short, long, help = "zipf exponent", default_value_t = 1.2)]
     exponent: f64,

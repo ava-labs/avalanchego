@@ -16,14 +16,19 @@ pub struct Single;
 impl TestRunner for Single {
     async fn run(&self, db: &Db, args: &crate::Args) -> Result<(), Box<dyn Error>> {
         let start = Instant::now();
-        let inner_key = Sha256::digest(0u64.to_ne_bytes()).to_vec();
+        let inner_keys: Vec<_> = (0..args.batch_size)
+            .map(|i| Sha256::digest(i.to_ne_bytes()))
+            .collect();
         let mut batch_id = 0;
 
         while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
-            let batch = vec![BatchOp::Put {
-                key: inner_key.clone(),
-                value: vec![batch_id as u8],
-            }];
+            let batch = inner_keys
+                .iter()
+                .map(|key| BatchOp::Put {
+                    key,
+                    value: vec![batch_id as u8],
+                })
+                .collect();
             let proposal = db.propose(batch).await.expect("proposal should succeed");
             proposal.commit().await?;
 

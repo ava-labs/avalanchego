@@ -84,7 +84,7 @@ mod single;
 mod tenkrandom;
 mod zipf;
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, PartialEq)]
 enum TestName {
     Create,
     TenKRandom,
@@ -121,6 +121,10 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+
+    if args.test_name == TestName::Single && args.batch_size > 1000 {
+        panic!("Single test is not designed to handle batch sizes > 1000");
+    }
 
     env_logger::Builder::new()
         .filter_level(match args.global_opts.log_level.as_str() {
