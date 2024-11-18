@@ -4,17 +4,16 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"math"
 
-	avajson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/json"
 )
 
-type Height avajson.Uint64
+type Height json.Uint64
 
 const (
-	ProposedHeightFlag = "proposed"
+	ProposedHeightJSON = `"proposed"`
 	ProposedHeight     = math.MaxUint64
 )
 
@@ -22,26 +21,28 @@ var errInvalidHeight = errors.New("invalid height")
 
 func (h Height) MarshalJSON() ([]byte, error) {
 	if h == ProposedHeight {
-		return []byte(`"` + ProposedHeightFlag + `"`), nil
+		return []byte(ProposedHeightJSON), nil
 	}
-	return avajson.Uint64(h).MarshalJSON()
+	return json.Uint64(h).MarshalJSON()
 }
 
 func (h *Height) UnmarshalJSON(b []byte) error {
-	// First try to unmarshal as a string
-	// and check if it is the proposed height flag
-	var s string
-	err := json.Unmarshal(b, &s)
-	if err == nil && s == ProposedHeightFlag {
+	// First check for known string values
+	switch string(b) {
+	case json.Null:
+		return nil
+	case ProposedHeightJSON:
 		*h = ProposedHeight
 		return nil
 	}
-	err = (*avajson.Uint64)(h).UnmarshalJSON(b)
-	if err != nil {
+
+	// Otherwise, unmarshal as a uint64
+	if err := (*json.Uint64)(h).UnmarshalJSON(b); err != nil {
 		return errInvalidHeight
 	}
-	// MaxUint64 is reserved for proposed height
-	// return an error if supplied numerically
+
+	// MaxUint64 is reserved for proposed height, so return an error if supplied
+	// numerically.
 	if uint64(*h) == ProposedHeight {
 		*h = 0
 		return errInvalidHeight

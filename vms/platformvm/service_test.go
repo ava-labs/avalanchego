@@ -913,27 +913,46 @@ func TestGetValidatorsAt(t *testing.T) {
 }
 
 func TestGetValidatorsAtArgsMarshalling(t *testing.T) {
-	require := require.New(t)
+	subnetID, err := ids.FromString("u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H")
+	require.NoError(t, err)
 
-	args := GetValidatorsAtArgs{
-		SubnetID: ids.GenerateTestID(),
-		Height:   pchainapi.Height(12345),
+	tests := []struct {
+		name string
+		args GetValidatorsAtArgs
+		json string
+	}{
+		{
+			name: "specific height",
+			args: GetValidatorsAtArgs{
+				Height:   pchainapi.Height(12345),
+				SubnetID: subnetID,
+			},
+			json: `{"height":"12345","subnetID":"u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H"}`,
+		},
+		{
+			name: "proposed height",
+			args: GetValidatorsAtArgs{
+				Height:   pchainapi.ProposedHeight,
+				SubnetID: subnetID,
+			},
+			json: `{"height":"proposed","subnetID":"u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H"}`,
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	argsJSON, err := json.Marshal(args)
-	require.NoError(err)
+			// Test that marshalling produces the expected JSON
+			argsJSON, err := json.Marshal(test.args)
+			require.NoError(err)
+			require.JSONEq(test.json, string(argsJSON))
 
-	var parsedArgs GetValidatorsAtArgs
-	require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
-	require.Equal(args, parsedArgs)
-
-	// confirm that "proposed" height unmarshals correctly as well
-	args.Height = pchainapi.ProposedHeight
-	argsJSON, err = json.Marshal(args)
-	require.NoError(err)
-
-	require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
-	require.Equal(args, parsedArgs)
+			// Test that unmarshalling produces the expected args
+			var parsedArgs GetValidatorsAtArgs
+			require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
+			require.Equal(test.args, parsedArgs)
+		})
+	}
 }
 
 func TestGetTimestamp(t *testing.T) {
