@@ -4,42 +4,102 @@
 package api
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestMarshallHeight(t *testing.T) {
-	require := require.New(t)
-	h := Height(56)
-	bytes, err := h.MarshalJSON()
-	require.NoError(err)
-	require.Equal(`"56"`, string(bytes))
+func TestHeightMarshalJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		height   Height
+		expected string
+	}{
+		{
+			name:     "0",
+			height:   0,
+			expected: `"0"`,
+		},
+		{
+			name:     "56",
+			height:   56,
+			expected: `"56"`,
+		},
+		{
+			name:     "proposed",
+			height:   ProposedHeight,
+			expected: `"proposed"`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	h = Height(ProposedHeight)
-	bytes, err = h.MarshalJSON()
-	require.NoError(err)
-	require.Equal(`"proposed"`, string(bytes))
+			bytes, err := test.height.MarshalJSON()
+			require.NoError(err)
+			require.Equal(test.expected, string(bytes))
+		})
+	}
 }
 
-func TestUnmarshallHeight(t *testing.T) {
-	require := require.New(t)
+func TestHeightUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name        string
+		initial     Height
+		json        string
+		expected    Height
+		expectedErr error
+	}{
+		{
+			name:     "null 56",
+			initial:  56,
+			json:     "null",
+			expected: 56,
+		},
+		{
+			name:     "null proposed",
+			initial:  ProposedHeight,
+			json:     "null",
+			expected: ProposedHeight,
+		},
+		{
+			name:     "proposed",
+			json:     `"proposed"`,
+			expected: ProposedHeight,
+		},
+		{
+			name:        "not a number",
+			json:        `"not a number"`,
+			expectedErr: errInvalidHeight,
+		},
+		{
+			name:     "56",
+			json:     `56`,
+			expected: 56,
+		},
+		{
+			name:     `"56"`,
+			json:     `"56"`,
+			expected: 56,
+		},
+		{
+			name:        "max uint64",
+			json:        "18446744073709551615",
+			expectedErr: errInvalidHeight,
+		},
+		{
+			name:        `"max uint64"`,
+			json:        `"18446744073709551615"`,
+			expectedErr: errInvalidHeight,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
-	var h Height
-
-	require.NoError(h.UnmarshalJSON([]byte("56")))
-	require.Equal(Height(56), h)
-
-	require.NoError(h.UnmarshalJSON([]byte(ProposedHeightFlag)))
-	require.Equal(Height(ProposedHeight), h)
-	require.True(h.IsProposed())
-
-	err := h.UnmarshalJSON([]byte("invalid"))
-	require.ErrorIs(err, errInvalidHeight)
-	require.Equal(Height(0), h)
-
-	err = h.UnmarshalJSON([]byte(`"` + strconv.FormatUint(uint64(ProposedHeight), 10) + `"`))
-	require.ErrorIs(err, errInvalidHeight)
-	require.Equal(Height(0), h)
+			err := test.initial.UnmarshalJSON([]byte(test.json))
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, test.initial)
+		})
+	}
 }
