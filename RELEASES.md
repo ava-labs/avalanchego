@@ -1,5 +1,23 @@
 # Release Notes
 
+## [v1.12.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+This upgrade consists of the following Avalanche Community Proposals (ACPs):
+- [ACP-77](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/77-reinventing-subnets/README.md) Reinventing Subnets
+- [ACP-103](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/103-dynamic-fees/README.md) Add Dynamic Fees to the P-Chain
+- [ACP-118](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/118-warp-signature-request/README.md) Warp Signature Interface Standard
+- [ACP-125](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/125-basefee-reduction/README.md) Reduce C-Chain minimum base fee from 25 nAVAX to 1 nAVAX
+- [ACP-131](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/131-cancun-eips/README.md) Activate Cancun EIPs on C-Chain and Subnet-EVM chains
+- [ACP-151](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/151-use-current-block-pchain-height-as-context/README.md) Use current block P-Chain height as context for state verification
+
+The changes in the upgrade go into effect at 11 AM ET (4 PM UTC) on Monday, November 25th, 2024 on the Fuji testnet.
+
+**All Fuji nodes must upgrade before 11 AM ET, November 25th 2024.**
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.11.13...v1.12.0-fuji
+
 ## [v1.11.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.13)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
