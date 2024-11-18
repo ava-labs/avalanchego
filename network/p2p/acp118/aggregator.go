@@ -187,7 +187,7 @@ func (a *aggregationJob) GetResult() (*warp.BitSetSignature, error) {
 func (a *aggregationJob) getResult() (*warp.BitSetSignature, error) {
 	aggregateSignature, err := bls.AggregateSignatures(a.signatures)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrFailedAggregation, err)
+		return nil, fmt.Errorf("%w: %w", ErrFailedAggregation, err)
 	}
 
 	bitSetSignature := &warp.BitSetSignature{
