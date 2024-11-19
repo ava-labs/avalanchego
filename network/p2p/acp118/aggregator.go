@@ -95,7 +95,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
 	if !ok {
-		return nil, fmt.Errorf("invalid warp signature type")
+		return nil, errors.New("invalid warp signature type")
 	}
 
 	var signerBitSet set.Bits
