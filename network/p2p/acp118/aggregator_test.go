@@ -107,8 +107,9 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
-			quorumNum: 1,
-			quorumDen: 1,
+			quorumNum:                  1,
+			quorumDen:                  1,
+			wantAggregateSignaturesErr: ErrFailedAggregation,
 		},
 		{
 			name:    "overflow",
@@ -169,26 +170,6 @@ func TestVerifier_Verify(t *testing.T) {
 			quorumDen:                  1,
 		},
 		{
-			name:    "invalid validator set",
-			handler: NewHandler(&testVerifier{}, signer),
-			ctx:     context.Background(),
-			validators: []Validator{
-				{
-					NodeID:    nodeID0,
-					PublicKey: pk0,
-					Weight:    1,
-				},
-				{
-					NodeID:    nodeID0,
-					PublicKey: pk0,
-					Weight:    1,
-				},
-			},
-			wantAggregateSignaturesErr: ErrDuplicateValidator,
-			quorumNum:                  1,
-			quorumDen:                  1,
-		},
-		{
 			name:    "context canceled",
 			handler: NewHandler(&testVerifier{}, signer),
 			ctx: func() context.Context {
@@ -219,9 +200,9 @@ func TestVerifier_Verify(t *testing.T) {
 			msg, err := warp.NewMessage(unsignedMsg, &warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}})
 			require.NoError(err)
 			client := p2ptest.NewClient(t, context.Background(), tt.handler, ids.GenerateTestNodeID(), nodeID0)
-			aggregator := NewSignatureAggregator(logging.NoLog{}, client, 1)
+			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
 
-			gotMsg, err := aggregator.AggregateSignatures(
+			gotMsg, _, gotDen, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
 				[]byte("justification"),
@@ -234,6 +215,13 @@ func TestVerifier_Verify(t *testing.T) {
 			if tt.wantAggregateSignaturesErr != nil {
 				return
 			}
+
+			wantDen := uint64(0)
+			for _, v := range tt.validators {
+				wantDen += v.Weight
+			}
+
+			require.Equal(wantDen, gotDen)
 
 			err = gotMsg.Signature.Verify(
 				context.Background(),

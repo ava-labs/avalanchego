@@ -7,9 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,30 +36,23 @@ type indexedValidator struct {
 }
 
 type result struct {
-	Message          *warp.Message
-	AggregatedWeight uint64
-	TotalWeight      uint64
-	Err              error
+	Validator indexedValidator
+	Signature *bls.Signature
+	Err       error
 }
 
 // NewSignatureAggregator returns an instance of SignatureAggregator
-func NewSignatureAggregator(
-	log logging.Logger,
-	client *p2p.Client,
-	maxPending int,
-) *SignatureAggregator {
+func NewSignatureAggregator(log logging.Logger, client *p2p.Client) *SignatureAggregator {
 	return &SignatureAggregator{
-		log:        log,
-		client:     client,
-		maxPending: maxPending,
+		log:    log,
+		client: client,
 	}
 }
 
 // SignatureAggregator aggregates validator signatures for warp messages
 type SignatureAggregator struct {
-	log        logging.Logger
-	client     *p2p.Client
-	maxPending int
+	log    logging.Logger
+	client *p2p.Client
 }
 
 // AggregateSignatures blocks until quorumNum/quorumDen signatures from
@@ -87,8 +78,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 		return nil, 0, 0, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
-	done := make(chan result)
-	totalStakeWeight := uint64(0)
 	nodeIDsToValidator := make(map[ids.NodeID]indexedValidator)
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
@@ -105,6 +94,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	sampleable := make([]ids.NodeID, 0, len(validators))
 	aggregatedStakeWeight := uint64(0)
+	totalStakeWeight := uint64(0)
 	for i, v := range validators {
 		totalStakeWeight, err = math.Add[uint64](totalStakeWeight, v.Weight)
 		if err != nil {
@@ -125,7 +115,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		sampleable = append(sampleable, v.NodeID)
 	}
 
-	signatures := make([]*bls.Signature, 0, 1)
+	signatures := make([]*bls.Signature, 0, len(sampleable)+1)
 	if bitSetSignature.Signature != [bls.SignatureLen]byte{} {
 		blsSignature, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
 		if err != nil {
@@ -134,166 +124,123 @@ func (s *SignatureAggregator) AggregateSignatures(
 		signatures = append(signatures, blsSignature)
 	}
 
-	job := aggregationJob{
-		log:                   s.log,
-		message:               message,
-		minThreshold:          (totalStakeWeight * quorumNum) / quorumDen,
-		nodeIDsToValidator:    nodeIDsToValidator,
-		totalStakeWeight:      totalStakeWeight,
-		aggregatedStakeWeight: aggregatedStakeWeight,
-		signatures:            signatures,
-		signerBitSet:          signerBitSet,
-		done:                  done,
+	results := make(chan result)
+	job := responseHandler{
+		message:            message,
+		nodeIDsToValidator: nodeIDsToValidator,
+		results:            results,
 	}
 
 	for _, nodeID := range sampleable {
-		if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, job.HandleResponse); err != nil {
-			return nil, 0, 0, err
-		}
+		// Avoid var shadowing in goroutine
+		nodeIDCopy := nodeID
+		go func() {
+			if err := s.client.AppRequest(ctx, set.Of(nodeIDCopy), requestBytes, job.HandleResponse); err != nil {
+				results <- result{Validator: nodeIDsToValidator[nodeIDCopy], Err: err}
+				return
+			}
+		}()
 	}
 
-	select {
-	case <-ctx.Done():
-		// Try to return whatever progress we have made if the context is
-		// cancelled early
-		result := job.GetResult()
-		if result.Err != nil {
-			return nil, 0, 0, result.Err
-		}
+	failedStakeWeight := uint64(0)
+	minThreshold := (totalStakeWeight * quorumNum) / quorumDen
 
-		return result.Message, result.AggregatedWeight, result.TotalWeight, nil
-	case result := <-done:
-		if result.Err != nil {
-			return nil, 0, 0, result.Err
-		}
+	for {
+		select {
+		case <-ctx.Done():
+			// Try to return whatever progress we have if the context is cancelled
+			msg, err := s.newWarpMessage(message, signerBitSet, signatures)
+			if err != nil {
+				return nil, 0, 0, err
+			}
 
-		return result.Message, result.AggregatedWeight, result.TotalWeight, nil
+			return msg, aggregatedStakeWeight, totalStakeWeight, nil
+		case result := <-results:
+			if result.Err != nil {
+				return nil, 0, 0, result.Err
+			}
+
+			if result.Err != nil {
+				failedStakeWeight += result.Validator.Weight
+				continue
+			}
+
+			signatures = append(signatures, result.Signature)
+			signerBitSet.Add(result.Validator.Index)
+			aggregatedStakeWeight += result.Validator.Weight
+
+			if aggregatedStakeWeight >= minThreshold {
+				msg, err := s.newWarpMessage(message, signerBitSet, signatures)
+				if err != nil {
+					return nil, 0, 0, err
+				}
+
+				return msg, aggregatedStakeWeight, totalStakeWeight, nil
+			}
+
+			// Fast-fail if it's not possible to generate a signature that meets the
+			// minimum threshold
+			if totalStakeWeight-failedStakeWeight < minThreshold {
+				return nil, 0, 0, ErrFailedAggregation
+			}
+		}
 	}
 }
 
-type aggregationJob struct {
-	log                logging.Logger
-	message            *warp.Message
-	minThreshold       uint64
-	nodeIDsToValidator map[ids.NodeID]indexedValidator
-	totalStakeWeight   uint64
-
-	lock                  sync.Mutex
-	aggregatedStakeWeight uint64
-	failedStakeWeight     uint64
-	signatures            []*bls.Signature
-	signerBitSet          set.Bits
-
-	done chan result
-}
-
-func (a *aggregationJob) GetResult() result {
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	return a.getResult()
-}
-
-func (a *aggregationJob) getResult() result {
-	aggregateSignature, err := bls.AggregateSignatures(a.signatures)
+func (s *SignatureAggregator) newWarpMessage(
+	message *warp.Message,
+	signerBitSet set.Bits,
+	signatures []*bls.Signature,
+) (*warp.Message, error) {
+	aggregateSignature, err := bls.AggregateSignatures(signatures)
 	if err != nil {
-		return result{Err: fmt.Errorf("%w: %w", ErrFailedAggregation, err)}
+		return nil, err
 	}
 
 	bitSetSignature := &warp.BitSetSignature{
-		Signers:   a.signerBitSet.Bytes(),
+		Signers:   signerBitSet.Bytes(),
 		Signature: [bls.SignatureLen]byte{},
 	}
-
 	copy(bitSetSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
-	unsignedMessage, err := warp.NewUnsignedMessage(a.message.NetworkID, a.message.SourceChainID, a.message.Payload)
-	if err != nil {
-		return result{Err: fmt.Errorf("failed to initialize message: %w", err)}
-	}
 
-	msg, err := warp.NewMessage(unsignedMessage, bitSetSignature)
-	if err != nil {
-		return result{Err: err}
-	}
-
-	return result{
-		Message:          msg,
-		AggregatedWeight: a.aggregatedStakeWeight,
-		TotalWeight:      a.totalStakeWeight,
-	}
+	return warp.NewMessage(&message.UnsignedMessage, bitSetSignature)
 }
 
-func (a *aggregationJob) HandleResponse(
+type responseHandler struct {
+	message            *warp.Message
+	nodeIDsToValidator map[ids.NodeID]indexedValidator
+	results            chan result
+}
+
+func (a *responseHandler) HandleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 ) {
-	a.lock.Lock()
-	// We are guaranteed a response from a node in the validator set
 	validator := a.nodeIDsToValidator[nodeID]
-	failed := true
-
-	defer a.lock.Unlock()
-	defer func() {
-		if a.aggregatedStakeWeight >= a.minThreshold {
-			a.done <- a.getResult()
-			return
-		}
-
-		if failed {
-			a.failedStakeWeight += validator.Weight
-		}
-
-		// Fast-fail if it's not possible to generate a signature that meets the
-		// minimum threshold
-		if a.totalStakeWeight-a.failedStakeWeight < a.minThreshold {
-			a.done <- result{Err: ErrFailedAggregation}
-			return
-		}
-	}()
 
 	if err != nil {
-		a.log.Debug(
-			"dropping response",
-			zap.Stringer("nodeID", nodeID),
-			zap.Error(err),
-		)
+		a.results <- result{Validator: validator, Err: err}
 		return
 	}
 
 	response := &sdk.SignatureResponse{}
 	if err := proto.Unmarshal(responseBytes, response); err != nil {
-		a.log.Debug(
-			"dropping response",
-			zap.Stringer("nodeID", nodeID),
-			zap.Error(err),
-		)
+		a.results <- result{Validator: validator, Err: err}
 		return
 	}
 
 	signature, err := bls.SignatureFromBytes(response.Signature)
 	if err != nil {
-		a.log.Debug(
-			"dropping response",
-			zap.Stringer("nodeID", nodeID),
-			zap.String("reason", "invalid signature"),
-			zap.Error(err),
-		)
+		a.results <- result{Validator: validator, Err: err}
 		return
 	}
 
 	if !bls.Verify(validator.PublicKey, signature, a.message.UnsignedMessage.Bytes()) {
-		a.log.Debug(
-			"dropping response",
-			zap.Stringer("nodeID", nodeID),
-			zap.String("reason", "public key failed verification"),
-		)
+		a.results <- result{Validator: validator, Err: err}
 		return
 	}
 
-	failed = false
-	a.signerBitSet.Add(validator.Index)
-	a.signatures = append(a.signatures, signature)
-	a.aggregatedStakeWeight += validator.Weight
+	a.results <- result{Validator: validator, Signature: signature}
 }
