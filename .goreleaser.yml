@@ -18,10 +18,12 @@ builds:
     overrides:
       - goos: linux
         goarch: arm64
+        goarm64: v8.0
         env:
           - CC=aarch64-linux-gnu-gcc
       - goos: darwin
         goarch: arm64
+        goarm64: v8.0
         env:
           - CC=oa64-clang
       - goos: darwin
