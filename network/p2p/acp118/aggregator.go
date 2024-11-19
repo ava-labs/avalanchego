@@ -152,7 +152,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 			}
 
 			// Try to return whatever progress we have if the context is cancelled
-			msg, err := s.newWarpMessage(message, signerBitSet, signatures)
+			msg, err := newWarpMessage(message, signerBitSet, signatures)
 			if err != nil {
 				return nil, 0, 0, err
 			}
