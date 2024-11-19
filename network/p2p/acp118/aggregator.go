@@ -22,14 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-var (
-	// ErrDuplicateValidator is returned if the provided validator set contains
-	// duplicate validators
-	ErrDuplicateValidator = errors.New("duplicate validator")
-	// ErrFailedAggregation is returned if it's not possible for us to
-	// generate a signature
-	ErrFailedAggregation = errors.New("failed aggregation")
-)
+// ErrFailedAggregation is returned if it's not possible for us to
+// generate a signature
+var ErrFailedAggregation = errors.New("failed aggregation")
 
 type Validator struct {
 	NodeID    ids.NodeID
@@ -43,8 +38,10 @@ type indexedValidator struct {
 }
 
 type result struct {
-	Message *warp.Message
-	Err     error
+	Message          *warp.Message
+	AggregatedWeight uint64
+	TotalWeight      uint64
+	Err              error
 }
 
 // NewSignatureAggregator returns an instance of SignatureAggregator
@@ -68,7 +65,10 @@ type SignatureAggregator struct {
 }
 
 // AggregateSignatures blocks until quorumNum/quorumDen signatures from
-// validators are requested to be aggregated into a warp message.
+// validators are requested to be aggregated into a warp message or the context
+// is canceled. Returns the signed message and the amount of stake that signed
+// the message. Caller is responsible for providing a well-formed canonical
+// validator set corresponding to the signer bitset in the message.
 func (s *SignatureAggregator) AggregateSignatures(
 	ctx context.Context,
 	message *warp.Message,
@@ -76,7 +76,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	validators []Validator,
 	quorumNum uint64,
 	quorumDen uint64,
-) (*warp.Message, error) {
+) (*warp.Message, uint64, uint64, error) {
 	request := &sdk.SignatureRequest{
 		Message:       message.UnsignedMessage.Bytes(),
 		Justification: justification,
@@ -84,18 +84,16 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal signature request: %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
 	done := make(chan result)
-	sem := make(chan struct{}, s.maxPending)
-
 	totalStakeWeight := uint64(0)
 	nodeIDsToValidator := make(map[ids.NodeID]indexedValidator)
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
 	if !ok {
-		return nil, errors.New("invalid warp signature type")
+		return nil, 0, 0, errors.New("invalid warp signature type")
 	}
 
 	var signerBitSet set.Bits
@@ -105,41 +103,39 @@ func (s *SignatureAggregator) AggregateSignatures(
 		signerBitSet = set.NewBits()
 	}
 
+	sampleable := make([]ids.NodeID, 0, len(validators))
 	aggregatedStakeWeight := uint64(0)
 	for i, v := range validators {
 		totalStakeWeight, err = math.Add[uint64](totalStakeWeight, v.Weight)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
 
-		// Check that the validator set provided is valid
-		if _, ok := nodeIDsToValidator[v.NodeID]; ok {
-			return nil, fmt.Errorf("%w: %s", ErrDuplicateValidator, v.NodeID)
+		// Only try to aggregate signatures from validators that are not already in
+		// the signer bit set
+		if signerBitSet.Contains(i) {
+			aggregatedStakeWeight += v.Weight
+			continue
 		}
 
 		nodeIDsToValidator[v.NodeID] = indexedValidator{
 			Index:     i,
 			Validator: v,
 		}
-
-		if signerBitSet.Contains(i) {
-			aggregatedStakeWeight += v.Weight
-		}
+		sampleable = append(sampleable, v.NodeID)
 	}
 
 	signatures := make([]*bls.Signature, 0, 1)
 	if bitSetSignature.Signature != [bls.SignatureLen]byte{} {
 		blsSignature, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse bls signature: %w", err)
+			return nil, 0, 0, fmt.Errorf("failed to parse bls signature: %w", err)
 		}
 		signatures = append(signatures, blsSignature)
 	}
 
 	job := aggregationJob{
 		log:                   s.log,
-		client:                s.client,
-		requestBytes:          requestBytes,
 		message:               message,
 		minThreshold:          (totalStakeWeight * quorumNum) / quorumDen,
 		nodeIDsToValidator:    nodeIDsToValidator,
@@ -147,43 +143,40 @@ func (s *SignatureAggregator) AggregateSignatures(
 		aggregatedStakeWeight: aggregatedStakeWeight,
 		signatures:            signatures,
 		signerBitSet:          signerBitSet,
-		sem:                   sem,
 		done:                  done,
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			// Try to return whatever progress we have made if the context is
-			// cancelled early
-			result, err := job.GetResult()
-			if err != nil {
-				return nil, err
-			}
-
-			return result, nil
-		case result := <-done:
-			if result.Err != nil {
-				return nil, result.Err
-			}
-
-			return result.Message, nil
-		case sem <- struct{}{}:
-			if err := job.SendRequest(ctx); err != nil {
-				return nil, err
-			}
+	for _, nodeID := range sampleable {
+		if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, job.HandleResponse); err != nil {
+			return nil, 0, 0, err
 		}
+	}
+
+	select {
+	case <-ctx.Done():
+		// Try to return whatever progress we have made if the context is
+		// cancelled early
+		result := job.GetResult()
+		if result.Err != nil {
+			return nil, 0, 0, result.Err
+		}
+
+		return result.Message, result.AggregatedWeight, result.TotalWeight, nil
+	case result := <-done:
+		if result.Err != nil {
+			return nil, 0, 0, result.Err
+		}
+
+		return result.Message, result.AggregatedWeight, result.TotalWeight, nil
 	}
 }
 
 type aggregationJob struct {
 	log                logging.Logger
-	client             *p2p.Client
-	requestBytes       []byte
 	message            *warp.Message
 	minThreshold       uint64
 	nodeIDsToValidator map[ids.NodeID]indexedValidator
-	totalStakeWeight   uint64 // TODO initialize this correctly
+	totalStakeWeight   uint64
 
 	lock                  sync.Mutex
 	aggregatedStakeWeight uint64
@@ -191,21 +184,20 @@ type aggregationJob struct {
 	signatures            []*bls.Signature
 	signerBitSet          set.Bits
 
-	sem  <-chan struct{}
 	done chan result
 }
 
-func (a *aggregationJob) GetResult() (*warp.Message, error) {
+func (a *aggregationJob) GetResult() result {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
 	return a.getResult()
 }
 
-func (a *aggregationJob) getResult() (*warp.Message, error) {
+func (a *aggregationJob) getResult() result {
 	aggregateSignature, err := bls.AggregateSignatures(a.signatures)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedAggregation, err)
+		return result{Err: fmt.Errorf("%w: %w", ErrFailedAggregation, err)}
 	}
 
 	bitSetSignature := &warp.BitSetSignature{
@@ -216,25 +208,19 @@ func (a *aggregationJob) getResult() (*warp.Message, error) {
 	copy(bitSetSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
 	unsignedMessage, err := warp.NewUnsignedMessage(a.message.NetworkID, a.message.SourceChainID, a.message.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize message: %w", err)
+		return result{Err: fmt.Errorf("failed to initialize message: %w", err)}
 	}
 
-	return warp.NewMessage(unsignedMessage, bitSetSignature)
-}
-
-func (a *aggregationJob) SendRequest(ctx context.Context) error {
-	// TODO dont rely on map iteration order and use weighted sampling instead
-	for nodeID, validator := range a.nodeIDsToValidator {
-		if a.signerBitSet.Contains(validator.Index) {
-			continue
-		}
-
-		if err := a.client.AppRequest(ctx, set.Of(nodeID), a.requestBytes, a.HandleResponse); err != nil {
-			return err
-		}
+	msg, err := warp.NewMessage(unsignedMessage, bitSetSignature)
+	if err != nil {
+		return result{Err: err}
 	}
 
-	return nil
+	return result{
+		Message:          msg,
+		AggregatedWeight: a.aggregatedStakeWeight,
+		TotalWeight:      a.totalStakeWeight,
+	}
 }
 
 func (a *aggregationJob) HandleResponse(
@@ -248,15 +234,10 @@ func (a *aggregationJob) HandleResponse(
 	validator := a.nodeIDsToValidator[nodeID]
 	failed := true
 
+	defer a.lock.Unlock()
 	defer func() {
-		defer func() {
-			a.lock.Unlock()
-			<-a.sem
-		}()
-
 		if a.aggregatedStakeWeight >= a.minThreshold {
-			signature, err := a.getResult()
-			a.done <- result{Message: signature, Err: err}
+			a.done <- a.getResult()
 			return
 		}
 
