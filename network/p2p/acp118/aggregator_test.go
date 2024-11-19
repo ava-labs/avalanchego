@@ -169,8 +169,9 @@ func TestVerifier_Verify(t *testing.T) {
 			quorumDen:                  1,
 		},
 		{
-			name: "invalid validator set",
-			ctx:  context.Background(),
+			name:    "invalid validator set",
+			handler: NewHandler(&testVerifier{}, signer),
+			ctx:     context.Background(),
 			validators: []Validator{
 				{
 					NodeID:    nodeID0,
@@ -188,7 +189,8 @@ func TestVerifier_Verify(t *testing.T) {
 			quorumDen:                  1,
 		},
 		{
-			name: "context canceled",
+			name:    "context canceled",
+			handler: NewHandler(&testVerifier{}, signer),
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
