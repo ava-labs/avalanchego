@@ -26,28 +26,29 @@ import (
 )
 
 var (
-	errInvalidTargetLockState       = errors.New("invalid target lock state")
-	errLockingLockedUTXO            = errors.New("utxo consumed for locking are already locked")
-	errUnlockingUnlockedUTXO        = errors.New("utxo consumed for unlocking are already unlocked")
-	errInsufficientBalance          = errors.New("insufficient balance")
-	errWrongInType                  = errors.New("wrong input type")
-	errWrongOutType                 = errors.New("wrong output type")
-	errWrongUTXOOutType             = errors.New("wrong utxo output type")
-	errWrongProducedAmount          = errors.New("produced more tokens, than input had")
-	errInputsCredentialsMismatch    = errors.New("number of inputs is different from number of credentials")
-	errInputsUTXOsMismatch          = errors.New("number of inputs is different from number of utxos")
-	errBadCredentials               = errors.New("bad credentials")
-	errNotBurnedEnough              = errors.New("burned less tokens, than needed to")
-	errAssetIDMismatch              = errors.New("utxo/input/output assetID is different from expected asset id")
-	errLockIDsMismatch              = errors.New("input lock ids is different from utxo lock ids")
-	errFailToGetDeposit             = errors.New("couldn't get deposit")
-	errLockedUTXO                   = errors.New("can't spend locked utxo")
-	errNotLockedUTXO                = errors.New("can't spend unlocked utxo")
-	errUTXOOutTypeOrAmtMismatch     = errors.New("inner out isn't *secp256k1fx.TransferOutput or inner out amount != input.Amt")
-	errCantSpend                    = errors.New("can't spend utxo with given credential and input")
-	errCompositeMultisigChangeOwner = errors.New("change owner can't be nested multisig owner")
-	errCompositeMultisigToOwner     = errors.New("to-owner can't be nested multisig owner")
-	errNewBondOwner                 = errors.New("can't create bond for new owner")
+	errInvalidTargetLockState    = errors.New("invalid target lock state")
+	errLockingLockedUTXO         = errors.New("utxo consumed for locking are already locked")
+	errUnlockingUnlockedUTXO     = errors.New("utxo consumed for unlocking are already unlocked")
+	errInsufficientBalance       = errors.New("insufficient balance")
+	errWrongInType               = errors.New("wrong input type")
+	errWrongOutType              = errors.New("wrong output type")
+	errWrongUTXOOutType          = errors.New("wrong utxo output type")
+	errWrongProducedAmount       = errors.New("produced more tokens, than input had")
+	errInputsCredentialsMismatch = errors.New("number of inputs is different from number of credentials")
+	errInputsUTXOsMismatch       = errors.New("number of inputs is different from number of utxos")
+	errBadCredentials            = errors.New("bad credentials")
+	errNotBurnedEnough           = errors.New("burned less tokens, than needed to")
+	errAssetIDMismatch           = errors.New("utxo/input/output assetID is different from expected asset id")
+	errLockIDsMismatch           = errors.New("input lock ids is different from utxo lock ids")
+	errFailToGetDeposit          = errors.New("couldn't get deposit")
+	errLockedUTXO                = errors.New("can't spend locked utxo")
+	errNotLockedUTXO             = errors.New("can't spend unlocked utxo")
+	errUTXOOutTypeOrAmtMismatch  = errors.New("inner out isn't *secp256k1fx.TransferOutput or inner out amount != input.Amt")
+	errCantSpend                 = errors.New("can't spend utxo with given credential and input")
+	errCompositeMultisig         = errors.New("owner can't be nested multisig owner")
+	errInvalidToOwner            = errors.New("invalid to-owner")
+	errInvalidChangeOwner        = errors.New("invalid change owner")
+	errNewBondOwner              = errors.New("can't create bond for new owner")
 )
 
 // Creates UTXOs from [outs] and adds them to the UTXO set.
@@ -245,13 +246,17 @@ func (h *handler) Lock(
 		id         *ids.ID
 	}
 
-	setOwner := func(secpOwner *secp256k1fx.OutputOwners, owner *Owner, errNested error) error {
+	setOwner := func(secpOwner *secp256k1fx.OutputOwners, owner *Owner) error {
 		if secpOwner == nil {
 			return nil
 		}
 
+		if err := secpOwner.Verify(); err != nil {
+			return fmt.Errorf("invalid owner: %w", err)
+		}
+
 		if err := h.fx.VerifyMultisigOwner(secpOwner, utxoDB); err != nil {
-			return fmt.Errorf("%w: %v", errNested, err)
+			return fmt.Errorf("%w: %v", errCompositeMultisig, err)
 		}
 
 		id, err := txs.GetOwnerID(secpOwner)
@@ -263,13 +268,13 @@ func (h *handler) Lock(
 	}
 
 	newOwner := Owner{}
-	if err := setOwner(to, &newOwner, errCompositeMultisigToOwner); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to set to-owner: %w", err)
+	if err := setOwner(to, &newOwner); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("%w: %s", errInvalidToOwner, err)
 	}
 
 	changeOwner := Owner{}
-	if err := setOwner(change, &changeOwner, errCompositeMultisigChangeOwner); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to set change owner: %w", err)
+	if err := setOwner(change, &changeOwner); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("%w: %s", errInvalidChangeOwner, err)
 	}
 
 	addrs, signer := secp256k1fx.ExtractFromAndSigners(keys)

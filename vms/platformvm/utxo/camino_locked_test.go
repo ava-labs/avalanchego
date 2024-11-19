@@ -205,6 +205,18 @@ func TestLock(t *testing.T) {
 		return state
 	}
 
+	noOpState := func(
+		t *testing.T,
+		ctrl *gomock.Controller,
+		utxos []*avax.UTXO,
+		keys []*secp256k1.PrivateKey,
+		to *secp256k1fx.OutputOwners,
+		change *secp256k1fx.OutputOwners,
+	) *state.MockState {
+		t.Helper()
+		return state.NewMockState(ctrl)
+	}
+
 	tests := map[string]struct {
 		state func(
 			t *testing.T,
@@ -229,20 +241,26 @@ func TestLock(t *testing.T) {
 		expectedErr        error
 	}{
 		"New bond owner": {
-			state: func(
-				t *testing.T,
-				ctrl *gomock.Controller,
-				_ []*avax.UTXO,
-				_ []*secp256k1.PrivateKey,
-				_ *secp256k1fx.OutputOwners,
-				_ *secp256k1fx.OutputOwners,
-			) *state.MockState {
-				t.Helper()
-				return state.NewMockState(ctrl)
-			},
+			state:            noOpState,
 			appliedLockState: locked.StateBonded,
 			to:               &recipientOwner,
 			expectedErr:      errNewBondOwner,
+		},
+		"Syntactically invalid change owner": {
+			state: noOpState,
+			change: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{{100}},
+				Threshold: 2,
+			},
+			expectedErr: errInvalidChangeOwner,
+		},
+		"Syntactically invalid to-owner": {
+			state: noOpState,
+			to: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{{100}},
+				Threshold: 2,
+			},
+			expectedErr: errInvalidToOwner,
 		},
 		"Nested multisig change owner": {
 			state: func(
@@ -269,7 +287,7 @@ func TestLock(t *testing.T) {
 				return state
 			},
 			change:      &changeOwner,
-			expectedErr: errCompositeMultisigChangeOwner,
+			expectedErr: errInvalidChangeOwner,
 		},
 		"Composite multisig change owner": {
 			state: func(
@@ -290,8 +308,11 @@ func TestLock(t *testing.T) {
 				)
 				return state
 			},
-			change:      &secp256k1fx.OutputOwners{Addrs: []ids.ShortID{{100}, {101}}},
-			expectedErr: errCompositeMultisigChangeOwner,
+			change: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{{100}, {101}},
+				Threshold: 1,
+			},
+			expectedErr: errInvalidChangeOwner,
 		},
 		"Nested multisig to-owner": {
 			state: func(
@@ -318,7 +339,7 @@ func TestLock(t *testing.T) {
 				return state
 			},
 			to:          &recipientOwner,
-			expectedErr: errCompositeMultisigToOwner,
+			expectedErr: errInvalidToOwner,
 		},
 		"Composite multisig to-owner": {
 			state: func(
@@ -339,8 +360,11 @@ func TestLock(t *testing.T) {
 				)
 				return state
 			},
-			to:          &secp256k1fx.OutputOwners{Addrs: []ids.ShortID{{100}, {101}}},
-			expectedErr: errCompositeMultisigToOwner,
+			to: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{{100}, {101}},
+				Threshold: 1,
+			},
+			expectedErr: errInvalidToOwner,
 		},
 		"Bond unlocked utxo: not enough balance": {
 			state:              defaultState,
