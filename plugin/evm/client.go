@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -24,7 +25,7 @@ type Client interface {
 	LockProfile(ctx context.Context, options ...rpc.Option) error
 	SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error
 	GetVMConfig(ctx context.Context, options ...rpc.Option) (*Config, error)
-	GetCurrentValidators(ctx context.Context, options ...rpc.Option) ([]CurrentValidator, error)
+	GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]CurrentValidator, error)
 }
 
 // Client implementation for interacting with EVM [chain]
@@ -77,8 +78,10 @@ func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*Confi
 }
 
 // GetCurrentValidators returns the current validators
-func (c *client) GetCurrentValidators(ctx context.Context, options ...rpc.Option) ([]CurrentValidator, error) {
+func (c *client) GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]CurrentValidator, error) {
 	res := &GetCurrentValidatorsResponse{}
-	err := c.validatorsRequester.SendRequest(ctx, "validators.getCurrentValidators", struct{}{}, res, options...)
+	err := c.validatorsRequester.SendRequest(ctx, "validators.getCurrentValidators", &GetCurrentValidatorsRequest{
+		NodeIDs: nodeIDs,
+	}, res, options...)
 	return res.Validators, err
 }

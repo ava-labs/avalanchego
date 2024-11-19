@@ -16,6 +16,8 @@ type StateReader interface {
 	GetValidationIDs() set.Set[ids.ID]
 	// GetNodeIDs returns the validator node IDs in the state
 	GetNodeIDs() set.Set[ids.NodeID]
+	// GetValidationID returns the validation ID for the given node ID
+	GetValidationID(nodeID ids.NodeID) (ids.ID, error)
 }
 
 type State interface {

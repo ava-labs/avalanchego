@@ -239,6 +239,15 @@ func (s *state) GetNodeIDs() set.Set[ids.NodeID] {
 	return ids
 }
 
+// GetValidationID returns the validation ID for the given nodeID
+func (s *state) GetValidationID(nodeID ids.NodeID) (ids.ID, error) {
+	vID, exists := s.index[nodeID]
+	if !exists {
+		return ids.ID{}, database.ErrNotFound
+	}
+	return vID, nil
+}
+
 // GetValidator returns the validator data for the given validationID
 func (s *state) GetValidator(vID ids.ID) (interfaces.Validator, error) {
 	data, ok := s.data[vID]
