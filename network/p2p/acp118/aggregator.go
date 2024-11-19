@@ -181,7 +181,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 			aggregatedStakeWeight += result.Validator.Weight
 
 			if aggregatedStakeWeight >= minThreshold {
-				msg, err := s.newWarpMessage(message, signerBitSet, signatures)
+				msg, err := newWarpMessage(message, signerBitSet, signatures)
 				if err != nil {
 					return nil, 0, 0, err
 				}
@@ -192,7 +192,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	}
 }
 
-func (s *SignatureAggregator) newWarpMessage(
+func newWarpMessage(
 	message *warp.Message,
 	signerBitSet set.Bits,
 	signatures []*bls.Signature) (*warp.Message, error) {
