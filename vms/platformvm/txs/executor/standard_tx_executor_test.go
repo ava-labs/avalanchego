@@ -2630,7 +2630,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
 				ManagerAddress: address,
-				Validators: []message.SubnetToL1ConverstionValidatorData{
+				Validators: []message.SubnetToL1ConversionValidatorData{
 					{
 						NodeID:       nodeID.Bytes(),
 						BLSPublicKey: pop.PublicKey,

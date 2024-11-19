@@ -12,17 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
-type SubnetToL1ConverstionValidatorData struct {
+type SubnetToL1ConversionValidatorData struct {
 	NodeID       types.JSONByteSlice    `serialize:"true" json:"nodeID"`
 	BLSPublicKey [bls.PublicKeyLen]byte `serialize:"true" json:"blsPublicKey"`
 	Weight       uint64                 `serialize:"true" json:"weight"`
 }
 
 type SubnetToL1ConversionData struct {
-	SubnetID       ids.ID                               `serialize:"true" json:"subnetID"`
-	ManagerChainID ids.ID                               `serialize:"true" json:"managerChainID"`
-	ManagerAddress types.JSONByteSlice                  `serialize:"true" json:"managerAddress"`
-	Validators     []SubnetToL1ConverstionValidatorData `serialize:"true" json:"validators"`
+	SubnetID       ids.ID                              `serialize:"true" json:"subnetID"`
+	ManagerChainID ids.ID                              `serialize:"true" json:"managerChainID"`
+	ManagerAddress types.JSONByteSlice                 `serialize:"true" json:"managerAddress"`
+	Validators     []SubnetToL1ConversionValidatorData `serialize:"true" json:"validators"`
 }
 
 // SubnetToL1ConversionID creates a subnet conversion ID from the provided
