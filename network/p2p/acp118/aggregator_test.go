@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -135,7 +136,7 @@ func TestVerifier_Verify(t *testing.T) {
 			client := p2ptest.NewClient(t, context.Background(), tt.handler, ids.GenerateTestNodeID(), nodeID0)
 			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
 
-			_, _, gotDen, err := aggregator.AggregateSignatures(
+			msg, gotNum, gotDen, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
 				[]byte("justification"),
@@ -149,11 +150,22 @@ func TestVerifier_Verify(t *testing.T) {
 				return
 			}
 
+			bitSetSignature := msg.Signature.(*warp.BitSetSignature)
+			require.Len(bitSetSignature.Signers, len(tt.wantSigners))
+
+			wantNum := uint64(0)
+			bitSet := set.BitsFromBytes(bitSetSignature.Signers)
+			for _, i := range tt.wantSigners {
+				require.True(bitSet.Contains(i))
+				wantNum += tt.validators[i].Weight
+			}
+
 			wantDen := uint64(0)
 			for _, v := range tt.validators {
 				wantDen += v.Weight
 			}
 
+			require.Equal(wantNum, gotNum)
 			require.Equal(wantDen, gotDen)
 		})
 	}
