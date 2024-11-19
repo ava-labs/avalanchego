@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -148,6 +149,10 @@ func (s *SignatureAggregator) AggregateSignatures(
 	for {
 		select {
 		case <-ctx.Done():
+			if len(signatures) == 0 {
+				return message, 0, totalStakeWeight, nil
+			}
+
 			// Try to return whatever progress we have if the context is cancelled
 			msg, err := s.newWarpMessage(message, signerBitSet, signatures)
 			if err != nil {
@@ -157,11 +162,19 @@ func (s *SignatureAggregator) AggregateSignatures(
 			return msg, aggregatedStakeWeight, totalStakeWeight, nil
 		case result := <-results:
 			if result.Err != nil {
-				return nil, 0, 0, result.Err
-			}
+				s.log.Debug(
+					"dropping response",
+					zap.Stringer("nodeID", result.Validator.NodeID),
+					zap.Uint64("weight", result.Validator.Weight),
+					zap.Error(err),
+				)
 
-			if result.Err != nil {
+				// Fast-fail if it's not possible to generate a signature that meets the
+				// minimum threshold
 				failedStakeWeight += result.Validator.Weight
+				if totalStakeWeight-failedStakeWeight < minThreshold {
+					return nil, 0, 0, ErrFailedAggregation
+				}
 				continue
 			}
 
@@ -177,12 +190,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 				return msg, aggregatedStakeWeight, totalStakeWeight, nil
 			}
-
-			// Fast-fail if it's not possible to generate a signature that meets the
-			// minimum threshold
-			if totalStakeWeight-failedStakeWeight < minThreshold {
-				return nil, 0, 0, ErrFailedAggregation
-			}
 		}
 	}
 }
@@ -190,8 +197,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 func (s *SignatureAggregator) newWarpMessage(
 	message *warp.Message,
 	signerBitSet set.Bits,
-	signatures []*bls.Signature,
-) (*warp.Message, error) {
+	signatures []*bls.Signature) (*warp.Message, error) {
 	aggregateSignature, err := bls.AggregateSignatures(signatures)
 	if err != nil {
 		return nil, err
