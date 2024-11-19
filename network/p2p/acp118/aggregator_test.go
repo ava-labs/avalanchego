@@ -7,9 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
@@ -18,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVerifier_Verify(t *testing.T) {
@@ -46,10 +45,8 @@ func TestVerifier_Verify(t *testing.T) {
 
 		pChainState  validators.State
 		pChainHeight uint64
-		quorumNumMin uint64
-		quorumDenMin uint64
-		quorumNumMax uint64
-		quorumDenMax uint64
+		quorumNum    uint64
+		quorumDen    uint64
 
 		wantAggregateSignaturesErr error
 		wantVerifyErr              error
@@ -80,10 +77,8 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
-			quorumNumMin: 1,
-			quorumDenMin: 1,
-			quorumNumMax: 1,
-			quorumDenMax: 1,
+			quorumNum: 1,
+			quorumDen: 1,
 		},
 		{
 			name:    "gets signatures from insufficient stake",
@@ -111,10 +106,8 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
-			quorumNumMin: 1,
-			quorumDenMin: 1,
-			quorumNumMax: 1,
-			quorumDenMax: 1,
+			quorumNum: 1,
+			quorumDen: 1,
 		},
 		{
 			name:    "overflow",
@@ -152,10 +145,8 @@ func TestVerifier_Verify(t *testing.T) {
 					}, nil
 				},
 			},
-			quorumNumMin:               1,
-			quorumDenMin:               2,
-			quorumNumMax:               1,
-			quorumDenMax:               2,
+			quorumNum:                  1,
+			quorumDen:                  2,
 			wantAggregateSignaturesErr: math.ErrOverflow,
 		},
 		{
@@ -173,10 +164,8 @@ func TestVerifier_Verify(t *testing.T) {
 				},
 			},
 			wantAggregateSignaturesErr: ErrFailedAggregation,
-			quorumNumMin:               1,
-			quorumDenMin:               1,
-			quorumNumMax:               1,
-			quorumDenMax:               1,
+			quorumNum:                  1,
+			quorumDen:                  1,
 		},
 		{
 			name: "invalid validator set",
@@ -194,10 +183,8 @@ func TestVerifier_Verify(t *testing.T) {
 				},
 			},
 			wantAggregateSignaturesErr: ErrDuplicateValidator,
-			quorumNumMin:               1,
-			quorumDenMin:               1,
-			quorumNumMax:               1,
-			quorumDenMax:               1,
+			quorumNum:                  1,
+			quorumDen:                  1,
 		},
 		{
 			name: "context canceled",
@@ -215,10 +202,8 @@ func TestVerifier_Verify(t *testing.T) {
 				},
 			},
 			wantAggregateSignaturesErr: ErrFailedAggregation,
-			quorumNumMin:               1,
-			quorumDenMin:               1,
-			quorumNumMax:               1,
-			quorumDenMax:               1,
+			quorumNum:                  1,
+			quorumDen:                  1,
 		},
 	}
 
@@ -226,20 +211,20 @@ func TestVerifier_Verify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			message, err := warp.NewUnsignedMessage(networkID, chainID, []byte("payload"))
+			unsignedMsg, err := warp.NewUnsignedMessage(networkID, chainID, []byte("payload"))
+			require.NoError(err)
+			msg, err := warp.NewMessage(unsignedMsg, &warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}})
 			require.NoError(err)
 			client := p2ptest.NewClient(t, context.Background(), tt.handler, ids.GenerateTestNodeID(), nodeID0)
-			verifier := NewSignatureAggregator(logging.NoLog{}, client, 1)
+			aggregator := NewSignatureAggregator(logging.NoLog{}, client, 1)
 
-			signedMessage, err := verifier.AggregateSignatures(
+			gotMsg, err := aggregator.AggregateSignatures(
 				tt.ctx,
-				message,
+				msg,
 				[]byte("justification"),
 				tt.validators,
-				tt.quorumNumMin,
-				tt.quorumDenMin,
-				tt.quorumNumMax,
-				tt.quorumDenMax,
+				tt.quorumNum,
+				tt.quorumDen,
 			)
 			require.ErrorIs(err, tt.wantAggregateSignaturesErr)
 
@@ -247,14 +232,14 @@ func TestVerifier_Verify(t *testing.T) {
 				return
 			}
 
-			err = signedMessage.Signature.Verify(
+			err = gotMsg.Signature.Verify(
 				context.Background(),
-				&signedMessage.UnsignedMessage,
+				&gotMsg.UnsignedMessage,
 				networkID,
 				tt.pChainState,
 				0,
-				tt.quorumNumMin,
-				tt.quorumDenMin,
+				tt.quorumNum,
+				tt.quorumDen,
 			)
 			require.ErrorIs(err, tt.wantVerifyErr)
 		})
