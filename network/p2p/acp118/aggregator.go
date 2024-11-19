@@ -195,7 +195,8 @@ func (s *SignatureAggregator) AggregateSignatures(
 func newWarpMessage(
 	message *warp.Message,
 	signerBitSet set.Bits,
-	signatures []*bls.Signature) (*warp.Message, error) {
+	signatures []*bls.Signature,
+) (*warp.Message, error) {
 	aggregateSignature, err := bls.AggregateSignatures(signatures)
 	if err != nil {
 		return nil, err
