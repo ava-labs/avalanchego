@@ -30,6 +30,11 @@ func TestVerifier_Verify(t *testing.T) {
 	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 
+	nodeID2 := ids.GenerateTestNodeID()
+	sk2, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	pk2 := bls.PublicFromSecretKey(sk2)
+
 	networkID := uint32(123)
 	chainID := ids.GenerateTestID()
 	signer := warp.NewSigner(sk0, networkID, chainID)
@@ -61,10 +66,10 @@ func TestVerifier_Verify(t *testing.T) {
 			quorumDen:   1,
 		},
 		{
-			name: "fails aggregation from some validators",
+			name: "fails aggregation from some validators - 1/2",
 			handler: NewHandler(
 				&testVerifier{
-					Errs: []*common.AppError{common.ErrUndefined},
+					Errs: []*common.AppError{nil, common.ErrUndefined},
 				},
 				signer,
 			),
@@ -83,7 +88,38 @@ func TestVerifier_Verify(t *testing.T) {
 			},
 			quorumNum:                  1,
 			quorumDen:                  1,
-			wantSigners:                []int{1},
+			wantSigners:                []int{0},
+			wantAggregateSignaturesErr: ErrFailedAggregation,
+		},
+		{
+			name: "fails aggregation from some validators - 2/3",
+			handler: NewHandler(
+				&testVerifier{
+					Errs: []*common.AppError{nil, nil, common.ErrUndefined},
+				},
+				signer,
+			),
+			ctx: context.Background(),
+			validators: []Validator{
+				{
+					NodeID:    nodeID0,
+					PublicKey: pk0,
+					Weight:    1,
+				},
+				{
+					NodeID:    nodeID1,
+					PublicKey: pk1,
+					Weight:    1,
+				},
+				{
+					NodeID:    nodeID2,
+					PublicKey: pk2,
+					Weight:    1,
+				},
+			},
+			quorumNum:                  1,
+			quorumDen:                  1,
+			wantSigners:                []int{0, 1},
 			wantAggregateSignaturesErr: ErrFailedAggregation,
 		},
 		{
