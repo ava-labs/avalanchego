@@ -216,7 +216,7 @@ func (a *aggregationJob) getResult() (*warp.Message, error) {
 	copy(bitSetSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
 	unsignedMessage, err := warp.NewUnsignedMessage(a.message.NetworkID, a.message.SourceChainID, a.message.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize message")
+		return nil, fmt.Errorf("failed to initialize message: %w", err)
 	}
 
 	return warp.NewMessage(unsignedMessage, bitSetSignature)
