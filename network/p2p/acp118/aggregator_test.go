@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -41,6 +40,8 @@ func TestVerifier_Verify(t *testing.T) {
 		validators                 []Validator
 		quorumNum                  uint64
 		quorumDen                  uint64
+		wantMsg                    *warp.Message
+		wantSigners                []int
 		wantAggregateSignaturesErr error
 	}{
 		{
@@ -54,8 +55,9 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			quorumNum: 1,
-			quorumDen: 1,
+			wantSigners: []int{0},
+			quorumNum:   1,
+			quorumDen:   1,
 		},
 		{
 			name: "fails aggregation from some validators",
@@ -80,6 +82,7 @@ func TestVerifier_Verify(t *testing.T) {
 			},
 			quorumNum:                  1,
 			quorumDen:                  1,
+			wantSigners:                []int{1},
 			wantAggregateSignaturesErr: ErrFailedAggregation,
 		},
 		{
@@ -99,26 +102,6 @@ func TestVerifier_Verify(t *testing.T) {
 			wantAggregateSignaturesErr: ErrFailedAggregation,
 			quorumNum:                  1,
 			quorumDen:                  1,
-		},
-		{
-			name:    "stake overflow",
-			handler: NewHandler(&testVerifier{}, signer),
-			ctx:     context.Background(),
-			validators: []Validator{
-				{
-					NodeID:    nodeID0,
-					PublicKey: pk0,
-					Weight:    math.MaxUint[uint64](),
-				},
-				{
-					NodeID:    nodeID1,
-					PublicKey: pk1,
-					Weight:    math.MaxUint[uint64](),
-				},
-			},
-			quorumNum:                  1,
-			quorumDen:                  2,
-			wantAggregateSignaturesErr: math.ErrOverflow,
 		},
 		{
 			name:    "context canceled",

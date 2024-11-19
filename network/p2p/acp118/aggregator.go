@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -97,10 +96,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	aggregatedStakeWeight := uint64(0)
 	totalStakeWeight := uint64(0)
 	for i, v := range validators {
-		totalStakeWeight, err = math.Add[uint64](totalStakeWeight, v.Weight)
-		if err != nil {
-			return nil, 0, 0, err
-		}
+		totalStakeWeight += v.Weight
 
 		// Only try to aggregate signatures from validators that are not already in
 		// the signer bit set
