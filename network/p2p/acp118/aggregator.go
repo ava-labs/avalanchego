@@ -24,6 +24,8 @@ import (
 // generate a signature
 var ErrFailedAggregation = errors.New("failed aggregation")
 
+// Validator signs warp messages. NodeID must be unique across validators, but
+// PublicKey is not guaranteed to be unique.
 type Validator struct {
 	NodeID    ids.NodeID
 	PublicKey *bls.PublicKey
@@ -214,35 +216,35 @@ type responseHandler struct {
 	results            chan result
 }
 
-func (a *responseHandler) HandleResponse(
+func (r *responseHandler) HandleResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 ) {
-	validator := a.nodeIDsToValidator[nodeID]
+	validator := r.nodeIDsToValidator[nodeID]
 
 	if err != nil {
-		a.results <- result{Validator: validator, Err: err}
+		r.results <- result{Validator: validator, Err: err}
 		return
 	}
 
 	response := &sdk.SignatureResponse{}
 	if err := proto.Unmarshal(responseBytes, response); err != nil {
-		a.results <- result{Validator: validator, Err: err}
+		r.results <- result{Validator: validator, Err: err}
 		return
 	}
 
 	signature, err := bls.SignatureFromBytes(response.Signature)
 	if err != nil {
-		a.results <- result{Validator: validator, Err: err}
+		r.results <- result{Validator: validator, Err: err}
 		return
 	}
 
-	if !bls.Verify(validator.PublicKey, signature, a.message.UnsignedMessage.Bytes()) {
-		a.results <- result{Validator: validator, Err: err}
+	if !bls.Verify(validator.PublicKey, signature, r.message.UnsignedMessage.Bytes()) {
+		r.results <- result{Validator: validator, Err: err}
 		return
 	}
 
-	a.results <- result{Validator: validator, Signature: signature}
+	r.results <- result{Validator: validator, Signature: signature}
 }
