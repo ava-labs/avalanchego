@@ -5,6 +5,7 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -355,9 +357,6 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 		}
 	}
 
-	log.Info("TODO(marun) Unskip waiting for nodes to be come healthy once the pods are no longer crashlooping")
-	return nil
-
 	log.Info("waiting for nodes to report healthy")
 	if err := waitForHealthy(ctx, log, nodesToWaitFor); err != nil {
 		return err
@@ -598,11 +597,19 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 
 	flags.SetDefaults(n.DefaultFlags)
 
+	chainConfigContent, err := n.GetChainConfigContent()
+	if err != nil {
+		return err
+	}
 	defaultFlags := FlagsMap{
-		config.ChainConfigContentKey: n.GetChainConfigContent(),
+		config.ChainConfigContentKey: chainConfigContent,
 	}
 	if n.Genesis != nil {
-		defaultFlags[config.GenesisFileContentKey] = n.GetGenesisFileContent()
+		genesisFileContent, err := n.GetGenesisFileContent()
+		if err != nil {
+			return err
+		}
+		defaultFlags[config.GenesisFileContentKey] = genesisFileContent
 	}
 	flags.SetDefaults(defaultFlags)
 
@@ -886,12 +893,30 @@ func (n *Network) SetPluginDir(pluginDir string) {
 	}
 }
 
-func (n *Network) GetChainConfigContent() string {
-	return "TODO(marun): Add real chain config content"
+func (n *Network) GetChainConfigContent() (string, error) {
+	chainConfigs := map[string]chains.ChainConfig{}
+	for alias, flags := range n.ChainConfigs {
+		marshaledFlags, err := json.Marshal(flags)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal flags map for %s-Chain: %w", alias, err)
+		}
+		chainConfigs[alias] = chains.ChainConfig{
+			Config: marshaledFlags,
+		}
+	}
+	marshaledChainConfigs, err := json.Marshal(chainConfigs)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(marshaledChainConfigs), nil
 }
 
-func (n *Network) GetGenesisFileContent() string {
-	return "TODO(marun): Add real genesis file content"
+func (n *Network) GetGenesisFileContent() (string, error) {
+	bytes, err := json.Marshal(n.Genesis)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal genesis: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 // Waits until the provided nodes are healthy.
