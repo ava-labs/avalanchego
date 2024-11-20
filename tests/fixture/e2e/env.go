@@ -122,7 +122,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				tc.Log().Info("stopping network")
 				require.NoError(network.Stop(tc.DefaultContext()))
 			} else {
-				tc.Log().Info("no network to stop")
+				tc.Log().Warn("no network to stop")
 			}
 			os.Exit(0)
 		} else if network != nil && flagVars.RestartNetwork() {

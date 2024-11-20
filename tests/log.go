@@ -20,13 +20,16 @@ var defaultEncoderConfig = zapcore.EncoderConfig{
 	CallerKey:     "",
 	MessageKey:    "msg",
 	StacktraceKey: "stacktrace",
-	EncodeLevel:   zapcore.LowercaseLevelEncoder,
+	// TODO(marun) Figure out why this is outputting e.g. `Level(-6)` instead of `INFO`
+	EncodeLevel: zapcore.LowercaseLevelEncoder,
 }
 
+// NewDefaultTestLogger returns a logger that writes to stdout
 func NewDefaultTestLogger() logging.Logger {
 	return NewTestLogger(os.Stdout)
 }
 
+// NewDefaultTestLogger returns a logger for the specified WriteCloser
 func NewTestLogger(writeCloser io.WriteCloser) logging.Logger {
 	return logging.NewLogger(
 		"",

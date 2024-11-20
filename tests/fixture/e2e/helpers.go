@@ -276,7 +276,7 @@ func StartNetwork(
 		// Ensure nodes are stopped if bootstrap fails. The network configuration
 		// will remain on disk to enable troubleshooting.
 		err := network.Stop(tc.DefaultContext())
-		require.NoError(err, "network bootstrapping failed")
+		require.NoError(err, "failed to stop network after bootstrap failure")
 	}
 
 	tc.Log().Info("network started successfully")
@@ -288,7 +288,7 @@ func StartNetwork(
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
-		tc.Log().Info("symlinked network dir for reuse",
+		tc.Log().Warn("symlinked network dir for reuse",
 			zap.String("networkDir", network.Dir),
 			zap.String("symlinkPath", symlinkPath),
 		)
@@ -296,7 +296,7 @@ func StartNetwork(
 
 	tc.DeferCleanup(func() {
 		if reuseNetwork {
-			tc.Log().Info("skipping shutdown for network intended for reuse",
+			tc.Log().Warn("skipping shutdown for network intended for reuse",
 				zap.String("networkDir", network.Dir),
 				zap.String("symlinkPath", symlinkPath),
 			)
@@ -304,7 +304,7 @@ func StartNetwork(
 		}
 
 		if skipShutdown {
-			tc.Log().Info("skipping shutdown for network",
+			tc.Log().Warn("skipping shutdown for network",
 				zap.String("networkDir", network.Dir),
 			)
 			return

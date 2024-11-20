@@ -322,7 +322,7 @@ func WaitForActiveValidators(
 			}
 		}
 		if allActive {
-			log.Info("saw the expected active validators of subnet",
+			log.Info("saw the expected active validators of the subnet",
 				zap.String("subnet", subnet.Name),
 			)
 			return nil

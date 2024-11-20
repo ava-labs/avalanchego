@@ -223,7 +223,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
-				tc.Log().Info("transfering",
+				tc.Log().Info("issuing transfer",
 					zap.Stringer("fromAddress", shortAddrs[fromIdx]),
 					zap.Uint64("senderOrigBal", senderOrigBal),
 					zap.Uint64("senderNewBal", senderNewBal),

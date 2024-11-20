@@ -55,7 +55,7 @@ var _ = ginkgo.AfterEach(func() {
 		strconv.FormatInt(startTime, 10),
 		strconv.FormatInt(endTime, 10),
 	)
-	tc.Log().Info("metrics and logs available via grafana (collectors must be running)",
+	tc.Log().Info(tmpnet.MetricsAvailableMessage,
 		zap.String("uri", metricsLink),
 	)
 })

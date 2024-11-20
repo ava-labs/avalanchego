@@ -16,9 +16,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
-
-	testlib "github.com/ava-labs/avalanchego/tests/lib"
 )
 
 const cliVersion = "0.0.1"
@@ -69,7 +68,7 @@ func main() {
 				return errAvalancheGoRequired
 			}
 
-			log, err := testlib.LoggerForFormat(rawLogFormat)
+			log, err := loggerForFormat(rawLogFormat)
 			if err != nil {
 				return err
 			}
@@ -149,7 +148,7 @@ func main() {
 			if len(networkDir) == 0 {
 				return errNetworkDirRequired
 			}
-			log, err := testlib.LoggerForFormat(rawLogFormat)
+			log, err := loggerForFormat(rawLogFormat)
 			if err != nil {
 				return err
 			}
@@ -165,4 +164,13 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func loggerForFormat(rawLogFormat string) (logging.Logger, error) {
+	writeCloser := os.Stdout
+	logFormat, err := logging.ToFormat(rawLogFormat, writeCloser.Fd())
+	if err != nil {
+		return nil, err
+	}
+	return logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder())), nil
 }

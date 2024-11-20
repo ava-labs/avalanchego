@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		}
 
 		if skipMonitorImageBuild {
-			tc.Log().Info("skipping build of bootstrap-monitor image")
+			tc.Log().Warn("skipping build of bootstrap-monitor image")
 		} else {
 			ginkgo.By("Building the bootstrap-monitor image")
 			buildImage(tc, monitorImage, false /* forceNewHash */, "build_bootstrap_monitor_image.sh")
@@ -455,7 +455,7 @@ func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, nam
 	scanner := bufio.NewScanner(readCloser)
 	for scanner.Scan() {
 		line := scanner.Text()
-		tc.Log().Info(line)
+		tc.Log().Info(" > " + line)
 		if len(desiredOutput) > 0 && strings.Contains(line, desiredOutput) {
 			return
 		}

@@ -185,7 +185,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
 
 			endTime := time.Now().Add(targetDelegationPeriod)
-			tc.Log().Info("determined gamma delegator validation end",
+			tc.Log().Info("determined gamma delegator validation end time",
 				zap.Time("time", endTime),
 			)
 

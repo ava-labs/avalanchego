@@ -40,6 +40,9 @@ const (
 	NetworkDirEnvName = "TMPNET_NETWORK_DIR"
 	RootDirEnvName    = "TMPNET_ROOT_DIR"
 
+	// Message to log indicating where to look for metrics and logs for network
+	MetricsAvailableMessage = "metrics and logs available via grafana (collectors must be running)"
+
 	// This interval was chosen to avoid spamming node APIs during
 	// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
 	// increase the time for a network's nodes to be seen as healthy.
@@ -384,7 +387,7 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 		return fmt.Errorf("failed to write metrics link to %s: %w", metricsPath, err)
 	}
 
-	log.Info("metrics and logs available in grafana",
+	log.Info(MetricsAvailableMessage,
 		zap.String("url", metricsURL),
 		zap.String("linkPath", metricsPath),
 	)

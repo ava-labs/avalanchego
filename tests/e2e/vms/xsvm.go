@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Log().Info("issued transfer",
+		tc.Log().Info("issued transfer transaction",
 			zap.Stringer("txID", transferTxStatus.TxID),
 		)
 
