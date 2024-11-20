@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-func TestVerifier_Verify(t *testing.T) {
+func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	sk0, err := bls.NewSecretKey()
 	require.NoError(t, err)
@@ -40,15 +40,15 @@ func TestVerifier_Verify(t *testing.T) {
 	signer := warp.NewSigner(sk0, networkID, chainID)
 
 	tests := []struct {
-		name                       string
-		handler                    p2p.Handler
-		ctx                        context.Context
-		validators                 []Validator
-		quorumNum                  uint64
-		quorumDen                  uint64
-		wantMsg                    *warp.Message
-		wantSigners                []int
-		wantAggregateSignaturesErr error
+		name        string
+		handler     p2p.Handler
+		ctx         context.Context
+		validators  []Validator
+		quorumNum   uint64
+		quorumDen   uint64
+		wantMsg     *warp.Message
+		wantSigners []int
+		wantErr     error
 	}{
 		{
 			name:    "aggregates from all validators",
@@ -86,10 +86,10 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			quorumNum:                  1,
-			quorumDen:                  1,
-			wantSigners:                []int{0},
-			wantAggregateSignaturesErr: ErrFailedAggregation,
+			quorumNum:   1,
+			quorumDen:   1,
+			wantSigners: []int{0},
+			wantErr:     ErrFailedAggregation,
 		},
 		{
 			name: "fails aggregation from some validators - 2/3",
@@ -117,10 +117,10 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			quorumNum:                  1,
-			quorumDen:                  1,
-			wantSigners:                []int{0, 1},
-			wantAggregateSignaturesErr: ErrFailedAggregation,
+			quorumNum:   1,
+			quorumDen:   1,
+			wantSigners: []int{0, 1},
+			wantErr:     ErrFailedAggregation,
 		},
 		{
 			name: "fails aggregation from all validators",
@@ -136,9 +136,9 @@ func TestVerifier_Verify(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			wantAggregateSignaturesErr: ErrFailedAggregation,
-			quorumNum:                  1,
-			quorumDen:                  1,
+			wantErr:   ErrFailedAggregation,
+			quorumNum: 1,
+			quorumDen: 1,
 		},
 		{
 			name:    "context canceled",
@@ -165,13 +165,26 @@ func TestVerifier_Verify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			unsignedMsg, err := warp.NewUnsignedMessage(networkID, chainID, []byte("payload"))
-			require.NoError(err)
-			msg, err := warp.NewMessage(unsignedMsg, &warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}})
-			require.NoError(err)
-			client := p2ptest.NewClient(t, context.Background(), tt.handler, ids.GenerateTestNodeID(), nodeID0)
+			client := p2ptest.NewClient(
+				t,
+				context.Background(),
+				tt.handler,
+				ids.EmptyNodeID,
+				tt.validators[0].NodeID,
+			)
 			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
 
+			unsignedMsg, err := warp.NewUnsignedMessage(
+				networkID,
+				chainID,
+				[]byte("payload"),
+			)
+			require.NoError(err)
+			msg, err := warp.NewMessage(
+				unsignedMsg,
+				&warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}},
+			)
+			require.NoError(err)
 			msg, gotNum, gotDen, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
@@ -180,9 +193,9 @@ func TestVerifier_Verify(t *testing.T) {
 				tt.quorumNum,
 				tt.quorumDen,
 			)
-			require.ErrorIs(err, tt.wantAggregateSignaturesErr)
+			require.ErrorIs(err, tt.wantErr)
 
-			if tt.wantAggregateSignaturesErr != nil {
+			if tt.wantErr != nil {
 				return
 			}
 
