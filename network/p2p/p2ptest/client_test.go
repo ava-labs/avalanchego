@@ -33,6 +33,8 @@ func TestNewClient_AppGossip(t *testing.T) {
 }
 
 func TestNewClient_AppRequest(t *testing.T) {
+	nodeID := ids.GenerateTestNodeID()
+
 	tests := []struct {
 		name        string
 		appResponse []byte
@@ -43,7 +45,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 			name:        "AppRequest - response",
 			appResponse: []byte("foobar"),
 			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+				return client.AppRequest(ctx, set.Of(nodeID), []byte("foo"), onResponse)
 			},
 		},
 		{
@@ -53,7 +55,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 				Message: "foobar",
 			},
 			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-				return client.AppRequest(ctx, set.Of(ids.GenerateTestNodeID()), []byte("foo"), onResponse)
+				return client.AppRequest(ctx, set.Of(nodeID), []byte("foo"), onResponse)
 			},
 		},
 		{
@@ -94,7 +96,7 @@ func TestNewClient_AppRequest(t *testing.T) {
 				},
 			}
 
-			client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+			client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), nodeID)
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,

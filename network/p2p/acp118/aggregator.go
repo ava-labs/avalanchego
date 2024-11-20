@@ -22,7 +22,10 @@ import (
 
 // ErrFailedAggregation is returned if it's not possible for us to
 // generate a signature
-var ErrFailedAggregation = errors.New("failed aggregation")
+var (
+	ErrFailedAggregation  = errors.New("failed aggregation")
+	errFailedVerification = errors.New("failed verification")
+)
 
 // Validator signs warp messages. NodeID must be unique across validators, but
 // PublicKey is not guaranteed to be unique.
@@ -243,7 +246,7 @@ func (r *responseHandler) HandleResponse(
 	}
 
 	if !bls.Verify(validator.PublicKey, signature, r.message.UnsignedMessage.Bytes()) {
-		r.results <- result{Validator: validator, Err: err}
+		r.results <- result{Validator: validator, Err: errFailedVerification}
 		return
 	}
 

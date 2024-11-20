@@ -134,7 +134,7 @@ func TestHandler(t *testing.T) {
 			}
 
 			for _, expectedErr = range tt.expectedErrs {
-				require.NoError(c.AppRequest(ctx, set.Of(clientNodeID), requestBytes, onResponse))
+				require.NoError(c.AppRequest(ctx, set.Of(serverNodeID), requestBytes, onResponse))
 				<-handled
 			}
 		})
