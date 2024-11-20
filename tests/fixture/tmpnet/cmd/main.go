@@ -104,7 +104,7 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
-			var flags tmpnet.FlagsMap
+			flags := make(tmpnet.FlagsMap)
 			if len(pluginDir) > 0 {
 				// Only set the plugin dir if one was provided since a missing dir is FATAL
 				flags[config.PluginDirKey] = pluginDir
