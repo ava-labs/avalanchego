@@ -48,7 +48,7 @@ func main() {
 		SubnetID:       subnetID,
 		ManagerChainID: chainID,
 		ManagerAddress: address,
-		Validators: []message.SubnetToL1ConverstionValidatorData{
+		Validators: []message.SubnetToL1ConversionValidatorData{
 			{
 				NodeID:       nodeID.Bytes(),
 				BLSPublicKey: nodePoP.PublicKey,

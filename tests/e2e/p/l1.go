@@ -250,7 +250,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
 				ManagerAddress: address,
-				Validators: []warpmessage.SubnetToL1ConverstionValidatorData{
+				Validators: []warpmessage.SubnetToL1ConversionValidatorData{
 					{
 						NodeID:       subnetGenesisNode.NodeID.Bytes(),
 						BLSPublicKey: genesisNodePoP.PublicKey,
