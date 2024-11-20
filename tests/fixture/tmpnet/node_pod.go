@@ -6,15 +6,17 @@ package tmpnet
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/yaml"
+
+	// "sigs.k8s.io/yaml"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -39,19 +41,22 @@ func (p *NodePod) SetDefaultFlags() {
 	p.node.Flags.SetDefaults(DefaultKubeFlags())
 }
 
-// Start the node as a kubernetes statefulset.
-func (p *NodePod) Start(log logging.Logger) error {
-	// Create a statefulset for the pod and wait for it to become ready
+func (p *NodePod) getPodName() string {
 	nodeIDString := p.node.NodeID.String()
 	unwantedNodeIDPrefix := "NodeID-"
 	startIndex := len(unwantedNodeIDPrefix)
 	endIndex := len(unwantedNodeIDPrefix) + 8
-	name := p.node.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+	return p.node.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+}
+
+// Start the node as a kubernetes statefulset.
+func (p *NodePod) Start(log logging.Logger) error {
+	// Create a statefulset for the pod and wait for it to become ready
 	runtimeConfig := p.node.RuntimeConfig.KubeRuntimeConfig
 	statefulSetFlags := p.node.Flags.Copy()
 	statefulSetFlags[config.DataDirKey] = volumeMountPath
 	statefulSet := NewNodeStatefulSet(
-		name,
+		p.getPodName(),
 		runtimeConfig.ImageName,
 		containerName,
 		volumeName,
@@ -60,29 +65,29 @@ func (p *NodePod) Start(log logging.Logger) error {
 		statefulSetFlags,
 	)
 
-	// Serialize the StatefulSet to YAML
-	yamlData, err := yaml.Marshal(statefulSet.Spec.Template.Spec.Containers[0].Env)
+	// // Serialize the StatefulSet to YAML
+	// yamlData, err := yaml.Marshal(statefulSet.Spec.Template.Spec.Containers[0].Env)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to serialize StatefulSet to YAML: %w", err)
+	// }
+
+	// // Pretty-print the YAML
+	// fmt.Println(string(yamlData))
+
+	clientset, err := p.getClientset()
 	if err != nil {
-		return fmt.Errorf("failed to serialize StatefulSet to YAML: %w", err)
+		return err
 	}
 
-	// Pretty-print the YAML
-	fmt.Println(string(yamlData))
-
-	// clientset, err := p.getClientset()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// //createdStatefulSet, err := clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
-	// _, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
-	// 	context.Background(),
-	// 	statefulSet,
-	// 	metav1.CreateOptions{},
-	// )
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create statefulset: %w", err)
-	// }
+	//createdStatefulSet, err := clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
+	_, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
+		context.Background(),
+		statefulSet,
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create statefulset: %w", err)
+	}
 
 	// Update pod.json
 	// - add kubeconfig file
@@ -133,7 +138,21 @@ func (p *NodePod) WaitForStopped(_ context.Context) error {
 	return nil
 }
 
-func (p *NodePod) IsHealthy(_ context.Context) (bool, error) {
-	//
+func (p *NodePod) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
+	runtimeConfig := p.node.RuntimeConfig.KubeRuntimeConfig
+	_, err := WaitForNodeHealthy(
+		ctx,
+		log,
+		runtimeConfig.Kubeconfig,
+		runtimeConfig.Namespace,
+		p.getPodName(),
+		DefaultPollingInterval,
+		os.Stdout,
+		os.Stderr,
+	)
+	if err != nil {
+
+	}
+
 	return false, nil
 }
