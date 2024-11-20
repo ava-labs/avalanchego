@@ -6,8 +6,9 @@ package tmpnet
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/tests"
 )
 
 func TestNetworkSerialization(t *testing.T) {
