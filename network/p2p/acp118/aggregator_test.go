@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
