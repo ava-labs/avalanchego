@@ -70,11 +70,17 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumDen:   1,
 		},
 		{
-			name: "aggregates from all validators - 3/3",
+			name: "aggregates from some validators - 1/3",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
-				nodeID1: NewHandler(&testVerifier{}, signer1),
-				nodeID2: NewHandler(&testVerifier{}, signer2),
+				nodeID1: NewHandler(
+					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
+					signer1,
+				),
+				nodeID2: NewHandler(
+					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
+					signer2,
+				),
 			},
 			ctx: context.Background(),
 			validators: []Validator{
@@ -86,17 +92,17 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				{
 					NodeID:    nodeID1,
 					PublicKey: pk1,
-					Weight:    2,
+					Weight:    1,
 				},
 				{
 					NodeID:    nodeID2,
 					PublicKey: pk2,
-					Weight:    3,
+					Weight:    1,
 				},
 			},
-			wantSigners: []int{0, 1, 2},
+			wantSigners: []int{0},
 			quorumNum:   1,
-			quorumDen:   1,
+			quorumDen:   3,
 		},
 		{
 			name: "aggregates from some validators - 2/3",
@@ -129,6 +135,35 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			wantSigners: []int{0, 1},
 			quorumNum:   3,
 			quorumDen:   6,
+		},
+		{
+			name: "aggregates from all validators - 3/3",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID1: NewHandler(&testVerifier{}, signer1),
+				nodeID2: NewHandler(&testVerifier{}, signer2),
+			},
+			ctx: context.Background(),
+			validators: []Validator{
+				{
+					NodeID:    nodeID0,
+					PublicKey: pk0,
+					Weight:    1,
+				},
+				{
+					NodeID:    nodeID1,
+					PublicKey: pk1,
+					Weight:    2,
+				},
+				{
+					NodeID:    nodeID2,
+					PublicKey: pk2,
+					Weight:    3,
+				},
+			},
+			wantSigners: []int{0, 1, 2},
+			quorumNum:   1,
+			quorumDen:   1,
 		},
 		{
 			name: "fails aggregation from some validators - 1/2",
