@@ -213,7 +213,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 
 		log.Info("added validator to subnet",
 			zap.String("subnet", s.Name),
-			zap.Stringer("node", node.NodeID),
+			zap.Stringer("nodeID", node.NodeID),
 		)
 	}
 
