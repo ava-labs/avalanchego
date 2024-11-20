@@ -33,7 +33,7 @@ func initBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir 
 	defer cancel()
 	if err := tmpnet.BootstrapNewNetwork(
 		ctx,
-		tests.NewDefaultTestLogger(),
+		tests.NewDefaultLogger(""),
 		network,
 		"",
 		avalancheGoPath,

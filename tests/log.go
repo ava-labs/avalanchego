@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// Define a default encoder appropriate for testing
-var defaultEncoderConfig = zapcore.EncoderConfig{
+// Define a simple encoder config appropriate for testing
+var simpleEncoderConfig = zapcore.EncoderConfig{
 	TimeKey:       "",
 	LevelKey:      "level",
 	NameKey:       "",
@@ -24,19 +24,33 @@ var defaultEncoderConfig = zapcore.EncoderConfig{
 	EncodeLevel: zapcore.LowercaseLevelEncoder,
 }
 
-// NewDefaultTestLogger returns a logger that writes to stdout
-func NewDefaultTestLogger() logging.Logger {
-	return NewTestLogger(os.Stdout)
-}
-
-// NewDefaultTestLogger returns a logger for the specified WriteCloser
-func NewTestLogger(writeCloser io.WriteCloser) logging.Logger {
+// NewSimpleLogger returns a logger with limited output for the specified WriteCloser
+func NewSimpleLogger(writeCloser io.WriteCloser) logging.Logger {
 	return logging.NewLogger(
 		"",
 		logging.NewWrappedCore(
 			logging.Verbo,
 			writeCloser,
-			zapcore.NewConsoleEncoder(defaultEncoderConfig),
+			zapcore.NewConsoleEncoder(simpleEncoderConfig),
 		),
 	)
+}
+
+func NewDefaultLogger(prefix string) logging.Logger {
+	log, err := LoggerForFormat(prefix, "auto")
+	if err != nil {
+		// This should never happen since auto is a valid log format
+		panic(err)
+	}
+	return log
+}
+
+// TODO(marun) Does/should the logging package have a function like this?
+func LoggerForFormat(prefix string, rawLogFormat string) (logging.Logger, error) {
+	writeCloser := os.Stdout
+	logFormat, err := logging.ToFormat(rawLogFormat, writeCloser.Fd())
+	if err != nil {
+		return nil, err
+	}
+	return logging.NewLogger(prefix, logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder())), nil
 }

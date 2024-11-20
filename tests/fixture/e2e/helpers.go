@@ -88,11 +88,7 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 
 // OutputWalletBalances outputs the X-Chain and P-Chain balances of the provided wallet.
 func OutputWalletBalances(tc tests.TestContext, wallet primary.Wallet) {
-	xAVAX, pAVAX := GetWalletBalances(tc, wallet)
-	tc.Log().Info("wallet balances in nAVAX",
-		zap.Uint64("xChain", xAVAX),
-		zap.Uint64("pChain", pAVAX),
-	)
+	_, _ = GetWalletBalances(tc, wallet)
 }
 
 // GetWalletBalances retrieves the X-Chain and P-Chain balances of the provided wallet.
@@ -113,6 +109,10 @@ func GetWalletBalances(tc tests.TestContext, wallet primary.Wallet) (uint64, uin
 		avaxAssetID = xContext.AVAXAssetID
 		xAVAX       = xBalances[avaxAssetID]
 		pAVAX       = pBalances[avaxAssetID]
+	)
+	tc.Log().Info("wallet balances in nAVAX",
+		zap.Uint64("xChain", xAVAX),
+		zap.Uint64("pChain", pAVAX),
 	)
 	return xAVAX, pAVAX
 }

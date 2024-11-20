@@ -18,19 +18,19 @@ import (
 const failNowMessage = "SimpleTestContext.FailNow called"
 
 type SimpleTestContext struct {
-	logger        logging.Logger
+	log           logging.Logger
 	cleanupFuncs  []func()
 	cleanupCalled bool
 }
 
-func NewTestContext() *SimpleTestContext {
+func NewTestContext(log logging.Logger) *SimpleTestContext {
 	return &SimpleTestContext{
-		logger: logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, os.Stdout, logging.Plain.ConsoleEncoder())),
+		log: log,
 	}
 }
 
 func (tc *SimpleTestContext) Errorf(format string, args ...interface{}) {
-	tc.logger.Error(fmt.Sprintf(format, args...))
+	tc.log.Error(fmt.Sprintf(format, args...))
 }
 
 func (*SimpleTestContext) FailNow() {
@@ -90,7 +90,7 @@ func (tc *SimpleTestContext) By(_ string, _ ...func()) {
 }
 
 func (tc *SimpleTestContext) Log() logging.Logger {
-	return tc.logger
+	return tc.log
 }
 
 // Helper simplifying use of a timed context by canceling the context on ginkgo teardown.

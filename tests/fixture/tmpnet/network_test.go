@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ func TestNetworkSerialization(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	network := NewDefaultNetwork("testnet")
-	require.NoError(network.EnsureDefaultConfig(tests.NewDefaultTestLogger(), "/path/to/avalanche/go", ""))
+	require.NoError(network.EnsureDefaultConfig(tests.NewSimpleLogger(os.Stdout), "/path/to/avalanche/go", ""))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())

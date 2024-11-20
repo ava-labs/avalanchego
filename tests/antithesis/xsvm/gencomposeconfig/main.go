@@ -4,9 +4,10 @@
 package main
 
 import (
-	"log"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -21,6 +22,8 @@ func main() {
 		subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, network.Nodes...),
 	}
 	if err := antithesis.GenerateComposeConfig(network, baseImageName, "" /* runtimePluginDir */); err != nil {
-		log.Fatalf("failed to generate compose config: %v", err)
+		tests.NewDefaultLogger("").Fatal("failed to generate compose config",
+			zap.Error(err),
+		)
 	}
 }

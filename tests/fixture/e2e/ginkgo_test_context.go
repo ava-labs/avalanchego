@@ -33,7 +33,7 @@ type GinkgoTestContext struct {
 
 func NewTestContext() *GinkgoTestContext {
 	return &GinkgoTestContext{
-		logger: tests.NewTestLogger(&ginkgoWriteCloser{}),
+		logger: tests.NewSimpleLogger(&ginkgoWriteCloser{}),
 	}
 }
 
