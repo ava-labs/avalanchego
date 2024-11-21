@@ -1,12 +1,4 @@
----
-title: P-Chain API
-description: This page is an overview of the P-Chain API associated with AvalancheGo.
----
-
-This API allows clients to interact with the
-[P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which
-maintains Avalanche’s [validator](/nodes/validate/how-to-stake#validators) set and handles
-blockchain creation.
+The P-Chain API allows clients to interact with the [P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which maintains Avalanche’s validator set and handles blockchain creation.
 
 ## Endpoint
 
