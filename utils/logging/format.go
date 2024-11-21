@@ -24,6 +24,8 @@ const (
 	ColorsString = "colors"
 	JSONString   = "json"
 
+	FormatDescription = "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}"
+
 	termTimeFormat = "[01-02|15:04:05.000]"
 )
 
