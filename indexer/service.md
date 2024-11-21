@@ -1,8 +1,3 @@
----
-title: Index API
-description: This page is an overview of the Index API associated with AvalancheGo.
----
-
 AvalancheGo can be configured to run with an indexer. That is, it saves (indexes) every container (a block, vertex or transaction) it accepts on the X-Chain, P-Chain and C-Chain. To run AvalancheGo with indexing enabled, set command line flag [\--index-enabled](/nodes/configure/configs-flags#apis) to true.
 
 **AvalancheGo will only index containers that are accepted when running with `--index-enabled` set to true.** To ensure your node has a complete index, run a node with a fresh database and `--index-enabled` set to true. The node will accept every block, vertex and transaction in the network history during bootstrapping, ensuring your index is complete.
