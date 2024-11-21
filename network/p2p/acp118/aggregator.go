@@ -142,10 +142,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 	for {
 		select {
 		case <-ctx.Done():
-			if len(signatures) == 0 {
-				return message, 0, totalStakeWeight, nil
-			}
-
 			// Try to return whatever progress we have if the context is cancelled
 			msg, err := newWarpMessage(message, signerBitSet, signatures)
 			if err != nil {
@@ -192,6 +188,10 @@ func newWarpMessage(
 	signerBitSet set.Bits,
 	signatures []*bls.Signature,
 ) (*warp.Message, error) {
+	if len(signatures) == 0 {
+		return message, nil
+	}
+
 	aggregateSignature, err := bls.AggregateSignatures(signatures)
 	if err != nil {
 		return nil, err
