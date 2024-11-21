@@ -58,15 +58,15 @@ The available endpoints for GET requests are:
 
 ## JSON RPC Request
 
-### Format[​]
+### Format
 
 This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](/api-reference/standards/guides/issuing-api-calls).
 
-### Endpoint[​]
+### Endpoint
 
-### Methods[​]
+### Methods
 
-#### `health.health`[​]
+#### `health.health`
 
 This method returns the last set of health check results.
 
@@ -198,7 +198,7 @@ In this example response, every check has passed. So, the node is healthy.
     - `timeOfFirstFailure` is the time this check first failed.
 - `healthy` is true all the health checks are passing.
 
-#### `health.readiness`[​]
+#### `health.readiness`
 
 This method returns the last evaluation of the startup health check results.
 
@@ -247,7 +247,7 @@ In this example response, every check has passed. So, the node has finished the 
     - `timeOfFirstFailure` is the time this check first failed.
 - `healthy` is true all the health checks are passing.
 
-#### `health.liveness`[​]
+#### `health.liveness`
 
 This method returns healthy.
 
