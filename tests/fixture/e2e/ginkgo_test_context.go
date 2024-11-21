@@ -5,10 +5,12 @@ package e2e
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -27,13 +29,38 @@ func (*ginkgoWriteCloser) Close() error {
 	return nil
 }
 
+// Define a simple encoder config appropriate for logging with ginkgo
+var ginkgoEncoderConfig = zapcore.EncoderConfig{
+	// Time, name and caller are omitted for consistency with previous output.
+	// TODO(marun) Maybe revisit this decision
+	TimeKey:       "",
+	LevelKey:      "level",
+	NameKey:       "",
+	CallerKey:     "",
+	MessageKey:    "msg",
+	StacktraceKey: "stacktrace",
+	EncodeLevel:   logging.ConsoleColorLevelEncoder,
+}
+
+// NewGinkgoLogger returns a logger with limited output for the specified WriteCloser
+func newGinkgoLogger(writeCloser io.WriteCloser) logging.Logger {
+	return logging.NewLogger(
+		"",
+		logging.NewWrappedCore(
+			logging.Verbo,
+			writeCloser,
+			zapcore.NewConsoleEncoder(ginkgoEncoderConfig),
+		),
+	)
+}
+
 type GinkgoTestContext struct {
 	logger logging.Logger
 }
 
 func NewTestContext() *GinkgoTestContext {
 	return &GinkgoTestContext{
-		logger: tests.NewSimpleLogger(&ginkgoWriteCloser{}),
+		logger: newGinkgoLogger(&ginkgoWriteCloser{}),
 	}
 }
 

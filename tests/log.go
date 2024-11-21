@@ -4,37 +4,10 @@
 package tests
 
 import (
-	"io"
 	"os"
-
-	"go.uber.org/zap/zapcore"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
-
-// Define a simple encoder config appropriate for testing
-var simpleEncoderConfig = zapcore.EncoderConfig{
-	TimeKey:       "",
-	LevelKey:      "level",
-	NameKey:       "",
-	CallerKey:     "",
-	MessageKey:    "msg",
-	StacktraceKey: "stacktrace",
-	// TODO(marun) Figure out why this is outputting e.g. `Level(-6)` instead of `INFO`
-	EncodeLevel: zapcore.LowercaseLevelEncoder,
-}
-
-// NewSimpleLogger returns a logger with limited output for the specified WriteCloser
-func NewSimpleLogger(writeCloser io.WriteCloser) logging.Logger {
-	return logging.NewLogger(
-		"",
-		logging.NewWrappedCore(
-			logging.Verbo,
-			writeCloser,
-			zapcore.NewConsoleEncoder(simpleEncoderConfig),
-		),
-	)
-}
 
 func NewDefaultLogger(prefix string) logging.Logger {
 	log, err := LoggerForFormat(prefix, logging.AutoString)
