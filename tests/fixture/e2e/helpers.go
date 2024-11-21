@@ -304,7 +304,7 @@ func StartNetwork(
 		}
 
 		if skipShutdown {
-			tc.Log().Warn("skipping shutdown for network",
+			tc.Log().Info("skipping shutdown for network",
 				zap.String("networkDir", network.Dir),
 			)
 			return
