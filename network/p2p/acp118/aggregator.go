@@ -132,7 +132,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 		go func() {
 			if err := s.client.AppRequest(ctx, set.Of(nodeIDCopy), requestBytes, job.HandleResponse); err != nil {
 				results <- result{Validator: nodeIDsToValidator[nodeIDCopy], Err: err}
-				return
 			}
 		}()
 	}
