@@ -5,7 +5,6 @@ package e2e
 
 import (
 	"context"
-	"io"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -42,13 +41,13 @@ var ginkgoEncoderConfig = zapcore.EncoderConfig{
 	EncodeLevel:   logging.ConsoleColorLevelEncoder,
 }
 
-// NewGinkgoLogger returns a logger with limited output for the specified WriteCloser
-func newGinkgoLogger(writeCloser io.WriteCloser) logging.Logger {
+// NewGinkgoLogger returns a logger with limited output
+func newGinkgoLogger() logging.Logger {
 	return logging.NewLogger(
 		"",
 		logging.NewWrappedCore(
 			logging.Verbo,
-			writeCloser,
+			&ginkgoWriteCloser{},
 			zapcore.NewConsoleEncoder(ginkgoEncoderConfig),
 		),
 	)
@@ -60,7 +59,7 @@ type GinkgoTestContext struct {
 
 func NewTestContext() *GinkgoTestContext {
 	return &GinkgoTestContext{
-		logger: newGinkgoLogger(&ginkgoWriteCloser{}),
+		logger: newGinkgoLogger(),
 	}
 }
 
