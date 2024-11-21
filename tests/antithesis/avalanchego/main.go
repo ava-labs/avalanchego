@@ -626,7 +626,7 @@ func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
 		if err := platformvm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
-			w.log.Error("failed to confirm P-chain transaction",
+			w.log.Warn("failed to confirm P-chain transaction",
 				zap.Stringer("txID", txID),
 				zap.String("uri", uri),
 				zap.Error(err),
