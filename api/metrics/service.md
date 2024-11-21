@@ -1,9 +1,4 @@
----
-title: Metrics API
-description: This page is an overview of the Metrics API associated with AvalancheGo.
----
-
-The API allows clients to get statistics about a node's health and performance.
+The Metrics API allows clients to get statistics about a node's health and performance.
 
 <Callout title="Note">
 This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
