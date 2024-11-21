@@ -14,17 +14,17 @@ This API uses the `json 2.0` RPC format.
 
 ### `platform.exportKey`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
-:::warning
+<Callout title="Warning" type="warn">
 
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/reference/avalanchego/keystore-api.md).
+Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
 
-:::
+</Callout>
 
 Get the private key that controls a given address.
 
@@ -71,11 +71,11 @@ curl -X POST --data '{
 
 ### `platform.getBalance`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get the balance of AVAX controlled by a given address.
 
@@ -419,11 +419,11 @@ curl -X POST --data '{
 
 ### `platform.getBlockchains`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get all the blockchains that exist (excluding the P-Chain).
 
@@ -1021,11 +1021,11 @@ curl -X POST --data '{
 
 ### `platform.getMaxStakeAmount`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Returns the maximum amount of nAVAX staking to the named node during a particular time period.
 
@@ -1228,11 +1228,11 @@ curl -X POST --data '{
 
 ### `platform.getRewardUTXOs`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Returns the UTXOs that were rewarded after the provided transaction's staking or delegation period
 ended.
@@ -1288,11 +1288,11 @@ curl -X POST --data '{
 
 ### `platform.getStake`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get the amount of nAVAX staked by a set of addresses. The amount returned does not include staking
 rewards.
@@ -1395,7 +1395,7 @@ curl -X POST --data '{
 }
 ```
 
-:::note
+<Callout title="Note">
 
 The AssetID for AVAX differs depending on the network you are on.
 
@@ -1403,7 +1403,7 @@ Mainnet: FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z
 
 Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
-:::
+</Callout>
 
 ### `platform.getSubnet`
 
@@ -1469,11 +1469,11 @@ curl -X POST --data '{
 
 ### `platform.getSubnets`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get info about the Subnets.
 
@@ -2062,17 +2062,17 @@ curl -X POST --data '{
 
 ### `platform.listAddresses`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
-:::warning
+<Callout title="Warning" type="warn">
 
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/reference/avalanchego/keystore-api.md).
+Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
 
-:::
+</Callout>
 
 List addresses controlled by the given user.
 
