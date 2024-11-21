@@ -7,6 +7,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -126,9 +127,9 @@ func (c *client) IssueTx(
 	options ...common.Option,
 ) error {
 	ops := common.NewOptions(options)
-	if f := ops.PostIssuanceFunc(); f != nil {
+	if f := ops.PostIssuanceHandler(); f != nil {
 		txID := tx.ID()
-		f(txID)
+		f('P', txID, time.Duration(0))
 	}
 	ctx := ops.Context()
 	return c.backend.AcceptTx(ctx, tx)
