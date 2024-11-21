@@ -1,21 +1,15 @@
 ---
-tags: [AvalancheGo APIs]
+title: Admin API
 description: This page is an overview of the Admin API associated with AvalancheGo.
-sidebar_label: Admin API
-pagination_label: Admin API
 ---
-
-# Admin API
 
 This API can be used for measuring node health and debugging.
 
-:::info
-The Admin API is disabled by default for security reasons. To run a node with the Admin API
-enabled, use [config flag `--api-admin-enabled=true`](/nodes/configure/avalanchego-config-flags.md#--api-admin-enabled-boolean).
+<Callout title="Note">
+The Admin API is disabled by default for security reasons. To run a node with the Admin API enabled, use [`config flag --api-admin-enabled=true`](/nodes/configure/configs-flags#--api-admin-enabled-boolean).
 
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
-
-:::
+This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+</Callout>
 
 ## Format
 
@@ -23,7 +17,7 @@ This API uses the `json 2.0` RPC format. For details, see [here](/reference/stan
 
 ## Endpoint
 
-```text
+```
 /ext/admin
 ```
 
@@ -36,7 +30,7 @@ work. This change only affects this node; other nodes will not know about this a
 
 **Signature:**
 
-```text
+```
 admin.alias({endpoint:string, alias:string}) -> {}
 ```
 
@@ -75,12 +69,11 @@ Now, calls to the X-Chain can be made to either `/ext/bc/X` or, equivalently, to
 
 Give a blockchain an alias, a different name that can be used any place the blockchain’s ID is used.
 
-:::note Aliasing a chain can also be done via the [Node API](/nodes/configure/avalanchego-config-flags.md#--chain-aliases-file-string).
-Note that the alias is set for each chain on each node individually. In a multi-node Subnet, the
-same alias should be configured on each node to use an alias across a Subnet successfully. Setting
-an alias for a chain on one node does not register that alias with other nodes automatically.
+<Callout title="Note">
+Aliasing a chain can also be done via the [Node API](/nodes/configure/configs-flags#--chain-aliases-file-string).
 
-:::
+Note that the alias is set for each chain on each node individually. In a multi-node Avalanche L1, the same alias should be configured on each node to use an alias across an Avalanche L1 successfully. Setting an alias for a chain on one node does not register that alias with other nodes automatically.
+</Callout>
 
 **Signature:**
 
@@ -417,7 +410,7 @@ Stop the CPU profile that was previously started.
 
 **Signature:**
 
-```text
+```
 admin.stopCPUProfiler() -> {}
 ```
 
