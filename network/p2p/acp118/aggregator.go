@@ -90,12 +90,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		return nil, 0, 0, errors.New("invalid warp signature type")
 	}
 
-	var signerBitSet set.Bits
-	if bitSetSignature.Signers != nil {
-		signerBitSet = set.BitsFromBytes(bitSetSignature.Signers)
-	} else {
-		signerBitSet = set.NewBits()
-	}
+	signerBitSet := set.BitsFromBytes(bitSetSignature.Signers)
 
 	sampleable := make([]ids.NodeID, 0, len(validators))
 	aggregatedStakeWeight := uint64(0)
