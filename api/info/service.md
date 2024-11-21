@@ -576,9 +576,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:34Z",
         "benched": [],
         "observedUptime": "75",
-        "observedSubnetUptimes": {
-          "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL": "100"
-        },
         "trackedSubnets": [
           "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
         ],
@@ -593,7 +590,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:55Z",
         "benched": [],
         "observedUptime": "95",
-        "observedSubnetUptimes": {},
         "trackedSubnets": [],
         "benched": []
       }
@@ -608,17 +604,14 @@ Returns the network's observed uptime of this node. This is the only reliable so
 
 **Signature**:
 
-```
-info.uptime({
-    subnetID: string // optional
-}) ->
+```sh
+info.uptime() ->
 {
     rewardingStakePercentage: float64,
     weightedAveragePercentage: float64
 }
 ```
 
-- `subnetID` is the Avalanche L1 to get the uptime of. If not provided, returns the uptime of the node on the primary network.
 - `rewardingStakePercentage` is the percent of stake which thinks this node is above the uptime requirement.
 - `weightedAveragePercentage` is the stake-weighted average of all observed uptimes for this node.
     
