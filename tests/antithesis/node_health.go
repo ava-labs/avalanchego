@@ -37,7 +37,7 @@ func awaitHealthyNode(ctx context.Context, log logging.Logger, uri string) error
 		res, err := client.Health(ctx, nil)
 		switch {
 		case err != nil:
-			log.Error("failed to reach node",
+			log.Warn("failed to reach node",
 				zap.String("uri", uri),
 				zap.Error(err),
 			)

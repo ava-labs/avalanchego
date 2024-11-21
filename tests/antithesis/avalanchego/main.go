@@ -456,7 +456,7 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	)
 	balances, err := xBuilder.GetFTBalance()
 	if err != nil {
-		w.log.Warn("failed to fetch X-chain balances",
+		w.log.Error("failed to fetch X-chain balances",
 			zap.Error(err),
 		)
 		assert.Unreachable("failed to fetch X-chain balances", map[string]any{

@@ -4,11 +4,9 @@
 package tmpnet
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -19,16 +17,7 @@ func TestNetworkSerialization(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	network := NewDefaultNetwork("testnet")
-	// TODO(marun) Remove when zap.NewNop() is possible
-	log := logging.NewLogger(
-		"",
-		logging.NewWrappedCore(
-			logging.Verbo,
-			os.Stdout,
-			zapcore.NewConsoleEncoder(zapcore.EncoderConfig{}),
-		),
-	)
-	require.NoError(network.EnsureDefaultConfig(log, "/path/to/avalanche/go", ""))
+	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}, "/path/to/avalanche/go", ""))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes())
