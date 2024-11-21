@@ -1,8 +1,3 @@
----
-title: Keystore API
-description: This page is an overview of the Keystore API associated with AvalancheGo.
----
-
 <Callout type="warn">
 Because the node operator has access to your plain-text password, you should only create a keystore user on a node that you operate. If that node is breached, you could lose all your tokens. Keystore APIs are not recommended for use on Mainnet.
 </Callout>
