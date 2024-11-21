@@ -296,7 +296,7 @@ func StartNetwork(
 
 	tc.DeferCleanup(func() {
 		if reuseNetwork {
-			tc.Log().Warn("skipping shutdown for network intended for reuse",
+			tc.Log().Info("skipping shutdown for network intended for reuse",
 				zap.String("networkDir", network.Dir),
 				zap.String("symlinkPath", symlinkPath),
 			)
