@@ -604,7 +604,7 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
 		if err := avm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
-			w.log.Error("failed to confirm X-chain transaction",
+			w.log.Warn("failed to confirm X-chain transaction",
 				zap.Stringer("txID", txID),
 				zap.String("uri", uri),
 				zap.Error(err),
