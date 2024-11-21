@@ -288,7 +288,7 @@ func StartNetwork(
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
-		tc.Log().Warn("symlinked network dir for reuse",
+		tc.Log().Info("symlinked network dir for reuse",
 			zap.String("networkDir", network.Dir),
 			zap.String("symlinkPath", symlinkPath),
 		)
