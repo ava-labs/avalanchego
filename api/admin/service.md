@@ -1,9 +1,4 @@
----
-title: Admin API
-description: This page is an overview of the Admin API associated with AvalancheGo.
----
-
-This API can be used for measuring node health and debugging.
+The Admin API can be used for measuring node health and debugging.
 
 <Callout title="Note">
 The Admin API is disabled by default for security reasons. To run a node with the Admin API enabled, use [`config flag --api-admin-enabled=true`](/nodes/configure/configs-flags#--api-admin-enabled-boolean).
