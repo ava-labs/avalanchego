@@ -528,6 +528,22 @@ func (mr *MockStateMockRecorder) GetL1ValidatorExcess() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetL1ValidatorExcess", reflect.TypeOf((*MockState)(nil).GetL1ValidatorExcess))
 }
 
+// GetL1Validators mocks base method.
+func (m *MockState) GetL1Validators(ctx context.Context, l1ID ids.ID) ([]*Staker, []L1Validator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetL1Validators", ctx, l1ID)
+	ret0, _ := ret[0].([]*Staker)
+	ret1, _ := ret[1].([]L1Validator)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetL1Validators indicates an expected call of GetL1Validators.
+func (mr *MockStateMockRecorder) GetL1Validators(ctx, l1ID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetL1Validators", reflect.TypeOf((*MockState)(nil).GetL1Validators), ctx, l1ID)
+}
+
 // GetLastAccepted mocks base method.
 func (m *MockState) GetLastAccepted() ids.ID {
 	m.ctrl.T.Helper()

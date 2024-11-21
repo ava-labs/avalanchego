@@ -216,6 +216,8 @@ type State interface {
 
 	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 
+	GetL1Validators(ctx context.Context, l1ID ids.ID) ([]*Staker, []L1Validator, error)
+
 	// Discard uncommitted changes to the database.
 	Abort()
 
@@ -834,14 +836,53 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
+func (s *state) GetL1Validators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, error) {
+	// First add the current validators (non-L1)
+	var legacyStakers []*Staker
+	if legacyBaseStakers, ok := s.currentStakers.validators[subnetID]; ok {
+		for _, staker := range legacyBaseStakers {
+			if err := ctx.Err(); err != nil {
+				return nil, nil, err
+			}
+			legacyStakers = append(legacyStakers, staker.validator)
+		}
+	}
+
+	// Then iterate over subnetIDNodeID DB and add the L1 validators
+	var l1Validators []L1Validator
+	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
+		subnetID[:],
+	)
+	defer validationIDIter.Release()
+	for validationIDIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		validationID, err := ids.ToID(validationIDIter.Value())
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse validation ID: %w", err)
+		}
+		vdr, err := s.GetL1Validator(validationID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get validator: %w", err)
+		}
+		l1Validators = append(l1Validators, vdr)
+	}
+
+	return legacyStakers, l1Validators, nil
+}
+
 func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
-	// First add the current validators (non-L1)
-	for _, staker := range s.currentStakers.validators[subnetID] {
+	baseStakers, l1Validators, err := s.GetL1Validators(ctx, subnetID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	for _, validator := range baseStakers {
 		if err := ctx.Err(); err != nil {
 			return nil, 0, err
 		}
-		validator := staker.validator
 		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
 			ValidationID:  validator.TxID,
 			NodeID:        validator.NodeID,
@@ -854,41 +895,21 @@ func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (ma
 		}
 	}
 
-	// Then iterate over subnetIDNodeID DB and add the L1 validators (if any)
-	// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
-	// if all validators are active (inactive weight is 0)
-	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
-		subnetID[:],
-	)
-	defer validationIDIter.Release()
-
-	for validationIDIter.Next() {
+	for _, validator := range l1Validators {
 		if err := ctx.Err(); err != nil {
 			return nil, 0, err
 		}
-
-		validationID, err := ids.ToID(validationIDIter.Value())
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
-		}
-
-		vdr, err := s.GetL1Validator(validationID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get validator: %w", err)
-		}
-
-		result[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validationID,
-			NodeID:        vdr.NodeID,
-			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-			Weight:        vdr.Weight,
-			StartTime:     vdr.StartTime,
-			IsActive:      vdr.isActive(),
-			MinNonce:      vdr.MinNonce,
+		result[validator.ValidationID] = &validators.GetCurrentValidatorOutput{
+			ValidationID:  validator.ValidationID,
+			NodeID:        validator.NodeID,
+			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey),
+			Weight:        validator.Weight,
+			StartTime:     validator.StartTime,
+			IsActive:      validator.isActive(),
+			MinNonce:      validator.MinNonce,
 			IsL1Validator: true,
 		}
 	}
-
 	return result, s.currentHeight, nil
 }
 

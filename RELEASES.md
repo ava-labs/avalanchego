@@ -1,5 +1,12 @@
 # Release Notes
 
+## Pending Release
+
+### APIs
+
+- Added `validationID` to `platform.getL1Validator`
+- Added L1 support to `platform.getCurrentValidators`
+
 ## [v1.11.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.13)
 
 This version is backwards compatible to [v1.11.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0). It is optional, but encouraged.
