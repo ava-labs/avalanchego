@@ -224,13 +224,13 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				})
 
 				tc.Log().Info("issuing transfer",
-					zap.Stringer("fromAddress", shortAddrs[fromIdx]),
-					zap.Uint64("senderOrigBal", senderOrigBal),
-					zap.Uint64("senderNewBal", senderNewBal),
+					zap.Stringer("sender", shortAddrs[fromIdx]),
+					zap.Uint64("senderOriginalBalance", senderOrigBal),
+					zap.Uint64("senderNewBalance", senderNewBal),
 					zap.Uint64("amountToTransfer", amountToTransfer),
-					zap.Stringer("toAddress", shortAddrs[toIdx]),
-					zap.Uint64("receiverOrigBal", receiverOrigBal),
-					zap.Uint64("receiverNewBal", receiverNewBal),
+					zap.Stringer("receiver", shortAddrs[toIdx]),
+					zap.Uint64("receiverOriginalBalance", receiverOrigBal),
+					zap.Uint64("receiverNewBalance", receiverNewBal),
 				)
 
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
