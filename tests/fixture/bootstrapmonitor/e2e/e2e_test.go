@@ -441,7 +441,6 @@ func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, nam
 		zap.String("pod", podName),
 		zap.String("container", containerName),
 	)
-	tc.Log().Info(strings.Repeat("=", 80))
 
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: containerName,
