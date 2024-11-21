@@ -10,6 +10,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/info"
@@ -114,7 +115,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
 
 			endTime := time.Now().Add(targetValidationPeriod)
-			tc.Outf("validation period ending at: %v\n", endTime)
+			tc.Log().Info("determined alpha node validation end time",
+				zap.Time("time", endTime),
+			)
 
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
 				&txs.SubnetValidator{
@@ -142,7 +145,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		})
 
 		betaValidatorEndTime := time.Now().Add(targetValidationPeriod)
-		tc.Outf("beta node validation period ending at: %v\n", betaValidatorEndTime)
+		tc.Log().Info("determined beta node validation end time",
+			zap.Time("time", betaValidatorEndTime),
+		)
 
 		tc.By("adding beta node as a validator", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
@@ -180,7 +185,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
 
 			endTime := time.Now().Add(targetDelegationPeriod)
-			tc.Outf("delegation period ending at: %v\n", endTime)
+			tc.Log().Info("determined gamma delegator validation end time",
+				zap.Time("time", endTime),
+			)
 
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
@@ -205,7 +212,9 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
 
 			endTime := time.Now().Add(targetDelegationPeriod)
-			tc.Outf("delegation period ending at: %v\n", endTime)
+			tc.Log().Info("determined delta delegator delegation period end time",
+				zap.Time("time", endTime),
+			)
 
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 				&txs.SubnetValidator{
