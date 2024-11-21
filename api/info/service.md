@@ -1,9 +1,4 @@
----
-title: Info API
-description: This page is an overview of the Info API associated with AvalancheGo.
----
-
-This API can be used to access basic information about an Avalanche node.
+The Info API can be used to access basic information about an Avalanche node.
 
 ## Format
 
