@@ -1,9 +1,4 @@
----
-title: Health API
-description: This page is an overview of the Health API associated with AvalancheGo. This API can be used for measuring node health.
----
-
-This API can be used for measuring node health.
+The Health API can be used for measuring node health.
 
 <Callout title="Note">
 This API set is for a specific node; it is unavailable on the [public server](/tooling/rpc-providers).
