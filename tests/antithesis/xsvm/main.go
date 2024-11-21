@@ -175,7 +175,7 @@ func (w *workload) run(ctx context.Context) {
 			},
 		)
 		if err != nil {
-			w.log.Error("failed to issue transfer",
+			w.log.Warn("failed to issue transfer",
 				zap.Int("worker", w.id),
 				zap.Error(err),
 			)
