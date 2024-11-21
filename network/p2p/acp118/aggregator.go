@@ -129,8 +129,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 	}
 
 	for _, nodeID := range sampleable {
-		// Avoid var shadowing in goroutine
-		nodeIDCopy := nodeID
 		go func() {
 			if err := s.client.AppRequest(ctx, set.Of(nodeIDCopy), requestBytes, job.HandleResponse); err != nil {
 				results <- result{Validator: nodeIDsToValidator[nodeIDCopy], Err: err}
