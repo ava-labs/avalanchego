@@ -4,6 +4,8 @@
 package main
 
 import (
+	"os"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -25,5 +27,6 @@ func main() {
 		tests.NewDefaultLogger("").Fatal("failed to generate compose config",
 			zap.Error(err),
 		)
+		os.Exit(1)
 	}
 }

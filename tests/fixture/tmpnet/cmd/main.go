@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -37,7 +38,7 @@ func main() {
 		Short: "tmpnetctl commands",
 	}
 	rootCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(tmpnet.NetworkDirEnvName), "The path to the configuration directory of a temporary network")
-	rootCmd.PersistentFlags().StringVar(&rawLogFormat, "log-format", "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
+	rootCmd.PersistentFlags().StringVar(&rawLogFormat, "log-format", logging.AutoString, logging.FormatDescription)
 
 	versionCmd := &cobra.Command{
 		Use:   "version",

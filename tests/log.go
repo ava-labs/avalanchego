@@ -37,7 +37,7 @@ func NewSimpleLogger(writeCloser io.WriteCloser) logging.Logger {
 }
 
 func NewDefaultLogger(prefix string) logging.Logger {
-	log, err := LoggerForFormat(prefix, "auto")
+	log, err := LoggerForFormat(prefix, logging.AutoString)
 	if err != nil {
 		// This should never happen since auto is a valid log format
 		panic(err)

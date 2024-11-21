@@ -29,13 +29,10 @@ var _ = ginkgo.Describe("[Etna]", func() {
 			require.NoError(err)
 
 			now := time.Now()
-			msg := "etna is activated"
-			if !upgrades.IsEtnaActivated(now) {
-				msg = "etna is not activated"
-			}
-			tc.Log().Info(msg,
+			tc.Log().Info("detected if Etna is activated",
 				zap.Time("now", now),
 				zap.Time("etnaTime", upgrades.EtnaTime),
+				zap.Bool("isEtnaActivated", upgrades.IsEtnaActivated(now)),
 			)
 		})
 })
