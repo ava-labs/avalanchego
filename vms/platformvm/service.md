@@ -1,5 +1,5 @@
 ---
-title: API
+title: P-Chain API
 description: This page is an overview of the P-Chain API associated with AvalancheGo.
 ---
 
