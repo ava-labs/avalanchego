@@ -19,8 +19,11 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
@@ -74,7 +77,7 @@ func (p *NodeProcess) readState() error {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(w io.Writer) error {
+func (p *NodeProcess) Start(log logging.Logger) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -106,19 +109,7 @@ func (p *NodeProcess) Start(w io.Writer) error {
 	ctx, cancelWithCause := context.WithCancelCause(context.Background())
 	defer cancelWithCause(nil)
 	logPath := p.node.GetDataDir() + "/logs/main.log"
-	go watchLogFileForFatal(ctx, cancelWithCause, w, logPath)
-
-	// Determine appropriate level of node description detail
-	dataDir := p.node.GetDataDir()
-	nodeDescription := fmt.Sprintf("node %q", p.node.NodeID)
-	if p.node.IsEphemeral {
-		nodeDescription = "ephemeral " + nodeDescription
-	}
-	nonDefaultNodeDir := filepath.Base(dataDir) != p.node.NodeID.String()
-	if nonDefaultNodeDir {
-		// Only include the data dir if its base is not the default (the node ID)
-		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, dataDir)
-	}
+	go watchLogFileForFatal(ctx, cancelWithCause, log, logPath)
 
 	// A node writes a process context file on start. If the file is not
 	// found in a reasonable amount of time, the node is unlikely to have
@@ -127,9 +118,11 @@ func (p *NodeProcess) Start(w io.Writer) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	if _, err = fmt.Fprintf(w, "Started %s\n", nodeDescription); err != nil {
-		return err
-	}
+	log.Info("started local node",
+		zap.Stringer("nodeID", p.node.NodeID),
+		zap.String("dataDir", p.node.GetDataDir()),
+		zap.Bool("isEphemeral", p.node.IsEphemeral),
+	)
 
 	// Configure collection of metrics and logs
 	return p.writeMonitoringConfig()
@@ -350,7 +343,7 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 // Errors encountered while looking for FATAL log entries are considered potential rather
 // than positive indications of failure and are printed to the provided writer instead of
 // being provided to the cancelWithCause function.
-func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCauseFunc, w io.Writer, path string) {
+func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCauseFunc, log logging.Logger, path string) {
 	waitInterval := 100 * time.Millisecond
 	// Wait for the file to exist
 	fileExists := false
@@ -371,7 +364,10 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 	// Open the file
 	file, err := os.Open(path)
 	if err != nil {
-		_, _ = fmt.Fprintf(w, "failed to open %s: %v", path, err)
+		log.Error("failed to open log file",
+			zap.String("path", path),
+			zap.Error(err),
+		)
 		return
 	}
 	defer file.Close()
@@ -391,7 +387,10 @@ func watchLogFileForFatal(ctx context.Context, cancelWithCause context.CancelCau
 					time.Sleep(waitInterval)
 					continue
 				} else {
-					_, _ = fmt.Fprintf(w, "error reading %s: %v\n", path, err)
+					log.Error("failed to read log file",
+						zap.String("path", path),
+						zap.Error(err),
+					)
 					return
 				}
 			}

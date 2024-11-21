@@ -100,7 +100,7 @@ func (f Format) WrapPrefix(prefix string) string {
 func (f Format) ConsoleEncoder() zapcore.Encoder {
 	switch f {
 	case Colors:
-		return zapcore.NewConsoleEncoder(newTermEncoderConfig(consoleColorLevelEncoder))
+		return zapcore.NewConsoleEncoder(newTermEncoderConfig(ConsoleColorLevelEncoder))
 	case JSON:
 		return zapcore.NewJSONEncoder(jsonEncoderConfig)
 	default:
@@ -133,7 +133,7 @@ func jsonLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(Level(l).LowerString())
 }
 
-func consoleColorLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+func ConsoleColorLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 	s, ok := levelToCapitalColorString[Level(l)]
 	if !ok {
 		s = unknownLevelColor.Wrap(l.String())

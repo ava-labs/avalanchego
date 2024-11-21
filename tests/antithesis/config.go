@@ -68,7 +68,7 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 
 	// Use the network configuration provided
 	if len(uris) != 0 {
-		require.NoError(tc, awaitHealthyNodes(tc.DefaultContext(), uris), "failed to see healthy nodes")
+		require.NoError(tc, awaitHealthyNodes(tc.DefaultContext(), tc.Log(), uris), "failed to see healthy nodes")
 		return &Config{
 			URIs:     uris,
 			ChainIDs: chainIDs,
