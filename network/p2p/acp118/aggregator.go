@@ -27,20 +27,13 @@ var (
 	errFailedVerification = errors.New("failed verification")
 )
 
-// Validator signs warp messages. NodeID must be unique across validators, but
-// PublicKey is not guaranteed to be unique.
-type Validator struct {
-	NodeID    ids.NodeID
-	PublicKey *bls.PublicKey
-	Weight    uint64
-}
-
 type indexedValidator struct {
-	Validator
+	warp.Validator
 	Index int
 }
 
 type result struct {
+	NodeID    ids.NodeID
 	Validator indexedValidator
 	Signature *bls.Signature
 	Err       error
@@ -83,7 +76,8 @@ func (s *SignatureAggregator) AggregateSignatures(
 		return nil, 0, 0, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
-	nodeIDsToValidator := make(map[ids.NodeID]indexedValidator)
+	publicKeysToValidators := make(map[*bls.PublicKey]indexedValidator)
+	nodeIDsToPublicKeys := make(map[ids.NodeID]*bls.PublicKey)
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
 	if !ok {
@@ -92,9 +86,10 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	signerBitSet := set.BitsFromBytes(bitSetSignature.Signers)
 
-	sampleable := make([]ids.NodeID, 0, len(validators))
+	nonSigners := make([]*bls.PublicKey, 0, len(validators))
 	aggregatedStakeWeight := uint64(0)
 	totalStakeWeight := uint64(0)
+	numRequests := 0
 	for i, v := range validators {
 		totalStakeWeight += v.Weight
 
@@ -105,14 +100,20 @@ func (s *SignatureAggregator) AggregateSignatures(
 			continue
 		}
 
-		nodeIDsToValidator[v.NodeID] = indexedValidator{
+		publicKeysToValidators[v.PublicKey] = indexedValidator{
 			Index:     i,
 			Validator: v,
 		}
-		sampleable = append(sampleable, v.NodeID)
+
+		for _, nodeID := range v.NodeIDs {
+			numRequests += 1
+			nodeIDsToPublicKeys[nodeID] = v.PublicKey
+		}
+
+		nonSigners = append(nonSigners, v.PublicKey)
 	}
 
-	signatures := make([]*bls.Signature, 0, len(sampleable)+1)
+	signatures := make([]*bls.Signature, 0, len(nonSigners)+1)
 	if bitSetSignature.Signature != [bls.SignatureLen]byte{} {
 		blsSignature, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
 		if err != nil {
@@ -121,25 +122,28 @@ func (s *SignatureAggregator) AggregateSignatures(
 		signatures = append(signatures, blsSignature)
 	}
 
-	results := make(chan result)
+	//TODO better than buffered channel?
+	results := make(chan result, numRequests)
 	job := responseHandler{
-		message:            message,
-		nodeIDsToValidator: nodeIDsToValidator,
-		results:            results,
+		message:                message,
+		publicKeysToValidators: publicKeysToValidators,
+		nodeIDsToPublicKeys:    nodeIDsToPublicKeys,
+		results:                results,
 	}
 
-	for _, nodeID := range sampleable {
-		go func() {
+	for _, pk := range nonSigners {
+		validator := publicKeysToValidators[pk]
+		for _, nodeID := range validator.NodeIDs {
 			if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, job.HandleResponse); err != nil {
-				results <- result{Validator: nodeIDsToValidator[nodeID], Err: err}
+				results <- result{NodeID: nodeID, Validator: validator, Err: err}
+				// TODO fatal
 			}
-		}()
+		}
 	}
 
-	failedStakeWeight := uint64(0)
 	minThreshold := (totalStakeWeight * quorumNum) / quorumDen
 
-	for {
+	for i := 0; i < numRequests; i++ {
 		select {
 		case <-ctx.Done():
 			// Try to return whatever progress we have if the context is cancelled
@@ -153,17 +157,18 @@ func (s *SignatureAggregator) AggregateSignatures(
 			if result.Err != nil {
 				s.log.Debug(
 					"dropping response",
-					zap.Stringer("nodeID", result.Validator.NodeID),
-					zap.Uint64("weight", result.Validator.Weight),
+					zap.Stringer("nodeID", result.NodeID),
 					zap.Error(err),
 				)
+				continue
+			}
 
-				// Fast-fail if it's not possible to generate a signature that meets the
-				// minimum threshold
-				failedStakeWeight += result.Validator.Weight
-				if totalStakeWeight-failedStakeWeight < minThreshold {
-					return nil, 0, 0, ErrFailedAggregation
-				}
+			if signerBitSet.Contains(result.Validator.Index) {
+				s.log.Debug(
+					"dropping duplicate signature",
+					zap.Stringer("nodeID", result.NodeID),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -181,6 +186,13 @@ func (s *SignatureAggregator) AggregateSignatures(
 			}
 		}
 	}
+
+	msg, err := newWarpMessage(message, signerBitSet, signatures)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	return msg, aggregatedStakeWeight, totalStakeWeight, nil
 }
 
 func newWarpMessage(
@@ -207,9 +219,10 @@ func newWarpMessage(
 }
 
 type responseHandler struct {
-	message            *warp.Message
-	nodeIDsToValidator map[ids.NodeID]indexedValidator
-	results            chan result
+	message                *warp.Message
+	publicKeysToValidators map[*bls.PublicKey]indexedValidator
+	nodeIDsToPublicKeys    map[ids.NodeID]*bls.PublicKey
+	results                chan result
 }
 
 func (r *responseHandler) HandleResponse(
@@ -218,29 +231,28 @@ func (r *responseHandler) HandleResponse(
 	responseBytes []byte,
 	err error,
 ) {
-	validator := r.nodeIDsToValidator[nodeID]
-
+	validator := r.publicKeysToValidators[r.nodeIDsToPublicKeys[nodeID]]
 	if err != nil {
-		r.results <- result{Validator: validator, Err: err}
+		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
 		return
 	}
 
 	response := &sdk.SignatureResponse{}
 	if err := proto.Unmarshal(responseBytes, response); err != nil {
-		r.results <- result{Validator: validator, Err: err}
+		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
 		return
 	}
 
 	signature, err := bls.SignatureFromBytes(response.Signature)
 	if err != nil {
-		r.results <- result{Validator: validator, Err: err}
+		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
 		return
 	}
 
 	if !bls.Verify(validator.PublicKey, signature, r.message.UnsignedMessage.Bytes()) {
-		r.results <- result{Validator: validator, Err: errFailedVerification}
+		r.results <- result{NodeID: nodeID, Validator: validator, Err: errFailedVerification}
 		return
 	}
 
-	r.results <- result{Validator: validator, Signature: signature}
+	r.results <- result{NodeID: nodeID, Validator: validator, Signature: signature}
 }
