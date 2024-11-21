@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -107,7 +108,7 @@ func main() {
 		log.Printf("issued initial funding X-chain baseTx %s in %s", baseTx.ID(), time.Since(baseStartTime))
 
 		// TODO(marun) Enable cleanup of these contexts
-		genesisWorkload.confirmXChainTx(ctx, baseTx)
+		require.NoError(genesisWorkload.confirmXChainTx(ctx, baseTx), "failed to confirm initial funding X-chain baseTx")
 
 		uri := c.URIs[i%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
@@ -242,7 +243,11 @@ func (w *workload) issueXChainBaseTx(ctx context.Context) {
 	}
 	log.Printf("issued new X-chain baseTx %s in %s", baseTx.ID(), time.Since(baseStartTime))
 
-	w.confirmXChainTx(ctx, baseTx)
+	if err := w.confirmXChainTx(ctx, baseTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, baseTx)
 }
 
@@ -295,7 +300,11 @@ func (w *workload) issueXChainCreateAssetTx(ctx context.Context) {
 	}
 	log.Printf("created new X-chain asset %s in %s", createAssetTx.ID(), time.Since(createAssetStartTime))
 
-	w.confirmXChainTx(ctx, createAssetTx)
+	if err := w.confirmXChainTx(ctx, createAssetTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, createAssetTx)
 }
 
@@ -360,9 +369,18 @@ func (w *workload) issueXChainOperationTx(ctx context.Context) {
 	}
 	log.Printf("issued X-chain operation tx %s in %s", operationTx.ID(), time.Since(operationStartTime))
 
-	w.confirmXChainTx(ctx, createAssetTx)
+	if err := w.confirmXChainTx(ctx, createAssetTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, createAssetTx)
-	w.confirmXChainTx(ctx, operationTx)
+
+	if err := w.confirmXChainTx(ctx, operationTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, operationTx)
 }
 
@@ -433,9 +451,18 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 	}
 	log.Printf("created P-chain import transaction %s in %s", importTx.ID(), time.Since(importStartTime))
 
-	w.confirmXChainTx(ctx, exportTx)
+	if err := w.confirmXChainTx(ctx, exportTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, exportTx)
-	w.confirmPChainTx(ctx, importTx)
+
+	if err := w.confirmPChainTx(ctx, importTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyPChainTxConsumedUTXOs(ctx, importTx)
 }
 
@@ -504,9 +531,18 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 	}
 	log.Printf("created X-chain import transaction %s in %s", importTx.ID(), time.Since(importStartTime))
 
-	w.confirmPChainTx(ctx, exportTx)
+	if err := w.confirmPChainTx(ctx, exportTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyPChainTxConsumedUTXOs(ctx, exportTx)
-	w.confirmXChainTx(ctx, importTx)
+
+	if err := w.confirmXChainTx(ctx, importTx); err != nil {
+		log.Println(err)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, importTx)
 }
 
@@ -520,30 +556,30 @@ func (w *workload) makeOwner() secp256k1fx.OutputOwners {
 	}
 }
 
-func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
+func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
 		if err := avm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
-			log.Printf("failed to confirm X-chain transaction %s on %s: %s", txID, uri, err)
-			return
+			return fmt.Errorf("failed to confirm X-chain transaction %s on %s: %w", txID, uri, err)
 		}
 		log.Printf("confirmed X-chain transaction %s on %s", txID, uri)
 	}
 	log.Printf("confirmed X-chain transaction %s on all nodes", txID)
+	return nil
 }
 
-func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
+func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) error {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
 		if err := platformvm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
-			log.Printf("failed to determine the status of a P-chain transaction %s on %s: %s", txID, uri, err)
-			return
+			return fmt.Errorf("failed to confirm P-chain transaction %s on %s: %w", txID, uri, err)
 		}
 		log.Printf("confirmed P-chain transaction %s on %s", txID, uri)
 	}
 	log.Printf("confirmed P-chain transaction %s on all nodes", txID)
+	return nil
 }
 
 func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx) {
