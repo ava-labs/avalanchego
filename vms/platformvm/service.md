@@ -1,11 +1,7 @@
 ---
-tags: [P-Chain, Platform Chain, AvalancheGo APIs]
+title: API
 description: This page is an overview of the P-Chain API associated with AvalancheGo.
-sidebar_label: API
-pagination_label: P-Chain Transaction Format
 ---
-
-# Platform Chain API
 
 This API allows clients to interact with the
 [P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which
@@ -446,7 +442,7 @@ platform.getBlockchains() ->
 {
     blockchains: []{
         id: string,
-        name:string,
+        name: string,
         subnetID: string,
         vmID: string
     }
@@ -777,6 +773,101 @@ curl -X POST --data '{
     ]
   },
   "id": 1
+}
+```
+
+### `platform.getFeeConfig`
+
+Returns the dynamic fees configuration of the P-chain.
+
+**Signature:**
+
+```sh
+platform.getFeeConfig() -> {
+    weights: []uint64,
+    maxCapacity: uint64,
+    maxPerSecond: uint64,
+    targetPerSecond: uint64,
+    minPrice: uint64,
+    excessConversionConstant: uint64
+}
+```
+
+- `weights` to merge fee dimensions into a single gas value
+- `maxCapacity` is the amount of gas the chain is allowed to store for future use
+- `maxPerSecond` is the amount of gas the chain is allowed to consume per second
+- `targetPerSecond` is the target amount of gas the chain should consume per second to keep fees stable
+- `minPrice` is the minimum price per unit of gas
+- `excessConversionConstant` is used to convert excess gas to a gas price
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "weights": [1,1000,1000,4],
+        "maxCapacity": 1000000,
+        "maxPerSecond": 100000,
+        "targetPerSecond": 50000,
+        "minPrice": 1,
+        "excessConversionConstant": 2164043
+    },
+    "id": 1
+}
+```
+
+### `platform.getFeeState`
+
+Returns the current fee state of the P-chain.
+
+**Signature:**
+
+```sh
+platform.getFeeState() -> {
+    capacity: uint64,
+    excess: uint64,
+    price: uint64,
+    timestamp: string
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "weights": [1,1000,1000,4],
+        "maxCapacity": 1000000,
+        "maxPerSecond": 100000,
+        "targetPerSecond": 50000,
+        "minPrice": 1,
+        "excessConversionConstant": 2164043
+    },
+    "id": 1
 }
 ```
 
