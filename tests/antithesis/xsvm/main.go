@@ -204,7 +204,7 @@ func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance)
 	for _, uri := range w.uris {
 		client := api.NewClient(uri, w.chainID.String())
 		if err := api.AwaitTxAccepted(ctx, client, w.key.Address(), tx.Nonce, PollingInterval); err != nil {
-			w.log.Error("failed to confirm transaction",
+			w.log.Warn("failed to confirm transaction",
 				zap.Int("worker", w.id),
 				zap.Stringer("txID", tx.TxID),
 				zap.String("uri", uri),
