@@ -22,7 +22,7 @@ To get an HTTP status code response that indicates the node's health, make a `GE
 
 To filter GET health checks, add a `tag` query parameter to the request. The `tag` parameter is a string. For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`, use the following query:
 
-```
+```sh
 curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL'
 ```
 
@@ -32,7 +32,7 @@ In this example returned results will contain global health checks and health ch
 
 In order to filter results by multiple tags, use multiple `tag` query parameters. For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL` and `28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY` use the following query:
 
-```
+```sh
 curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL&tag=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY'
 ```
 
@@ -63,7 +63,7 @@ This method returns the last set of health check results.
 
 **Example Call**:
 
-```
+```sh
 curl  -H 'Content-Type: application/json' --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -76,7 +76,7 @@ curl  -H 'Content-Type: application/json' --data '{
 
 **Example Response**:
 
-```
+```json
 {
     "jsonrpc": "2.0",
     "result": {
@@ -195,7 +195,7 @@ This method returns the last evaluation of the startup health check results.
 
 **Example Call**:
 
-```
+```sh
 curl  -H 'Content-Type: application/json' --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -208,7 +208,7 @@ curl  -H 'Content-Type: application/json' --data '{
 
 **Example Response**:
 
-```
+```json
 {
     "jsonrpc": "2.0",
     "result": {
@@ -244,7 +244,7 @@ This method returns healthy.
 
 **Example Call**:
 
-```
+```sh
 curl  -H 'Content-Type: application/json' --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -254,7 +254,7 @@ curl  -H 'Content-Type: application/json' --data '{
 
 **Example Response**:
 
-```
+```json
 {
     "jsonrpc": "2.0",
     "result": {
