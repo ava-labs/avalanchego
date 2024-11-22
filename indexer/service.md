@@ -24,25 +24,25 @@ Each chain has one or more index. To see if a C-Chain block is accepted, for exa
 
 ### C-Chain Blocks
 
-```text
+```sh
 /ext/index/C/block
 ```
 
 ### P-Chain Blocks
 
-```text
+```sh
 /ext/index/P/block
 ```
 
 ### X-Chain Transactions
 
-```text
+```sh
 /ext/index/X/tx
 ```
 
 ### X-Chain Blocks
 
-```text
+```sh
 /ext/index/X/block
 ```
 
@@ -58,7 +58,7 @@ Get container by ID.
 
 **Signature**:
 
-```json
+```sh
 index.getContainerByID({
   id: string,
   encoding: string
@@ -86,7 +86,7 @@ index.getContainerByID({
 
 **Example Call**:
 
-```
+```sh
 curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -122,7 +122,7 @@ Get container by index. The first container accepted is at index 0, the second i
 
 **Signature**:
 
-```
+```sh
 index.getContainerByIndex({
   index: uint64,
   encoding: string
@@ -150,7 +150,7 @@ index.getContainerByIndex({
 
 **Example Call**:
 
-```
+```sh
 curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -166,7 +166,7 @@ curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -192,7 +192,7 @@ Returns the transactions at index \[`startIndex`\], \[`startIndex+1`\], ... , \[
 
 **Signature**:
 
-```
+```sh
 index.getContainerRange({
   startIndex: uint64,
   numToFetch: uint64,
@@ -222,7 +222,7 @@ index.getContainerRange({
 
 **Example Call**:
 
-```
+```sh
 curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -239,7 +239,7 @@ curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -261,7 +261,7 @@ Get a container's index.
 
 **Signature**:
 
-```
+```sh
 index.getIndex({
   id: string,
   encoding: string
@@ -281,7 +281,7 @@ index.getIndex({
 
 **Example Call**:
 
-```
+```sh
 curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -297,7 +297,7 @@ curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -313,7 +313,7 @@ Get the most recently accepted container.
 
 **Signature**:
 
-```
+```sh
 index.getLastAccepted({
   encoding:string
 }) -> {
@@ -338,7 +338,7 @@ index.getLastAccepted({
 
 **Example Call**:
 
-```
+```sh
 curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -353,7 +353,7 @@ curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -373,7 +373,7 @@ Returns true if the container is in this index.
 
 **Signature**:
 
-```
+```sh
 index.isAccepted({
   id: string,
   encoding: string
@@ -393,7 +393,7 @@ index.isAccepted({
 
 **Example Call**:
 
-```
+```sh
 curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -409,7 +409,7 @@ curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -423,14 +423,13 @@ curl --location --request POST 'localhost:9650/ext/index/X/tx' \
 
 Here is an example of how to iterate through all transactions on the X-Chain.
 
-
 You can use the Index API to get the ID of every transaction that has been accepted on the X-Chain, and use the X-Chain API method `avm.getTx` to get a human-readable representation of the transaction.
 
 To get an X-Chain transaction by its index (the order it was accepted in), use Index API method [index.getlastaccepted](#indexgetlastaccepted).
 
-For example, to get the _second_ transaction (note that `"index":1`) accepted on the X-Chain, do:
+For example, to get the second transaction (note that `"index":1`) accepted on the X-Chain, do:
 
-```
+```sh
 curl --location --request POST 'https://indexer-demo.avax.network/ext/index/X/tx' \
 --header 'Content-Type: application/json' \
 --data-raw '{
@@ -448,7 +447,7 @@ This returns the ID of the second transaction accepted in the X-Chain's history.
 
 The above API call gives the response below:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -466,7 +465,7 @@ The ID of this transaction is `ZGYTSU8w3zUP6VFseGC798vA2Vnxnfj6fz1QPfA9N93bhjJvo
 
 To get the transaction by its ID, use API method `avm.getTx`:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -478,9 +477,9 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' https://api.avax.network/ext/bc/X
 ```
 
-Response:
+**Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
