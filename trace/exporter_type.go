@@ -33,6 +33,16 @@ func (t ExporterType) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + t.String() + `"`), nil
 }
 
+func (t *ExporterType) UnmarshalJSON(b []byte) error {
+	exporterTypeStr := strings.Trim(string(b), `"`)
+	exporterType, err := ExporterTypeFromString(exporterTypeStr)
+	if err != nil && !errors.Is(err, errUnknownExporterType) {
+		return err
+	}
+	*t = exporterType
+	return nil
+}
+
 func (t ExporterType) String() string {
 	switch t {
 	case GRPC:
