@@ -5,17 +5,22 @@ package tmpnet
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
-	// "sigs.k8s.io/yaml"
-
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,6 +32,13 @@ const (
 	// TODO(marun) Need to make this configurable
 	volumeSize = "128Mi"
 )
+
+type PodContext struct {
+	// TODO(marun) Should the context of the kubeconfig be included?
+	Kubeconfig  string
+	Namespace   string
+	StatefulSet string
+}
 
 type NodePod struct {
 	node *Node
@@ -41,7 +53,7 @@ func (p *NodePod) SetDefaultFlags() {
 	p.node.Flags.SetDefaults(DefaultKubeFlags())
 }
 
-func (p *NodePod) getPodName() string {
+func (p *NodePod) getStatefulSetName() string {
 	nodeIDString := p.node.NodeID.String()
 	unwantedNodeIDPrefix := "NodeID-"
 	startIndex := len(unwantedNodeIDPrefix)
@@ -56,7 +68,8 @@ func (p *NodePod) Start(log logging.Logger) error {
 	statefulSetFlags := p.node.Flags.Copy()
 	statefulSetFlags[config.DataDirKey] = volumeMountPath
 	statefulSet := NewNodeStatefulSet(
-		p.getPodName(),
+		p.getStatefulSetName(),
+		false, // generateName
 		runtimeConfig.ImageName,
 		containerName,
 		volumeName,
@@ -65,22 +78,11 @@ func (p *NodePod) Start(log logging.Logger) error {
 		statefulSetFlags,
 	)
 
-	// // Serialize the StatefulSet to YAML
-	// yamlData, err := yaml.Marshal(statefulSet.Spec.Template.Spec.Containers[0].Env)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to serialize StatefulSet to YAML: %w", err)
-	// }
-
-	// // Pretty-print the YAML
-	// fmt.Println(string(yamlData))
-
 	clientset, err := p.getClientset()
 	if err != nil {
 		return err
 	}
-
-	//createdStatefulSet, err := clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
-	_, err = clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
+	createdStatefulSet, err := clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
 		context.Background(),
 		statefulSet,
 		metav1.CreateOptions{},
@@ -88,11 +90,23 @@ func (p *NodePod) Start(log logging.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to create statefulset: %w", err)
 	}
-
-	// Update pod.json
-	// - add kubeconfig file
-	// - add namespace
-	// - add way to ID the statefulset (i.e. name or labels)
+	log.Debug("created statefulset",
+		zap.String("namespace", runtimeConfig.Namespace),
+		zap.String("name", createdStatefulSet.Name),
+	)
+	podContext := PodContext{
+		Kubeconfig:  runtimeConfig.Kubeconfig,
+		Namespace:   runtimeConfig.Namespace,
+		StatefulSet: createdStatefulSet.Name,
+	}
+	bytes, err := DefaultJSONMarshal(podContext)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pod context: %w", err)
+	}
+	// TODO(marun) Define the file path once for reuse
+	if err := perms.WriteFile(filepath.Join(p.node.GetDataDir(), "pod.json"), bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write pod context: %w", err)
+	}
 
 	return nil
 }
@@ -140,19 +154,45 @@ func (p *NodePod) WaitForStopped(_ context.Context) error {
 
 func (p *NodePod) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
 	runtimeConfig := p.node.RuntimeConfig.KubeRuntimeConfig
-	_, err := WaitForNodeHealthy(
-		ctx,
-		log,
-		runtimeConfig.Kubeconfig,
+	kubeconfigPath := os.Getenv("KUBECONFIG")
+	if kubeconfigPath == "" {
+		kubeconfigPath = runtimeConfig.Kubeconfig
+	}
+	kubeconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to build kubeconfig: %w", err)
+	}
+
+	podName := p.getStatefulSetName() + "-0"
+
+	clientset, err := p.getClientset()
+	if err != nil {
+		return false, err
+	}
+
+	// Wait for the pod to become ready (otherwise it won't be accepting network connections)
+	if err := WaitForPodCondition(ctx, clientset, runtimeConfig.Namespace, podName, corev1.PodReady); err != nil {
+		return false, err
+	}
+
+	// A forwarded connection enables connectivity without exposing the node external to the kube cluster
+	// TODO(marun) Detect if running in a cluster, where this won't be necessary
+	localPort, localPortStopChan, err := enableLocalForwardForPod(
+		kubeconfig,
 		runtimeConfig.Namespace,
-		p.getPodName(),
-		DefaultPollingInterval,
-		os.Stdout,
+		podName,
+		config.DefaultHTTPPort,
+		io.Discard, // Ignore stdout output
 		os.Stderr,
 	)
 	if err != nil {
-
+		return false, fmt.Errorf("failed to enable local forward for pod: %w", err)
 	}
-
-	return false, nil
+	defer close(localPortStopChan)
+	localNodeURI := fmt.Sprintf("http://127.0.0.1:%d", localPort)
+	healthReply, err := CheckNodeHealth(ctx, localNodeURI)
+	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
+		return false, err
+	}
+	return healthReply.Healthy, nil
 }

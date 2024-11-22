@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -47,7 +48,7 @@ func CheckNodeHealth(ctx context.Context, uri string) (*health.APIReply, error) 
 }
 
 // WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
-func WaitForHealthy(ctx context.Context, node *Node) error {
+func WaitForHealthy(ctx context.Context, log logging.Logger, node *Node) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", node.NodeID)
 	}
@@ -55,7 +56,7 @@ func WaitForHealthy(ctx context.Context, node *Node) error {
 	defer ticker.Stop()
 
 	for {
-		healthy, err := node.IsHealthy(ctx)
+		healthy, err := node.IsHealthy(ctx, log)
 		switch {
 		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
 			return fmt.Errorf("%w for node %q", err, node.NodeID)
