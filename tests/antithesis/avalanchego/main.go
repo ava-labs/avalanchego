@@ -115,7 +115,7 @@ func main() {
 			zap.Duration("duration", time.Since(baseStartTime)),
 		)
 
-		genesisWorkload.confirmXChainTx(ctx, baseTx)
+		require.NoError(genesisWorkload.confirmXChainTx(ctx, baseTx), "failed to confirm initial funding X-chain baseTx")
 
 		uri := c.URIs[i%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
@@ -266,7 +266,15 @@ func (w *workload) issueXChainBaseTx(ctx context.Context) {
 		zap.Duration("duration", time.Since(baseStartTime)),
 	)
 
-	w.confirmXChainTx(ctx, baseTx)
+	if err := w.confirmXChainTx(ctx, baseTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "X"),
+			zap.String("txType", "base"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, baseTx)
 }
 
@@ -329,7 +337,15 @@ func (w *workload) issueXChainCreateAssetTx(ctx context.Context) {
 		zap.Duration("duration", time.Since(createAssetStartTime)),
 	)
 
-	w.confirmXChainTx(ctx, createAssetTx)
+	if err := w.confirmXChainTx(ctx, createAssetTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "X"),
+			zap.String("txType", "createAsset"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, createAssetTx)
 }
 
@@ -409,9 +425,26 @@ func (w *workload) issueXChainOperationTx(ctx context.Context) {
 		zap.Duration("duration", time.Since(operationStartTime)),
 	)
 
-	w.confirmXChainTx(ctx, createAssetTx)
+	if err := w.confirmXChainTx(ctx, createAssetTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "X"),
+			zap.String("txType", "createAsset"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, createAssetTx)
-	w.confirmXChainTx(ctx, operationTx)
+
+	if err := w.confirmXChainTx(ctx, operationTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "X"),
+			zap.String("txType", "operation"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, operationTx)
 }
 
@@ -497,9 +530,26 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 		zap.Duration("duration", time.Since(importStartTime)),
 	)
 
-	w.confirmXChainTx(ctx, exportTx)
+	if err := w.confirmXChainTx(ctx, exportTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "X"),
+			zap.String("txType", "export"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, exportTx)
-	w.confirmPChainTx(ctx, importTx)
+
+	if err := w.confirmPChainTx(ctx, importTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "P"),
+			zap.String("txType", "import"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyPChainTxConsumedUTXOs(ctx, importTx)
 }
 
@@ -583,9 +633,26 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 		zap.Duration("duration", time.Since(importStartTime)),
 	)
 
-	w.confirmPChainTx(ctx, exportTx)
+	if err := w.confirmPChainTx(ctx, exportTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "P"),
+			zap.String("txType", "export"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyPChainTxConsumedUTXOs(ctx, exportTx)
-	w.confirmXChainTx(ctx, importTx)
+
+	if err := w.confirmXChainTx(ctx, importTx); err != nil {
+		w.log.Warn("failed to confirm transaction",
+			zap.String("chain", "X"),
+			zap.String("txType", "import"),
+			zap.Error(err),
+		)
+		return
+	}
+
 	w.verifyXChainTxConsumedUTXOs(ctx, importTx)
 }
 
@@ -599,17 +666,12 @@ func (w *workload) makeOwner() secp256k1fx.OutputOwners {
 	}
 }
 
-func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
+func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) error {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := avm.NewClient(uri, "X")
 		if err := avm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
-			w.log.Warn("failed to confirm X-chain transaction",
-				zap.Stringer("txID", txID),
-				zap.String("uri", uri),
-				zap.Error(err),
-			)
-			return
+			return fmt.Errorf("failed to confirm X-chain transaction %s on %s: %w", txID, uri, err)
 		}
 		w.log.Info("confirmed X-chain transaction",
 			zap.Stringer("txID", txID),
@@ -619,19 +681,15 @@ func (w *workload) confirmXChainTx(ctx context.Context, tx *xtxs.Tx) {
 	w.log.Info("confirmed X-chain transaction",
 		zap.Stringer("txID", txID),
 	)
+	return nil
 }
 
-func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
+func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) error {
 	txID := tx.ID()
 	for _, uri := range w.uris {
 		client := platformvm.NewClient(uri)
 		if err := platformvm.AwaitTxAccepted(client, ctx, txID, 100*time.Millisecond); err != nil {
-			w.log.Warn("failed to confirm P-chain transaction",
-				zap.Stringer("txID", txID),
-				zap.String("uri", uri),
-				zap.Error(err),
-			)
-			return
+			return fmt.Errorf("failed to confirm P-chain transaction %s on %s: %w", txID, uri, err)
 		}
 		w.log.Info("confirmed P-chain transaction",
 			zap.Stringer("txID", txID),
@@ -641,6 +699,7 @@ func (w *workload) confirmPChainTx(ctx context.Context, tx *ptxs.Tx) {
 	w.log.Info("confirmed P-chain transaction",
 		zap.Stringer("txID", txID),
 	)
+	return nil
 }
 
 func (w *workload) verifyXChainTxConsumedUTXOs(ctx context.Context, tx *xtxs.Tx) {
