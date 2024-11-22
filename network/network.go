@@ -486,9 +486,9 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
-	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip, areWeAPrimaryNetworkAValidator); err != nil {
+		// hardcode true so we always track all subnets
+		if err := n.track(ip, true); err != nil {
 			return err
 		}
 	}
