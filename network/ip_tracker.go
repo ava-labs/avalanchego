@@ -98,7 +98,8 @@ type trackedNode struct {
 }
 
 func (n *trackedNode) wantsConnection() bool {
-	return n.manuallyTracked || n.trackedSubnets.Len() > 0
+	// hardcode true so we always track peers that match our validator set
+	return true
 }
 
 func (n *trackedNode) canDelete() bool {
