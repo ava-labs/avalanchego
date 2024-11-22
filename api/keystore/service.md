@@ -22,19 +22,19 @@ This API uses the `json 2.0` API format. For more information on making JSON RPC
 
 ## Endpoint
 
-```
+```sh
 /ext/keystore
 ```
 
 ## Methods
 
-### keystore.createUser
+### `keystore.createUser`
 
 Create a new user with the specified username and password.
 
 **Signature**:
 
-```
+```sh
 keystore.createUser(
     {
         username:string,
@@ -48,7 +48,7 @@ keystore.createUser(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -62,7 +62,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -70,23 +70,23 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.deleteUser
+### `keystore.deleteUser`
 
 <Callout type="warn">
-    Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 </Callout>
 
 Delete a user.
 
 **Signature**:
 
-```
+```sh
 keystore.deleteUser({username: string, password:string}) -> {}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -100,7 +100,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -108,7 +108,7 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.exportUser
+### `keystore.exportUser`
 
 <Callout type="warn">
 Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
@@ -118,7 +118,7 @@ Export a user. The user can be imported to another node with [`keystore.importUs
 
 **Signature**:
 
-```
+```sh
 keystore.exportUser(
     {
         username:string,
@@ -135,7 +135,7 @@ keystore.exportUser(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -149,7 +149,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -160,7 +160,7 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.importUser
+### `keystore.importUser`
 
 <Callout type="warn">
 Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
@@ -170,7 +170,7 @@ Import a user. `password` must match the user's password. `username` doesn't hav
 
 **Signature**:
 
-```
+```sh
 keystore.importUser(
     {
         username:string,
@@ -185,7 +185,7 @@ keystore.importUser(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -200,7 +200,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -208,7 +208,7 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.listUsers
+### `keystore.listUsers`
 
 <Callout type="warn">
 Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
@@ -218,13 +218,13 @@ List the users in this keystore.
 
 **Signature**:
 
-```
+```sh
 keystore.ListUsers() -> {users:[]string}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -234,7 +234,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
