@@ -6,7 +6,7 @@ This API uses the `json 2.0` RPC format. For more information on making JSON RPC
 
 ## Endpoint
 
-```
+```sh
 /ext/info
 ```
 
@@ -18,7 +18,7 @@ Returns peer preferences for Avalanche Community Proposals (ACPs)
 
 **Signature**:
 
-```
+```sh
 info.acps() -> {
     acps: map[uint32]{
         supportWeight: uint64
@@ -32,7 +32,7 @@ info.acps() -> {
 
 **Example Call**:
 
-```
+```sh
 curl -sX POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -43,7 +43,7 @@ curl -sX POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -109,7 +109,7 @@ Check whether a given chain is done bootstrapping
 
 **Signature**:
 
-```
+```sh
 info.isBootstrapped({chain: string}) -> {isBootstrapped: bool}
 ```
 
@@ -117,7 +117,7 @@ info.isBootstrapped({chain: string}) -> {isBootstrapped: bool}
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -130,7 +130,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -146,13 +146,13 @@ Given a blockchain's alias, get its ID. (See [`admin.aliasChain`](/api-reference
 
 **Signature**:
 
-```
+```sh
 info.getBlockchainID({alias:string}) -> {blockchainID:string}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -165,7 +165,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -181,13 +181,13 @@ Get the ID of the network this node is participating in.
 
 **Signature**:
 
-```
+```sh
 info.getNetworkID() -> { networkID: int }
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -197,7 +197,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -215,13 +215,13 @@ Get the name of the network this node is participating in.
 
 **Signature**:
 
-```
+```sh
 info.getNetworkName() -> { networkName:string }
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -231,7 +231,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -245,13 +245,13 @@ curl -X POST --data '{
 
 Get the ID, the BLS key, and the proof of possession(BLS signature) of this node.
 
-
 <Callout title="Note">
 This endpoint set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
 </Callout>
+
 **Signature**:
 
-```
+```sh
 info.getNodeID() -> {
     nodeID: string,
     nodePOP: {
@@ -268,7 +268,7 @@ info.getNodeID() -> {
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -278,7 +278,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -302,13 +302,13 @@ This endpoint set is for a specific node, it is unavailable on the [public serve
 
 **Signature**:
 
-```
+```sh
 info.getNodeIP() -> {ip: string}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -318,7 +318,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -334,7 +334,7 @@ Get the version of this node.
 
 **Signature**:
 
-```
+```sh
 info.getNodeVersion() -> {
     version: string,
     databaseVersion: string,
@@ -354,7 +354,7 @@ where:
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -364,7 +364,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -388,7 +388,7 @@ Get the fees of the network.
 
 **Signature**:
 
-```
+```sh
 info.getTxFee() ->
 {
     txFee: uint64,
@@ -417,7 +417,7 @@ All fees are denominated in nAVAX.
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -427,7 +427,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -455,7 +455,7 @@ This endpoint set is for a specific node, it is unavailable on the [public serve
 
 **Signature**:
 
-```
+```sh
 info.getVMs() -> {
     vms: map[string][]string
 }
@@ -463,7 +463,7 @@ info.getVMs() -> {
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -474,7 +474,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -497,7 +497,7 @@ Get a description of peer connections.
 
 **Signature**:
 
-```
+```sh
 info.peers({
     nodeIDs: string[] // optional
 }) ->
@@ -529,7 +529,7 @@ info.peers({
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -542,7 +542,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -612,7 +612,7 @@ info.uptime() ->
     
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -622,7 +622,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -635,7 +635,7 @@ curl -X POST --data '{
 
 #### Example Avalanche L1 Call
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -648,7 +648,7 @@ curl -X POST --data '{
 
 #### Example Avalanche L1 Response
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
