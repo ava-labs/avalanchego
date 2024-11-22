@@ -155,6 +155,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.NetworkNameKey:             constants.LocalName,
 			config.LogLevelKey:                logging.Debug.String(),
 			config.LogDisplayLevelKey:         logging.Trace.String(),
+			config.LogFormatKey:               logging.JSONString,
 			config.HTTPHostKey:                "0.0.0.0",
 			config.PublicIPKey:                address,
 			config.StakingTLSKeyContentKey:    tlsKey,
