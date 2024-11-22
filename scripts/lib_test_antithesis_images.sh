@@ -46,13 +46,17 @@ docker cp "${CONTAINER_NAME}":/docker-compose.yml "${COMPOSE_FILE}"
 # Copy the volume paths out of the container
 docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"
 
-# Run the docker compose project for 30 seconds without error. Local
-# network bootstrap is ~6s, but github workers can be much slower.
-${COMPOSE_CMD} up -d
-sleep 30
-if ${COMPOSE_CMD} ps -q | xargs docker inspect -f '{{ .State.Status }}' | grep -v 'running'; then
-  echo "An error occurred."
+# Wait for up to TIMEOUT for the workload to emit HEALTHY_MESSAGE to indicate that all nodes are
+# reporting healthy. This indicates that the workload has been correctly configured. Subsequent
+# validation will need to be tailored to a given workload implementation.
+
+TIMEOUT=30s
+HEALTHY_MESSAGE="all nodes reported healthy"
+
+if timeout "${TIMEOUT}" bash -c "${COMPOSE_CMD} up 2>&1 | grep -m 1 '${HEALTHY_MESSAGE}'"; then
+  echo "Saw log containing '${HEALTHY_MESSAGE}'"
+  echo "Successfully invoked the antithesis test setup configured by ${IMAGE_NAME}:${IMAGE_TAG}"
+else
+  echo "Failed to see log containing '${HEALTHY_MESSAGE}' within ${TIMEOUT}"
   exit 1
 fi
-
-echo "Successfully invoked the antithesis test setup configured by ${IMAGE_NAME}:${IMAGE_TAG}"

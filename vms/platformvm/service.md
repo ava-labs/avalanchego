@@ -696,8 +696,8 @@ platform.getCurrentValidators({
   - `delegationFeeRate` is the percent fee this validator charges when others delegate stake to
     them. Omitted if `subnetID` is not a PoS Subnet.
   - `uptime` is the % of time the queried node has reported the peer as online and validating the
-    Subnet. Omitted if `subnetID` is not a PoS Subnet.
-  - `connected` is if the node is connected and tracks the Subnet.
+    Subnet. Omitted if `subnetID` is not a PoS Subnet. (Deprecated: uptime is deprecated for Subnet Validators. It will be available only for Primary Network Validators.)
+  - `connected` is if the node is connected and tracks the Subnet. (Deprecated: connected is deprecated for Subnet Validators. It will be available only for Primary Network Validators.)
   - `signer` is the node's BLS public key and proof of possession. Omitted if the validator doesn't
     have a BLS public key.
   - `delegatorCount` is the number of delegators on this validator.
@@ -780,6 +780,90 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getL1Validator`
+
+Returns a current L1 validator.
+
+**Signature:**
+
+```sh
+platform.getL1Validator({
+    validationID: string,
+}) -> {
+    subnetID: string,
+    nodeID: string,
+    publicKey: string,
+    remainingBalanceOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    deactivationOwner: {
+      locktime: string,
+      threshold: string,
+      addresses: string[]
+    },
+    startTime: string,
+    weight: string,
+    minNonce: string,
+    balance: string,
+    height: string
+}
+```
+
+- `subnetID` is the L1 this validator is validating.
+- `nodeID` is the node ID of the validator.
+- `publicKey` is the compressed BLS public key of the validator.
+- `remainingBalanceOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that will receive any withdrawn balance.
+- `deactivationOwner` is an `OutputOwners` which includes a `locktime`, `threshold`, and an array of `addresses`. It specifies the owner that can withdraw the balance.
+- `startTime` is the unix timestamp, in seconds, of when this validator was added to the validator set.
+- `weight` is weight of this validator used for consensus voting and ICM.
+- `minNonce` is minimum nonce that must be included in a `SetL1ValidatorWeightTx` for the transaction to be valid.
+- `balance` is current remaining balance that can be used to pay for the validators continuous fee.
+- `height` is height of the last accepted block.
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getL1Validator",
+    "params": {
+      "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "subnetID": "2DeHa7Qb6sufPkmQcFWG2uCd4pBPv9WB6dkzroiMQhd1NSRtof",
+        "nodeID": "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg",
+        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+        "remainingBalanceOwner": {
+            "locktime": "0",
+            "threshold": "0",
+            "addresses": []
+        },
+        "deactivationOwner": {
+            "locktime": "0",
+            "threshold": "0",
+            "addresses": []
+        },
+        "startTime": "1731445206",
+        "weight": "49463",
+        "minNonce": "0",
+        "balance": "1000000000",
+        "height": "3"
+    },
+    "id": 1
+}
+```
+
 ### `platform.getHeight`
 
 Returns the height of the last accepted block.
@@ -799,6 +883,42 @@ platform.getHeight() ->
 curl -X POST --data '{
     "jsonrpc": "2.0",
     "method": "platform.getHeight",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "height": "56"
+  },
+  "id": 1
+}
+```
+
+### `platform.getProposedHeight`
+
+Returns this node's current proposer VM height
+
+**Signature:**
+
+```sh
+platform.getProposedHeight() ->
+{
+    height: int,
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getProposedHeight",
     "params": {},
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
@@ -1204,7 +1324,7 @@ Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
 ### `platform.getSubnet`
 
-Get owners and elastic info about the Subnet.
+Get owners and info about the Subnet or L1.
 
 **Signature:**
 
@@ -1217,17 +1337,22 @@ platform.getSubnet({
     controlKeys: []string,
     threshold: string,
     locktime: string,
-    subnetTransformationTxID: string
+    subnetTransformationTxID: string,
+    conversionID: string,
+    managerChainID: string,
+    managerAddress: string
 }
 ```
 
 - `subnetID` is the ID of the Subnet to get information about. If omitted, fails.
-- `threshold` signatures from addresses in `controlKeys` are needed to make changes to 
+- `threshold` signatures from addresses in `controlKeys` are needed to make changes to
   a permissioned subnet. If the Subnet is a PoS Subnet, then `threshold` will be `0` and `controlKeys`
   will be empty.
 - changes can not be made into the subnet until `locktime` is in the past.
-- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into a elastic one, 
-  for when this change was performed.
+- `subnetTransformationTxID` is the ID of the transaction that changed the subnet into an elastic one, if it exists.
+- `conversionID` is the ID of the conversion from a permissioned Subnet into an L1, if it exists.
+- `managerChainID` is the ChainID that has the ability to modify this L1s validator set, if it exists.
+- `managerAddress` is the address that has the ability to modify this L1s validator set, if it exists.
 
 **Example Call:**
 
@@ -1250,7 +1375,10 @@ curl -X POST --data '{
     "controlKeys": ["P-fuji1ztvstx6naeg6aarfd047fzppdt8v4gsah88e0c","P-fuji193kvt4grqewv6ce2x59wnhydr88xwdgfcedyr3"],
     "threshold": "1",
     "locktime": "0",
-    "subnetTransformationTxID": "11111111111111111111111111111111LpoYY"
+    "subnetTransformationTxID": "11111111111111111111111111111111LpoYY",
+    "conversionID": "11111111111111111111111111111111LpoYY",
+    "managerChainID": "11111111111111111111111111111111LpoYY",
+    "managerAddress": null
   },
   "id": 1
 }
@@ -1763,13 +1891,14 @@ Get the validators and their weights of a Subnet or the Primary Network at a giv
 ```sh
 platform.getValidatorsAt(
     {
-        height: int,
+        height: [int|string],
         subnetID: string, // optional
     }
 )
 ```
 
-- `height` is the P-Chain height to get the validator set at.
+- `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
+  to return the validator set at this node's ProposerVM height. 
 - `subnetID` is the Subnet ID to get the validator set of. If not given, gets validator set of the
   Primary Network.
 

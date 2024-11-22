@@ -45,11 +45,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 const (
@@ -779,18 +780,24 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				AddSubnetValidatorFee:         v.GetUint64(AddSubnetValidatorFeeKey),
 				AddSubnetDelegatorFee:         v.GetUint64(AddSubnetDelegatorFeeKey),
 			},
-			DynamicFeeConfig: feecomponent.Config{
-				Weights: feecomponent.Dimensions{
-					feecomponent.Bandwidth: v.GetUint64(DynamicFeesBandwidthWeightKey),
-					feecomponent.DBRead:    v.GetUint64(DynamicFeesDBReadWeightKey),
-					feecomponent.DBWrite:   v.GetUint64(DynamicFeesDBWriteWeightKey),
-					feecomponent.Compute:   v.GetUint64(DynamicFeesComputeWeightKey),
+			DynamicFeeConfig: gas.Config{
+				Weights: gas.Dimensions{
+					gas.Bandwidth: v.GetUint64(DynamicFeesBandwidthWeightKey),
+					gas.DBRead:    v.GetUint64(DynamicFeesDBReadWeightKey),
+					gas.DBWrite:   v.GetUint64(DynamicFeesDBWriteWeightKey),
+					gas.Compute:   v.GetUint64(DynamicFeesComputeWeightKey),
 				},
-				MaxGasCapacity:           feecomponent.Gas(v.GetUint64(DynamicFeesMaxGasCapacityKey)),
-				MaxGasPerSecond:          feecomponent.Gas(v.GetUint64(DynamicFeesMaxGasPerSecondKey)),
-				TargetGasPerSecond:       feecomponent.Gas(v.GetUint64(DynamicFeesTargetGasPerSecondKey)),
-				MinGasPrice:              feecomponent.GasPrice(v.GetUint64(DynamicFeesMinGasPriceKey)),
-				ExcessConversionConstant: feecomponent.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
+				MaxCapacity:              gas.Gas(v.GetUint64(DynamicFeesMaxGasCapacityKey)),
+				MaxPerSecond:             gas.Gas(v.GetUint64(DynamicFeesMaxGasPerSecondKey)),
+				TargetPerSecond:          gas.Gas(v.GetUint64(DynamicFeesTargetGasPerSecondKey)),
+				MinPrice:                 gas.Price(v.GetUint64(DynamicFeesMinGasPriceKey)),
+				ExcessConversionConstant: gas.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
+			},
+			ValidatorFeeConfig: validatorfee.Config{
+				Capacity:                 gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
+				Target:                   gas.Gas(v.GetUint64(ValidatorFeesTargetKey)),
+				MinPrice:                 gas.Price(v.GetUint64(ValidatorFeesMinPriceKey)),
+				ExcessConversionConstant: gas.Gas(v.GetUint64(ValidatorFeesExcessConversionConstantKey)),
 			},
 		}
 	}

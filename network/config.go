@@ -131,6 +131,7 @@ type Config struct {
 	BLSKey *bls.SecretKey `json:"-"`
 
 	// TrackedSubnets of the node.
+	// It must not include the primary network ID.
 	TrackedSubnets set.Set[ids.ID]    `json:"-"`
 	Beacons        validators.Manager `json:"-"`
 

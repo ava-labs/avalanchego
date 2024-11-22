@@ -21,6 +21,7 @@ func TraceBootstrapableEngine(bootstrapableEngine BootstrapableEngine, tracer tr
 	return &tracedBootstrapableEngine{
 		Engine:              TraceEngine(bootstrapableEngine, tracer),
 		bootstrapableEngine: bootstrapableEngine,
+		tracer:              tracer,
 	}
 }
 

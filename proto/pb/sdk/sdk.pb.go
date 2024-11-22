@@ -229,7 +229,7 @@ func (x *SignatureRequest) GetJustification() []byte {
 	return nil
 }
 
-// SignatureRespnose is an AppResponse message type for providing
+// SignatureResponse is an AppResponse message type for providing
 // a requested BLS signature over a Warp message, as defined in ACP-118:
 // https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request
 type SignatureResponse struct {

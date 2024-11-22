@@ -3,17 +3,16 @@
 
 package utils
 
-// Join merges the provided slices into a single slice.
+// DeleteIndex moves the last element in the slice to index [i] and shrinks the
+// size of the slice by 1.
 //
-// TODO: Use slices.Concat once the minimum go version is 1.22.
-func Join[T any](slices ...[]T) []T {
-	size := 0
-	for _, s := range slices {
-		size += len(s)
-	}
-	newSlice := make([]T, 0, size)
-	for _, s := range slices {
-		newSlice = append(newSlice, s...)
-	}
-	return newSlice
+// This is an O(1) operation that allows the removal of an element from a slice
+// when the order of the slice is not important.
+//
+// If [i] is out of bounds, this function will panic.
+func DeleteIndex[S ~[]E, E any](s S, i int) S {
+	newSize := len(s) - 1
+	s[i] = s[newSize]
+	s[newSize] = Zero[E]()
+	return s[:newSize]
 }

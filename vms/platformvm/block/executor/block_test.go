@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/uptime/uptimemock"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -38,7 +38,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				state := state.NewMockState(ctrl)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -46,7 +46,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -65,7 +65,7 @@ func TestBlockOptions(t *testing.T) {
 			blkF: func(ctrl *gomock.Controller) *Block {
 				state := state.NewMockState(ctrl)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -73,7 +73,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -101,7 +101,7 @@ func TestBlockOptions(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(nil, status.Unknown, database.ErrNotFound)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -109,7 +109,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -139,7 +139,7 @@ func TestBlockOptions(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(nil, status.Unknown, database.ErrClosed)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -147,7 +147,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -180,7 +180,7 @@ func TestBlockOptions(t *testing.T) {
 				state := state.NewMockState(ctrl)
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -188,7 +188,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -231,7 +231,7 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(nil, database.ErrNotFound)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -239,7 +239,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -286,8 +286,8 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetTx(stakerTxID).Return(stakerTx, status.Committed, nil)
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
+				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(0.0, database.ErrNotFound)
 
 				manager := &manager{
 					backend: &backend{
@@ -295,7 +295,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -343,7 +343,7 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(nil, database.ErrNotFound)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
+				uptimes := uptimemock.NewCalculator(ctrl)
 
 				manager := &manager{
 					backend: &backend{
@@ -351,7 +351,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: 0,
 						},
 						Uptimes: uptimes,
@@ -404,8 +404,8 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(transformSubnetTx, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
 
 				manager := &manager{
 					backend: &backend{
@@ -413,7 +413,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: .8,
 						},
 						Uptimes: uptimes,
@@ -466,8 +466,8 @@ func TestBlockOptions(t *testing.T) {
 				state.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, nodeID).Return(staker, nil)
 				state.EXPECT().GetSubnetTransformation(subnetID).Return(transformSubnetTx, nil)
 
-				uptimes := uptime.NewMockCalculator(ctrl)
-				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, constants.PrimaryNetworkID, primaryNetworkValidatorStartTime).Return(.5, nil)
+				uptimes := uptimemock.NewCalculator(ctrl)
+				uptimes.EXPECT().CalculateUptimePercentFrom(nodeID, primaryNetworkValidatorStartTime).Return(.5, nil)
 
 				manager := &manager{
 					backend: &backend{
@@ -475,7 +475,7 @@ func TestBlockOptions(t *testing.T) {
 						ctx:   snowtest.Context(t, snowtest.PChainID),
 					},
 					txExecutorBackend: &executor.Backend{
-						Config: &config.Config{
+						Config: &config.Internal{
 							UptimePercentage: .8,
 						},
 						Uptimes: uptimes,

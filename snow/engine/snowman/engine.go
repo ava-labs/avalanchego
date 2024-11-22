@@ -31,7 +31,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const nonVerifiedCacheSize = 64 * units.MiB
+const (
+	nonVerifiedCacheSize = 64 * units.MiB
+	errInsufficientStake = "insufficient connected stake"
+)
 
 var _ common.Engine = (*Engine)(nil)
 
@@ -173,7 +176,7 @@ func (e *Engine) Gossip(ctx context.Context) error {
 	// nodes with a large amount of stake weight.
 	vdrID, ok := e.ConnectedValidators.SampleValidator()
 	if !ok {
-		e.Ctx.Log.Warn("skipping block gossip",
+		e.Ctx.Log.Debug("skipping block gossip",
 			zap.String("reason", "no connected validators"),
 		)
 		return nil
@@ -353,8 +356,8 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return e.executeDeferredWork(ctx)
 }
 
-func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID) error {
-	e.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID)
+func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
+	e.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID, acceptedHeight)
 
 	e.Ctx.Log.Verbo("called Chits for the block",
 		zap.Stringer("nodeID", nodeID),
@@ -362,6 +365,7 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		zap.Stringer("preferredID", preferredID),
 		zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		zap.Stringer("acceptedID", acceptedID),
+		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
 
 	issuedMetric := e.metrics.issued.WithLabelValues(pullGossipSource)
@@ -411,9 +415,9 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 }
 
 func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	lastAccepted, ok := e.acceptedFrontiers.LastAccepted(nodeID)
+	lastAcceptedID, lastAcceptedHeight, ok := e.acceptedFrontiers.LastAccepted(nodeID)
 	if ok {
-		return e.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted, lastAccepted)
+		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
 	}
 
 	v := &voter{
@@ -426,12 +430,6 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 	}
 	return e.executeDeferredWork(ctx)
 }
-
-func (*Engine) Timeout(context.Context) error {
-	return nil
-}
-
-func (*Engine) Halt(context.Context) {}
 
 func (e *Engine) Shutdown(ctx context.Context) error {
 	e.Ctx.Log.Info("shutting down consensus engine")
@@ -587,7 +585,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			// Because we only return accepted state here, it's fairly likely
 			// that the requested height is higher than the last accepted block.
 			// That means that this code path is actually quite common.
-			e.Ctx.Log.Debug("failed fetching accepted block",
+			e.Ctx.Log.Debug("unable to retrieve accepted block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
@@ -596,7 +594,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			)
 			acceptedAtHeight = lastAcceptedID
 		}
-		e.Sender.SendChits(ctx, nodeID, requestID, lastAcceptedID, acceptedAtHeight, lastAcceptedID)
+		e.Sender.SendChits(ctx, nodeID, requestID, lastAcceptedID, acceptedAtHeight, lastAcceptedID, lastAcceptedHeight)
 		return
 	}
 
@@ -615,7 +613,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			// Because it is possible for a byzantine node to spam requests at
 			// old heights on a pruning network, we log this as debug. However,
 			// this case is unexpected to be hit by correct peers.
-			e.Ctx.Log.Debug("failed fetching accepted block",
+			e.Ctx.Log.Debug("unable to retrieve accepted block",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
@@ -630,7 +628,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		var ok bool
 		preferenceAtHeight, ok = e.Consensus.PreferenceAtHeight(requestedHeight)
 		if !ok {
-			e.Ctx.Log.Debug("failed fetching processing block",
+			e.Ctx.Log.Debug("processing block not found",
 				zap.Stringer("nodeID", nodeID),
 				zap.Uint64("requestedHeight", requestedHeight),
 				zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
@@ -641,7 +639,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			preferenceAtHeight = preference
 		}
 	}
-	e.Sender.SendChits(ctx, nodeID, requestID, preference, preferenceAtHeight, lastAcceptedID)
+	e.Sender.SendChits(ctx, nodeID, requestID, preference, preferenceAtHeight, lastAcceptedID, lastAcceptedHeight)
 }
 
 // Build blocks if they have been requested and the number of processing blocks
@@ -871,6 +869,10 @@ func (e *Engine) sendQuery(
 	blkBytes []byte,
 	push bool,
 ) {
+	if e.abortDueToInsufficientConnectedStake(blkID) {
+		return
+	}
+
 	e.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", e.Validators),
 	)
@@ -914,6 +916,21 @@ func (e *Engine) sendQuery(
 	} else {
 		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, nextHeightToAccept)
 	}
+}
+
+func (e *Engine) abortDueToInsufficientConnectedStake(blkID ids.ID) bool {
+	stakeConnectedRatio := e.Config.ConnectedValidators.ConnectedPercent()
+	minConnectedStakeToQuery := float64(e.Params.AlphaConfidence) / float64(e.Params.K)
+
+	if stakeConnectedRatio < minConnectedStakeToQuery {
+		e.Ctx.Log.Debug("dropped query for block",
+			zap.String("reason", errInsufficientStake),
+			zap.Stringer("blkID", blkID),
+			zap.Float64("ratio", stakeConnectedRatio),
+		)
+		return true
+	}
+	return false
 }
 
 // issue [blk] to consensus

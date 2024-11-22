@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -36,7 +37,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -94,6 +97,21 @@ func (s *Service) GetHeight(r *http.Request, _ *struct{}, response *api.GetHeigh
 	ctx := r.Context()
 	height, err := s.vm.GetCurrentHeight(ctx)
 	response.Height = avajson.Uint64(height)
+	return err
+}
+
+// GetProposedHeight returns the current ProposerVM height
+func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getProposedHeight"),
+	)
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	ctx := r.Context()
+	proposerHeight, err := s.vm.GetMinimumHeight(ctx)
+	reply.Height = avajson.Uint64(proposerHeight)
 	return err
 }
 
@@ -435,8 +453,12 @@ type GetSubnetResponse struct {
 	ControlKeys []string       `json:"controlKeys"`
 	Threshold   avajson.Uint32 `json:"threshold"`
 	Locktime    avajson.Uint64 `json:"locktime"`
-	// subnet transformation tx ID for a permissionless subnet
+	// subnet transformation tx ID for an elastic subnet
 	SubnetTransformationTxID ids.ID `json:"subnetTransformationTxID"`
+	// subnet conversion information for an L1
+	ConversionID   ids.ID              `json:"conversionID"`
+	ManagerChainID ids.ID              `json:"managerChainID"`
+	ManagerAddress types.JSONByteSlice `json:"managerAddress"`
 }
 
 func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetSubnetResponse) error {
@@ -481,6 +503,20 @@ func (s *Service) GetSubnet(_ *http.Request, args *GetSubnetArgs, response *GetS
 	case database.ErrNotFound:
 		response.IsPermissioned = true
 		response.SubnetTransformationTxID = ids.Empty
+	default:
+		return err
+	}
+
+	switch c, err := s.vm.state.GetSubnetToL1Conversion(args.SubnetID); err {
+	case nil:
+		response.IsPermissioned = false
+		response.ConversionID = c.ConversionID
+		response.ManagerChainID = c.ChainID
+		response.ManagerAddress = c.Addr
+	case database.ErrNotFound:
+		response.ConversionID = ids.Empty
+		response.ManagerChainID = ids.Empty
+		response.ManagerAddress = []byte(nil)
 	default:
 		return err
 	}
@@ -830,13 +866,26 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 			shares := attr.shares
 			delegationFee := avajson.Float32(100 * float32(shares) / float32(reward.PercentDenominator))
-
-			uptime, err := s.getAPIUptime(currentStaker)
-			if err != nil {
-				return err
+			var (
+				uptime    *avajson.Float32
+				connected *bool
+			)
+			if args.SubnetID == constants.PrimaryNetworkID {
+				rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(currentStaker.NodeID, currentStaker.StartTime)
+				if err != nil {
+					return err
+				}
+				// Transform this to a percentage (0-100) to make it consistent
+				// with observedUptime in info.peers API
+				currentUptime := avajson.Float32(rawUptime * 100)
+				if err != nil {
+					return err
+				}
+				isConnected := s.vm.uptimeManager.IsConnected(currentStaker.NodeID)
+				connected = &isConnected
+				uptime = &currentUptime
 			}
 
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			var (
 				validationRewardOwner *platformapi.Owner
 				delegationRewardOwner *platformapi.Owner
@@ -896,15 +945,8 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 
 		case txs.SubnetPermissionedValidatorCurrentPriority:
-			uptime, err := s.getAPIUptime(currentStaker)
-			if err != nil {
-				return err
-			}
-			connected := s.vm.uptimeManager.IsConnected(nodeID, args.SubnetID)
 			reply.Validators = append(reply.Validators, platformapi.PermissionedValidator{
-				Staker:    apiStaker,
-				Connected: connected,
-				Uptime:    uptime,
+				Staker: apiStaker,
 			})
 
 		default:
@@ -939,6 +981,93 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 		}
 		reply.Validators[i] = vdr
 	}
+
+	return nil
+}
+
+type GetL1ValidatorArgs struct {
+	ValidationID ids.ID `json:"validationID"`
+}
+
+type GetL1ValidatorReply struct {
+	SubnetID ids.ID     `json:"subnetID"`
+	NodeID   ids.NodeID `json:"nodeID"`
+	// PublicKey is the compressed BLS public key of the validator
+	PublicKey             types.JSONByteSlice `json:"publicKey"`
+	RemainingBalanceOwner platformapi.Owner   `json:"remainingBalanceOwner"`
+	DeactivationOwner     platformapi.Owner   `json:"deactivationOwner"`
+	StartTime             avajson.Uint64      `json:"startTime"`
+	Weight                avajson.Uint64      `json:"weight"`
+	MinNonce              avajson.Uint64      `json:"minNonce"`
+	// Balance is the remaining amount of AVAX this L1 validator has for paying
+	// the continuous fee, according to the last accepted state. If the
+	// validator is inactive, the balance will be 0.
+	Balance avajson.Uint64 `json:"balance"`
+	// Height is the height of the last accepted block
+	Height avajson.Uint64 `json:"height"`
+}
+
+// GetL1Validator returns the L1 validator if it exists
+func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, reply *GetL1ValidatorReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getL1Validator"),
+		zap.Stringer("validationID", args.ValidationID),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	l1Validator, err := s.vm.state.GetL1Validator(args.ValidationID)
+	if err != nil {
+		return fmt.Errorf("fetching L1 validator %q failed: %w", args.ValidationID, err)
+	}
+
+	var remainingBalanceOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(l1Validator.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+		return fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
+	}
+	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
+		Threshold: remainingBalanceOwner.Threshold,
+		Addrs:     remainingBalanceOwner.Addresses,
+	})
+	if err != nil {
+		return fmt.Errorf("failed formatting remaining balance owner: %w", err)
+	}
+
+	var deactivationOwner message.PChainOwner
+	if _, err := txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &deactivationOwner); err != nil {
+		return fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
+	}
+	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
+		Threshold: deactivationOwner.Threshold,
+		Addrs:     deactivationOwner.Addresses,
+	})
+	if err != nil {
+		return fmt.Errorf("failed formatting deactivation owner: %w", err)
+	}
+
+	ctx := r.Context()
+	height, err := s.vm.GetCurrentHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("failed getting current height: %w", err)
+	}
+
+	reply.SubnetID = l1Validator.SubnetID
+	reply.NodeID = l1Validator.NodeID
+	reply.PublicKey = bls.PublicKeyToCompressedBytes(
+		bls.PublicKeyFromValidUncompressedBytes(l1Validator.PublicKey),
+	)
+	reply.RemainingBalanceOwner = *remainingBalanceAPIOwner
+	reply.DeactivationOwner = *deactivationAPIOwner
+	reply.StartTime = avajson.Uint64(l1Validator.StartTime)
+	reply.Weight = avajson.Uint64(l1Validator.Weight)
+	reply.MinNonce = avajson.Uint64(l1Validator.MinNonce)
+	if l1Validator.EndAccumulatedFee != 0 {
+		accruedFees := s.vm.state.GetAccruedFees()
+		reply.Balance = avajson.Uint64(l1Validator.EndAccumulatedFee - accruedFees)
+	}
+	reply.Height = avajson.Uint64(height)
 
 	return nil
 }
@@ -1663,8 +1792,8 @@ func (s *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestamp
 
 // GetValidatorsAtArgs is the response from GetValidatorsAt
 type GetValidatorsAtArgs struct {
-	Height   avajson.Uint64 `json:"height"`
-	SubnetID ids.ID         `json:"subnetID"`
+	Height   platformapi.Height `json:"height"`
+	SubnetID ids.ID             `json:"subnetID"`
 }
 
 type jsonGetValidatorOutput struct {
@@ -1734,11 +1863,11 @@ type GetValidatorsAtReply struct {
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
 func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
-	height := uint64(args.Height)
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getValidatorsAt"),
-		zap.Uint64("height", height),
+		zap.Uint64("height", uint64(args.Height)),
+		zap.Bool("isProposed", args.Height.IsProposed()),
 		zap.Stringer("subnetID", args.SubnetID),
 	)
 
@@ -1747,6 +1876,14 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 
 	ctx := r.Context()
 	var err error
+	height := uint64(args.Height)
+	if args.Height.IsProposed() {
+		height, err = s.vm.GetMinimumHeight(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get proposed height: %w", err)
+		}
+	}
+
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator set: %w", err)
@@ -1828,20 +1965,47 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 	return err
 }
 
-func (s *Service) getAPIUptime(staker *state.Staker) (*avajson.Float32, error) {
-	// Only report uptimes that we have been actively tracking.
-	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
-		return nil, nil
+// GetFeeConfig returns the dynamic fee config of the chain.
+func (s *Service) GetFeeConfig(_ *http.Request, _ *struct{}, reply *gas.Config) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getFeeConfig"),
+	)
+
+	// TODO: Remove after Etna is activated.
+	now := time.Now()
+	if !s.vm.Internal.UpgradeConfig.IsEtnaActivated(now) {
+		return nil
 	}
 
-	rawUptime, err := s.vm.uptimeManager.CalculateUptimePercentFrom(staker.NodeID, staker.SubnetID, staker.StartTime)
-	if err != nil {
-		return nil, err
-	}
-	// Transform this to a percentage (0-100) to make it consistent
-	// with observedUptime in info.peers API
-	uptime := avajson.Float32(rawUptime * 100)
-	return &uptime, nil
+	*reply = s.vm.DynamicFeeConfig
+	return nil
+}
+
+type GetFeeStateReply struct {
+	gas.State
+	Price gas.Price `json:"price"`
+	Time  time.Time `json:"timestamp"`
+}
+
+// GetFeeState returns the current fee state of the chain.
+func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getFeeState"),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	reply.State = s.vm.state.GetFeeState()
+	reply.Price = gas.CalculatePrice(
+		s.vm.DynamicFeeConfig.MinPrice,
+		reply.State.Excess,
+		s.vm.DynamicFeeConfig.ExcessConversionConstant,
+	)
+	reply.Time = s.vm.state.GetTimestamp()
+	return nil
 }
 
 func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Owner, error) {

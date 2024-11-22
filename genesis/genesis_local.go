@@ -12,10 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -51,19 +52,32 @@ var (
 				AddSubnetValidatorFee:         units.MilliAvax,
 				AddSubnetDelegatorFee:         units.MilliAvax,
 			},
-			// TODO: Set these values to something more reasonable
-			DynamicFeeConfig: feecomponent.Config{
-				Weights: feecomponent.Dimensions{
-					feecomponent.Bandwidth: 1,
-					feecomponent.DBRead:    1,
-					feecomponent.DBWrite:   1,
-					feecomponent.Compute:   1,
+			DynamicFeeConfig: gas.Config{
+				Weights: gas.Dimensions{
+					gas.Bandwidth: 1,     // Max block size ~1MB
+					gas.DBRead:    1_000, // Max reads per block 1,000
+					gas.DBWrite:   1_000, // Max writes per block 1,000
+					gas.Compute:   4,     // Max compute time per block ~250ms
 				},
-				MaxGasCapacity:           1_000_000,
-				MaxGasPerSecond:          1_000,
-				TargetGasPerSecond:       500,
-				MinGasPrice:              1,
-				ExcessConversionConstant: 1,
+				MaxCapacity:     1_000_000,
+				MaxPerSecond:    100_000, // Refill time 10s
+				TargetPerSecond: 50_000,  // Target is half of max
+				MinPrice:        1,
+				// ExcessConversionConstant = (MaxPerSecond - TargetPerSecond) * NumberOfSecondsPerDoubling / ln(2)
+				//
+				// ln(2) is a float and the result is consensus critical, so we
+				// hardcode the result.
+				ExcessConversionConstant: 2_164_043, // Double every 30s
+			},
+			ValidatorFeeConfig: validatorfee.Config{
+				Capacity: 20_000,
+				Target:   10_000,
+				MinPrice: gas.Price(1 * units.NanoAvax),
+				// ExcessConversionConstant = (Capacity - Target) * NumberOfSecondsPerDoubling / ln(2)
+				//
+				// ln(2) is a float and the result is consensus critical, so we
+				// hardcode the result.
+				ExcessConversionConstant: 865_617, // Double every minute
 			},
 		},
 		StakingConfig: StakingConfig{

@@ -22,18 +22,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
-	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
+	"github.com/ava-labs/avalanchego/vms/avm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
-	"github.com/ava-labs/avalanchego/vms/avm/state"
+	"github.com/ava-labs/avalanchego/vms/avm/state/statemock"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -49,7 +48,7 @@ func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -72,7 +71,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -104,7 +103,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 
@@ -258,7 +257,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 
@@ -299,7 +298,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 
@@ -495,7 +494,7 @@ func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -520,7 +519,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -608,7 +607,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -661,7 +660,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"destinationChain": "2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w",
 		"exportedOutputs": [
 			{
@@ -698,7 +697,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -801,7 +800,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"name": "Team Rocket",
 		"symbol": "TR",
 		"denomination": 0,
@@ -891,7 +890,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -973,7 +972,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1033,7 +1032,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1118,7 +1117,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1214,7 +1213,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1293,7 +1292,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1357,7 +1356,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: upgradetest.Durango,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1440,7 +1439,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1544,7 +1543,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1618,7 +1617,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -1679,7 +1678,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -1760,7 +1759,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 				}
 			}
 		],
-		"memo": "0x",
+		"memo": null,
 		"operations": [
 			{
 				"assetID": %[4]q,
@@ -2010,7 +2009,7 @@ func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2024,7 +2023,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2036,7 +2035,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 
 func TestServiceGetUTXOs(t *testing.T) {
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2288,7 +2287,7 @@ func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2308,7 +2307,7 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	service := &Service{vm: env.vm}
 	env.vm.ctx.Lock.Unlock()
@@ -2332,6 +2331,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2378,6 +2378,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2466,6 +2467,7 @@ func TestNFTWorkflow(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2584,6 +2586,7 @@ func TestImportExportKey(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username: username,
 			password: password,
@@ -2623,6 +2626,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username: username,
 			password: password,
@@ -2668,6 +2672,7 @@ func TestSend(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username:    username,
 			password:    password,
@@ -2721,9 +2726,7 @@ func TestSendMultiple(t *testing.T) {
 					initialKeys: keys,
 				}},
 				vmStaticConfig: &config.Config{
-					Upgrades: upgrade.Config{
-						EtnaTime: mockable.MaxTime,
-					},
+					Upgrades: upgradetest.GetConfig(upgradetest.Durango),
 				},
 			})
 			service := &Service{vm: env.vm}
@@ -2773,6 +2776,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
+		fork: upgradetest.Durango,
 		keystoreUsers: []*user{{
 			username: username,
 			password: password,
@@ -2807,6 +2811,7 @@ func TestImport(t *testing.T) {
 			require := require.New(t)
 
 			env := setup(t, &envConfig{
+				fork:             upgradetest.Durango,
 				isCustomFeeAsset: !tc.avaxAsset,
 				keystoreUsers: []*user{{
 					username:    username,
@@ -2894,7 +2899,7 @@ func TestServiceGetBlock(t *testing.T) {
 		{
 			name: "block not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
@@ -2915,7 +2920,7 @@ func TestServiceGetBlock(t *testing.T) {
 				block.EXPECT().InitCtx(gomock.Any())
 				block.EXPECT().Txs().Return(nil)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -2939,7 +2944,7 @@ func TestServiceGetBlock(t *testing.T) {
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
 				require.NoError(t, err)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -2963,7 +2968,7 @@ func TestServiceGetBlock(t *testing.T) {
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
 				require.NoError(t, err)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -2987,7 +2992,7 @@ func TestServiceGetBlock(t *testing.T) {
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
 				require.NoError(t, err)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -3060,10 +3065,10 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "block height not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				return &Service{
 					vm: &VM{
 						state:        state,
@@ -3080,10 +3085,10 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		{
 			name: "block not found",
 			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
@@ -3105,10 +3110,10 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				block.EXPECT().InitCtx(gomock.Any())
 				block.EXPECT().Txs().Return(nil)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -3130,13 +3135,13 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
 				require.NoError(t, err)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -3158,13 +3163,13 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
 				require.NoError(t, err)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -3186,13 +3191,13 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
 				require.NoError(t, err)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{
@@ -3264,10 +3269,10 @@ func TestServiceGetHeight(t *testing.T) {
 		{
 			name: "block not found",
 			serviceFunc: func(ctrl *gomock.Controller) *Service {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(blockID)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
 					vm: &VM{
@@ -3284,13 +3289,13 @@ func TestServiceGetHeight(t *testing.T) {
 		{
 			name: "happy path",
 			serviceFunc: func(ctrl *gomock.Controller) *Service {
-				state := state.NewMockState(ctrl)
+				state := statemock.NewState(ctrl)
 				state.EXPECT().GetLastAccepted().Return(blockID)
 
 				block := block.NewMockBlock(ctrl)
 				block.EXPECT().Height().Return(blockHeight)
 
-				manager := executor.NewMockManager(ctrl)
+				manager := executormock.NewManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
 				return &Service{
 					vm: &VM{

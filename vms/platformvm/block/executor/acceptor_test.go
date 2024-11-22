@@ -11,7 +11,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/chains/atomic/atomicmock"
+	"github.com/ava-labs/avalanchego/database/databasemock"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -22,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -61,7 +62,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			state: s,
 		},
 		metrics:    metrics.Noop,
-		validators: validators.TestManager,
+		validators: validatorstest.Manager,
 	}
 
 	require.NoError(acceptor.ApricotProposalBlock(blk))
@@ -82,7 +83,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	s := state.NewMockState(ctrl)
-	sharedMemory := atomic.NewMockSharedMemory(ctrl)
+	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
@@ -96,7 +97,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validators.TestManager,
+		validators: validatorstest.Manager,
 	}
 
 	blk, err := block.NewApricotAtomicBlock(
@@ -112,12 +113,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Set expected calls on the state.
-	// We should error after [commonAccept] is called.
-	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
-	s.EXPECT().SetHeight(blk.Height()).Times(1)
-	s.EXPECT().AddStatelessBlock(blk).Times(1)
-
 	err = acceptor.ApricotAtomicBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
@@ -126,8 +121,12 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	childID := ids.GenerateTestID()
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
+		statelessBlock: blk,
 		onAcceptState:  onAcceptState,
 		atomicRequests: atomicRequests,
+		metrics: metrics.Block{
+			Block: blk,
+		},
 	}
 	// Give [blk] a child.
 	childOnAcceptState := state.NewMockDiff(ctrl)
@@ -146,7 +145,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk).Times(1)
-	batch := database.NewMockBatch(ctrl)
+	batch := databasemock.NewBatch(ctrl)
 	s.EXPECT().CommitBatch().Return(batch, nil).Times(1)
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
@@ -161,7 +160,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	s := state.NewMockState(ctrl)
-	sharedMemory := atomic.NewMockSharedMemory(ctrl)
+	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
 	clk := &mockable.Clock{}
@@ -176,7 +175,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 			},
 		},
 		metrics:    metrics.Noop,
-		validators: validators.TestManager,
+		validators: validatorstest.Manager,
 	}
 
 	blk, err := block.NewBanffStandardBlock(
@@ -195,12 +194,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// Set expected calls on the state.
-	// We should error after [commonAccept] is called.
-	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
-	s.EXPECT().SetHeight(blk.Height()).Times(1)
-	s.EXPECT().AddStatelessBlock(blk).Times(1)
-
 	err = acceptor.BanffStandardBlock(blk)
 	require.ErrorIs(err, errMissingBlockState)
 
@@ -210,12 +203,16 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	atomicRequests := make(map[ids.ID]*atomic.Requests)
 	calledOnAcceptFunc := false
 	acceptor.backend.blkIDToState[blk.ID()] = &blockState{
-		onAcceptState: onAcceptState,
+		statelessBlock: blk,
+		onAcceptState:  onAcceptState,
 		onAcceptFunc: func() {
 			calledOnAcceptFunc = true
 		},
 
 		atomicRequests: atomicRequests,
+		metrics: metrics.Block{
+			Block: blk,
+		},
 	}
 	// Give [blk] a child.
 	childOnAcceptState := state.NewMockDiff(ctrl)
@@ -234,7 +231,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().SetLastAccepted(blk.ID()).Times(1)
 	s.EXPECT().SetHeight(blk.Height()).Times(1)
 	s.EXPECT().AddStatelessBlock(blk).Times(1)
-	batch := database.NewMockBatch(ctrl)
+	batch := databasemock.NewBatch(ctrl)
 	s.EXPECT().CommitBatch().Return(batch, nil).Times(1)
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
@@ -251,7 +248,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	s := state.NewMockState(ctrl)
-	sharedMemory := atomic.NewMockSharedMemory(ctrl)
+	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
@@ -265,7 +262,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 			},
 		},
 		metrics:      metrics.Noop,
-		validators:   validators.TestManager,
+		validators:   validatorstest.Manager,
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
@@ -307,10 +304,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
 		s.EXPECT().AddStatelessBlock(parentState.statelessBlock).Times(1),
-
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
 	)
 
 	err = acceptor.ApricotCommitBlock(blk)
@@ -321,15 +314,19 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: parentState.onCommitState,
-		onAcceptFunc:  parentState.onAcceptFunc,
+		statelessBlock: blk,
+		onAcceptState:  parentState.onCommitState,
+		onAcceptFunc:   parentState.onAcceptFunc,
 
 		inputs:         parentState.inputs,
 		timestamp:      parentOnCommitState.GetTimestamp(),
 		atomicRequests: parentState.atomicRequests,
+		metrics: metrics.Block{
+			Block: blk,
+		},
 	}
 
-	batch := database.NewMockBatch(ctrl)
+	batch := databasemock.NewBatch(ctrl)
 
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.
@@ -361,7 +358,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	s := state.NewMockState(ctrl)
-	sharedMemory := atomic.NewMockSharedMemory(ctrl)
+	sharedMemory := atomicmock.NewSharedMemory(ctrl)
 
 	parentID := ids.GenerateTestID()
 	acceptor := &acceptor{
@@ -375,7 +372,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 			},
 		},
 		metrics:      metrics.Noop,
-		validators:   validators.TestManager,
+		validators:   validatorstest.Manager,
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
@@ -417,10 +414,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		parentStatelessBlk.EXPECT().Height().Return(blk.Height()-1).Times(1),
 		s.EXPECT().SetHeight(blk.Height()-1).Times(1),
 		s.EXPECT().AddStatelessBlock(parentState.statelessBlock).Times(1),
-
-		s.EXPECT().SetLastAccepted(blkID).Times(1),
-		s.EXPECT().SetHeight(blk.Height()).Times(1),
-		s.EXPECT().AddStatelessBlock(blk).Times(1),
 	)
 
 	err = acceptor.ApricotAbortBlock(blk)
@@ -431,15 +424,19 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 	// Set [blk]'s state in the map as though it had been verified.
 	acceptor.backend.blkIDToState[parentID] = parentState
 	acceptor.backend.blkIDToState[blkID] = &blockState{
-		onAcceptState: parentState.onAbortState,
-		onAcceptFunc:  parentState.onAcceptFunc,
+		statelessBlock: blk,
+		onAcceptState:  parentState.onAbortState,
+		onAcceptFunc:   parentState.onAcceptFunc,
 
 		inputs:         parentState.inputs,
 		timestamp:      parentOnAbortState.GetTimestamp(),
 		atomicRequests: parentState.atomicRequests,
+		metrics: metrics.Block{
+			Block: blk,
+		},
 	}
 
-	batch := database.NewMockBatch(ctrl)
+	batch := databasemock.NewBatch(ctrl)
 
 	// Set expected calls on dependencies.
 	// Make sure the parent is accepted first.

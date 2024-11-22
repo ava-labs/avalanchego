@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	convertEToBase2 = math.Log(2)
-
 	_ Factory = (*ContinuousFactory)(nil)
 	_ Meter   = (*continuousMeter)(nil)
 )
@@ -34,7 +32,7 @@ type continuousMeter struct {
 // NewMeter returns a new Meter with the provided halflife
 func NewMeter(halflife time.Duration) Meter {
 	return &continuousMeter{
-		halflife: float64(halflife) / convertEToBase2,
+		halflife: float64(halflife) / math.Ln2,
 	}
 }
 

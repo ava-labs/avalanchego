@@ -77,18 +77,6 @@ func GetChainID(m any) (ids.ID, error) {
 	return ids.ToID(chainIDBytes)
 }
 
-type sourceChainIDGetter interface {
-	GetSourceChainID() ids.ID
-}
-
-func GetSourceChainID(m any) (ids.ID, error) {
-	msg, ok := m.(sourceChainIDGetter)
-	if !ok {
-		return GetChainID(m)
-	}
-	return msg.GetSourceChainID(), nil
-}
-
 type requestIDGetter interface {
 	GetRequestId() uint32
 }

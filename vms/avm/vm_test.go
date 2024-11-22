@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -114,7 +115,7 @@ func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	env.vm.ctx.Lock.Unlock()
 
@@ -127,7 +128,7 @@ func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	env.vm.ctx.Lock.Unlock()
 
@@ -200,7 +201,7 @@ func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: propertyfx.ID,
 			Fx: &propertyfx.Fx{},
@@ -288,7 +289,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork:             latest,
+		fork:             upgradetest.Latest,
 		isCustomFeeAsset: true,
 	})
 	env.vm.ctx.Lock.Unlock()
@@ -302,7 +303,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork:             latest,
+		fork:             upgradetest.Latest,
 		isCustomFeeAsset: true,
 	})
 	env.vm.ctx.Lock.Unlock()
@@ -349,7 +350,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 
 func TestVMFormat(t *testing.T) {
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	defer env.vm.ctx.Lock.Unlock()
 
@@ -376,7 +377,7 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork:          latest,
+		fork:          upgradetest.Latest,
 		notLinearized: true,
 	})
 	defer env.vm.ctx.Lock.Unlock()
@@ -451,7 +452,7 @@ func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: durango,
+		fork: upgradetest.Durango,
 	})
 	defer env.vm.ctx.Lock.Unlock()
 
@@ -529,7 +530,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork:          durango,
+		fork:          upgradetest.Durango,
 		notLinearized: true,
 	})
 	defer env.vm.ctx.Lock.Unlock()
@@ -603,7 +604,7 @@ func TestImportTxNotState(t *testing.T) {
 func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{fork: durango})
+	env := setup(t, &envConfig{fork: upgradetest.Durango})
 	defer env.vm.ctx.Lock.Unlock()
 
 	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
@@ -662,7 +663,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: latest,
+		fork: upgradetest.Latest,
 	})
 	defer env.vm.ctx.Lock.Unlock()
 

@@ -5,25 +5,27 @@
 package transfer
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -76,10 +78,47 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 			// Ensure the same set of 10 keys is used for all tests
 			// by retrieving them outside of runFunc.
-			testKeys := env.AllocatePreFundedKeys(10)
+			testKeys := []*secp256k1.PrivateKey{
+				// The funded key will be the source of funds for the new keys
+				env.PreFundedKey,
+			}
+			newKeys, err := tmpnet.NewPrivateKeys(9)
+			require.NoError(err)
+			testKeys = append(testKeys, newKeys...)
+
+			const transferPerRound = units.MilliAvax
+
+			tc.By("Funding new keys")
+			fundingWallet := e2e.NewWallet(tc, env.NewKeychain(), env.GetRandomNodeURI())
+			fundingOutputs := make([]*avax.TransferableOutput, len(newKeys))
+			fundingAssetID := fundingWallet.X().Builder().Context().AVAXAssetID
+			for i, key := range newKeys {
+				fundingOutputs[i] = &avax.TransferableOutput{
+					Asset: avax.Asset{
+						ID: fundingAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						// Enough for 1 transfer per round
+						Amt: totalRounds * transferPerRound,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs: []ids.ShortID{
+								key.Address(),
+							},
+						},
+					},
+				}
+			}
+			_, err = fundingWallet.X().IssueBaseTx(
+				fundingOutputs,
+				tc.WithDefaultContext(),
+			)
+			require.NoError(err)
 
 			runFunc := func(round int) {
-				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
+				tc.Log().Info("starting new round",
+					zap.Int("round", round),
+				)
 
 				needPermute := round > 3
 				if needPermute {
@@ -116,7 +155,11 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 				for _, uri := range rpcEps {
 					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
-						tc.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
+						tc.Log().Info("metric before tx",
+							zap.String("metric", metric),
+							zap.String("uri", uri),
+							zap.Any("value", metricsBeforeTx[uri][metric]),
+						)
 					}
 				}
 
@@ -128,10 +171,9 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					bal := balances[avaxAssetID]
 					testBalances = append(testBalances, bal)
 
-					fmt.Printf(`CURRENT BALANCE %21d AVAX (SHORT ADDRESS %q)
-`,
-						bal,
-						testKeys[i].PublicKey().Address(),
+					tc.Log().Info("balance in AVAX",
+						zap.Uint64("balance", bal),
+						zap.Stringer("address", testKeys[i].PublicKey().Address()),
 					)
 				}
 				fromIdx := -1
@@ -158,9 +200,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				senderOrigBal := testBalances[fromIdx]
 				receiverOrigBal := testBalances[toIdx]
-
-				amountToTransfer := senderOrigBal / 10
-
+				amountToTransfer := transferPerRound
 				senderNewBal := senderOrigBal - amountToTransfer - xContext.BaseTxFee
 				receiverNewBal := receiverOrigBal + amountToTransfer
 
@@ -183,27 +223,14 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
-				fmt.Printf(`===
-TRANSFERRING
-
-FROM [%q]
-SENDER    CURRENT BALANCE     : %21d AVAX
-SENDER    NEW BALANCE (AFTER) : %21d AVAX
-
-TRANSFER AMOUNT FROM SENDER   : %21d AVAX
-
-TO [%q]
-RECEIVER  CURRENT BALANCE     : %21d AVAX
-RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
-===
-`,
-					shortAddrs[fromIdx],
-					senderOrigBal,
-					senderNewBal,
-					amountToTransfer,
-					shortAddrs[toIdx],
-					receiverOrigBal,
-					receiverNewBal,
+				tc.Log().Info("issuing transfer",
+					zap.Stringer("sender", shortAddrs[fromIdx]),
+					zap.Uint64("senderOriginalBalance", senderOrigBal),
+					zap.Uint64("senderNewBalance", senderNewBal),
+					zap.Uint64("amountToTransfer", amountToTransfer),
+					zap.Stringer("receiver", shortAddrs[toIdx]),
+					zap.Uint64("receiverOriginalBalance", receiverOrigBal),
+					zap.Uint64("receiverNewBalance", receiverNewBal),
 				)
 
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
@@ -226,12 +253,16 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
 				senderCurBalX := balances[avaxAssetID]
-				tc.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
+				tc.Log().Info("first wallet balance",
+					zap.Uint64("balance", senderCurBalX),
+				)
 
 				balances, err = wallets[toIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
 				receiverCurBalX := balances[avaxAssetID]
-				tc.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
+				tc.Log().Info("second wallet balance",
+					zap.Uint64("balance", receiverCurBalX),
+				)
 
 				require.Equal(senderCurBalX, senderNewBal)
 				require.Equal(receiverCurBalX, receiverNewBal)
@@ -270,5 +301,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				runFunc(i)
 				time.Sleep(time.Second)
 			}
+
+			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 		})
 })

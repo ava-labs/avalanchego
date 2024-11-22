@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"gopkg.in/yaml.v3"
@@ -30,11 +29,11 @@ var (
 	errPluginDirEnvVarNotSet  = errors.New("AVALANCHEGO_PLUGIN_DIR environment variable not set")
 )
 
-// Creates docker compose configuration for an antithesis test
-// setup. Configuration is via env vars to simplify usage by main entrypoints. If
-// the provided network includes a subnet, the initial DB state for the subnet
-// will be created and written to the target path.
-func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error {
+// Creates docker compose configuration for an antithesis test setup. Configuration is via env vars to
+// simplify usage by main entrypoints. If the provided network includes a subnet, the initial DB state for
+// the subnet will be created and written to the target path. The runtimePluginDir should be set if the node
+// image used for the test setup uses a path other than the default (~/.avalanchego/plugins).
+func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtimePluginDir string) error {
 	targetPath := os.Getenv("TARGET_PATH")
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
@@ -47,12 +46,13 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 
 	// Subnet testing requires creating an initial db state for the bootstrap node
 	if len(network.Subnets) > 0 {
-		avalancheGoPath := os.Getenv("AVALANCHEGO_PATH")
+		avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
 		if len(avalancheGoPath) == 0 {
 			return errAvalancheGoEvVarNotSet
 		}
 
-		pluginDir := os.Getenv("AVALANCHEGO_PLUGIN_DIR")
+		// Plugin dir configured here is only used for initializing the bootstrap db.
+		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
 		if len(pluginDir) == 0 {
 			return errPluginDirEnvVarNotSet
 		}
@@ -70,7 +70,7 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string) error 
 	nodeImageName := fmt.Sprintf("%s-node:%s", baseImageName, imageTag)
 	workloadImageName := fmt.Sprintf("%s-workload:%s", baseImageName, imageTag)
 
-	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath); err != nil {
+	if err := initComposeConfig(network, nodeImageName, workloadImageName, targetPath, runtimePluginDir); err != nil {
 		return fmt.Errorf("failed to generate compose config: %w", err)
 	}
 
@@ -84,9 +84,10 @@ func initComposeConfig(
 	nodeImageName string,
 	workloadImageName string,
 	targetPath string,
+	pluginDir string,
 ) error {
 	// Generate a compose project for the specified network
-	project, err := newComposeProject(network, nodeImageName, workloadImageName)
+	project, err := newComposeProject(network, nodeImageName, workloadImageName, pluginDir)
 	if err != nil {
 		return fmt.Errorf("failed to create compose project: %w", err)
 	}
@@ -124,12 +125,12 @@ func initComposeConfig(
 
 // Create a new docker compose project for an antithesis test setup
 // for the provided network configuration.
-func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string) (*types.Project, error) {
+func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadImageName string, pluginDir string) (*types.Project, error) {
 	networkName := "avalanche-testnet"
 	baseNetworkAddress := "10.0.20"
 
 	services := make(types.Services, len(network.Nodes)+1)
-	uris := make([]string, len(network.Nodes))
+	uris := make(CSV, len(network.Nodes))
 	var (
 		bootstrapIP  string
 		bootstrapIDs string
@@ -159,6 +160,11 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 			config.StakingTLSKeyContentKey:    tlsKey,
 			config.StakingCertContentKey:      tlsCert,
 			config.StakingSignerKeyContentKey: signerKey,
+		}
+
+		// Set a non-default plugin dir if provided
+		if len(pluginDir) > 0 {
+			env[config.PluginDirKey] = pluginDir
 		}
 
 		// Apply configuration appropriate to a test network
@@ -230,16 +236,16 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 	}
 
 	workloadEnv := types.Mapping{
-		"AVAWL_URIS": strings.Join(uris, " "),
+		config.EnvVarName(EnvPrefix, URIsKey): uris.String(),
 	}
-	chainIDs := []string{}
+	chainIDs := CSV{}
 	for _, subnet := range network.Subnets {
 		for _, chain := range subnet.Chains {
 			chainIDs = append(chainIDs, chain.ChainID.String())
 		}
 	}
 	if len(chainIDs) > 0 {
-		workloadEnv["AVAWL_CHAIN_IDS"] = strings.Join(chainIDs, " ")
+		workloadEnv[config.EnvVarName(EnvPrefix, ChainIDsKey)] = chainIDs.String()
 	}
 
 	workloadName := "workload"
@@ -277,8 +283,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 	envVarMap := make(types.Mapping, len(keyMap))
 	for key, val := range keyMap {
-		// e.g. network-id -> AVAGO_NETWORK_ID
-		envVar := strings.ToUpper(config.EnvPrefix + "_" + config.DashesToUnderscores.Replace(key))
+		envVar := config.EnvVarName(config.EnvPrefix, key)
 		envVarMap[envVar] = val
 	}
 	return envVarMap

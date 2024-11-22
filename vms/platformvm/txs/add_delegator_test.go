@@ -58,7 +58,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 			},
 		},
 	}}
@@ -70,7 +70,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},
@@ -93,7 +93,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 		},
 	}
 
@@ -157,7 +157,7 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Amt: uint64(1234),
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+				Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 			},
 		},
 	}}
@@ -169,7 +169,7 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 				Amt: validatorWeight,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
-					Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+					Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 				},
 			},
 		},
@@ -192,7 +192,7 @@ func TestAddDelegatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
 			Threshold: 1,
-			Addrs:     []ids.ShortID{preFundedKeys[0].PublicKey().Address()},
+			Addrs:     []ids.ShortID{preFundedKeys[0].Address()},
 		},
 	}
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
@@ -16,8 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/set"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var _ = ginkgo.Describe("Duplicate node handling", func() {
@@ -69,7 +68,7 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 
 	// Collect the node ids of the new node's peers
 	infoClient := info.NewClient(newNode.URI)
-	peers, err := infoClient.Peers(tc.DefaultContext())
+	peers, err := infoClient.Peers(tc.DefaultContext(), nil)
 	require.NoError(err)
 	peerIDs := set.NewSet[ids.NodeID](len(existingNodes))
 	for _, peer := range peers {
@@ -82,7 +81,7 @@ func checkConnectedPeers(tc tests.TestContext, existingNodes []*tmpnet.Node, new
 
 		// Check that the new node is a peer
 		infoClient := info.NewClient(existingNode.URI)
-		peers, err := infoClient.Peers(tc.DefaultContext())
+		peers, err := infoClient.Peers(tc.DefaultContext(), nil)
 		require.NoError(err)
 		isPeer := false
 		for _, peer := range peers {

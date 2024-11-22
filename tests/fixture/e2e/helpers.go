@@ -16,12 +16,16 @@ import (
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -49,28 +53,76 @@ const (
 	PrivateNetworksDirName = "private_networks"
 )
 
+// NewPrivateKey returns a new private key.
+func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
+	key, err := secp256k1.NewPrivateKey()
+	require.NoError(tc, err)
+	return key
+}
+
 // Create a new wallet for the provided keychain against the specified node URI.
 func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
-	tc.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	tc.Log().Info("initializing a new wallet",
+		zap.Stringer("nodeID", nodeURI.NodeID),
+		zap.String("URI", nodeURI.URI),
+	)
 	baseWallet, err := primary.MakeWallet(tc.DefaultContext(), &primary.WalletConfig{
 		URI:          nodeURI.URI,
 		AVAXKeychain: keychain,
 		EthKeychain:  keychain,
 	})
 	require.NoError(tc, err)
-	return primary.NewWalletWithOptions(
+	wallet := primary.NewWalletWithOptions(
 		baseWallet,
 		common.WithPostIssuanceFunc(
 			func(id ids.ID) {
-				tc.Outf(" issued transaction with ID: %s\n", id)
+				tc.Log().Info("issued transaction",
+					zap.Stringer("txID", id),
+				)
 			},
 		),
 	)
+	OutputWalletBalances(tc, wallet)
+	return wallet
+}
+
+// OutputWalletBalances outputs the X-Chain and P-Chain balances of the provided wallet.
+func OutputWalletBalances(tc tests.TestContext, wallet primary.Wallet) {
+	_, _ = GetWalletBalances(tc, wallet)
+}
+
+// GetWalletBalances retrieves the X-Chain and P-Chain balances of the provided wallet.
+func GetWalletBalances(tc tests.TestContext, wallet primary.Wallet) (uint64, uint64) {
+	require := require.New(tc)
+	var (
+		xWallet  = wallet.X()
+		xBuilder = xWallet.Builder()
+		pWallet  = wallet.P()
+		pBuilder = pWallet.Builder()
+	)
+	xBalances, err := xBuilder.GetFTBalance()
+	require.NoError(err, "failed to fetch X-chain balances")
+	pBalances, err := pBuilder.GetBalance()
+	require.NoError(err, "failed to fetch P-chain balances")
+	var (
+		xContext    = xBuilder.Context()
+		avaxAssetID = xContext.AVAXAssetID
+		xAVAX       = xBalances[avaxAssetID]
+		pAVAX       = pBalances[avaxAssetID]
+	)
+	tc.Log().Info("wallet balances in nAVAX",
+		zap.Uint64("xChain", xAVAX),
+		zap.Uint64("pChain", pAVAX),
+	)
+	return xAVAX, pAVAX
 }
 
 // Create a new eth client targeting the specified node URI.
 func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client {
-	tc.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	tc.Log().Info("initializing a new eth client",
+		zap.Stringer("nodeID", nodeURI.NodeID),
+		zap.String("URI", nodeURI.URI),
+	)
 	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
@@ -83,10 +135,12 @@ func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpne
 	require := require.New(tc)
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.GetWriter(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
 
 	tc.DeferCleanup(func() {
-		tc.Outf("shutting down ephemeral node %q\n", node.NodeID)
+		tc.Log().Info("shutting down ephemeral node",
+			zap.Stringer("nodeID", node.NodeID),
+		)
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(node.Stop(ctx))
@@ -108,7 +162,9 @@ func SendEthTransaction(tc tests.TestContext, ethClient ethclient.Client, signed
 	require := require.New(tc)
 
 	txID := signedTx.Hash()
-	tc.Outf(" sending eth transaction with ID: %s\n", txID)
+	tc.Log().Info("sending eth transaction",
+		zap.Stringer("txID", txID),
+	)
 
 	require.NoError(ethClient.SendTransaction(tc.DefaultContext(), signedTx))
 
@@ -152,7 +208,9 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	require := require.New(tc)
 
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
-		tc.Outf("{{yellow}}Skipping bootstrap check due to the %s env var being set", SkipBootstrapChecksEnvName)
+		tc.Log().Info("skipping bootstrap check due to env var being set",
+			zap.String("envVar", SkipBootstrapChecksEnvName),
+		)
 		return nil
 	}
 	tc.By("checking if bootstrap is possible with the current network state")
@@ -167,7 +225,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	}
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.GetWriter(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
@@ -180,6 +238,17 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 
 	// Check that the node becomes healthy within timeout
 	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), node))
+
+	// Ensure that the primary validators are still healthy
+	for _, node := range network.Nodes {
+		if node.IsEphemeral {
+			continue
+		}
+		healthy, err := node.IsHealthy(tc.DefaultContext())
+		require.NoError(err)
+		require.True(healthy, "primary validator %s is not healthy", node.NodeID)
+	}
+
 	return node
 }
 
@@ -190,22 +259,27 @@ func StartNetwork(
 	avalancheGoExecPath string,
 	pluginDir string,
 	shutdownDelay time.Duration,
+	skipShutdown bool,
 	reuseNetwork bool,
 ) {
 	require := require.New(tc)
 
-	require.NoError(
-		tmpnet.BootstrapNewNetwork(
-			tc.DefaultContext(),
-			tc.GetWriter(),
-			network,
-			DefaultNetworkDir,
-			avalancheGoExecPath,
-			pluginDir,
-		),
+	err := tmpnet.BootstrapNewNetwork(
+		tc.DefaultContext(),
+		tc.Log(),
+		network,
+		DefaultNetworkDir,
+		avalancheGoExecPath,
+		pluginDir,
 	)
+	if err != nil {
+		// Ensure nodes are stopped if bootstrap fails. The network configuration
+		// will remain on disk to enable troubleshooting.
+		err := network.Stop(tc.DefaultContext())
+		require.NoError(err, "failed to stop network after bootstrap failure")
+	}
 
-	tc.Outf("{{green}}Successfully started network{{/}}\n")
+	tc.Log().Info("network started successfully")
 
 	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
 	require.NoError(err)
@@ -214,23 +288,66 @@ func StartNetwork(
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
-		tc.Outf("{{green}}Symlinked %s to %s to enable reuse{{/}}\n", network.Dir, symlinkPath)
+		tc.Log().Info("symlinked network dir for reuse",
+			zap.String("networkDir", network.Dir),
+			zap.String("symlinkPath", symlinkPath),
+		)
 	}
 
 	tc.DeferCleanup(func() {
 		if reuseNetwork {
-			tc.Outf("{{yellow}}Skipping shutdown for network %s (symlinked to %s) to enable reuse{{/}}\n", network.Dir, symlinkPath)
+			tc.Log().Info("skipping shutdown for network intended for reuse",
+				zap.String("networkDir", network.Dir),
+				zap.String("symlinkPath", symlinkPath),
+			)
+			return
+		}
+
+		if skipShutdown {
+			tc.Log().Info("skipping shutdown for network",
+				zap.String("networkDir", network.Dir),
+			)
 			return
 		}
 
 		if shutdownDelay > 0 {
-			tc.Outf("Waiting %s before network shutdown to ensure final metrics scrape\n", shutdownDelay)
+			tc.Log().Info("delaying network shutdown to ensure final metrics scrape",
+				zap.Duration("delay", shutdownDelay),
+			)
 			time.Sleep(shutdownDelay)
 		}
 
-		tc.Outf("Shutting down network\n")
+		tc.Log().Info("shutting down network")
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(network.Stop(ctx))
 	})
+}
+
+// NewPChainFeeCalculatorFromContext returns either a static or dynamic fee
+// calculator depending on the provided context.
+func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator {
+	if context.GasPrice != 0 {
+		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
+	}
+	return fee.NewStaticCalculator(context.StaticFeeConfig)
+}
+
+// GetRepoRootPath strips the provided suffix from the current working
+// directory. If the test binary is executed from the root of the repo, the
+// result will be the repo root.
+func GetRepoRootPath(suffix string) (string, error) {
+	// - When executed via a test binary, the working directory will be wherever
+	// the binary is executed from, but scripts should require execution from
+	// the repo root.
+	//
+	// - When executed via ginkgo (nicer for development + supports
+	// parallel execution) the working directory will always be the
+	// target path (e.g. [repo root]./tests/bootstrap/e2e) and getting the repo
+	// root will require stripping the target path suffix.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(cwd, suffix), nil
 }

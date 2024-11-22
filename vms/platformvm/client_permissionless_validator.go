@@ -44,9 +44,13 @@ type ClientPermissionlessValidator struct {
 	PotentialReward        *uint64
 	AccruedDelegateeReward *uint64
 	DelegationFee          float32
-	Uptime                 *float32
-	Connected              *bool
-	Signer                 *signer.ProofOfPossession
+	// Uptime is deprecated for Subnet Validators.
+	// It will be available only for Primary Network Validators.
+	Uptime *float32
+	// Connected is deprecated for Subnet Validators.
+	// It will be available only for Primary Network Validators.
+	Connected *bool
+	Signer    *signer.ProofOfPossession
 	// The delegators delegating to this validator
 	DelegatorCount  *uint64
 	DelegatorWeight *uint64
@@ -133,7 +137,7 @@ func getClientPermissionlessValidators(validatorsSliceIntf []interface{}) ([]Cli
 			AccruedDelegateeReward: (*uint64)(apiValidator.AccruedDelegateeReward),
 			DelegationFee:          float32(apiValidator.DelegationFee),
 			Uptime:                 (*float32)(apiValidator.Uptime),
-			Connected:              &apiValidator.Connected,
+			Connected:              apiValidator.Connected,
 			Signer:                 apiValidator.Signer,
 			DelegatorCount:         (*uint64)(apiValidator.DelegatorCount),
 			DelegatorWeight:        (*uint64)(apiValidator.DelegatorWeight),

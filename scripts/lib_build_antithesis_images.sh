@@ -108,6 +108,7 @@ function gen_antithesis_compose_config {
     # Ensure the target path is empty before generating the compose config
     rm -r "${target_path:?}"
   fi
+  mkdir -p "${target_path}"
 
   # Define the env vars for the compose config generation
   local compose_env="TARGET_PATH=${target_path} IMAGE_TAG=${image_tag} ${extra_compose_args}"

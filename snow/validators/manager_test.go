@@ -242,36 +242,57 @@ func TestGet(t *testing.T) {
 	require.False(ok)
 }
 
-func TestLen(t *testing.T) {
-	require := require.New(t)
+func TestNum(t *testing.T) {
+	var (
+		require = require.New(t)
 
-	m := NewManager()
-	subnetID := ids.GenerateTestID()
+		m = NewManager()
 
-	count := m.Count(subnetID)
-	require.Zero(count)
+		subnetID0 = ids.GenerateTestID()
+		subnetID1 = ids.GenerateTestID()
+		nodeID0   = ids.GenerateTestNodeID()
+		nodeID1   = ids.GenerateTestNodeID()
+	)
 
-	nodeID0 := ids.GenerateTestNodeID()
-	require.NoError(m.AddStaker(subnetID, nodeID0, nil, ids.Empty, 1))
+	require.Zero(m.NumSubnets())
+	require.Zero(m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Equal(1, count)
+	require.NoError(m.AddStaker(subnetID0, nodeID0, nil, ids.Empty, 1))
 
-	nodeID1 := ids.GenerateTestNodeID()
-	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
+	require.Equal(1, m.NumSubnets())
+	require.Equal(1, m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Equal(2, count)
+	require.NoError(m.AddStaker(subnetID0, nodeID1, nil, ids.Empty, 1))
 
-	require.NoError(m.RemoveWeight(subnetID, nodeID1, 1))
+	require.Equal(1, m.NumSubnets())
+	require.Equal(2, m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Equal(1, count)
+	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 2))
 
-	require.NoError(m.RemoveWeight(subnetID, nodeID0, 1))
+	require.Equal(2, m.NumSubnets())
+	require.Equal(2, m.NumValidators(subnetID0))
+	require.Equal(1, m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Zero(count)
+	require.NoError(m.RemoveWeight(subnetID0, nodeID1, 1))
+
+	require.Equal(2, m.NumSubnets())
+	require.Equal(1, m.NumValidators(subnetID0))
+	require.Equal(1, m.NumValidators(subnetID1))
+
+	require.NoError(m.RemoveWeight(subnetID0, nodeID0, 1))
+
+	require.Equal(1, m.NumSubnets())
+	require.Zero(m.NumValidators(subnetID0))
+	require.Equal(1, m.NumValidators(subnetID1))
+
+	require.NoError(m.RemoveWeight(subnetID1, nodeID1, 2))
+
+	require.Zero(m.NumSubnets())
+	require.Zero(m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 }
 
 func TestGetMap(t *testing.T) {

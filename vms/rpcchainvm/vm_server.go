@@ -11,7 +11,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -74,7 +73,7 @@ type VMServer struct {
 
 	allowShutdown *utils.Atomic[bool]
 
-	metrics prometheus.Gatherer
+	metrics metrics.MultiGatherer
 	db      database.Database
 	log     logging.Logger
 
@@ -89,12 +88,14 @@ type VMServer struct {
 func NewServer(vm block.ChainVM, allowShutdown *utils.Atomic[bool]) *VMServer {
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
-	return &VMServer{
+	vmSrv := &VMServer{
+		metrics:       metrics.NewPrefixGatherer(),
 		vm:            vm,
 		bVM:           bVM,
 		ssVM:          ssVM,
 		allowShutdown: allowShutdown,
 	}
+	return vmSrv
 }
 
 func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest) (*vmpb.InitializeResponse, error) {
@@ -133,11 +134,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		return nil, err
 	}
 
-	pluginMetrics := metrics.NewPrefixGatherer()
-	vm.metrics = pluginMetrics
-
 	processMetrics, err := metrics.MakeAndRegister(
-		pluginMetrics,
+		vm.metrics,
 		"process",
 	)
 	if err != nil {
@@ -157,7 +155,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 
 	grpcMetrics, err := metrics.MakeAndRegister(
-		pluginMetrics,
+		vm.metrics,
 		"grpc",
 	)
 	if err != nil {
@@ -171,7 +169,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 
 	vmMetrics := metrics.NewPrefixGatherer()
-	if err := pluginMetrics.Register("vm", vmMetrics); err != nil {
+	if err := vm.metrics.Register("vm", vmMetrics); err != nil {
 		return nil, err
 	}
 
@@ -516,39 +514,6 @@ func (vm *VMServer) Version(ctx context.Context, _ *emptypb.Empty) (*vmpb.Versio
 	return &vmpb.VersionResponse{
 		Version: version,
 	}, err
-}
-
-func (vm *VMServer) CrossChainAppRequest(ctx context.Context, msg *vmpb.CrossChainAppRequestMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	deadline, err := grpcutils.TimestampAsTime(msg.Deadline)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequest(ctx, chainID, msg.RequestId, deadline, msg.Request)
-}
-
-func (vm *VMServer) CrossChainAppRequestFailed(ctx context.Context, msg *vmpb.CrossChainAppRequestFailedMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-
-	appErr := &common.AppError{
-		Code:    msg.ErrorCode,
-		Message: msg.ErrorMessage,
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppRequestFailed(ctx, chainID, msg.RequestId, appErr)
-}
-
-func (vm *VMServer) CrossChainAppResponse(ctx context.Context, msg *vmpb.CrossChainAppResponseMsg) (*emptypb.Empty, error) {
-	chainID, err := ids.ToID(msg.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	return &emptypb.Empty{}, vm.vm.CrossChainAppResponse(ctx, chainID, msg.RequestId, msg.Response)
 }
 
 func (vm *VMServer) AppRequest(ctx context.Context, req *vmpb.AppRequestMsg) (*emptypb.Empty, error) {

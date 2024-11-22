@@ -17,16 +17,25 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/databasemock"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+// TestsBasic is a list of all basic database tests that require only
+// a KeyValueReaderWriterDeleter.
+var TestsBasic = map[string]func(t *testing.T, db database.KeyValueReaderWriterDeleter){
+	"SimpleKeyValue":       TestSimpleKeyValue,
+	"OverwriteKeyValue":    TestOverwriteKeyValue,
+	"EmptyKey":             TestEmptyKey,
+	"KeyEmptyValue":        TestKeyEmptyValue,
+	"MemorySafetyDatabase": TestMemorySafetyDatabase,
+	"ModifyValueAfterPut":  TestModifyValueAfterPut,
+	"PutGetEmpty":          TestPutGetEmpty,
+}
+
 // Tests is a list of all database tests
 var Tests = map[string]func(t *testing.T, db database.Database){
-	"SimpleKeyValue":                   TestSimpleKeyValue,
-	"OverwriteKeyValue":                TestOverwriteKeyValue,
-	"EmptyKey":                         TestEmptyKey,
-	"KeyEmptyValue":                    TestKeyEmptyValue,
 	"SimpleKeyValueClosed":             TestSimpleKeyValueClosed,
 	"NewBatchClosed":                   TestNewBatchClosed,
 	"BatchPut":                         TestBatchPut,
@@ -48,23 +57,29 @@ var Tests = map[string]func(t *testing.T, db database.Database){
 	"IteratorError":                    TestIteratorError,
 	"IteratorErrorAfterRelease":        TestIteratorErrorAfterRelease,
 	"CompactNoPanic":                   TestCompactNoPanic,
-	"MemorySafetyDatabase":             TestMemorySafetyDatabase,
 	"MemorySafetyBatch":                TestMemorySafetyBatch,
 	"AtomicClear":                      TestAtomicClear,
 	"Clear":                            TestClear,
 	"AtomicClearPrefix":                TestAtomicClearPrefix,
 	"ClearPrefix":                      TestClearPrefix,
-	"ModifyValueAfterPut":              TestModifyValueAfterPut,
 	"ModifyValueAfterBatchPut":         TestModifyValueAfterBatchPut,
 	"ModifyValueAfterBatchPutReplay":   TestModifyValueAfterBatchPutReplay,
 	"ConcurrentBatches":                TestConcurrentBatches,
 	"ManySmallConcurrentKVPairBatches": TestManySmallConcurrentKVPairBatches,
-	"PutGetEmpty":                      TestPutGetEmpty,
+}
+
+func init() {
+	// Add all basic database tests to the database tests
+	for name, test := range TestsBasic {
+		Tests[name] = func(t *testing.T, db database.Database) {
+			test(t, db)
+		}
+	}
 }
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
 // calls return the expected values.
-func TestSimpleKeyValue(t *testing.T, db database.Database) {
+func TestSimpleKeyValue(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -100,7 +115,7 @@ func TestSimpleKeyValue(t *testing.T, db database.Database) {
 	require.NoError(db.Delete(key))
 }
 
-func TestOverwriteKeyValue(t *testing.T, db database.Database) {
+func TestOverwriteKeyValue(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -116,7 +131,7 @@ func TestOverwriteKeyValue(t *testing.T, db database.Database) {
 	require.Equal(value2, gotValue)
 }
 
-func TestKeyEmptyValue(t *testing.T, db database.Database) {
+func TestKeyEmptyValue(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -132,7 +147,7 @@ func TestKeyEmptyValue(t *testing.T, db database.Database) {
 	require.Empty(value)
 }
 
-func TestEmptyKey(t *testing.T, db database.Database) {
+func TestEmptyKey(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	var (
@@ -201,7 +216,7 @@ func TestSimpleKeyValueClosed(t *testing.T, db database.Database) {
 
 // TestMemorySafetyDatabase ensures it is safe to modify a key after passing it
 // to Database.Put and Database.Get.
-func TestMemorySafetyDatabase(t *testing.T, db database.Database) {
+func TestMemorySafetyDatabase(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte("1key")
@@ -210,9 +225,14 @@ func TestMemorySafetyDatabase(t *testing.T, db database.Database) {
 	key2 := []byte("2key")
 	value2 := []byte("value2")
 
-	// Put both K/V pairs in the database
+	// Put key in the database directly
 	require.NoError(db.Put(key, value))
-	require.NoError(db.Put(key2, value2))
+
+	// Put key2 in the database by modifying key, which should be safe
+	// to modify after the Put call
+	key[0] = key2[0]
+	require.NoError(db.Put(key, value2))
+	key[0] = keyCopy[0]
 
 	// Get the value for [key]
 	gotVal, err := db.Get(key)
@@ -466,7 +486,7 @@ func TestBatchReplay(t *testing.T, db database.Database) {
 	require.NoError(batch.Put(key1, value2))
 
 	for i := 0; i < 2; i++ {
-		mockBatch := database.NewMockBatch(ctrl)
+		mockBatch := databasemock.NewBatch(ctrl)
 		gomock.InOrder(
 			mockBatch.EXPECT().Put(key1, value1).Times(1),
 			mockBatch.EXPECT().Put(key2, value2).Times(1),
@@ -497,13 +517,13 @@ func TestBatchReplayPropagateError(t *testing.T, db database.Database) {
 	require.NoError(batch.Put(key1, value1))
 	require.NoError(batch.Put(key2, value2))
 
-	mockBatch := database.NewMockBatch(ctrl)
+	mockBatch := databasemock.NewBatch(ctrl)
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(database.ErrClosed).Times(1),
 	)
 	require.Equal(database.ErrClosed, batch.Replay(mockBatch))
 
-	mockBatch = database.NewMockBatch(ctrl)
+	mockBatch = databasemock.NewBatch(ctrl)
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
 	)
@@ -1041,7 +1061,7 @@ func testClearPrefix(t *testing.T, db database.Database, clearF func(database.Da
 	require.NoError(db.Close())
 }
 
-func TestModifyValueAfterPut(t *testing.T, db database.Database) {
+func TestModifyValueAfterPut(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte{1}
@@ -1165,7 +1185,7 @@ func runConcurrentBatches(
 	return eg.Wait()
 }
 
-func TestPutGetEmpty(t *testing.T, db database.Database) {
+func TestPutGetEmpty(t *testing.T, db database.KeyValueReaderWriterDeleter) {
 	require := require.New(t)
 
 	key := []byte("hello")
@@ -1183,7 +1203,7 @@ func TestPutGetEmpty(t *testing.T, db database.Database) {
 	require.Empty(value) // May be nil or empty byte slice.
 }
 
-func FuzzKeyValue(f *testing.F, db database.Database) {
+func FuzzKeyValue(f *testing.F, db database.KeyValueReaderWriterDeleter) {
 	f.Fuzz(func(t *testing.T, key []byte, value []byte) {
 		require := require.New(t)
 

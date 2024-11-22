@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -50,9 +51,6 @@ type peer struct {
 	version *version.Application
 	// The subnets that this peer is currently tracking
 	trackedSubnets set.Set[ids.ID]
-	// The subnets that this peer actually has a connection to.
-	// This is a subset of trackedSubnets.
-	connectedSubnets set.Set[ids.ID]
 }
 
 // ChainRouter routes incoming messages from the validator network
@@ -136,7 +134,7 @@ func (cr *ChainRouter) Initialize(
 }
 
 // RegisterRequest marks that we should expect to receive a reply for a request
-// issued by [requestingChainID] from the given node's [respondingChainID] and
+// from the given node's [chainID] and
 // the reply should have the given requestID.
 //
 // The type of message we expect is [op].
@@ -148,8 +146,7 @@ func (cr *ChainRouter) Initialize(
 func (cr *ChainRouter) RegisterRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
-	requestingChainID ids.ID,
-	respondingChainID ids.ID,
+	chainID ids.ID,
 	requestID uint32,
 	op message.Op,
 	timeoutMsg message.InboundMessage,
@@ -159,8 +156,7 @@ func (cr *ChainRouter) RegisterRequest(
 	if cr.closing {
 		cr.log.Debug("dropping request",
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("requestingChainID", requestingChainID),
-			zap.Stringer("respondingChainID", respondingChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("messageOp", op),
 			zap.Error(errClosing),
@@ -171,16 +167,11 @@ func (cr *ChainRouter) RegisterRequest(
 	// When we receive a response message type (Chits, Put, Accepted, etc.)
 	// we validate that we actually sent the corresponding request.
 	// Give this request a unique ID so we can do that validation.
-	//
-	// For cross-chain messages, the responding chain is the source of the
-	// response which is sent to the requester which is the destination,
-	// which is why we flip the two in request id generation.
 	uniqueRequestID := ids.RequestID{
-		NodeID:             nodeID,
-		SourceChainID:      respondingChainID,
-		DestinationChainID: requestingChainID,
-		RequestID:          requestID,
-		Op:                 byte(op),
+		NodeID:    nodeID,
+		ChainID:   chainID,
+		RequestID: requestID,
+		Op:        byte(op),
 	}
 	// Add to the set of unfulfilled requests
 	cr.timedRequests.Put(uniqueRequestID, requestEntry{
@@ -203,7 +194,7 @@ func (cr *ChainRouter) RegisterRequest(
 	// Register a timeout to fire if we don't get a reply in time.
 	cr.timeoutManager.RegisterRequest(
 		nodeID,
-		respondingChainID,
+		chainID,
 		shouldMeasureLatency,
 		uniqueRequestID,
 		func() {
@@ -217,25 +208,12 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	op := msg.Op()
 
 	m := msg.Message()
-	destinationChainID, err := message.GetChainID(m)
+	chainID, err := message.GetChainID(m)
 	if err != nil {
 		cr.log.Debug("dropping message with invalid field",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("messageOp", op),
 			zap.String("field", "ChainID"),
-			zap.Error(err),
-		)
-
-		msg.OnFinishedHandling()
-		return
-	}
-
-	sourceChainID, err := message.GetSourceChainID(m)
-	if err != nil {
-		cr.log.Debug("dropping message with invalid field",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("messageOp", op),
-			zap.String("field", "SourceChainID"),
 			zap.Error(err),
 		)
 
@@ -262,7 +240,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Error(errClosing),
 		)
 		msg.OnFinishedHandling()
@@ -270,12 +248,12 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	}
 
 	// Get the chain, if it exists
-	chain, exists := cr.chainHandlers[destinationChainID]
+	chain, exists := cr.chainHandlers[chainID]
 	if !exists {
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Error(errUnknownChain),
 		)
 		msg.OnFinishedHandling()
@@ -286,7 +264,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		cr.log.Debug("dropping message",
 			zap.Stringer("messageOp", op),
 			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("chainID", destinationChainID),
+			zap.Stringer("chainID", chainID),
 			zap.Error(errUnallowedNode),
 		)
 		msg.OnFinishedHandling()
@@ -321,7 +299,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	if expectedResponse, isFailed := message.FailedToResponseOps[op]; isFailed {
 		// Create the request ID of the request we sent that this message is in
 		// response to.
-		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, sourceChainID, destinationChainID, requestID)
+		uniqueRequestID, req := cr.clearRequest(expectedResponse, nodeID, chainID, requestID)
 		if req == nil {
 			// This was a duplicated response.
 			msg.OnFinishedHandling()
@@ -352,7 +330,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 		return
 	}
 
-	uniqueRequestID, req := cr.clearRequest(op, nodeID, sourceChainID, destinationChainID, requestID)
+	uniqueRequestID, req := cr.clearRequest(op, nodeID, chainID, requestID)
 	if req == nil {
 		// We didn't request this message.
 		msg.OnFinishedHandling()
@@ -363,7 +341,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	latency := cr.clock.Time().Sub(req.time)
 
 	// Tell the timeout manager we got a response
-	cr.timeoutManager.RegisterResponse(nodeID, destinationChainID, uniqueRequestID, req.op, latency)
+	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, req.op, latency)
 
 	// Pass the response to the chain
 	chain.Push(
@@ -397,6 +375,7 @@ func (cr *ChainRouter) Shutdown(ctx context.Context) {
 		chainLog := chain.Context().Log
 		if err != nil {
 			chainLog.Warn("timed out while shutting down",
+				zap.String("stack", utils.GetStacktrace(true)),
 				zap.Error(err),
 			)
 		} else {
@@ -453,25 +432,6 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 			},
 		)
 	}
-
-	// When we register the P-chain, we mark ourselves as connected on all of
-	// the subnets that we have tracked.
-	if chainID != constants.PlatformChainID {
-		return
-	}
-
-	// If we have currently benched ourselves, we will mark ourselves as
-	// connected when we unbench. So skip connecting now.
-	// This is not "theoretically" possible, but keeping this here prevents us
-	// from keeping an invariant that we never bench ourselves.
-	if _, benched := cr.benched[cr.myNodeID]; benched {
-		return
-	}
-
-	myself := cr.peers[cr.myNodeID]
-	for subnetID := range myself.trackedSubnets {
-		cr.connectedSubnet(myself, cr.myNodeID, subnetID)
-	}
 }
 
 // Connected routes an incoming notification that a validator was just connected
@@ -504,7 +464,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	msg := message.InternalConnected(nodeID, nodeVersion)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
-	// set, disconnect. we cannot put a subnet-only validator check here since
+	// set, disconnect. we cannot put an L1 validator check here since
 	// Disconnected would not be handled properly.
 	//
 	// When sybil protection is disabled, we only want this clause to happen
@@ -525,8 +485,6 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 			}
 		}
 	}
-
-	cr.connectedSubnet(connectedPeer, nodeID, subnetID)
 }
 
 // Disconnected routes an incoming notification that a validator was connected
@@ -551,7 +509,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	msg := message.InternalDisconnected(nodeID)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
-	// set, disconnect. we cannot put a subnet-only validator check here since
+	// set, disconnect. we cannot put an L1 validator check here since
 	// if a validator connects then it leaves validator-set, it would not be
 	// disconnected properly.
 	for _, chain := range cr.chainHandlers {
@@ -603,8 +561,6 @@ func (cr *ChainRouter) Benched(chainID ids.ID, nodeID ids.NodeID) {
 				})
 		}
 	}
-
-	peer.connectedSubnets.Clear()
 }
 
 // Unbenched routes an incoming notification that a validator was just unbenched
@@ -646,13 +602,6 @@ func (cr *ChainRouter) Unbenched(chainID ids.ID, nodeID ids.NodeID) {
 					EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
 				})
 		}
-	}
-
-	// This will unbench the node from all its subnets.
-	// We handle this case separately because the node may have been benched on
-	// a subnet that has no chains.
-	for subnetID := range peer.trackedSubnets {
-		cr.connectedSubnet(peer, nodeID, subnetID)
 	}
 }
 
@@ -720,6 +669,7 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 	chainLog := chain.Context().Log
 	if err != nil {
 		chainLog.Warn("timed out while shutting down",
+			zap.String("stack", utils.GetStacktrace(true)),
 			zap.Error(err),
 		)
 	} else {
@@ -736,17 +686,15 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 func (cr *ChainRouter) clearRequest(
 	op message.Op,
 	nodeID ids.NodeID,
-	sourceChainID ids.ID,
-	destinationChainID ids.ID,
+	chainID ids.ID,
 	requestID uint32,
 ) (ids.RequestID, *requestEntry) {
 	// Create the request ID of the request we sent that this message is (allegedly) in response to.
 	uniqueRequestID := ids.RequestID{
-		NodeID:             nodeID,
-		SourceChainID:      sourceChainID,
-		DestinationChainID: destinationChainID,
-		RequestID:          requestID,
-		Op:                 byte(op),
+		NodeID:    nodeID,
+		ChainID:   chainID,
+		RequestID: requestID,
+		Op:        byte(op),
 	}
 	// Mark that an outstanding request has been fulfilled
 	request, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -757,47 +705,4 @@ func (cr *ChainRouter) clearRequest(
 	cr.timedRequests.Delete(uniqueRequestID)
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	return uniqueRequestID, &request
-}
-
-// connectedSubnet pushes an InternalSubnetConnected message with [nodeID] and
-// [subnetID] to the P-chain. This should be called when a node is either first
-// connecting to [subnetID] or when a node that was already connected is
-// unbenched on [subnetID]. This is a noop if [subnetID] is the Primary Network
-// or if the peer is already marked as connected to the subnet.
-// Invariant: should be called after *message.Connected is pushed to the P-chain
-// Invariant: should be called after the P-chain was provided in [AddChain]
-func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID ids.ID) {
-	// if connected to primary network, we can skip this
-	// because Connected has its own internal message
-	if subnetID == constants.PrimaryNetworkID {
-		return
-	}
-
-	// peer already connected to this subnet
-	if peer.connectedSubnets.Contains(subnetID) {
-		return
-	}
-
-	msg := message.InternalConnectedSubnet(nodeID, subnetID)
-	// We only push this message to the P-chain because it is the only chain
-	// that cares about the connectivity of all subnets. Others chains learn
-	// about the connectivity of their own subnet when they receive a
-	// *message.Connected.
-	platformChain, ok := cr.chainHandlers[constants.PlatformChainID]
-	if !ok {
-		cr.log.Error("trying to issue InternalConnectedSubnet message, but platform chain is not registered",
-			zap.Stringer("nodeID", nodeID),
-			zap.Stringer("subnetID", subnetID),
-		)
-		return
-	}
-	platformChain.Push(
-		context.TODO(),
-		handler.Message{
-			InboundMessage: msg,
-			EngineType:     p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
-		},
-	)
-
-	peer.connectedSubnets.Add(subnetID)
 }

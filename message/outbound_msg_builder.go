@@ -35,11 +35,13 @@ type OutboundMsgBuilder interface {
 		objectedACPs []uint32,
 		knownPeersFilter []byte,
 		knownPeersSalt []byte,
+		requestAllSubnetIPs bool,
 	) (OutboundMessage, error)
 
 	GetPeerList(
 		knownPeersFilter []byte,
 		knownPeersSalt []byte,
+		requestAllSubnetIPs bool,
 	) (OutboundMessage, error)
 
 	PeerList(
@@ -49,7 +51,6 @@ type OutboundMsgBuilder interface {
 
 	Ping(
 		primaryUptime uint32,
-		subnetUptimes []*p2p.SubnetUptime,
 	) (OutboundMessage, error)
 
 	Pong() (OutboundMessage, error)
@@ -153,6 +154,7 @@ type OutboundMsgBuilder interface {
 		preferredID ids.ID,
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
+		acceptedHeight uint64,
 	) (OutboundMessage, error)
 
 	AppRequest(
@@ -198,14 +200,12 @@ func newOutboundBuilder(compressionType compression.Type, builder *msgBuilder) O
 
 func (b *outMsgBuilder) Ping(
 	primaryUptime uint32,
-	subnetUptimes []*p2p.SubnetUptime,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Ping{
 				Ping: &p2p.Ping{
-					Uptime:        primaryUptime,
-					SubnetUptimes: subnetUptimes,
+					Uptime: primaryUptime,
 				},
 			},
 		},
@@ -242,6 +242,7 @@ func (b *outMsgBuilder) Handshake(
 	objectedACPs []uint32,
 	knownPeersFilter []byte,
 	knownPeersSalt []byte,
+	requestAllSubnetIPs bool,
 ) (OutboundMessage, error) {
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
@@ -270,7 +271,8 @@ func (b *outMsgBuilder) Handshake(
 						Filter: knownPeersFilter,
 						Salt:   knownPeersSalt,
 					},
-					IpBlsSig: ipBLSSig,
+					IpBlsSig:   ipBLSSig,
+					AllSubnets: requestAllSubnetIPs,
 				},
 			},
 		},
@@ -282,6 +284,7 @@ func (b *outMsgBuilder) Handshake(
 func (b *outMsgBuilder) GetPeerList(
 	knownPeersFilter []byte,
 	knownPeersSalt []byte,
+	requestAllSubnetIPs bool,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -291,6 +294,7 @@ func (b *outMsgBuilder) GetPeerList(
 						Filter: knownPeersFilter,
 						Salt:   knownPeersSalt,
 					},
+					AllSubnets: requestAllSubnetIPs,
 				},
 			},
 		},
@@ -636,6 +640,7 @@ func (b *outMsgBuilder) Chits(
 	preferredID ids.ID,
 	preferredIDAtHeight ids.ID,
 	acceptedID ids.ID,
+	acceptedHeight uint64,
 ) (OutboundMessage, error) {
 	return b.builder.createOutbound(
 		&p2p.Message{
@@ -646,6 +651,7 @@ func (b *outMsgBuilder) Chits(
 					PreferredId:         preferredID[:],
 					PreferredIdAtHeight: preferredIDAtHeight[:],
 					AcceptedId:          acceptedID[:],
+					AcceptedHeight:      acceptedHeight,
 				},
 			},
 		},

@@ -221,7 +221,7 @@ func TestExecute(t *testing.T) {
 
 	unhalted := &common.Halter{}
 	halted := &common.Halter{}
-	halted.Halt(context.Background())
+	halted.Halt()
 
 	tests := []struct {
 		name                      string
@@ -269,7 +269,7 @@ func TestExecute(t *testing.T) {
 
 			require.NoError(execute(
 				context.Background(),
-				test.haltable,
+				test.haltable.Halted,
 				logging.NoLog{}.Info,
 				db,
 				parser,

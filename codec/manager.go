@@ -32,6 +32,7 @@ var (
 	ErrCantPackVersion   = errors.New("couldn't pack codec version")
 	ErrCantUnpackVersion = errors.New("couldn't unpack codec version")
 	ErrDuplicatedVersion = errors.New("duplicated codec version")
+	ErrExtraSpace        = errors.New("trailing buffer space")
 )
 
 var _ Manager = (*manager)(nil)
@@ -157,5 +158,17 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 	if !exists {
 		return version, ErrUnknownVersion
 	}
-	return version, c.Unmarshal(p.Bytes[p.Offset:], dest)
+
+	if err := c.UnmarshalFrom(&p, dest); err != nil {
+		return version, err
+	}
+	if p.Offset != len(bytes) {
+		return version, fmt.Errorf("%w: read %d provided %d",
+			ErrExtraSpace,
+			p.Offset,
+			len(bytes),
+		)
+	}
+
+	return version, nil
 }

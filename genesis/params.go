@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
-	feecomponent "github.com/ava-labs/avalanchego/vms/components/fee"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 type StakingConfig struct {
@@ -37,9 +38,10 @@ type StakingConfig struct {
 }
 
 type TxFeeConfig struct {
-	CreateAssetTxFee uint64              `json:"createAssetTxFee"`
-	StaticFeeConfig  txfee.StaticConfig  `json:"staticFeeConfig"`
-	DynamicFeeConfig feecomponent.Config `json:"dynamicFeeConfig"`
+	CreateAssetTxFee   uint64              `json:"createAssetTxFee"`
+	StaticFeeConfig    txfee.StaticConfig  `json:"staticFeeConfig"`
+	DynamicFeeConfig   gas.Config          `json:"dynamicFeeConfig"`
+	ValidatorFeeConfig validatorfee.Config `json:"validatorFeeConfig"`
 }
 
 type Params struct {

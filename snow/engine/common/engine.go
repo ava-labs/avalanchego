@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -22,9 +21,6 @@ import (
 // required.
 type Engine interface {
 	Handler
-
-	// Return the context of the chain this engine is working on
-	Context() *snow.ConsensusContext
 
 	// Start engine operations from given request ID
 	Start(ctx context.Context, startReqID uint32) error
@@ -334,6 +330,7 @@ type ChitsHandler interface {
 		preferredID ids.ID,
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
+		acceptedHeight uint64,
 	) error
 
 	// Notify this engine that a Query request it issued has failed.
@@ -348,7 +345,7 @@ type ChitsHandler interface {
 	) error
 }
 
-type NetworkAppHandler interface {
+type AppHandler interface {
 	AppRequestHandler
 	AppResponseHandler
 	AppGossipHandler
@@ -415,83 +412,12 @@ type AppGossipHandler interface {
 	) error
 }
 
-type CrossChainAppHandler interface {
-	CrossChainAppRequestHandler
-	CrossChainAppResponseHandler
-}
-
-type CrossChainAppRequestHandler interface {
-	// Notify this engine of a request for a CrossChainAppResponse with the same
-	// requestID.
-	//
-	// The meaning of request, and what should be sent in response to it, is
-	// application (VM) specific.
-	//
-	// Guarantees surrounding the request are specific to the implementation of
-	// the requesting VM. For example, the request may or may not be guaranteed
-	// to be well-formed/valid depending on the implementation of the requesting
-	// VM.
-	CrossChainAppRequest(
-		ctx context.Context,
-		chainID ids.ID,
-		requestID uint32,
-		deadline time.Time,
-		request []byte,
-	) error
-}
-
-type CrossChainAppResponseHandler interface {
-	// Notify this engine of the response to a previously sent
-	// CrossChainAppRequest with the same requestID.
-	//
-	// The meaning of response is application (VM) specifc.
-	//
-	// Guarantees surrounding the response are specific to the implementation of
-	// the responding VM. For example, the response may or may not be guaranteed
-	// to be well-formed/valid depending on the implementation of the requesting
-	// VM.
-	CrossChainAppResponse(
-		ctx context.Context,
-		chainID ids.ID,
-		requestID uint32,
-		response []byte,
-	) error
-
-	// Notify this engine that a CrossChainAppRequest it issued has failed.
-	//
-	// This function will be called if a CrossChainAppRequest message with
-	// nodeID and requestID was previously sent by this engine and will not
-	// receive a response.
-	CrossChainAppRequestFailed(
-		ctx context.Context,
-		chainID ids.ID,
-		requestID uint32,
-		appErr *AppError,
-	) error
-}
-
-type AppHandler interface {
-	NetworkAppHandler
-	CrossChainAppHandler
-}
-
 type InternalHandler interface {
 	// Notify this engine of peer changes.
 	validators.Connector
 
-	// Notify this engine that a registered timeout has fired.
-	Timeout(context.Context) error
-
 	// Gossip to the network a container on the accepted frontier
 	Gossip(context.Context) error
-
-	// Halt this engine.
-	//
-	// This function will be called before the environment starts exiting. This
-	// function is special, in that it does not expect the chain's context lock
-	// to be held before calling this function. This function also does not
-	// require the engine to have been started.
-	Halt(context.Context)
 
 	// Shutdown this engine.
 	//

@@ -22,9 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 const (
@@ -105,15 +106,20 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.IntSlice(ACPObjectKey, nil, "ACPs to object adoption")
 
 	// AVAX fees:
+	// Validator fees:
+	fs.Uint64(ValidatorFeesCapacityKey, uint64(genesis.LocalParams.ValidatorFeeConfig.Capacity), "Maximum number of validators")
+	fs.Uint64(ValidatorFeesTargetKey, uint64(genesis.LocalParams.ValidatorFeeConfig.Target), "Target number of validators")
+	fs.Uint64(ValidatorFeesMinPriceKey, uint64(genesis.LocalParams.ValidatorFeeConfig.MinPrice), "Minimum validator price in nAVAX per second")
+	fs.Uint64(ValidatorFeesExcessConversionConstantKey, uint64(genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant), "Constant to convert validator excess price")
 	// Dynamic fees:
-	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
-	fs.Uint64(DynamicFeesDBReadWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.DBRead], "Complexity multiplier used to convert DB Reads into Gas")
-	fs.Uint64(DynamicFeesDBWriteWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.DBWrite], "Complexity multiplier used to convert DB Writes into Gas")
-	fs.Uint64(DynamicFeesComputeWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[fee.Compute], "Complexity multiplier used to convert Compute into Gas")
-	fs.Uint64(DynamicFeesMaxGasCapacityKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxGasCapacity), "Maximum amount of Gas the chain is allowed to store for future use")
-	fs.Uint64(DynamicFeesMaxGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxGasPerSecond), "Rate at which Gas is stored for future use")
-	fs.Uint64(DynamicFeesTargetGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.TargetGasPerSecond), "Target rate of Gas usage")
-	fs.Uint64(DynamicFeesMinGasPriceKey, uint64(genesis.LocalParams.DynamicFeeConfig.MinGasPrice), "Minimum Gas price")
+	fs.Uint64(DynamicFeesBandwidthWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Bandwidth], "Complexity multiplier used to convert Bandwidth into Gas")
+	fs.Uint64(DynamicFeesDBReadWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.DBRead], "Complexity multiplier used to convert DB Reads into Gas")
+	fs.Uint64(DynamicFeesDBWriteWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.DBWrite], "Complexity multiplier used to convert DB Writes into Gas")
+	fs.Uint64(DynamicFeesComputeWeightKey, genesis.LocalParams.DynamicFeeConfig.Weights[gas.Compute], "Complexity multiplier used to convert Compute into Gas")
+	fs.Uint64(DynamicFeesMaxGasCapacityKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxCapacity), "Maximum amount of Gas the chain is allowed to store for future use")
+	fs.Uint64(DynamicFeesMaxGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.MaxPerSecond), "Rate at which Gas is stored for future use")
+	fs.Uint64(DynamicFeesTargetGasPerSecondKey, uint64(genesis.LocalParams.DynamicFeeConfig.TargetPerSecond), "Target rate of Gas usage")
+	fs.Uint64(DynamicFeesMinGasPriceKey, uint64(genesis.LocalParams.DynamicFeeConfig.MinPrice), "Minimum Gas price")
 	fs.Uint64(DynamicFeesExcessConversionConstantKey, uint64(genesis.LocalParams.DynamicFeeConfig.ExcessConversionConstant), "Constant to convert excess Gas to the Gas price")
 	// Static fees:
 	fs.Uint64(TxFeeKey, genesis.LocalParams.StaticFeeConfig.TxFee, "Transaction fee, in nAVAX")
@@ -137,7 +143,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(LogsDirKey, defaultLogDir, "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
-	fs.String(LogFormatKey, "auto", "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}")
+	fs.String(LogFormatKey, logging.AutoString, logging.FormatDescription)
 	fs.Uint(LogRotaterMaxSizeKey, 8, "The maximum file size in megabytes of the log file before it gets rotated.")
 	fs.Uint(LogRotaterMaxFilesKey, 7, "The maximum number of old log files to retain. 0 means retain all old log files.")
 	fs.Uint(LogRotaterMaxAgeKey, 0, "The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files.")

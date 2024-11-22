@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package platformvm;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/platformvm";
+
+message L1ValidatorRegistrationJustification {
+  oneof preimage {
+    // This should be set to obtain an attestation that a validator specified in
+    // a ConvertSubnetToL1Tx has been removed from the validator set.
+    SubnetIDIndex convert_subnet_to_l1_tx_data = 1;
+    // This should be set to a RegisterL1ValidatorMessage to obtain an
+    // attestation that a validator is not currently registered and can never be
+    // registered. This can be because the validator was successfully added and
+    // then later removed, or because the validator was never added and the
+    // registration expired.
+    bytes register_l1_validator_message = 2;
+  }
+}
+
+message SubnetIDIndex {
+  bytes subnet_id = 1;
+  uint32 index = 2;
+}

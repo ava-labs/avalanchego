@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
@@ -22,7 +23,7 @@ func BenchmarkLoadUser(b *testing.B) {
 		require := require.New(b)
 
 		env := setup(b, &envConfig{
-			fork: latest,
+			fork: upgradetest.Latest,
 			keystoreUsers: []*user{{
 				username: username,
 				password: password,
@@ -64,7 +65,7 @@ func BenchmarkLoadUser(b *testing.B) {
 func getAllUTXOsBenchmark(b *testing.B, utxoCount int, randSrc rand.Source) {
 	require := require.New(b)
 
-	env := setup(b, &envConfig{fork: latest})
+	env := setup(b, &envConfig{fork: upgradetest.Latest})
 	defer env.vm.ctx.Lock.Unlock()
 
 	addr := ids.GenerateTestShortID()

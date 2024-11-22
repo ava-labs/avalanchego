@@ -12,41 +12,41 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	walletsigner "github.com/ava-labs/avalanchego/wallet/chain/p/signer"
 )
 
 func TestAtomicTxImports(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, latestFork)
+	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	utxoID := avax.UTXOID{
-		TxID:        ids.Empty.Prefix(1),
-		OutputIndex: 1,
+	addr := genesistest.DefaultFundedKeys[0].Address()
+	owner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{addr},
 	}
-	amount := uint64(70000)
-	recipientKey := preFundedKeys[1]
 
 	m := atomic.NewMemory(prefixdb.New([]byte{5}, env.baseDB))
 
 	env.msm.SharedMemory = m.NewSharedMemory(env.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(env.ctx.XChainID)
 	utxo := &avax.UTXO{
-		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 1,
+		},
+		Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: amount,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
-			},
+			Amt:          70 * units.MicroAvax,
+			OutputOwners: *owner,
 		},
 	}
 	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
@@ -58,21 +58,17 @@ func TestAtomicTxImports(t *testing.T) {
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
-				recipientKey.PublicKey().Address().Bytes(),
+				addr.Bytes(),
 			},
 		}}},
 	}))
 
-	builder, signer := env.factory.NewWallet(recipientKey)
-	utx, err := builder.NewImportTx(
+	wallet := newWallet(t, env, walletConfig{})
+
+	tx, err := wallet.IssueImportTx(
 		env.ctx.XChainID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
-		},
+		owner,
 	)
-	require.NoError(err)
-	tx, err := walletsigner.SignUnsigned(context.Background(), signer, utx)
 	require.NoError(err)
 
 	require.NoError(env.Builder.Add(tx))

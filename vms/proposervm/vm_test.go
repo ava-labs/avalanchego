@@ -22,16 +22,19 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -808,11 +811,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Time{},
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  mockable.MaxTime,
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1128,11 +1127,7 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Time{},
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  mockable.MaxTime,
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1210,11 +1205,7 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Time{},
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  mockable.MaxTime,
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1600,11 +1591,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1773,11 +1760,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1906,15 +1889,11 @@ func TestVMInnerBlkCache(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create a VM
-	innerVM := block.NewMockChainVM(ctrl)
+	innerVM := blockmock.NewChainVM(ctrl)
 	vm := New(
 		innerVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
-			},
+			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -1937,7 +1916,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
 
 	{
-		innerBlk := snowmantest.NewMockBlock(ctrl)
+		innerBlk := snowmanmock.NewBlock(ctrl)
 		innerBlkID := ids.GenerateTestID()
 		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
@@ -1975,7 +1954,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 	require.NoError(err)
 
 	// We will ask the inner VM to parse.
-	mockInnerBlkNearTip := snowmantest.NewMockBlock(ctrl)
+	mockInnerBlkNearTip := snowmanmock.NewBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
 	mockInnerBlkNearTip.EXPECT().Bytes().Return(blkNearTipInnerBytes).Times(1)
 
@@ -2006,8 +1985,8 @@ func TestVMInnerBlkCache(t *testing.T) {
 }
 
 type blockWithVerifyContext struct {
-	*snowmantest.MockBlock
-	*block.MockWithVerifyContext
+	*snowmanmock.Block
+	*blockmock.WithVerifyContext
 }
 
 // Ensures that we call [VerifyWithContext] rather than [Verify] on blocks that
@@ -2018,15 +1997,11 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	// Create a VM
-	innerVM := block.NewMockChainVM(ctrl)
+	innerVM := blockmock.NewChainVM(ctrl)
 	vm := New(
 		innerVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  time.Unix(0, 0),
-			},
+			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2052,7 +2027,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
 
 	{
-		innerBlk := snowmantest.NewMockBlock(ctrl)
+		innerBlk := snowmanmock.NewBlock(ctrl)
 		innerBlkID := ids.GenerateTestID()
 		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
 		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
@@ -2079,18 +2054,18 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	{
 		pChainHeight := uint64(0)
 		innerBlk := blockWithVerifyContext{
-			MockBlock:             snowmantest.NewMockBlock(ctrl),
-			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
+			Block:             snowmanmock.NewBlock(ctrl),
+			WithVerifyContext: blockmock.NewWithVerifyContext(ctrl),
 		}
-		innerBlk.MockWithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(true, nil).Times(2)
-		innerBlk.MockWithVerifyContext.EXPECT().VerifyWithContext(context.Background(),
+		innerBlk.WithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(true, nil).Times(2)
+		innerBlk.WithVerifyContext.EXPECT().VerifyWithContext(context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
 		).Return(nil)
-		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
-		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
-		innerBlk.MockBlock.EXPECT().Bytes().Return(utils.RandomBytes(1024)).AnyTimes()
+		innerBlk.Block.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.Block.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.Block.EXPECT().Bytes().Return(utils.RandomBytes(1024)).AnyTimes()
 
 		blk := NewMockPostForkBlock(ctrl)
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
@@ -2108,7 +2083,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		// Call VerifyWithContext again but with a different P-Chain height
 		blk.EXPECT().setInnerBlk(innerBlk).AnyTimes()
 		pChainHeight++
-		innerBlk.MockWithVerifyContext.EXPECT().VerifyWithContext(context.Background(),
+		innerBlk.WithVerifyContext.EXPECT().VerifyWithContext(context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
@@ -2127,13 +2102,13 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		// Ensure we call Verify on a block that returns
 		// false for ShouldVerifyWithContext
 		innerBlk := blockWithVerifyContext{
-			MockBlock:             snowmantest.NewMockBlock(ctrl),
-			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
+			Block:             snowmanmock.NewBlock(ctrl),
+			WithVerifyContext: blockmock.NewWithVerifyContext(ctrl),
 		}
-		innerBlk.MockWithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(false, nil)
-		innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
-		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
-		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.WithVerifyContext.EXPECT().ShouldVerifyWithContext(gomock.Any()).Return(false, nil)
+		innerBlk.Block.EXPECT().Verify(gomock.Any()).Return(nil)
+		innerBlk.Block.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.Block.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 		blk := NewMockPostForkBlock(ctrl)
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
@@ -2150,12 +2125,12 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 	{
 		// Ensure we call Verify on a block that doesn't have a valid context
 		innerBlk := blockWithVerifyContext{
-			MockBlock:             snowmantest.NewMockBlock(ctrl),
-			MockWithVerifyContext: block.NewMockWithVerifyContext(ctrl),
+			Block:             snowmanmock.NewBlock(ctrl),
+			WithVerifyContext: blockmock.NewWithVerifyContext(ctrl),
 		}
-		innerBlk.MockBlock.EXPECT().Verify(gomock.Any()).Return(nil)
-		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
-		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.Block.EXPECT().Verify(gomock.Any()).Return(nil)
+		innerBlk.Block.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.Block.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
 		blk := NewMockPostForkBlock(ctrl)
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
@@ -2226,11 +2201,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Unix(0, 0),
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  mockable.MaxTime,
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2320,11 +2291,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Time{},
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  mockable.MaxTime,
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: numHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
@@ -2367,11 +2334,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	proVM = New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            time.Time{},
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  mockable.MaxTime,
-			},
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: newNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,

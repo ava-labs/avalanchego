@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -41,7 +43,7 @@ var (
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
 	readState() error
-	Start(w io.Writer) error
+	Start(log logging.Logger) error
 	InitiateStop() error
 	WaitForStopped(ctx context.Context) error
 	IsHealthy(ctx context.Context) (bool, error)
@@ -79,7 +81,7 @@ type Node struct {
 
 	// Runtime state, intended to be set by NodeRuntime
 	URI            string
-	StakingAddress string
+	StakingAddress netip.AddrPort
 
 	// Initialized on demand
 	runtime NodeRuntime
@@ -171,8 +173,8 @@ func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(w io.Writer) error {
-	return n.getRuntime().Start(w)
+func (n *Node) Start(log logging.Logger) error {
+	return n.getRuntime().Start(log)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {

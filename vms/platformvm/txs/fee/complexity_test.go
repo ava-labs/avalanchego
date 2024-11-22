@@ -14,16 +14,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/fee"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestTxComplexity(t *testing.T) {
+func TestTxComplexity_Individual(t *testing.T) {
 	for _, test := range txTests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
@@ -47,12 +48,42 @@ func TestTxComplexity(t *testing.T) {
 				return
 			}
 
-			require.Len(txBytes, int(actual[fee.Bandwidth]))
+			require.Len(txBytes, int(actual[gas.Bandwidth]))
 		})
 	}
 }
 
-func BenchmarkTxComplexity(b *testing.B) {
+func TestTxComplexity_Batch(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		unsignedTxs        = make([]txs.UnsignedTx, 0, len(txTests))
+		expectedComplexity gas.Dimensions
+	)
+	for _, test := range txTests {
+		if test.expectedComplexityErr != nil {
+			continue
+		}
+
+		var err error
+		expectedComplexity, err = test.expectedComplexity.Add(&expectedComplexity)
+		require.NoError(err)
+
+		txBytes, err := hex.DecodeString(test.tx)
+		require.NoError(err)
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		require.NoError(err)
+
+		unsignedTxs = append(unsignedTxs, tx.Unsigned)
+	}
+
+	complexity, err := TxComplexity(unsignedTxs...)
+	require.NoError(err)
+	require.Equal(expectedComplexity, complexity)
+}
+
+func BenchmarkTxComplexity_Individual(b *testing.B) {
 	for _, test := range txTests {
 		b.Run(test.name, func(b *testing.B) {
 			require := require.New(b)
@@ -71,11 +102,35 @@ func BenchmarkTxComplexity(b *testing.B) {
 	}
 }
 
+func BenchmarkTxComplexity_Batch(b *testing.B) {
+	require := require.New(b)
+
+	unsignedTxs := make([]txs.UnsignedTx, 0, len(txTests))
+	for _, test := range txTests {
+		if test.expectedComplexityErr != nil {
+			continue
+		}
+
+		txBytes, err := hex.DecodeString(test.tx)
+		require.NoError(err)
+
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		require.NoError(err)
+
+		unsignedTxs = append(unsignedTxs, tx.Unsigned)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = TxComplexity(unsignedTxs...)
+	}
+}
+
 func TestOutputComplexity(t *testing.T) {
 	tests := []struct {
 		name        string
 		out         *avax.TransferableOutput
-		expected    fee.Dimensions
+		expected    gas.Dimensions
 		expectedErr error
 	}{
 		{
@@ -87,11 +142,9 @@ func TestOutputComplexity(t *testing.T) {
 					},
 				},
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 60,
-				fee.DBRead:    0,
-				fee.DBWrite:   1,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 60,
+				gas.DBWrite:   1,
 			},
 			expectedErr: nil,
 		},
@@ -104,11 +157,9 @@ func TestOutputComplexity(t *testing.T) {
 					},
 				},
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 80,
-				fee.DBRead:    0,
-				fee.DBWrite:   1,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 80,
+				gas.DBWrite:   1,
 			},
 			expectedErr: nil,
 		},
@@ -121,11 +172,9 @@ func TestOutputComplexity(t *testing.T) {
 					},
 				},
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 120,
-				fee.DBRead:    0,
-				fee.DBWrite:   1,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 120,
+				gas.DBWrite:   1,
 			},
 			expectedErr: nil,
 		},
@@ -140,11 +189,9 @@ func TestOutputComplexity(t *testing.T) {
 					},
 				},
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 132,
-				fee.DBRead:    0,
-				fee.DBWrite:   1,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 132,
+				gas.DBWrite:   1,
 			},
 			expectedErr: nil,
 		},
@@ -153,12 +200,7 @@ func TestOutputComplexity(t *testing.T) {
 			out: &avax.TransferableOutput{
 				Out: nil,
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 0,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
-			},
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedOutput,
 		},
 	}
@@ -178,7 +220,7 @@ func TestOutputComplexity(t *testing.T) {
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(bytes) - codec.VersionSize)
-			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
 		})
 	}
 }
@@ -188,7 +230,7 @@ func TestInputComplexity(t *testing.T) {
 		name        string
 		in          *avax.TransferableInput
 		cred        verify.Verifiable
-		expected    fee.Dimensions
+		expected    gas.Dimensions
 		expectedErr error
 	}{
 		{
@@ -203,11 +245,10 @@ func TestInputComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 0),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 92,
-				fee.DBRead:    1,
-				fee.DBWrite:   1,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 92,
+				gas.DBRead:    1,
+				gas.DBWrite:   1,
 			},
 			expectedErr: nil,
 		},
@@ -223,11 +264,11 @@ func TestInputComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 1),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 161,
-				fee.DBRead:    1,
-				fee.DBWrite:   1,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 161,
+				gas.DBRead:    1,
+				gas.DBWrite:   1,
+				gas.Compute:   200,
 			},
 			expectedErr: nil,
 		},
@@ -243,11 +284,11 @@ func TestInputComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 3),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 299,
-				fee.DBRead:    1,
-				fee.DBWrite:   1,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 299,
+				gas.DBRead:    1,
+				gas.DBWrite:   1,
+				gas.Compute:   600,
 			},
 			expectedErr: nil,
 		},
@@ -265,11 +306,11 @@ func TestInputComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 3),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 311,
-				fee.DBRead:    1,
-				fee.DBWrite:   1,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 311,
+				gas.DBRead:    1,
+				gas.DBWrite:   1,
+				gas.Compute:   600,
 			},
 			expectedErr: nil,
 		},
@@ -278,13 +319,8 @@ func TestInputComplexity(t *testing.T) {
 			in: &avax.TransferableInput{
 				In: nil,
 			},
-			cred: nil,
-			expected: fee.Dimensions{
-				fee.Bandwidth: 0,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
-			},
+			cred:        nil,
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedInput,
 		},
 	}
@@ -308,7 +344,83 @@ func TestInputComplexity(t *testing.T) {
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(inputBytes) + len(credentialBytes) - 2*codec.VersionSize)
-			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
+		})
+	}
+}
+
+func TestConvertSubnetToL1ValidatorComplexity(t *testing.T) {
+	tests := []struct {
+		name     string
+		vdr      txs.ConvertSubnetToL1Validator
+		expected gas.Dimensions
+	}{
+		{
+			name: "any can spend",
+			vdr: txs.ConvertSubnetToL1Validator{
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner:     message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 200,
+				gas.DBWrite:   4,
+				gas.Compute:   1050,
+			},
+		},
+		{
+			name: "single remaining balance owner",
+			vdr: txs.ConvertSubnetToL1Validator{
+				NodeID: make([]byte, ids.NodeIDLen),
+				Signer: signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+				DeactivationOwner: message.PChainOwner{},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBWrite:   4,
+				gas.Compute:   1050,
+			},
+		},
+		{
+			name: "single deactivation owner",
+			vdr: txs.ConvertSubnetToL1Validator{
+				NodeID:                make([]byte, ids.NodeIDLen),
+				Signer:                signer.ProofOfPossession{},
+				RemainingBalanceOwner: message.PChainOwner{},
+				DeactivationOwner: message.PChainOwner{
+					Threshold: 1,
+					Addresses: []ids.ShortID{
+						ids.GenerateTestShortID(),
+					},
+				},
+			},
+			expected: gas.Dimensions{
+				gas.Bandwidth: 220,
+				gas.DBWrite:   4,
+				gas.Compute:   1050,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			actual, err := ConvertSubnetToL1ValidatorComplexity(&test.vdr)
+			require.NoError(err)
+			require.Equal(test.expected, actual)
+
+			vdrBytes, err := txs.Codec.Marshal(txs.CodecVersion, test.vdr)
+			require.NoError(err)
+
+			numBytesWithoutCodecVersion := uint64(len(vdrBytes) - codec.VersionSize)
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
 		})
 	}
 }
@@ -317,7 +429,7 @@ func TestOwnerComplexity(t *testing.T) {
 	tests := []struct {
 		name        string
 		owner       fx.Owner
-		expected    fee.Dimensions
+		expected    gas.Dimensions
 		expectedErr error
 	}{
 		{
@@ -325,11 +437,8 @@ func TestOwnerComplexity(t *testing.T) {
 			owner: &secp256k1fx.OutputOwners{
 				Addrs: make([]ids.ShortID, 0),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 16,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 16,
 			},
 			expectedErr: nil,
 		},
@@ -338,11 +447,8 @@ func TestOwnerComplexity(t *testing.T) {
 			owner: &secp256k1fx.OutputOwners{
 				Addrs: make([]ids.ShortID, 1),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 36,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 36,
 			},
 			expectedErr: nil,
 		},
@@ -351,18 +457,15 @@ func TestOwnerComplexity(t *testing.T) {
 			owner: &secp256k1fx.OutputOwners{
 				Addrs: make([]ids.ShortID, 3),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 76,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
+			expected: gas.Dimensions{
+				gas.Bandwidth: 76,
 			},
 			expectedErr: nil,
 		},
 		{
 			name:        "invalid owner type",
 			owner:       nil,
-			expected:    fee.Dimensions{},
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedOwner,
 		},
 	}
@@ -382,7 +485,7 @@ func TestOwnerComplexity(t *testing.T) {
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(ownerBytes) - codec.VersionSize)
-			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
 		})
 	}
 }
@@ -392,7 +495,7 @@ func TestAuthComplexity(t *testing.T) {
 		name        string
 		auth        verify.Verifiable
 		cred        verify.Verifiable
-		expected    fee.Dimensions
+		expected    gas.Dimensions
 		expectedErr error
 	}{
 		{
@@ -403,11 +506,8 @@ func TestAuthComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 0),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 8,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 8,
 			},
 			expectedErr: nil,
 		},
@@ -419,11 +519,9 @@ func TestAuthComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 1),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 77,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 77,
+				gas.Compute:   200,
 			},
 			expectedErr: nil,
 		},
@@ -435,24 +533,17 @@ func TestAuthComplexity(t *testing.T) {
 			cred: &secp256k1fx.Credential{
 				Sigs: make([][secp256k1.SignatureLen]byte, 3),
 			},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 215,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 215,
+				gas.Compute:   600,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "invalid auth type",
-			auth: nil,
-			cred: nil,
-			expected: fee.Dimensions{
-				fee.Bandwidth: 0,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0, // TODO: implement
-			},
+			name:        "invalid auth type",
+			auth:        nil,
+			cred:        nil,
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedAuth,
 		},
 	}
@@ -475,7 +566,7 @@ func TestAuthComplexity(t *testing.T) {
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(authBytes) + len(credentialBytes) - 2*codec.VersionSize)
-			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
 		})
 	}
 }
@@ -484,40 +575,28 @@ func TestSignerComplexity(t *testing.T) {
 	tests := []struct {
 		name        string
 		signer      signer.Signer
-		expected    fee.Dimensions
+		expected    gas.Dimensions
 		expectedErr error
 	}{
 		{
-			name:   "empty",
-			signer: &signer.Empty{},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 0,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
-			},
+			name:        "empty",
+			signer:      &signer.Empty{},
+			expected:    gas.Dimensions{},
 			expectedErr: nil,
 		},
 		{
 			name:   "bls pop",
 			signer: &signer.ProofOfPossession{},
-			expected: fee.Dimensions{
-				fee.Bandwidth: 144,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0, // TODO: implement
+			expected: gas.Dimensions{
+				gas.Bandwidth: 144,
+				gas.Compute:   1050,
 			},
 			expectedErr: nil,
 		},
 		{
-			name:   "invalid signer type",
-			signer: nil,
-			expected: fee.Dimensions{
-				fee.Bandwidth: 0,
-				fee.DBRead:    0,
-				fee.DBWrite:   0,
-				fee.Compute:   0,
-			},
+			name:        "invalid signer type",
+			signer:      nil,
+			expected:    gas.Dimensions{},
 			expectedErr: errUnsupportedSigner,
 		},
 	}
@@ -537,7 +616,7 @@ func TestSignerComplexity(t *testing.T) {
 			require.NoError(err)
 
 			numBytesWithoutCodecVersion := uint64(len(signerBytes) - codec.VersionSize)
-			require.Equal(numBytesWithoutCodecVersion, actual[fee.Bandwidth])
+			require.Equal(numBytesWithoutCodecVersion, actual[gas.Bandwidth])
 		})
 	}
 }

@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -42,7 +41,6 @@ type testPeer struct {
 type rawTestPeer struct {
 	config         *Config
 	cert           *staking.Certificate
-	nodeID         ids.NodeID
 	inboundMsgChan <-chan message.InboundMessage
 }
 
@@ -106,7 +104,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	require.NoError(err)
 	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
-	nodeID := ids.NodeIDFromCert(cert)
+	config.MyNodeID = ids.NodeIDFromCert(cert)
 
 	ip := utils.NewAtomic(netip.AddrPortFrom(
 		netip.IPv6Loopback(),
@@ -126,7 +124,6 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 	return &rawTestPeer{
 		config:         &config,
 		cert:           cert,
-		nodeID:         nodeID,
 		inboundMsgChan: inboundMsgChan,
 	}
 }
@@ -137,10 +134,10 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 			self.config,
 			conn,
 			peer.cert,
-			peer.nodeID,
+			peer.config.MyNodeID,
 			NewThrottledMessageQueue(
 				self.config.Metrics,
-				peer.nodeID,
+				peer.config.MyNodeID,
 				logging.NoLog{},
 				throttling.NewNoOutboundThrottler(),
 			),
@@ -212,122 +209,35 @@ func TestSend(t *testing.T) {
 }
 
 func TestPingUptimes(t *testing.T) {
-	trackedSubnetID := ids.GenerateTestID()
-	untrackedSubnetID := ids.GenerateTestID()
-
 	sharedConfig := newConfig(t)
-	sharedConfig.MySubnets = set.Of(trackedSubnetID)
-
-	testCases := []struct {
-		name        string
-		msg         message.OutboundMessage
-		shouldClose bool
-		assertFn    func(*require.Assertions, *testPeer)
-	}{
-		{
-			name: "primary network only",
-			msg: func() message.OutboundMessage {
-				pingMsg, err := sharedConfig.MessageCreator.Ping(1, nil)
-				require.NoError(t, err)
-				return pingMsg
-			}(),
-			shouldClose: false,
-			assertFn: func(require *require.Assertions, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(ok)
-				require.Equal(uint32(1), uptime)
-
-				uptime, ok = peer.ObservedUptime(trackedSubnetID)
-				require.False(ok)
-				require.Zero(uptime)
-			},
-		},
-		{
-			name: "primary network and subnet",
-			msg: func() message.OutboundMessage {
-				pingMsg, err := sharedConfig.MessageCreator.Ping(
-					1,
-					[]*p2p.SubnetUptime{
-						{
-							SubnetId: trackedSubnetID[:],
-							Uptime:   1,
-						},
-					},
-				)
-				require.NoError(t, err)
-				return pingMsg
-			}(),
-			shouldClose: false,
-			assertFn: func(require *require.Assertions, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(ok)
-				require.Equal(uint32(1), uptime)
-
-				uptime, ok = peer.ObservedUptime(trackedSubnetID)
-				require.True(ok)
-				require.Equal(uint32(1), uptime)
-			},
-		},
-		{
-			name: "primary network and non tracked subnet",
-			msg: func() message.OutboundMessage {
-				pingMsg, err := sharedConfig.MessageCreator.Ping(
-					1,
-					[]*p2p.SubnetUptime{
-						{
-							// Providing the untrackedSubnetID here should cause
-							// the remote peer to disconnect from us.
-							SubnetId: untrackedSubnetID[:],
-							Uptime:   1,
-						},
-						{
-							SubnetId: trackedSubnetID[:],
-							Uptime:   1,
-						},
-					},
-				)
-				require.NoError(t, err)
-				return pingMsg
-			}(),
-			shouldClose: true,
-			assertFn:    nil,
-		},
-	}
 
 	// The raw peers are generated outside of the test cases to avoid generating
 	// many TLS keys.
 	rawPeer0 := newRawTestPeer(t, sharedConfig)
 	rawPeer1 := newRawTestPeer(t, sharedConfig)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require := require.New(t)
+	require := require.New(t)
 
-			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
-			awaitReady(t, peer0, peer1)
-			defer func() {
-				peer1.StartClose()
-				peer0.StartClose()
-				require.NoError(peer0.AwaitClosed(context.Background()))
-				require.NoError(peer1.AwaitClosed(context.Background()))
-			}()
+	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	awaitReady(t, peer0, peer1)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(context.Background()))
+		require.NoError(peer1.AwaitClosed(context.Background()))
+	}()
+	pingMsg, err := sharedConfig.MessageCreator.Ping(1)
+	require.NoError(err)
+	require.True(peer0.Send(context.Background(), pingMsg))
 
-			require.True(peer0.Send(context.Background(), tc.msg))
+	// we send Get message after ping to ensure Ping is handled by the
+	// time Get is handled. This is because Get is routed to the handler
+	// whereas Ping is handled by the peer directly. We have no way to
+	// know when the peer has handled the Ping message.
+	sendAndFlush(t, peer0, peer1)
 
-			if tc.shouldClose {
-				require.NoError(peer1.AwaitClosed(context.Background()))
-				return
-			}
-
-			// we send Get message after ping to ensure Ping is handled by the
-			// time Get is handled. This is because Get is routed to the handler
-			// whereas Ping is handled by the peer directly. We have no way to
-			// know when the peer has handled the Ping message.
-			sendAndFlush(t, peer0, peer1)
-
-			tc.assertFn(require, peer1)
-		})
-	}
+	uptime := peer1.ObservedUptime()
+	require.Equal(uint32(1), uptime)
 }
 
 func TestTrackedSubnets(t *testing.T) {
@@ -411,7 +321,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 
 	require.NoError(rawPeer0.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
-		rawPeer1.nodeID,
+		rawPeer1.config.MyNodeID,
 		bls.PublicFromSecretKey(rawPeer1.config.IPSigner.blsSigner),
 		ids.GenerateTestID(),
 		1,
@@ -421,7 +331,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require.NoError(err)
 	require.NoError(rawPeer1.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
-		rawPeer0.nodeID,
+		rawPeer0.config.MyNodeID,
 		bls.PublicFromSecretKey(bogusBLSKey), // This is the wrong BLS key for this peer
 		ids.GenerateTestID(),
 		1,

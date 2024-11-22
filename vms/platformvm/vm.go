@@ -52,14 +52,14 @@ import (
 )
 
 var (
-	_ snowmanblock.ChainVM       = (*VM)(nil)
-	_ secp256k1fx.VM             = (*VM)(nil)
-	_ validators.State           = (*VM)(nil)
-	_ validators.SubnetConnector = (*VM)(nil)
+	_ snowmanblock.ChainVM                      = (*VM)(nil)
+	_ snowmanblock.BuildBlockWithContextChainVM = (*VM)(nil)
+	_ secp256k1fx.VM                            = (*VM)(nil)
+	_ validators.State                          = (*VM)(nil)
 )
 
 type VM struct {
-	config.Config
+	config.Internal
 	blockbuilder.Builder
 	*network.Network
 	validators.State
@@ -106,7 +106,7 @@ func (vm *VM) Initialize(
 ) error {
 	chainCtx.Log.Verbo("initializing platform chain")
 
-	execConfig, err := config.GetExecutionConfig(configBytes)
+	execConfig, err := config.GetConfig(configBytes)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,8 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
-		&vm.Config,
+		vm.Internal.Validators,
+		vm.Internal.UpgradeConfig,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
@@ -149,14 +150,18 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	if currentTime := vm.state.GetTimestamp(); vm.Internal.UpgradeConfig.IsEtnaActivated(currentTime) {
+		blockexecutor.EtnaActivationWasLogged.Set(true)
+	}
+
+	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
 
 	txExecutorBackend := &txexecutor.Backend{
-		Config:       &vm.Config,
+		Config:       &vm.Internal,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
@@ -192,6 +197,9 @@ func (vm *VM) Initialize(
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		chainCtx.Lock.RLocker(),
+		vm.state,
+		chainCtx.WarpSigner,
 		registerer,
 		execConfig.Network,
 	)
@@ -288,7 +296,7 @@ func (vm *VM) pruneMempool() error {
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	if vm.Config.PartialSyncPrimaryNetwork {
+	if vm.Internal.PartialSyncPrimaryNetwork {
 		vm.ctx.Log.Info("skipping primary network chain creation")
 	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
 		return err
@@ -325,7 +333,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		vm.Config.CreateChain(chain.ID(), tx)
+		vm.Internal.CreateChain(chain.ID(), tx)
 	}
 	return nil
 }
@@ -347,20 +355,17 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
-		return err
+	if !vm.uptimeManager.StartedTracking() {
+		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+		if err := vm.uptimeManager.StartTracking(primaryVdrIDs); err != nil {
+			return err
+		}
 	}
 
 	vl := validators.NewLogger(vm.ctx.Log, constants.PrimaryNetworkID, vm.ctx.NodeID)
 	vm.Validators.RegisterSetCallbackListener(constants.PrimaryNetworkID, vl)
 
 	for subnetID := range vm.TrackedSubnets {
-		vdrIDs := vm.Validators.GetValidatorIDs(subnetID)
-		if err := vm.uptimeManager.StartTracking(vdrIDs, subnetID); err != nil {
-			return err
-		}
-
 		vl := validators.NewLogger(vm.ctx.Log, subnetID, vm.ctx.NodeID)
 		vm.Validators.RegisterSetCallbackListener(subnetID, vl)
 	}
@@ -394,17 +399,10 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.onShutdownCtxCancel()
 	vm.Builder.ShutdownBlockTimer()
 
-	if vm.bootstrapped.Get() {
+	if vm.uptimeManager.StartedTracking() {
 		primaryVdrIDs := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-		if err := vm.uptimeManager.StopTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
+		if err := vm.uptimeManager.StopTracking(primaryVdrIDs); err != nil {
 			return err
-		}
-
-		for subnetID := range vm.TrackedSubnets {
-			vdrIDs := vm.Validators.GetValidatorIDs(subnetID)
-			if err := vm.uptimeManager.StopTracking(vdrIDs, subnetID); err != nil {
-				return err
-			}
 		}
 
 		if err := vm.state.Commit(); err != nil {
@@ -472,14 +470,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
-	if err := vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID); err != nil {
+	if err := vm.uptimeManager.Connect(nodeID); err != nil {
 		return err
 	}
 	return vm.Network.Connected(ctx, nodeID, version)
-}
-
-func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {
-	return vm.uptimeManager.Connect(nodeID, subnetID)
 }
 
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {

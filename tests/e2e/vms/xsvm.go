@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -19,8 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/export"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/importtx"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
-
-	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const pollingInterval = 50 * time.Millisecond
@@ -67,15 +67,22 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
 		sourceAPINode := sourceValidators[0]
-		tc.Outf(" issuing transactions for source subnet on %s (%s)\n", sourceAPINode.NodeID, sourceAPINode.URI)
+		tc.Log().Info("issuing transactions for source subnet",
+			zap.String("subnetName", subnetAName),
+			zap.Stringer("nodeID", sourceAPINode.NodeID),
+			zap.String("nodeURI", sourceAPINode.URI),
+		)
 
 		destinationValidators := getNodesForIDs(network.Nodes, destinationSubnet.ValidatorIDs)
 		require.NotEmpty(destinationValidators)
 		destinationAPINode := destinationValidators[0]
-		tc.Outf(" issuing transactions for destination subnet on %s (%s)\n", destinationAPINode.NodeID, destinationAPINode.URI)
+		tc.Log().Info("issuing transactions for destination subnet",
+			zap.String("subnetName", subnetBName),
+			zap.Stringer("nodeID", destinationAPINode.NodeID),
+			zap.String("nodeURI", destinationAPINode.URI),
+		)
 
-		destinationKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		destinationKey := e2e.NewPrivateKey(tc)
 
 		tc.By("checking that the funded key has sufficient funds for the export")
 		sourceClient := api.NewClient(sourceAPINode.URI, sourceChain.ChainID.String())
@@ -100,7 +107,9 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Outf(" issued transaction with ID: %s\n", exportTxStatus.TxID)
+		tc.Log().Info("issued export transaction",
+			zap.Stringer("txID", exportTxStatus.TxID),
+		)
 
 		tc.By("checking that the export transaction has been accepted on all nodes")
 		for _, node := range sourceValidators[1:] {
@@ -115,8 +124,7 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 
 		tc.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
 			destinationChain.ChainID, destinationSubnet.SubnetID))
-		recipientKey, err := secp256k1.NewPrivateKey()
-		require.NoError(err)
+		recipientKey := e2e.NewPrivateKey(tc)
 		transferTxStatus, err := transfer.Transfer(
 			tc.DefaultContext(),
 			&transfer.Config{
@@ -129,7 +137,9 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Outf(" issued transaction with ID: %s\n", transferTxStatus.TxID)
+		tc.Log().Info("issued transfer transaction",
+			zap.Stringer("txID", transferTxStatus.TxID),
+		)
 
 		tc.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
 		sourceURIs := make([]string, len(sourceValidators))
@@ -148,7 +158,9 @@ var _ = ginkgo.Describe("[XSVM]", func() {
 			},
 		)
 		require.NoError(err)
-		tc.Outf(" issued transaction with ID: %s\n", importTxStatus.TxID)
+		tc.Log().Info("issued import transaction",
+			zap.Stringer("txID", importTxStatus.TxID),
+		)
 
 		tc.By("checking that the balance of the source key has decreased")
 		sourceBalance, err := sourceClient.Balance(tc.DefaultContext(), sourceChain.PreFundedKey.Address(), sourceChain.ChainID)

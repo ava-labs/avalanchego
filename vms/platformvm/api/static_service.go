@@ -121,7 +121,7 @@ type PermissionlessValidator struct {
 	DelegationFee          json.Float32              `json:"delegationFee"`
 	ExactDelegationFee     *json.Uint32              `json:"exactDelegationFee,omitempty"`
 	Uptime                 *json.Float32             `json:"uptime,omitempty"`
-	Connected              bool                      `json:"connected"`
+	Connected              *bool                     `json:"connected,omitempty"`
 	Staked                 []UTXO                    `json:"staked,omitempty"`
 	Signer                 *signer.ProofOfPossession `json:"signer,omitempty"`
 
@@ -145,7 +145,7 @@ type GenesisPermissionlessValidator struct {
 type PermissionedValidator struct {
 	Staker
 	// The owner the staking reward, if applicable, will go to
-	Connected bool          `json:"connected"`
+	Connected *bool         `json:"connected,omitempty"`
 	Uptime    *json.Float32 `json:"uptime,omitempty"`
 }
 

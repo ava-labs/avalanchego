@@ -66,6 +66,7 @@ Available Commands:
   help        Help about any command
   issue       Issues transactions
   version     Prints out the version
+  versionjson Prints out the version in json format
 
 Flags:
   -h, --help   help for xsvm

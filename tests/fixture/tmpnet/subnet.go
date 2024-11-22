@@ -6,16 +6,19 @@ package tmpnet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -36,6 +39,12 @@ type Chain struct {
 	VMID    ids.ID
 	Config  string
 	Genesis []byte
+	// VersionArgs are the argument(s) to pass to the VM binary to receive
+	// version details in json format (e.g. `--version-json`). This
+	// supports checking that the rpcchainvm version of the VM binary
+	// matches the version used by the configured avalanchego binary. If
+	// empty, the version check will be skipped.
+	VersionArgs []string
 
 	// Set at runtime
 	ChainID      ids.ID
@@ -87,16 +96,16 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (primary.Wallet, err
 
 	// Only fetch the subnet transaction if a subnet ID is present. This won't be true when
 	// the wallet is first used to create the subnet.
-	txIDs := set.Set[ids.ID]{}
+	subnetIDs := []ids.ID{}
 	if s.SubnetID != ids.Empty {
-		txIDs.Add(s.SubnetID)
+		subnetIDs = append(subnetIDs, s.SubnetID)
 	}
 
 	return primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:              uri,
-		AVAXKeychain:     keychain,
-		EthKeychain:      keychain,
-		PChainTxsToFetch: txIDs,
+		URI:          uri,
+		AVAXKeychain: keychain,
+		EthKeychain:  keychain,
+		SubnetIDs:    subnetIDs,
 	})
 }
 
@@ -126,16 +135,16 @@ func (s *Subnet) Create(ctx context.Context, uri string) error {
 	return nil
 }
 
-func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) error {
+func (s *Subnet) CreateChains(ctx context.Context, log logging.Logger, uri string) error {
 	wallet, err := s.GetWallet(ctx, uri)
 	if err != nil {
 		return err
 	}
 	pWallet := wallet.P()
 
-	if _, err := fmt.Fprintf(w, "Creating chains for subnet %q\n", s.Name); err != nil {
-		return err
-	}
+	log.Info("creating chains for subnet",
+		zap.String("subnet", s.Name),
+	)
 
 	for _, chain := range s.Chains {
 		createChainTx, err := pWallet.IssueCreateChainTx(
@@ -151,15 +160,17 @@ func (s *Subnet) CreateChains(ctx context.Context, w io.Writer, uri string) erro
 		}
 		chain.ChainID = createChainTx.ID()
 
-		if _, err := fmt.Fprintf(w, " created chain %q for VM %q on subnet %q\n", chain.ChainID, chain.VMID, s.Name); err != nil {
-			return err
-		}
+		log.Info("created chain",
+			zap.Stringer("chain", chain.ChainID),
+			zap.String("subnet", s.Name),
+			zap.Stringer("vm", chain.VMID),
+		)
 	}
 	return nil
 }
 
 // Add validators to the subnet
-func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, apiURI string, nodes ...*Node) error {
+func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI string, nodes ...*Node) error {
 	wallet, err := s.GetWallet(ctx, apiURI)
 	if err != nil {
 		return err
@@ -200,9 +211,10 @@ func (s *Subnet) AddValidators(ctx context.Context, w io.Writer, apiURI string, 
 			return err
 		}
 
-		if _, err := fmt.Fprintf(w, " added %s as validator for subnet `%s`\n", node.NodeID, s.Name); err != nil {
-			return err
-		}
+		log.Info("added validator to subnet",
+			zap.String("subnet", s.Name),
+			zap.Stringer("nodeID", node.NodeID),
+		)
 	}
 
 	return nil
@@ -283,25 +295,18 @@ func (s *Subnet) HasChainConfig() bool {
 
 func WaitForActiveValidators(
 	ctx context.Context,
-	w io.Writer,
+	log logging.Logger,
 	pChainClient platformvm.Client,
 	subnet *Subnet,
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)
 	defer ticker.Stop()
 
-	if _, err := fmt.Fprintf(w, "Waiting for validators of subnet %q to become active\n", subnet.Name); err != nil {
-		return err
-	}
-
-	if _, err := fmt.Fprint(w, " "); err != nil {
-		return err
-	}
+	log.Info("waiting for subnet validators to become active",
+		zap.String("subnet", subnet.Name),
+	)
 
 	for {
-		if _, err := fmt.Fprint(w, "."); err != nil {
-			return err
-		}
 		validators, err := pChainClient.GetCurrentValidators(ctx, subnet.SubnetID, nil)
 		if err != nil {
 			return err
@@ -317,15 +322,15 @@ func WaitForActiveValidators(
 			}
 		}
 		if allActive {
-			if _, err := fmt.Fprintf(w, "\n saw the expected active validators of subnet %q\n", subnet.Name); err != nil {
-				return err
-			}
+			log.Info("saw the expected active validators of the subnet",
+				zap.String("subnet", subnet.Name),
+			)
 			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see the expected active validators of subnet %q before timeout", subnet.Name)
+			return fmt.Errorf("failed to see the expected active validators of subnet %q before timeout: %w", subnet.Name, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -333,14 +338,10 @@ func WaitForActiveValidators(
 
 // Reads subnets from [network dir]/subnets/[subnet name].json
 func readSubnets(subnetDir string) ([]*Subnet, error) {
-	if _, err := os.Stat(subnetDir); os.IsNotExist(err) {
+	entries, err := os.ReadDir(subnetDir)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(subnetDir)
-	if err != nil {
 		return nil, fmt.Errorf("failed to read subnet dir: %w", err)
 	}
 

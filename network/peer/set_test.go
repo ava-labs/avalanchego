@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestSet(t *testing.T) {
@@ -18,12 +18,12 @@ func TestSet(t *testing.T) {
 	set := NewSet()
 
 	peer1 := &peer{
-		id:              ids.BuildTestNodeID([]byte{0x01}),
-		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 0},
+		id:             ids.BuildTestNodeID([]byte{0x01}),
+		observedUptime: *utils.NewAtomic[uint32](0),
 	}
 	updatedPeer1 := &peer{
-		id:              ids.BuildTestNodeID([]byte{0x01}),
-		observedUptimes: map[ids.ID]uint32{constants.PrimaryNetworkID: 1},
+		id:             ids.BuildTestNodeID([]byte{0x01}),
+		observedUptime: *utils.NewAtomic[uint32](1),
 	}
 	peer2 := &peer{
 		id: ids.BuildTestNodeID([]byte{0x02}),
@@ -42,8 +42,8 @@ func TestSet(t *testing.T) {
 	set.Add(peer1)
 	retrievedPeer1, peer1Found := set.GetByID(peer1.id)
 	require.True(peer1Found)
-	observed1, _ := peer1.ObservedUptime(constants.PrimaryNetworkID)
-	observed2, _ := retrievedPeer1.ObservedUptime(constants.PrimaryNetworkID)
+	observed1 := peer1.ObservedUptime()
+	observed2 := retrievedPeer1.ObservedUptime()
 	require.Equal(observed1, observed2)
 	require.Equal(1, set.Len())
 
@@ -51,8 +51,8 @@ func TestSet(t *testing.T) {
 	set.Add(updatedPeer1)
 	retrievedPeer1, peer1Found = set.GetByID(peer1.id)
 	require.True(peer1Found)
-	observed1, _ = updatedPeer1.ObservedUptime(constants.PrimaryNetworkID)
-	observed2, _ = retrievedPeer1.ObservedUptime(constants.PrimaryNetworkID)
+	observed1 = updatedPeer1.ObservedUptime()
+	observed2 = retrievedPeer1.ObservedUptime()
 	require.Equal(observed1, observed2)
 	require.Equal(1, set.Len())
 
@@ -60,8 +60,8 @@ func TestSet(t *testing.T) {
 	set.Add(peer2)
 	retrievedPeer2, peer2Found := set.GetByID(peer2.id)
 	require.True(peer2Found)
-	observed1, _ = peer2.ObservedUptime(constants.PrimaryNetworkID)
-	observed2, _ = retrievedPeer2.ObservedUptime(constants.PrimaryNetworkID)
+	observed1 = peer2.ObservedUptime()
+	observed2 = retrievedPeer2.ObservedUptime()
 	require.Equal(observed1, observed2)
 	require.Equal(2, set.Len())
 

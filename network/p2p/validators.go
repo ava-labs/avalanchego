@@ -98,6 +98,8 @@ func (v *Validators) refresh(ctx context.Context) {
 		return
 	}
 
+	delete(validatorSet, ids.EmptyNodeID) // Ignore inactive ACP-77 validators.
+
 	for nodeID, vdr := range validatorSet {
 		v.validatorList = append(v.validatorList, validator{
 			nodeID: nodeID,

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -169,7 +170,7 @@ func TestValidatorsSample(t *testing.T) {
 			require := require.New(t)
 			subnetID := ids.GenerateTestID()
 			ctrl := gomock.NewController(t)
-			mockValidators := validators.NewMockState(ctrl)
+			mockValidators := validatorsmock.NewState(ctrl)
 
 			calls := make([]any, 0)
 			for _, call := range tt.calls {
@@ -295,6 +296,31 @@ func TestValidatorsTop(t *testing.T) {
 				nodeID1,
 			},
 		},
+		{
+			name: "top ignores inactive validators",
+			validators: []validator{
+				{
+					nodeID: ids.EmptyNodeID,
+					weight: 4,
+				},
+				{
+					nodeID: nodeID1,
+					weight: 2,
+				},
+				{
+					nodeID: nodeID2,
+					weight: 1,
+				},
+				{
+					nodeID: nodeID3,
+					weight: 1,
+				},
+			},
+			percentage: .5,
+			expected: []ids.NodeID{
+				nodeID1,
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -310,7 +336,7 @@ func TestValidatorsTop(t *testing.T) {
 			}
 
 			subnetID := ids.GenerateTestID()
-			mockValidators := validators.NewMockState(ctrl)
+			mockValidators := validatorsmock.NewState(ctrl)
 
 			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)

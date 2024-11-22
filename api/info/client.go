@@ -25,11 +25,11 @@ type Client interface {
 	GetNetworkID(context.Context, ...rpc.Option) (uint32, error)
 	GetNetworkName(context.Context, ...rpc.Option) (string, error)
 	GetBlockchainID(context.Context, string, ...rpc.Option) (ids.ID, error)
-	Peers(context.Context, ...rpc.Option) ([]Peer, error)
+	Peers(context.Context, []ids.NodeID, ...rpc.Option) ([]Peer, error)
 	IsBootstrapped(context.Context, string, ...rpc.Option) (bool, error)
 	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
 	Upgrades(context.Context, ...rpc.Option) (*upgrade.Config, error)
-	Uptime(context.Context, ids.ID, ...rpc.Option) (*UptimeResponse, error)
+	Uptime(context.Context, ...rpc.Option) (*UptimeResponse, error)
 	GetVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, error)
 }
 
@@ -83,9 +83,11 @@ func (c *client) GetBlockchainID(ctx context.Context, alias string, options ...r
 	return res.BlockchainID, err
 }
 
-func (c *client) Peers(ctx context.Context, options ...rpc.Option) ([]Peer, error) {
+func (c *client) Peers(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]Peer, error) {
 	res := &PeersReply{}
-	err := c.requester.SendRequest(ctx, "info.peers", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "info.peers", &PeersArgs{
+		NodeIDs: nodeIDs,
+	}, res, options...)
 	return res.Peers, err
 }
 
@@ -109,11 +111,9 @@ func (c *client) Upgrades(ctx context.Context, options ...rpc.Option) (*upgrade.
 	return res, err
 }
 
-func (c *client) Uptime(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (*UptimeResponse, error) {
+func (c *client) Uptime(ctx context.Context, options ...rpc.Option) (*UptimeResponse, error) {
 	res := &UptimeResponse{}
-	err := c.requester.SendRequest(ctx, "info.uptime", &UptimeRequest{
-		SubnetID: subnetID,
-	}, res, options...)
+	err := c.requester.SendRequest(ctx, "info.uptime", struct{}{}, res, options...)
 	return res, err
 }
 
