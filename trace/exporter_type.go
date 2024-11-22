@@ -10,14 +10,22 @@ import (
 )
 
 const (
-	GRPC ExporterType = iota + 1
+	NoOp ExporterType = iota
+	GRPC
 	HTTP
 )
 
-var errUnknownExporterType = errors.New("unknown exporter type")
+var (
+	errUnknownExporterType = errors.New("unknown exporter type")
+	errInvalidFormat       = errors.New("invalid format")
+)
 
 func ExporterTypeFromString(exporterTypeStr string) (ExporterType, error) {
 	switch strings.ToLower(exporterTypeStr) {
+	case NoOp.String():
+		return 0, nil
+	case "null":
+		return 0, nil
 	case GRPC.String():
 		return GRPC, nil
 	case HTTP.String():
@@ -34,9 +42,12 @@ func (t ExporterType) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ExporterType) UnmarshalJSON(b []byte) error {
-	exporterTypeStr := strings.Trim(string(b), `"`)
+	exporterTypeStr, err := stripQuotes(string(b))
+	if err != nil {
+		return err
+	}
 	exporterType, err := ExporterTypeFromString(exporterTypeStr)
-	if err != nil && !errors.Is(err, errUnknownExporterType) {
+	if err != nil {
 		return err
 	}
 	*t = exporterType
@@ -45,6 +56,8 @@ func (t *ExporterType) UnmarshalJSON(b []byte) error {
 
 func (t ExporterType) String() string {
 	switch t {
+	case NoOp:
+		return ""
 	case GRPC:
 		return "grpc"
 	case HTTP:
@@ -52,4 +65,11 @@ func (t ExporterType) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+func stripQuotes(s string) (string, error) {
+	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
+		return "", errInvalidFormat
+	}
+	return s[1 : len(s)-1], nil
 }
