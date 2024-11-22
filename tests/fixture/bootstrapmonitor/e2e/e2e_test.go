@@ -265,6 +265,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSet {
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
+		true, /* generateName */
 		latestAvalanchegoImage,
 		nodeContainerName,
 		volumeName,

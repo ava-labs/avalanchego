@@ -527,7 +527,7 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 	log.Info("waiting for node to report healthy",
 		zap.Stringer("nodeID", node.NodeID),
 	)
-	return WaitForHealthy(ctx, node)
+	return WaitForHealthy(ctx, log, node)
 }
 
 // Stops all nodes in the network.
@@ -921,13 +921,15 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 
 // Waits until the provided nodes are healthy.
 func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) error {
+	// TODO(marun) Change the network health interval to be longer for kube since the nodes will take longer to start
+	// Also maybe build in a wait for pod readiness?
 	ticker := time.NewTicker(networkHealthCheckInterval)
 	defer ticker.Stop()
 
 	unhealthyNodes := set.Of(nodes...)
 	for {
 		for node := range unhealthyNodes {
-			healthy, err := node.IsHealthy(ctx)
+			healthy, err := node.IsHealthy(ctx, log)
 			if err != nil {
 				return err
 			}

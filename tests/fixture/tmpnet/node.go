@@ -47,7 +47,7 @@ type NodeRuntime interface {
 	Start(log logging.Logger) error
 	InitiateStop() error
 	WaitForStopped(ctx context.Context) error
-	IsHealthy(ctx context.Context) (bool, error)
+	IsHealthy(ctx context.Context, log logging.Logger) (bool, error)
 }
 
 // Configuration required to configure a node runtime. Only one of the fields should be set.
@@ -192,8 +192,8 @@ func (n *Node) getRuntime() NodeRuntime {
 
 // Runtime methods
 
-func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
-	return n.getRuntime().IsHealthy(ctx)
+func (n *Node) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
+	return n.getRuntime().IsHealthy(ctx, log)
 }
 
 func (n *Node) Start(log logging.Logger) error {
