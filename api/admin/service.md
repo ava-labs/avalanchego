@@ -12,7 +12,7 @@ This API uses the `json 2.0` RPC format. For details, see [here](/api-reference/
 
 ## Endpoint
 
-```
+```sh
 /ext/admin
 ```
 
@@ -24,7 +24,7 @@ Assign an API endpoint an alias, a different endpoint for the API. The original 
 
 **Signature**:
 
-```
+```sh
 admin.alias({endpoint:string, alias:string}) -> {}
 ```
 
@@ -34,7 +34,7 @@ admin.alias({endpoint:string, alias:string}) -> {}
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -48,7 +48,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -70,7 +70,7 @@ Note that the alias is set for each chain on each node individually. In a multi-
 
 **Signature**:
 
-```
+```sh
 admin.aliasChain(
     {
         chain:string,
@@ -84,7 +84,7 @@ admin.aliasChain(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -98,7 +98,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -108,13 +108,13 @@ curl -X POST --data '{
 
 Now, instead of interacting with the blockchain whose ID is `sV6o671RtkGBcno1FiaDbVcFv2sG5aVXMZYzKdP4VQAWmJQnM` by making API calls to `/ext/bc/sV6o671RtkGBcno1FiaDbVcFv2sG5aVXMZYzKdP4VQAWmJQnM`, one can also make calls to `ext/bc/myBlockchainAlias`.
 
-### admin.getChainAliases
+### `admin.getChainAliases`
 
 Returns the aliases of the chain
 
 **Signature**:
 
-```
+```sh
 admin.getChainAliases(
     {
         chain:string
@@ -126,7 +126,7 @@ admin.getChainAliases(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -139,7 +139,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -153,13 +153,13 @@ curl -X POST --data '{
 }
 ```
 
-### admin.getLoggerLevel
+### `admin.getLoggerLevel`
 
 Returns log and display levels of loggers.
 
 **Signature**:
 
-```
+```sh
 admin.getLoggerLevel(
     {
         loggerName:string // optional
@@ -178,7 +178,7 @@ admin.getLoggerLevel(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -191,7 +191,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -212,7 +212,7 @@ Dynamically loads any virtual machines installed on the node as plugins. See [he
 
 **Signature**:
 
-```
+```sh
 admin.loadVMs() -> {
     newVMs: map[string][]string
     failedVMs: map[string]string,
@@ -223,7 +223,7 @@ admin.loadVMs() -> {
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -234,7 +234,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "result": {
@@ -255,13 +255,13 @@ Writes a profile of mutex statistics to `lock.profile`.
 
 **Signature**:
 
-```
+```sh
 admin.lockProfile() -> {}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -272,7 +272,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -286,13 +286,13 @@ Writes a memory profile of the to `mem.profile`.
 
 **Signature**:
 
-```
+```sh
 admin.memoryProfile() -> {}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -303,7 +303,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -317,7 +317,7 @@ Sets log and display levels of loggers.
 
 **Signature**:
 
-```
+```sh
 admin.setLoggerLevel(
     {
         loggerName: string, // optional
@@ -335,7 +335,7 @@ admin.setLoggerLevel(
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -350,7 +350,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -364,13 +364,13 @@ Start profiling the CPU utilization of the node. To stop, call `admin.stopCPUPro
 
 **Signature**:
 
-```
+```sh
 admin.startCPUProfiler() -> {}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -381,7 +381,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -395,13 +395,13 @@ Stop the CPU profile that was previously started.
 
 **Signature**:
 
-```
+```sh
 admin.stopCPUProfiler() -> {}
 ```
 
 **Example Call**:
 
-```
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -411,7 +411,7 @@ curl -X POST --data '{
 
 **Example Response**:
 
-```
+```json
 {
   "jsonrpc": "2.0",
   "id": 1,
