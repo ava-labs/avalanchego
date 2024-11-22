@@ -177,7 +177,7 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 	}
 }
 
-func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
+func (p *NodeProcess) IsHealthy(ctx context.Context, _ logging.Logger) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
 	// API URI is current.
@@ -190,7 +190,7 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	}
 
 	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
-	if err != nil {
+	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
 	}
 	return healthReply.Healthy, nil

@@ -50,6 +50,7 @@ func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled 
 // newNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
+	generateName bool,
 	imageName string,
 	containerName string,
 	volumeName string,
@@ -57,10 +58,18 @@ func NewNodeStatefulSet(
 	volumeMountPath string,
 	flags FlagsMap,
 ) *appsv1.StatefulSet {
-	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
+	var objectMeta metav1.ObjectMeta
+	if generateName {
+		objectMeta = metav1.ObjectMeta{
 			GenerateName: name + "-",
-		},
+		}
+	} else {
+		objectMeta = metav1.ObjectMeta{
+			Name: name,
+		}
+	}
+	return &appsv1.StatefulSet{
+		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:    pointer.Int32(1),
 			ServiceName: name,
