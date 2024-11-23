@@ -2,7 +2,7 @@ The P-Chain API allows clients to interact with the [P-Chain](/learn/avalanche/a
 
 ## Endpoint
 
-```sh
+```
 /ext/bc/P
 ```
 
@@ -30,7 +30,7 @@ Get the private key that controls a given address.
 
 **Signature:**
 
-```sh
+```
 platform.exportKey({
     username: string,
     password: string,
@@ -81,7 +81,7 @@ Get the balance of AVAX controlled by a given address.
 
 **Signature:**
 
-```sh
+```
 platform.getBalance({
     addresses: []string
 }) -> {
@@ -157,7 +157,7 @@ Get a block by its ID.
 
 **Signature:**
 
-```sh
+```
 platform.getBlock({
     blockID: string
     encoding: string // optional
@@ -290,7 +290,7 @@ Get a block by its height.
 
 **Signature:**
 
-```sh
+```
 platform.getBlockByHeight({
     height: int
     encoding: string // optional
@@ -429,15 +429,15 @@ Get all the blockchains that exist (excluding the P-Chain).
 
 **Signature:**
 
-```sh
+```
 platform.getBlockchains() ->
 {
-    blockchains: []{
-        id: string,
-        name: string,
-        subnetID: string,
-        vmID: string
-    }
+  blockchains: []{
+    id: string,
+    name: string,
+    subnetID: string,
+    vmID: string
+  }
 }
 ```
 
@@ -519,11 +519,11 @@ Get the status of a blockchain.
 
 **Signature:**
 
-```sh
+```
 platform.getBlockchainStatus(
-    {
-        blockchainID: string
-    }
+  {
+    blockchainID: string
+  }
 ) -> {status: string}
 ```
 
@@ -569,10 +569,10 @@ an upper bound because it does not account for burnt tokens, including transacti
 
 **Signature:**
 
-```sh
-platform.getCurrentSupply({
-    subnetID: string // optional
-}) -> {supply: int}
+```
+platform.getCurrentSupply ({
+  subnetID: string // optional
+}) -> { supply: int }
 ```
 
 - `supply` is an upper bound on the number of tokens that exist.
@@ -610,10 +610,10 @@ List the current validators of the given Subnet.
 
 **Signature:**
 
-```sh
+```
 platform.getCurrentValidators({
-    subnetID: string, // optional
-    nodeIDs: string[], // optional
+  subnetID: string, // optional
+  nodeIDs: string[], // optional
 }) -> {
     validators: []{
         txID: string,
@@ -774,14 +774,14 @@ Returns the dynamic fees configuration of the P-chain.
 
 **Signature:**
 
-```sh
+```
 platform.getFeeConfig() -> {
-    weights: []uint64,
-    maxCapacity: uint64,
-    maxPerSecond: uint64,
-    targetPerSecond: uint64,
-    minPrice: uint64,
-    excessConversionConstant: uint64
+  weights: []uint64,
+  maxCapacity: uint64,
+  maxPerSecond: uint64,
+  targetPerSecond: uint64,
+  minPrice: uint64,
+  excessConversionConstant: uint64
 }
 ```
 
@@ -826,12 +826,12 @@ Returns the current fee state of the P-chain.
 
 **Signature:**
 
-```sh
+```
 platform.getFeeState() -> {
-    capacity: uint64,
-    excess: uint64,
-    price: uint64,
-    timestamp: string
+  capacity: uint64,
+  excess: uint64,
+  price: uint64,
+  timestamp: string
 }
 ```
 
@@ -869,7 +869,7 @@ Returns a current L1 validator.
 
 **Signature:**
 
-```sh
+```
 platform.getL1Validator({
     validationID: string,
 }) -> {
@@ -953,10 +953,10 @@ Returns the height of the last accepted block.
 
 **Signature:**
 
-```sh
+```
 platform.getHeight() ->
 {
-    height: int,
+  height: int,
 }
 ```
 
@@ -989,10 +989,10 @@ Returns this node's current proposer VM height
 
 **Signature:**
 
-```sh
+```
 platform.getProposedHeight() ->
 {
-    height: int,
+  height: int,
 }
 ```
 
@@ -1031,18 +1031,14 @@ Returns the maximum amount of nAVAX staking to the named node during a particula
 
 **Signature:**
 
-```sh
-platform.getMaxStakeAmount(
-    {
-        subnetID: string,
-        nodeID: string,
-        startTime: int,
-        endTime: int
-    }
-) ->
+```
+platform.getMaxStakeAmount (
 {
-    amount: uint64
-}
+  subnetID: string,
+  nodeID: string,
+  startTime: int,
+  endTime: int
+}) -> { amount: uint64 }
 ```
 
 - `subnetID` is a Buffer or cb58 string representing Subnet
@@ -1088,13 +1084,13 @@ tokens that can be delegated.
 
 **Signature:**
 
-```sh
+```
 platform.getMinStake({
-    subnetID: string // optional
+  subnetID: string // optional
 }) ->
 {
-    minValidatorStake : uint64,
-    minDelegatorStake : uint64
+  minValidatorStake : uint64,
+  minDelegatorStake : uint64
 }
 ```
 
@@ -1131,10 +1127,10 @@ currently validating the Subnet but will in the future.
 
 **Signature:**
 
-```sh
+```
 platform.getPendingValidators({
-    subnetID: string, // optional
-    nodeIDs: string[], // optional
+  subnetID: string, // optional
+  nodeIDs: string[], // optional
 }) -> {
     validators: []{
         txID: string,
@@ -1239,7 +1235,7 @@ ended.
 
 **Signature:**
 
-```sh
+```
 platform.getRewardUTXOs({
     txID: string,
     encoding: string // optional
@@ -1299,7 +1295,7 @@ rewards.
 
 **Signature:**
 
-```sh
+```
 platform.getStake({
     addresses: []string,
     validatorsOnly: true or false
@@ -1359,7 +1355,7 @@ Retrieve an assetID for a Subnet’s staking asset.
 
 **Signature:**
 
-```sh
+```
 platform.getStakingAssetID({
     subnetID: string // optional
 }) -> {
@@ -1411,7 +1407,7 @@ Get owners and info about the Subnet or L1.
 
 **Signature:**
 
-```sh
+```
 platform.getSubnet({
     subnetID: string
 }) ->
@@ -1479,7 +1475,7 @@ Get info about the Subnets.
 
 **Signature:**
 
-```sh
+```
 platform.getSubnets({
     ids: []string
 }) ->
@@ -1540,7 +1536,7 @@ Get the current P-Chain timestamp.
 
 **Signature:**
 
-```sh
+```
 platform.getTimestamp() -> {time: string}
 ```
 
@@ -1574,7 +1570,7 @@ Get the total amount of tokens staked on the requested Subnet.
 
 **Signature:**
 
-```sh
+```
 platform.getTotalStake({
     subnetID: string
 }) -> {
@@ -1649,7 +1645,7 @@ Optional `encoding` parameter to specify the format for the returned transaction
 
 **Signature:**
 
-```sh
+```
 platform.getTx({
     txID: string,
     encoding: string // optional
@@ -1758,10 +1754,10 @@ Gets a transaction’s status by its ID. If the transaction was dropped, respons
 
 **Signature:**
 
-```sh
+```
 platform.getTxStatus({
-    txID: string
-}) -> {status: string}
+  txID: string
+}) -> { status: string }
 ```
 
 `status` is one of:
@@ -1803,7 +1799,7 @@ Gets the UTXOs that reference a given set of addresses.
 
 **Signature:**
 
-```sh
+```
 platform.getUTXOs(
     {
         addresses: []string,
@@ -1971,7 +1967,7 @@ Get the validators and their weights of a Subnet or the Primary Network at a giv
 
 **Signature:**
 
-```sh
+```
 platform.getValidatorsAt(
     {
         height: [int|string],
@@ -2022,11 +2018,11 @@ Issue a transaction to the Platform Chain.
 
 **Signature:**
 
-```sh
+```
 platform.issueTx({
     tx: string,
     encoding: string, // optional
-}) -> {txID: string}
+}) -> { txID: string }
 ```
 
 - `tx` is the byte representation of a transaction.
@@ -2078,11 +2074,11 @@ List addresses controlled by the given user.
 
 **Signature:**
 
-```sh
+```
 platform.listAddresses({
     username: string,
     password: string
-}) -> {addresses: []string}
+}) -> { addresses: []string }
 ```
 
 **Example Call:**
@@ -2117,7 +2113,7 @@ Sample validators from the specified Subnet.
 
 **Signature:**
 
-```sh
+```
 platform.sampleValidators(
     {
         size: int,
@@ -2167,12 +2163,12 @@ Get the Subnet that validates a given blockchain.
 
 **Signature:**
 
-```sh
+```
 platform.validatedBy(
     {
         blockchainID: string
     }
-) -> {subnetID: string}
+) -> { subnetID: string }
 ```
 
 - `blockchainID` is the blockchain’s ID.
@@ -2209,12 +2205,12 @@ Get the IDs of the blockchains a Subnet validates.
 
 **Signature:**
 
-```sh
+```
 platform.validates(
     {
         subnetID: string
     }
-) -> {blockchainIDs: []string}
+) -> { blockchainIDs: []string }
 ```
 
 - `subnetID` is the Subnet’s ID.

@@ -6,7 +6,7 @@ This API uses the `json 2.0` RPC format. For more information on making JSON RPC
 
 ## Endpoint
 
-```sh
+```
 /ext/info
 ```
 
@@ -18,15 +18,15 @@ Returns peer preferences for Avalanche Community Proposals (ACPs)
 
 **Signature**:
 
-```sh
+```
 info.acps() -> {
-    acps: map[uint32]{
-        supportWeight: uint64
-        supporters:    set[string]
-        objectWeight:  uint64
-        objectors:     set[string]
-        abstainWeight: uint64
-    }
+  acps: map[uint32]{
+    supportWeight: uint64
+    supporters:    set[string]
+    objectWeight:  uint64
+    objectors:     set[string]
+    abstainWeight: uint64
+  }
 }
 ```
 
@@ -109,7 +109,7 @@ Check whether a given chain is done bootstrapping
 
 **Signature**:
 
-```sh
+```
 info.isBootstrapped({chain: string}) -> {isBootstrapped: bool}
 ```
 
@@ -146,7 +146,7 @@ Given a blockchain's alias, get its ID. (See [`admin.aliasChain`](/api-reference
 
 **Signature**:
 
-```sh
+```
 info.getBlockchainID({alias:string}) -> {blockchainID:string}
 ```
 
@@ -181,7 +181,7 @@ Get the ID of the network this node is participating in.
 
 **Signature**:
 
-```sh
+```
 info.getNetworkID() -> { networkID: int }
 ```
 
@@ -215,7 +215,7 @@ Get the name of the network this node is participating in.
 
 **Signature**:
 
-```sh
+```
 info.getNetworkName() -> { networkName:string }
 ```
 
@@ -251,7 +251,7 @@ This endpoint set is for a specific node, it is unavailable on the [public serve
 
 **Signature**:
 
-```sh
+```
 info.getNodeID() -> {
     nodeID: string,
     nodePOP: {
@@ -302,7 +302,7 @@ This endpoint set is for a specific node, it is unavailable on the [public serve
 
 **Signature**:
 
-```sh
+```
 info.getNodeIP() -> {ip: string}
 ```
 
@@ -334,13 +334,13 @@ Get the version of this node.
 
 **Signature**:
 
-```sh
+```
 info.getNodeVersion() -> {
-    version: string,
-    databaseVersion: string,
-    gitCommit: string,
-    vmVersions: map[string]string,
-    rpcProtocolVersion: string,
+  version: string,
+  databaseVersion: string,
+  gitCommit: string,
+  vmVersions: map[string]string,
+  rpcProtocolVersion: string,
 }
 ```
 
@@ -388,18 +388,18 @@ Get the fees of the network.
 
 **Signature**:
 
-```sh
+```
 info.getTxFee() ->
 {
-    txFee: uint64,
-    createAssetTxFee: uint64,
-    createSubnetTxFee: uint64,
-    transformSubnetTxFee: uint64,
-    createBlockchainTxFee: uint64,
-    addPrimaryNetworkValidatorFee: uint64,
-    addPrimaryNetworkDelegatorFee: uint64,
-    addSubnetValidatorFee: uint64,
-    addSubnetDelegatorFee: uint64
+  txFee: uint64,
+  createAssetTxFee: uint64,
+  createSubnetTxFee: uint64,
+  transformSubnetTxFee: uint64,
+  createBlockchainTxFee: uint64,
+  addPrimaryNetworkValidatorFee: uint64,
+  addPrimaryNetworkDelegatorFee: uint64,
+  addSubnetValidatorFee: uint64,
+  addSubnetDelegatorFee: uint64
 }
 ```
 
@@ -455,9 +455,9 @@ This endpoint set is for a specific node, it is unavailable on the [public serve
 
 **Signature**:
 
-```sh
+```
 info.getVMs() -> {
-    vms: map[string][]string
+  vms: map[string][]string
 }
 ```
 
@@ -497,23 +497,23 @@ Get a description of peer connections.
 
 **Signature**:
 
-```sh
+```
 info.peers({
-    nodeIDs: string[] // optional
+  nodeIDs: string[] // optional
 }) ->
 {
-    numPeers: int,
-    peers:[]{
-        ip: string,
-        publicIP: string,
-        nodeID: string,
-        version: string,
-        lastSent: string,
-        lastReceived: string,
-        benched: string[],
-        observedUptime: int,
-        observedSubnetUptime: map[string]int,
-    }
+  numPeers: int,
+  peers:[]{
+    ip: string,
+    publicIP: string,
+    nodeID: string,
+    version: string,
+    lastSent: string,
+    lastReceived: string,
+    benched: string[],
+    observedUptime: int,
+    observedSubnetUptime: map[string]int,
+  }
 }
 ```
 
@@ -599,11 +599,11 @@ Returns the network's observed uptime of this node. This is the only reliable so
 
 **Signature**:
 
-```sh
+```
 info.uptime() ->
 {
-    rewardingStakePercentage: float64,
-    weightedAveragePercentage: float64
+  rewardingStakePercentage: float64,
+  weightedAveragePercentage: float64
 }
 ```
 

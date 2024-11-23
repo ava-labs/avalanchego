@@ -22,7 +22,7 @@ This API uses the `json 2.0` API format. For more information on making JSON RPC
 
 ## Endpoint
 
-```sh
+```
 /ext/keystore
 ```
 
@@ -34,12 +34,12 @@ Create a new user with the specified username and password.
 
 **Signature**:
 
-```sh
+```
 keystore.createUser(
-    {
-        username:string,
-        password:string
-    }
+{
+    username:string,
+    password:string
+}
 ) -> {}
 ```
 
@@ -80,8 +80,8 @@ Delete a user.
 
 **Signature**:
 
-```sh
-keystore.deleteUser({username: string, password:string}) -> {}
+```
+keystore.deleteUser({ username: string, password:string }) -> {}
 ```
 
 **Example Call**:
@@ -118,13 +118,13 @@ Export a user. The user can be imported to another node with [`keystore.importUs
 
 **Signature**:
 
-```sh
+```
 keystore.exportUser(
-    {
-        username:string,
-        password:string,
-        encoding:string //optional
-    }
+{
+    username:string,
+    password:string,
+    encoding:string //optional
+}
 ) -> {
     user:string,
     encoding:string
@@ -170,14 +170,14 @@ Import a user. `password` must match the user's password. `username` doesn't hav
 
 **Signature**:
 
-```sh
+```
 keystore.importUser(
-    {
-        username:string,
-        password:string,
-        user:string,
-        encoding:string //optional
-    }
+{
+    username:string,
+    password:string,
+    user:string,
+    encoding:string //optional
+}
 ) -> {}
 ```
 
@@ -218,8 +218,8 @@ List the users in this keystore.
 
 **Signature**:
 
-```sh
-keystore.ListUsers() -> {users:[]string}
+```
+keystore.ListUsers() -> { users: []string }
 ```
 
 **Example Call**:

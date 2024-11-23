@@ -12,7 +12,7 @@ This API uses the `json 2.0` RPC format. For details, see [here](/api-reference/
 
 ## Endpoint
 
-```sh
+```
 /ext/admin
 ```
 
@@ -24,7 +24,7 @@ Assign an API endpoint an alias, a different endpoint for the API. The original 
 
 **Signature**:
 
-```sh
+```
 admin.alias({endpoint:string, alias:string}) -> {}
 ```
 
@@ -70,7 +70,7 @@ Note that the alias is set for each chain on each node individually. In a multi-
 
 **Signature**:
 
-```sh
+```
 admin.aliasChain(
     {
         chain:string,
@@ -114,11 +114,11 @@ Returns the aliases of the chain
 
 **Signature**:
 
-```sh
+```
 admin.getChainAliases(
-    {
-        chain:string
-    }
+  {
+    chain:string
+  }
 ) -> {aliases:string[]}
 ```
 
@@ -159,17 +159,17 @@ Returns log and display levels of loggers.
 
 **Signature**:
 
-```sh
+```
 admin.getLoggerLevel(
-    {
-        loggerName:string // optional
-    }
+  {
+    loggerName:string // optional
+  }
 ) -> {
         loggerLevels: {
-            loggerName: {
-                    logLevel: string,
-                    displayLevel: string
-            }
+          loggerName: {
+            logLevel: string,
+            displayLevel: string
+          }
         }
     }
 ```
@@ -212,10 +212,10 @@ Dynamically loads any virtual machines installed on the node as plugins. See [he
 
 **Signature**:
 
-```sh
+```
 admin.loadVMs() -> {
-    newVMs: map[string][]string
-    failedVMs: map[string]string,
+  newVMs: map[string][]string
+  failedVMs: map[string]string,
 }
 ```
 
@@ -255,7 +255,7 @@ Writes a profile of mutex statistics to `lock.profile`.
 
 **Signature**:
 
-```sh
+```
 admin.lockProfile() -> {}
 ```
 
@@ -286,7 +286,7 @@ Writes a memory profile of the to `mem.profile`.
 
 **Signature**:
 
-```sh
+```
 admin.memoryProfile() -> {}
 ```
 
@@ -317,13 +317,13 @@ Sets log and display levels of loggers.
 
 **Signature**:
 
-```sh
+```
 admin.setLoggerLevel(
-    {
-        loggerName: string, // optional
-        logLevel: string, // optional
-        displayLevel: string, // optional
-    }
+  {
+    loggerName: string, // optional
+    logLevel: string, // optional
+    displayLevel: string, // optional
+  }
 ) -> {}
 ```
 
@@ -364,7 +364,7 @@ Start profiling the CPU utilization of the node. To stop, call `admin.stopCPUPro
 
 **Signature**:
 
-```sh
+```
 admin.startCPUProfiler() -> {}
 ```
 
@@ -395,7 +395,7 @@ Stop the CPU profile that was previously started.
 
 **Signature**:
 
-```sh
+```
 admin.stopCPUProfiler() -> {}
 ```
 

@@ -24,25 +24,25 @@ Each chain has one or more index. To see if a C-Chain block is accepted, for exa
 
 ### C-Chain Blocks
 
-```sh
+```
 /ext/index/C/block
 ```
 
 ### P-Chain Blocks
 
-```sh
+```
 /ext/index/P/block
 ```
 
 ### X-Chain Transactions
 
-```sh
+```
 /ext/index/X/tx
 ```
 
 ### X-Chain Blocks
 
-```sh
+```
 /ext/index/X/block
 ```
 
@@ -58,7 +58,7 @@ Get container by ID.
 
 **Signature**:
 
-```sh
+```
 index.getContainerByID({
   id: string,
   encoding: string
@@ -122,7 +122,7 @@ Get container by index. The first container accepted is at index 0, the second i
 
 **Signature**:
 
-```sh
+```
 index.getContainerByIndex({
   index: uint64,
   encoding: string
@@ -192,7 +192,7 @@ Returns the transactions at index \[`startIndex`\], \[`startIndex+1`\], ... , \[
 
 **Signature**:
 
-```sh
+```
 index.getContainerRange({
   startIndex: uint64,
   numToFetch: uint64,
@@ -261,7 +261,7 @@ Get a container's index.
 
 **Signature**:
 
-```sh
+```
 index.getIndex({
   id: string,
   encoding: string
@@ -313,7 +313,7 @@ Get the most recently accepted container.
 
 **Signature**:
 
-```sh
+```
 index.getLastAccepted({
   encoding:string
 }) -> {
@@ -373,7 +373,7 @@ Returns true if the container is in this index.
 
 **Signature**:
 
-```sh
+```
 index.isAccepted({
   id: string,
   encoding: string

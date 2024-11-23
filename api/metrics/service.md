@@ -6,7 +6,7 @@ This API set is for a specific node, it is unavailable on the [public server](/t
 
 ## Endpoint
 
-```sh
+```
 /ext/metrics
 ```
 
