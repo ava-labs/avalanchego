@@ -1,29 +1,18 @@
----
-tags: [AvalancheGo APIs]
-description: This page is an overview of the Admin API associated with AvalancheGo.
-sidebar_label: Admin API
-pagination_label: Admin API
----
+The Admin API can be used for measuring node health and debugging.
 
-# Admin API
+<Callout title="Note">
+The Admin API is disabled by default for security reasons. To run a node with the Admin API enabled, use [`config flag --api-admin-enabled=true`](/nodes/configure/configs-flags#--api-admin-enabled-boolean).
 
-This API can be used for measuring node health and debugging.
-
-:::info
-The Admin API is disabled by default for security reasons. To run a node with the Admin API
-enabled, use [config flag `--api-admin-enabled=true`](/nodes/configure/avalanchego-config-flags.md#--api-admin-enabled-boolean).
-
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
-
-:::
+This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+</Callout>
 
 ## Format
 
-This API uses the `json 2.0` RPC format. For details, see [here](/reference/standards/guides/issuing-api-calls.md).
+This API uses the `json 2.0` RPC format. For details, see [here](/api-reference/standards/guides/issuing-api-calls).
 
 ## Endpoint
 
-```text
+```
 /ext/admin
 ```
 
@@ -31,23 +20,21 @@ This API uses the `json 2.0` RPC format. For details, see [here](/reference/stan
 
 ### `admin.alias`
 
-Assign an API endpoint an alias, a different endpoint for the API. The original endpoint will still
-work. This change only affects this node; other nodes will not know about this alias.
+Assign an API endpoint an alias, a different endpoint for the API. The original endpoint will still work. This change only affects this node; other nodes will not know about this alias.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.alias({endpoint:string, alias:string}) -> {}
 ```
 
-- `endpoint` is the original endpoint of the API. `endpoint` should only include the part of the
-  endpoint after `/ext/`.
+- `endpoint` is the original endpoint of the API. `endpoint` should only include the part of the endpoint after `/ext/`.
 - The API being aliased can now be called at `ext/alias`.
 - `alias` can be at most 512 characters.
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -59,7 +46,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -73,18 +60,17 @@ Now, calls to the X-Chain can be made to either `/ext/bc/X` or, equivalently, to
 
 ### `admin.aliasChain`
 
-Give a blockchain an alias, a different name that can be used any place the blockchain’s ID is used.
+Give a blockchain an alias, a different name that can be used any place the blockchain's ID is used.
 
-:::note Aliasing a chain can also be done via the [Node API](/nodes/configure/avalanchego-config-flags.md#--chain-aliases-file-string).
-Note that the alias is set for each chain on each node individually. In a multi-node Subnet, the
-same alias should be configured on each node to use an alias across a Subnet successfully. Setting
-an alias for a chain on one node does not register that alias with other nodes automatically.
+<Callout title="Note">
+Aliasing a chain can also be done via the [Node API](/nodes/configure/configs-flags#--chain-aliases-file-string).
 
-:::
+Note that the alias is set for each chain on each node individually. In a multi-node Avalanche L1, the same alias should be configured on each node to use an alias across an Avalanche L1 successfully. Setting an alias for a chain on one node does not register that alias with other nodes automatically.
+</Callout>
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.aliasChain(
     {
         chain:string,
@@ -93,12 +79,12 @@ admin.aliasChain(
 ) -> {}
 ```
 
-- `chain` is the blockchain’s ID.
-- `alias` can now be used in place of the blockchain’s ID (in API endpoints, for example.)
+- `chain` is the blockchain's ID.
+- `alias` can now be used in place of the blockchain's ID (in API endpoints, for example.)
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -110,7 +96,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -120,30 +106,27 @@ curl -X POST --data '{
 }
 ```
 
-Now, instead of interacting with the blockchain whose ID is
-`sV6o671RtkGBcno1FiaDbVcFv2sG5aVXMZYzKdP4VQAWmJQnM` by making API calls to
-`/ext/bc/sV6o671RtkGBcno1FiaDbVcFv2sG5aVXMZYzKdP4VQAWmJQnM`, one can also make calls to
-`ext/bc/myBlockchainAlias`.
+Now, instead of interacting with the blockchain whose ID is `sV6o671RtkGBcno1FiaDbVcFv2sG5aVXMZYzKdP4VQAWmJQnM` by making API calls to `/ext/bc/sV6o671RtkGBcno1FiaDbVcFv2sG5aVXMZYzKdP4VQAWmJQnM`, one can also make calls to `ext/bc/myBlockchainAlias`.
 
 ### `admin.getChainAliases`
 
 Returns the aliases of the chain
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.getChainAliases(
-    {
-        chain:string
-    }
+  {
+    chain:string
+  }
 ) -> {aliases:string[]}
 ```
 
-- `chain` is the blockchain’s ID.
+- `chain` is the blockchain's ID.
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -154,7 +137,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -174,29 +157,28 @@ curl -X POST --data '{
 
 Returns log and display levels of loggers.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.getLoggerLevel(
-    {
-        loggerName:string // optional
-    }
+  {
+    loggerName:string // optional
+  }
 ) -> {
         loggerLevels: {
-            loggerName: {
-                    logLevel: string,
-                    displayLevel: string
-            }
+          loggerName: {
+            logLevel: string,
+            displayLevel: string
+          }
         }
     }
 ```
 
-- `loggerName` is the name of the logger to be returned. This is an optional argument. If not
-  specified, it returns all possible loggers.
+- `loggerName` is the name of the logger to be returned. This is an optional argument. If not specified, it returns all possible loggers.
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -207,7 +189,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -226,24 +208,22 @@ curl -X POST --data '{
 
 ### `admin.loadVMs`
 
-Dynamically loads any virtual machines installed on the node as plugins. See
-[here](/build/vm/intro#installing-a-vm) for more information on how to install a
-virtual machine on a node.
+Dynamically loads any virtual machines installed on the node as plugins. See [here](/virtual-machines#installing-a-vm) for more information on how to install a virtual machine on a node.
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 admin.loadVMs() -> {
-    newVMs: map[string][]string
-    failedVMs: map[string]string,
+  newVMs: map[string][]string
+  failedVMs: map[string]string,
 }
 ```
 
 - `failedVMs` is only included in the response if at least one virtual machine fails to be loaded.
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -252,7 +232,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -273,15 +253,15 @@ curl -X POST --data '{
 
 Writes a profile of mutex statistics to `lock.profile`.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.lockProfile() -> {}
 ```
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -290,7 +270,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -304,15 +284,15 @@ curl -X POST --data '{
 
 Writes a memory profile of the to `mem.profile`.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.memoryProfile() -> {}
 ```
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -321,7 +301,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -335,28 +315,27 @@ curl -X POST --data '{
 
 Sets log and display levels of loggers.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.setLoggerLevel(
-    {
-        loggerName: string, // optional
-        logLevel: string, // optional
-        displayLevel: string, // optional
-    }
+  {
+    loggerName: string, // optional
+    logLevel: string, // optional
+    displayLevel: string, // optional
+  }
 ) -> {}
 ```
 
-- `loggerName` is the logger's name to be changed. This is an optional parameter. If not specified,
-  it changes all possible loggers.
+- `loggerName` is the logger's name to be changed. This is an optional parameter. If not specified, it changes all possible loggers.
 - `logLevel` is the log level of written logs, can be omitted.
 - `displayLevel` is the log level of displayed logs, can be omitted.
 
 `logLevel` and `displayLevel` cannot be omitted at the same time.
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -369,7 +348,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -381,18 +360,17 @@ curl -X POST --data '{
 
 ### `admin.startCPUProfiler`
 
-Start profiling the CPU utilization of the node. To stop, call `admin.stopCPUProfiler`. On stop,
-writes the profile to `cpu.profile`.
+Start profiling the CPU utilization of the node. To stop, call `admin.stopCPUProfiler`. On stop, writes the profile to `cpu.profile`.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.startCPUProfiler() -> {}
 ```
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -401,7 +379,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -415,15 +393,15 @@ curl -X POST --data '{
 
 Stop the CPU profile that was previously started.
 
-**Signature:**
+**Signature**:
 
-```text
+```
 admin.stopCPUProfiler() -> {}
 ```
 
-**Example Call:**
+**Example Call**:
 
-```bash
+```sh
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
@@ -431,7 +409,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/admin
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
