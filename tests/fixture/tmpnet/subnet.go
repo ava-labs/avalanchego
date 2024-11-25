@@ -91,22 +91,23 @@ type Subnet struct {
 }
 
 // Retrieves a wallet configured for use with the subnet
-func (s *Subnet) GetWallet(ctx context.Context, uri string) (primary.Wallet, error) {
+func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, error) {
 	keychain := secp256k1fx.NewKeychain(s.OwningKey)
 
 	// Only fetch the subnet transaction if a subnet ID is present. This won't be true when
 	// the wallet is first used to create the subnet.
-	subnetIDs := []ids.ID{}
+	config := primary.WalletConfig{}
 	if s.SubnetID != ids.Empty {
-		subnetIDs = append(subnetIDs, s.SubnetID)
+		config.SubnetIDs = []ids.ID{s.SubnetID}
 	}
 
-	return primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: keychain,
-		EthKeychain:  keychain,
-		SubnetIDs:    subnetIDs,
-	})
+	return primary.MakeWallet(
+		ctx,
+		uri,
+		keychain,
+		keychain,
+		config,
+	)
 }
 
 // Issues the subnet creation transaction and retains the result. The URI of a node is

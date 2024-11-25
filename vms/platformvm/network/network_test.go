@@ -130,17 +130,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			expectedErr: errTest,
 		},
 		{
-			name: "mempool is disabled if primary network is not being fully synced",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				return mempoolmock.NewMempool(ctrl)
-			},
-			partialSyncPrimaryNetwork: true,
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return commonmock.NewSender(ctrl)
-			},
-			expectedErr: errMempoolDisabledWithPartialSync,
-		},
-		{
 			name: "happy path",
 			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
 				mempool := mempoolmock.NewMempool(ctrl)

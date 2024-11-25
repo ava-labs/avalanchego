@@ -47,25 +47,24 @@ func main() {
 
 	ctx := context.Background()
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-		SubnetIDs:    []ids.ID{subnetID},
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		uri,
+		kc,
+		primary.WalletConfig{
+			SubnetIDs: []ids.ID{subnetID},
+		},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-
 	createChainStartTime := time.Now()
-	createChainTx, err := pWallet.IssueCreateChainTx(
+	createChainTx, err := wallet.IssueCreateChainTx(
 		subnetID,
 		genesisBytes,
 		vmID,
