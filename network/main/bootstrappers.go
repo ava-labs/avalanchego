@@ -16,7 +16,6 @@ func trackBootstrappers(network network.Network) []genesis.Bootstrapper {
 	for _, bootstrapper := range bootstrappers {
 		network.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
 	}
-
 	return bootstrappers
 }
 	

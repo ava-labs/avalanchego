@@ -18,6 +18,7 @@ import (
 // ./build/avalanchego --network-id=local --db-type=memdb --sybil-protection-enabled=false
 var (
 	NetworkId = constants.LocalID
+	// p chain id. 
 	ChainID = ids.FromStringOrPanic("11111111111111111111111111111111LpoYY")
 )
 
@@ -80,7 +81,10 @@ func main() {
 	log.Info("Created example message", zap.Any("op", exampleMsg.Op().String()))
 	
 	ctx := context.Background()
+
+	// if local network we send to ourselves(since no peers will be returned)
 	sendToSelf(ctx, log, network, handler, exampleMsg)
+	sendToAllPeers(ctx, log, network, handler, exampleMsg)
 
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.

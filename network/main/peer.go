@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/netip"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -13,12 +14,22 @@ import (
 	"go.uber.org/zap"
 )
 
-func sendToAllPeers(log logging.Logger, network network.Network, handler *testExternalHandler, msg message.OutboundMessage) {
+func sendToAllPeers(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler, msg message.OutboundMessage) {
+	if NetworkId == constants.LocalID {
+		return
+	}
+	bootstrappers := trackBootstrappers(network)
+	nodeIds := make([]ids.NodeID, len(bootstrappers))
+	// grab nodeIds from bootstrappers
+	for _, bootstrapper := range bootstrappers {
+		nodeIds = append(nodeIds, bootstrapper.ID)
+	}
+	time.Sleep(8 * time.Second)
+
 	// grab peer info
-	peerInfo := network.PeerInfo([]ids.NodeID{})
+	peerInfo := network.PeerInfo(nodeIds)
 	log.Info("Peer Info", zap.Any("peers", peerInfo))
 
-	ctx := context.Background()
 	for _, info := range peerInfo {
 		peer, err := peer.StartTestPeer(
 			ctx,
@@ -54,7 +65,7 @@ func sendToSelf(ctx context.Context, log logging.Logger, network network.Network
 		)
 		return
 	}
-	
+
 	sent := peer.Send(ctx, msg)
 	log.Info("Sent msg", zap.Bool("sent", sent))
 }
