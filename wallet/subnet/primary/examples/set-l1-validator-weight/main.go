@@ -57,7 +57,7 @@ func main() {
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
+	// Get the chain context
 	context := wallet.Builder().Context()
 
 	addressedCallPayload, err := message.NewL1ValidatorWeight(

@@ -47,16 +47,14 @@ func main() {
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pBuilder := wallet.Builder()
-	pContext := pBuilder.Context()
-	avaxAssetID := pContext.AVAXAssetID
+	// Get the chain context
+	context := wallet.Builder().Context()
 
 	issueTxStartTime := time.Now()
 	tx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{
 		{
 			Asset: avax.Asset{
-				ID: avaxAssetID,
+				ID: context.AVAXAssetID,
 			},
 			Out: &stakeable.LockOut{
 				Locktime: locktime,
