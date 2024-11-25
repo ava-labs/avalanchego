@@ -174,10 +174,7 @@ func FetchPState(
 		constants.PlatformChainID,
 		addrList,
 	)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return chainClient, context, utxos, nil
+	return chainClient, context, utxos, err
 }
 
 type EthState struct {
