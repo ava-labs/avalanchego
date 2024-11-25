@@ -61,7 +61,7 @@ func NewPrivateKey(tc tests.TestContext) *secp256k1.PrivateKey {
 }
 
 // Create a new wallet for the provided keychain against the specified node URI.
-func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) primary.Wallet {
+func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI) *primary.Wallet {
 	tc.Log().Info("initializing a new wallet",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
@@ -87,12 +87,12 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 }
 
 // OutputWalletBalances outputs the X-Chain and P-Chain balances of the provided wallet.
-func OutputWalletBalances(tc tests.TestContext, wallet primary.Wallet) {
+func OutputWalletBalances(tc tests.TestContext, wallet *primary.Wallet) {
 	_, _ = GetWalletBalances(tc, wallet)
 }
 
 // GetWalletBalances retrieves the X-Chain and P-Chain balances of the provided wallet.
-func GetWalletBalances(tc tests.TestContext, wallet primary.Wallet) (uint64, uint64) {
+func GetWalletBalances(tc tests.TestContext, wallet *primary.Wallet) (uint64, uint64) {
 	require := require.New(tc)
 	var (
 		xWallet  = wallet.X()

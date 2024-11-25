@@ -23,36 +23,28 @@ import (
 	xsigner "github.com/ava-labs/avalanchego/wallet/chain/x/signer"
 )
 
-var _ Wallet = (*wallet)(nil)
-
 // Wallet provides chain wallets for the primary network.
-type Wallet interface {
-	P() pwallet.Wallet
-	X() x.Wallet
-	C() c.Wallet
-}
-
-type wallet struct {
+type Wallet struct {
 	p pwallet.Wallet
 	x x.Wallet
 	c c.Wallet
 }
 
-func (w *wallet) P() pwallet.Wallet {
+func (w *Wallet) P() pwallet.Wallet {
 	return w.p
 }
 
-func (w *wallet) X() x.Wallet {
+func (w *Wallet) X() x.Wallet {
 	return w.x
 }
 
-func (w *wallet) C() c.Wallet {
+func (w *Wallet) C() c.Wallet {
 	return w.c
 }
 
 // Creates a new default wallet
-func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) Wallet {
-	return &wallet{
+func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) *Wallet {
+	return &Wallet{
 		p: p,
 		x: x,
 		c: c,
@@ -60,11 +52,11 @@ func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) Wallet {
 }
 
 // Creates a Wallet with the given set of options
-func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
+func NewWalletWithOptions(w *Wallet, options ...common.Option) *Wallet {
 	return NewWallet(
-		pwallet.WithOptions(w.P(), options...),
-		x.NewWalletWithOptions(w.X(), options...),
-		c.NewWalletWithOptions(w.C(), options...),
+		pwallet.WithOptions(w.p, options...),
+		x.NewWalletWithOptions(w.x, options...),
+		c.NewWalletWithOptions(w.c, options...),
 	)
 }
 
@@ -92,7 +84,7 @@ type WalletConfig struct {
 // transactions.
 //
 // The wallet manages all state locally, and performs all tx signing locally.
-func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
+func MakeWallet(ctx context.Context, config *WalletConfig) (*Wallet, error) {
 	avaxAddrs := config.AVAXKeychain.Addresses()
 	avaxState, err := FetchState(ctx, config.URI, avaxAddrs)
 	if err != nil {
