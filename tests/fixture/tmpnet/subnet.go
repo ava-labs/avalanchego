@@ -96,9 +96,9 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, er
 
 	// Only fetch the subnet transaction if a subnet ID is present. This won't be true when
 	// the wallet is first used to create the subnet.
-	config := primary.WalletConfig{}
+	subnetIDs := []ids.ID{}
 	if s.SubnetID != ids.Empty {
-		config.SubnetIDs = []ids.ID{s.SubnetID}
+		subnetIDs = append(subnetIDs, s.SubnetID)
 	}
 
 	return primary.MakeWallet(
@@ -106,7 +106,9 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, er
 		uri,
 		keychain,
 		keychain,
-		config,
+		primary.WalletConfig{
+			SubnetIDs: subnetIDs,
+		},
 	)
 }
 
