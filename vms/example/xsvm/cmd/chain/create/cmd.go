@@ -38,8 +38,8 @@ func createFunc(c *cobra.Command, args []string) error {
 	ctx := c.Context()
 	kc := secp256k1fx.NewKeychain(config.PrivateKey)
 
-	// NewWalletFromURI fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting.
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
+	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
 	wallet, err := primary.MakePWallet(
 		ctx,
