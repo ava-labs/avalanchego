@@ -23,8 +23,7 @@ import (
 var (
 	_ Manager = (*manager)(nil)
 
-	ErrChainNotSynced              = errors.New("chain not synced")
-	ErrImportTxWhilePartialSyncing = errors.New("issuing an import tx is not allowed while partial syncing")
+	ErrChainNotSynced = errors.New("chain not synced")
 )
 
 type Manager interface {
@@ -123,12 +122,6 @@ func (m *manager) Preferred() ids.ID {
 func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
 		return ErrChainNotSynced
-	}
-
-	if m.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
-		if _, isImportTx := tx.Unsigned.(*txs.ImportTx); isImportTx {
-			return ErrImportTxWhilePartialSyncing
-		}
 	}
 
 	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
