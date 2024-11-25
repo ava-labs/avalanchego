@@ -19,17 +19,25 @@ var _ router.ExternalHandler = (*testExternalHandler)(nil)
 // However, a given NodeID will only be performing one call at a time.
 type testExternalHandler struct {
 	log logging.Logger
+	con bool
 }
 
 // Note: HandleInbound will be called with raw P2P messages, the networking
 // implementation does not implicitly register timeouts, so this handler is only
 // called by messages explicitly sent by the peer. If timeouts are required,
 // that must be handled by the user of this utility.
-func (t *testExternalHandler) HandleInbound(_ context.Context, message message.InboundMessage) {
-	t.log.Info(
-		"receiving message",
-		zap.Stringer("op", message.Op()),
-	)
+func (t *testExternalHandler) HandleInbound(_ context.Context, msg message.InboundMessage) {
+	// select on the message's operation
+	switch msg.Op() {
+	case message.Op(message.PullQueryOp):
+		if !t.con {
+			t.log.Info("received pull query")
+			t.con = true
+		}
+		return
+	default:
+		t.log.Info("received message", zap.Stringer("op", msg.Op()))
+	}
 }
 
 func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Application, subnetID ids.ID) {
