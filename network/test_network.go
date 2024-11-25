@@ -79,6 +79,7 @@ func NewTestNetwork(
 	currentValidators validators.Manager,
 	trackedSubnets set.Set[ids.ID],
 	router router.ExternalHandler,
+	allowPrivateIPs bool,
 ) (Network, error) {
 	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(
@@ -182,7 +183,7 @@ func NewTestNetwork(
 			NetworkID:                    networkID,
 			MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
 			PingFrequency:                constants.DefaultPingFrequency,
-			AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
+			AllowPrivateIPs:              allowPrivateIPs,
 			CompressionType:              constants.DefaultNetworkCompressionType,
 			TLSKey:                       tlsCert.PrivateKey.(crypto.Signer),
 			BLSKey:                       blsKey,

@@ -96,6 +96,7 @@ func ExampleNewTestNetwork() {
 		validators,
 		trackedSubnets,
 		handler,
+		false,
 	)
 	if err != nil {
 		log.Fatal(
