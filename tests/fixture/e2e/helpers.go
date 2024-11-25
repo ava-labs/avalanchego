@@ -66,11 +66,13 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
 	)
-	baseWallet, err := primary.MakeWallet(tc.DefaultContext(), &primary.WalletConfig{
-		URI:          nodeURI.URI,
-		AVAXKeychain: keychain,
-		EthKeychain:  keychain,
-	})
+	baseWallet, err := primary.MakeWallet(
+		tc.DefaultContext(),
+		nodeURI.URI,
+		keychain,
+		keychain,
+		primary.WalletConfig{},
+	)
 	require.NoError(tc, err)
 	wallet := primary.NewWalletWithOptions(
 		baseWallet,

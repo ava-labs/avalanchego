@@ -60,11 +60,13 @@ func main() {
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          c.URIs[0],
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-	})
+	wallet, err := primary.MakeWallet(
+		ctx,
+		c.URIs[0],
+		kc,
+		kc,
+		primary.WalletConfig{},
+	)
 	require.NoError(err, "failed to initialize wallet")
 	tc.Log().Info("synced wallet",
 		zap.Duration("duration", time.Since(walletSyncStartTime)),
@@ -120,11 +122,13 @@ func main() {
 		uri := c.URIs[i%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
 		walletSyncStartTime := time.Now()
-		wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-			URI:          uri,
-			AVAXKeychain: kc,
-			EthKeychain:  kc,
-		})
+		wallet, err := primary.MakeWallet(
+			ctx,
+			uri,
+			kc,
+			kc,
+			primary.WalletConfig{},
+		)
 		require.NoError(err, "failed to initialize wallet")
 		tc.Log().Info("synced wallet",
 			zap.Duration("duration", time.Since(walletSyncStartTime)),
