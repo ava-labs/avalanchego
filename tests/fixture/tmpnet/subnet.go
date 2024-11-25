@@ -91,7 +91,7 @@ type Subnet struct {
 }
 
 // Retrieves a wallet configured for use with the subnet
-func (s *Subnet) GetWallet(ctx context.Context, uri string) (primary.Wallet, error) {
+func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, error) {
 	keychain := secp256k1fx.NewKeychain(s.OwningKey)
 
 	// Only fetch the subnet transaction if a subnet ID is present. This won't be true when

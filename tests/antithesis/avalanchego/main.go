@@ -153,7 +153,7 @@ func main() {
 type workload struct {
 	id     int
 	log    logging.Logger
-	wallet primary.Wallet
+	wallet *primary.Wallet
 	addrs  set.Set[ids.ShortID]
 	uris   []string
 }
