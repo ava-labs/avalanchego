@@ -41,7 +41,7 @@ func (w *Wallet) C() c.Wallet {
 	return w.c
 }
 
-// Creates a new Wallet
+// Creates a new default wallet
 func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) *Wallet {
 	return &Wallet{
 		p: p,
@@ -50,7 +50,7 @@ func NewWallet(p pwallet.Wallet, x x.Wallet, c c.Wallet) *Wallet {
 	}
 }
 
-// Creates a new Wallet with the given set of options
+// Creates a Wallet with the given set of options
 func NewWalletWithOptions(w *Wallet, options ...common.Option) *Wallet {
 	return NewWallet(
 		pwallet.WithOptions(w.p, options...),
