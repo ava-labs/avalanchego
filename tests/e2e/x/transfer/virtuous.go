@@ -135,7 +135,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				xContext := xBuilder.Context()
 				avaxAssetID := xContext.AVAXAssetID
 
-				wallets := make([]primary.Wallet, len(testKeys))
+				wallets := make([]*primary.Wallet, len(testKeys))
 				shortAddrs := make([]ids.ShortID, len(testKeys))
 				for i := range wallets {
 					shortAddrs[i] = testKeys[i].PublicKey().Address()
