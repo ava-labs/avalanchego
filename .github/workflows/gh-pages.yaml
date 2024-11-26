@@ -44,11 +44,13 @@ jobs:
         run: |
           cp -rv target/doc/* ./_site
           cp -rv docs/assets ./_site
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: pages
           path: _site
           if-no-files-found: error
+          overwrite: true
+          include-hidden-files: true
   deploy:
     needs: build
     permissions:
