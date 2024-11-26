@@ -5,7 +5,6 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -18,18 +17,18 @@ func sendToAllPeers(ctx context.Context, log logging.Logger, network network.Net
 	if NetworkId == constants.LocalID {
 		return
 	}
-	bootstrappers := trackBootstrappers(network)
-	nodeIds := make([]ids.NodeID, len(bootstrappers))
-	// grab nodeIds from bootstrappers
-	for _, bootstrapper := range bootstrappers {
-		nodeIds = append(nodeIds, bootstrapper.ID)
-	}
+	trackBootstrappers(network)
+	// nodeIds := make([]ids.NodeID, len(bootstrappers))
+	// // grab nodeIds from bootstrappers
+	// for _, bootstrapper := range bootstrappers {
+	// 	nodeIds = append(nodeIds, bootstrapper.ID)
+	// }
 	time.Sleep(8 * time.Second)
 
 	// grab peer info
-	peerInfo := network.PeerInfo(nodeIds)
+	peerInfo := network.PeerInfo(nil)
 	log.Info("Peer Info", zap.Any("peers", peerInfo))
-
+	
 	for _, info := range peerInfo {
 		peer, err := peer.StartTestPeer(
 			ctx,
