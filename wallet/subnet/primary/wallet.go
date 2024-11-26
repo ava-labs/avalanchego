@@ -61,11 +61,6 @@ func NewWalletWithOptions(w *Wallet, options ...common.Option) *Wallet {
 }
 
 type WalletConfig struct {
-	// Base URI to use for all node requests.
-	URI string // required
-	// Keys to use for signing all transactions.
-	AVAXKeychain keychain.Keychain // required
-	EthKeychain  c.EthKeychain     // required
 	// Subnet IDs that the wallet should know about to be able to generate
 	// transactions.
 	SubnetIDs []ids.ID // optional
@@ -84,15 +79,21 @@ type WalletConfig struct {
 // transactions.
 //
 // The wallet manages all state locally, and performs all tx signing locally.
-func MakeWallet(ctx context.Context, config *WalletConfig) (*Wallet, error) {
-	avaxAddrs := config.AVAXKeychain.Addresses()
-	avaxState, err := FetchState(ctx, config.URI, avaxAddrs)
+func MakeWallet(
+	ctx context.Context,
+	uri string,
+	avaxKeychain keychain.Keychain,
+	ethKeychain c.EthKeychain,
+	config WalletConfig,
+) (*Wallet, error) {
+	avaxAddrs := avaxKeychain.Addresses()
+	avaxState, err := FetchState(ctx, uri, avaxAddrs)
 	if err != nil {
 		return nil, err
 	}
 
-	ethAddrs := config.EthKeychain.EthAddresses()
-	ethState, err := FetchEthState(ctx, config.URI, ethAddrs)
+	ethAddrs := ethKeychain.EthAddresses()
+	ethState, err := FetchEthState(ctx, uri, ethAddrs)
 	if err != nil {
 		return nil, err
 	}
@@ -118,19 +119,19 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (*Wallet, error) {
 	pBackend := pwallet.NewBackend(avaxState.PCTX, pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
-	pSigner := psigner.New(config.AVAXKeychain, pBackend)
+	pSigner := psigner.New(avaxKeychain, pBackend)
 
 	xChainID := avaxState.XCTX.BlockchainID
 	xUTXOs := common.NewChainUTXOs(xChainID, avaxState.UTXOs)
 	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
 	xBuilder := xbuilder.New(avaxAddrs, avaxState.XCTX, xBackend)
-	xSigner := xsigner.New(config.AVAXKeychain, xBackend)
+	xSigner := xsigner.New(avaxKeychain, xBackend)
 
 	cChainID := avaxState.CCTX.BlockchainID
 	cUTXOs := common.NewChainUTXOs(cChainID, avaxState.UTXOs)
 	cBackend := c.NewBackend(cUTXOs, ethState.Accounts)
 	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, avaxState.CCTX, cBackend)
-	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
+	cSigner := c.NewSigner(avaxKeychain, ethKeychain, cBackend)
 
 	return NewWallet(
 		pwallet.New(pClient, pBuilder, pSigner),

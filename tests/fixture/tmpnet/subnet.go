@@ -101,12 +101,15 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, er
 		subnetIDs = append(subnetIDs, s.SubnetID)
 	}
 
-	return primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: keychain,
-		EthKeychain:  keychain,
-		SubnetIDs:    subnetIDs,
-	})
+	return primary.MakeWallet(
+		ctx,
+		uri,
+		keychain,
+		keychain,
+		primary.WalletConfig{
+			SubnetIDs: subnetIDs,
+		},
+	)
 }
 
 // Issues the subnet creation transaction and retains the result. The URI of a node is
