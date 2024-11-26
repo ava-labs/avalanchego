@@ -545,7 +545,7 @@ func TestState_writeStakers(t *testing.T) {
 func createPermissionlessValidatorTx(t testing.TB, subnetID ids.ID, validatorsData txs.Validator) *txs.AddPermissionlessValidatorTx {
 	var sig signer.Signer = &signer.Empty{}
 	if subnetID == constants.PrimaryNetworkID {
-		sk, err := bls.NewSecretKey()
+		sk, err := bls.NewSigner()
 		require.NoError(t, err)
 		sig = signer.NewProofOfPossession(sk)
 	}
@@ -785,7 +785,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		subnetStakers  = make([]Staker, numNodes)
 	)
 	for i := range primaryStakers {
-		sk, err := bls.NewSecretKey()
+		sk, err := bls.NewSigner()
 		require.NoError(err)
 
 		timeOffset := time.Duration(i) * time.Second
@@ -1514,12 +1514,12 @@ func TestL1Validators(t *testing.T) {
 		NodeID:       ids.GenerateTestNodeID(),
 	}
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSecretKey()
+	otherSK, err := bls.NewSigner()
 	require.NoError(t, err)
 	otherPK := bls.PublicFromSecretKey(otherSK)
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
@@ -2016,7 +2016,7 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 	}
 	require.NoError(state.PutCurrentValidator(legacyStaker))
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
@@ -2094,12 +2094,12 @@ func TestGetCurrentValidators(t *testing.T) {
 	subnetID2 := ids.GenerateTestID()
 	subnetIDs := []ids.ID{subnetID1, subnetID2}
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 	pk := bls.PublicFromSecretKey(sk)
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSecretKey()
+	otherSK, err := bls.NewSigner()
 	require.NoError(t, err)
 	otherPK := bls.PublicFromSecretKey(otherSK)
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)

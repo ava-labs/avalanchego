@@ -228,7 +228,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 }
 
 func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	const (

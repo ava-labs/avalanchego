@@ -72,7 +72,7 @@ func TestHandler(t *testing.T) {
 			require := require.New(t)
 
 			ctx := context.Background()
-			sk, err := bls.NewSecretKey()
+			sk, err := bls.NewSigner()
 			require.NoError(err)
 			pk := bls.PublicFromSecretKey(sk)
 			networkID := uint32(123)

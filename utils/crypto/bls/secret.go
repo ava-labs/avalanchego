@@ -27,7 +27,7 @@ type SecretKey = blst.SecretKey
 
 // NewSecretKey generates a new secret key from the local source of
 // cryptographically secure randomness.
-func NewSecretKey() (*SecretKey, error) {
+func NewSigner() (*SecretKey, error) {
 	var ikm [32]byte
 	_, err := rand.Read(ikm[:])
 	if err != nil {

@@ -52,7 +52,7 @@ func ConsensusContext(ctx *snow.Context) *snow.ConsensusContext {
 func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 	require := require.New(tb)
 
-	secretKey, err := bls.NewSecretKey()
+	secretKey, err := bls.NewSigner()
 	require.NoError(err)
 	publicKey := bls.PublicFromSecretKey(secretKey)
 

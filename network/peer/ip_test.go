@@ -21,7 +21,7 @@ func TestSignedIpVerify(t *testing.T) {
 	cert1, err := staking.ParseCertificate(tlsCert1.Leaf.Raw)
 	require.NoError(t, err)
 	tlsKey1 := tlsCert1.PrivateKey.(crypto.Signer)
-	blsKey1, err := bls.NewSecretKey()
+	blsKey1, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	tlsCert2, err := staking.NewTLSCert()

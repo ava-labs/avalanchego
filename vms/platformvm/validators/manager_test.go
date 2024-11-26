@@ -39,7 +39,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		Upgrades:   upgrades,
 	})
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 	var (
 		subnetID      = ids.GenerateTestID()

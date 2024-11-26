@@ -1477,7 +1477,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		}
 	)
-	sk1, err := bls.NewSecretKey()
+	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 
@@ -1583,7 +1583,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	t.Logf("primaryEndHeight: %d", primaryEndHeight)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(t, err)
 	pk2 := bls.PublicFromSecretKey(sk2)
 
@@ -1749,7 +1749,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1918,7 +1918,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(

@@ -111,7 +111,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 		1,
 	))
 	tls := tlsCert.PrivateKey.(crypto.Signer)
-	bls, err := bls.NewSecretKey()
+	bls, err := bls.NewSigner()
 	require.NoError(err)
 
 	config.IPSigner = NewIPSigner(ip, tls, bls)
@@ -327,7 +327,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 		1,
 	))
 
-	bogusBLSKey, err := bls.NewSecretKey()
+	bogusBLSKey, err := bls.NewSigner()
 	require.NoError(err)
 	require.NoError(rawPeer1.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
@@ -348,7 +348,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 func TestShouldDisconnect(t *testing.T) {
 	peerID := ids.GenerateTestNodeID()
 	txID := ids.GenerateTestID()
-	blsKey, err := bls.NewSecretKey()
+	blsKey, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	tests := []struct {

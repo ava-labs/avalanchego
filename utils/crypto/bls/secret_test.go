@@ -33,7 +33,7 @@ func TestSecretKeyBytes(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(err)
 	sig := Sign(sk, msg)
 	skBytes := SecretKeyToBytes(sk)

@@ -162,7 +162,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 }
 
 func TestFilterValidators(t *testing.T) {
-	sk0, err := bls.NewSecretKey()
+	sk0, err := bls.NewSigner()
 	require.NoError(t, err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	vdr0 := &Validator{
@@ -171,7 +171,7 @@ func TestFilterValidators(t *testing.T) {
 		Weight:         1,
 	}
 
-	sk1, err := bls.NewSecretKey()
+	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
 	pk1 := bls.PublicFromSecretKey(sk1)
 	vdr1 := &Validator{
@@ -315,7 +315,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 	getValidatorOutputs := make([]*validators.GetValidatorOutput, 0, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nodeID := ids.GenerateTestNodeID()
-		blsPrivateKey, err := bls.NewSecretKey()
+		blsPrivateKey, err := bls.NewSigner()
 		require.NoError(b, err)
 		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
 		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{

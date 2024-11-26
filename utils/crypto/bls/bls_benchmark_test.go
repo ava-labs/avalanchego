@@ -35,7 +35,7 @@ var (
 )
 
 func BenchmarkSign(b *testing.B) {
-	privateKey, err := NewSecretKey()
+	privateKey, err := NewSigner()
 	require.NoError(b, err)
 	for _, messageSize := range sizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
@@ -51,7 +51,7 @@ func BenchmarkSign(b *testing.B) {
 }
 
 func BenchmarkVerify(b *testing.B) {
-	privateKey, err := NewSecretKey()
+	privateKey, err := NewSigner()
 	require.NoError(b, err)
 	publicKey := PublicFromSecretKey(privateKey)
 
@@ -72,7 +72,7 @@ func BenchmarkVerify(b *testing.B) {
 func BenchmarkAggregatePublicKeys(b *testing.B) {
 	keys := make([]*PublicKey, biggestSize)
 	for i := range keys {
-		privateKey, err := NewSecretKey()
+		privateKey, err := NewSigner()
 		require.NoError(b, err)
 
 		keys[i] = PublicFromSecretKey(privateKey)
@@ -89,7 +89,7 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 }
 
 func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(b, err)
 
 	pk := PublicFromSecretKey(sk)
@@ -101,7 +101,7 @@ func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
 }
 
 func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(b, err)
 
 	pk := PublicFromSecretKey(sk)
@@ -114,7 +114,7 @@ func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
 }
 
 func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(b, err)
 
 	pk := PublicFromSecretKey(sk)
@@ -126,7 +126,7 @@ func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
 }
 
 func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(b, err)
 
 	pk := PublicFromSecretKey(sk)
@@ -139,7 +139,7 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 }
 
 func BenchmarkSignatureFromBytes(b *testing.B) {
-	privateKey, err := NewSecretKey()
+	privateKey, err := NewSigner()
 	require.NoError(b, err)
 
 	message := utils.RandomBytes(32)

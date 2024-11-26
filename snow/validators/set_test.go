@@ -165,7 +165,7 @@ func TestSetGet(t *testing.T) {
 	_, ok := s.Get(nodeID)
 	require.False(ok)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	pk := bls.PublicFromSecretKey(sk)
@@ -232,7 +232,7 @@ func TestSetMap(t *testing.T) {
 	m := s.Map()
 	require.Empty(m)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	pk := bls.PublicFromSecretKey(sk)
@@ -330,7 +330,7 @@ func TestSetSample(t *testing.T) {
 	require.NoError(err)
 	require.Empty(sampled)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	nodeID0 := ids.GenerateTestNodeID()
@@ -385,7 +385,7 @@ func TestSetAddCallback(t *testing.T) {
 	require := require.New(t)
 
 	nodeID0 := ids.BuildTestNodeID([]byte{1})
-	sk0, err := bls.NewSecretKey()
+	sk0, err := bls.NewSigner()
 	require.NoError(err)
 	pk0 := bls.PublicFromSecretKey(sk0)
 	txID0 := ids.GenerateTestID()

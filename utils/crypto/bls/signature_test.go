@@ -16,7 +16,7 @@ func TestSignatureBytes(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(err)
 	sig := Sign(sk, msg)
 	sigBytes := SignatureToBytes(sig)
@@ -34,7 +34,7 @@ func TestAggregateSignaturesNoop(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(err)
 
 	sig := Sign(sk, msg)
