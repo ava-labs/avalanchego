@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"os"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -17,7 +16,7 @@ import (
 // run with in memory db, and
 // ./build/avalanchego --network-id=local --db-type=memdb --sybil-protection-enabled=false
 var (
-	NetworkId = constants.LocalID
+	NetworkId = constants.FujiID
 	// p chain id. 
 	ChainID = ids.FromStringOrPanic("11111111111111111111111111111111LpoYY")
 )
@@ -65,10 +64,10 @@ func main() {
 	
 	// Typically network.StartClose() should be called based on receiving a
 	// SIGINT or SIGTERM. For the example, we close the network after 15s.
-	go log.RecoverAndPanic(func() {
-		time.Sleep(15 * time.Second)
-		network.StartClose()
-	})
+	// go log.RecoverAndPanic(func() {
+	// 	time.Sleep(15 * time.Second)
+	// 	network.StartClose()
+	// })
 
 	exampleMsg, err := getStateSummaryMsg(log, ChainID)
 	if err != nil {
@@ -84,7 +83,15 @@ func main() {
 
 	// if local network we send to ourselves(since no peers will be returned)
 	sendToSelf(ctx, log, network, handler, exampleMsg)
-	sendToAllPeers(ctx, log, network, handler, exampleMsg)
+	peers, err := getAllPeers(ctx, log, network, handler)
+	if err != nil {
+		log.Fatal("failed to get and start peers",
+		zap.Error(err),
+		)
+	}
+	
+	log.Info("peers len: ", zap.Int("len", len(peers)))
+	send(ctx, log, peers, exampleMsg)
 
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
