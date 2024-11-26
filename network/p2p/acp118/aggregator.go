@@ -69,7 +69,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 	ctx context.Context,
 	message *warp.Message,
 	justification []byte,
-	validators []Validator,
+	validators []warp.Validator,
 	quorumNum uint64,
 	quorumDen uint64,
 ) (*warp.Message, uint64, uint64, error) {

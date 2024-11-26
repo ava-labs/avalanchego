@@ -45,7 +45,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		name        string
 		peers       map[ids.NodeID]p2p.Handler
 		ctx         context.Context
-		validators  []Validator
+		validators  []warp.Validator
 		quorumNum   uint64
 		quorumDen   uint64
 		wantMsg     *warp.Message
@@ -58,11 +58,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
 			wantSigners: []int{0},
@@ -83,21 +83,21 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 				{
-					NodeID:    nodeID1,
 					PublicKey: pk1,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
-					NodeID:    nodeID2,
 					PublicKey: pk2,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
 			wantSigners: []int{0},
@@ -115,21 +115,21 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 				{
-					NodeID:    nodeID1,
 					PublicKey: pk1,
 					Weight:    2,
+					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
-					NodeID:    nodeID2,
 					PublicKey: pk2,
 					Weight:    3,
+					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
 			wantSigners: []int{0, 1},
@@ -144,21 +144,21 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{}, signer2),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 				{
-					NodeID:    nodeID1,
 					PublicKey: pk1,
 					Weight:    2,
+					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
-					NodeID:    nodeID2,
 					PublicKey: pk2,
 					Weight:    3,
+					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
 			wantSigners: []int{0, 1, 2},
@@ -175,16 +175,16 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 				{
-					NodeID:    nodeID1,
 					PublicKey: pk1,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 			},
 			quorumNum:   1,
@@ -206,21 +206,21 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 				{
-					NodeID:    nodeID1,
 					PublicKey: pk1,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
-					NodeID:    nodeID2,
 					PublicKey: pk2,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
 			quorumNum:   2,
@@ -239,21 +239,21 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 				{
-					NodeID:    nodeID1,
 					PublicKey: pk1,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
-					NodeID:    nodeID2,
 					PublicKey: pk2,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
 			quorumNum:   1,
@@ -270,11 +270,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
 			wantErr:   ErrFailedAggregation,
@@ -292,11 +292,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 
 				return ctx
 			}(),
-			validators: []Validator{
+			validators: []warp.Validator{
 				{
-					NodeID:    nodeID0,
 					PublicKey: pk0,
 					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
 			quorumNum: 0,
@@ -327,7 +327,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				&warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}},
 			)
 			require.NoError(err)
-			gotMsg, gotNum, gotDen, err := aggregator.AggregateSignatures(
+			gotMsg, gotAggregatedStake, gotTotalStake, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
 				[]byte("justification"),
@@ -345,19 +345,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			bitSet := set.BitsFromBytes(bitSetSignature.Signers)
 			require.Equal(len(tt.wantSigners), bitSet.Len())
 
-			wantNum := uint64(0)
+			wantAggregatedStake := uint64(0)
 			for _, i := range tt.wantSigners {
 				require.True(bitSet.Contains(i))
-				wantNum += tt.validators[i].Weight
+				wantAggregatedStake += tt.validators[i].Weight
 			}
 
-			wantDen := uint64(0)
+			wantTotalStake := uint64(0)
 			for _, v := range tt.validators {
-				wantDen += v.Weight
+				wantTotalStake += v.Weight
 			}
 
-			require.Equal(wantNum, gotNum)
-			require.Equal(wantDen, gotDen)
+			require.Equal(wantAggregatedStake, gotAggregatedStake)
+			require.Equal(wantTotalStake, gotTotalStake)
 		})
 	}
 }
