@@ -44,7 +44,7 @@ func BenchmarkSign(b *testing.B) {
 			b.ResetTimer()
 
 			for n := 0; n < b.N; n++ {
-				_ = Sign(privateKey, message)
+				_ = privateKey.Sign(message)
 			}
 		})
 	}
@@ -53,12 +53,12 @@ func BenchmarkSign(b *testing.B) {
 func BenchmarkVerify(b *testing.B) {
 	privateKey, err := NewSigner()
 	require.NoError(b, err)
-	publicKey := PublicFromSecretKey(privateKey)
+	publicKey := PublicKey(privateKey)
 
 	for _, messageSize := range sizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
-			signature := Sign(privateKey, message)
+			signature := privateKey.Sign(message)
 
 			b.ResetTimer()
 
@@ -75,7 +75,7 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 		privateKey, err := NewSigner()
 		require.NoError(b, err)
 
-		keys[i] = PublicFromSecretKey(privateKey)
+		keys[i] = PublicKey(privateKey)
 	}
 
 	for _, size := range sizes {
@@ -92,7 +92,7 @@ func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicFromSecretKey(sk)
+	pk := PublicKey(sk)
 
 	b.ResetTimer()
 	for range b.N {
@@ -104,7 +104,7 @@ func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicFromSecretKey(sk)
+	pk := PublicKey(sk)
 	pkBytes := PublicKeyToCompressedBytes(pk)
 
 	b.ResetTimer()
@@ -117,7 +117,7 @@ func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicFromSecretKey(sk)
+	pk := PublicKey(sk)
 
 	b.ResetTimer()
 	for range b.N {
@@ -129,7 +129,7 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicFromSecretKey(sk)
+	pk := PublicKey(sk)
 	pkBytes := PublicKeyToUncompressedBytes(pk)
 
 	b.ResetTimer()
@@ -143,7 +143,7 @@ func BenchmarkSignatureFromBytes(b *testing.B) {
 	require.NoError(b, err)
 
 	message := utils.RandomBytes(32)
-	signature := Sign(privateKey, message)
+	signature := privateKey.Sign(message)
 	signatureBytes := SignatureToBytes(signature)
 
 	b.ResetTimer()

@@ -185,7 +185,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
-			PublicKey:    bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk)),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(sk).PublicKey(),
 			Weight:       1,
 		}
 		state = statetest.New(t, statetest.Config{})
@@ -250,7 +250,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 		nodeID1                    = ids.NodeID{5}
 		nodeID2                    = ids.NodeID{6}
 		nodeID3                    = ids.NodeID{6}
-		pk                         = bls.PublicFromSecretKey(sk)
+		pk                         = sk.PublicKey()
 		expiry                     = genesistest.DefaultValidatorStartTimeUnix + 1
 		weight              uint64 = 1
 	)
@@ -556,7 +556,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
-			PublicKey:    bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk)),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(sk).PublicKey(),
 			Weight:       weight,
 			MinNonce:     nonce + 1,
 		}

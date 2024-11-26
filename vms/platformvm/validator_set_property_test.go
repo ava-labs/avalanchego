@@ -424,7 +424,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			startTime: currentTime,
 			endTime:   endTime,
 			nodeID:    nodeID,
-			publicKey: bls.PublicFromSecretKey(sk),
+			publicKey: sk.PublicKey(),
 		})
 	default:
 		return nil, fmt.Errorf("unexpected initial event %d", events[0])
@@ -463,7 +463,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 				startTime: currentTime,
 				endTime:   endTime,
 				nodeID:    nodeID,
-				publicKey: bls.PublicFromSecretKey(sk),
+				publicKey: sk.PublicKey(),
 			}
 			res = append(res, val)
 			currentPrimaryVal = val

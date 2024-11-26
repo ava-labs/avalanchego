@@ -1479,7 +1479,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	)
 	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk1 := bls.PublicFromSecretKey(sk1)
+	pk1 := sk1.PublicKey()
 
 	// build primary network validator with BLS key
 	primaryTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1585,7 +1585,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// reinsert primary validator with a different BLS key
 	sk2, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk2 := bls.PublicFromSecretKey(sk2)
+	pk2 := sk2.PublicKey()
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{

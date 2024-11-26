@@ -2653,7 +2653,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 
 			var (
 				validationID = subnetID.Append(0)
-				pkBytes      = bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(sk))
+				pkBytes      = bls.PublicKeyToUncompressedBytes(sk).PublicKey()
 			)
 			remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.RemainingBalanceOwner)
 			require.NoError(err)
@@ -2804,7 +2804,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
 	remainingBalanceOwner := message.PChainOwner{}
@@ -2835,10 +2835,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	warpSignature := &warp.BitSetSignature{
 		Signers: set.NewBits(0).Bytes(),
 		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
-			bls.Sign(
-				sk,
-				unsignedWarp.Bytes(),
-			),
+			sk.Sign(unsignedWarp.Bytes()),
 		)),
 	}
 	warpMessage := must[*warp.Message](t)(warp.NewMessage(
@@ -3103,7 +3100,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
-					PublicKey:    bls.PublicKeyToUncompressedBytes(bls.PublicFromSecretKey(initialSK)),
+					PublicKey:    bls.PublicKeyToUncompressedBytes(initialSK).PublicKey(),
 					Weight:       1,
 				})
 			},
@@ -3355,10 +3352,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	warpSignature := &warp.BitSetSignature{
 		Signers: set.NewBits(0).Bytes(),
 		Signature: ([bls.SignatureLen]byte)(bls.SignatureToBytes(
-			bls.Sign(
-				sk,
-				unsignedIncreaseWeightWarpMessage.Bytes(),
-			),
+			sk.Sign(unsignedIncreaseWeightWarpMessage.Bytes()),
 		)),
 	}
 	increaseWeightWarpMessage := must[*warp.Message](t)(warp.NewMessage(

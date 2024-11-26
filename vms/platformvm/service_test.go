@@ -1077,7 +1077,7 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{
 			NodeID:    nodeID,
-			PublicKey: bls.PublicFromSecretKey(sk),
+			PublicKey: sk.PublicKey(),
 			Weight:    math.MaxUint64,
 		}
 	}

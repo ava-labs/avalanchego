@@ -19,7 +19,7 @@ func newBLSPublicKey(t *testing.T) [bls.PublicKeyLen]byte {
 	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToCompressedBytes(pk)
 	return [bls.PublicKeyLen]byte(pkBytes)
 }

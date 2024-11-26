@@ -645,7 +645,7 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 }
 
-func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
+func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 	if v.GetBool(StakingEphemeralSignerEnabledKey) {
 		key, err := bls.NewSigner()
 		if err != nil {
@@ -694,7 +694,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
 	}
 
-	keyBytes := bls.SecretKeyToBytes(key)
+	keyBytes := key.ToBytes()
 	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
 		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
 	}

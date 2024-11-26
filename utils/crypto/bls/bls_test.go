@@ -32,17 +32,17 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
-					PublicFromSecretKey(sk2),
+					PublicKey(sk0),
+					PublicKey(sk1),
+					PublicKey(sk2),
 				}
 
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
-					Sign(sk2, msg),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
+					sk2.Sign(msg),
 				}
 
 				return pks, sigs, msg
@@ -56,13 +56,13 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk),
+					PublicKey(sk),
 				}
 
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk, msg),
+					sk.Sign(msg),
 				}
 
 				return pks, sigs, msg
@@ -80,17 +80,17 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
-					PublicFromSecretKey(sk2),
+					PublicKey(sk0),
+					PublicKey(sk1),
+					PublicKey(sk2),
 				}
 
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
-					Sign(sk2, msg),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
+					sk2.Sign(msg),
 				}
 
 				msg[0]++
@@ -110,18 +110,18 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
-					PublicFromSecretKey(sk2),
+					PublicKey(sk0),
+					PublicKey(sk1),
+					PublicKey(sk2),
 				}
 
 				msg := utils.RandomBytes(1234)
 				msg2 := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
-					Sign(sk2, msg2),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
+					sk2.Sign(msg2),
 				}
 
 				return pks, sigs, msg
@@ -141,17 +141,17 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
-					PublicFromSecretKey(sk3),
+					PublicKey(sk0),
+					PublicKey(sk1),
+					PublicKey(sk3),
 				}
 
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
-					Sign(sk2, msg),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
+					sk2.Sign(msg),
 				}
 
 				return pks, sigs, msg
@@ -169,16 +169,16 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
-					PublicFromSecretKey(sk2),
+					PublicKey(sk0),
+					PublicKey(sk1),
+					PublicKey(sk2),
 				}
 
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
 				}
 
 				return pks, sigs, msg
@@ -196,16 +196,16 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
+					PublicKey(sk0),
+					PublicKey(sk1),
 				}
 
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
-					Sign(sk2, msg),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
+					sk2.Sign(msg),
 				}
 
 				return pks, sigs, msg
@@ -225,9 +225,9 @@ func TestAggregation(t *testing.T) {
 				msg := utils.RandomBytes(1234)
 
 				sigs := []*Signature{
-					Sign(sk0, msg),
-					Sign(sk1, msg),
-					Sign(sk2, msg),
+					sk0.Sign(msg),
+					sk1.Sign(msg),
+					sk2.Sign(msg),
 				}
 
 				return nil, sigs, msg
@@ -246,9 +246,9 @@ func TestAggregation(t *testing.T) {
 				require.NoError(err)
 
 				pks := []*PublicKey{
-					PublicFromSecretKey(sk0),
-					PublicFromSecretKey(sk1),
-					PublicFromSecretKey(sk2),
+					PublicKey(sk0),
+					PublicKey(sk1),
+					PublicKey(sk2),
 				}
 
 				msg := utils.RandomBytes(1234)
@@ -290,9 +290,9 @@ func TestAggregationThreshold(t *testing.T) {
 
 	// All the public keys would be registered on chain
 	pks := []*PublicKey{
-		PublicFromSecretKey(sk0),
-		PublicFromSecretKey(sk1),
-		PublicFromSecretKey(sk2),
+		PublicKey(sk0),
+		PublicKey(sk1),
+		PublicKey(sk2),
 	}
 
 	// The transaction's unsigned bytes are publicly known.
@@ -300,9 +300,9 @@ func TestAggregationThreshold(t *testing.T) {
 
 	// People may attempt time sign the transaction.
 	sigs := []*Signature{
-		Sign(sk0, msg),
-		Sign(sk1, msg),
-		Sign(sk2, msg),
+		sk0.Sign(msg),
+		sk1.Sign(msg),
+		sk2.Sign(msg),
 	}
 
 	// The signed transaction would specify which of the public keys have been
@@ -350,9 +350,9 @@ func TestVerify(t *testing.T) {
 			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
 				sk, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk)
+				pk := PublicKey(sk)
 				msg := utils.RandomBytes(1234)
-				sig := Sign(sk, msg)
+				sig := sk.Sign(msg)
 				return pk, sig, msg
 			},
 			expectedValid: true,
@@ -362,9 +362,9 @@ func TestVerify(t *testing.T) {
 			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
 				sk, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk)
+				pk := PublicKey(sk)
 				msg := utils.RandomBytes(1234)
-				sig := Sign(sk, msg)
+				sig := sk.Sign(msg)
 				msg[0]++
 				return pk, sig, msg
 			},
@@ -376,11 +376,11 @@ func TestVerify(t *testing.T) {
 				sk, err := NewSigner()
 				require.NoError(err)
 				msg := utils.RandomBytes(1234)
-				sig := Sign(sk, msg)
+				sig := sk.Sign(msg)
 
 				sk2, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk2)
+				pk := PublicKey(sk2)
 				return pk, sig, msg
 			},
 			expectedValid: false,
@@ -390,11 +390,11 @@ func TestVerify(t *testing.T) {
 			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
 				sk, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk)
+				pk := PublicKey(sk)
 				msg := utils.RandomBytes(1234)
 
 				msg2 := utils.RandomBytes(1234)
-				sig2 := Sign(sk, msg2)
+				sig2 := sk.Sign(msg2)
 				return pk, sig2, msg
 			},
 			expectedValid: false,
@@ -426,9 +426,9 @@ func TestVerifyProofOfPossession(t *testing.T) {
 			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
 				sk, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk)
+				pk := PublicKey(sk)
 				msg := utils.RandomBytes(1234)
-				sig := SignProofOfPossession(sk, msg)
+				sig := sk.SignProofOfPossession(msg)
 				return pk, sig, msg
 			},
 			expectedValid: true,
@@ -438,9 +438,9 @@ func TestVerifyProofOfPossession(t *testing.T) {
 			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
 				sk, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk)
+				pk := PublicKey(sk)
 				msg := utils.RandomBytes(1234)
-				sig := SignProofOfPossession(sk, msg)
+				sig := sk.SignProofOfPossession(msg)
 				msg[0]++
 				return pk, sig, msg
 			},
@@ -452,11 +452,11 @@ func TestVerifyProofOfPossession(t *testing.T) {
 				sk, err := NewSigner()
 				require.NoError(err)
 				msg := utils.RandomBytes(1234)
-				sig := SignProofOfPossession(sk, msg)
+				sig := sk.SignProofOfPossession(msg)
 
 				sk2, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk2)
+				pk := PublicKey(sk2)
 				return pk, sig, msg
 			},
 			expectedValid: false,
@@ -466,11 +466,11 @@ func TestVerifyProofOfPossession(t *testing.T) {
 			setup: func(require *require.Assertions) (*PublicKey, *Signature, []byte) {
 				sk, err := NewSigner()
 				require.NoError(err)
-				pk := PublicFromSecretKey(sk)
+				pk := PublicKey(sk)
 				msg := utils.RandomBytes(1234)
 
 				msg2 := utils.RandomBytes(1234)
-				sig2 := SignProofOfPossession(sk, msg2)
+				sig2 := sk.SignProofOfPossession(msg2)
 				return pk, sig2, msg
 			},
 			expectedValid: false,

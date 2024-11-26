@@ -808,7 +808,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := bls.Sign(sk, unsignedBytes)
+	sig := sk.Sign(unsignedBytes)
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 
@@ -899,10 +899,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
 				bls.SignatureToBytes(
-					bls.Sign(
-						sk,
-						unsignedWarp.Bytes(),
-					),
+					sk.Sign(unsignedWarp.Bytes()),
 				),
 			),
 		},

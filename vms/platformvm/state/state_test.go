@@ -792,7 +792,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		primaryStakers[i] = Staker{
 			TxID:            ids.GenerateTestID(),
 			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       bls.PublicFromSecretKey(sk),
+			PublicKey:       sk.PublicKey(),
 			SubnetID:        constants.PrimaryNetworkID,
 			Weight:          uint64(i + 1),
 			StartTime:       startTime.Add(timeOffset),
@@ -1516,12 +1516,12 @@ func TestL1Validators(t *testing.T) {
 
 	sk, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
 	otherSK, err := bls.NewSigner()
 	require.NoError(t, err)
-	otherPK := bls.PublicFromSecretKey(otherSK)
+	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
 
 	tests := []struct {
@@ -2018,7 +2018,7 @@ func TestLoadL1ValidatorAndLegacy(t *testing.T) {
 
 	sk, err := bls.NewSigner()
 	require.NoError(err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
 	l1Validator := L1Validator{
@@ -2096,12 +2096,12 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	sk, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
 	otherSK, err := bls.NewSigner()
 	require.NoError(t, err)
-	otherPK := bls.PublicFromSecretKey(otherSK)
+	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
 	now := time.Now()
 

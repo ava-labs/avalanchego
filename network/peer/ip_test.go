@@ -38,7 +38,7 @@ func TestSignedIpVerify(t *testing.T) {
 	type test struct {
 		name         string
 		tlsSigner    crypto.Signer
-		blsSigner    *bls.SecretKey
+		blsSigner    bls.Signer
 		expectedCert *staking.Certificate
 		ip           UnsignedIP
 		maxTimestamp time.Time

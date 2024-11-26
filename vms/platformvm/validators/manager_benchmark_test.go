@@ -118,7 +118,7 @@ func addPrimaryValidator(
 	if err := s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
-		PublicKey:       bls.PublicFromSecretKey(sk),
+		PublicKey:       sk.PublicKey(),
 		SubnetID:        constants.PrimaryNetworkID,
 		Weight:          2 * units.MegaAvax,
 		StartTime:       startTime,

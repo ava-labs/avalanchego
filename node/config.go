@@ -77,7 +77,7 @@ type StakingConfig struct {
 	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
 	PartialSyncPrimaryNetwork     bool            `json:"partialSyncPrimaryNetwork"`
 	StakingTLSCert                tls.Certificate `json:"-"`
-	StakingSigningKey             *bls.SecretKey  `json:"-"`
+	StakingSigningKey             bls.Signer      `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
 	StakingKeyPath                string          `json:"stakingKeyPath"`
 	StakingCertPath               string          `json:"stakingCertPath"`

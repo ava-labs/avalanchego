@@ -30,7 +30,7 @@ func TestVerifyWarpMessages(t *testing.T) {
 
 			return sk, &validators.GetValidatorOutput{
 				NodeID:    ids.GenerateTestNodeID(),
-				PublicKey: bls.PublicFromSecretKey(sk),
+				PublicKey: sk.PublicKey(),
 				Weight:    1,
 			}
 		}
@@ -59,8 +59,8 @@ func TestVerifyWarpMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		sig0 = bls.Sign(sk0, validUnsignedWarpMessage.Bytes())
-		sig1 = bls.Sign(sk1, validUnsignedWarpMessage.Bytes())
+		sig0 = sk0.Sign(validUnsignedWarpMessage.Bytes())
+		sig1 = sk1.Sign(validUnsignedWarpMessage.Bytes())
 	)
 	sig, err := bls.AggregateSignatures([]*bls.Signature{sig0, sig1})
 	require.NoError(t, err)

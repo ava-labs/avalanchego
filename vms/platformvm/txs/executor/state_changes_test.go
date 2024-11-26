@@ -237,7 +237,7 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 	)
 
 	var (
-		pk      = bls.PublicFromSecretKey(sk)
+		pk      = sk.PublicKey()
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
 		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {

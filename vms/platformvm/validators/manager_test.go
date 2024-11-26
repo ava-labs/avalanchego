@@ -45,7 +45,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		subnetID      = ids.GenerateTestID()
 		startTime     = genesistest.DefaultValidatorStartTime
 		endTime       = startTime.Add(24 * time.Hour)
-		pk            = bls.PublicFromSecretKey(sk)
+		pk            = sk.PublicKey()
 		primaryStaker = &state.Staker{
 			TxID:            ids.GenerateTestID(),
 			NodeID:          ids.GenerateTestNodeID(),

@@ -113,7 +113,7 @@ func main() {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := bls.Sign(sk, unsignedBytes)
+	sig := sk.Sign(unsignedBytes)
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 
