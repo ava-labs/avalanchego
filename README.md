@@ -69,11 +69,20 @@ Firewood guarantees recoverability by not referencing the new nodes in a new rev
  - [ ] Implement a node cache
  - [ ] Hook up the RPC
 
+## Build
+
+In order to build firewood, `protoc` must be installed. See instructions for installation [here](https://grpc.io/docs/protoc-installation/).
+
+On Mac, you can install via brew:
+```
+brew install protobuf
+```
+
 ## Run
 
 There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
---example simple`.
+--example insert`.
 
 For maximum performance, use `cargo run --maxperf` instead, which enables maximum
 link time compiler optimizations, but takes a lot longer to compile.
