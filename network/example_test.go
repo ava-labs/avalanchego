@@ -89,12 +89,21 @@ func ExampleNewTestNetwork() {
 	handler := &testExternalHandler{
 		log: log,
 	}
-
-	network, err := NewTestNetwork(
-		log,
+	cfg, err := NewTestNetworkConfig(
 		constants.FujiID,
 		validators,
 		trackedSubnets,
+	)
+	if err != nil {
+		log.Fatal(
+			"failed to create test network config",
+			zap.Error(err),
+		)
+		return
+	}
+	network, err := NewTestNetwork(
+		log,
+		cfg,
 		handler,
 	)
 	if err != nil {
