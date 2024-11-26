@@ -14,7 +14,7 @@ use std::{fs::File, iter::repeat_with, os::raw::c_int, path::Path};
 use storage::{MemStore, NodeStore};
 
 // To enable flamegraph output
-// cargo bench --bench shale-bench -- --profile-time=N
+// cargo bench --bench hashops -- --profile-time=N
 enum FlamegraphProfiler {
     Init(c_int),
     Active(ProfilerGuard<'static>),
@@ -137,8 +137,7 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().with_profiler(FlamegraphProfiler::Init(100));
-    // targets = bench_trie_hash, bench_merkle::<3, 32>, bench_db::<100>
-    targets = bench_merkle::<3, 4>, bench_merkle<3, 32>, bench_db<100>
+    targets = bench_merkle::<3, 4>, bench_merkle<3, 32>, bench_db::<100>
 }
 
 criterion_main!(benches);

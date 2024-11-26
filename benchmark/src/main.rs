@@ -36,9 +36,19 @@ struct Args {
     cache_size: NonZeroUsize,
     #[arg(short, long, default_value_t = 128)]
     revisions: usize,
-    #[arg(short = 'p', long, default_value_t = 3000)]
+    #[arg(
+        short = 'p',
+        long,
+        default_value_t = 3000,
+        help = "Port to listen for prometheus"
+    )]
     prometheus_port: u16,
-    #[arg(short = 's', long, default_value_t = false)]
+    #[arg(
+        short = 's',
+        long,
+        default_value_t = false,
+        help = "Dump prometheus stats on exit"
+    )]
     stats_dump: bool,
 
     #[clap(flatten)]

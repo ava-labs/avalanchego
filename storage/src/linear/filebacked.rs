@@ -53,9 +53,7 @@ impl FileBacked {
 
 impl ReadableStorage for FileBacked {
     fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, Error> {
-        let mut fd = self.fd.lock().expect("p");
-        fd.seek(std::io::SeekFrom::Start(addr))?;
-        Ok(Box::new(fd.try_clone().expect("poisoned lock")))
+        Ok(Box::new(PredictiveReader::new(self, addr)))
     }
 
     fn size(&self) -> Result<u64, Error> {
@@ -110,5 +108,121 @@ impl WritableStorage for FileBacked {
     fn add_to_free_list_cache(&self, addr: LinearAddress, next: Option<LinearAddress>) {
         let mut guard = self.free_list_cache.lock().expect("poisoned lock");
         guard.put(addr, next);
+    }
+}
+
+/// A reader that can predictively read from a file, avoiding reading past boundaries, but reading in 1k chunks
+struct PredictiveReader {
+    fd: File,
+    buffer: [u8; Self::PREDICTIVE_READ_BUFFER_SIZE],
+    offset: u64,
+    len: usize,
+    pos: usize,
+}
+
+impl PredictiveReader {
+    const PREDICTIVE_READ_BUFFER_SIZE: usize = 1024;
+
+    fn new(fb: &FileBacked, start: u64) -> Self {
+        let fd = fb
+            .fd
+            .lock()
+            .expect("poisoned lock")
+            .try_clone()
+            .expect("resource exhaustion");
+
+        Self {
+            fd,
+            buffer: [0u8; Self::PREDICTIVE_READ_BUFFER_SIZE],
+            offset: start,
+            len: 0,
+            pos: 0,
+        }
+    }
+}
+
+impl Read for PredictiveReader {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        if self.len == self.pos {
+            let bytes_left_in_page = Self::PREDICTIVE_READ_BUFFER_SIZE
+                - (self.offset % Self::PREDICTIVE_READ_BUFFER_SIZE as u64) as usize;
+            self.fd.seek(std::io::SeekFrom::Start(self.offset))?;
+            let read = self.fd.read(&mut self.buffer[..bytes_left_in_page])?;
+            self.offset += read as u64;
+            self.len = read;
+            self.pos = 0;
+        }
+        let max_to_return = std::cmp::min(buf.len(), self.len - self.pos);
+        buf[..max_to_return].copy_from_slice(&self.buffer[self.pos..self.pos + max_to_return]);
+        self.pos += max_to_return;
+        Ok(max_to_return)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn basic_reader_test() {
+        let mut tf = NamedTempFile::new().unwrap();
+        let path = tf.path().to_path_buf();
+        let output = tf.as_file_mut();
+        write!(output, "hello world").unwrap();
+
+        // whole thing at once, this is always less than 1K so it should
+        // read the whole thing in
+        let fb = FileBacked::new(
+            path,
+            NonZero::new(10).unwrap(),
+            NonZero::new(10).unwrap(),
+            false,
+        )
+        .unwrap();
+        let mut reader = fb.stream_from(0).unwrap();
+        let mut buf: String = String::new();
+        assert_eq!(reader.read_to_string(&mut buf).unwrap(), 11);
+        assert_eq!(buf, "hello world".to_string());
+        assert_eq!(0, reader.read(&mut [0u8; 1]).unwrap());
+
+        // byte at a time
+        let mut reader = fb.stream_from(0).unwrap();
+        for ch in b"hello world" {
+            let mut buf = [0u8; 1];
+            let read = reader.read(&mut buf).unwrap();
+            assert_eq!(read, 1);
+            assert_eq!(buf[0], *ch);
+        }
+        assert_eq!(0, reader.read(&mut [0u8; 1]).unwrap());
+
+        // with offset
+        let mut reader = fb.stream_from(6).unwrap();
+        buf = String::new();
+        assert_eq!(reader.read_to_string(&mut buf).unwrap(), 5);
+        assert_eq!(buf, "world".to_string());
+    }
+
+    #[test]
+    fn big_file() {
+        let mut tf = NamedTempFile::new().unwrap();
+        let path = tf.path().to_path_buf();
+        let output = tf.as_file_mut();
+        for _ in 0..1000 {
+            write!(output, "hello world").unwrap();
+        }
+
+        let fb = FileBacked::new(
+            path,
+            NonZero::new(10).unwrap(),
+            NonZero::new(10).unwrap(),
+            false,
+        )
+        .unwrap();
+        let mut reader = fb.stream_from(0).unwrap();
+        let mut buf: String = String::new();
+        assert_eq!(reader.read_to_string(&mut buf).unwrap(), 11000);
+        assert_eq!(buf.len(), 11000);
     }
 }
