@@ -130,8 +130,8 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	for _, nodeID := range sampleable {
 		go func() {
-			if err := s.client.AppRequest(ctx, set.Of(nodeIDCopy), requestBytes, job.HandleResponse); err != nil {
-				results <- result{Validator: nodeIDsToValidator[nodeIDCopy], Err: err}
+			if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, job.HandleResponse); err != nil {
+				results <- result{Validator: nodeIDsToValidator[nodeID], Err: err}
 			}
 		}()
 	}
