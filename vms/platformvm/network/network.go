@@ -29,7 +29,6 @@ type Network struct {
 	*p2p.Network
 
 	log                       logging.Logger
-	txVerifier                TxVerifier
 	mempool                   *gossipMempool
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
@@ -175,7 +174,6 @@ func New(
 	return &Network{
 		Network:                   p2pNetwork,
 		log:                       log,
-		txVerifier:                txVerifier,
 		mempool:                   gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
