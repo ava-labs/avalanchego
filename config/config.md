@@ -429,23 +429,8 @@ Path to a JSON file containing the genesis data to use. Ignored when running
 standard networks (Mainnet, Fuji Testnet), or when `--genesis-content` is
 specified. If not given, uses default genesis data.
 
-These are the main properties in the JSON file:
+See the documentation for the genesis JSON format [here](../genesis/README.md) and an example used for the local network genesis [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/).
 
-- `networkID`: A unique identifier for the blockchain, must be a number in the range [0, 2^32).
-- `allocations`: The list of initial addresses, their initial balances and the unlock schedule for each.
-- `startTime`: The time of the beginning of the blockchain, it must be a Unix
-  timestamp and it can't be a time in the future.
-- `initialStakeDuration`: The stake duration, in seconds, of the validators that exist at network genesis.
-- `initialStakeDurationOffset`: The offset, in seconds, between the start times
-  of the validators that exist at genesis.
-- `initialStakedFunds`: A list of addresses that own the funds staked at genesis
-  (each address must be present in `allocations` as well)
-- `initialStakers`: The validators that exist at genesis. Each element contains
-  the `rewardAddress`, NodeID and the `delegationFee` of the validator.
-- `cChainGenesis`: The genesis info to be passed to the C-Chain.
-- `message`: A message to include in the genesis. Not required.
-
-For an example of a JSON representation of genesis data, see [genesis_local.json](https://github.com/ava-labs/avalanchego/blob/master/genesis/genesis_local.json).
 
 #### `--genesis-file-content` (string)
 
