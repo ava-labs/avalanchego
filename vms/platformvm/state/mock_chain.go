@@ -487,21 +487,6 @@ func (mr *MockChainMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), utxoID)
 }
 
-// GetValidationID mocks base method.
-func (m *MockChain) GetValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidationID", subnetID, nodeID)
-	ret0, _ := ret[0].(ids.ID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetValidationID indicates an expected call of GetValidationID.
-func (mr *MockChainMockRecorder) GetValidationID(subnetID, nodeID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidationID", reflect.TypeOf((*MockChain)(nil).GetValidationID), subnetID, nodeID)
-}
-
 // HasExpiry mocks base method.
 func (m *MockChain) HasExpiry(arg0 ExpiryEntry) (bool, error) {
 	m.ctrl.T.Helper()
