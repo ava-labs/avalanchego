@@ -4,8 +4,8 @@
 
 ### APIs
 
-- Added `validationID` to `platform.getL1Validator`
-- Added L1 support to `platform.getCurrentValidators`
+- Added `validationID` to `platform.getL1Validator` outputs
+- Added L1 validators support to `platform.getCurrentValidators`
 
 ## [v1.11.13](https://github.com/ava-labs/avalanchego/releases/tag/v1.11.13)
 
