@@ -20,20 +20,28 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+func NewSelfClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler p2p.Handler) *p2p.Client {
+	return NewClient(t, ctx, nodeID, handler, nodeID, handler)
+}
+
 // NewClient generates a client-server pair and returns the client used to
 // communicate with a server with the specified handler
 func NewClient(
 	t *testing.T,
 	ctx context.Context,
-	handler p2p.Handler,
 	clientNodeID ids.NodeID,
+	clientHandler p2p.Handler,
 	serverNodeID ids.NodeID,
+	serverHandler p2p.Handler,
 ) *p2p.Client {
 	return NewClientWithPeers(
 		t,
 		ctx,
 		clientNodeID,
-		map[ids.NodeID]p2p.Handler{serverNodeID: handler},
+		clientHandler,
+		map[ids.NodeID]p2p.Handler{
+			serverNodeID: serverHandler,
+		},
 	)
 }
 
@@ -42,35 +50,33 @@ func NewClientWithPeers(
 	t *testing.T,
 	ctx context.Context,
 	clientNodeID ids.NodeID,
+	clientHandler p2p.Handler,
 	peers map[ids.NodeID]p2p.Handler,
 ) *p2p.Client {
-	clientSender := &enginetest.Sender{}
-	clientNetwork, err := p2p.NewNetwork(logging.NoLog{}, clientSender, prometheus.NewRegistry(), "")
-	require.NoError(t, err)
+	peers[clientNodeID] = clientHandler
 
 	peerSenders := make(map[ids.NodeID]*enginetest.Sender)
 	peerNetworks := make(map[ids.NodeID]*p2p.Network)
 	for nodeID := range peers {
 		peerSenders[nodeID] = &enginetest.Sender{}
-		serverNetwork, err := p2p.NewNetwork(logging.NoLog{}, peerSenders[nodeID], prometheus.NewRegistry(), "")
+		peerNetwork, err := p2p.NewNetwork(logging.NoLog{}, peerSenders[nodeID], prometheus.NewRegistry(), "")
 		require.NoError(t, err)
-		peerNetworks[nodeID] = serverNetwork
+		peerNetworks[nodeID] = peerNetwork
 	}
 
-	clientSender.SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
+	peerSenders[clientNodeID].SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
 		// Send the request asynchronously to avoid deadlock when the server
 		// sends the response back to the client
 		for nodeID := range peers {
-			nodeIDCopy := nodeID
 			go func() {
-				require.NoError(t, peerNetworks[nodeIDCopy].AppGossip(ctx, nodeIDCopy, gossipBytes))
+				require.NoError(t, peerNetworks[nodeID].AppGossip(ctx, nodeID, gossipBytes))
 			}()
 		}
 
 		return nil
 	}
 
-	clientSender.SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+	peerSenders[clientNodeID].SendAppRequestF = func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
 		for nodeID := range nodeIDs {
 			network, ok := peerNetworks[nodeID]
 			if !ok {
@@ -91,9 +97,8 @@ func NewClientWithPeers(
 		peerSenders[nodeID].SendAppResponseF = func(ctx context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 			// Send the request asynchronously to avoid deadlock when the server
 			// sends the response back to the client
-			nodeIDCopy := nodeID
 			go func() {
-				require.NoError(t, clientNetwork.AppResponse(ctx, nodeIDCopy, requestID, responseBytes))
+				require.NoError(t, peerNetworks[clientNodeID].AppResponse(ctx, nodeID, requestID, responseBytes))
 			}()
 
 			return nil
@@ -106,7 +111,7 @@ func NewClientWithPeers(
 			// sends the response back to the client
 			nodeIDCopy := nodeID
 			go func() {
-				require.NoError(t, clientNetwork.AppRequestFailed(ctx, nodeIDCopy, requestID, &common.AppError{
+				require.NoError(t, peerNetworks[clientNodeID].AppRequestFailed(ctx, nodeIDCopy, requestID, &common.AppError{
 					Code:    errorCode,
 					Message: errorMessage,
 				}))
@@ -116,13 +121,11 @@ func NewClientWithPeers(
 		}
 	}
 
-	require.NoError(t, clientNetwork.Connected(ctx, clientNodeID, nil))
 	for nodeID := range peers {
-		require.NoError(t, clientNetwork.Connected(ctx, nodeID, nil))
 		require.NoError(t, peerNetworks[nodeID].Connected(ctx, clientNodeID, nil))
 		require.NoError(t, peerNetworks[nodeID].Connected(ctx, nodeID, nil))
 		require.NoError(t, peerNetworks[nodeID].AddHandler(0, peers[nodeID]))
 	}
 
-	return clientNetwork.NewClient(0)
+	return peerNetworks[clientNodeID].NewClient(0)
 }
