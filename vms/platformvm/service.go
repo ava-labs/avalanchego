@@ -829,38 +829,9 @@ func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidato
 
 func (s *Service) getL1Validators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]interface{}, error) {
 	validators := []interface{}{}
-	var baseStakers []*state.Staker
-	var l1Validators []state.L1Validator
-	if nodeIDs.Len() == 0 {
-		var err error
-		baseStakers, l1Validators, _, err = s.vm.state.GetCurrentValidators(subnetID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		for nodeID := range nodeIDs {
-			// search in the L1 validators first
-			vID, err := s.vm.state.GetValidationID(subnetID, nodeID)
-			if err == nil {
-				l1Validator, err := s.vm.state.GetL1Validator(vID)
-				if err != nil {
-					return nil, err
-				}
-				l1Validators = append(l1Validators, l1Validator)
-				continue
-			}
-			if err != database.ErrNotFound {
-				return nil, err
-			}
-			// search in the base stakers
-			staker, err := s.vm.state.GetCurrentValidator(subnetID, nodeID)
-			if err != nil {
-				// return also database.ErrNotFound since
-				// we could not find the nodeID anywhere
-				return nil, err
-			}
-			baseStakers = append(baseStakers, staker)
-		}
+	baseStakers, l1Validators, _, err := s.vm.state.GetCurrentValidators(subnetID)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, staker := range baseStakers {

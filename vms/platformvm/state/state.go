@@ -351,7 +351,7 @@ type state struct {
 	l1ValidatorsDB      database.Database
 	weightsCache        cache.Cacher[ids.ID, uint64] // subnetID -> total L1 validator weight
 	weightsDB           database.Database
-	subnetIDNodeIDCache cache.Cacher[subnetIDNodeID, ids.ID] // subnetID+nodeID -> validationID, validation ID can be ids.Empty if validator is deleted
+	subnetIDNodeIDCache cache.Cacher[subnetIDNodeID, bool] // subnetID+nodeID -> is validator
 	subnetIDNodeIDDB    database.Database
 	activeDB            database.Database
 	inactiveCache       cache.Cacher[ids.ID, maybe.Maybe[L1Validator]] // validationID -> L1Validator
@@ -613,8 +613,8 @@ func New(
 	subnetIDNodeIDCache, err := metercacher.New(
 		"l1_validator_subnet_id_node_id_cache",
 		metricsReg,
-		cache.NewSizedLRU[subnetIDNodeID, ids.ID](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, ids.ID) int {
-			return ids.IDLen + ids.NodeIDLen + ids.IDLen
+		cache.NewSizedLRU[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
+			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
 		}),
 	)
 	if err != nil {
@@ -919,47 +919,26 @@ func (s *state) getPersistedL1Validator(validationID ids.ID) (L1Validator, error
 }
 
 func (s *state) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
-	// use GetValidationID since it use cache
-	_, err := s.GetValidationID(subnetID, nodeID)
-	if err == database.ErrNotFound {
-		return false, nil
-	}
-	return err == nil, err
-}
-
-func (s *state) GetValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, error) {
-	if vID, modified := s.l1ValidatorsDiff.getValidationID(subnetID, nodeID); modified {
-		// deleted
-		if vID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
-		return vID, nil
+	if has, modified := s.l1ValidatorsDiff.hasL1Validator(subnetID, nodeID); modified {
+		return has, nil
 	}
 
 	subnetIDNodeID := subnetIDNodeID{
 		subnetID: subnetID,
 		nodeID:   nodeID,
 	}
-	if vID, ok := s.subnetIDNodeIDCache.Get(subnetIDNodeID); ok {
-		// deleted
-		if vID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
-		return vID, nil
+	if has, ok := s.subnetIDNodeIDCache.Get(subnetIDNodeID); ok {
+		return has, nil
 	}
 
 	key := subnetIDNodeID.Marshal()
-	vIDBytes, err := s.subnetIDNodeIDDB.Get(key)
+	has, err := s.subnetIDNodeIDDB.Has(key)
 	if err != nil {
-		return ids.Empty, err
-	}
-	vID, err := ids.ToID(vIDBytes)
-	if err != nil {
-		return ids.Empty, err
+		return false, err
 	}
 
-	s.subnetIDNodeIDCache.Put(subnetIDNodeID, vID)
-	return vID, nil
+	s.subnetIDNodeIDCache.Put(subnetIDNodeID, has)
+	return has, nil
 }
 
 func (s *state) PutL1Validator(l1Validator L1Validator) error {
@@ -2844,7 +2823,7 @@ func (s *state) writeL1Validators() error {
 			return err
 		}
 
-		s.subnetIDNodeIDCache.Put(subnetIDNodeID, ids.Empty)
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, false)
 	}
 
 	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
@@ -2864,7 +2843,7 @@ func (s *state) writeL1Validators() error {
 			return err
 		}
 
-		s.subnetIDNodeIDCache.Put(subnetIDNodeID, validationID)
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, true)
 
 		// Add the new validator
 		var err error

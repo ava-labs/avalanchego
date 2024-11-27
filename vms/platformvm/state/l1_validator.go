@@ -73,9 +73,6 @@ type L1Validators interface {
 	// If an L1 validator is added with the same validationID as a previously
 	// removed L1 validator, the behavior is undefined.
 	PutL1Validator(l1Validator L1Validator) error
-
-	// GetValidationID returns the validationID of the L1 validator with the given subnetID and nodeID.
-	GetValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, error)
 }
 
 // L1Validator defines an ACP-77 validator. For a given ValidationID, it is
@@ -262,7 +259,7 @@ type l1ValidatorsDiff struct {
 	netAddedActive      int               // May be negative
 	modifiedTotalWeight map[ids.ID]uint64 // subnetID -> totalWeight
 	modified            map[ids.ID]L1Validator
-	modifiedGetNodeIDs  map[subnetIDNodeID]ids.ID
+	modifiedHasNodeIDs  map[subnetIDNodeID]bool
 	active              *btree.BTreeG[L1Validator]
 }
 
@@ -270,7 +267,7 @@ func newL1ValidatorsDiff() *l1ValidatorsDiff {
 	return &l1ValidatorsDiff{
 		modifiedTotalWeight: make(map[ids.ID]uint64),
 		modified:            make(map[ids.ID]L1Validator),
-		modifiedGetNodeIDs:  make(map[subnetIDNodeID]ids.ID),
+		modifiedHasNodeIDs:  make(map[subnetIDNodeID]bool),
 		active:              btree.NewG(defaultTreeDegree, L1Validator.Less),
 	}
 }
@@ -288,25 +285,13 @@ func (d *l1ValidatorsDiff) getActiveL1ValidatorsIterator(parentIterator iterator
 	)
 }
 
-// getValidationID returns the validationID of the L1 validator with the given
-// subnetID and nodeID. If the boolean is false, the validator is not in the
-// diff. If boolen is true and the validationID is empty, the validator has been
-// deleted.
-func (d *l1ValidatorsDiff) getValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, bool) {
+func (d *l1ValidatorsDiff) hasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, bool) {
 	subnetIDNodeID := subnetIDNodeID{
 		subnetID: subnetID,
 		nodeID:   nodeID,
 	}
-	vID, modified := d.modifiedGetNodeIDs[subnetIDNodeID]
-	return vID, modified
-}
-
-// hasL1Validator returns two booleans. The first boolean is true if the
-// validator exists or deleted. The second boolean is true if the validator has been
-// modified.
-func (d *l1ValidatorsDiff) hasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, bool) {
-	vID, modified := d.getValidationID(subnetID, nodeID)
-	return vID != ids.Empty, modified
+	has, modified := d.modifiedHasNodeIDs[subnetIDNodeID]
+	return has, modified
 }
 
 func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) error {
@@ -379,11 +364,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) 
 		subnetID: l1Validator.SubnetID,
 		nodeID:   l1Validator.NodeID,
 	}
-	if l1Validator.isDeleted() {
-		d.modifiedGetNodeIDs[subnetIDNodeID] = ids.Empty
-	} else {
-		d.modifiedGetNodeIDs[subnetIDNodeID] = l1Validator.ValidationID
-	}
+	d.modifiedHasNodeIDs[subnetIDNodeID] = !l1Validator.isDeleted()
 	if l1Validator.IsActive() {
 		d.active.ReplaceOrInsert(l1Validator)
 	}
