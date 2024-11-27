@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
@@ -84,9 +85,10 @@ func TestHandler(t *testing.T) {
 			c := p2ptest.NewClient(
 				t,
 				ctx,
-				h,
 				clientNodeID,
+				p2p.NoOpHandler{},
 				serverNodeID,
+				h,
 			)
 
 			unsignedMessage, err := warp.NewUnsignedMessage(

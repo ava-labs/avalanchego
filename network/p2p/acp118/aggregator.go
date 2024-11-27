@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -20,23 +21,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-// ErrFailedAggregation is returned if it's not possible for us to
-// generate a signature
-var (
-	ErrFailedAggregation  = errors.New("failed aggregation")
-	errFailedVerification = errors.New("failed verification")
-)
+var errFailedVerification = errors.New("failed verification")
 
 type indexedValidator struct {
-	warp.Validator
+	*warp.Validator
 	Index int
 }
 
 type result struct {
-	NodeID    ids.NodeID
-	Validator indexedValidator
-	Signature *bls.Signature
-	Err       error
+	NodeID      ids.NodeID
+	Validator   indexedValidator
+	Signature   *bls.Signature
+	Err         error
+	ShouldClose bool
 }
 
 // NewSignatureAggregator returns an instance of SignatureAggregator
@@ -62,10 +59,16 @@ func (s *SignatureAggregator) AggregateSignatures(
 	ctx context.Context,
 	message *warp.Message,
 	justification []byte,
-	validators []warp.Validator,
+	validators []*warp.Validator,
 	quorumNum uint64,
 	quorumDen uint64,
-) (*warp.Message, uint64, uint64, error) {
+) (
+	_ *warp.Message,
+	aggregatedStake *big.Int,
+	totalStake *big.Int,
+	finished bool,
+	_ error,
+) {
 	request := &sdk.SignatureRequest{
 		Message:       message.UnsignedMessage.Bytes(),
 		Justification: justification,
@@ -73,7 +76,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	requestBytes, err := proto.Marshal(request)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("failed to marshal signature request: %w", err)
+		return nil, nil, nil, false, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
 	publicKeysToValidators := make(map[*bls.PublicKey]indexedValidator)
@@ -81,22 +84,22 @@ func (s *SignatureAggregator) AggregateSignatures(
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
 	if !ok {
-		return nil, 0, 0, errors.New("invalid warp signature type")
+		return nil, nil, nil, false, errors.New("invalid warp signature type")
 	}
 
 	signerBitSet := set.BitsFromBytes(bitSetSignature.Signers)
 
 	nonSigners := make([]*bls.PublicKey, 0, len(validators))
-	aggregatedStakeWeight := uint64(0)
-	totalStakeWeight := uint64(0)
+	aggregatedStakeWeight := new(big.Int)
+	totalStakeWeight := new(big.Int)
 	numRequests := 0
 	for i, v := range validators {
-		totalStakeWeight += v.Weight
+		totalStakeWeight.Add(totalStakeWeight, new(big.Int).SetUint64(v.Weight))
 
 		// Only try to aggregate signatures from validators that are not already in
 		// the signer bit set
 		if signerBitSet.Contains(i) {
-			aggregatedStakeWeight += v.Weight
+			aggregatedStakeWeight.Add(aggregatedStakeWeight, new(big.Int).SetUint64(v.Weight))
 			continue
 		}
 
@@ -117,14 +120,14 @@ func (s *SignatureAggregator) AggregateSignatures(
 	if bitSetSignature.Signature != [bls.SignatureLen]byte{} {
 		blsSignature, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
 		if err != nil {
-			return nil, 0, 0, fmt.Errorf("failed to parse bls signature: %w", err)
+			return nil, nil, nil, false, fmt.Errorf("failed to parse bls signature: %w", err)
 		}
 		signatures = append(signatures, blsSignature)
 	}
 
-	//TODO better than buffered channel?
+	// TODO something better than a buffered channel?
 	results := make(chan result, numRequests)
-	job := responseHandler{
+	handler := responseHandler{
 		message:                message,
 		publicKeysToValidators: publicKeysToValidators,
 		nodeIDsToPublicKeys:    nodeIDsToPublicKeys,
@@ -134,14 +137,14 @@ func (s *SignatureAggregator) AggregateSignatures(
 	for _, pk := range nonSigners {
 		validator := publicKeysToValidators[pk]
 		for _, nodeID := range validator.NodeIDs {
-			if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, job.HandleResponse); err != nil {
-				results <- result{NodeID: nodeID, Validator: validator, Err: err}
-				// TODO fatal
+			if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, handler.HandleResponse); err != nil {
+				results <- result{NodeID: nodeID, Validator: validator, Err: err, ShouldClose: true}
 			}
 		}
 	}
 
-	minThreshold := (totalStakeWeight * quorumNum) / quorumDen
+	minThreshold := new(big.Int).Mul(totalStakeWeight, new(big.Int).SetUint64(quorumNum))
+	minThreshold.Div(minThreshold, new(big.Int).SetUint64(quorumDen))
 
 	for i := 0; i < numRequests; i++ {
 		select {
@@ -149,10 +152,10 @@ func (s *SignatureAggregator) AggregateSignatures(
 			// Try to return whatever progress we have if the context is cancelled
 			msg, err := newWarpMessage(message, signerBitSet, signatures)
 			if err != nil {
-				return nil, 0, 0, err
+				return nil, nil, nil, false, err
 			}
 
-			return msg, aggregatedStakeWeight, totalStakeWeight, nil
+			return msg, aggregatedStakeWeight, totalStakeWeight, false, nil
 		case result := <-results:
 			if result.Err != nil {
 				s.log.Debug(
@@ -160,7 +163,12 @@ func (s *SignatureAggregator) AggregateSignatures(
 					zap.Stringer("nodeID", result.NodeID),
 					zap.Error(err),
 				)
-				continue
+
+				if !result.ShouldClose {
+					continue
+				}
+
+				return nil, nil, nil, false, result.Err
 			}
 
 			if signerBitSet.Contains(result.Validator.Index) {
@@ -174,25 +182,25 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 			signatures = append(signatures, result.Signature)
 			signerBitSet.Add(result.Validator.Index)
-			aggregatedStakeWeight += result.Validator.Weight
+			aggregatedStakeWeight.Add(aggregatedStakeWeight, new(big.Int).SetUint64(result.Validator.Weight))
 
-			if aggregatedStakeWeight >= minThreshold {
+			if aggregatedStakeWeight.Cmp(minThreshold) != -1 {
 				msg, err := newWarpMessage(message, signerBitSet, signatures)
 				if err != nil {
-					return nil, 0, 0, err
+					return nil, nil, nil, false, err
 				}
 
-				return msg, aggregatedStakeWeight, totalStakeWeight, nil
+				return msg, aggregatedStakeWeight, totalStakeWeight, true, nil
 			}
 		}
 	}
 
 	msg, err := newWarpMessage(message, signerBitSet, signatures)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, nil, nil, false, err
 	}
 
-	return msg, aggregatedStakeWeight, totalStakeWeight, nil
+	return msg, aggregatedStakeWeight, totalStakeWeight, true, nil
 }
 
 func newWarpMessage(

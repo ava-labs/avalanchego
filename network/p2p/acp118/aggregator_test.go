@@ -5,6 +5,7 @@ package acp118
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,15 +43,16 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	signer2 := warp.NewSigner(sk2, networkID, chainID)
 
 	tests := []struct {
-		name        string
-		peers       map[ids.NodeID]p2p.Handler
-		ctx         context.Context
-		validators  []warp.Validator
-		quorumNum   uint64
-		quorumDen   uint64
-		wantMsg     *warp.Message
-		wantSigners []int
-		wantErr     error
+		name         string
+		peers        map[ids.NodeID]p2p.Handler
+		ctx          context.Context
+		validators   []warp.Validator
+		quorumNum    uint64
+		quorumDen    uint64
+		wantMsg      *warp.Message
+		wantSigners  []int
+		wantFinished bool
+		wantErr      error
 	}{
 		{
 			name: "aggregates from all validators 1/1",
@@ -65,9 +67,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
-			wantSigners: []int{0},
-			quorumNum:   1,
-			quorumDen:   1,
+			wantSigners:  []int{0},
+			wantFinished: true,
+			quorumNum:    1,
+			quorumDen:    1,
 		},
 		{
 			name: "aggregates from some validators - 1/3",
@@ -100,9 +103,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantSigners: []int{0},
-			quorumNum:   1,
-			quorumDen:   3,
+			wantSigners:  []int{0},
+			wantFinished: true,
+			quorumNum:    1,
+			quorumDen:    3,
 		},
 		{
 			name: "aggregates from some validators - 2/3",
@@ -132,9 +136,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantSigners: []int{0, 1},
-			quorumNum:   3,
-			quorumDen:   6,
+			wantSigners:  []int{0, 1},
+			wantFinished: true,
+			quorumNum:    3,
+			quorumDen:    6,
 		},
 		{
 			name: "aggregates from all validators - 3/3",
@@ -161,9 +166,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantSigners: []int{0, 1, 2},
-			quorumNum:   1,
-			quorumDen:   1,
+			wantSigners:  []int{0, 1, 2},
+			wantFinished: true,
+			quorumNum:    1,
+			quorumDen:    1,
 		},
 		{
 			name: "fails aggregation from some validators - 1/2",
@@ -187,10 +193,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 			},
-			quorumNum:   1,
-			quorumDen:   1,
-			wantSigners: []int{0},
-			wantErr:     ErrFailedAggregation,
+			quorumNum:    1,
+			quorumDen:    1,
+			wantSigners:  []int{0},
+			wantFinished: true,
 		},
 		{
 			name: "fails aggregation from some validators - 1/3",
@@ -223,10 +229,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			quorumNum:   2,
-			quorumDen:   3,
-			wantSigners: []int{0},
-			wantErr:     ErrFailedAggregation,
+			quorumNum:    2,
+			quorumDen:    3,
+			wantSigners:  []int{0},
+			wantFinished: true,
 		},
 		{
 			name: "fails aggregation from some validators - 2/3",
@@ -256,10 +262,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			quorumNum:   1,
-			quorumDen:   1,
-			wantSigners: []int{0, 1},
-			wantErr:     ErrFailedAggregation,
+			quorumNum:    1,
+			quorumDen:    1,
+			wantSigners:  []int{0, 1},
+			wantFinished: true,
 		},
 		{
 			name: "fails aggregation from all validators",
@@ -277,9 +283,9 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
-			wantErr:   ErrFailedAggregation,
-			quorumNum: 1,
-			quorumDen: 1,
+			wantFinished: true,
+			quorumNum:    1,
+			quorumDen:    1,
 		},
 		{
 			name: "context canceled",
@@ -312,6 +318,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				t,
 				context.Background(),
 				ids.EmptyNodeID,
+				p2p.NoOpHandler{},
 				tt.peers,
 			)
 			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
@@ -327,7 +334,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				&warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}},
 			)
 			require.NoError(err)
-			gotMsg, gotAggregatedStake, gotTotalStake, err := aggregator.AggregateSignatures(
+			gotMsg, gotAggregatedStake, gotTotalStake, finished, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
 				[]byte("justification"),
@@ -336,6 +343,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				tt.quorumDen,
 			)
 			require.ErrorIs(err, tt.wantErr)
+			require.Equal(tt.wantFinished, finished)
 
 			if tt.wantErr != nil {
 				return
@@ -345,15 +353,15 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			bitSet := set.BitsFromBytes(bitSetSignature.Signers)
 			require.Equal(len(tt.wantSigners), bitSet.Len())
 
-			wantAggregatedStake := uint64(0)
+			wantAggregatedStake := new(big.Int)
 			for _, i := range tt.wantSigners {
 				require.True(bitSet.Contains(i))
-				wantAggregatedStake += tt.validators[i].Weight
+				wantAggregatedStake.Add(wantAggregatedStake, new(big.Int).SetUint64(tt.validators[i].Weight))
 			}
 
-			wantTotalStake := uint64(0)
+			wantTotalStake := new(big.Int)
 			for _, v := range tt.validators {
-				wantTotalStake += v.Weight
+				wantTotalStake.Add(wantTotalStake, new(big.Int).SetUint64(v.Weight))
 			}
 
 			require.Equal(wantAggregatedStake, gotAggregatedStake)
