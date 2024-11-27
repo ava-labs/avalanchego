@@ -214,9 +214,10 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
-
-	GetL1Validators(ctx context.Context, l1ID ids.ID) ([]*Staker, []L1Validator, error)
+	// GetCurrentValidators returns legacy stakers, L1 validators for the given subnetID along with current P-chain height.
+	// Note: This is most convenient to fetch validators of an L1. Even though it can still return
+	// stakers of a subnet, it is not recommended to use this method to fetch stakers of a subnet.
+	GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -350,7 +351,7 @@ type state struct {
 	l1ValidatorsDB      database.Database
 	weightsCache        cache.Cacher[ids.ID, uint64] // subnetID -> total L1 validator weight
 	weightsDB           database.Database
-	subnetIDNodeIDCache cache.Cacher[subnetIDNodeID, bool] // subnetID+nodeID -> is validator
+	subnetIDNodeIDCache cache.Cacher[subnetIDNodeID, ids.ID] // subnetID+nodeID -> validationID, validation ID can be ids.Empty if validator is deleted
 	subnetIDNodeIDDB    database.Database
 	activeDB            database.Database
 	inactiveCache       cache.Cacher[ids.ID, maybe.Maybe[L1Validator]] // validationID -> L1Validator
@@ -612,8 +613,8 @@ func New(
 	subnetIDNodeIDCache, err := metercacher.New(
 		"l1_validator_subnet_id_node_id_cache",
 		metricsReg,
-		cache.NewSizedLRU[subnetIDNodeID, bool](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, bool) int {
-			return ids.IDLen + ids.NodeIDLen + wrappers.BoolLen
+		cache.NewSizedLRU[subnetIDNodeID, ids.ID](execCfg.L1SubnetIDNodeIDCacheSize, func(subnetIDNodeID, ids.ID) int {
+			return ids.IDLen + ids.NodeIDLen + ids.IDLen
 		}),
 	)
 	if err != nil {
@@ -836,14 +837,11 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetL1Validators(ctx context.Context, subnetID ids.ID) ([]*Staker, []L1Validator, error) {
+func (s *state) GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
 	var legacyStakers []*Staker
 	if legacyBaseStakers, ok := s.currentStakers.validators[subnetID]; ok {
 		for _, staker := range legacyBaseStakers {
-			if err := ctx.Err(); err != nil {
-				return nil, nil, err
-			}
 			legacyStakers = append(legacyStakers, staker.validator)
 		}
 	}
@@ -855,62 +853,18 @@ func (s *state) GetL1Validators(ctx context.Context, subnetID ids.ID) ([]*Staker
 	)
 	defer validationIDIter.Release()
 	for validationIDIter.Next() {
-		if err := ctx.Err(); err != nil {
-			return nil, nil, err
-		}
 		validationID, err := ids.ToID(validationIDIter.Value())
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse validation ID: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
 		vdr, err := s.GetL1Validator(validationID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get validator: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to get validator: %w", err)
 		}
 		l1Validators = append(l1Validators, vdr)
 	}
 
-	return legacyStakers, l1Validators, nil
-}
-
-func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
-	baseStakers, l1Validators, err := s.GetL1Validators(ctx, subnetID)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	for _, validator := range baseStakers {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
-		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validator.TxID,
-			NodeID:        validator.NodeID,
-			PublicKey:     validator.PublicKey,
-			Weight:        validator.Weight,
-			StartTime:     uint64(validator.StartTime.Unix()),
-			MinNonce:      0,
-			IsActive:      true,
-			IsL1Validator: false,
-		}
-	}
-
-	for _, validator := range l1Validators {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
-		result[validator.ValidationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validator.ValidationID,
-			NodeID:        validator.NodeID,
-			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey),
-			Weight:        validator.Weight,
-			StartTime:     validator.StartTime,
-			IsActive:      validator.isActive(),
-			MinNonce:      validator.MinNonce,
-			IsL1Validator: true,
-		}
-	}
-	return result, s.currentHeight, nil
+	return legacyStakers, l1Validators, s.currentHeight, nil
 }
 
 func (s *state) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
@@ -965,26 +919,47 @@ func (s *state) getPersistedL1Validator(validationID ids.ID) (L1Validator, error
 }
 
 func (s *state) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
-	if has, modified := s.l1ValidatorsDiff.hasL1Validator(subnetID, nodeID); modified {
-		return has, nil
+	// use GetValidationID since it use cache
+	_, err := s.GetValidationID(subnetID, nodeID)
+	if err == database.ErrNotFound {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func (s *state) GetValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, error) {
+	if vID, modified := s.l1ValidatorsDiff.getValidationID(subnetID, nodeID); modified {
+		// deleted
+		if vID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+		return vID, nil
 	}
 
 	subnetIDNodeID := subnetIDNodeID{
 		subnetID: subnetID,
 		nodeID:   nodeID,
 	}
-	if has, ok := s.subnetIDNodeIDCache.Get(subnetIDNodeID); ok {
-		return has, nil
+	if vID, ok := s.subnetIDNodeIDCache.Get(subnetIDNodeID); ok {
+		// deleted
+		if vID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+		return vID, nil
 	}
 
 	key := subnetIDNodeID.Marshal()
-	has, err := s.subnetIDNodeIDDB.Has(key)
+	vIDBytes, err := s.subnetIDNodeIDDB.Get(key)
 	if err != nil {
-		return false, err
+		return ids.Empty, err
+	}
+	vID, err := ids.ToID(vIDBytes)
+	if err != nil {
+		return ids.Empty, err
 	}
 
-	s.subnetIDNodeIDCache.Put(subnetIDNodeID, has)
-	return has, nil
+	s.subnetIDNodeIDCache.Put(subnetIDNodeID, vID)
+	return vID, nil
 }
 
 func (s *state) PutL1Validator(l1Validator L1Validator) error {
@@ -2497,7 +2472,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		switch err {
 		case nil:
 			// Modifying an existing validator
-			if priorL1Validator.isActive() == l1Validator.isActive() {
+			if priorL1Validator.IsActive() == l1Validator.IsActive() {
 				// This validator's active status isn't changing. This means
 				// the effectiveNodeIDs are equal.
 				nodeID := l1Validator.effectiveNodeID()
@@ -2869,7 +2844,7 @@ func (s *state) writeL1Validators() error {
 			return err
 		}
 
-		s.subnetIDNodeIDCache.Put(subnetIDNodeID, false)
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, ids.Empty)
 	}
 
 	for validationID, l1Validator := range s.l1ValidatorsDiff.modified {
@@ -2889,11 +2864,11 @@ func (s *state) writeL1Validators() error {
 			return err
 		}
 
-		s.subnetIDNodeIDCache.Put(subnetIDNodeID, true)
+		s.subnetIDNodeIDCache.Put(subnetIDNodeID, validationID)
 
 		// Add the new validator
 		var err error
-		if l1Validator.isActive() {
+		if l1Validator.IsActive() {
 			s.activeL1Validators.put(l1Validator)
 			err = putL1Validator(s.activeDB, emptyL1ValidatorCache, l1Validator)
 		} else {

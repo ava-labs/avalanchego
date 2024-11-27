@@ -73,6 +73,9 @@ type L1Validators interface {
 	// If an L1 validator is added with the same validationID as a previously
 	// removed L1 validator, the behavior is undefined.
 	PutL1Validator(l1Validator L1Validator) error
+
+	// GetValidationID returns the validationID of the L1 validator with the given subnetID and nodeID.
+	GetValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, error)
 }
 
 // L1Validator defines an ACP-77 validator. For a given ValidationID, it is
@@ -161,33 +164,33 @@ func (v L1Validator) isDeleted() bool {
 	return v.Weight == 0
 }
 
-func (v L1Validator) isActive() bool {
+func (v L1Validator) IsActive() bool {
 	return v.Weight != 0 && v.EndAccumulatedFee != 0
 }
 
 func (v L1Validator) effectiveValidationID() ids.ID {
-	if v.isActive() {
+	if v.IsActive() {
 		return v.ValidationID
 	}
 	return ids.Empty
 }
 
 func (v L1Validator) effectiveNodeID() ids.NodeID {
-	if v.isActive() {
+	if v.IsActive() {
 		return v.NodeID
 	}
 	return ids.EmptyNodeID
 }
 
 func (v L1Validator) effectivePublicKey() *bls.PublicKey {
-	if v.isActive() {
+	if v.IsActive() {
 		return bls.PublicKeyFromValidUncompressedBytes(v.PublicKey)
 	}
 	return nil
 }
 
 func (v L1Validator) effectivePublicKeyBytes() []byte {
-	if v.isActive() {
+	if v.IsActive() {
 		return v.PublicKey
 	}
 	return nil
@@ -259,7 +262,7 @@ type l1ValidatorsDiff struct {
 	netAddedActive      int               // May be negative
 	modifiedTotalWeight map[ids.ID]uint64 // subnetID -> totalWeight
 	modified            map[ids.ID]L1Validator
-	modifiedHasNodeIDs  map[subnetIDNodeID]bool
+	modifiedGetNodeIDs  map[subnetIDNodeID]ids.ID
 	active              *btree.BTreeG[L1Validator]
 }
 
@@ -267,7 +270,7 @@ func newL1ValidatorsDiff() *l1ValidatorsDiff {
 	return &l1ValidatorsDiff{
 		modifiedTotalWeight: make(map[ids.ID]uint64),
 		modified:            make(map[ids.ID]L1Validator),
-		modifiedHasNodeIDs:  make(map[subnetIDNodeID]bool),
+		modifiedGetNodeIDs:  make(map[subnetIDNodeID]ids.ID),
 		active:              btree.NewG(defaultTreeDegree, L1Validator.Less),
 	}
 }
@@ -285,20 +288,32 @@ func (d *l1ValidatorsDiff) getActiveL1ValidatorsIterator(parentIterator iterator
 	)
 }
 
-func (d *l1ValidatorsDiff) hasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, bool) {
+// getValidationID returns the validationID of the L1 validator with the given
+// subnetID and nodeID. If the boolean is false, the validator is not in the
+// diff. If boolen is true and the validationID is empty, the validator has been
+// deleted.
+func (d *l1ValidatorsDiff) getValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, bool) {
 	subnetIDNodeID := subnetIDNodeID{
 		subnetID: subnetID,
 		nodeID:   nodeID,
 	}
-	has, modified := d.modifiedHasNodeIDs[subnetIDNodeID]
-	return has, modified
+	vID, modified := d.modifiedGetNodeIDs[subnetIDNodeID]
+	return vID, modified
+}
+
+// hasL1Validator returns two booleans. The first boolean is true if the
+// validator exists or deleted. The second boolean is true if the validator has been
+// modified.
+func (d *l1ValidatorsDiff) hasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, bool) {
+	vID, modified := d.getValidationID(subnetID, nodeID)
+	return vID != ids.Empty, modified
 }
 
 func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) error {
 	var (
 		prevWeight uint64
 		prevActive bool
-		newActive  = l1Validator.isActive()
+		newActive  = l1Validator.IsActive()
 	)
 	switch priorL1Validator, err := state.GetL1Validator(l1Validator.ValidationID); err {
 	case nil:
@@ -307,7 +322,7 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) 
 		}
 
 		prevWeight = priorL1Validator.Weight
-		prevActive = priorL1Validator.isActive()
+		prevActive = priorL1Validator.IsActive()
 	case database.ErrNotFound:
 		// Verify that there is not a legacy subnet validator with the same
 		// subnetID+nodeID as this L1 validator.
@@ -364,8 +379,12 @@ func (d *l1ValidatorsDiff) putL1Validator(state Chain, l1Validator L1Validator) 
 		subnetID: l1Validator.SubnetID,
 		nodeID:   l1Validator.NodeID,
 	}
-	d.modifiedHasNodeIDs[subnetIDNodeID] = !l1Validator.isDeleted()
-	if l1Validator.isActive() {
+	if l1Validator.isDeleted() {
+		d.modifiedGetNodeIDs[subnetIDNodeID] = ids.Empty
+	} else {
+		d.modifiedGetNodeIDs[subnetIDNodeID] = l1Validator.ValidationID
+	}
+	if l1Validator.IsActive() {
 		d.active.ReplaceOrInsert(l1Validator)
 	}
 	return nil

@@ -258,6 +258,22 @@ func (d *diff) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) 
 	return parentState.HasL1Validator(subnetID, nodeID)
 }
 
+func (d *diff) GetValidationID(subnetID ids.ID, nodeID ids.NodeID) (ids.ID, error) {
+	if vID, modified := d.l1ValidatorsDiff.getValidationID(subnetID, nodeID); modified {
+		if vID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+		return vID, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return ids.Empty, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetValidationID(subnetID, nodeID)
+}
+
 func (d *diff) PutL1Validator(l1Validator L1Validator) error {
 	return d.l1ValidatorsDiff.putL1Validator(d, l1Validator)
 }

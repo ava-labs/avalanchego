@@ -805,42 +805,65 @@ func (s *Service) GetCurrentValidators(r *http.Request, args *GetCurrentValidato
 	}
 
 	// Check if subnet is L1
-	_, conversionErr := s.vm.state.GetSubnetToL1Conversion(args.SubnetID)
-	switch conversionErr {
-	case nil:
-		// Get the validators for L1
-		l1Validators, err := s.getL1Validators(r.Context(), args.SubnetID, nodeIDs)
-		if err != nil {
-			return err
-		}
-		reply.Validators = l1Validators
-	case database.ErrNotFound:
-		// Get the validators for the subnet
+	_, err := s.vm.state.GetSubnetToL1Conversion(args.SubnetID)
+	if err == database.ErrNotFound {
+		// Subnet is not L1, get validators for the subnet
 		subnetValidators, err := s.getPrimaryOrSubnetValidators(args.SubnetID, nodeIDs)
 		if err != nil {
 			return err
 		}
 		reply.Validators = subnetValidators
-
-	default:
-		return conversionErr
+		return nil
 	}
-
+	if err != nil {
+		return err
+	}
+	// Subnet is L1, get validators for L1
+	l1Validators, err := s.getL1Validators(args.SubnetID, nodeIDs)
+	if err != nil {
+		return err
+	}
+	reply.Validators = l1Validators
 	return nil
 }
 
-func (s *Service) getL1Validators(ctx context.Context, subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]interface{}, error) {
+func (s *Service) getL1Validators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) ([]interface{}, error) {
 	validators := []interface{}{}
-	baseStakers, l1Validators, err := s.vm.state.GetL1Validators(ctx, subnetID)
-	if err != nil {
-		return nil, err
+	var baseStakers []*state.Staker
+	var l1Validators []state.L1Validator
+	if nodeIDs.Len() == 0 {
+		var err error
+		baseStakers, l1Validators, _, err = s.vm.state.GetCurrentValidators(subnetID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		for nodeID := range nodeIDs {
+			// search in the L1 validators first
+			vID, err := s.vm.state.GetValidationID(subnetID, nodeID)
+			if err == nil {
+				l1Validator, err := s.vm.state.GetL1Validator(vID)
+				if err != nil {
+					return nil, err
+				}
+				l1Validators = append(l1Validators, l1Validator)
+				continue
+			}
+			if err != database.ErrNotFound {
+				return nil, err
+			}
+			// search in the base stakers
+			staker, err := s.vm.state.GetCurrentValidator(subnetID, nodeID)
+			if err != nil {
+				// return also database.ErrNotFound since
+				// we could not find the nodeID anywhere
+				return nil, err
+			}
+			baseStakers = append(baseStakers, staker)
+		}
 	}
 
 	for _, staker := range baseStakers {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-
 		nodeID := staker.NodeID
 		if nodeIDs.Len() != 0 && !nodeIDs.Contains(nodeID) {
 			continue
@@ -857,10 +880,6 @@ func (s *Service) getL1Validators(ctx context.Context, subnetID ids.ID, nodeIDs 
 	}
 
 	for _, l1Validator := range l1Validators {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-
 		nodeID := l1Validator.NodeID
 		if nodeIDs.Len() != 0 && !nodeIDs.Contains(nodeID) {
 			continue
