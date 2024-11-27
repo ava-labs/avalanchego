@@ -27,6 +27,6 @@ Each allocation contains the following fields:
 - `initialAmount`: Initial unlocked amount minted to the `avaxAddr` on the X-Chain
 - `unlockSchedule`: List of locked, stakeable UTXOs minted to `avaxAddr` on the P-Chain
 
-Note: if an `avaxAddr` from allocations is included in `initialStakers`, the genesis creates
-includes all the UTXOs in the `unlockSchedule` as part of the locked stake of the genesis
-validators. Otherwise, the locked UTXO is created directly on the P-Chain.
+Note: if an `avaxAddr` from allocations is included in `initialStakers`, the genesis includes
+all the UTXOs specified in the `unlockSchedule` as part of the locked stake of the corresponding
+genesis validator. Otherwise, the locked UTXO is created directly on the P-Chain.
