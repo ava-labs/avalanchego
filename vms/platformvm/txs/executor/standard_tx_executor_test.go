@@ -2653,7 +2653,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 
 			var (
 				validationID = subnetID.Append(0)
-				pkBytes      = bls.PublicKeyToUncompressedBytes(sk).PublicKey()
+				pkBytes      = bls.PublicKeyToUncompressedBytes(sk.PublicKey())
 			)
 			remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.RemainingBalanceOwner)
 			require.NoError(err)
@@ -3100,7 +3100,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 					ValidationID: ids.GenerateTestID(),
 					SubnetID:     subnetID,
 					NodeID:       nodeID,
-					PublicKey:    bls.PublicKeyToUncompressedBytes(initialSK).PublicKey(),
+					PublicKey:    bls.PublicKeyToUncompressedBytes(initialSK.PublicKey()),
 					Weight:       1,
 				})
 			},

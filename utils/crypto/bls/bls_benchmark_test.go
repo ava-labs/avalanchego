@@ -53,7 +53,7 @@ func BenchmarkSign(b *testing.B) {
 func BenchmarkVerify(b *testing.B) {
 	privateKey, err := NewSigner()
 	require.NoError(b, err)
-	publicKey := PublicKey(privateKey)
+	publicKey := privateKey.PublicKey()
 
 	for _, messageSize := range sizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
@@ -75,7 +75,7 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 		privateKey, err := NewSigner()
 		require.NoError(b, err)
 
-		keys[i] = PublicKey(privateKey)
+		keys[i] = privateKey.PublicKey()
 	}
 
 	for _, size := range sizes {
@@ -92,7 +92,7 @@ func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicKey(sk)
+	pk := sk.PublicKey()
 
 	b.ResetTimer()
 	for range b.N {
@@ -104,7 +104,7 @@ func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := PublicKeyToCompressedBytes(pk)
 
 	b.ResetTimer()
@@ -117,7 +117,7 @@ func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicKey(sk)
+	pk := sk.PublicKey()
 
 	b.ResetTimer()
 	for range b.N {
@@ -129,7 +129,7 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 	sk, err := NewSigner()
 	require.NoError(b, err)
 
-	pk := PublicKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := PublicKeyToUncompressedBytes(pk)
 
 	b.ResetTimer()

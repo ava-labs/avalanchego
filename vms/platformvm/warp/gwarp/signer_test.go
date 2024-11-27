@@ -21,7 +21,7 @@ import (
 type testSigner struct {
 	client    *Client
 	server    warp.Signer
-	sk        *bls.SecretKey
+	sk        bls.Signer
 	networkID uint32
 	chainID   ids.ID
 }

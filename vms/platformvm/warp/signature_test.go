@@ -35,7 +35,7 @@ var (
 
 type testValidator struct {
 	nodeID ids.NodeID
-	sk     *bls.SecretKey
+	sk     bls.Signer
 	vdr    *Validator
 }
 

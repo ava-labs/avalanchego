@@ -185,7 +185,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
-			PublicKey:    bls.PublicKeyToUncompressedBytes(sk).PublicKey(),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(sk.PublicKey()),
 			Weight:       1,
 		}
 		state = statetest.New(t, statetest.Config{})
@@ -556,7 +556,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 			ValidationID: ids.GenerateTestID(),
 			SubnetID:     ids.GenerateTestID(),
 			NodeID:       ids.GenerateTestNodeID(),
-			PublicKey:    bls.PublicKeyToUncompressedBytes(sk).PublicKey(),
+			PublicKey:    bls.PublicKeyToUncompressedBytes(sk.PublicKey()),
 			Weight:       weight,
 			MinNonce:     nonce + 1,
 		}

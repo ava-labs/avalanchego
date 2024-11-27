@@ -24,7 +24,7 @@ func TestVerifyWarpMessages(t *testing.T) {
 	var (
 		subnetID     = ids.GenerateTestID()
 		chainID      = ids.GenerateTestID()
-		newValidator = func() (*bls.SecretKey, *validators.GetValidatorOutput) {
+		newValidator = func() (bls.Signer, *validators.GetValidatorOutput) {
 			sk, err := bls.NewSigner()
 			require.NoError(t, err)
 
