@@ -1,20 +1,8 @@
----
-tags: [P-Chain, Platform Chain, AvalancheGo APIs]
-description: This page is an overview of the P-Chain API associated with AvalancheGo.
-sidebar_label: API
-pagination_label: P-Chain Transaction Format
----
-
-# Platform Chain API
-
-This API allows clients to interact with the
-[P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which
-maintains Avalanche’s [validator](/nodes/validate/how-to-stake#validators) set and handles
-blockchain creation.
+The P-Chain API allows clients to interact with the [P-Chain](/learn/avalanche/avalanche-platform.md#p-chain), which maintains Avalanche’s validator set and handles blockchain creation.
 
 ## Endpoint
 
-```sh
+```
 /ext/bc/P
 ```
 
@@ -26,23 +14,23 @@ This API uses the `json 2.0` RPC format.
 
 ### `platform.exportKey`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
-:::warning
+<Callout title="Warning" type="warn">
 
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/reference/avalanchego/keystore-api.md).
+Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
 
-:::
+</Callout>
 
 Get the private key that controls a given address.
 
 **Signature:**
 
-```sh
+```
 platform.exportKey({
     username: string,
     password: string,
@@ -83,17 +71,17 @@ curl -X POST --data '{
 
 ### `platform.getBalance`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get the balance of AVAX controlled by a given address.
 
 **Signature:**
 
-```sh
+```
 platform.getBalance({
     addresses: []string
 }) -> {
@@ -169,7 +157,7 @@ Get a block by its ID.
 
 **Signature:**
 
-```sh
+```
 platform.getBlock({
     blockID: string
     encoding: string // optional
@@ -302,7 +290,7 @@ Get a block by its height.
 
 **Signature:**
 
-```sh
+```
 platform.getBlockByHeight({
     height: int
     encoding: string // optional
@@ -431,25 +419,25 @@ curl -X POST --data '{
 
 ### `platform.getBlockchains`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get all the blockchains that exist (excluding the P-Chain).
 
 **Signature:**
 
-```sh
+```
 platform.getBlockchains() ->
 {
-    blockchains: []{
-        id: string,
-        name:string,
-        subnetID: string,
-        vmID: string
-    }
+  blockchains: []{
+    id: string,
+    name: string,
+    subnetID: string,
+    vmID: string
+  }
 }
 ```
 
@@ -531,11 +519,11 @@ Get the status of a blockchain.
 
 **Signature:**
 
-```sh
+```
 platform.getBlockchainStatus(
-    {
-        blockchainID: string
-    }
+  {
+    blockchainID: string
+  }
 ) -> {status: string}
 ```
 
@@ -581,10 +569,10 @@ an upper bound because it does not account for burnt tokens, including transacti
 
 **Signature:**
 
-```sh
-platform.getCurrentSupply({
-    subnetID: string // optional
-}) -> {supply: int}
+```
+platform.getCurrentSupply ({
+  subnetID: string // optional
+}) -> { supply: int }
 ```
 
 - `supply` is an upper bound on the number of tokens that exist.
@@ -622,10 +610,10 @@ List the current validators of the given Subnet.
 
 **Signature:**
 
-```sh
+```
 platform.getCurrentValidators({
-    subnetID: string, // optional
-    nodeIDs: string[], // optional
+  subnetID: string, // optional
+  nodeIDs: string[], // optional
 }) -> {
     validators: []{
         txID: string,
@@ -780,13 +768,108 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getFeeConfig`
+
+Returns the dynamic fees configuration of the P-chain.
+
+**Signature:**
+
+```
+platform.getFeeConfig() -> {
+  weights: []uint64,
+  maxCapacity: uint64,
+  maxPerSecond: uint64,
+  targetPerSecond: uint64,
+  minPrice: uint64,
+  excessConversionConstant: uint64
+}
+```
+
+- `weights` to merge fee dimensions into a single gas value
+- `maxCapacity` is the amount of gas the chain is allowed to store for future use
+- `maxPerSecond` is the amount of gas the chain is allowed to consume per second
+- `targetPerSecond` is the target amount of gas the chain should consume per second to keep fees stable
+- `minPrice` is the minimum price per unit of gas
+- `excessConversionConstant` is used to convert excess gas to a gas price
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "weights": [1,1000,1000,4],
+        "maxCapacity": 1000000,
+        "maxPerSecond": 100000,
+        "targetPerSecond": 50000,
+        "minPrice": 1,
+        "excessConversionConstant": 2164043
+    },
+    "id": 1
+}
+```
+
+### `platform.getFeeState`
+
+Returns the current fee state of the P-chain.
+
+**Signature:**
+
+```
+platform.getFeeState() -> {
+  capacity: uint64,
+  excess: uint64,
+  price: uint64,
+  timestamp: string
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "weights": [1,1000,1000,4],
+        "maxCapacity": 1000000,
+        "maxPerSecond": 100000,
+        "targetPerSecond": 50000,
+        "minPrice": 1,
+        "excessConversionConstant": 2164043
+    },
+    "id": 1
+}
+```
+
 ### `platform.getL1Validator`
 
 Returns a current L1 validator.
 
 **Signature:**
 
-```sh
+```
 platform.getL1Validator({
     validationID: string,
 }) -> {
@@ -870,10 +953,10 @@ Returns the height of the last accepted block.
 
 **Signature:**
 
-```sh
+```
 platform.getHeight() ->
 {
-    height: int,
+  height: int,
 }
 ```
 
@@ -906,10 +989,10 @@ Returns this node's current proposer VM height
 
 **Signature:**
 
-```sh
+```
 platform.getProposedHeight() ->
 {
-    height: int,
+  height: int,
 }
 ```
 
@@ -938,28 +1021,24 @@ curl -X POST --data '{
 
 ### `platform.getMaxStakeAmount`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Returns the maximum amount of nAVAX staking to the named node during a particular time period.
 
 **Signature:**
 
-```sh
-platform.getMaxStakeAmount(
-    {
-        subnetID: string,
-        nodeID: string,
-        startTime: int,
-        endTime: int
-    }
-) ->
+```
+platform.getMaxStakeAmount (
 {
-    amount: uint64
-}
+  subnetID: string,
+  nodeID: string,
+  startTime: int,
+  endTime: int
+}) -> { amount: uint64 }
 ```
 
 - `subnetID` is a Buffer or cb58 string representing Subnet
@@ -1005,13 +1084,13 @@ tokens that can be delegated.
 
 **Signature:**
 
-```sh
+```
 platform.getMinStake({
-    subnetID: string // optional
+  subnetID: string // optional
 }) ->
 {
-    minValidatorStake : uint64,
-    minDelegatorStake : uint64
+  minValidatorStake : uint64,
+  minDelegatorStake : uint64
 }
 ```
 
@@ -1048,10 +1127,10 @@ currently validating the Subnet but will in the future.
 
 **Signature:**
 
-```sh
+```
 platform.getPendingValidators({
-    subnetID: string, // optional
-    nodeIDs: string[], // optional
+  subnetID: string, // optional
+  nodeIDs: string[], // optional
 }) -> {
     validators: []{
         txID: string,
@@ -1145,18 +1224,18 @@ curl -X POST --data '{
 
 ### `platform.getRewardUTXOs`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Returns the UTXOs that were rewarded after the provided transaction's staking or delegation period
 ended.
 
 **Signature:**
 
-```sh
+```
 platform.getRewardUTXOs({
     txID: string,
     encoding: string // optional
@@ -1205,18 +1284,18 @@ curl -X POST --data '{
 
 ### `platform.getStake`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get the amount of nAVAX staked by a set of addresses. The amount returned does not include staking
 rewards.
 
 **Signature:**
 
-```sh
+```
 platform.getStake({
     addresses: []string,
     validatorsOnly: true or false
@@ -1276,7 +1355,7 @@ Retrieve an assetID for a Subnet’s staking asset.
 
 **Signature:**
 
-```sh
+```
 platform.getStakingAssetID({
     subnetID: string // optional
 }) -> {
@@ -1312,7 +1391,7 @@ curl -X POST --data '{
 }
 ```
 
-:::note
+<Callout title="Note">
 
 The AssetID for AVAX differs depending on the network you are on.
 
@@ -1320,7 +1399,7 @@ Mainnet: FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z
 
 Testnet: U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK
 
-:::
+</Callout>
 
 ### `platform.getSubnet`
 
@@ -1328,7 +1407,7 @@ Get owners and info about the Subnet or L1.
 
 **Signature:**
 
-```sh
+```
 platform.getSubnet({
     subnetID: string
 }) ->
@@ -1386,17 +1465,17 @@ curl -X POST --data '{
 
 ### `platform.getSubnets`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
 Get info about the Subnets.
 
 **Signature:**
 
-```sh
+```
 platform.getSubnets({
     ids: []string
 }) ->
@@ -1457,7 +1536,7 @@ Get the current P-Chain timestamp.
 
 **Signature:**
 
-```sh
+```
 platform.getTimestamp() -> {time: string}
 ```
 
@@ -1491,7 +1570,7 @@ Get the total amount of tokens staked on the requested Subnet.
 
 **Signature:**
 
-```sh
+```
 platform.getTotalStake({
     subnetID: string
 }) -> {
@@ -1566,7 +1645,7 @@ Optional `encoding` parameter to specify the format for the returned transaction
 
 **Signature:**
 
-```sh
+```
 platform.getTx({
     txID: string,
     encoding: string // optional
@@ -1675,10 +1754,10 @@ Gets a transaction’s status by its ID. If the transaction was dropped, respons
 
 **Signature:**
 
-```sh
+```
 platform.getTxStatus({
-    txID: string
-}) -> {status: string}
+  txID: string
+}) -> { status: string }
 ```
 
 `status` is one of:
@@ -1720,7 +1799,7 @@ Gets the UTXOs that reference a given set of addresses.
 
 **Signature:**
 
-```sh
+```
 platform.getUTXOs(
     {
         addresses: []string,
@@ -1888,7 +1967,7 @@ Get the validators and their weights of a Subnet or the Primary Network at a giv
 
 **Signature:**
 
-```sh
+```
 platform.getValidatorsAt(
     {
         height: [int|string],
@@ -1939,11 +2018,11 @@ Issue a transaction to the Platform Chain.
 
 **Signature:**
 
-```sh
+```
 platform.issueTx({
     tx: string,
     encoding: string, // optional
-}) -> {txID: string}
+}) -> { txID: string }
 ```
 
 - `tx` is the byte representation of a transaction.
@@ -1979,27 +2058,27 @@ curl -X POST --data '{
 
 ### `platform.listAddresses`
 
-:::caution
+<Callout title="Caution" type="warn">
 
 Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
 
-:::
+</Callout>
 
-:::warning
+<Callout title="Warning" type="warn">
 
-Not recommended for use on Mainnet. See warning notice in [Keystore API](/reference/avalanchego/keystore-api.md).
+Not recommended for use on Mainnet. See warning notice in [Keystore API](/api-reference/keystore-api).
 
-:::
+</Callout>
 
 List addresses controlled by the given user.
 
 **Signature:**
 
-```sh
+```
 platform.listAddresses({
     username: string,
     password: string
-}) -> {addresses: []string}
+}) -> { addresses: []string }
 ```
 
 **Example Call:**
@@ -2034,7 +2113,7 @@ Sample validators from the specified Subnet.
 
 **Signature:**
 
-```sh
+```
 platform.sampleValidators(
     {
         size: int,
@@ -2084,12 +2163,12 @@ Get the Subnet that validates a given blockchain.
 
 **Signature:**
 
-```sh
+```
 platform.validatedBy(
     {
         blockchainID: string
     }
-) -> {subnetID: string}
+) -> { subnetID: string }
 ```
 
 - `blockchainID` is the blockchain’s ID.
@@ -2126,12 +2205,12 @@ Get the IDs of the blockchains a Subnet validates.
 
 **Signature:**
 
-```sh
+```
 platform.validates(
     {
         subnetID: string
     }
-) -> {blockchainIDs: []string}
+) -> { blockchainIDs: []string }
 ```
 
 - `subnetID` is the Subnet’s ID.

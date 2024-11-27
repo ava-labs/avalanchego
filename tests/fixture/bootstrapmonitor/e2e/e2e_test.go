@@ -15,6 +15,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -89,14 +90,14 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		require := require.New(tc)
 
 		if skipAvalanchegoImageBuild {
-			tc.Outf("{{yellow}}skipping build of avalanchego image{{/}}\n")
+			tc.Log().Warn("skipping build of avalanchego image")
 		} else {
 			ginkgo.By("Building the avalanchego image")
 			buildAvalanchegoImage(tc, avalanchegoImage, false /* forceNewHash */)
 		}
 
 		if skipMonitorImageBuild {
-			tc.Outf("{{yellow}}skipping build of bootstrap-monitor image{{/}}\n")
+			tc.Log().Warn("skipping build of bootstrap-monitor image")
 		} else {
 			ginkgo.By("Building the bootstrap-monitor image")
 			buildImage(tc, monitorImage, false /* forceNewHash */, "build_bootstrap_monitor_image.sh")
@@ -142,7 +143,12 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		require.Eventually(func() bool {
 			testConfig, err := bootstrapmonitor.GetBootstrapTestConfigFromPod(tc.DefaultContext(), clientset, namespace, bootstrapPodName, nodeContainerName)
 			if err != nil {
-				tc.Outf("Error determining image used by the %q container of pod %s.%s: %v \n", nodeContainerName, namespace, bootstrapPodName, err)
+				tc.Log().Debug("failed to determine image used by the pod container",
+					zap.String("container", nodeContainerName),
+					zap.String("namespace", namespace),
+					zap.String("pod", bootstrapPodName),
+					zap.Error(err),
+				)
 				return false
 			}
 			if !strings.Contains(testConfig.Image, "sha256") {
@@ -177,7 +183,11 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 				return false
 			}
 			if err != nil {
-				tc.Outf("Error getting pod %s.%s: %v\n", namespace, bootstrapPodName, err)
+				tc.Log().Debug("failed to retrieve pod",
+					zap.String("namespace", namespace),
+					zap.String("pod", bootstrapPodName),
+					zap.Error(err),
+				)
 				return false
 			}
 			return pod.UID != podUID
@@ -193,7 +203,12 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		require.Eventually(func() bool {
 			testConfig, err := bootstrapmonitor.GetBootstrapTestConfigFromPod(tc.DefaultContext(), clientset, namespace, bootstrapPodName, nodeContainerName)
 			if err != nil {
-				tc.Outf("Error determining image used by the %q container of pod %s.%s: %v \n", nodeContainerName, namespace, bootstrapPodName, err)
+				tc.Log().Debug("failed to determine image used by the pod container",
+					zap.String("container", nodeContainerName),
+					zap.String("namespace", namespace),
+					zap.String("pod", bootstrapPodName),
+					zap.Error(err),
+				)
 				return false
 			}
 			if testConfig.Image != containerImage {
@@ -279,7 +294,7 @@ func waitForPodCondition(tc tests.TestContext, clientset *kubernetes.Clientset, 
 func waitForNodeHealthy(tc tests.TestContext, kubeconfig *restclient.Config, namespace string, podName string) ids.NodeID {
 	nodeID, err := tmpnet.WaitForNodeHealthy(
 		tc.DefaultContext(),
-		tc.Outf,
+		tc.Log(),
 		kubeconfig,
 		namespace,
 		podName,
@@ -421,9 +436,11 @@ func grantMonitorPermissions(tc tests.TestContext, clientset *kubernetes.Clients
 func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, namespace string, podName string, containerName string, desiredOutput string) {
 	// TODO(marun) Figure out why log output is randomly truncated (not flushed?)
 
-	outputLogLine(tc, fmt.Sprintf(
-		"Logs from: %q container of pod %s.%s (may not be complete)", containerName, namespace, podName))
-	outputLogLine(tc, strings.Repeat("=", 80))
+	tc.Log().Info("log output from container (may not be complete)",
+		zap.String("namespace", namespace),
+		zap.String("pod", podName),
+		zap.String("container", containerName),
+	)
 
 	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: containerName,
@@ -437,14 +454,9 @@ func waitForLogOutput(tc tests.TestContext, clientset *kubernetes.Clientset, nam
 	scanner := bufio.NewScanner(readCloser)
 	for scanner.Scan() {
 		line := scanner.Text()
-		outputLogLine(tc, line)
+		tc.Log().Info(" > " + line)
 		if len(desiredOutput) > 0 && strings.Contains(line, desiredOutput) {
 			return
 		}
 	}
-}
-
-// outputLogLine outputs logs in a consistent color
-func outputLogLine(tc tests.TestContext, line string) {
-	tc.Outf("{{light-gray}}%s{{/}}\n", line)
 }

@@ -63,12 +63,15 @@ func main() {
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
 	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-		SubnetIDs:    []ids.ID{subnetID},
-	})
+	wallet, err := primary.MakeWallet(
+		ctx,
+		uri,
+		kc,
+		kc,
+		primary.WalletConfig{
+			SubnetIDs: []ids.ID{subnetID},
+		},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
