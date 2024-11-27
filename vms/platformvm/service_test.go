@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor/executormock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -1591,7 +1590,7 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 
 			testValidator := func(vdr interface{}) ids.NodeID {
 				switch v := vdr.(type) {
-				case platformapi.Staker:
+				case pchainapi.Staker:
 					staker, exists := stakersByTxID[v.TxID]
 					require.True(exists, "unexpected validator: %s", vdr)
 					require.Equal(staker.NodeID, v.NodeID)

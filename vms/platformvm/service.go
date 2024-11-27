@@ -779,7 +779,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 // GetCurrentValidators returns the current validators. If a single nodeID
 // is provided, full delegators information is also returned. Otherwise only
 // delegators' number and total weight is returned.
-func (s *Service) GetCurrentValidators(r *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
+func (s *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentValidatorsArgs, reply *GetCurrentValidatorsReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
 		zap.String("method", "getCurrentValidators"),
