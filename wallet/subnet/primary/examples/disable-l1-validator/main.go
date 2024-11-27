@@ -25,12 +25,15 @@ func main() {
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
 	// [uri] is hosting and registers [validationID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:           uri,
-		AVAXKeychain:  kc,
-		EthKeychain:   kc,
-		ValidationIDs: []ids.ID{validationID},
-	})
+	wallet, err := primary.MakeWallet(
+		ctx,
+		uri,
+		kc,
+		kc,
+		primary.WalletConfig{
+			ValidationIDs: []ids.ID{validationID},
+		},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
