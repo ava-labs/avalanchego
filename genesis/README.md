@@ -9,7 +9,7 @@ The genesis JSON file contains the following properties:
 - `startTime`: The time of the beginning of the blockchain, it must be a Unix
   timestamp and it can't be a time in the future.
 - `initialStakeDuration`: The stake duration, in seconds, of the validators that exist at network genesis.
-- `initialStakeDurationOffset`: The offset, in seconds, between the start times
+- `initialStakeDurationOffset`: The offset, in seconds, between the end times
   of the validators that exist at genesis.
 - `initialStakedFunds`: A list of addresses that own the funds staked at genesis
   (each address must be present in `allocations` as well)
