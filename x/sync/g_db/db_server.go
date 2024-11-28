@@ -136,20 +136,6 @@ func (s *DBServer) CommitChangeProof(
 	return &emptypb.Empty{}, err
 }
 
-func (s *DBServer) GetProof(
-	ctx context.Context,
-	req *pb.GetProofRequest,
-) (*pb.GetProofResponse, error) {
-	proof, err := s.db.GetProof(ctx, req.Key)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.GetProofResponse{
-		Proof: proof.ToProto(),
-	}, nil
-}
-
 func (s *DBServer) GetRangeProof(
 	ctx context.Context,
 	req *pb.GetRangeProofRequest,

@@ -15,8 +15,6 @@ service DB {
 
   rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
 
-  rpc GetProof(GetProofRequest) returns (GetProofResponse);
-
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
   rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
@@ -28,20 +26,6 @@ service DB {
 
 message GetMerkleRootResponse {
   bytes root_hash = 1;
-}
-
-message GetProofRequest {
-  bytes key = 1;
-}
-
-message GetProofResponse {
-  Proof proof = 1;
-}
-
-message Proof {
-  bytes key = 1;
-  MaybeBytes value = 2;
-  repeated ProofNode proof = 3;
 }
 
 // For use in sync client, which has a restriction on the size of

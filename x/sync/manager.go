@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"slices"
 	"sync"
@@ -270,6 +271,10 @@ func (m *Manager) close() {
 		// Drop currently processing work items.
 		if m.cancelCtx != nil {
 			m.cancelCtx()
+		}
+
+		if closer, ok := m.config.DB.(io.Closer); ok {
+			_ = closer.Close()
 		}
 
 		// ensure any goroutines waiting for work from the heaps gets released
@@ -665,161 +670,28 @@ func (m *Manager) handleChangeProofResponse(
 // Invariant: [lastReceivedKey] < [rangeEnd].
 // If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 func (m *Manager) findNextKey(
-	ctx context.Context,
+	_ context.Context,
 	lastReceivedKey []byte,
-	rangeEnd maybe.Maybe[[]byte],
-	endProof []merkledb.ProofNode,
+	_ maybe.Maybe[[]byte],
+	_ []merkledb.ProofNode,
 ) (maybe.Maybe[[]byte], error) {
-	if len(endProof) == 0 {
-		// We try to find the next key to fetch by looking at the end proof.
-		// If the end proof is empty, we have no information to use.
-		// Start fetching from the next key after [lastReceivedKey].
-		nextKey := lastReceivedKey
-		nextKey = append(nextKey, 0)
+	type nextKeyer interface {
+		NextKey([]byte) ([]byte, error)
+	}
+	if nextKeyer, ok := m.config.DB.(nextKeyer); ok {
+		nextKey, err := nextKeyer.NextKey(lastReceivedKey)
+		if err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
 		return maybe.Some(nextKey), nil
-	}
-
-	// We want the first key larger than the [lastReceivedKey].
-	// This is done by taking two proofs for the same key
-	// (one that was just received as part of a proof, and one from the local db)
-	// and traversing them from the longest key to the shortest key.
-	// For each node in these proofs, compare if the children of that node exist
-	// or have the same ID in the other proof.
-	proofKeyPath := merkledb.ToKey(lastReceivedKey)
-
-	// If the received proof is an exclusion proof, the last node may be for a
-	// key that is after the [lastReceivedKey].
-	// If the last received node's key is after the [lastReceivedKey], it can
-	// be removed to obtain a valid proof for a prefix of the [lastReceivedKey].
-	if !proofKeyPath.HasPrefix(endProof[len(endProof)-1].Key) {
-		endProof = endProof[:len(endProof)-1]
-		// update the proofKeyPath to be for the prefix
-		proofKeyPath = endProof[len(endProof)-1].Key
-	}
-
-	// get a proof for the same key as the received proof from the local db
-	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Bytes())
-	if err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-	localProofNodes := localProofOfKey.Path
-
-	// The local proof may also be an exclusion proof with an extra node.
-	// Remove this extra node if it exists to get a proof of the same key as the received proof
-	if !proofKeyPath.HasPrefix(localProofNodes[len(localProofNodes)-1].Key) {
-		localProofNodes = localProofNodes[:len(localProofNodes)-1]
-	}
-
-	nextKey := maybe.Nothing[[]byte]()
-
-	// Add sentinel node back into the localProofNodes, if it is missing.
-	// Required to ensure that a common node exists in both proofs
-	if len(localProofNodes) > 0 && localProofNodes[0].Key.Length() != 0 {
-		sentinel := merkledb.ProofNode{
-			Children: map[byte]ids.ID{
-				localProofNodes[0].Key.Token(0, m.tokenSize): ids.Empty,
-			},
-		}
-		localProofNodes = append([]merkledb.ProofNode{sentinel}, localProofNodes...)
-	}
-
-	// Add sentinel node back into the endProof, if it is missing.
-	// Required to ensure that a common node exists in both proofs
-	if len(endProof) > 0 && endProof[0].Key.Length() != 0 {
-		sentinel := merkledb.ProofNode{
-			Children: map[byte]ids.ID{
-				endProof[0].Key.Token(0, m.tokenSize): ids.Empty,
-			},
-		}
-		endProof = append([]merkledb.ProofNode{sentinel}, endProof...)
-	}
-
-	localProofNodeIndex := len(localProofNodes) - 1
-	receivedProofNodeIndex := len(endProof) - 1
-
-	// traverse the two proofs from the deepest nodes up to the sentinel node until a difference is found
-	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey.IsNothing() {
-		localProofNode := localProofNodes[localProofNodeIndex]
-		receivedProofNode := endProof[receivedProofNodeIndex]
-
-		// [deepestNode] is the proof node with the longest key (deepest in the trie) in the
-		// two proofs that hasn't been handled yet.
-		// [deepestNodeFromOtherProof] is the proof node from the other proof with
-		// the same key/depth if it exists, nil otherwise.
-		var deepestNode, deepestNodeFromOtherProof *merkledb.ProofNode
-
-		// select the deepest proof node from the two proofs
-		switch {
-		case receivedProofNode.Key.Length() > localProofNode.Key.Length():
-			// there was a branch node in the received proof that isn't in the local proof
-			// see if the received proof node has children not present in the local proof
-			deepestNode = &receivedProofNode
-
-			// we have dealt with this received node, so move on to the next received node
-			receivedProofNodeIndex--
-
-		case localProofNode.Key.Length() > receivedProofNode.Key.Length():
-			// there was a branch node in the local proof that isn't in the received proof
-			// see if the local proof node has children not present in the received proof
-			deepestNode = &localProofNode
-
-			// we have dealt with this local node, so move on to the next local node
-			localProofNodeIndex--
-
-		default:
-			// the two nodes are at the same depth
-			// see if any of the children present in the local proof node are different
-			// from the children in the received proof node
-			deepestNode = &localProofNode
-			deepestNodeFromOtherProof = &receivedProofNode
-
-			// we have dealt with this local node and received node, so move on to the next nodes
-			localProofNodeIndex--
-			receivedProofNodeIndex--
-		}
-
-		// We only want to look at the children with keys greater than the proofKey.
-		// The proof key has the deepest node's key as a prefix,
-		// so only the next token of the proof key needs to be considered.
-
-		// If the deepest node has the same key as [proofKeyPath],
-		// then all of its children have keys greater than the proof key,
-		// so we can start at the 0 token.
-		startingChildToken := 0
-
-		// If the deepest node has a key shorter than the key being proven,
-		// we can look at the next token index of the proof key to determine which of that
-		// node's children have keys larger than [proofKeyPath].
-		// Any child with a token greater than the [proofKeyPath]'s token at that
-		// index will have a larger key.
-		if deepestNode.Key.Length() < proofKeyPath.Length() {
-			startingChildToken = int(proofKeyPath.Token(deepestNode.Key.Length(), m.tokenSize)) + 1
-		}
-
-		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
-		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildToken); hasDifference {
-			nextKey = maybe.Some(deepestNode.Key.Extend(merkledb.ToToken(childIndex, m.tokenSize)).Bytes())
-			break
-		}
-	}
-
-	// If the nextKey is before or equal to the [lastReceivedKey]
-	// then we couldn't find a better answer than the [lastReceivedKey].
-	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
-	// the open range (lastReceivedKey, rangeEnd).
-	if nextKey.HasValue() && bytes.Compare(nextKey.Value(), lastReceivedKey) <= 0 {
-		nextKeyVal := slices.Clone(lastReceivedKey)
-		nextKeyVal = append(nextKeyVal, 0)
-		nextKey = maybe.Some(nextKeyVal)
-	}
-
-	// If the [nextKey] is larger than the end of the range, return Nothing to signal that there is no next key in range
-	if rangeEnd.HasValue() && bytes.Compare(nextKey.Value(), rangeEnd.Value()) >= 0 {
-		return maybe.Nothing[[]byte](), nil
+	} else {
+		panic("not implemented")
 	}
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
-	return nextKey, nil
+	nextKey := lastReceivedKey
+	nextKey = append(nextKey, 0)
+	return maybe.Some(nextKey), nil
 }
 
 func (m *Manager) Error() error {
@@ -1001,6 +873,9 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
+	if len(mid.Value()) > 32 {
+		mid = maybe.Some(mid.Value()[:32])
+	}
 
 	if maybe.Equal(work.start, mid, bytes.Equal) || maybe.Equal(mid, work.end, bytes.Equal) {
 		// The range is too small to split.
