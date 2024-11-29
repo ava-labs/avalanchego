@@ -35,12 +35,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/metrics"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/libevm/common"
+	ethsnapshot "github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/triedb"
 )
 
 const (
@@ -118,28 +119,7 @@ var (
 )
 
 // Snapshot represents the functionality supported by a snapshot storage layer.
-type Snapshot interface {
-	// Root returns the root hash for which this snapshot was made.
-	Root() common.Hash
-
-	// Account directly retrieves the account associated with a particular hash in
-	// the snapshot slim data format.
-	Account(hash common.Hash) (*types.SlimAccount, error)
-
-	// AccountRLP directly retrieves the account RLP associated with a particular
-	// hash in the snapshot slim data format.
-	AccountRLP(hash common.Hash) ([]byte, error)
-
-	// Storage directly retrieves the storage data associated with a particular hash,
-	// within a particular account.
-	Storage(accountHash, storageHash common.Hash) ([]byte, error)
-
-	// AccountIterator creates an account iterator over the account trie given by the provided root hash.
-	AccountIterator(seek common.Hash) AccountIterator
-
-	// StorageIterator creates a storage iterator over the storage trie given by the provided root hash.
-	StorageIterator(account common.Hash, seek common.Hash) (StorageIterator, bool)
-}
+type Snapshot = ethsnapshot.Snapshot
 
 // snapshot is the internal version of the snapshot data layer that supports some
 // additional methods compared to the public API.
@@ -164,6 +144,12 @@ type snapshot interface {
 	// Stale return whether this layer has become stale (was flattened across) or
 	// if it's still live.
 	Stale() bool
+
+	// AccountIterator creates an account iterator over an arbitrary layer.
+	AccountIterator(seek common.Hash) AccountIterator
+
+	// StorageIterator creates a storage iterator over an arbitrary layer.
+	StorageIterator(account common.Hash, seek common.Hash) (StorageIterator, bool)
 }
 
 // Config includes the configurations for snapshots.
@@ -321,9 +307,44 @@ func (t *Tree) Snapshots(blockHash common.Hash, limits int, nodisk bool) []Snaps
 	return ret
 }
 
+type blockHashes struct {
+	blockHash       common.Hash
+	parentBlockHash common.Hash
+}
+
+func WithBlockHashes(blockHash, parentBlockHash common.Hash) stateconf.SnapshotUpdateOption {
+	return stateconf.WithUpdatePayload(blockHashes{blockHash, parentBlockHash})
+}
+
 // Update adds a new snapshot into the tree, if that can be linked to an existing
 // old parent. It is disallowed to insert a disk layer (the origin of all).
-func (t *Tree) Update(blockHash, blockRoot, parentBlockHash common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) error {
+func (t *Tree) Update(
+	blockRoot common.Hash,
+	parentRoot common.Hash,
+	destructs map[common.Hash]struct{},
+	accounts map[common.Hash][]byte,
+	storage map[common.Hash]map[common.Hash][]byte,
+	opts ...stateconf.SnapshotUpdateOption,
+) error {
+	if len(opts) == 0 {
+		return fmt.Errorf("missing block hashes")
+	}
+
+	payload := stateconf.ExtractUpdatePayload(opts[0])
+	p, ok := payload.(blockHashes)
+	if !ok {
+		return fmt.Errorf("invalid block hashes payload type: %T", payload)
+	}
+
+	return t.UpdateWithBlockHashes(p.blockHash, blockRoot, p.parentBlockHash, destructs, accounts, storage)
+}
+
+func (t *Tree) UpdateWithBlockHashes(
+	blockHash, blockRoot, parentBlockHash common.Hash,
+	destructs map[common.Hash]struct{},
+	accounts map[common.Hash][]byte,
+	storage map[common.Hash]map[common.Hash][]byte,
+) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -379,6 +400,10 @@ func (t *Tree) verifyIntegrity(base *diskLayer, waitBuild bool) error {
 	log.Info("Verified snapshot integrity", "root", base.root, "elapsed", time.Since(start))
 	t.verified = true
 	return nil
+}
+
+func (t *Tree) Cap(root common.Hash, layers int) error {
+	return nil // No-op as this code uses Flatten on block accept instead
 }
 
 // Flatten flattens the snapshot for [blockHash] into its parent. if its
@@ -823,7 +848,11 @@ func (t *Tree) AccountIterator(root common.Hash, seek common.Hash, force bool) (
 // account. The iterator will be move to the specific start position. When [force]
 // is true, a new account iterator is created without acquiring the [snapTree]
 // lock and without confirming that the snapshot on the disk layer is fully generated.
-func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek common.Hash, force bool) (StorageIterator, error) {
+func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek common.Hash) (StorageIterator, error) {
+	return t.StorageIteratorWithForce(root, account, seek, false)
+}
+
+func (t *Tree) StorageIteratorWithForce(root common.Hash, account common.Hash, seek common.Hash, force bool) (StorageIterator, error) {
 	if !force {
 		ok, err := t.generating()
 		if err != nil {
@@ -854,7 +883,7 @@ func (t *Tree) verify(root common.Hash, force bool) error {
 	defer acctIt.Release()
 
 	got, err := generateTrieRoot(nil, "", acctIt, common.Hash{}, stackTrieGenerate, func(db ethdb.KeyValueWriter, accountHash, codeHash common.Hash, stat *generateStats) (common.Hash, error) {
-		storageIt, err := t.StorageIterator(root, accountHash, common.Hash{}, force)
+		storageIt, err := t.StorageIteratorWithForce(root, accountHash, common.Hash{}, force)
 		if err != nil {
 			return common.Hash{}, err
 		}

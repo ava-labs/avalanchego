@@ -17,10 +17,10 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/assert"
 )
 

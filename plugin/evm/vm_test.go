@@ -24,8 +24,8 @@ import (
 	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/metrics"
-	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/trie"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,7 +97,7 @@ var (
 		if params.GetExtra(cfg).IsDurango(0) {
 			addr := common.HexToAddress("0x99b9DEA54C48Dfea6aA9A4Ca4623633EE04ddbB5")
 			balance := new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10))
-			g.Alloc[addr] = types.GenesisAccount{Balance: balance}
+			g.Alloc[addr] = types.Account{Balance: balance}
 		}
 
 		b, err := json.Marshal(g)
@@ -169,7 +169,7 @@ func newPrefundedGenesis(
 ) *core.Genesis {
 	alloc := types.GenesisAlloc{}
 	for _, address := range addresses {
-		alloc[address] = types.GenesisAccount{
+		alloc[address] = types.Account{
 			Balance: big.NewInt(int64(balance)),
 		}
 	}

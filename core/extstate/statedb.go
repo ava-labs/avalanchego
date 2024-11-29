@@ -15,8 +15,9 @@ import (
 
 type VmStateDB interface {
 	vm.StateDB
+	Logs() []*types.Log
+
 	GetTxHash() common.Hash
-	GetLogData() (topics [][]common.Hash, data [][]byte)
 	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
 	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
 	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
@@ -34,6 +35,16 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 	rulesExtra := params.GetRulesExtra(rules)
 	s.predicateStorageSlots = predicate.PreparePredicateStorageSlots(rulesExtra, list)
 	s.VmStateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
+}
+
+// GetLogData returns the underlying topics and data from each log included in the StateDB
+// Test helper function.
+func (s *StateDB) GetLogData() (topics [][]common.Hash, data [][]byte) {
+	for _, log := range s.Logs() {
+		topics = append(topics, log.Topics)
+		data = append(data, common.CopyBytes(log.Data))
+	}
+	return topics, data
 }
 
 // GetPredicateStorageSlots returns the storage slots associated with the address, index pair.

@@ -451,7 +451,7 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, engine consensus.E
 		}
 	)
 	accman, acc := newTestAccountManager(t)
-	gspec.Alloc[acc.Address] = types.GenesisAccount{Balance: big.NewInt(params.Ether)}
+	gspec.Alloc[acc.Address] = types.Account{Balance: big.NewInt(params.Ether)}
 	// Generate blocks for testing
 	db, blocks, _, _ := core.GenerateChainWithGenesis(gspec, engine, n, 10, generator)
 	chain, err := core.NewBlockChain(db, cacheConfig, gspec, engine, vm.Config{}, gspec.ToBlock().Hash(), false)

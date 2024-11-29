@@ -32,10 +32,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/trie/testutil"
-	"github.com/ava-labs/coreth/trie/triestate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie/testutil"
+	"github.com/ava-labs/libevm/trie/triestate"
 )
 
 // randomStateSet generates a random state change set.

@@ -11,10 +11,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/trie/trienode"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/trie/trienode"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/libevm/common"

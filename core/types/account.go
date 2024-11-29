@@ -29,7 +29,6 @@ import (
 )
 
 //go:generate go run github.com/fjl/gencodec -type Account -field-override accountMarshaling -out gen_account.go
-//go:generate go run github.com/fjl/gencodec -type GenesisAccount -field-override genesisAccountMarshaling -out gen_genesis_account.go
 
 // Account represents an Ethereum account and its attached data.
 // This type is used to specify accounts in the genesis block state, and
@@ -73,10 +72,10 @@ func (h storageJSON) MarshalText() ([]byte, error) {
 }
 
 // GenesisAlloc specifies the initial state of a genesis block.
-type GenesisAlloc map[common.Address]GenesisAccount
+type GenesisAlloc map[common.Address]Account
 
 func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
-	m := make(map[common.UnprefixedAddress]GenesisAccount)
+	m := make(map[common.UnprefixedAddress]Account)
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
@@ -85,24 +84,4 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 		(*ga)[common.Address(addr)] = a
 	}
 	return nil
-}
-
-type GenesisMultiCoinBalance map[common.Hash]*big.Int
-
-// GenesisAccount is an account in the state of the genesis block.
-type GenesisAccount struct {
-	Code       []byte                      `json:"code,omitempty"`
-	Storage    map[common.Hash]common.Hash `json:"storage,omitempty"`
-	Balance    *big.Int                    `json:"balance" gencodec:"required"`
-	MCBalance  GenesisMultiCoinBalance     `json:"mcbalance,omitempty"`
-	Nonce      uint64                      `json:"nonce,omitempty"`
-	PrivateKey []byte                      `json:"secretKey,omitempty"` // for tests
-}
-
-type genesisAccountMarshaling struct {
-	Code       hexutil.Bytes
-	Balance    *math.HexOrDecimal256
-	Nonce      math.HexOrDecimal64
-	Storage    map[storageJSON]storageJSON
-	PrivateKey hexutil.Bytes
 }

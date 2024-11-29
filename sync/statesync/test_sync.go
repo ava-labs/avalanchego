@@ -11,12 +11,12 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/sync/syncutils"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/assert"
 )
 

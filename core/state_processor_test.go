@@ -38,11 +38,11 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -113,7 +113,7 @@ func TestStateProcessorErrors(t *testing.T) {
 				Config:    config,
 				Timestamp: uint64(upgrade.InitiallyActiveTime.Unix()),
 				Alloc: types.GenesisAlloc{
-					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.GenesisAccount{
+					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.Account{
 						Balance: big.NewInt(4000000000000000000), // 4 ether
 						Nonce:   0,
 					},
@@ -278,7 +278,7 @@ func TestStateProcessorErrors(t *testing.T) {
 					},
 				),
 				Alloc: types.GenesisAlloc{
-					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.GenesisAccount{
+					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.Account{
 						Balance: big.NewInt(1000000000000000000), // 1 ether
 						Nonce:   0,
 					},
@@ -317,7 +317,7 @@ func TestStateProcessorErrors(t *testing.T) {
 			gspec = &Genesis{
 				Config: config,
 				Alloc: types.GenesisAlloc{
-					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.GenesisAccount{
+					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.Account{
 						Balance: big.NewInt(1000000000000000000), // 1 ether
 						Nonce:   0,
 						Code:    common.FromHex("0xB0B0FACE"),

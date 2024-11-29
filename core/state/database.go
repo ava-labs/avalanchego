@@ -31,15 +31,14 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/trie/trienode"
-	"github.com/ava-labs/coreth/trie/utils"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
+	ethstate "github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/trie/utils"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/crate-crypto/go-ipa/banderwagon"
 )
 
@@ -82,74 +81,7 @@ type Database interface {
 }
 
 // Trie is a Ethereum Merkle Patricia trie.
-type Trie interface {
-	// GetKey returns the sha3 preimage of a hashed key that was previously used
-	// to store a value.
-	//
-	// TODO(fjl): remove this when StateTrie is removed
-	GetKey([]byte) []byte
-
-	// GetAccount abstracts an account read from the trie. It retrieves the
-	// account blob from the trie with provided account address and decodes it
-	// with associated decoding algorithm. If the specified account is not in
-	// the trie, nil will be returned. If the trie is corrupted(e.g. some nodes
-	// are missing or the account blob is incorrect for decoding), an error will
-	// be returned.
-	GetAccount(address common.Address) (*types.StateAccount, error)
-
-	// GetStorage returns the value for key stored in the trie. The value bytes
-	// must not be modified by the caller. If a node was not found in the database,
-	// a trie.MissingNodeError is returned.
-	GetStorage(addr common.Address, key []byte) ([]byte, error)
-
-	// UpdateAccount abstracts an account write to the trie. It encodes the
-	// provided account object with associated algorithm and then updates it
-	// in the trie with provided address.
-	UpdateAccount(address common.Address, account *types.StateAccount) error
-
-	// UpdateStorage associates key with value in the trie. If value has length zero,
-	// any existing value is deleted from the trie. The value bytes must not be modified
-	// by the caller while they are stored in the trie. If a node was not found in the
-	// database, a trie.MissingNodeError is returned.
-	UpdateStorage(addr common.Address, key, value []byte) error
-
-	// DeleteAccount abstracts an account deletion from the trie.
-	DeleteAccount(address common.Address) error
-
-	// DeleteStorage removes any existing value for key from the trie. If a node
-	// was not found in the database, a trie.MissingNodeError is returned.
-	DeleteStorage(addr common.Address, key []byte) error
-
-	// UpdateContractCode abstracts code write to the trie. It is expected
-	// to be moved to the stateWriter interface when the latter is ready.
-	UpdateContractCode(address common.Address, codeHash common.Hash, code []byte) error
-
-	// Hash returns the root hash of the trie. It does not write to the database and
-	// can be used even if the trie doesn't have one.
-	Hash() common.Hash
-
-	// Commit collects all dirty nodes in the trie and replace them with the
-	// corresponding node hash. All collected nodes(including dirty leaves if
-	// collectLeaf is true) will be encapsulated into a nodeset for return.
-	// The returned nodeset can be nil if the trie is clean(nothing to commit).
-	// Once the trie is committed, it's not usable anymore. A new trie must
-	// be created with new root and updated trie database for following usage
-	Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error)
-
-	// NodeIterator returns an iterator that returns nodes of the trie. Iteration
-	// starts at the key after the given start key. And error will be returned
-	// if fails to create node iterator.
-	NodeIterator(startKey []byte) (trie.NodeIterator, error)
-
-	// Prove constructs a Merkle proof for key. The result contains all encoded nodes
-	// on the path to the value at key. The value itself is also included in the last
-	// node and can be retrieved by verifying the proof.
-	//
-	// If the trie does not contain a value for key, the returned proof contains all
-	// nodes of the longest existing prefix of the key (at least the root), ending
-	// with the node that proves the absence of the key.
-	Prove(key []byte, proofDb ethdb.KeyValueWriter) error
-}
+type Trie = ethstate.Trie
 
 // NewDatabase creates a backing store for state. The returned database is safe for
 // concurrent use, but does not retain any recent trie nodes in memory. To keep some

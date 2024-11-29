@@ -231,7 +231,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -264,7 +264,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -299,7 +299,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -331,7 +331,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, uint256.NewInt(50))
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -363,7 +363,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -384,7 +384,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -416,7 +416,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
 			},
@@ -437,7 +437,7 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, u256Hundred)
-				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
 			},

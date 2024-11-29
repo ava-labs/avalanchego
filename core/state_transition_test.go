@@ -100,7 +100,7 @@ func executeStateTransitionTest(t *testing.T, st stateTransitionTest) {
 		gspec = &Genesis{
 			Config: st.config,
 			Alloc: types.GenesisAlloc{
-				common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.GenesisAccount{
+				common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): types.Account{
 					Balance: big.NewInt(2000000000000000000), // 2 ether
 					Nonce:   0,
 				},

@@ -34,15 +34,15 @@ import (
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/trie/trienode"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/trie/trienode"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -176,9 +176,9 @@ func newHelper(scheme string) *testHelper {
 	diskdb := rawdb.NewMemoryDatabase()
 	config := &triedb.Config{}
 	if scheme == rawdb.PathScheme {
-		config.PathDB = &pathdb.Config{} // disable caching
+		config.DBOverride = pathdb.Config{}.BackendConstructor // disable caching
 	} else {
-		config.HashDB = &hashdb.Config{} // disable caching
+		config.DBOverride = hashdb.Config{}.BackendConstructor // disable caching
 	}
 	triedb := triedb.NewDatabase(diskdb, config)
 	accTrie, _ := trie.NewStateTrie(trie.StateTrieID(types.EmptyRootHash), triedb)
