@@ -32,8 +32,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/coreth/trie/triestate"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/trie/triestate"
 	"golang.org/x/exp/slices"
 )
 

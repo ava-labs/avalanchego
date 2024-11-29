@@ -35,11 +35,13 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/trie/trienode"
-	"github.com/ava-labs/coreth/trie/triestate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/trie/trienode"
+	"github.com/ava-labs/libevm/trie/triestate"
+	"github.com/ava-labs/libevm/triedb"
+	"github.com/ava-labs/libevm/triedb/database"
 )
 
 const (
@@ -99,6 +101,10 @@ type Config struct {
 	CleanCacheSize int    // Maximum memory allowance (in bytes) for caching clean nodes
 	DirtyCacheSize int    // Maximum memory allowance (in bytes) for caching dirty nodes
 	ReadOnly       bool   // Flag whether the database is opened in read only mode.
+}
+
+func (c Config) BackendConstructor(diskdb ethdb.Database, _ *triedb.Config) triedb.DBOverride {
+	return New(diskdb, &c)
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -220,7 +226,7 @@ func New(diskdb ethdb.Database, config *Config) *Database {
 }
 
 // Reader retrieves a layer belonging to the given state root.
-func (db *Database) Reader(root common.Hash) (layer, error) {
+func (db *Database) Reader(root common.Hash) (database.Reader, error) {
 	l := db.tree.get(root)
 	if l == nil {
 		return nil, fmt.Errorf("state %#x is not available", root)

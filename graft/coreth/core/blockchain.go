@@ -48,8 +48,6 @@ import (
 	"github.com/ava-labs/coreth/internal/version"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
@@ -58,6 +56,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 )
 
 var (
@@ -177,18 +177,19 @@ type CacheConfig struct {
 // triedbConfig derives the configures for trie database.
 func (c *CacheConfig) triedbConfig() *triedb.Config {
 	config := &triedb.Config{Preimages: c.Preimages}
-	if c.StateScheme == rawdb.HashScheme {
-		config.HashDB = &hashdb.Config{
+	if c.StateScheme == rawdb.HashScheme || c.StateScheme == "" {
+		config.DBOverride = hashdb.Config{
 			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
 			StatsPrefix:    trieCleanCacheStatsNamespace,
-		}
+			ReferenceRoot:  true, // Automatically reference root nodes when an update is made
+		}.BackendConstructor
 	}
 	if c.StateScheme == rawdb.PathScheme {
-		config.PathDB = &pathdb.Config{
+		config.DBOverride = pathdb.Config{
 			StateHistory:   c.StateHistory,
 			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
 			DirtyCacheSize: c.TrieDirtyLimit * 1024 * 1024,
-		}
+		}.BackendConstructor
 	}
 	return config
 }
@@ -1125,8 +1126,8 @@ func (bc *BlockChain) newTip(block *types.Block) bool {
 // canonical chain.
 // writeBlockAndSetHead expects to be the last verification step during InsertBlock
 // since it creates a reference that will only be cleaned up by Accept/Reject.
-func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
-	if err := bc.writeBlockWithState(block, receipts, state); err != nil {
+func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, parentRoot common.Hash, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) error {
+	if err := bc.writeBlockWithState(block, parentRoot, receipts, state); err != nil {
 		return err
 	}
 
@@ -1143,7 +1144,7 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 
 // writeBlockWithState writes the block and all associated state to the database,
 // but it expects the chain mutex to be held.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.StateDB) error {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, parentRoot common.Hash, receipts []*types.Receipt, state *state.StateDB) error {
 	// Irrelevant of the canonical status, write the block itself to the database.
 	//
 	// Note all the components of block(hash->number map, header, body, receipts)
@@ -1157,14 +1158,8 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	}
 
 	// Commit all cached state changes into underlying memory database.
-	// If snapshots are enabled, call CommitWithSnaps to explicitly create a snapshot
-	// diff layer for the block.
 	var err error
-	if bc.snaps == nil {
-		_, err = state.Commit(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()), true)
-	} else {
-		_, err = state.CommitWithSnap(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()), bc.snaps, block.Hash(), block.ParentHash(), true)
-	}
+	_, err = bc.commitWithSnap(block, parentRoot, state)
 	if err != nil {
 		return err
 	}
@@ -1367,7 +1362,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// will be cleaned up in Accept/Reject so we need to ensure an error cannot occur
 	// later in verification, since that would cause the referenced root to never be dereferenced.
 	wstart := time.Now()
-	if err := bc.writeBlockAndSetHead(block, receipts, logs, statedb); err != nil {
+	if err := bc.writeBlockAndSetHead(block, parent.Root, receipts, logs, statedb); err != nil {
 		return err
 	}
 	// Update the metrics touched during block commit
@@ -1667,7 +1662,7 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 		if snap == nil {
 			return common.Hash{}, fmt.Errorf("failed to get snapshot for parent root: %s", parentRoot)
 		}
-		statedb, err = state.NewWithSnapshot(parentRoot, bc.stateCache, snap)
+		statedb, err = state.New(parentRoot, bc.stateCache, bc.snaps)
 	}
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("could not fetch state for (%s: %d): %v", parent.Hash().Hex(), parent.NumberU64(), err)
@@ -1692,12 +1687,28 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	log.Debug("Processed block", "block", current.Hash(), "number", current.NumberU64())
 
 	// Commit all cached state changes into underlying memory database.
-	// If snapshots are enabled, call CommitWithSnaps to explicitly create a snapshot
-	// diff layer for the block.
-	if bc.snaps == nil {
-		return statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), false)
+	return bc.commitWithSnap(current, parentRoot, statedb)
+}
+
+func (bc *BlockChain) commitWithSnap(
+	current *types.Block, parentRoot common.Hash, statedb *state.StateDB,
+) (common.Hash, error) {
+	// blockHashes must be passed through Commit since snapshots are based on the
+	// block hash.
+	blockHashes := snapshot.WithBlockHashes(current.Hash(), current.ParentHash())
+	root, err := statedb.Commit(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), blockHashes)
+	if err != nil {
+		return common.Hash{}, err
 	}
-	return statedb.CommitWithSnap(current.NumberU64(), bc.chainConfig.IsEIP158(current.Number()), bc.snaps, current.Hash(), current.ParentHash(), false)
+	// Upstream does not perform a snapshot update if the root is the same as the
+	// parent root, however here the snapshots are based on the block hash, so
+	// this update is necessary. Note blockHashes are passed here as well.
+	if bc.snaps != nil && root == parentRoot {
+		if err := bc.snaps.Update(root, parentRoot, nil, nil, nil, blockHashes); err != nil {
+			return common.Hash{}, err
+		}
+	}
+	return root, nil
 }
 
 // initSnapshot instantiates a Snapshot instance and adds it to [bc]
@@ -1838,7 +1849,6 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		// Flatten snapshot if initialized, holding a reference to the state root until the next block
 		// is processed.
 		if err := bc.flattenSnapshot(func() error {
-			triedb.Reference(root, common.Hash{})
 			if previousRoot != (common.Hash{}) {
 				triedb.Dereference(previousRoot)
 			}

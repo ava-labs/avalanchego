@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/triedb"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
 	"github.com/davecgh/go-spew/spew"
@@ -93,7 +93,7 @@ func TestAccountRange(t *testing.T) {
 			m[addr] = true
 		}
 	}
-	root, _ := sdb.Commit(0, true, false)
+	root, _ := sdb.Commit(0, true)
 	sdb, _ = state.New(root, statedb, nil)
 
 	trie, err := statedb.OpenTrie(root)
@@ -151,7 +151,7 @@ func TestEmptyAccountRange(t *testing.T) {
 		st, _   = state.New(types.EmptyRootHash, statedb, nil)
 	)
 	// Commit(although nothing to flush) and re-init the statedb
-	st.Commit(0, true, false)
+	st.Commit(0, true)
 	st, _ = state.New(types.EmptyRootHash, statedb, nil)
 
 	results := st.RawDump(&state.DumpConfig{
@@ -197,7 +197,7 @@ func TestStorageRangeAt(t *testing.T) {
 	for _, entry := range storage {
 		sdb.SetState(addr, *entry.Key, entry.Value)
 	}
-	root, _ := sdb.Commit(0, false, false)
+	root, _ := sdb.Commit(0, false)
 	sdb, _ = state.New(root, db, nil)
 
 	// Check a few combinations of limit and start/end.

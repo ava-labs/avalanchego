@@ -32,11 +32,11 @@ import (
 
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/coreth/core/rawdb"
-	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/trie/trienode"
 )
 
 // nodebuffer is a collection of modified trie nodes to aggregate the disk

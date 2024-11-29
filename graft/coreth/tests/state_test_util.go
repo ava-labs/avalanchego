@@ -31,11 +31,11 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 )
 
@@ -50,9 +50,9 @@ type StateTestState struct {
 func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bool, scheme string) StateTestState {
 	tconf := &triedb.Config{Preimages: true}
 	if scheme == rawdb.HashScheme {
-		tconf.HashDB = hashdb.Defaults
+		tconf.DBOverride = hashdb.Defaults.BackendConstructor
 	} else {
-		tconf.PathDB = pathdb.Defaults
+		tconf.DBOverride = pathdb.Defaults.BackendConstructor
 	}
 	triedb := triedb.NewDatabase(db, tconf)
 	sdb := state.NewDatabaseWithNodeDB(db, triedb)
@@ -66,7 +66,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 		}
 	}
 	// Commit and re-open to start with a clean state.
-	root, _ := statedb.Commit(0, false, false)
+	root, _ := statedb.Commit(0, false)
 
 	// If snapshot is requested, initialize the snapshotter and use it in state.
 	var snaps *snapshot.Tree

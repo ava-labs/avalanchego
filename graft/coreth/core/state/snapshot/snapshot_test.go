@@ -106,7 +106,7 @@ func TestDiskLayerExternalInvalidationFullFlatten(t *testing.T) {
 	accounts := map[common.Hash][]byte{
 		common.HexToHash("0xa1"): randomAccount(),
 	}
-	if err := snaps.Update(common.HexToHash("0x02"), common.HexToHash("0xff02"), common.HexToHash("0x01"), nil, accounts, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(common.HexToHash("0x02"), common.HexToHash("0xff02"), common.HexToHash("0x01"), nil, accounts, nil); err != nil {
 		t.Fatalf("failed to create a diff layer: %v", err)
 	}
 	if n := snaps.NumStateLayers(); n != 2 {
@@ -147,10 +147,10 @@ func TestDiskLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	accounts := map[common.Hash][]byte{
 		common.HexToHash("0xa1"): randomAccount(),
 	}
-	if err := snaps.Update(common.HexToHash("0x02"), common.HexToHash("0xff02"), common.HexToHash("0x01"), nil, accounts, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(common.HexToHash("0x02"), common.HexToHash("0xff02"), common.HexToHash("0x01"), nil, accounts, nil); err != nil {
 		t.Fatalf("failed to create a diff layer: %v", err)
 	}
-	if err := snaps.Update(common.HexToHash("0x03"), common.HexToHash("0xff03"), common.HexToHash("0x02"), nil, accounts, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(common.HexToHash("0x03"), common.HexToHash("0xff03"), common.HexToHash("0x02"), nil, accounts, nil); err != nil {
 		t.Fatalf("failed to create a diff layer: %v", err)
 	}
 	if n := snaps.NumBlockLayers(); n != 3 {
@@ -196,13 +196,13 @@ func TestDiffLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	accounts := map[common.Hash][]byte{
 		common.HexToHash("0xa1"): randomAccount(),
 	}
-	if err := snaps.Update(common.HexToHash("0x02"), common.HexToHash("0xff02"), common.HexToHash("0x01"), nil, accounts, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(common.HexToHash("0x02"), common.HexToHash("0xff02"), common.HexToHash("0x01"), nil, accounts, nil); err != nil {
 		t.Fatalf("failed to create a diff layer: %v", err)
 	}
-	if err := snaps.Update(common.HexToHash("0x03"), common.HexToHash("0xff03"), common.HexToHash("0x02"), nil, accounts, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(common.HexToHash("0x03"), common.HexToHash("0xff03"), common.HexToHash("0x02"), nil, accounts, nil); err != nil {
 		t.Fatalf("failed to create a diff layer: %v", err)
 	}
-	if err := snaps.Update(common.HexToHash("0x04"), common.HexToHash("0xff04"), common.HexToHash("0x03"), nil, accounts, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(common.HexToHash("0x04"), common.HexToHash("0xff04"), common.HexToHash("0x03"), nil, accounts, nil); err != nil {
 		t.Fatalf("failed to create a diff layer: %v", err)
 	}
 	if n := snaps.NumStateLayers(); n != 4 {
@@ -244,12 +244,12 @@ func TestPostFlattenBasicDataAccess(t *testing.T) {
 	// Create a starting base layer and a snapshot tree out of it
 	snaps := NewTestTree(rawdb.NewMemoryDatabase(), common.HexToHash("0x01"), common.HexToHash("0xff01"))
 	// The lowest difflayer
-	snaps.Update(common.HexToHash("0xa1"), common.HexToHash("0xffa1"), common.HexToHash("0x01"), nil, setAccount("0xa1"), nil)
-	snaps.Update(common.HexToHash("0xa2"), common.HexToHash("0xffa2"), common.HexToHash("0xa1"), nil, setAccount("0xa2"), nil)
-	snaps.Update(common.HexToHash("0xb2"), common.HexToHash("0xffb2"), common.HexToHash("0xa1"), nil, setAccount("0xb2"), nil)
+	snaps.UpdateWithBlockHashes(common.HexToHash("0xa1"), common.HexToHash("0xffa1"), common.HexToHash("0x01"), nil, setAccount("0xa1"), nil)
+	snaps.UpdateWithBlockHashes(common.HexToHash("0xa2"), common.HexToHash("0xffa2"), common.HexToHash("0xa1"), nil, setAccount("0xa2"), nil)
+	snaps.UpdateWithBlockHashes(common.HexToHash("0xb2"), common.HexToHash("0xffb2"), common.HexToHash("0xa1"), nil, setAccount("0xb2"), nil)
 
-	snaps.Update(common.HexToHash("0xa3"), common.HexToHash("0xffa3"), common.HexToHash("0xa2"), nil, setAccount("0xa3"), nil)
-	snaps.Update(common.HexToHash("0xb3"), common.HexToHash("0xffb3"), common.HexToHash("0xb2"), nil, setAccount("0xb3"), nil)
+	snaps.UpdateWithBlockHashes(common.HexToHash("0xa3"), common.HexToHash("0xffa3"), common.HexToHash("0xa2"), nil, setAccount("0xa3"), nil)
+	snaps.UpdateWithBlockHashes(common.HexToHash("0xb3"), common.HexToHash("0xffb3"), common.HexToHash("0xb2"), nil, setAccount("0xb3"), nil)
 
 	// checkExist verifies if an account exists in a snapshot
 	checkExist := func(layer Snapshot, key string) error {
@@ -434,10 +434,10 @@ func TestTreeFlattenDoesNotDropPendingLayers(t *testing.T) {
 		diffBlockAHash := common.Hash{0xee, 0xee, byte(i)}
 		diffBlockBHash := common.Hash{0xdd, 0xdd, byte(i)}
 		diffBlockRoot := common.Hash{0xff, 0xff, byte(i)}
-		if err := snaps.Update(diffBlockAHash, diffBlockRoot, parentAHash, nil, accounts, nil); err != nil {
+		if err := snaps.UpdateWithBlockHashes(diffBlockAHash, diffBlockRoot, parentAHash, nil, accounts, nil); err != nil {
 			t.Fatalf("failed to create a diff layer: %v", err)
 		}
-		if err := snaps.Update(diffBlockBHash, diffBlockRoot, parentBHash, nil, accounts, nil); err != nil {
+		if err := snaps.UpdateWithBlockHashes(diffBlockBHash, diffBlockRoot, parentBHash, nil, accounts, nil); err != nil {
 			t.Fatalf("failed to create a diff layer: %v", err)
 		}
 
@@ -509,7 +509,7 @@ func TestStaleOriginLayer(t *testing.T) {
 	}
 
 	// Create diff layer A containing account 0xa1
-	if err := snaps.Update(diffBlockHashA, diffRootA, baseBlockHash, nil, accountsA, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashA, diffRootA, baseBlockHash, nil, accountsA, nil); err != nil {
 		t.Errorf("failed to create diff layer A: %v", err)
 	}
 	// Flatten account 0xa1 to disk
@@ -519,12 +519,12 @@ func TestStaleOriginLayer(t *testing.T) {
 	}
 	// Create diff layer B containing account 0xa2
 	// The bloom filter should contain only 0xa2.
-	if err := snaps.Update(diffBlockHashB, diffRootB, diffBlockHashA, nil, accountsB, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashB, diffRootB, diffBlockHashA, nil, accountsB, nil); err != nil {
 		t.Errorf("failed to create diff layer B: %v", err)
 	}
 	// Create diff layer C containing account 0xa3
 	// The bloom filter should contain 0xa2 and 0xa3
-	if err := snaps.Update(diffBlockHashC, diffRootC, diffBlockHashB, nil, accountsC, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashC, diffRootC, diffBlockHashB, nil, accountsC, nil); err != nil {
 		t.Errorf("failed to create diff layer C: %v", err)
 	}
 
@@ -591,16 +591,16 @@ func TestRebloomOnFlatten(t *testing.T) {
 	}
 
 	// Build the tree
-	if err := snaps.Update(diffBlockHashA, diffRootA, baseBlockHash, nil, accountsA, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashA, diffRootA, baseBlockHash, nil, accountsA, nil); err != nil {
 		t.Errorf("failed to create diff layer A: %v", err)
 	}
-	if err := snaps.Update(diffBlockHashB, diffRootB, diffBlockHashA, nil, accountsB, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashB, diffRootB, diffBlockHashA, nil, accountsB, nil); err != nil {
 		t.Errorf("failed to create diff layer B: %v", err)
 	}
-	if err := snaps.Update(diffBlockHashC, diffRootC, diffBlockHashB, nil, accountsC, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashC, diffRootC, diffBlockHashB, nil, accountsC, nil); err != nil {
 		t.Errorf("failed to create diff layer C: %v", err)
 	}
-	if err := snaps.Update(diffBlockHashD, diffRootD, diffBlockHashB, nil, accountsD, nil); err != nil {
+	if err := snaps.UpdateWithBlockHashes(diffBlockHashD, diffRootD, diffBlockHashB, nil, accountsD, nil); err != nil {
 		t.Errorf("failed to create diff layer D: %v", err)
 	}
 
@@ -687,9 +687,9 @@ func TestReadStateDuringFlattening(t *testing.T) {
 	snaps := NewTestTree(rawdb.NewMemoryDatabase(), baseBlockHash, baseRoot)
 
 	// 4 layers in total, 3 diff layers and 1 disk layers
-	snaps.Update(diffBlockHashA, diffRootA, baseBlockHash, nil, setAccount("0xa1"), nil)
-	snaps.Update(diffBlockHashB, diffRootB, diffBlockHashA, nil, setAccount("0xa2"), nil)
-	snaps.Update(diffBlockHashC, diffRootC, diffBlockHashB, nil, setAccount("0xa3"), nil)
+	snaps.UpdateWithBlockHashes(diffBlockHashA, diffRootA, baseBlockHash, nil, setAccount("0xa1"), nil)
+	snaps.UpdateWithBlockHashes(diffBlockHashB, diffRootB, diffBlockHashA, nil, setAccount("0xa2"), nil)
+	snaps.UpdateWithBlockHashes(diffBlockHashC, diffRootC, diffBlockHashB, nil, setAccount("0xa3"), nil)
 
 	// Obtain the topmost snapshot handler for state accessing
 	snap := snaps.Snapshot(diffRootC)

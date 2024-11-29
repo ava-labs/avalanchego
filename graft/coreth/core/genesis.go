@@ -37,14 +37,14 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/trie"
-	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 )
 
@@ -53,7 +53,7 @@ import (
 var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 
 // Deprecated: use types.GenesisAccount instead.
-type GenesisAccount = types.GenesisAccount
+type GenesisAccount = types.Account
 
 // Deprecated: use types.GenesisAlloc instead.
 type GenesisAlloc = types.GenesisAlloc
@@ -219,8 +219,8 @@ func (g *Genesis) trieConfig() *triedb.Config {
 		return nil
 	}
 	return &triedb.Config{
-		PathDB:   pathdb.Defaults,
-		IsVerkle: true,
+		DBOverride: pathdb.Defaults.BackendConstructor,
+		IsVerkle:   true,
 	}
 }
 
@@ -258,11 +258,6 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 		for key, value := range account.Storage {
 			statedb.SetState(addr, key, value)
 		}
-		if account.MCBalance != nil {
-			for coinID, value := range account.MCBalance {
-				statedb.AddBalanceMultiCoin(addr, coinID, value)
-			}
-		}
 	}
 	root := statedb.IntermediateRoot(false)
 	head.Root = root
@@ -299,7 +294,7 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 		}
 	}
 
-	statedb.Commit(0, false, false)
+	statedb.Commit(0, false)
 	// Commit newly generated states into disk if it's not empty.
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {
