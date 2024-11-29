@@ -64,6 +64,14 @@ func (s *DBServer) GetChangeProof(
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)
 	}
+	var trieIDs []ids.ID
+	if len(req.TrieId) > 0 {
+		id, err := ids.ToID(req.TrieId)
+		if err != nil {
+			return nil, err
+		}
+		trieIDs = append(trieIDs, id)
+	}
 
 	changeProof, err := s.db.GetChangeProof(
 		ctx,
@@ -72,6 +80,7 @@ func (s *DBServer) GetChangeProof(
 		start,
 		end,
 		int(req.KeyLimit),
+		trieIDs...,
 	)
 	if err != nil {
 		if !errors.Is(err, merkledb.ErrInsufficientHistory) {
@@ -136,20 +145,6 @@ func (s *DBServer) CommitChangeProof(
 	return &emptypb.Empty{}, err
 }
 
-func (s *DBServer) GetProof(
-	ctx context.Context,
-	req *pb.GetProofRequest,
-) (*pb.GetProofResponse, error) {
-	proof, err := s.db.GetProof(ctx, req.Key)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.GetProofResponse{
-		Proof: proof.ToProto(),
-	}, nil
-}
-
 func (s *DBServer) GetRangeProof(
 	ctx context.Context,
 	req *pb.GetRangeProofRequest,
@@ -166,7 +161,15 @@ func (s *DBServer) GetRangeProof(
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)
 	}
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, start, end, int(req.KeyLimit))
+	var trieIDs []ids.ID
+	if len(req.TrieId) > 0 {
+		id, err := ids.ToID(req.TrieId)
+		if err != nil {
+			return nil, err
+		}
+		trieIDs = append(trieIDs, id)
+	}
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, start, end, int(req.KeyLimit), trieIDs...)
 	if err != nil {
 		return nil, err
 	}

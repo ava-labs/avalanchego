@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/x/ethsync"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -28,7 +29,14 @@ func Test_Server_GetRangeProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, defaultRequestKeyLimit, 1)
+	smallTrieDB, err := ethsync.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(t, err)
+	batch := smallTrieDB.NewBatch()
+	err = generateWithKeyLenAndTrie(t, batch, r, defaultRequestKeyLimit, 32, 32)
 	require.NoError(t, err)
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
@@ -156,7 +164,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	serverDB, err := merkledb.New(
+	serverDB, err := ethsync.New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -170,7 +178,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		ops := make([]database.BatchOp, 0, 11)
 		// add some key/values
 		for i := 0; i < 10; i++ {
-			key := make([]byte, r.Intn(100))
+			key := make([]byte, 32) // XXX: fix keylen
 			_, err = r.Read(key)
 			require.NoError(t, err)
 
@@ -186,19 +194,26 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		_, err = r.Read(deleteKeyStart)
 		require.NoError(t, err)
 
-		it := serverDB.NewIteratorWithStart(deleteKeyStart)
-		if it.Next() {
-			ops = append(ops, database.BatchOp{Key: it.Key(), Delete: true})
+		deleteKey, ok := serverDB.IterateOneKey(deleteKeyStart) // XXX
+		if ok {
+			ops = append(ops, database.BatchOp{Key: deleteKey, Delete: true})
 		}
-		require.NoError(t, it.Error())
-		it.Release()
 
-		view, err := serverDB.NewView(
-			context.Background(),
-			merkledb.ViewChanges{BatchOps: ops},
-		)
-		require.NoError(t, err)
-		require.NoError(t, view.CommitToDB(context.Background()))
+		batch := serverDB.NewBatch()
+		for _, op := range ops {
+			if op.Delete {
+				require.NoError(t, batch.Put(op.Key, nil))
+			} else {
+				require.NoError(t, batch.Put(op.Key, op.Value))
+			}
+		}
+		require.NoError(t, batch.Write())
+		//view, err := serverDB.NewView(
+		//	context.Background(),
+		//	merkledb.ViewChanges{BatchOps: ops},
+		//)
+		//require.NoError(t, err)
+		//require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
 	endRoot, err := serverDB.GetMerkleRoot(context.Background())

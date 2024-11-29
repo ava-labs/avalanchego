@@ -15,8 +15,6 @@ service DB {
 
   rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
 
-  rpc GetProof(GetProofRequest) returns (GetProofResponse);
-
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
   rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
@@ -30,20 +28,6 @@ message GetMerkleRootResponse {
   bytes root_hash = 1;
 }
 
-message GetProofRequest {
-  bytes key = 1;
-}
-
-message GetProofResponse {
-  Proof proof = 1;
-}
-
-message Proof {
-  bytes key = 1;
-  MaybeBytes value = 2;
-  repeated ProofNode proof = 3;
-}
-
 // For use in sync client, which has a restriction on the size of
 // the response. GetChangeProof in the DB service doesn't.
 message SyncGetChangeProofRequest {
@@ -53,6 +37,7 @@ message SyncGetChangeProofRequest {
   MaybeBytes end_key = 4;
   uint32 key_limit = 5;
   uint32 bytes_limit = 6;
+  bytes trie_id = 7;
 }
 
 message SyncGetChangeProofResponse {
@@ -68,6 +53,7 @@ message GetChangeProofRequest {
   MaybeBytes start_key = 3;
   MaybeBytes end_key = 4;
   uint32 key_limit = 5;
+  bytes trie_id = 6;
 }
 
 message GetChangeProofResponse {
@@ -102,6 +88,7 @@ message SyncGetRangeProofRequest {
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
+  bytes trie_id = 6;
 }
 
 message GetRangeProofRequest {
@@ -109,6 +96,7 @@ message GetRangeProofRequest {
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
+  bytes trie_id = 5;
 }
 
 message VerifyRangeProofRequest {
