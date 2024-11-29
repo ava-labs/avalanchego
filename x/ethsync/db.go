@@ -55,19 +55,24 @@ const (
 	HashLength = merkledb.HashLength
 )
 
-var rootKey = []byte{}
+var rootKey = []byte{'r', 'o', 'o', 't'}
 
 type db struct {
 	db         ethdb.Database
 	triedb     *triedb.Database
 	root       common.Hash
+	accountID  ids.ID
 	updateLock sync.RWMutex
 }
 
 func New(ctx context.Context, disk database.Database, config merkledb.Config) (*db, error) {
+	return NewWithAccount(ctx, disk, ids.Empty)
+}
+
+func NewWithAccount(ctx context.Context, disk database.Database, accountID ids.ID) (*db, error) {
 	ethdb := rawdb.NewDatabase(evm.Database{Database: disk})
 	root := types.EmptyRootHash
-	diskRoot, err := ethdb.Get(rootKey)
+	diskRoot, err := ethdb.Get(mkRootKey(accountID))
 	if err == nil {
 		copy(root[:], diskRoot)
 	} else if err != database.ErrNotFound {
@@ -82,9 +87,38 @@ func New(ctx context.Context, disk database.Database, config merkledb.Config) (*
 	}, nil
 }
 
-func (db *db) Clear() error {
-	return database.Clear(Database{db.db}, ethdb.IdealBatchSize)
+func mkRootKey(accountID ids.ID) []byte {
+	if accountID == (ids.ID{}) {
+		return rootKey
+	}
+	return append(accountID[:], rootKey...)
 }
+
+func (db *db) Clear() error {
+	for {
+		batchSize := 1000
+		batch := make(map[string][]byte, batchSize)
+		if err := db.getKVs(nil, nil, batch, batchSize); err != nil {
+			return fmt.Errorf("failed to get key-values: %w", err)
+		}
+		if len(batch) == 0 {
+			// No more keys to delete, we're done
+			break
+		}
+		updates := make([]KeyValue, 0, len(batch))
+		for key := range batch {
+			// Delete each key
+			updates = append(updates, KeyValue{Key: []byte(key), Value: nil})
+		}
+		if err := db.updateKVs(updates); err != nil {
+			return fmt.Errorf("failed to clear keys: %w", err)
+		}
+	}
+
+	db.root = types.EmptyRootHash
+	return db.db.Delete(mkRootKey(db.accountID))
+}
+
 func (db *db) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	db.updateLock.RLock()
 	defer db.updateLock.RUnlock()
@@ -96,8 +130,12 @@ func (db *db) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 }
 
 func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int, trieIDs ...ids.ID) (*RangeProof, error) {
+	trieID, err := db.getTrieID(rootID, trieIDs...)
+	if err != nil {
+		return nil, err
+	}
 	response := &RangeProof{}
-	tr, err := trie.New(trie.StateTrieID(common.BytesToHash(rootID[:])), db.triedb)
+	tr, err := trie.New(trieID, db.triedb)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +273,7 @@ func (db *db) updateKVs(kvs []merkledb.KeyValue) error {
 	db.updateLock.Lock()
 	defer db.updateLock.Unlock()
 
-	tr, err := trie.New(trie.StateTrieID(db.root), db.triedb)
+	tr, err := trie.New(db.openableTrieID(), db.triedb)
 	if err != nil {
 		return err
 	}
@@ -275,15 +313,44 @@ func (db *db) Close() error {
 	if err := db.triedb.Commit(db.root, false); err != nil {
 		return err
 	}
-	return db.db.Put(rootKey, db.root[:])
+	return db.db.Put(mkRootKey(db.accountID), db.root[:])
+}
+
+func (db *db) getTrieID(stateRootID ids.ID, trieIDs ...ids.ID) (*trie.ID, error) {
+	stateRoot := common.BytesToHash(stateRootID[:])
+	if len(trieIDs) == 0 {
+		return trie.StateTrieID(stateRoot), nil
+	}
+	owner := common.BytesToHash(trieIDs[0][:])
+	if owner == (common.Hash{}) {
+		return trie.StateTrieID(stateRoot), nil
+	}
+
+	stateTrie, err := trie.NewStateTrie(trie.StateTrieID(stateRoot), db.triedb)
+	if err != nil {
+		return nil, err
+	}
+	account, err := stateTrie.GetAccountByHash(owner)
+	if err != nil {
+		return nil, err
+	}
+	return trie.StorageTrieID(stateRoot, owner, account.Root), nil
 }
 
 func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int, trieIDs ...ids.ID) (*ChangeProof, error) {
-	startTrie, err := trie.New(trie.StateTrieID(common.BytesToHash(startRootID[:])), db.triedb)
+	startTrieID, err := db.getTrieID(startRootID, trieIDs...)
 	if err != nil {
 		return nil, merkledb.ErrInsufficientHistory
 	}
-	endTrie, err := trie.New(trie.StateTrieID(common.BytesToHash(endRootID[:])), db.triedb)
+	startTrie, err := trie.New(startTrieID, db.triedb)
+	if err != nil {
+		return nil, merkledb.ErrInsufficientHistory
+	}
+	endTrieID, err := db.getTrieID(endRootID, trieIDs...)
+	if err != nil {
+		return nil, merkledb.ErrNoEndRoot
+	}
+	endTrie, err := trie.New(endTrieID, db.triedb)
 	if err != nil {
 		return nil, merkledb.ErrNoEndRoot
 	}
@@ -354,7 +421,7 @@ func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID,
 		endKey = response.KeyChanges[len(response.KeyChanges)-1].Key
 	}
 	keyVals := make(map[string][]byte)
-	if err := getKVsFromTrie(startTrie, startKey, endKey, keyVals); err != nil {
+	if err := getKVsFromTrie(startTrie, startKey, endKey, keyVals, 0); err != nil {
 		panic("failed to get key-values")
 	}
 	for _, kv := range response.KeyChanges {
@@ -368,7 +435,7 @@ func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID,
 
 	// Now get them from the end trie
 	keyValsEnd := make(map[string][]byte)
-	if err := getKVsFromTrie(endTrie, startKey, endKey, keyValsEnd); err != nil {
+	if err := getKVsFromTrie(endTrie, startKey, endKey, keyValsEnd, 0); err != nil {
 		panic("failed to get key-values")
 	}
 	// Make sure the key-values are the same
@@ -454,7 +521,7 @@ func (db *db) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start, 
 	if len(proof.KeyChanges) > 0 {
 		endOfProofRange = proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	}
-	if err := db.getKVs(startKey, endOfProofRange, kvs); err != nil {
+	if err := db.getKVs(startKey, endOfProofRange, kvs, 0); err != nil {
 		return fmt.Errorf("failed to get key-values: %w", err)
 	}
 	fmt.Println("kvs", len(kvs))
@@ -510,18 +577,33 @@ func (db *db) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start, 
 	return nil
 }
 
-func (db *db) getKVs(startKey, endKey []byte, kvs map[string][]byte) error {
+// openableTrieID returns the trie ID that can be opened by the trie database,
+// to read current values or update them.
+// assumes updateLock is held for reading
+func (db *db) openableTrieID() *trie.ID {
+	if db.accountID == (ids.ID{}) {
+		return trie.StateTrieID(db.root)
+	}
+	// XXX: passing db.root here but maybe should retain the original state root?
+	// Is this even meaningful as there would be no "state-root" corresponding
+	// to partially synced storage tries.
+	return trie.StorageTrieID(db.root, common.Hash(db.accountID), db.root)
+}
+
+// getKVs returns the key-values in the trie in the range [startKey, endKey].
+// If limit is non-zero, at most limit key-values are returned.
+func (db *db) getKVs(startKey, endKey []byte, kvs map[string][]byte, limit int) error {
 	db.updateLock.Lock()
 	defer db.updateLock.Unlock()
 
-	tr, err := trie.New(trie.StateTrieID(db.root), db.triedb)
+	tr, err := trie.New(db.openableTrieID(), db.triedb)
 	if err != nil {
 		return err
 	}
-	return getKVsFromTrie(tr, startKey, endKey, kvs)
+	return getKVsFromTrie(tr, startKey, endKey, kvs, limit)
 }
 
-func getKVsFromTrie(tr *trie.Trie, startKey, endKey []byte, kvs map[string][]byte) error {
+func getKVsFromTrie(tr *trie.Trie, startKey, endKey []byte, kvs map[string][]byte, limit int) error {
 	nodeIt, err := tr.NodeIterator(startKey)
 	if err != nil {
 		return err
@@ -529,6 +611,9 @@ func getKVsFromTrie(tr *trie.Trie, startKey, endKey []byte, kvs map[string][]byt
 	it := trie.NewIterator(nodeIt)
 	for it.Next() {
 		if len(endKey) > 0 && bytes.Compare(it.Key, endKey) > 0 {
+			break
+		}
+		if limit > 0 && len(kvs) >= limit {
 			break
 		}
 		kvs[string(it.Key)] = bytes.Clone(it.Value)
@@ -574,7 +659,7 @@ func (db *db) IterateOneKey(key []byte) ([]byte, bool) {
 	db.updateLock.RLock()
 	defer db.updateLock.RUnlock()
 
-	tr, err := trie.New(trie.StateTrieID(db.root), db.triedb)
+	tr, err := trie.New(db.openableTrieID(), db.triedb)
 	if err != nil {
 		panic("failed to create trie")
 	}

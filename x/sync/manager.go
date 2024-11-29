@@ -153,6 +153,8 @@ type ManagerConfig struct {
 	StateSyncNodes        []ids.NodeID
 	// If not specified, [merkledb.DefaultHasher] will be used.
 	Hasher merkledb.Hasher
+
+	TrieID ids.ID
 }
 
 func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
@@ -351,6 +353,10 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
+	var trieID []byte
+	if m.config.TrieID != ids.Empty {
+		trieID = m.config.TrieID[:]
+	}
 	request := &pb.SyncGetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
@@ -364,6 +370,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		},
 		KeyLimit:   defaultRequestKeyLimit,
 		BytesLimit: defaultRequestByteSizeLimit,
+		TrieId:     trieID,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -410,6 +417,10 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
+	var trieID []byte
+	if m.config.TrieID != ids.Empty {
+		trieID = m.config.TrieID[:]
+	}
 	request := &pb.SyncGetRangeProofRequest{
 		RootHash: targetRootID[:],
 		StartKey: &pb.MaybeBytes{
@@ -422,6 +433,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		},
 		KeyLimit:   defaultRequestKeyLimit,
 		BytesLimit: defaultRequestByteSizeLimit,
+		TrieId:     trieID,
 	}
 
 	requestBytes, err := proto.Marshal(request)
