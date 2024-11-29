@@ -37,6 +37,7 @@ message SyncGetChangeProofRequest {
   MaybeBytes end_key = 4;
   uint32 key_limit = 5;
   uint32 bytes_limit = 6;
+  bytes trie_id = 7;
 }
 
 message SyncGetChangeProofResponse {
@@ -52,6 +53,7 @@ message GetChangeProofRequest {
   MaybeBytes start_key = 3;
   MaybeBytes end_key = 4;
   uint32 key_limit = 5;
+  bytes trie_id = 6;
 }
 
 message GetChangeProofResponse {
@@ -86,6 +88,7 @@ message SyncGetRangeProofRequest {
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
+  bytes trie_id = 6;
 }
 
 message GetRangeProofRequest {
@@ -93,6 +96,7 @@ message GetRangeProofRequest {
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
+  bytes trie_id = 5;
 }
 
 message VerifyRangeProofRequest {

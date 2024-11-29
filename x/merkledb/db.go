@@ -83,6 +83,7 @@ type ChangeProofer interface {
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		maxLength int,
+		trieIDs ...ids.ID,
 	) (*ChangeProof, error)
 
 	// Returns nil iff all the following hold:
@@ -121,6 +122,7 @@ type RangeProofer interface {
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		maxLength int,
+		trieIDs ...ids.ID,
 	) (*RangeProof, error)
 
 	// Returns nil iff all the following hold:
@@ -699,6 +701,7 @@ func (db *merkleDB) GetRangeProofAtRoot(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
+	trieIDs ...ids.ID,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -729,6 +732,7 @@ func (db *merkleDB) GetChangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
+	trieIDs ...ids.ID,
 ) (*ChangeProof, error) {
 	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetChangeProof")
 	defer span.End()

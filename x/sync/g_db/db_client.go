@@ -44,9 +44,15 @@ func (c *DBClient) GetChangeProof(
 	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
+	trieIDs ...ids.ID,
 ) (*merkledb.ChangeProof, error) {
 	if endRootID == ids.Empty {
 		return nil, merkledb.ErrEmptyProof
+	}
+
+	var trieID []byte
+	if len(trieIDs) > 0 {
+		trieID = trieIDs[0][:]
 	}
 
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
@@ -61,6 +67,7 @@ func (c *DBClient) GetChangeProof(
 			Value:     endKey.Value(),
 		},
 		KeyLimit: uint32(keyLimit),
+		TrieId:   trieID,
 	})
 	if err != nil {
 		return nil, err
@@ -154,9 +161,15 @@ func (c *DBClient) GetRangeProofAtRoot(
 	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
+	trieIDs ...ids.ID,
 ) (*merkledb.RangeProof, error) {
 	if rootID == ids.Empty {
 		return nil, merkledb.ErrEmptyProof
+	}
+
+	var trieID []byte
+	if len(trieIDs) > 0 {
+		trieID = trieIDs[0][:]
 	}
 
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
@@ -170,6 +183,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 			Value:     endKey.Value(),
 		},
 		KeyLimit: uint32(keyLimit),
+		TrieId:   trieID,
 	})
 	if err != nil {
 		return nil, err

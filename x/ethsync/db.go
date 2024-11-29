@@ -95,7 +95,7 @@ func (db *db) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return ids.ID(db.root), nil
 }
 
-func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
+func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int, trieIDs ...ids.ID) (*RangeProof, error) {
 	response := &RangeProof{}
 	tr, err := trie.New(trie.StateTrieID(common.BytesToHash(rootID[:])), db.triedb)
 	if err != nil {
@@ -278,7 +278,7 @@ func (db *db) Close() error {
 	return db.db.Put(rootKey, db.root[:])
 }
 
-func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int) (*ChangeProof, error) {
+func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int, trieIDs ...ids.ID) (*ChangeProof, error) {
 	startTrie, err := trie.New(trie.StateTrieID(common.BytesToHash(startRootID[:])), db.triedb)
 	if err != nil {
 		return nil, merkledb.ErrInsufficientHistory
