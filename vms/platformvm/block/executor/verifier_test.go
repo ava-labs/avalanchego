@@ -14,10 +14,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -33,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -40,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txsmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -49,17 +52,36 @@ import (
 	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
-func newTestVerifier(t testing.TB, s state.State) *verifier {
+type testVerifierConfig struct {
+	DB       database.Database
+	Upgrades upgrade.Config
+	Context  *snow.Context
+}
+
+func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 	require := require.New(t)
+
+	if c.DB == nil {
+		c.DB = memdb.New()
+	}
+	if c.Upgrades == (upgrade.Config{}) {
+		c.Upgrades = upgradetest.GetConfig(upgradetest.Latest)
+	}
+	if c.Context == nil {
+		c.Context = snowtest.Context(t, constants.PlatformChainID)
+	}
 
 	mempool, err := mempool.New("", prometheus.NewRegistry(), nil)
 	require.NoError(err)
 
 	var (
-		upgrades = upgradetest.GetConfig(upgradetest.Latest)
-		ctx      = snowtest.Context(t, constants.PlatformChainID)
-		clock    = &mockable.Clock{}
-		fx       = &secp256k1fx.Fx{}
+		state = statetest.New(t, statetest.Config{
+			DB:       c.DB,
+			Upgrades: c.Upgrades,
+			Context:  c.Context,
+		})
+		clock = &mockable.Clock{}
+		fx    = &secp256k1fx.Fx{}
 	)
 	require.NoError(fx.InitializeVM(&secp256k1fx.TestVM{
 		Clk: *clock,
@@ -69,25 +91,25 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 	return &verifier{
 		backend: &backend{
 			Mempool:      mempool,
-			lastAccepted: s.GetLastAccepted(),
+			lastAccepted: state.GetLastAccepted(),
 			blkIDToState: make(map[ids.ID]*blockState),
-			state:        s,
-			ctx:          ctx,
+			state:        state,
+			ctx:          c.Context,
 		},
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
 				StaticFeeConfig:        genesis.LocalParams.StaticFeeConfig,
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,
-				UpgradeConfig:          upgrades,
+				UpgradeConfig:          c.Upgrades,
 			},
-			Ctx: ctx,
+			Ctx: c.Context,
 			Clk: clock,
 			Fx:  fx,
 			FlowChecker: utxo.NewVerifier(
-				ctx,
+				c.Context,
 				clock,
 				fx,
 			),
@@ -97,271 +119,331 @@ func newTestVerifier(t testing.TB, s state.State) *verifier {
 }
 
 func TestVerifierVisitProposalBlock(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
-	parentID := ids.GenerateTestID()
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentOnAcceptState := state.NewMockDiff(ctrl)
-	timestamp := time.Now()
-	// One call for each of onCommitState and onAbortState.
-	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetFeeState().Return(gas.State{}).Times(2)
-	parentOnAcceptState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(2)
-	parentOnAcceptState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(2)
-	parentOnAcceptState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(2)
-
-	backend := &backend{
-		lastAccepted: parentID,
-		blkIDToState: map[ids.ID]*blockState{
-			parentID: {
-				statelessBlock: parentStatelessBlk,
-				onAcceptState:  parentOnAcceptState,
+	var (
+		require  = require.New(t)
+		verifier = newTestVerifier(t, testVerifierConfig{
+			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+		})
+		initialTimestamp = verifier.state.GetTimestamp()
+		newTimestamp     = initialTimestamp.Add(time.Second)
+		proposalTx       = &txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{
+				Time: uint64(newTimestamp.Unix()),
 			},
-		},
-		Mempool: mempool,
-		state:   s,
-		ctx: &snow.Context{
-			Log: logging.NoLog{},
-		},
-	}
-	manager := &manager{
-		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
-			},
-			Clk: &mockable.Clock{},
-		},
-		backend: backend,
-	}
+		}
+	)
+	require.NoError(proposalTx.Initialize(txs.Codec))
 
-	blkTx := txsmock.NewUnsignedTx(ctrl)
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.ProposalTxExecutor{})).Return(nil).Times(1)
+	// Build the block that will be executed on top of the last accepted block.
+	lastAcceptedID := verifier.state.GetLastAccepted()
+	lastAccepted, err := verifier.state.GetStatelessBlock(lastAcceptedID)
+	require.NoError(err)
 
-	// We can't serialize [blkTx] because it isn't
-	// registered with the blocks.Codec.
-	// Serialize this block with a dummy tx
-	// and replace it after creation with the mock tx.
-	// TODO allow serialization of mock txs.
-	apricotBlk, err := block.NewApricotProposalBlock(
-		parentID,
-		2,
-		&txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{},
-			Creds:    []verify.Verifiable{},
-		},
+	proposalBlock, err := block.NewApricotProposalBlock(
+		lastAcceptedID,
+		lastAccepted.Height()+1,
+		proposalTx,
 	)
 	require.NoError(err)
-	apricotBlk.Tx.Unsigned = blkTx
 
-	// Set expectations for dependencies.
-	tx := apricotBlk.Txs()[0]
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().Remove([]*txs.Tx{tx}).Times(1)
+	// Execute the block.
+	require.NoError(proposalBlock.Visit(verifier))
 
-	// Visit the block
-	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
-	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
-	require.Equal(apricotBlk, gotBlkState.statelessBlock)
-	require.Equal(timestamp, gotBlkState.timestamp)
+	// Verify that the block's execution was recorded as expected.
+	blkID := proposalBlock.ID()
+	require.Contains(verifier.blkIDToState, blkID)
+	executedBlockState := verifier.blkIDToState[blkID]
 
-	// Assert that the expected tx statuses are set.
-	_, gotStatus, err := gotBlkState.onCommitState.GetTx(tx.ID())
+	txID := proposalTx.ID()
+
+	onCommit := executedBlockState.onCommitState
+	require.NotNil(onCommit)
+	acceptedTx, acceptedStatus, err := onCommit.GetTx(txID)
 	require.NoError(err)
-	require.Equal(status.Committed, gotStatus)
+	require.Equal(proposalTx, acceptedTx)
+	require.Equal(status.Committed, acceptedStatus)
 
-	_, gotStatus, err = gotBlkState.onAbortState.GetTx(tx.ID())
+	onAbort := executedBlockState.onAbortState
+	require.NotNil(onAbort)
+	acceptedTx, acceptedStatus, err = onAbort.GetTx(txID)
 	require.NoError(err)
-	require.Equal(status.Aborted, gotStatus)
+	require.Equal(proposalTx, acceptedTx)
+	require.Equal(status.Aborted, acceptedStatus)
 
-	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	require.Equal(
+		&blockState{
+			proposalBlockState: proposalBlockState{
+				onCommitState: onCommit,
+				onAbortState:  onAbort,
+			},
+			statelessBlock: proposalBlock,
+
+			timestamp:       initialTimestamp,
+			verifiedHeights: set.Of[uint64](0),
+			metrics: metrics.Block{
+				Block:          proposalBlock,
+				GasPrice:       verifier.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+				ValidatorPrice: verifier.txExecutorBackend.Config.ValidatorFeeConfig.MinPrice,
+			},
+		},
+		executedBlockState,
+	)
 }
 
 func TestVerifierVisitAtomicBlock(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
-	parentID := ids.GenerateTestID()
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	grandparentID := ids.GenerateTestID()
-	parentState := state.NewMockDiff(ctrl)
-
-	backend := &backend{
-		blkIDToState: map[ids.ID]*blockState{
-			parentID: {
-				statelessBlock: parentStatelessBlk,
-				onAcceptState:  parentState,
+	var (
+		require  = require.New(t)
+		verifier = newTestVerifier(t, testVerifierConfig{
+			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhase4),
+		})
+		wallet = txstest.NewWallet(
+			t,
+			verifier.ctx,
+			verifier.txExecutorBackend.Config,
+			verifier.state,
+			secp256k1fx.NewKeychain(genesis.EWOQKey),
+			nil, // subnetIDs
+			nil, // validationIDs
+			nil, // chainIDs
+		)
+		exportedOutput = &avax.TransferableOutput{
+			Asset: avax.Asset{ID: verifier.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          units.NanoAvax,
+				OutputOwners: secp256k1fx.OutputOwners{},
 			},
-		},
-		Mempool: mempool,
-		state:   s,
-		ctx: &snow.Context{
-			Log: logging.NoLog{},
-		},
-	}
-	manager := &manager{
-		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
-			},
-			Clk: &mockable.Clock{},
-		},
-		backend: backend,
-	}
+		}
+		initialTimestamp = verifier.state.GetTimestamp()
+	)
 
-	onAccept := state.NewMockDiff(ctrl)
-	blkTx := txsmock.NewUnsignedTx(ctrl)
-	inputs := set.Of(ids.GenerateTestID())
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
-		func(e *executor.AtomicTxExecutor) error {
-			e.OnAccept = onAccept
-			e.Inputs = inputs
-			return nil
-		},
-	).Times(1)
-
-	// We can't serialize [blkTx] because it isn't registered with blocks.Codec.
-	// Serialize this block with a dummy tx and replace it after creation with
-	// the mock tx.
-	// TODO allow serialization of mock txs.
-	apricotBlk, err := block.NewApricotAtomicBlock(
-		parentID,
-		2,
-		&txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{},
-			Creds:    []verify.Verifiable{},
+	// Build the transaction that will be executed.
+	atomicTx, err := wallet.IssueExportTx(
+		verifier.ctx.XChainID,
+		[]*avax.TransferableOutput{
+			exportedOutput,
 		},
 	)
 	require.NoError(err)
-	apricotBlk.Tx.Unsigned = blkTx
 
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	parentStatelessBlk.EXPECT().Parent().Return(grandparentID).Times(1)
-	mempool.EXPECT().Remove([]*txs.Tx{apricotBlk.Tx}).Times(1)
-	onAccept.EXPECT().AddTx(apricotBlk.Tx, status.Committed).Times(1)
-	onAccept.EXPECT().GetTimestamp().Return(timestamp).Times(1)
+	// Build the block that will be executed on top of the last accepted block.
+	lastAcceptedID := verifier.state.GetLastAccepted()
+	lastAccepted, err := verifier.state.GetStatelessBlock(lastAcceptedID)
+	require.NoError(err)
 
-	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
+	atomicBlock, err := block.NewApricotAtomicBlock(
+		lastAcceptedID,
+		lastAccepted.Height()+1,
+		atomicTx,
+	)
+	require.NoError(err)
 
-	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
-	require.Equal(apricotBlk, gotBlkState.statelessBlock)
-	require.Equal(onAccept, gotBlkState.onAcceptState)
-	require.Equal(inputs, gotBlkState.inputs)
-	require.Equal(timestamp, gotBlkState.timestamp)
+	// Execute the block.
+	require.NoError(atomicBlock.Visit(verifier))
 
-	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	// Verify that the block's execution was recorded as expected.
+	blkID := atomicBlock.ID()
+	require.Contains(verifier.blkIDToState, blkID)
+	atomicBlockState := verifier.blkIDToState[blkID]
+	onAccept := atomicBlockState.onAcceptState
+	require.NotNil(onAccept)
+
+	txID := atomicTx.ID()
+	acceptedTx, acceptedStatus, err := onAccept.GetTx(txID)
+	require.NoError(err)
+	require.Equal(atomicTx, acceptedTx)
+	require.Equal(status.Committed, acceptedStatus)
+
+	exportedUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(len(atomicTx.UTXOs())),
+		},
+		Asset: exportedOutput.Asset,
+		Out:   exportedOutput.Out,
+	}
+	exportedUTXOID := exportedUTXO.InputID()
+	exportedUTXOBytes, err := txs.Codec.Marshal(txs.CodecVersion, exportedUTXO)
+	require.NoError(err)
+
+	require.Equal(
+		&blockState{
+			statelessBlock: atomicBlock,
+
+			onAcceptState: onAccept,
+
+			timestamp: initialTimestamp,
+			atomicRequests: map[ids.ID]*atomic.Requests{
+				verifier.ctx.XChainID: {
+					PutRequests: []*atomic.Element{
+						{
+							Key:    exportedUTXOID[:],
+							Value:  exportedUTXOBytes,
+							Traits: [][]byte{},
+						},
+					},
+				},
+			},
+			verifiedHeights: set.Of[uint64](0),
+			metrics: metrics.Block{
+				Block:          atomicBlock,
+				GasPrice:       verifier.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+				ValidatorPrice: verifier.txExecutorBackend.Config.ValidatorFeeConfig.MinPrice,
+			},
+		},
+		atomicBlockState,
+	)
 }
 
 func TestVerifierVisitStandardBlock(t *testing.T) {
 	require := require.New(t)
-	ctrl := gomock.NewController(t)
 
-	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
-	parentID := ids.GenerateTestID()
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentState := state.NewMockDiff(ctrl)
+	var (
+		ctx = snowtest.Context(t, constants.PlatformChainID)
 
-	backend := &backend{
-		blkIDToState: map[ids.ID]*blockState{
-			parentID: {
-				statelessBlock: parentStatelessBlk,
-				onAcceptState:  parentState,
+		baseDB  = memdb.New()
+		stateDB = prefixdb.New([]byte{0}, baseDB)
+		amDB    = prefixdb.New([]byte{1}, baseDB)
+
+		am       = atomic.NewMemory(amDB)
+		sm       = am.NewSharedMemory(ctx.ChainID)
+		xChainSM = am.NewSharedMemory(ctx.XChainID)
+
+		owner = secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{genesis.EWOQKey.Address()},
+		}
+		utxo = &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: 1,
 			},
-		},
-		Mempool: mempool,
-		state:   s,
-		ctx: &snow.Context{
-			Log: logging.NoLog{},
-		},
-	}
-	manager := &manager{
-		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
+			Asset: avax.Asset{ID: ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          units.Avax,
+				OutputOwners: owner,
 			},
-			Clk: &mockable.Clock{},
-		},
-		backend: backend,
-	}
+		}
+	)
 
-	blkTx := txsmock.NewUnsignedTx(ctrl)
-	atomicRequests := map[ids.ID]*atomic.Requests{
-		ids.GenerateTestID(): {
-			RemoveRequests: [][]byte{{1}, {2}},
+	inputID := utxo.InputID()
+	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+	require.NoError(err)
+
+	require.NoError(xChainSM.Apply(map[ids.ID]*atomic.Requests{
+		ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
-					Key:    []byte{3},
-					Value:  []byte{4},
-					Traits: [][]byte{{5}, {6}},
+					Key:   inputID[:],
+					Value: utxoBytes,
+					Traits: [][]byte{
+						genesis.EWOQKey.Address().Bytes(),
+					},
 				},
 			},
 		},
-	}
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
-		func(e *executor.StandardTxExecutor) error {
-			e.OnAccept = func() {}
-			e.Inputs = set.Set[ids.ID]{}
-			e.AtomicRequests = atomicRequests
-			return nil
-		},
-	).Times(1)
+	}))
 
-	// We can't serialize [blkTx] because it isn't
-	// registered with the blocks.Codec.
-	// Serialize this block with a dummy tx
-	// and replace it after creation with the mock tx.
-	// TODO allow serialization of mock txs.
-	apricotBlk, err := block.NewApricotStandardBlock(
-		parentID,
-		2, /*height*/
-		[]*txs.Tx{
-			{
-				Unsigned: &txs.AdvanceTimeTx{},
-				Creds:    []verify.Verifiable{},
-			},
-		},
+	ctx.SharedMemory = sm
+
+	var (
+		verifier = newTestVerifier(t, testVerifierConfig{
+			DB:       stateDB,
+			Upgrades: upgradetest.GetConfig(upgradetest.ApricotPhase5),
+			Context:  ctx,
+		})
+		wallet = txstest.NewWallet(
+			t,
+			verifier.ctx,
+			verifier.txExecutorBackend.Config,
+			verifier.state,
+			secp256k1fx.NewKeychain(genesis.EWOQKey),
+			nil,                    // subnetIDs
+			nil,                    // validationIDs
+			[]ids.ID{ctx.XChainID}, // Read the UTXO to import
+		)
+		initialTimestamp = verifier.state.GetTimestamp()
+	)
+
+	// Build the transaction that will be executed.
+	tx, err := wallet.IssueImportTx(
+		verifier.ctx.XChainID,
+		&owner,
 	)
 	require.NoError(err)
-	apricotBlk.Transactions[0].Unsigned = blkTx
 
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	parentState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
-	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	parentState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
-	parentState.EXPECT().GetActiveSubnetOnlyValidatorsIterator().Return(&iterator.Empty[state.SubnetOnlyValidator]{}, nil).Times(1)
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	mempool.EXPECT().Remove(apricotBlk.Txs()).Times(1)
+	// Verify that the transaction is only consuming the imported UTXO.
+	require.Len(tx.InputIDs(), 1)
 
-	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
+	// Build the block that will be executed on top of the last accepted block.
+	lastAcceptedID := verifier.state.GetLastAccepted()
+	lastAccepted, err := verifier.state.GetStatelessBlock(lastAcceptedID)
+	require.NoError(err)
 
-	// Assert expected state.
-	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
-	gotBlkState := manager.backend.blkIDToState[apricotBlk.ID()]
-	require.Equal(apricotBlk, gotBlkState.statelessBlock)
-	require.Equal(set.Set[ids.ID]{}, gotBlkState.inputs)
-	require.Equal(timestamp, gotBlkState.timestamp)
+	firstBlock, err := block.NewApricotStandardBlock(
+		lastAcceptedID,
+		lastAccepted.Height()+1,
+		[]*txs.Tx{tx},
+	)
+	require.NoError(err)
 
-	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	// Execute the block.
+	require.NoError(firstBlock.Visit(verifier))
+
+	// Verify that the block's execution was recorded as expected.
+	firstBlockID := firstBlock.ID()
+	{
+		require.Contains(verifier.blkIDToState, firstBlockID)
+		atomicBlockState := verifier.blkIDToState[firstBlockID]
+		onAccept := atomicBlockState.onAcceptState
+		require.NotNil(onAccept)
+
+		txID := tx.ID()
+		acceptedTx, acceptedStatus, err := onAccept.GetTx(txID)
+		require.NoError(err)
+		require.Equal(tx, acceptedTx)
+		require.Equal(status.Committed, acceptedStatus)
+
+		require.Equal(
+			&blockState{
+				statelessBlock: firstBlock,
+
+				onAcceptState: onAccept,
+
+				inputs:    tx.InputIDs(),
+				timestamp: initialTimestamp,
+				atomicRequests: map[ids.ID]*atomic.Requests{
+					verifier.ctx.XChainID: {
+						RemoveRequests: [][]byte{
+							inputID[:],
+						},
+					},
+				},
+				verifiedHeights: set.Of[uint64](0),
+				metrics: metrics.Block{
+					Block:          firstBlock,
+					GasPrice:       verifier.txExecutorBackend.Config.DynamicFeeConfig.MinPrice,
+					ValidatorPrice: verifier.txExecutorBackend.Config.ValidatorFeeConfig.MinPrice,
+				},
+			},
+			atomicBlockState,
+		)
+	}
+
+	// Verify that the import transaction can not be replayed.
+	{
+		secondBlock, err := block.NewApricotStandardBlock(
+			firstBlockID,
+			firstBlock.Height()+1,
+			[]*txs.Tx{tx}, // Replay the prior transaction
+		)
+		require.NoError(err)
+
+		err = secondBlock.Visit(verifier)
+		require.ErrorIs(err, errConflictingParentTxs)
+
+		// Verify that the block's execution was not recorded.
+		require.NotContains(verifier.blkIDToState, secondBlock.ID())
+	}
 }
 
 func TestVerifierVisitCommitBlock(t *testing.T) {
@@ -396,10 +478,11 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	}
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
-			Clk: &mockable.Clock{},
+			Clk:          &mockable.Clock{},
+			Bootstrapped: utils.NewAtomic(true),
 		},
 		backend: backend,
 	}
@@ -415,6 +498,11 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnCommitState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		// Allow metrics to be calculated.
+		parentOnCommitState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
+		parentOnCommitState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
+		parentOnCommitState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
+		parentOnCommitState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
@@ -463,10 +551,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	}
 	manager := &manager{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
-			Clk: &mockable.Clock{},
+			Clk:          &mockable.Clock{},
+			Bootstrapped: utils.NewAtomic(true),
 		},
 		backend: backend,
 	}
@@ -482,6 +571,11 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	gomock.InOrder(
 		parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1),
 		parentOnAbortState.EXPECT().GetTimestamp().Return(timestamp).Times(1),
+		// Allow metrics to be calculated.
+		parentOnAbortState.EXPECT().GetFeeState().Return(gas.State{}).Times(1),
+		parentOnAbortState.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(1),
+		parentOnAbortState.EXPECT().NumActiveL1Validators().Return(0).Times(1),
+		parentOnAbortState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1),
 	)
 
 	// Verify the block.
@@ -518,7 +612,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -590,7 +684,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 					},
 					Clk: &mockable.Clock{},
@@ -608,9 +702,9 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(3)
+			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
 			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(3)
+			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -690,7 +784,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			}
 			verifier := &verifier{
 				txExecutorBackend: &executor.Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 					},
 					Clk: &mockable.Clock{},
@@ -708,9 +802,9 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			s.EXPECT().GetLastAccepted().Return(parentID).Times(3)
 			s.EXPECT().GetTimestamp().Return(parentTime).Times(3)
 			s.EXPECT().GetFeeState().Return(gas.State{}).Times(3)
-			s.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(3)
+			s.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).Times(3)
 			s.EXPECT().GetAccruedFees().Return(uint64(0)).Times(3)
-			s.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(3)
+			s.EXPECT().NumActiveL1Validators().Return(0).Times(3)
 
 			onDecisionState, err := state.NewDiff(parentID, backend)
 			require.NoError(err)
@@ -735,104 +829,6 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 			require.ErrorIs(err, test.result)
 		})
 	}
-}
-
-func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	// Create mocked dependencies.
-	s := state.NewMockState(ctrl)
-	mempool := mempoolmock.NewMempool(ctrl)
-
-	grandParentID := ids.GenerateTestID()
-	grandParentStatelessBlk := block.NewMockBlock(ctrl)
-	grandParentState := state.NewMockDiff(ctrl)
-	parentID := ids.GenerateTestID()
-	parentStatelessBlk := block.NewMockBlock(ctrl)
-	parentState := state.NewMockDiff(ctrl)
-	atomicInputs := set.Of(ids.GenerateTestID())
-
-	backend := &backend{
-		blkIDToState: map[ids.ID]*blockState{
-			grandParentID: {
-				statelessBlock: grandParentStatelessBlk,
-				onAcceptState:  grandParentState,
-				inputs:         atomicInputs,
-			},
-			parentID: {
-				statelessBlock: parentStatelessBlk,
-				onAcceptState:  parentState,
-			},
-		},
-		Mempool: mempool,
-		state:   s,
-		ctx: &snow.Context{
-			Log: logging.NoLog{},
-		},
-	}
-	verifier := &verifier{
-		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
-				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
-			},
-			Clk: &mockable.Clock{},
-		},
-		backend: backend,
-	}
-
-	blkTx := txsmock.NewUnsignedTx(ctrl)
-	atomicRequests := map[ids.ID]*atomic.Requests{
-		ids.GenerateTestID(): {
-			RemoveRequests: [][]byte{{1}, {2}},
-			PutRequests: []*atomic.Element{
-				{
-					Key:    []byte{3},
-					Value:  []byte{4},
-					Traits: [][]byte{{5}, {6}},
-				},
-			},
-		},
-	}
-	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.StandardTxExecutor{})).DoAndReturn(
-		func(e *executor.StandardTxExecutor) error {
-			e.OnAccept = func() {}
-			e.Inputs = atomicInputs
-			e.AtomicRequests = atomicRequests
-			return nil
-		},
-	).Times(1)
-
-	// We can't serialize [blkTx] because it isn't
-	// registered with the blocks.Codec.
-	// Serialize this block with a dummy tx
-	// and replace it after creation with the mock tx.
-	// TODO allow serialization of mock txs.
-	blk, err := block.NewApricotStandardBlock(
-		parentID,
-		2,
-		[]*txs.Tx{
-			{
-				Unsigned: &txs.AdvanceTimeTx{},
-				Creds:    []verify.Verifiable{},
-			},
-		},
-	)
-	require.NoError(err)
-	blk.Transactions[0].Unsigned = blkTx
-
-	// Set expectations for dependencies.
-	timestamp := time.Now()
-	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
-	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetFeeState().Return(gas.State{}).Times(1)
-	parentState.EXPECT().GetSoVExcess().Return(gas.Gas(0)).Times(1)
-	parentState.EXPECT().GetAccruedFees().Return(uint64(0)).Times(1)
-	parentState.EXPECT().NumActiveSubnetOnlyValidators().Return(0).Times(1)
-	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
-
-	err = verifier.ApricotStandardBlock(blk)
-	require.ErrorIs(err, errConflictingParentTxs)
 }
 
 func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) {
@@ -865,7 +861,7 @@ func TestVerifierVisitApricotStandardBlockWithProposalBlockParent(t *testing.T) 
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -922,7 +918,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	}
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
@@ -959,7 +955,7 @@ func TestVerifierVisitApricotCommitBlockUnexpectedParentState(t *testing.T) {
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -1002,7 +998,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	timestamp := time.Unix(12345, 0)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
@@ -1046,7 +1042,7 @@ func TestVerifierVisitApricotAbortBlockUnexpectedParentState(t *testing.T) {
 	parentStatelessBlk := block.NewMockBlock(ctrl)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.ApricotPhasePost6),
 			},
 			Clk: &mockable.Clock{},
@@ -1089,7 +1085,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	timestamp := time.Unix(12345, 0)
 	verifier := &verifier{
 		txExecutorBackend: &executor.Backend{
-			Config: &config.Config{
+			Config: &config.Internal{
 				UpgradeConfig: upgradetest.GetConfig(upgradetest.Banff),
 			},
 			Clk: &mockable.Clock{},
@@ -1124,15 +1120,15 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 }
 
 func TestBlockExecutionWithComplexity(t *testing.T) {
-	s := statetest.New(t, statetest.Config{})
-	verifier := newTestVerifier(t, s)
+	verifier := newTestVerifier(t, testVerifierConfig{})
 	wallet := txstest.NewWallet(
 		t,
 		verifier.ctx,
 		verifier.txExecutorBackend.Config,
-		s,
+		verifier.state,
 		secp256k1fx.NewKeychain(genesis.EWOQKey),
 		nil, // subnetIDs
+		nil, // validationIDs
 		nil, // chainIDs
 	)
 
@@ -1185,13 +1181,13 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 			verifier.txExecutorBackend.Clk.Set(test.timestamp)
 			timestamp, _, err := state.NextBlockTime(
 				verifier.txExecutorBackend.Config.ValidatorFeeConfig,
-				s,
+				verifier.state,
 				verifier.txExecutorBackend.Clk,
 			)
 			require.NoError(err)
 
-			lastAcceptedID := s.GetLastAccepted()
-			lastAccepted, err := s.GetStatelessBlock(lastAcceptedID)
+			lastAcceptedID := verifier.state.GetLastAccepted()
+			lastAccepted, err := verifier.state.GetStatelessBlock(lastAcceptedID)
 			require.NoError(err)
 
 			blk, err := block.NewBanffStandardBlock(
@@ -1221,7 +1217,7 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 	}
 }
 
-func TestDeactivateLowBalanceSoVs(t *testing.T) {
+func TestDeactivateLowBalanceL1Validators(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -1229,8 +1225,8 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 		pk      = bls.PublicFromSecretKey(sk)
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
-		newSoV = func(endAccumulatedFee uint64) state.SubnetOnlyValidator {
-			return state.SubnetOnlyValidator{
+		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {
+			return state.L1Validator{
 				ValidationID:      ids.GenerateTestID(),
 				SubnetID:          ids.GenerateTestID(),
 				NodeID:            ids.GenerateTestNodeID(),
@@ -1239,49 +1235,49 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 				EndAccumulatedFee: endAccumulatedFee,
 			}
 		}
-		fractionalTimeSoV0 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
-		fractionalTimeSoV1 = newSoV(1 * units.NanoAvax) // lasts .5 seconds
-		wholeTimeSoV       = newSoV(2 * units.NanoAvax) // lasts 1 second
+		fractionalTimeL1Validator0 = newL1Validator(1 * units.NanoAvax) // lasts .5 seconds
+		fractionalTimeL1Validator1 = newL1Validator(1 * units.NanoAvax) // lasts .5 seconds
+		wholeTimeL1Validator       = newL1Validator(2 * units.NanoAvax) // lasts 1 second
 	)
 
 	tests := []struct {
-		name         string
-		initialSoVs  []state.SubnetOnlyValidator
-		expectedSoVs []state.SubnetOnlyValidator
+		name                 string
+		initialL1Validators  []state.L1Validator
+		expectedL1Validators []state.L1Validator
 	}{
 		{
-			name: "no SoVs",
+			name: "no L1 validators",
 		},
 		{
-			name: "fractional SoV is not undercharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
+			name: "fractional L1 validator is not undercharged",
+			initialL1Validators: []state.L1Validator{
+				fractionalTimeL1Validator0,
 			},
 		},
 		{
-			name: "fractional SoVs are not undercharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
-				fractionalTimeSoV1,
+			name: "fractional L1 validators are not undercharged",
+			initialL1Validators: []state.L1Validator{
+				fractionalTimeL1Validator0,
+				fractionalTimeL1Validator1,
 			},
 		},
 		{
-			name: "whole SoVs are not overcharged",
-			initialSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
+			name: "whole L1 validators are not overcharged",
+			initialL1Validators: []state.L1Validator{
+				wholeTimeL1Validator,
 			},
-			expectedSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
+			expectedL1Validators: []state.L1Validator{
+				wholeTimeL1Validator,
 			},
 		},
 		{
 			name: "partial eviction",
-			initialSoVs: []state.SubnetOnlyValidator{
-				fractionalTimeSoV0,
-				wholeTimeSoV,
+			initialL1Validators: []state.L1Validator{
+				fractionalTimeL1Validator0,
+				wholeTimeL1Validator,
 			},
-			expectedSoVs: []state.SubnetOnlyValidator{
-				wholeTimeSoV,
+			expectedL1Validators: []state.L1Validator{
+				wholeTimeL1Validator,
 			},
 		},
 	}
@@ -1290,8 +1286,8 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 			require := require.New(t)
 
 			s := statetest.New(t, statetest.Config{})
-			for _, sov := range test.initialSoVs {
-				require.NoError(s.PutSubnetOnlyValidator(sov))
+			for _, l1Validator := range test.initialL1Validators {
+				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
 			diff, err := state.NewDiffOn(s)
@@ -1303,13 +1299,13 @@ func TestDeactivateLowBalanceSoVs(t *testing.T) {
 				MinPrice:                 gas.Price(2 * units.NanoAvax), // Min price is increased to allow fractional fees
 				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 			}
-			require.NoError(deactivateLowBalanceSoVs(config, diff))
+			require.NoError(deactivateLowBalanceL1Validators(config, diff))
 
-			sovs, err := diff.GetActiveSubnetOnlyValidatorsIterator()
+			l1Validators, err := diff.GetActiveL1ValidatorsIterator()
 			require.NoError(err)
 			require.Equal(
-				test.expectedSoVs,
-				iterator.ToSlice(sovs),
+				test.expectedL1Validators,
+				iterator.ToSlice(l1Validators),
 			)
 		})
 	}

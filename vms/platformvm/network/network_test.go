@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
@@ -27,7 +28,7 @@ import (
 var (
 	errTest = errors.New("test error")
 
-	testConfig = Config{
+	testConfig = config.Network{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
 		PushGossipNumValidators:                     1,
@@ -175,6 +176,9 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.partialSyncPrimaryNetwork,
 				tt.appSenderFunc(ctrl),
+				nil,
+				nil,
+				nil,
 				prometheus.NewRegistry(),
 				testConfig,
 			)

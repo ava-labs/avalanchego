@@ -464,7 +464,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	msg := message.InternalConnected(nodeID, nodeVersion)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
-	// set, disconnect. we cannot put a subnet-only validator check here since
+	// set, disconnect. we cannot put an L1 validator check here since
 	// Disconnected would not be handled properly.
 	//
 	// When sybil protection is disabled, we only want this clause to happen
@@ -509,7 +509,7 @@ func (cr *ChainRouter) Disconnected(nodeID ids.NodeID) {
 	msg := message.InternalDisconnected(nodeID)
 
 	// TODO: fire up an event when validator state changes i.e when they leave
-	// set, disconnect. we cannot put a subnet-only validator check here since
+	// set, disconnect. we cannot put an L1 validator check here since
 	// if a validator connects then it leaves validator-set, it would not be
 	// disconnected properly.
 	for _, chain := range cr.chainHandlers {

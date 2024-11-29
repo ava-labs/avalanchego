@@ -10,5 +10,4 @@ vms/platformvm/signer/signer.go==Signer=vms/platformvm/signer/signermock/signer.
 vms/platformvm/state/diff.go==MockDiff=vms/platformvm/state/mock_diff.go
 vms/platformvm/state/state.go=Chain=MockState=vms/platformvm/state/mock_state.go
 vms/platformvm/state/state.go=State=MockChain=vms/platformvm/state/mock_chain.go
-vms/platformvm/txs/unsigned_tx.go==UnsignedTx=vms/platformvm/txs/txsmock/unsigned_tx.go
 vms/proposervm/block.go=Block=MockPostForkBlock=vms/proposervm/mock_post_fork_block.go

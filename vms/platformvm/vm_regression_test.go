@@ -331,7 +331,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -631,13 +631,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	vm.Config.Validators = validators.NewManager()
+	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
 		DB:         vm.db,
-		Validators: vm.Config.Validators,
-		Upgrades:   vm.Config.UpgradeConfig,
+		Validators: vm.Internal.Validators,
+		Upgrades:   vm.Internal.UpgradeConfig,
 		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.Config.RewardConfig),
+		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
 	})
 
 	// Verify that new validator is now in the current validator set.
@@ -923,13 +923,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	vm.Config.Validators = validators.NewManager()
+	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
 		DB:         vm.db,
-		Validators: vm.Config.Validators,
-		Upgrades:   vm.Config.UpgradeConfig,
+		Validators: vm.Internal.Validators,
+		Upgrades:   vm.Internal.UpgradeConfig,
 		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.Config.RewardConfig),
+		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
 	})
 
 	// Verify that validators are in the current validator set with the correct

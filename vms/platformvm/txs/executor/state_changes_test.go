@@ -95,7 +95,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						DynamicFeeConfig: feeConfig,
 						UpgradeConfig:    upgradetest.GetConfig(test.fork),
 					},
@@ -207,7 +207,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 					},
 				},
@@ -227,7 +227,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 	}
 }
 
-func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
+func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 	sk, err := bls.NewSecretKey()
 	require.NoError(t, err)
 
@@ -240,8 +240,8 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 		pk      = bls.PublicFromSecretKey(sk)
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
-		newSoV = func(endAccumulatedFee uint64) state.SubnetOnlyValidator {
-			return state.SubnetOnlyValidator{
+		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {
+			return state.L1Validator{
 				ValidationID:      ids.GenerateTestID(),
 				SubnetID:          ids.GenerateTestID(),
 				NodeID:            ids.GenerateTestNodeID(),
@@ -250,14 +250,14 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 				EndAccumulatedFee: endAccumulatedFee,
 			}
 		}
-		sovToEvict0 = newSoV(3 * units.NanoAvax) // lasts 3 seconds
-		sovToEvict1 = newSoV(3 * units.NanoAvax) // lasts 3 seconds
-		sovToKeep   = newSoV(units.Avax)
+		l1ValidatorToEvict0 = newL1Validator(3 * units.NanoAvax) // lasts 3 seconds
+		l1ValidatorToEvict1 = newL1Validator(3 * units.NanoAvax) // lasts 3 seconds
+		l1ValidatorToKeep   = newL1Validator(units.Avax)
 
 		currentTime = genesistest.DefaultValidatorStartTime
 		newTime     = currentTime.Add(timeToAdvance)
 
-		config = config.Config{
+		config = config.Internal{
 			ValidatorFeeConfig: fee.Config{
 				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
 				Target:                   1,
@@ -269,55 +269,55 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 	)
 
 	tests := []struct {
-		name             string
-		initialSoVs      []state.SubnetOnlyValidator
-		expectedModified bool
-		expectedSoVs     []state.SubnetOnlyValidator
-		expectedExcess   gas.Gas
+		name                 string
+		initialL1Validators  []state.L1Validator
+		expectedModified     bool
+		expectedL1Validators []state.L1Validator
+		expectedExcess       gas.Gas
 	}{
 		{
-			name:             "no SoVs",
+			name:             "no L1 validators",
 			expectedModified: false,
 			expectedExcess:   0,
 		},
 		{
 			name: "evicted one",
-			initialSoVs: []state.SubnetOnlyValidator{
-				sovToEvict0,
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToEvict0,
 			},
 			expectedModified: true,
 			expectedExcess:   0,
 		},
 		{
 			name: "evicted all",
-			initialSoVs: []state.SubnetOnlyValidator{
-				sovToEvict0,
-				sovToEvict1,
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToEvict0,
+				l1ValidatorToEvict1,
 			},
 			expectedModified: true,
 			expectedExcess:   3,
 		},
 		{
 			name: "evicted 2 of 3",
-			initialSoVs: []state.SubnetOnlyValidator{
-				sovToEvict0,
-				sovToEvict1,
-				sovToKeep,
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToEvict0,
+				l1ValidatorToEvict1,
+				l1ValidatorToKeep,
 			},
 			expectedModified: true,
-			expectedSoVs: []state.SubnetOnlyValidator{
-				sovToKeep,
+			expectedL1Validators: []state.L1Validator{
+				l1ValidatorToKeep,
 			},
 			expectedExcess: 6,
 		},
 		{
 			name: "no evictions",
-			initialSoVs: []state.SubnetOnlyValidator{
-				sovToKeep,
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToKeep,
 			},
 			expectedModified: false,
-			expectedSoVs: []state.SubnetOnlyValidator{
-				sovToKeep,
+			expectedL1Validators: []state.L1Validator{
+				l1ValidatorToKeep,
 			},
 			expectedExcess: 0,
 		},
@@ -329,8 +329,8 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 				s       = statetest.New(t, statetest.Config{})
 			)
 
-			for _, sov := range test.initialSoVs {
-				require.NoError(s.PutSubnetOnlyValidator(sov))
+			for _, l1Validator := range test.initialL1Validators {
+				require.NoError(s.PutL1Validator(l1Validator))
 			}
 
 			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
@@ -353,14 +353,14 @@ func TestAdvanceTimeTo_UpdateSoVs(t *testing.T) {
 			require.NoError(err)
 			require.Equal(test.expectedModified, validatorsModified)
 
-			activeSoVs, err := s.GetActiveSubnetOnlyValidatorsIterator()
+			activeL1Validators, err := s.GetActiveL1ValidatorsIterator()
 			require.NoError(err)
 			require.Equal(
-				test.expectedSoVs,
-				iterator.ToSlice(activeSoVs),
+				test.expectedL1Validators,
+				iterator.ToSlice(activeL1Validators),
 			)
 
-			require.Equal(test.expectedExcess, s.GetSoVExcess())
+			require.Equal(test.expectedExcess, s.GetL1ValidatorExcess())
 			require.Equal(uint64(secondsToAdvance), s.GetAccruedFees())
 		})
 	}

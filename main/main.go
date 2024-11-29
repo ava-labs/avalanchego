@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 )
 
 func main() {
@@ -59,6 +60,8 @@ func main() {
 
 	if term.IsTerminal(int(os.Stdout.Fd())) {
 		fmt.Println(app.Header)
+	} else {
+		executor.EtnaActivationWasLogged.Set(true)
 	}
 
 	nodeApp, err := app.New(nodeConfig)

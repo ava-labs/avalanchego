@@ -26,10 +26,18 @@ import (
 )
 
 const (
-	validatorSetsCacheSize        = 64
-	maxRecentlyAcceptedWindowSize = 64
-	minRecentlyAcceptedWindowSize = 0
-	recentlyAcceptedWindowTTL     = 30 * time.Second
+	// MaxRecentlyAcceptedWindowSize is the maximum number of blocks that the
+	// recommended minimum height will lag behind the last accepted block.
+	MaxRecentlyAcceptedWindowSize = 64
+	// MinRecentlyAcceptedWindowSize is the minimum number of blocks that the
+	// recommended minimum height will lag behind the last accepted block.
+	MinRecentlyAcceptedWindowSize = 0
+	// RecentlyAcceptedWindowTTL is the amount of time after a block is accepted
+	// to avoid recommending it as the minimum height. The size constraints take
+	// precedence over this time constraint.
+	RecentlyAcceptedWindowTTL = 30 * time.Second
+
+	validatorSetsCacheSize = 64
 )
 
 var (
@@ -92,11 +100,13 @@ type State interface {
 		endHeight uint64,
 		subnetID ids.ID,
 	) error
+
+	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 }
 
 func NewManager(
 	log logging.Logger,
-	cfg config.Config,
+	cfg config.Internal,
 	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
@@ -111,9 +121,9 @@ func NewManager(
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
-				MaxSize: maxRecentlyAcceptedWindowSize,
-				MinSize: minRecentlyAcceptedWindowSize,
-				TTL:     recentlyAcceptedWindowTTL,
+				MaxSize: MaxRecentlyAcceptedWindowSize,
+				MinSize: MinRecentlyAcceptedWindowSize,
+				TTL:     RecentlyAcceptedWindowTTL,
 			},
 		),
 	}
@@ -123,7 +133,7 @@ func NewManager(
 // calling exported functions.
 type manager struct {
 	log     logging.Logger
-	cfg     config.Config
+	cfg     config.Internal
 	state   State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
@@ -400,4 +410,8 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 
 func (m *manager) OnAcceptedBlockID(blkID ids.ID) {
 	m.recentlyAccepted.Add(blkID)
+}
+
+func (m *manager) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+	return m.state.GetCurrentValidatorSet(ctx, subnetID)
 }

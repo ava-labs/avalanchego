@@ -132,16 +132,44 @@ func (m *txMetrics) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) er
 	return nil
 }
 
-func (m *txMetrics) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (m *txMetrics) BaseTx(*txs.BaseTx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "convert_subnet",
+		txLabel: "base",
 	}).Inc()
 	return nil
 }
 
-func (m *txMetrics) BaseTx(*txs.BaseTx) error {
+func (m *txMetrics) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	m.numTxs.With(prometheus.Labels{
-		txLabel: "base",
+		txLabel: "convert_subnet_to_l1",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "register_l1_validator",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "set_l1_validator_weight",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "increase_l1_validator_balance",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "disable_l1_validator",
 	}).Inc()
 	return nil
 }

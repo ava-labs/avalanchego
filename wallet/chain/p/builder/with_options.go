@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -154,18 +155,64 @@ func (w *withOptions) NewTransferSubnetOwnershipTx(
 	)
 }
 
-func (w *withOptions) NewConvertSubnetTx(
+func (w *withOptions) NewConvertSubnetToL1Tx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetValidator,
+	validators []*txs.ConvertSubnetToL1Validator,
 	options ...common.Option,
-) (*txs.ConvertSubnetTx, error) {
-	return w.builder.NewConvertSubnetTx(
+) (*txs.ConvertSubnetToL1Tx, error) {
+	return w.builder.NewConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
 		validators,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewRegisterL1ValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	message []byte,
+	options ...common.Option,
+) (*txs.RegisterL1ValidatorTx, error) {
+	return w.builder.NewRegisterL1ValidatorTx(
+		balance,
+		proofOfPossession,
+		message,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewSetL1ValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.SetL1ValidatorWeightTx, error) {
+	return w.builder.NewSetL1ValidatorWeightTx(
+		message,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewIncreaseL1ValidatorBalanceTx(
+	validationID ids.ID,
+	balance uint64,
+	options ...common.Option,
+) (*txs.IncreaseL1ValidatorBalanceTx, error) {
+	return w.builder.NewIncreaseL1ValidatorBalanceTx(
+		validationID,
+		balance,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) NewDisableL1ValidatorTx(
+	validationID ids.ID,
+	options ...common.Option,
+) (*txs.DisableL1ValidatorTx, error) {
+	return w.builder.NewDisableL1ValidatorTx(
+		validationID,
 		common.UnionOptions(w.options, options)...,
 	)
 }
