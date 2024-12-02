@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/uint256"
 )
 
@@ -147,16 +146,12 @@ func TestGenerateMultiCoinAccounts(t *testing.T) {
 
 	// Get latest snapshot and make sure it has the correct account and storage
 	snap := snaps.Snapshot(root)
-	snapAccount, err := snap.AccountRLP(addrHash)
+	snapAccount, err := snap.Account(addrHash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	account := new(types.StateAccount)
-	if err := rlp.DecodeBytes(snapAccount, account); err != nil {
-		t.Fatal(err)
-	}
-	if !types.IsMultiCoin(account) {
-		t.Fatalf("Expected SnapAccount to return IsMultiCoin: true, found: %v", types.IsMultiCoin(account))
+	if !types.IsMultiCoin(snapAccount) {
+		t.Fatalf("Expected SnapAccount to return IsMultiCoin: true, found: false")
 	}
 
 	NormalizeCoinID(&assetID)
