@@ -43,7 +43,7 @@ func main() {
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
+	// Get the chain wallets
 	pWallet := wallet.P()
 	cWallet := wallet.C()
 
