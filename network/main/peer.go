@@ -13,14 +13,32 @@ import (
 	"go.uber.org/zap"
 )
 
-func getAllPeers(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler) ([]peer.Peer, error) {
+type TestPeers struct {
+	log logging.Logger
+	peers []peer.Peer
+}
+
+
+func NewTestPeers(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler) (*TestPeers, error) {
 	if NetworkId == constants.LocalID {
-		return []peer.Peer{}, nil
+		p, err := peer.StartTestPeer(
+			ctx,
+			netip.MustParseAddrPort("127.0.0.1:9651"),
+			constants.LocalID,
+			handler,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+		return &TestPeers{
+			log: log,
+			peers: []peer.Peer{p},
+		}, nil
 	}
 
 	// adds peers to the network
 	trackBootstrappers(network)
-
 	time.Sleep(8 * time.Second)
 
 	// grab peer info
@@ -35,9 +53,7 @@ func getAllPeers(ctx context.Context, log logging.Logger, network network.Networ
 			info.IP,
 			NetworkId,
 			handler,
-			true,
 		)
-		
 		if err != nil {
 			// continue in case of failure but note in log
 			log.Fatal(
@@ -53,39 +69,22 @@ func getAllPeers(ctx context.Context, log logging.Logger, network network.Networ
 
 	log.Info("Successfully connected ", zap.Int("num connected", connected), zap.Int("num total", len(peerInfo)))
 
-	return peers, nil
+	return &TestPeers{
+		log,
+		peers,
+	}, nil
 }
 
-func sendToSelf(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler, msg message.OutboundMessage) {
-	peer, err := peer.StartTestPeer(
-				ctx,
-				netip.MustParseAddrPort("127.0.0.1:9651"),
-				constants.LocalID,
-				handler,
-				true,
-			)
-	if err != nil {
-		log.Fatal(
-			"failed to create subnet ID",
-			zap.Error(err),
-		)
-		return
-	}
-
-	sent := peer.Send(ctx, msg)
-	log.Info("Sent msg", zap.Bool("sent", sent))
-}
-
-
-func send(ctx context.Context, log logging.Logger, peers []peer.Peer, msg message.OutboundMessage) int {
+func (t TestPeers) Send(ctx context.Context, msg message.OutboundMessage) int {
 	success := 0
-	for _, p := range peers {
+	for _, p := range t.peers {
 		if p.Send(ctx, msg) {
 			success++
-			log.Info("Successfully sent message to peer")
+			t.log.Info("Successfully sent message to peer")
 		} else {
-			log.Info("Message not delivered to peer")
+			t.log.Info("Message not delivered to peer")
 		}
+		p.Info()
 	}
 	return success
 }

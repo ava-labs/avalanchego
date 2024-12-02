@@ -82,16 +82,15 @@ func main() {
 	ctx := context.Background()
 
 	// if local network we send to ourselves(since no peers will be returned)
-	sendToSelf(ctx, log, network, handler, exampleMsg)
-	peers, err := getAllPeers(ctx, log, network, handler)
+	tp, err := NewTestPeers(ctx, log, network, handler)
 	if err != nil {
 		log.Fatal("failed to get and start peers",
 		zap.Error(err),
 		)
 	}
-	
-	log.Info("peers len: ", zap.Int("len", len(peers)))
-	send(ctx, log, peers, exampleMsg)
+
+	log.Info("peers len: ", zap.Int("len", len(tp.peers)))
+	tp.Send(ctx, exampleMsg)
 
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
