@@ -230,7 +230,7 @@ func TestAggregateSignatures(t *testing.T) {
 			expectedErr:     nil,
 		},
 		{
-			name: "early termination of signature fetching on parent context cancelation",
+			name: "early termination of signature fetching on parent context cancellation",
 			contextWithCancelFunc: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()

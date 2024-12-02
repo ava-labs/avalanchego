@@ -1919,7 +1919,7 @@ func TestConfigureLogLevel(t *testing.T) {
 				}
 			}
 
-			// If the VM was not initialized, do not attept to shut it down
+			// If the VM was not initialized, do not attempt to shut it down
 			if err == nil {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {

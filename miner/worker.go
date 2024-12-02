@@ -430,7 +430,7 @@ func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transac
 			continue
 		}
 		// Abort transaction if it won't fit in the block and continue to search for a smaller
-		// transction that will fit.
+		// transaction that will fit.
 		if totalTxsSize := env.size + tx.Size(); totalTxsSize > targetTxsSize {
 			log.Trace("Skipping transaction that would exceed target size", "hash", tx.Hash(), "totalTxsSize", totalTxsSize, "txSize", tx.Size())
 			txs.Pop()
