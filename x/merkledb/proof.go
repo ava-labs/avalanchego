@@ -276,14 +276,15 @@ type RangeProof struct {
 //
 //	If [start] is Nothing, all keys are considered > [start].
 //	If [end] is Nothing, all keys are considered < [end].
-func (proof *RangeProof) Verify(
+func (db *merkleDB) VerifyRangeProof(
 	ctx context.Context,
+	proof *RangeProof,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
-	tokenSize int,
-	hasher Hasher,
 ) error {
+	tokenSize := db.tokenSize
+	hasher := db.hasher
 	switch {
 	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd

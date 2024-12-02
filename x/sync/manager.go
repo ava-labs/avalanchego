@@ -522,13 +522,12 @@ func (m *Manager) handleRangeProofResponse(
 
 	if err := verifyRangeProof(
 		ctx,
+		m.config.DB,
 		&rangeProof,
 		int(request.KeyLimit),
 		maybeBytesToMaybe(request.StartKey),
 		maybeBytesToMaybe(request.EndKey),
 		request.RootHash,
-		m.tokenSize,
-		m.config.Hasher,
 	); err != nil {
 		return err
 	}
@@ -622,13 +621,12 @@ func (m *Manager) handleChangeProofResponse(
 		// so they sent a range proof instead.
 		if err := verifyRangeProof(
 			ctx,
+			m.config.DB,
 			&rangeProof,
 			int(request.KeyLimit),
 			startKey,
 			endKey,
 			request.EndRootHash,
-			m.tokenSize,
-			m.config.Hasher,
 		); err != nil {
 			return err
 		}
@@ -1141,13 +1139,12 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex int) (byte
 // than [keyLimit] keys.
 func verifyRangeProof(
 	ctx context.Context,
+	db DB,
 	rangeProof *merkledb.RangeProof,
 	keyLimit int,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
-	tokenSize int,
-	hasher merkledb.Hasher,
 ) error {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
@@ -1162,14 +1159,7 @@ func verifyRangeProof(
 		)
 	}
 
-	if err := rangeProof.Verify(
-		ctx,
-		start,
-		end,
-		root,
-		tokenSize,
-		hasher,
-	); err != nil {
+	if err := db.VerifyRangeProof(ctx, rangeProof, start, end, root); err != nil {
 		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
 	return nil
