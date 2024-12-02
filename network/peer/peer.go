@@ -668,7 +668,6 @@ func (p *peer) sendNetworkMessages() {
 				)
 				return
 			}
-
 			p.Send(p.onClosingCtx, pingMessage)
 		case <-p.onClosingCtx.Done():
 			return
@@ -727,11 +726,9 @@ func (p *peer) handle(msg message.InboundMessage) {
 	case *p2p.Ping:
 		p.handlePing(m)
 		msg.OnFinishedHandling()
-		return
 	case *p2p.Pong:
 		p.handlePong(m)
 		msg.OnFinishedHandling()
-		return
 	case *p2p.Handshake:
 		p.handleHandshake(m)
 		msg.OnFinishedHandling()

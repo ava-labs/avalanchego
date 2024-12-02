@@ -38,7 +38,7 @@ func NewTestPeers(ctx context.Context, log logging.Logger, network network.Netwo
 	}
 
 	// adds peers to the network
-	trackBootstrappers(network)
+trackBootstrappers(network)
 	time.Sleep(8 * time.Second)
 
 	// grab peer info

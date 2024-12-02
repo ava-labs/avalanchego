@@ -42,4 +42,6 @@ func ExampleStartTestPeer() {
 	if err != nil {
 		panic(err)
 	}
+
+	// GetAcceptedFrontier
 }

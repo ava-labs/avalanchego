@@ -16,7 +16,7 @@ import (
 // run with in memory db, and
 // ./build/avalanchego --network-id=local --db-type=memdb --sybil-protection-enabled=false
 var (
-	NetworkId = constants.FujiID
+	NetworkId = constants.MainnetID
 	// p chain id. 
 	ChainID = ids.FromStringOrPanic("11111111111111111111111111111111LpoYY")
 )
