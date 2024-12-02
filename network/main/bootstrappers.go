@@ -18,4 +18,3 @@ func trackBootstrappers(network network.Network) []genesis.Bootstrapper {
 	}
 	return bootstrappers
 }
-	

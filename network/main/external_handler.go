@@ -36,10 +36,10 @@ func (t *testExternalHandler) HandleInbound(_ context.Context, msg message.Inbou
 		}
 		return
 	case message.Op(message.PingOp): 
-		t.log.Info("PINGGGO")
+		// t.log.Info("PINGGGO")
 		return
 	case message.Op(message.PongOp): 
-		t.log.Info("Pongo was his name-o")
+		// t.log.Info("Pongo was his name-o")
 		return
 	default:
 		t.log.Info("received message", zap.Stringer("op", msg.Op()))

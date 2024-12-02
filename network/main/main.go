@@ -25,6 +25,11 @@ type testAggressiveValidatorManager struct {
 	validators.Manager
 }
 
+// func main() {
+// 	s := []byte("pong")
+// 	push("bao.txt", s)
+// }
+
 func main() {
 	log := logging.NewLogger(
 		"networking",
@@ -90,7 +95,10 @@ func main() {
 	}
 
 	log.Info("peers len: ", zap.Int("len", len(tp.peers)))
-	tp.Send(ctx, exampleMsg)
+	// tp.Send(ctx, exampleMsg)
+	metrics := newMetrics(log)
+
+	metrics.collect(tp)
 
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.
