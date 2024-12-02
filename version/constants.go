@@ -194,11 +194,10 @@ var (
 		constants.KopernikusID: kopernikusEarliestTime,
 	}
 
-	// TODO @evlekht update this before release
 	BerlinPhaseTimes = map[uint32]time.Time{
 		constants.KopernikusID: time.Date(2024, time.November, 28, 10, 0, 0, 0, time.UTC),
 		constants.ColumbusID:   time.Date(2024, time.November, 28, 10, 0, 0, 0, time.UTC),
-		constants.CaminoID:     unreachableFutureTime,
+		constants.CaminoID:     time.Date(2024, time.December, 18, 10, 0, 0, 0, time.UTC),
 	}
 
 	CortinaTimes = map[uint32]time.Time{
