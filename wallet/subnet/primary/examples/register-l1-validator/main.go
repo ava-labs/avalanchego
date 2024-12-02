@@ -53,22 +53,22 @@ func main() {
 	}
 	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		uri,
+		kc,
+		primary.WalletConfig{},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-	context := pWallet.Builder().Context()
+	// Get the chain context
+	context := wallet.Builder().Context()
 
 	expiry := uint64(time.Now().Add(5 * time.Minute).Unix()) // This message will expire in 5 minutes
 	addressedCallPayload, err := message.NewRegisterL1Validator(
@@ -127,7 +127,7 @@ func main() {
 	}
 
 	registerL1ValidatorStartTime := time.Now()
-	registerL1ValidatorTx, err := pWallet.IssueRegisterL1ValidatorTx(
+	registerL1ValidatorTx, err := wallet.IssueRegisterL1ValidatorTx(
 		units.Avax,
 		nodePoP.ProofOfPossession,
 		warp.Bytes(),
