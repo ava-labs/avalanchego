@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 var _ router.ExternalHandler = (*testExternalHandler)(nil)
 
 // Note: all of the external handler's methods are called on peer goroutines. It
@@ -35,10 +34,10 @@ func (t *testExternalHandler) HandleInbound(_ context.Context, msg message.Inbou
 			t.con = true
 		}
 		return
-	case message.Op(message.PingOp): 
+	case message.Op(message.PingOp):
 		// t.log.Info("PINGGGO")
 		return
-	case message.Op(message.PongOp): 
+	case message.Op(message.PongOp):
 		// t.log.Info("Pongo was his name-o")
 		return
 	default:
@@ -47,12 +46,12 @@ func (t *testExternalHandler) HandleInbound(_ context.Context, msg message.Inbou
 }
 
 func (t *testExternalHandler) Connected(nodeID ids.NodeID, version *version.Application, subnetID ids.ID) {
-	t.log.Info(
-		"connected",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("version", version),
-		zap.Stringer("subnetID", subnetID),
-	)
+	// t.log.Info(
+	// 	"connected",
+	// 	zap.Stringer("nodeID", nodeID),
+	// 	zap.Stringer("version", version),
+	// 	zap.Stringer("subnetID", subnetID),
+	// )
 }
 
 func (t *testExternalHandler) Disconnected(nodeID ids.NodeID) {

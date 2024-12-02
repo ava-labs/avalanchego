@@ -17,7 +17,7 @@ import (
 // ./build/avalanchego --network-id=local --db-type=memdb --sybil-protection-enabled=false
 var (
 	NetworkId = constants.MainnetID
-	// p chain id. 
+	// p chain id.
 	ChainID = ids.FromStringOrPanic("11111111111111111111111111111111LpoYY")
 )
 
@@ -39,7 +39,7 @@ func main() {
 			logging.Colors.ConsoleEncoder(),
 		),
 	)
-	
+
 	// Needs to be periodically updated by the caller to have the latest
 	// validator set
 	validators := &testAggressiveValidatorManager{
@@ -58,7 +58,7 @@ func main() {
 		set.Set[ids.ID]{},
 		handler,
 	)
-	
+
 	if err != nil {
 		log.Fatal(
 			"failed to create test network",
@@ -66,7 +66,7 @@ func main() {
 		)
 		return
 	}
-	
+
 	// Typically network.StartClose() should be called based on receiving a
 	// SIGINT or SIGTERM. For the example, we close the network after 15s.
 	// go log.RecoverAndPanic(func() {
@@ -83,14 +83,14 @@ func main() {
 		return
 	}
 	log.Info("Created example message", zap.Any("op", exampleMsg.Op().String()))
-	
+
 	ctx := context.Background()
 
 	// if local network we send to ourselves(since no peers will be returned)
 	tp, err := NewTestPeers(ctx, log, network, handler)
 	if err != nil {
 		log.Fatal("failed to get and start peers",
-		zap.Error(err),
+			zap.Error(err),
 		)
 	}
 
@@ -98,7 +98,7 @@ func main() {
 	// tp.Send(ctx, exampleMsg)
 	metrics := newMetrics(log)
 
-	metrics.collect(tp)
+	go metrics.collect(tp)
 
 	// Calling network.Dispatch() will block until a fatal error occurs or
 	// network.StartClose() is called.

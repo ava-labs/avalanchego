@@ -7,7 +7,7 @@ import (
 
 var _ subnets.Allower = &alwaysAllower{}
 
-type alwaysAllower struct {}
+type alwaysAllower struct{}
 
 // allow messages to any node
 func (alwaysAllower) IsAllowed(nodeID ids.NodeID, isValidator bool) bool {

@@ -14,10 +14,9 @@ import (
 )
 
 type TestPeers struct {
-	log logging.Logger
+	log   logging.Logger
 	peers []peer.Peer
 }
-
 
 func NewTestPeers(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler) (*TestPeers, error) {
 	if NetworkId == constants.LocalID {
@@ -32,19 +31,19 @@ func NewTestPeers(ctx context.Context, log logging.Logger, network network.Netwo
 			return nil, err
 		}
 		return &TestPeers{
-			log: log,
+			log:   log,
 			peers: []peer.Peer{p},
 		}, nil
 	}
 
 	// adds peers to the network
-trackBootstrappers(network)
+	trackBootstrappers(network)
 	time.Sleep(8 * time.Second)
 
 	// grab peer info
 	peerInfo := network.PeerInfo(nil)
 	log.Info("Peer Info", zap.Any("peers", peerInfo))
-	
+
 	var peers []peer.Peer
 	connected := 0
 	for _, info := range peerInfo {

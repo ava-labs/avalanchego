@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-
 func getStateSummaryMsg(log logging.Logger, chainId ids.ID) (message.OutboundMessage, error) {
 	mc, err := message.NewCreator(
 		log,
@@ -21,5 +20,5 @@ func getStateSummaryMsg(log logging.Logger, chainId ids.ID) (message.OutboundMes
 	if err != nil {
 		return nil, err
 	}
-	return mc.GetAcceptedFrontier(chainId, 1, time.Second * 5)
+	return mc.GetAcceptedFrontier(chainId, 1, time.Second*5)
 }
