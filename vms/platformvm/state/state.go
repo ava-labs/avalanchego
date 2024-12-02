@@ -214,7 +214,10 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
+	// GetCurrentValidators returns legacy stakers, L1 validators for the given subnetID along with current P-chain height.
+	// Note: This is most convenient to fetch validators of an L1. Even though it can still return
+	// stakers of a subnet, it is not recommended to use this method to fetch stakers of a subnet.
+	GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -834,62 +837,34 @@ func (s *state) DeleteExpiry(entry ExpiryEntry) {
 	s.expiryDiff.DeleteExpiry(entry)
 }
 
-func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	result := make(map[ids.ID]*validators.GetCurrentValidatorOutput)
+func (s *state) GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error) {
 	// First add the current validators (non-L1)
-	for _, staker := range s.currentStakers.validators[subnetID] {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
-		validator := staker.validator
-		result[validator.TxID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validator.TxID,
-			NodeID:        validator.NodeID,
-			PublicKey:     validator.PublicKey,
-			Weight:        validator.Weight,
-			StartTime:     uint64(validator.StartTime.Unix()),
-			MinNonce:      0,
-			IsActive:      true,
-			IsL1Validator: false,
+	var legacyStakers []*Staker
+	if legacyBaseStakers, ok := s.currentStakers.validators[subnetID]; ok {
+		for _, staker := range legacyBaseStakers {
+			legacyStakers = append(legacyStakers, staker.validator)
 		}
 	}
 
-	// Then iterate over subnetIDNodeID DB and add the L1 validators (if any)
-	// TODO: consider optimizing this to avoid hitting the subnetIDNodeIDDB and read from actives lookup
-	// if all validators are active (inactive weight is 0)
+	// Then iterate over subnetIDNodeID DB and add the L1 validators
+	var l1Validators []L1Validator
 	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(
 		subnetID[:],
 	)
 	defer validationIDIter.Release()
-
 	for validationIDIter.Next() {
-		if err := ctx.Err(); err != nil {
-			return nil, 0, err
-		}
-
 		validationID, err := ids.ToID(validationIDIter.Value())
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
-
 		vdr, err := s.GetL1Validator(validationID)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get validator: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to get validator: %w", err)
 		}
-
-		result[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID:  validationID,
-			NodeID:        vdr.NodeID,
-			PublicKey:     bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey),
-			Weight:        vdr.Weight,
-			StartTime:     vdr.StartTime,
-			IsActive:      vdr.isActive(),
-			MinNonce:      vdr.MinNonce,
-			IsL1Validator: true,
-		}
+		l1Validators = append(l1Validators, vdr)
 	}
 
-	return result, s.currentHeight, nil
+	return legacyStakers, l1Validators, s.currentHeight, nil
 }
 
 func (s *state) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
@@ -2476,7 +2451,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		switch err {
 		case nil:
 			// Modifying an existing validator
-			if priorL1Validator.isActive() == l1Validator.isActive() {
+			if priorL1Validator.IsActive() == l1Validator.IsActive() {
 				// This validator's active status isn't changing. This means
 				// the effectiveNodeIDs are equal.
 				nodeID := l1Validator.effectiveNodeID()
@@ -2872,7 +2847,7 @@ func (s *state) writeL1Validators() error {
 
 		// Add the new validator
 		var err error
-		if l1Validator.isActive() {
+		if l1Validator.IsActive() {
 			s.activeL1Validators.put(l1Validator)
 			err = putL1Validator(s.activeDB, emptyL1ValidatorCache, l1Validator)
 		} else {

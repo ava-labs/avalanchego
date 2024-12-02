@@ -141,14 +141,6 @@ type GenesisPermissionlessValidator struct {
 	Signer             *signer.ProofOfPossession `json:"signer,omitempty"`
 }
 
-// PermissionedValidator is the repr. of a permissioned validator sent over APIs.
-type PermissionedValidator struct {
-	Staker
-	// The owner the staking reward, if applicable, will go to
-	Connected *bool         `json:"connected,omitempty"`
-	Uptime    *json.Float32 `json:"uptime,omitempty"`
-}
-
 // PrimaryDelegator is the repr. of a primary network delegator sent over APIs.
 type PrimaryDelegator struct {
 	Staker
