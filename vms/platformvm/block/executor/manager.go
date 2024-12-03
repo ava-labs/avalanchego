@@ -23,7 +23,8 @@ import (
 var (
 	_ Manager = (*manager)(nil)
 
-	ErrChainNotSynced = errors.New("chain not synced")
+	ErrChainNotSynced              = errors.New("chain not synced")
+	ErrImportTxWhilePartialSyncing = errors.New("issuing an import tx is not allowed while partial syncing")
 )
 
 type Manager interface {
@@ -122,6 +123,15 @@ func (m *manager) Preferred() ids.ID {
 func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
 		return ErrChainNotSynced
+	}
+
+	// If partial sync is enabled, this node isn't guaranteed to have the full
+	// UTXO set from shared memory. To avoid issuing invalid transactions,
+	// issuance of an ImportTx during this state is completely disallowed.
+	if m.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		if _, isImportTx := tx.Unsigned.(*txs.ImportTx); isImportTx {
+			return ErrImportTxWhilePartialSyncing
+		}
 	}
 
 	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())

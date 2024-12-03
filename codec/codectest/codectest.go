@@ -35,7 +35,7 @@ func RunAll(t *testing.T, ctor func() codecpkg.GeneralCodec) {
 	}
 }
 
-// RunAll runs all [MultipleTagsTests], constructing a new GeneralCodec for each.
+// RunAllMultipleTags runs all [MultipleTagsTests], constructing a new GeneralCodec for each.
 func RunAllMultipleTags(t *testing.T, ctor func() codecpkg.GeneralCodec) {
 	for _, tt := range MultipleTagsTests {
 		tt.Run(t, ctor())

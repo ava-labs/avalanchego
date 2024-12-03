@@ -9,6 +9,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -28,11 +29,10 @@ var _ = ginkgo.Describe("[Etna]", func() {
 			require.NoError(err)
 
 			now := time.Now()
-			if !upgrades.IsEtnaActivated(now) {
-				tc.Outf("{{green}}Etna is not activated{{/}}: %s (now) < %s (EtnaTime)\n", now, upgrades.EtnaTime)
-				return
-			}
-
-			tc.Outf("{{green}}Etna is activated{{/}}: %s (now) >= %s (EtnaTime)\n", now, upgrades.EtnaTime)
+			tc.Log().Info("detected if Etna is activated",
+				zap.Time("now", now),
+				zap.Time("etnaTime", upgrades.EtnaTime),
+				zap.Bool("isEtnaActivated", upgrades.IsEtnaActivated(now)),
+			)
 		})
 })

@@ -13,6 +13,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/api/info"
@@ -203,7 +204,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			subnetGenesisNode.StakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
-				tc.Outf("received %s %s from %s\n", m.Op(), m.Message(), m.NodeID())
+				tc.Log().Info("received a message",
+					zap.Stringer("op", m.Op()),
+					zap.Stringer("message", m.Message()),
+					zap.Stringer("from", m.NodeID()),
+				)
 				genesisPeerMessages.PushRight(m)
 			}),
 		)
@@ -250,7 +255,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
 				ManagerAddress: address,
-				Validators: []warpmessage.SubnetToL1ConverstionValidatorData{
+				Validators: []warpmessage.SubnetToL1ConversionValidatorData{
 					{
 						NodeID:       subnetGenesisNode.NodeID.Bytes(),
 						BLSPublicKey: genesisNodePoP.PublicKey,

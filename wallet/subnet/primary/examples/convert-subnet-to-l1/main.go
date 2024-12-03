@@ -48,7 +48,7 @@ func main() {
 		SubnetID:       subnetID,
 		ManagerChainID: chainID,
 		ManagerAddress: address,
-		Validators: []message.SubnetToL1ConverstionValidatorData{
+		Validators: []message.SubnetToL1ConversionValidatorData{
 			{
 				NodeID:       nodeID.Bytes(),
 				BLSPublicKey: nodePoP.PublicKey,
@@ -60,25 +60,24 @@ func main() {
 		log.Fatalf("failed to calculate conversionID: %s\n", err)
 	}
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-		SubnetIDs:    []ids.ID{subnetID},
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		uri,
+		kc,
+		primary.WalletConfig{
+			SubnetIDs: []ids.ID{subnetID},
+		},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-
 	convertSubnetToL1StartTime := time.Now()
-	convertSubnetToL1Tx, err := pWallet.IssueConvertSubnetToL1Tx(
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,

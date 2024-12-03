@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
@@ -54,5 +55,7 @@ var _ = ginkgo.AfterEach(func() {
 		strconv.FormatInt(startTime, 10),
 		strconv.FormatInt(endTime, 10),
 	)
-	tc.Outf("Test Metrics: %s\n", metricsLink)
+	tc.Log().Info(tmpnet.MetricsAvailableMessage,
+		zap.String("uri", metricsLink),
+	)
 })

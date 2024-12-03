@@ -6,39 +6,50 @@ package antithesis
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // Waits for the nodes at the provided URIs to report healthy.
-func awaitHealthyNodes(ctx context.Context, uris []string) error {
+func awaitHealthyNodes(ctx context.Context, log logging.Logger, uris []string) error {
 	for _, uri := range uris {
-		if err := awaitHealthyNode(ctx, uri); err != nil {
+		if err := awaitHealthyNode(ctx, log, uri); err != nil {
 			return err
 		}
 	}
-	log.Println("all nodes reported healthy")
+	log.Info("all nodes reported healthy")
 	return nil
 }
 
-func awaitHealthyNode(ctx context.Context, uri string) error {
+func awaitHealthyNode(ctx context.Context, log logging.Logger, uri string) error {
 	client := health.NewClient(uri)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	log.Printf("awaiting node health at %s", uri)
+	log.Info("awaiting node health",
+		zap.String("uri", uri),
+	)
 	for {
 		res, err := client.Health(ctx, nil)
 		switch {
 		case err != nil:
-			log.Printf("node couldn't be reached at %s", uri)
+			log.Warn("failed to reach node",
+				zap.String("uri", uri),
+				zap.Error(err),
+			)
 		case res.Healthy:
-			log.Printf("node reported healthy at %s", uri)
+			log.Info("node reported healthy",
+				zap.String("uri", uri),
+			)
 			return nil
 		default:
-			log.Printf("node reported unhealthy at %s", uri)
+			log.Info("node reported unhealthy",
+				zap.String("uri", uri),
+			)
 		}
 
 		select {

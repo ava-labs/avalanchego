@@ -687,3 +687,29 @@ func GetDeactivationOwners(
 	}
 	return deactivationOwners, nil
 }
+
+// GetOwners returns the union of GetSubnetOwners and GetDeactivationOwners.
+func GetOwners(
+	c Client,
+	ctx context.Context,
+	subnetIDs []ids.ID,
+	validationIDs []ids.ID,
+) (map[ids.ID]fx.Owner, error) {
+	subnetOwners, err := GetSubnetOwners(c, ctx, subnetIDs...)
+	if err != nil {
+		return nil, err
+	}
+	deactivationOwners, err := GetDeactivationOwners(c, ctx, validationIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
+	for id, owner := range subnetOwners {
+		owners[id] = owner
+	}
+	for id, owner := range deactivationOwners {
+		owners[id] = owner
+	}
+	return owners, nil
+}

@@ -1,84 +1,52 @@
----
-tags: [AvalancheGo APIs]
-description: This page is an overview of the Keystore API associated with AvalancheGo.
-sidebar_label: Keystore API
-pagination_label: Keystore API
----
+<Callout type="warn">
+Because the node operator has access to your plain-text password, you should only create a keystore user on a node that you operate. If that node is breached, you could lose all your tokens. Keystore APIs are not recommended for use on Mainnet.
+</Callout>
 
-# Keystore API
+Every node has a built-in keystore. Clients create users on the keystore, which act as identities to be used when interacting with blockchains. A keystore exists at the node level, so if you create a user on a node it exists _only_ on that node. However, users may be imported and exported using this API.
 
-:::warning
-Because the node operator has access to your plain-text password, you should only create a
-keystore user on a node that you operate. If that node is breached, you could lose all your tokens.
-Keystore APIs are not recommended for use on Mainnet.
-:::
+For validation and cross-chain transfer on the Mainnet, you should issue transactions through [AvalancheJS](/tooling/avalanche-js). That way control keys for your funds won't be stored on the node, which significantly lowers the risk should a computer running a node be compromised. See following docs for details:
 
-Every node has a built-in keystore. Clients create users on the keystore, which act as identities to
-be used when interacting with blockchains. A keystore exists at the node level, so if you create a
-user on a node it exists _only_ on that node. However, users may be imported and exported using this
-API.
-
-For validation and cross-chain transfer on the Mainnet, you should issue transactions through
-[AvalancheJS](/tooling/avalanchejs-overview). That way control keys for your funds won't be stored on
-the node, which significantly lowers the risk should a computer running a node be compromised. See
-following docs for details:
-
-- Transfer AVAX Tokens Between Chains:
-
-  - C-Chain: [export](https://github.com/ava-labs/avalanchejs/blob/master/examples/c-chain/export.ts) and
-    [import](https://github.com/ava-labs/avalanchejs/blob/master/examples/c-chain/import.ts)
-  - P-Chain: [export](https://github.com/ava-labs/avalanchejs/blob/master/examples/p-chain/export.ts) and
-    [import](https://github.com/ava-labs/avalanchejs/blob/master/examples/p-chain/import.ts)
-  - X-Chain: [export](https://github.com/ava-labs/avalanchejs/blob/master/examples/x-chain/export.ts) and
-    [import](https://github.com/ava-labs/avalanchejs/blob/master/examples/x-chain/import.ts)
-
-- [Add a Node to the Validator Set](/nodes/validate/add-a-validator)
-
-:::info
-
-This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers.md).
-
-:::
+1. Transfer AVAX Tokens Between Chains:    
+    - C-Chain: [export](https://github.com/ava-labs/avalanchejs/blob/master/examples/c-chain/export.ts) and [import](https://github.com/ava-labs/avalanchejs/blob/master/examples/c-chain/import.ts)
+    - P-Chain: [export](https://github.com/ava-labs/avalanchejs/blob/master/examples/p-chain/export.ts) and [import](https://github.com/ava-labs/avalanchejs/blob/master/examples/p-chain/import.ts)
+    - X-Chain: [export](https://github.com/ava-labs/avalanchejs/blob/master/examples/x-chain/export.ts) and [import](https://github.com/ava-labs/avalanchejs/blob/master/examples/x-chain/import.ts)
+2. [Add a Node to the Validator Set](/nodes/validate/node-validator)
+    
+<Callout title="Note">
+This API set is for a specific node, it is unavailable on the [public server](/tooling/rpc-providers).
+</Callout>
 
 ## Format
 
-This API uses the `json 2.0` API format. For more information on making JSON RPC calls, see
-[here](/reference/standards/guides/issuing-api-calls.md).
+This API uses the `json 2.0` API format. For more information on making JSON RPC calls, see [here](/api-reference/standards/guides/issuing-api-calls).
 
 ## Endpoint
 
-```text
+```
 /ext/keystore
 ```
 
 ## Methods
 
-### keystore.createUser
-
-:::caution
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+### `keystore.createUser`
 
 Create a new user with the specified username and password.
 
-**Signature:**
+**Signature**:
 
-```sh
+```
 keystore.createUser(
-    {
-        username:string,
-        password:string
-    }
+{
+    username:string,
+    password:string
+}
 ) -> {}
 ```
 
 - `username` and `password` can be at most 1024 characters.
-- Your request will be rejected if `password` is too weak. `password` should be at least 8
-  characters and contain upper and lower case letters as well as numbers and symbols.
+- Your request will be rejected if `password` is too weak. `password` should be at least 8 characters and contain upper and lower case letters as well as numbers and symbols.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -92,7 +60,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/keystore
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -102,23 +70,21 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.deleteUser
+### `keystore.deleteUser`
 
-:::caution
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+<Callout type="warn">
+Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+</Callout>
 
 Delete a user.
 
-**Signature:**
+**Signature**:
 
-```sh
-keystore.deleteUser({username: string, password:string}) -> {}
+```
+keystore.deleteUser({ username: string, password:string }) -> {}
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -132,7 +98,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/keystore
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -142,37 +108,32 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.exportUser
+### `keystore.exportUser`
 
-:::caution
+<Callout type="warn">
+Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+</Callout>
 
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+Export a user. The user can be imported to another node with [`keystore.importUser`](/api-reference/keystore-api#keystoreimportuser). The user's password remains encrypted.
 
-:::
+**Signature**:
 
-Export a user. The user can be imported to another node with
-[`keystore.importUser`](/reference/avalanchego/keystore-api.md#keystoreimportuser). The user’s password
-remains encrypted.
-
-**Signature:**
-
-```sh
+```
 keystore.exportUser(
-    {
-        username:string,
-        password:string,
-        encoding:string //optional
-    }
+{
+    username:string,
+    password:string,
+    encoding:string //optional
+}
 ) -> {
     user:string,
     encoding:string
 }
 ```
 
-`encoding` specifies the format of the string encoding user data. Can only be `hex` when a value is
-provided.
+`encoding` specifies the format of the string encoding user data. Can only be `hex` when a value is provided.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -186,7 +147,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/keystore
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -199,34 +160,30 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.importUser
+### `keystore.importUser`
 
-:::caution
+<Callout type="warn">
+Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+</Callout>
 
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+Import a user. `password` must match the user's password. `username` doesn't have to match the username `user` had when it was exported.
 
-:::
+**Signature**:
 
-Import a user. `password` must match the user’s password. `username` doesn’t have to match the
-username `user` had when it was exported.
-
-**Signature:**
-
-```sh
+```
 keystore.importUser(
-    {
-        username:string,
-        password:string,
-        user:string,
-        encoding:string //optional
-    }
+{
+    username:string,
+    password:string,
+    user:string,
+    encoding:string //optional
+}
 ) -> {}
 ```
 
-`encoding` specifies the format of the string encoding user data. Can only be `hex` when a value is
-provided.
+`encoding` specifies the format of the string encoding user data. Can only be `hex` when a value is provided.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -241,7 +198,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/keystore
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -251,23 +208,21 @@ curl -X POST --data '{
 }
 ```
 
-### keystore.listUsers
+### `keystore.listUsers`
 
-:::caution
-
-Deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
+<Callout type="warn">
+Deprecated as of [v1.9.12](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
+</Callout>
 
 List the users in this keystore.
 
-**Signature:**
+**Signature**:
 
-```sh
-keystore.ListUsers() -> {users:[]string}
+```
+keystore.ListUsers() -> { users: []string }
 ```
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl -X POST --data '{
@@ -277,7 +232,7 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/keystore
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {

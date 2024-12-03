@@ -7,14 +7,14 @@ if ! [[ "$0" =~ scripts/lint.sh ]]; then
   exit 255
 fi
 
-# The -P option is not supported by the grep version installed by
+# The -P option is not supported by the ggrep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
-# using an unsupported version of grep.
-grep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
-  >&2 echo "error: This script requires a recent version of gnu grep.";\
-  >&2 echo "       On macos, gnu grep can be installed with 'brew install grep'.";\
-  >&2 echo "       It will also be necessary to ensure that gnu grep is available in the path.";\
+# using an unsupported version of ggrep.
+ggrep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
+  >&2 echo "error: This script requires a recent version of gnu ggrep.";\
+  >&2 echo "       On macos, gnu ggrep can be installed with 'brew install ggrep'.";\
+  >&2 echo "       It will also be necessary to ensure that gnu ggrep is available in the path.";\
   exit 255 )
 
 if [ "$#" -eq 0 ]; then
@@ -53,21 +53,21 @@ function test_license_header {
 }
 
 function test_single_import {
-  if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
+  if ggrep -R -zo -P 'import \(\n\t".*"\n\)' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if ggrep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
     echo ""
     return 1
   fi
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  if ggrep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
@@ -77,7 +77,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P '_ .+? = &.+?\{\}' .; then
+  if ggrep -R -o -P '_ .+? = &.+?\{\}' .; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -90,16 +90,16 @@ function test_import_testing_only_in_tests {
   ROOT=$( git rev-parse --show-toplevel )
   NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" );
 
-  IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
-  IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');
-  IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/tests/');
-  IMPORT_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/avalanchego/.*?test"');
+  IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs ggrep -lP '^\s*(import\s+)?"testing"');
+  IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs ggrep -l '"github.com/stretchr/testify');
+  IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs ggrep -l '"github.com/ava-labs/avalanchego/tests/');
+  IMPORT_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | xargs ggrep -lP '"github.com/ava-labs/avalanchego/.*?test"');
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.
-  # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
+  # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs ggrep -l '"go.uber.org/mock');
   HAVE_TEST_LOGIC=$( printf "%s\n%s\n%s\n%s" "${IMPORT_TESTING}" "${IMPORT_TESTIFY}" "${IMPORT_FROM_TESTS}" "${IMPORT_TEST_PKG}" );
 
-  IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | grep -P '.*test/[^/]+\.go$' ) # directory (hence package name) ends in "test"
+  IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | ggrep -P '.*test/[^/]+\.go$' ) # directory (hence package name) ends in "test"
 
   # Files in /tests/ are already excluded by the `find ... ! -path`
   INTENDED_FOR_TESTING="${IN_TEST_PKG}"

@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -105,10 +106,13 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				require.NoError(err)
 				if initialGasPrice == nil {
 					initialGasPrice = gasPrice
-					tc.Outf("{{blue}}initial gas price is %v{{/}}\n", initialGasPrice)
+					tc.Log().Info("initial gas price",
+						zap.Uint64("price", initialGasPrice.Uint64()),
+					)
 				} else if gasPrice.Cmp(initialGasPrice) > 0 {
-					// Gas price has increased
-					tc.Outf("{{blue}}gas price has increased to %v{{/}}\n", gasPrice)
+					tc.Log().Info("gas price has increased",
+						zap.Uint64("price", gasPrice.Uint64()),
+					)
 					return true
 				}
 
@@ -139,10 +143,11 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 				var err error
 				gasPrice, err = ethClient.SuggestGasPrice(tc.DefaultContext())
 				require.NoError(err)
-				tc.Outf("{{blue}}.{{/}}")
 				return initialGasPrice.Cmp(gasPrice) > 0
 			}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see gas price decrease before timeout")
-			tc.Outf("\n{{blue}}gas price has decreased to %v{{/}}\n", gasPrice)
+			tc.Log().Info("gas price has decreased",
+				zap.Uint64("price", gasPrice.Uint64()),
+			)
 		})
 
 		tc.By("sending funds at the current gas price", func() {

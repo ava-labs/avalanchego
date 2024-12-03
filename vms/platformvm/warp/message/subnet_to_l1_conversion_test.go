@@ -69,7 +69,7 @@ func TestSubnetToL1ConversionID(t *testing.T) {
 			0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40,
 		},
 		ManagerAddress: []byte{0x41},
-		Validators: []SubnetToL1ConverstionValidatorData{
+		Validators: []SubnetToL1ConversionValidatorData{
 			{
 				NodeID: types.JSONByteSlice([]byte{
 					0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
