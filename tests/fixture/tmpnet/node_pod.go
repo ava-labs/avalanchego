@@ -5,9 +5,11 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,11 +43,31 @@ type PodContext struct {
 }
 
 type NodePod struct {
-	node *Node
+	node       *Node
+	podContext PodContext
 }
 
+func (p *NodePod) getPodContextPath() string {
+	return filepath.Join(p.node.GetDataDir(), "pod.json")
+}
+
+// TODO(marun) Factor out common elements from node process and node pod
 func (p *NodePod) readState() error {
-	// TODO(marun)
+	path := p.getPodContextPath()
+	bytes, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		// The absence of the pod context file indicates the node is not running
+		p.podContext = PodContext{}
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to read node pod context: %w", err)
+	}
+	podContext := PodContext{}
+	if err := json.Unmarshal(bytes, &podContext); err != nil {
+		return fmt.Errorf("failed to unmarshal node pod context: %w", err)
+	}
+	p.podContext = podContext
+
 	return nil
 }
 
@@ -53,6 +75,7 @@ func (p *NodePod) SetDefaultFlags() {
 	p.node.Flags.SetDefaults(DefaultKubeFlags())
 }
 
+// TODO(marun) Maybe better with a timestamp used as input to generateName and include uuid and node id as labels?
 func (p *NodePod) getStatefulSetName() string {
 	nodeIDString := p.node.NodeID.String()
 	unwantedNodeIDPrefix := "NodeID-"
@@ -104,7 +127,7 @@ func (p *NodePod) Start(log logging.Logger) error {
 		return fmt.Errorf("failed to marshal pod context: %w", err)
 	}
 	// TODO(marun) Define the file path once for reuse
-	if err := perms.WriteFile(filepath.Join(p.node.GetDataDir(), "pod.json"), bytes, perms.ReadWrite); err != nil {
+	if err := perms.WriteFile(p.getPodContextPath(), bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write pod context: %w", err)
 	}
 
@@ -125,6 +148,9 @@ func (p *NodePod) getClientset() (*kubernetes.Clientset, error) {
 
 // Stop the pod by setting the replicas to zero on the statefulset.
 func (p *NodePod) InitiateStop() error {
+	// TODO(marun) Implement
+	// Need to
+
 	// clientset, err := p.getClientset()
 	// if err != nil {
 	// 	return err
@@ -147,49 +173,14 @@ func (p *NodePod) InitiateStop() error {
 }
 
 // Waits for the node process to stop.
+// TODO(marun) Implement
 func (p *NodePod) WaitForStopped(_ context.Context) error {
 	// Wait for the status on the replicaset to indicate no replicas
 	return nil
 }
 
 func (p *NodePod) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
-	runtimeConfig := p.node.RuntimeConfig.KubeRuntimeConfig
-	kubeconfigPath := os.Getenv("KUBECONFIG")
-	if kubeconfigPath == "" {
-		kubeconfigPath = runtimeConfig.Kubeconfig
-	}
-	kubeconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	if err != nil {
-		return false, fmt.Errorf("failed to build kubeconfig: %w", err)
-	}
 
-	podName := p.getStatefulSetName() + "-0"
-
-	clientset, err := p.getClientset()
-	if err != nil {
-		return false, err
-	}
-
-	// Wait for the pod to become ready (otherwise it won't be accepting network connections)
-	if err := WaitForPodCondition(ctx, clientset, runtimeConfig.Namespace, podName, corev1.PodReady); err != nil {
-		return false, err
-	}
-
-	// A forwarded connection enables connectivity without exposing the node external to the kube cluster
-	// TODO(marun) Detect if running in a cluster, where this won't be necessary
-	localPort, localPortStopChan, err := enableLocalForwardForPod(
-		kubeconfig,
-		runtimeConfig.Namespace,
-		podName,
-		config.DefaultHTTPPort,
-		io.Discard, // Ignore stdout output
-		os.Stderr,
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to enable local forward for pod: %w", err)
-	}
-	defer close(localPortStopChan)
-	localNodeURI := fmt.Sprintf("http://127.0.0.1:%d", localPort)
 	healthReply, err := CheckNodeHealth(ctx, localNodeURI)
 	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
