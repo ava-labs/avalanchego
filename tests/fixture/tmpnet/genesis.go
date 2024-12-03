@@ -10,8 +10,9 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/crypto"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -41,6 +42,16 @@ var (
 
 // Helper type to simplify configuring X-Chain genesis balances
 type XChainBalanceMap map[ids.ShortID]uint64
+
+// GetEthAddress returns the ethereum address derived from [privKey]
+func GetEthAddress(privKey *secp256k1.PrivateKey) common.Address {
+	return PublicKeyToEthAddress(privKey.PublicKey())
+}
+
+// PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
+func PublicKeyToEthAddress(pubKey *secp256k1.PublicKey) common.Address {
+	return crypto.PubkeyToAddress(*(pubKey.ToECDSA()))
+}
 
 // Create a genesis struct valid for bootstrapping a test
 // network. Note that many of the genesis fields (e.g. reward
@@ -116,7 +127,7 @@ func NewTestGenesis(
 	cChainBalances := make(core.GenesisAlloc, len(keysToFund))
 	for _, key := range keysToFund {
 		xChainBalances[key.Address()] = defaultFundedKeyXChainAmount
-		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
+		cChainBalances[GetEthAddress(key)] = core.GenesisAccount{
 			Balance: defaultFundedKeyCChainAmount,
 		}
 	}
