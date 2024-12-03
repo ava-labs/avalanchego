@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -19,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ router.ExternalHandler = (*testExternalHandler)(nil)
