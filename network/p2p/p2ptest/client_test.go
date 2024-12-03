@@ -27,7 +27,14 @@ func TestNewClient_AppGossip(t *testing.T) {
 		},
 	}
 
-	client := NewClient(t, ctx, testHandler, ids.GenerateTestNodeID(), ids.GenerateTestNodeID())
+	client := NewClient(
+		t,
+		ctx,
+		ids.GenerateTestNodeID(),
+		p2p.NoOpHandler{},
+		ids.GenerateTestNodeID(),
+		testHandler,
+	)
 	require.NoError(client.AppGossip(ctx, common.SendConfig{}, []byte("foobar")))
 	<-appGossipChan
 }
@@ -94,7 +101,14 @@ func TestNewClient_AppRequest(t *testing.T) {
 				},
 			}
 
-			client := NewClient(t, ctx, testHandler, ids.EmptyNodeID, ids.EmptyNodeID)
+			client := NewClient(
+				t,
+				ctx,
+				ids.GenerateTestNodeID(),
+				p2p.NoOpHandler{},
+				ids.GenerateTestNodeID(),
+				testHandler,
+			)
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,
