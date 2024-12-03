@@ -74,12 +74,11 @@ func (*noopListener) Addr() net.Addr {
 }
 
 func NewTestNetworkConfig(
+	metrics prometheus.Registerer,
 	networkID uint32,
 	currentValidators validators.Manager,
 	trackedSubnets set.Set[ids.ID],
 ) (*Config, error) {
-	metrics := prometheus.NewRegistry()
-
 	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
 		return nil, err
@@ -208,10 +207,10 @@ func NewTestNetworkConfig(
 
 func NewTestNetwork(
 	log logging.Logger,
+	metrics prometheus.Registerer,
 	cfg *Config,
 	router router.ExternalHandler,
 ) (Network, error) {
-	metrics := prometheus.NewRegistry()
 	msgCreator, err := message.NewCreator(
 		logging.NoLog{},
 		metrics,

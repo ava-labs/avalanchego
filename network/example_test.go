@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ router.ExternalHandler = (*testExternalHandler)(nil)
@@ -89,7 +90,9 @@ func ExampleNewTestNetwork() {
 	handler := &testExternalHandler{
 		log: log,
 	}
+	metrics := prometheus.NewRegistry()
 	cfg, err := NewTestNetworkConfig(
+		metrics,
 		constants.FujiID,
 		validators,
 		trackedSubnets,
@@ -103,6 +106,7 @@ func ExampleNewTestNetwork() {
 	}
 	network, err := NewTestNetwork(
 		log,
+		metrics,
 		cfg,
 		handler,
 	)
