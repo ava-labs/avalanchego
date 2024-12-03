@@ -6,6 +6,7 @@ package peer
 import (
 	"context"
 	"crypto"
+	"fmt"
 	"net"
 	"net/netip"
 	"time"
@@ -56,12 +57,12 @@ func StartTestPeer(
 	dialer := net.Dialer{}
 	conn, err := dialer.DialContext(ctx, constants.NetworkType, ip.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dial error %w", err)
 	}
 
 	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cert error %w", err)
 	}
 
 	tlsConfg := TLSConfig(*tlsCert, nil)
@@ -72,7 +73,7 @@ func StartTestPeer(
 
 	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("upgrade error %w", err)
 	}
 
 	mc, err := message.NewCreator(
@@ -82,12 +83,12 @@ func StartTestPeer(
 		10*time.Second,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creator error %w", err)
 	}
 
 	metrics, err := NewMetrics(prometheus.NewRegistry())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("metrics error %w", err)
 	}
 
 	resourceTracker, err := tracker.NewResourceTracker(

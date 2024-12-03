@@ -71,7 +71,16 @@ func main() {
 	// 	time.Sleep(15 * time.Second)
 	// 	network.StartClose()
 	// })
+	// nodeID, err := ids.NodeIDFromString("NodeID-CduWdu3Gv7bsqAxnsdTCWuuMEyLYQqchX")
+	// if err != nil {
+	// 	log.Fatal("node Id not correct")
+	// }
+	// bootstrappers := []genesis.Bootstrapper{
+	// 	genesis.Bootstrapper{
+	// 		ID: nodeID,
 
+	// 	}
+	// }
 	tp, err := NewTestPeers(ctx, log, network, handler, []genesis.Bootstrapper{})
 	if err != nil {
 		log.Fatal("failed to get and start peers",

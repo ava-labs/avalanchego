@@ -38,16 +38,15 @@ func NewTestPeers(ctx context.Context, log logging.Logger, network network.Netwo
 	}
 
 	// adds peers to the network
-	trackBootstrappers(network, bootstrappers)
+	log.Info("Connect to bootstrappers")
+	bootstrappers = trackBootstrappers(network, bootstrappers)
 	time.Sleep(8 * time.Second)
 
 	// grab peer info
-	peerInfo := network.PeerInfo(nil)
-	log.Info("Peer Info", zap.Any("peers", peerInfo))
+	// peerInfo := network.PeerInfo(nil)
 
 	var peers []peer.Peer
-	connected := 0
-	for _, info := range peerInfo {
+	for _, info := range bootstrappers {
 		p, err := peer.StartTestPeer(
 			ctx,
 			info.IP,
@@ -58,17 +57,16 @@ func NewTestPeers(ctx context.Context, log logging.Logger, network network.Netwo
 			// continue in case of failure but note in log
 			log.Fatal(
 				"failed to create test peer",
-				zap.String("ID", p.ID().String()),
+				zap.String("ID", info.ID.String()),
 				zap.Error(err),
 			)
 			continue
 		} else {
-			connected++
 			peers = append(peers, p)
 		}
 	}
 
-	log.Info("Successfully connected ", zap.Int("num connected", connected), zap.Int("num total", len(peerInfo)))
+	log.Info("Successfully connected ", zap.Int("num connected", len(peers)), zap.Int("num total", len(bootstrappers)))
 
 	return &TestPeers{
 		log,

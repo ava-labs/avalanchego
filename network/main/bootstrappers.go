@@ -13,7 +13,7 @@ func trackBootstrappers(network network.Network, bootstrappers []genesis.Bootstr
 	if len(bootstrappers) == 0 {
 		// We need to initially connect to some nodes in the network before peer
 		// gossip will enable connecting to all the remaining nodes in the network.
-		bootstrappers = genesis.SampleBootstrappers(NetworkId, 5)
+		bootstrappers = genesis.GetBootstrappers(NetworkId)
 	} 
 
 	for _, bootstrapper := range bootstrappers {
