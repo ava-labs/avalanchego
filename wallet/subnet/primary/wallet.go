@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -76,7 +75,7 @@ type WalletConfig struct {
 // that reference any of the provided keys. If the UTXOs are modified through an
 // external issuance process, such as another instance of the wallet, the UTXOs
 // may become out of sync. The wallet will also fetch all requested P-chain
-// transactions.
+// owners.
 //
 // The wallet manages all state locally, and performs all tx signing locally.
 func MakeWallet(
@@ -98,21 +97,9 @@ func MakeWallet(
 		return nil, err
 	}
 
-	subnetOwners, err := platformvm.GetSubnetOwners(avaxState.PClient, ctx, config.SubnetIDs...)
+	owners, err := platformvm.GetOwners(avaxState.PClient, ctx, config.SubnetIDs, config.ValidationIDs)
 	if err != nil {
 		return nil, err
-	}
-	deactivationOwners, err := platformvm.GetDeactivationOwners(avaxState.PClient, ctx, config.ValidationIDs...)
-	if err != nil {
-		return nil, err
-	}
-
-	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
-	for id, owner := range subnetOwners {
-		owners[id] = owner
-	}
-	for id, owner := range deactivationOwners {
-		owners[id] = owner
 	}
 
 	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
@@ -138,4 +125,38 @@ func MakeWallet(
 		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
 		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
 	), nil
+}
+
+// MakePWallet returns a P-chain wallet that supports issuing transactions.
+//
+// On creation, the wallet attaches to the provided uri and fetches all UTXOs
+// that reference any of the provided keys. If the UTXOs are modified through an
+// external issuance process, such as another instance of the wallet, the UTXOs
+// may become out of sync. The wallet will also fetch all requested P-chain
+// owners.
+//
+// The wallet manages all state locally, and performs all tx signing locally.
+func MakePWallet(
+	ctx context.Context,
+	uri string,
+	keychain keychain.Keychain,
+	config WalletConfig,
+) (pwallet.Wallet, error) {
+	addrs := keychain.Addresses()
+	client, context, utxos, err := FetchPState(ctx, uri, addrs)
+	if err != nil {
+		return nil, err
+	}
+
+	owners, err := platformvm.GetOwners(client, ctx, config.SubnetIDs, config.ValidationIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	pUTXOs := common.NewChainUTXOs(constants.PlatformChainID, utxos)
+	pBackend := pwallet.NewBackend(context, pUTXOs, owners)
+	pClient := p.NewClient(client, pBackend)
+	pBuilder := pbuilder.New(addrs, context, pBackend)
+	pSigner := psigner.New(keychain, pBackend)
+	return pwallet.New(pClient, pBuilder, pSigner), nil
 }

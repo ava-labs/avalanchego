@@ -512,7 +512,6 @@ info.peers({
     lastReceived: string,
     benched: string[],
     observedUptime: int,
-    observedSubnetUptime: map[string]int,
   }
 }
 ```
@@ -558,7 +557,6 @@ curl -X POST --data '{
         "lastReceived": "2020-06-01T15:22:57Z",
         "benched": [],
         "observedUptime": "99",
-        "observedSubnetUptimes": {},
         "trackedSubnets": [],
         "benched": []
       },
