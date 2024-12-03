@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestNewClient_AppGossip(t *testing.T) {
+func TestClient_AppGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
@@ -27,11 +27,9 @@ func TestNewClient_AppGossip(t *testing.T) {
 		},
 	}
 
-	client := NewClient(
+	client := NewSelfClient(
 		t,
 		ctx,
-		ids.GenerateTestNodeID(),
-		p2p.NoOpHandler{},
 		ids.GenerateTestNodeID(),
 		testHandler,
 	)
@@ -39,7 +37,7 @@ func TestNewClient_AppGossip(t *testing.T) {
 	<-appGossipChan
 }
 
-func TestNewClient_AppRequest(t *testing.T) {
+func TestClient_AppRequest(t *testing.T) {
 	tests := []struct {
 		name        string
 		appResponse []byte
@@ -101,21 +99,19 @@ func TestNewClient_AppRequest(t *testing.T) {
 				},
 			}
 
-			client := NewClient(
+			client := NewSelfClient(
 				t,
 				ctx,
-				ids.GenerateTestNodeID(),
-				p2p.NoOpHandler{},
-				ids.GenerateTestNodeID(),
+				ids.EmptyNodeID,
 				testHandler,
 			)
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,
 				func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+					defer close(appRequestChan)
 					require.ErrorIs(err, tt.appErr)
 					require.Equal(tt.appResponse, responseBytes)
-					close(appRequestChan)
 				},
 			))
 			<-appRequestChan
