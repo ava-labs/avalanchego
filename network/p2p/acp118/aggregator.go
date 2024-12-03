@@ -29,11 +29,10 @@ type indexedValidator struct {
 }
 
 type result struct {
-	NodeID      ids.NodeID
-	Validator   indexedValidator
-	Signature   *bls.Signature
-	Err         error
-	ShouldClose bool
+	NodeID    ids.NodeID
+	Validator indexedValidator
+	Signature *bls.Signature
+	Err       error
 }
 
 // NewSignatureAggregator returns an instance of SignatureAggregator
@@ -125,8 +124,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		signatures = append(signatures, blsSignature)
 	}
 
-	// TODO something better than a buffered channel?
-	results := make(chan result, numRequests)
+	results := make(chan result)
 	handler := responseHandler{
 		message:                message,
 		publicKeysToValidators: publicKeysToValidators,
@@ -138,7 +136,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		validator := publicKeysToValidators[pk]
 		for _, nodeID := range validator.NodeIDs {
 			if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, handler.HandleResponse); err != nil {
-				results <- result{NodeID: nodeID, Validator: validator, Err: err, ShouldClose: true}
+				return nil, nil, nil, false, fmt.Errorf("failed to send aggregation request: %w", err)
 			}
 		}
 	}
@@ -163,12 +161,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 					zap.Stringer("nodeID", result.NodeID),
 					zap.Error(err),
 				)
-
-				if !result.ShouldClose {
-					continue
-				}
-
-				return nil, nil, nil, false, result.Err
+				continue
 			}
 
 			if signerBitSet.Contains(result.Validator.Index) {
