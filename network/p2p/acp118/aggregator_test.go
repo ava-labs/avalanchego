@@ -46,7 +46,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		name         string
 		peers        map[ids.NodeID]p2p.Handler
 		ctx          context.Context
-		validators   []warp.Validator
+		validators   []*warp.Validator
 		quorumNum    uint64
 		quorumDen    uint64
 		wantMsg      *warp.Message
@@ -60,7 +60,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -86,7 +86,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -119,7 +119,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -149,7 +149,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				nodeID2: NewHandler(&testVerifier{}, signer2),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -181,7 +181,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -212,7 +212,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -245,7 +245,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -276,7 +276,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				),
 			},
 			ctx: context.Background(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -298,7 +298,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 
 				return ctx
 			}(),
-			validators: []warp.Validator{
+			validators: []*warp.Validator{
 				{
 					PublicKey: pk0,
 					Weight:    1,
