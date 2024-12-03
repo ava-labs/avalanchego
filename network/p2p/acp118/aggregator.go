@@ -115,6 +115,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		nonSigners = append(nonSigners, v.PublicKey)
 	}
 
+	// Account for requested signatures + the signature that was provided
 	signatures := make([]*bls.Signature, 0, len(nonSigners)+1)
 	if bitSetSignature.Signature != [bls.SignatureLen]byte{} {
 		blsSignature, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
