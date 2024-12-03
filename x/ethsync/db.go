@@ -219,6 +219,21 @@ func (db *db) VerifyRangeProof(ctx context.Context, proof *RangeProof, start, en
 }
 
 func (db *db) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
+	kvs := make(map[string][]byte)
+	if err := db.getKVs(start.Value(), end.Value(), kvs); err != nil {
+		return err
+	}
+	deletes := make([]KeyValue, 0, len(kvs))
+	for k := range kvs {
+		deletes = append(deletes, KeyValue{
+			Key:   []byte(k),
+			Value: nil, // Delete
+		})
+	}
+	if err := db.updateKVs(deletes); err != nil {
+		return err
+	}
+
 	return db.updateKVs(proof.KeyValues)
 }
 
