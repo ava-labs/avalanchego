@@ -54,8 +54,9 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		wantFinished bool
 		wantErr      error
 	}{
+		// TODO test different weights
 		{
-			name: "aggregates from all validators 1/1",
+			name: "meets threshold - 1/1 validators",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
@@ -73,7 +74,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumDen:    1,
 		},
 		{
-			name: "aggregates from some validators - 1/3",
+			name: "meets threshold - 1/3 validators",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(
@@ -109,7 +110,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumDen:    3,
 		},
 		{
-			name: "aggregates from some validators - 2/3",
+			name: "meets threshold - 2/3 validators",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
@@ -127,19 +128,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				},
 				{
 					PublicKey: pk1,
-					Weight:    2,
+					Weight:    1,
 					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKey: pk2,
-					Weight:    3,
+					Weight:    1,
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
 			wantSigners:  []int{0, 1},
 			wantFinished: true,
-			quorumNum:    3,
-			quorumDen:    6,
+			quorumNum:    2,
+			quorumDen:    3,
 		},
 		{
 			name: "aggregates from all validators - 3/3",
@@ -157,12 +158,12 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				},
 				{
 					PublicKey: pk1,
-					Weight:    2,
+					Weight:    1,
 					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKey: pk2,
-					Weight:    3,
+					Weight:    1,
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
@@ -321,6 +322,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				p2p.NoOpHandler{},
 				tt.peers,
 			)
+
 			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
 
 			unsignedMsg, err := warp.NewUnsignedMessage(
@@ -334,6 +336,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				&warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}},
 			)
 			require.NoError(err)
+
 			gotMsg, gotAggregatedStake, gotTotalStake, finished, err := aggregator.AggregateSignatures(
 				tt.ctx,
 				msg,
