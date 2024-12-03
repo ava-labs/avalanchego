@@ -8,37 +8,36 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
 	dir = "metriclogs"
+	fileType = ".json"
 )
 
-type metric struct {
+type onlineMetric struct {
 	Time   time.Time
 	Online bool
 }
 
 // collects metrics
 type metrics struct {
-	// online(true) or offline(false)
-	status map[ids.NodeID]bool
+	online map[ids.NodeID]bool
 	log    logging.Logger
 }
 
 func newMetrics(log logging.Logger) *metrics {
 	return &metrics{
-		status: make(map[ids.NodeID]bool),
+		online: make(map[ids.NodeID]bool),
 		log:    log,
 	}
 }
 
 func (m *metrics) collect(tp *TestPeers) {
-	// interval := constants.DefaultPingPongTimeout
-	ticker := time.NewTicker(10 * time.Second)
+	interval := constants.DefaultPingPongTimeout
+	ticker := time.NewTicker(interval)
 
 	for range ticker.C {
 		for _, peer := range tp.peers {
@@ -47,40 +46,32 @@ func (m *metrics) collect(tp *TestPeers) {
 			// we sent a message to this peer but didn't receive it
 			if peer.LastSent().Sub(peer.LastReceived()) > constants.DefaultPingPongTimeout {
 				// this peer has been offline since `LastSent`
-				// push to metrics file
-				if m.status[id] {
-					m.setStatus(peer, false)
+				if m.online[id] {
+					m.setOnline(id, false, peer.LastSent())
 				}
 				m.log.Info("Still ofline, don't log")
-			} else if !m.status[id] {
+			} else if !m.online[id] {
 				// peer was previously offline but is no longer
 				// peer is online since `LastRecieved`
-				// push to metrics file
-				m.setStatus(peer, true)
+				m.setOnline(id, true, peer.LastReceived())
 			}
 		}
 	}
 }
 
-func (m metrics) setStatus(peer peer.Peer, online bool) error {
-	m.status[peer.ID()] = online
-	filepath := path.Join(dir, peer.ID().String()+".json")
-	metric := metric{
-		Time:   peer.LastSent(),
-		Online: false,
+func (m metrics) setOnline(id ids.NodeID, online bool, time time.Time) error {
+	m.online[id] = online
+	filepath := path.Join(dir, id.String()+fileType)
+	om := onlineMetric{
+		Time:   time,
+		Online: online,
 	}
-	bytes, err := json.Marshal(metric)
-	if err != nil {
-		m.log.Info("error marshaling")
-		return err
-	}
-
-	return appendToFile(filepath, bytes)
+	
+	return appendToFile(filepath, om)
 }
 
-// pushes to file
-func appendToFile(filename string, bytes []byte) error {
-	// Get the directory path
+// only online metric for now, could change to interface to make generic
+func appendToFile(filename string, x interface{}) error {
 	dir := filepath.Dir(filename)
 
 	// Create all directories in path if they don't exist
@@ -88,19 +79,23 @@ func appendToFile(filename string, bytes []byte) error {
 		return err
 	}
 
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	// append to current file if exists
+	var data []interface{}
+	fileBytes, err := os.ReadFile(filename)
+	if err == nil {
+		err = json.Unmarshal(fileBytes, &data)
+		if err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	data = append(data, x)
+	dataBytes, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
-	_, err = file.Write(bytes)
-	return err
+    return os.WriteFile(filename, dataBytes, 0666)
 }
-
-// defaultpongtimeout
-// if lastSent > lastRecieved + constants.DefaultPongTimeout
-// 		push(time, offline)
-// else if (offline) {
-// 		push(time, online)
-// }

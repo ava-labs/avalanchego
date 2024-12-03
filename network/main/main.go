@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -13,24 +14,21 @@ import (
 	"go.uber.org/zap"
 )
 
-// run with in memory db, and
+// For a local network with an in memory db run
 // ./build/avalanchego --network-id=local --db-type=memdb --sybil-protection-enabled=false
 var (
-	NetworkId = constants.MainnetID
+	NetworkId = constants.FujiID
 	// p chain id.
 	ChainID = ids.FromStringOrPanic("11111111111111111111111111111111LpoYY")
+	LocalIP = "127.0.0.1:9651"
 )
 
 type testAggressiveValidatorManager struct {
 	validators.Manager
 }
 
-// func main() {
-// 	s := []byte("pong")
-// 	push("bao.txt", s)
-// }
-
 func main() {
+	ctx := context.Background()
 	log := logging.NewLogger(
 		"networking",
 		logging.NewWrappedCore(
@@ -74,30 +72,24 @@ func main() {
 	// 	network.StartClose()
 	// })
 
-	exampleMsg, err := getStateSummaryMsg(log, ChainID)
-	if err != nil {
-		log.Fatal(
-			"failed to create outbound msg",
-			zap.Error(err),
-		)
-		return
-	}
-	log.Info("Created example message", zap.Any("op", exampleMsg.Op().String()))
-
-	ctx := context.Background()
-
-	// if local network we send to ourselves(since no peers will be returned)
-	tp, err := NewTestPeers(ctx, log, network, handler)
+	tp, err := NewTestPeers(ctx, log, network, handler, []genesis.Bootstrapper{})
 	if err != nil {
 		log.Fatal("failed to get and start peers",
 			zap.Error(err),
 		)
 	}
 
-	log.Info("peers len: ", zap.Int("len", len(tp.peers)))
+	// exampleMsg, err := getStateSummaryMsg(log, ChainID)
+	// if err != nil {
+	// 	log.Fatal(
+	// 		"failed to create outbound msg",
+	// 		zap.Error(err),
+	// 	)
+	// 	return
+	// }
 	// tp.Send(ctx, exampleMsg)
-	metrics := newMetrics(log)
 
+	metrics := newMetrics(log)
 	go metrics.collect(tp)
 
 	// Calling network.Dispatch() will block until a fatal error occurs or

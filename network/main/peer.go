@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"time"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -18,11 +19,11 @@ type TestPeers struct {
 	peers []peer.Peer
 }
 
-func NewTestPeers(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler) (*TestPeers, error) {
+func NewTestPeers(ctx context.Context, log logging.Logger, network network.Network, handler *testExternalHandler, bootstrappers []genesis.Bootstrapper) (*TestPeers, error) {
 	if NetworkId == constants.LocalID {
 		p, err := peer.StartTestPeer(
 			ctx,
-			netip.MustParseAddrPort("127.0.0.1:9651"),
+			netip.MustParseAddrPort(LocalIP),
 			constants.LocalID,
 			handler,
 		)
@@ -37,7 +38,7 @@ func NewTestPeers(ctx context.Context, log logging.Logger, network network.Netwo
 	}
 
 	// adds peers to the network
-	trackBootstrappers(network)
+	trackBootstrappers(network, bootstrappers)
 	time.Sleep(8 * time.Second)
 
 	// grab peer info
@@ -57,6 +58,7 @@ func NewTestPeers(ctx context.Context, log logging.Logger, network network.Netwo
 			// continue in case of failure but note in log
 			log.Fatal(
 				"failed to create test peer",
+				zap.String("ID", p.ID().String()),
 				zap.Error(err),
 			)
 			continue
