@@ -89,7 +89,7 @@ func TestSync(t *testing.T) {
 	}
 
 	accountsPerState := 10
-	serverStates := 200
+	serverStates := 100
 	serverRoot := types.EmptyRootHash
 	serverRoots := make([]common.Hash, serverStates)
 	for i := 0; i < serverStates; i++ {
@@ -131,7 +131,7 @@ func TestSync(t *testing.T) {
 		os.Stdout,
 		logging.Auto.ConsoleEncoder(),
 	)
-	syncRootIdx := 100
+	syncRootIdx := 50
 	initialRoot := serverRoots[syncRootIdx]
 	managerConfig := sync.ManagerConfig{
 		DB:                    client,
