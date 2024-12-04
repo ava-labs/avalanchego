@@ -593,7 +593,7 @@ func (db *db) getChangeProof(
 			Key:   bytes.Clone(it.Key),
 			Value: currentVal,
 		})
-		fmt.Println("--> CHANGE kv", hex.EncodeToString(it.Key), hex.EncodeToString(current))
+		//fmt.Println("--> CHANGE kv", hex.EncodeToString(it.Key), hex.EncodeToString(current))
 	}
 
 	// for i, it := range response.KeyChanges {
