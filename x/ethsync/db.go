@@ -133,6 +133,10 @@ func (db *db) getExpectedID(prefix []byte, stateID ids.ID) ids.ID {
 	db.expectedRootLock.RLock()
 	defer db.expectedRootLock.RUnlock()
 
+	if len(prefix) == 0 {
+		return stateID
+	}
+
 	stateIDMap, ok := db.expectedRoots[common.Hash(stateID)]
 	if !ok {
 		return stateID
@@ -184,6 +188,7 @@ func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end
 			if !bytes.Equal(end.Value()[:32], accHash) {
 				return nil, fmt.Errorf("end key does not match account hash: %x != %x", end.Value()[:32], accHash)
 			}
+			end = maybe.Some(end.Value()[32:])
 		}
 	}
 	return db.getRangeProofAtRoot(ctx, tr, rootID, start, end, maxLength)
@@ -346,21 +351,33 @@ func (db *db) commitRangeProof(ctx context.Context, prefix []byte, start, end ma
 			Value: nil, // Delete
 		})
 	}
-	if err := db.updateKVs(prefix, deletes); err != nil {
-		return err
+	if len(deletes) > 0 {
+		fmt.Println("deleting", len(deletes), "keys")
+		if err := db.updateKVs(prefix, deletes); err != nil {
+			return err
+		}
 	}
 
 	return db.updateKVs(prefix, proof.KeyValues)
 }
 
 func (db *db) NextKey(lastReceived []byte, rangeEnd maybe.Maybe[[]byte]) ([]byte, error) {
+	fmt.Println(
+		"next key",
+		"lastReceived", hex.EncodeToString(lastReceived),
+		"rangeEnd", hex.EncodeToString(rangeEnd.Value()),
+	)
 	if len(rangeEnd.Value()) == 64 {
 		prefix := rangeEnd.Value()[:32]
 		next, err := db.NextKey(lastReceived, maybe.Nothing[[]byte]())
 		if err != nil {
 			return nil, err
 		}
-		return append(prefix, next...), nil
+		retval := make([]byte, 0, len(prefix)+len(next))
+		retval = append(retval, prefix...)
+		retval = append(retval, next...)
+		fmt.Println("next key", hex.EncodeToString(retval))
+		return retval, nil
 	}
 	if len(lastReceived) != 32 {
 		return nil, fmt.Errorf("key length is not 32: %d", len(lastReceived))
@@ -373,6 +390,12 @@ func (db *db) NextKey(lastReceived []byte, rangeEnd maybe.Maybe[[]byte]) ([]byte
 func (db *db) updateKVs(prefix []byte, kvs []merkledb.KeyValue) error {
 	db.updateLock.Lock()
 	defer db.updateLock.Unlock()
+
+	fmt.Println(
+		"updating",
+		"prefix", hex.EncodeToString(prefix),
+		"kvs", len(kvs),
+	)
 
 	trID := db.getTrieID(prefix)
 	tr, err := trie.New(trID, db.triedb)
@@ -390,7 +413,7 @@ func (db *db) updateKVs(prefix []byte, kvs []merkledb.KeyValue) error {
 			}
 		}
 	}
-	root, nodeSet, err := tr.Commit(false)
+	root, nodeSet, err := tr.Commit(true)
 	if err != nil {
 		return err
 	}
@@ -409,7 +432,7 @@ func (db *db) updateKVs(prefix []byte, kvs []merkledb.KeyValue) error {
 	if len(prefix) > 0 {
 		// Just guarantees uniqueness
 		hasher := sha3.NewLegacyKeccak256()
-		hasher.Write(layerID[:])
+		hasher.Write(db.layerID[:])
 		hasher.Write(root[:])
 		layerID = common.BytesToHash(hasher.Sum(nil))
 	}
@@ -418,6 +441,7 @@ func (db *db) updateKVs(prefix []byte, kvs []merkledb.KeyValue) error {
 	}
 	if len(prefix) == 0 {
 		db.root = root
+		fmt.Println("root updated", hex.EncodeToString(db.root[:]))
 	}
 	db.layerID = layerID
 	db.lastRoots[common.BytesToHash(prefix)] = root
@@ -427,6 +451,15 @@ func (db *db) updateKVs(prefix []byte, kvs []merkledb.KeyValue) error {
 func (db *db) Close() error {
 	if err := db.triedb.Commit(db.layerID, false); err != nil {
 		return err
+	}
+	if db.layerID != db.root {
+		nodes := trienode.NewMergedNodeSet()
+		if err := db.triedb.Update(db.root, db.layerID, 0, nodes, nil); err != nil {
+			return err
+		}
+		if err := db.triedb.Commit(db.root, false); err != nil {
+			return err
+		}
 	}
 	return db.db.Put(rootKey, db.root[:])
 }

@@ -51,7 +51,7 @@ func (m Maybe[T]) String() string {
 	if !m.hasValue {
 		return fmt.Sprintf("Nothing[%T]", m.value)
 	}
-	return fmt.Sprintf("Some[%T]{%v}", m.value, m.value)
+	return fmt.Sprintf("Some[%T]{%x}", m.value, m.value)
 }
 
 // Bind returns Nothing iff [m] is Nothing.

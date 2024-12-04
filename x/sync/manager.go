@@ -88,6 +88,12 @@ func (w *workItem) requestFailed() {
 }
 
 func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority, queueTime time.Time) *workItem {
+	if len(start.Value()) == 64 && len(end.Value()) != 64 {
+		panic("invalid work item")
+	}
+	if len(end.Value()) == 64 && len(start.Value()) != 64 {
+		panic("invalid work item")
+	}
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
@@ -876,7 +882,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 	}
 
 	// completed the range [work.start, lastKey], log and record in the completed work heap
-	m.config.Log.Debug("completed range",
+	m.config.Log.Info("completed range",
 		zap.Stringer("start", work.start),
 		zap.Stringer("end", largestHandledKey),
 		zap.Stringer("rootID", rootID),
@@ -904,7 +910,13 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
-	if len(mid.Value()) > 32 {
+	if len(work.start.Value()) == 64 {
+		if len(mid.Value()) > 64 {
+			mid = maybe.Some(mid.Value()[:64])
+		} else if len(mid.Value()) < 64 {
+			panic("unexpected short mid")
+		}
+	} else if len(mid.Value()) > 32 {
 		mid = maybe.Some(mid.Value()[:32])
 	}
 
