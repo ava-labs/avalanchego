@@ -33,15 +33,15 @@ type Signer interface {
 	ToBytes() []byte
 }
 
-var _ Signer = (*signer)(nil)
+var _ Signer = (*LocalSigner)(nil)
 
-type signer struct {
+type LocalSigner struct {
 	sk *SecretKey
 }
 
 // NewSecretKey generates a new secret key from the local source of
 // cryptographically secure randomness.
-func NewSigner() (Signer, error) {
+func NewSigner() (*LocalSigner, error) {
 	var ikm [32]byte
 	_, err := rand.Read(ikm[:])
 	if err != nil {
@@ -50,11 +50,11 @@ func NewSigner() (Signer, error) {
 	sk := blst.KeyGen(ikm[:])
 	ikm = [32]byte{} // zero out the ikm
 
-	return &signer{sk: sk}, nil
+	return &LocalSigner{sk: sk}, nil
 }
 
 // ToBytes returns the big-endian format of the secret key.
-func (s *signer) ToBytes() []byte {
+func (s *LocalSigner) ToBytes() []byte {
 	return s.sk.Serialize()
 }
 
@@ -68,21 +68,21 @@ func SecretKeyFromBytes(skBytes []byte) (Signer, error) {
 	runtime.SetFinalizer(sk, func(sk *SecretKey) {
 		sk.Zeroize()
 	})
-	return &signer{sk: sk}, nil
+	return &LocalSigner{sk: sk}, nil
 }
 
 // PublicKey returns the public key that corresponds to this secret
 // key.
-func (s *signer) PublicKey() *PublicKey {
+func (s *LocalSigner) PublicKey() *PublicKey {
 	return new(PublicKey).From(s.sk)
 }
 
 // Sign [msg] to authorize this message
-func (s *signer) Sign(msg []byte) *Signature {
+func (s *LocalSigner) Sign(msg []byte) *Signature {
 	return new(Signature).Sign(s.sk, msg, ciphersuiteSignature)
 }
 
 // Sign [msg] to prove the ownership
-func (s *signer) SignProofOfPossession(msg []byte) *Signature {
+func (s *LocalSigner) SignProofOfPossession(msg []byte) *Signature {
 	return new(Signature).Sign(s.sk, msg, ciphersuiteProofOfPossession)
 }
