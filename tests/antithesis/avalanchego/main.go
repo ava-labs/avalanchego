@@ -245,7 +245,7 @@ func (w *workload) executeTest(ctx context.Context) {
 	case 5:
 		w.log.Info("executing banff.TestCustomAssetTransfer")
 		addr, _ := w.addrs.Peek()
-		banff.TestCustomAssetTransfer(tc, w.wallet, addr)
+		banff.TestCustomAssetTransfer(tc, *w.wallet, addr)
 	case 6:
 		w.log.Info("sleeping")
 	}
