@@ -265,16 +265,16 @@ func testWarpVMTransaction(t *testing.T, unsignedMessage *avalancheWarp.Unsigned
 	defer logsSub.Unsubscribe()
 
 	nodeID1 := ids.GenerateTestNodeID()
-	blsSecretKey1, err := bls.NewSecretKey()
+	blsSecretKey1, err := bls.NewSigner()
 	require.NoError(err)
-	blsPublicKey1 := bls.PublicFromSecretKey(blsSecretKey1)
-	blsSignature1 := bls.Sign(blsSecretKey1, unsignedMessage.Bytes())
+	blsPublicKey1 := blsSecretKey1.PublicKey()
+	blsSignature1 := blsSecretKey1.Sign(unsignedMessage.Bytes())
 
 	nodeID2 := ids.GenerateTestNodeID()
-	blsSecretKey2, err := bls.NewSecretKey()
+	blsSecretKey2, err := bls.NewSigner()
 	require.NoError(err)
-	blsPublicKey2 := bls.PublicFromSecretKey(blsSecretKey2)
-	blsSignature2 := bls.Sign(blsSecretKey2, unsignedMessage.Bytes())
+	blsPublicKey2 := blsSecretKey2.PublicKey()
+	blsSignature2 := blsSecretKey2.Sign(unsignedMessage.Bytes())
 
 	blsAggregatedSignature, err := bls.AggregateSignatures([]*bls.Signature{blsSignature1, blsSignature2})
 	require.NoError(err)
@@ -523,18 +523,18 @@ func testReceiveWarpMessage(
 	type signer struct {
 		networkID ids.ID
 		nodeID    ids.NodeID
-		secret    *bls.SecretKey
+		secret    bls.Signer
 		signature *bls.Signature
 		weight    uint64
 	}
 	newSigner := func(networkID ids.ID, weight uint64) signer {
-		secret, err := bls.NewSecretKey()
+		secret, err := bls.NewSigner()
 		require.NoError(err)
 		return signer{
 			networkID: networkID,
 			nodeID:    ids.GenerateTestNodeID(),
 			secret:    secret,
-			signature: bls.Sign(secret, unsignedMessage.Bytes()),
+			signature: secret.Sign(unsignedMessage.Bytes()),
 			weight:    weight,
 		}
 	}
@@ -582,7 +582,7 @@ func testReceiveWarpMessage(
 			for _, s := range signers {
 				vdrOutput[s.nodeID] = &validators.GetValidatorOutput{
 					NodeID:    s.nodeID,
-					PublicKey: bls.PublicFromSecretKey(s.secret),
+					PublicKey: s.secret.PublicKey(),
 					Weight:    s.weight,
 				}
 			}

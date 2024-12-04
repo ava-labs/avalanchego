@@ -228,12 +228,12 @@ func NewContext() *snow.Context {
 			return subnetID, nil
 		},
 	}
-	blsSecretKey, err := bls.NewSecretKey()
+	blsSecretKey, err := bls.NewSigner()
 	if err != nil {
 		panic(err)
 	}
 	ctx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, ctx.NetworkID, ctx.ChainID)
-	ctx.PublicKey = bls.PublicFromSecretKey(blsSecretKey)
+	ctx.PublicKey = blsSecretKey.PublicKey()
 	return ctx
 }
 
