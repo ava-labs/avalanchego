@@ -25,11 +25,11 @@ var (
 )
 
 func TestSnowContext() *snow.Context {
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	if err != nil {
 		panic(err)
 	}
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	networkID := constants.UnitTestID
 	chainID := testChainID
 
