@@ -25,6 +25,8 @@ import (
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/rlp"
+	"golang.org/x/crypto/sha3"
 )
 
 type (
@@ -57,11 +59,21 @@ const (
 
 var rootKey = []byte{}
 
+type manager interface {
+	EnqueueWork(start, end maybe.Maybe[[]byte], priorityAsByte byte)
+}
+
 type db struct {
 	db         ethdb.Database
 	triedb     *triedb.Database
 	root       common.Hash
+	layerID    common.Hash
 	updateLock sync.RWMutex
+
+	expectedRootLock sync.RWMutex
+	expectedRoots    map[common.Hash]map[common.Hash]common.Hash // stateID -> accHash -> root
+	lastRoots        map[common.Hash]common.Hash
+	manager          manager
 }
 
 func New(ctx context.Context, disk database.Database, config merkledb.Config) (*db, error) {
@@ -76,15 +88,62 @@ func New(ctx context.Context, disk database.Database, config merkledb.Config) (*
 
 	triedb := triedb.NewDatabase(ethdb, &triedb.Config{PathDB: pathdb.Defaults})
 	return &db{
-		db:     ethdb,
-		triedb: triedb,
-		root:   root,
+		db:            ethdb,
+		triedb:        triedb,
+		root:          root,
+		layerID:       root,
+		expectedRoots: make(map[common.Hash]map[common.Hash]common.Hash),
+		lastRoots:     make(map[common.Hash]common.Hash),
 	}, nil
+}
+
+func (db *db) KVCallback(start, end maybe.Maybe[[]byte], priority byte, stateID ids.ID, keyValues []merkledb.KeyChange) error {
+	if len(start.Value()) == 64 {
+		return nil // Storage trie, ignore
+	}
+	for _, kv := range keyValues {
+		acc := new(types.StateAccount)
+		if err := rlp.DecodeBytes(kv.Value.Value(), acc); err != nil {
+			continue // failed to decode account
+		}
+		if acc.Root == types.EmptyRootHash {
+			continue // empty account
+		}
+
+		// Add the account root to the expected roots
+		db.expectedRootLock.Lock()
+		if _, ok := db.expectedRoots[common.Hash(stateID)]; !ok {
+			db.expectedRoots[common.Hash(stateID)] = make(map[common.Hash]common.Hash)
+		}
+		db.expectedRoots[common.Hash(stateID)][common.BytesToHash(kv.Key)] = acc.Root
+		db.expectedRootLock.Unlock()
+		if db.manager != nil {
+			var start, end []byte
+			start = append(start, kv.Key...)
+			start = append(start, bytes.Repeat([]byte{0}, 32)...)
+			end = append(end, kv.Key...)
+			end = append(end, bytes.Repeat([]byte{0xff}, 32)...)
+			db.manager.EnqueueWork(maybe.Some(start), maybe.Some(end), priority)
+		}
+	}
+	return nil
+}
+
+func (db *db) getExpectedID(prefix []byte, stateID ids.ID) ids.ID {
+	db.expectedRootLock.RLock()
+	defer db.expectedRootLock.RUnlock()
+
+	stateIDMap, ok := db.expectedRoots[common.Hash(stateID)]
+	if !ok {
+		return stateID
+	}
+	return ids.ID(stateIDMap[common.BytesToHash(prefix)])
 }
 
 func (db *db) Clear() error {
 	return database.Clear(Database{db.db}, ethdb.IdealBatchSize)
 }
+
 func (db *db) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	db.updateLock.RLock()
 	defer db.updateLock.RUnlock()
@@ -96,11 +155,44 @@ func (db *db) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 }
 
 func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
-	response := &RangeProof{}
-	tr, err := trie.New(trie.StateTrieID(common.BytesToHash(rootID[:])), db.triedb)
+	stateRoot := common.BytesToHash(rootID[:])
+	tr, err := trie.New(trie.StateTrieID(stateRoot), db.triedb)
 	if err != nil {
 		return nil, err
 	}
+	if len(start.Value()) == 64 {
+		// This is a storage trie
+		accHash := start.Value()[:32]
+		accBytes, err := tr.Get(accHash)
+		if err != nil {
+			return nil, err
+		}
+		acc := new(types.StateAccount)
+		if err := rlp.DecodeBytes(accBytes, acc); err != nil {
+			return nil, err
+		}
+		tr, err = trie.New(trie.StorageTrieID(stateRoot, common.BytesToHash(accHash), acc.Root), db.triedb)
+		if err != nil {
+			return nil, err
+		}
+
+		start = maybe.Some(start.Value()[32:])
+		if end.HasValue() {
+			if len(end.Value()) != 64 {
+				return nil, fmt.Errorf("invalid end key length: %d", len(end.Value()))
+			}
+			if !bytes.Equal(end.Value()[:32], accHash) {
+				return nil, fmt.Errorf("end key does not match account hash: %x != %x", end.Value()[:32], accHash)
+			}
+		}
+	}
+	return db.getRangeProofAtRoot(ctx, tr, rootID, start, end, maxLength)
+}
+
+func (db *db) getRangeProofAtRoot(
+	ctx context.Context, tr *trie.Trie,
+	rootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
+	response := &RangeProof{}
 	nodeIt, err := tr.NodeIterator(start.Value())
 	if err != nil {
 		return nil, err
@@ -169,6 +261,18 @@ func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end
 }
 
 func (db *db) VerifyRangeProof(ctx context.Context, proof *RangeProof, start, end maybe.Maybe[[]byte], expectedRootID ids.ID) error {
+	var prefix []byte
+	if len(start.Value()) == 64 {
+		prefix = start.Value()[:32]
+		start = maybe.Some(start.Value()[32:])
+		if end.HasValue() {
+			end = maybe.Some(end.Value()[32:])
+		}
+	}
+	return db.verifyRangeProof(ctx, prefix, proof, start, end, db.getExpectedID(prefix, expectedRootID))
+}
+
+func (db *db) verifyRangeProof(ctx context.Context, prefix []byte, proof *RangeProof, start, end maybe.Maybe[[]byte], expectedRootID ids.ID) error {
 	fmt.Println(
 		"proof verification",
 		"start", hex.EncodeToString(start.Value()),
@@ -219,8 +323,20 @@ func (db *db) VerifyRangeProof(ctx context.Context, proof *RangeProof, start, en
 }
 
 func (db *db) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
+	var prefix []byte
+	if len(start.Value()) == 64 {
+		prefix = start.Value()[:32]
+		start = maybe.Some(start.Value()[32:])
+		if end.HasValue() {
+			end = maybe.Some(end.Value()[32:])
+		}
+	}
+	return db.commitRangeProof(ctx, prefix, start, end, proof)
+}
+
+func (db *db) commitRangeProof(ctx context.Context, prefix []byte, start, end maybe.Maybe[[]byte], proof *RangeProof) error {
 	kvs := make(map[string][]byte)
-	if err := db.getKVs(start.Value(), end.Value(), kvs); err != nil {
+	if err := db.getKVs(prefix, start.Value(), end.Value(), kvs); err != nil {
 		return err
 	}
 	deletes := make([]KeyValue, 0, len(kvs))
@@ -230,27 +346,36 @@ func (db *db) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byt
 			Value: nil, // Delete
 		})
 	}
-	if err := db.updateKVs(deletes); err != nil {
+	if err := db.updateKVs(prefix, deletes); err != nil {
 		return err
 	}
 
-	return db.updateKVs(proof.KeyValues)
+	return db.updateKVs(prefix, proof.KeyValues)
 }
 
-func (db *db) NextKey(key []byte) ([]byte, error) {
-	if len(key) != 32 {
-		return nil, fmt.Errorf("key length is not 32")
+func (db *db) NextKey(lastReceived []byte, rangeEnd maybe.Maybe[[]byte]) ([]byte, error) {
+	if len(rangeEnd.Value()) == 64 {
+		prefix := rangeEnd.Value()[:32]
+		next, err := db.NextKey(lastReceived, maybe.Nothing[[]byte]())
+		if err != nil {
+			return nil, err
+		}
+		return append(prefix, next...), nil
 	}
-	keyCopy := bytes.Clone(key)
+	if len(lastReceived) != 32 {
+		return nil, fmt.Errorf("key length is not 32: %d", len(lastReceived))
+	}
+	keyCopy := bytes.Clone(lastReceived)
 	IncrOne(keyCopy)
 	return keyCopy, nil
 }
 
-func (db *db) updateKVs(kvs []merkledb.KeyValue) error {
+func (db *db) updateKVs(prefix []byte, kvs []merkledb.KeyValue) error {
 	db.updateLock.Lock()
 	defer db.updateLock.Unlock()
 
-	tr, err := trie.New(trie.StateTrieID(db.root), db.triedb)
+	trID := db.getTrieID(prefix)
+	tr, err := trie.New(trID, db.triedb)
 	if err != nil {
 		return err
 	}
@@ -272,37 +397,99 @@ func (db *db) updateKVs(kvs []merkledb.KeyValue) error {
 	fmt.Fprintln(
 		os.Stderr,
 		"committing", len(kvs),
-		"parent", hex.EncodeToString(db.root[:]),
+		"parent", hex.EncodeToString(db.layerID[:]),
 		"root", hex.EncodeToString(root[:]),
+		"trID.Root", hex.EncodeToString(trID.Root[:]),
 	)
-	if root == db.root {
+	if root == trID.Root {
 		return nil
 	}
 	nodes := trienode.NewWithNodeSet(nodeSet)
-	if err := db.triedb.Update(root, db.root, 0, nodes, nil); err != nil {
+	layerID := root
+	if len(prefix) > 0 {
+		// Just guarantees uniqueness
+		hasher := sha3.NewLegacyKeccak256()
+		hasher.Write(layerID[:])
+		hasher.Write(root[:])
+		layerID = common.BytesToHash(hasher.Sum(nil))
+	}
+	if err := db.triedb.Update(layerID, db.layerID, 0, nodes, nil); err != nil {
 		return err
 	}
-	db.root = root
+	if len(prefix) == 0 {
+		db.root = root
+	}
+	db.layerID = layerID
+	db.lastRoots[common.BytesToHash(prefix)] = root
 	return nil
 }
 
 func (db *db) Close() error {
-	if err := db.triedb.Commit(db.root, false); err != nil {
+	if err := db.triedb.Commit(db.layerID, false); err != nil {
 		return err
 	}
 	return db.db.Put(rootKey, db.root[:])
 }
 
 func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int) (*ChangeProof, error) {
-	startTrie, err := trie.New(trie.StateTrieID(common.BytesToHash(startRootID[:])), db.triedb)
+	startStateRoot := common.BytesToHash(startRootID[:])
+	startTrie, err := trie.New(trie.StateTrieID(startStateRoot), db.triedb)
 	if err != nil {
 		return nil, merkledb.ErrInsufficientHistory
 	}
-	endTrie, err := trie.New(trie.StateTrieID(common.BytesToHash(endRootID[:])), db.triedb)
+	endStateRoot := common.BytesToHash(endRootID[:])
+	endTrie, err := trie.New(trie.StateTrieID(endStateRoot), db.triedb)
 	if err != nil {
 		return nil, merkledb.ErrNoEndRoot
 	}
+	if len(start.Value()) == 64 {
+		// This is a storage trie
+		accHash := start.Value()[:32]
+		startAccBytes, err := startTrie.Get(accHash)
+		if err != nil {
+			return nil, err
+		}
+		startAcc := new(types.StateAccount)
+		if err := rlp.DecodeBytes(startAccBytes, startAcc); err != nil {
+			return nil, err
+		}
 
+		endAccBytes, err := endTrie.Get(accHash)
+		if err != nil {
+			return nil, err
+		}
+		endAcc := new(types.StateAccount)
+		if err := rlp.DecodeBytes(endAccBytes, endAcc); err != nil {
+			return nil, err
+		}
+
+		startTrie, err = trie.New(trie.StorageTrieID(startStateRoot, common.BytesToHash(accHash), startAcc.Root), db.triedb)
+		if err != nil {
+			return nil, merkledb.ErrInsufficientHistory
+		}
+		endTrie, err = trie.New(trie.StorageTrieID(endStateRoot, common.BytesToHash(accHash), endAcc.Root), db.triedb)
+		if err != nil {
+			return nil, merkledb.ErrNoEndRoot
+		}
+
+		if end.HasValue() {
+			if len(end.Value()) != 64 {
+				return nil, fmt.Errorf("invalid end key length: %d", len(end.Value()))
+			}
+			if !bytes.Equal(end.Value()[:32], accHash) {
+				return nil, fmt.Errorf("end key does not match account hash: %x != %x", end.Value()[:32], accHash)
+			}
+			end = maybe.Some(end.Value()[32:])
+		}
+		start = maybe.Some(start.Value()[32:])
+	}
+
+	return db.getChangeProof(ctx, startTrie, endTrie, startRootID, endRootID, start, end, maxLength)
+}
+
+func (db *db) getChangeProof(
+	ctx context.Context, startTrie, endTrie *trie.Trie,
+	startRootID, endRootID ids.ID, start, end maybe.Maybe[[]byte], maxLength int) (*ChangeProof, error) {
 	startIt, err := startTrie.NodeIterator(start.Value())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create start iterator: %w", err)
@@ -424,6 +611,32 @@ func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID,
 }
 
 func (db *db) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start, end maybe.Maybe[[]byte], expectedEndRootID ids.ID) error {
+	var prefix []byte
+	if len(start.Value()) == 64 {
+		prefix = start.Value()[:32]
+		start = maybe.Some(start.Value()[32:])
+		if end.HasValue() {
+			end = maybe.Some(end.Value()[32:])
+		}
+	}
+
+	if err := db.verifyChangeProof(ctx, prefix, proof, start, end, db.getExpectedID(prefix, expectedEndRootID)); err != nil {
+		return fmt.Errorf("failed to verify change proof: %w", err)
+	}
+	// HACK: tacking on start
+	if len(proof.KeyChanges) > 0 {
+		proof.KeyChanges = append(
+			proof.KeyChanges,
+			merkledb.KeyChange{Key: []byte("PREFIX"), Value: maybe.Some(prefix)},
+		)
+	}
+	///
+	return nil
+}
+
+func (db *db) verifyChangeProof(
+	ctx context.Context, prefix []byte,
+	proof *ChangeProof, start, end maybe.Maybe[[]byte], expectedEndRootID ids.ID) error {
 	fmt.Println(
 		"change proof verification",
 		"start", hex.EncodeToString(start.Value()),
@@ -469,7 +682,7 @@ func (db *db) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start, 
 	if len(proof.KeyChanges) > 0 {
 		endOfProofRange = proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	}
-	if err := db.getKVs(startKey, endOfProofRange, kvs); err != nil {
+	if err := db.getKVs(prefix, startKey, endOfProofRange, kvs); err != nil {
 		return fmt.Errorf("failed to get key-values: %w", err)
 	}
 	fmt.Println("kvs", len(kvs))
@@ -525,11 +738,21 @@ func (db *db) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start, 
 	return nil
 }
 
-func (db *db) getKVs(startKey, endKey []byte, kvs map[string][]byte) error {
-	db.updateLock.Lock()
-	defer db.updateLock.Unlock()
+// assumes updateLock is held
+func (db *db) getTrieID(prefix []byte) *trie.ID {
+	owner := common.BytesToHash(prefix)
+	root := db.lastRoots[owner]
+	if root == (common.Hash{}) {
+		root = types.EmptyRootHash
+	}
+	return trie.StorageTrieID(db.layerID, owner, root)
+}
 
-	tr, err := trie.New(trie.StateTrieID(db.root), db.triedb)
+func (db *db) getKVs(prefix []byte, startKey, endKey []byte, kvs map[string][]byte) error {
+	db.updateLock.RLock()
+	defer db.updateLock.RUnlock()
+
+	tr, err := trie.New(db.getTrieID(prefix), db.triedb)
 	if err != nil {
 		return err
 	}
@@ -552,6 +775,15 @@ func getKVsFromTrie(tr *trie.Trie, startKey, endKey []byte, kvs map[string][]byt
 }
 
 func (db *db) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
+	// UNHACK: remove prefix
+	last := proof.KeyChanges[len(proof.KeyChanges)-1]
+	if !bytes.Equal(last.Key, []byte("PREFIX")) {
+		panic("invalid prefix")
+	}
+	prefix := last.Value.Value()
+	proof.KeyChanges = proof.KeyChanges[:len(proof.KeyChanges)-1]
+	///
+
 	keyValues := make([]KeyValue, 0, len(proof.KeyChanges))
 	for _, change := range proof.KeyChanges {
 		keyValues = append(keyValues, KeyValue{
@@ -560,11 +792,11 @@ func (db *db) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 		})
 	}
 
-	return db.updateKVs(keyValues)
+	return db.updateKVs(prefix, keyValues)
 }
 
 func (db *db) Put(key, value []byte) error {
-	return db.updateKVs([]KeyValue{{Key: key, Value: value}})
+	return db.updateKVs(nil, []KeyValue{{Key: key, Value: value}})
 }
 
 func (db *db) NewBatch() *trieBatch {
@@ -582,7 +814,7 @@ func (t *trieBatch) Put(key, value []byte) error {
 }
 
 func (t *trieBatch) Write() error {
-	return t.db.updateKVs(t.kvs)
+	return t.db.updateKVs(nil, t.kvs)
 }
 
 func (db *db) IterateOneKey(key []byte) ([]byte, bool) {

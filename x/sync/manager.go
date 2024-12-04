@@ -153,6 +153,12 @@ type ManagerConfig struct {
 	StateSyncNodes        []ids.NodeID
 	// If not specified, [merkledb.DefaultHasher] will be used.
 	Hasher merkledb.Hasher
+
+	KVCallback func(start, end maybe.Maybe[[]byte], priority byte, endID ids.ID, keyValues []merkledb.KeyChange) error
+}
+
+func (m *Manager) EnqueueWork(start, end maybe.Maybe[[]byte], priorityAsByte byte) {
+	m.enqueueWork(newWorkItem(ids.Empty, start, end, priority(priorityAsByte), time.Now()))
 }
 
 func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
@@ -544,6 +550,23 @@ func (m *Manager) handleRangeProofResponse(
 		m.setError(err)
 		return nil
 	}
+	keyChanges := make([]merkledb.KeyChange, len(rangeProof.KeyValues))
+	for i, keyValue := range rangeProof.KeyValues {
+		keyChanges[i] = merkledb.KeyChange{
+			Key:   keyValue.Key,
+			Value: maybe.Some(keyValue.Value),
+		}
+	}
+	if m.config.KVCallback != nil {
+		root, err := ids.ToID(request.RootHash)
+		if err != nil {
+			return err
+		}
+		if err := m.config.KVCallback(work.start, work.end, byte(work.priority), root, keyChanges); err != nil {
+			m.setError(err)
+			return nil
+		}
+	}
 
 	if len(rangeProof.KeyValues) > 0 {
 		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
@@ -612,6 +635,14 @@ func (m *Manager) handleChangeProofResponse(
 				m.setError(err)
 				return nil
 			}
+
+			if m.config.KVCallback != nil {
+				if err := m.config.KVCallback(work.start, work.end, byte(work.priority), endRoot, changeProof.KeyChanges); err != nil {
+					m.setError(err)
+					return nil
+				}
+			}
+
 			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 		}
 
@@ -672,14 +703,14 @@ func (m *Manager) handleChangeProofResponse(
 func (m *Manager) findNextKey(
 	_ context.Context,
 	lastReceivedKey []byte,
-	_ maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	_ []merkledb.ProofNode,
 ) (maybe.Maybe[[]byte], error) {
 	type nextKeyer interface {
-		NextKey([]byte) ([]byte, error)
+		NextKey([]byte, maybe.Maybe[[]byte]) ([]byte, error)
 	}
 	if nextKeyer, ok := m.config.DB.(nextKeyer); ok {
-		nextKey, err := nextKeyer.NextKey(lastReceivedKey)
+		nextKey, err := nextKeyer.NextKey(lastReceivedKey, end)
 		if err != nil {
 			return maybe.Nothing[[]byte](), err
 		}
