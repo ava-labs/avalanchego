@@ -259,7 +259,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyValues = response.KeyValues[min(1, len(response.KeyValues)):]
 					response.KeyValues = []merkledb.KeyValue{
 						{
-							Key:   []byte("foo"),
+							Key:   []byte("01234567890123456789012345678901"),
 							Value: []byte("bar"),
 						},
 					}

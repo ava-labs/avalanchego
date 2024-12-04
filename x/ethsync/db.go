@@ -687,6 +687,9 @@ func (db *db) verifyChangeProof(
 	}
 	fmt.Println("kvs", len(kvs))
 	for _, kv := range proof.KeyChanges {
+		if len(kv.Key) != 32 {
+			return fmt.Errorf("invalid key length: %d", len(kv.Key))
+		}
 		val := kv.Value.Value()
 
 		kvs[string(kv.Key)] = val
