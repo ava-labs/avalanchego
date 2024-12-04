@@ -6,9 +6,9 @@ package ethsync
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -54,8 +54,7 @@ func addState(statedb *state.StateDB, addr common.Address, kvs int) {
 	}
 	bytes := binary.BigEndian.AppendUint64(nil, lastKey+uint64(kvs))
 	statedb.SetState(addr, lastKeyStoredAt, common.BytesToHash(bytes))
-
-	fmt.Println("--> Address: ", addr, " KVs: ", lastKey+uint64(kvs))
+	// fmt.Println("--> Address: ", addr, " KVs: ", lastKey+uint64(kvs))
 }
 
 func verifyState(t *testing.T, statedb *state.StateDB, addr common.Address) {
@@ -90,8 +89,9 @@ func TestSync(t *testing.T) {
 	}
 
 	accountsPerState := 10
-	serverStates := 100
+	serverStates := 200
 	serverRoot := types.EmptyRootHash
+	serverRoots := make([]common.Hash, serverStates)
 	for i := 0; i < serverStates; i++ {
 		statedb, err := state.New(serverRoot, serverDB, nil)
 		require.NoError(err)
@@ -107,7 +107,7 @@ func TestSync(t *testing.T) {
 
 		serverRoot, err = statedb.Commit(uint64(i), true)
 		require.NoError(err)
-
+		serverRoots[i] = serverRoot
 		t.Logf("Server state %d: %s", i, serverRoot)
 	}
 
@@ -131,11 +131,13 @@ func TestSync(t *testing.T) {
 		os.Stdout,
 		logging.Auto.ConsoleEncoder(),
 	)
+	syncRootIdx := 100
+	initialRoot := serverRoots[syncRootIdx]
 	managerConfig := sync.ManagerConfig{
 		DB:                    client,
 		Log:                   logging.NewLogger("sync", log),
 		BranchFactor:          merkledb.BranchFactor16,
-		TargetRoot:            ids.ID(serverRoot),
+		TargetRoot:            ids.ID(initialRoot),
 		SimultaneousWorkLimit: defaultSimultaneousWorkLimit,
 		RangeProofClient:      p2ptest.NewClient(t, ctx, rangeProofs, clientNodeID, serverNodeID),
 		ChangeProofClient:     p2ptest.NewClient(t, ctx, changeProofs, clientNodeID, serverNodeID),
@@ -146,12 +148,41 @@ func TestSync(t *testing.T) {
 	client.manager = manager // Needed to hook-up KVCallback
 
 	require.NoError(manager.Start(ctx))
-	require.NoError(manager.Wait(ctx))
+
+	doneCh := make(chan struct{})
+	go func() {
+		require.NoError(manager.Wait(ctx))
+		defer close(doneCh)
+	}()
+
+	lastIdx := len(serverRoots) - 1
+l:
+	for {
+		select {
+		case <-doneCh:
+			break l
+		case <-time.After(50 * time.Millisecond):
+
+			if syncRootIdx+1 > lastIdx {
+				<-doneCh
+				break l
+			}
+
+			nextTarget := ids.ID(serverRoots[syncRootIdx+1])
+			err := manager.UpdateSyncTarget(nextTarget)
+			if err == sync.ErrAlreadyClosed {
+				break l
+			}
+			require.NoError(err)
+			syncRootIdx++
+		}
+	}
 
 	// Verify the client database
 	ethdb := rawdb.NewDatabase(evm.Database{Database: clientDisk})
 	clientDB := state.NewDatabaseWithConfig(ethdb, &triedb.Config{PathDB: pathdb.Defaults})
-	clientState, err := state.New(serverRoot, clientDB, nil)
+	t.Logf("syncRootIdx: %d, syncRoot: %x", syncRootIdx, serverRoots[syncRootIdx])
+	clientState, err := state.New(serverRoots[syncRootIdx], clientDB, nil)
 	require.NoError(err)
 	for _, account := range accounts {
 		verifyState(t, clientState, account)

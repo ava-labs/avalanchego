@@ -69,11 +69,8 @@ type db struct {
 	root       common.Hash
 	layerID    common.Hash
 	updateLock sync.RWMutex
-
-	expectedRootLock sync.RWMutex
-	expectedRoots    map[common.Hash]map[common.Hash]common.Hash // stateID -> accHash -> root
-	lastRoots        map[common.Hash]common.Hash
-	manager          manager
+	lastRoots  map[common.Hash]common.Hash
+	manager    manager
 }
 
 func New(ctx context.Context, disk database.Database, config merkledb.Config) (*db, error) {
@@ -88,12 +85,11 @@ func New(ctx context.Context, disk database.Database, config merkledb.Config) (*
 
 	triedb := triedb.NewDatabase(ethdb, &triedb.Config{PathDB: pathdb.Defaults})
 	return &db{
-		db:            ethdb,
-		triedb:        triedb,
-		root:          root,
-		layerID:       root,
-		expectedRoots: make(map[common.Hash]map[common.Hash]common.Hash),
-		lastRoots:     make(map[common.Hash]common.Hash),
+		db:        ethdb,
+		triedb:    triedb,
+		root:      root,
+		layerID:   root,
+		lastRoots: make(map[common.Hash]common.Hash),
 	}, nil
 }
 
@@ -110,13 +106,6 @@ func (db *db) KVCallback(start, end maybe.Maybe[[]byte], priority byte, stateID 
 			continue // empty account
 		}
 
-		// Add the account root to the expected roots
-		db.expectedRootLock.Lock()
-		if _, ok := db.expectedRoots[common.Hash(stateID)]; !ok {
-			db.expectedRoots[common.Hash(stateID)] = make(map[common.Hash]common.Hash)
-		}
-		db.expectedRoots[common.Hash(stateID)][common.BytesToHash(kv.Key)] = acc.Root
-		db.expectedRootLock.Unlock()
 		if db.manager != nil {
 			var start, end []byte
 			start = append(start, kv.Key...)
@@ -127,21 +116,6 @@ func (db *db) KVCallback(start, end maybe.Maybe[[]byte], priority byte, stateID 
 		}
 	}
 	return nil
-}
-
-func (db *db) getExpectedID(prefix []byte, stateID ids.ID) ids.ID {
-	db.expectedRootLock.RLock()
-	defer db.expectedRootLock.RUnlock()
-
-	if len(prefix) == 0 {
-		return stateID
-	}
-
-	stateIDMap, ok := db.expectedRoots[common.Hash(stateID)]
-	if !ok {
-		return stateID
-	}
-	return ids.ID(stateIDMap[common.BytesToHash(prefix)])
 }
 
 func (db *db) Clear() error {
@@ -164,6 +138,7 @@ func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end
 	if err != nil {
 		return nil, err
 	}
+	var additionalProof proof
 	if len(start.Value()) == 64 {
 		// This is a storage trie
 		accHash := start.Value()[:32]
@@ -175,6 +150,13 @@ func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end
 		if err := rlp.DecodeBytes(accBytes, acc); err != nil {
 			return nil, err
 		}
+
+		// TODO: to prove the account root, we include this for now.
+		// The client can find a better way to track this.
+		if err := tr.Prove(accHash, &additionalProof); err != nil {
+			return nil, err
+		}
+
 		tr, err = trie.New(trie.StorageTrieID(stateRoot, common.BytesToHash(accHash), acc.Root), db.triedb)
 		if err != nil {
 			return nil, err
@@ -191,7 +173,12 @@ func (db *db) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start, end
 			end = maybe.Some(end.Value()[32:])
 		}
 	}
-	return db.getRangeProofAtRoot(ctx, tr, rootID, start, end, maxLength)
+	response, err := db.getRangeProofAtRoot(ctx, tr, rootID, start, end, maxLength)
+	if err != nil {
+		return nil, err
+	}
+	response.StartProof = append(response.StartProof, additionalProof...)
+	return response, nil
 }
 
 func (db *db) getRangeProofAtRoot(
@@ -267,14 +254,38 @@ func (db *db) getRangeProofAtRoot(
 
 func (db *db) VerifyRangeProof(ctx context.Context, proof *RangeProof, start, end maybe.Maybe[[]byte], expectedRootID ids.ID) error {
 	var prefix []byte
+	verifyRootID := expectedRootID
 	if len(start.Value()) == 64 {
 		prefix = start.Value()[:32]
 		start = maybe.Some(start.Value()[32:])
 		if end.HasValue() {
 			end = maybe.Some(end.Value()[32:])
 		}
+
+		// If the proof is for a storage trie, the expected root ID should be
+		// recovered from the "additionalProof", included in StartProof.
+		proofDB := rawdb.NewMemoryDatabase()
+		for _, node := range proof.StartProof {
+			if err := proofDB.Put(node.Key.Bytes(), node.ValueOrHash.Value()); err != nil {
+				return err
+			}
+		}
+		val, err := trie.VerifyProof(
+			common.BytesToHash(expectedRootID[:]),
+			prefix,
+			proofDB,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %w", err)
+		}
+		account := new(types.StateAccount)
+		if err := rlp.DecodeBytes(val, account); err != nil {
+			return fmt.Errorf("failed to decode account: %w", err)
+		}
+
+		verifyRootID = ids.ID(account.Root)
 	}
-	return db.verifyRangeProof(ctx, prefix, proof, start, end, db.getExpectedID(prefix, expectedRootID))
+	return db.verifyRangeProof(ctx, prefix, proof, start, end, verifyRootID)
 }
 
 func (db *db) verifyRangeProof(ctx context.Context, prefix []byte, proof *RangeProof, start, end maybe.Maybe[[]byte], expectedRootID ids.ID) error {
@@ -475,6 +486,7 @@ func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID,
 	if err != nil {
 		return nil, merkledb.ErrNoEndRoot
 	}
+	var additionalProof proof
 	if len(start.Value()) == 64 {
 		// This is a storage trie
 		accHash := start.Value()[:32]
@@ -493,6 +505,12 @@ func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID,
 		}
 		endAcc := new(types.StateAccount)
 		if err := rlp.DecodeBytes(endAccBytes, endAcc); err != nil {
+			return nil, err
+		}
+
+		// TODO: to prove the account root, we include this for now.
+		// The client can find a better way to track this.
+		if err := endTrie.Prove(accHash, (*proof)(&additionalProof)); err != nil {
 			return nil, err
 		}
 
@@ -517,7 +535,12 @@ func (db *db) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID,
 		start = maybe.Some(start.Value()[32:])
 	}
 
-	return db.getChangeProof(ctx, startTrie, endTrie, startRootID, endRootID, start, end, maxLength)
+	response, err := db.getChangeProof(ctx, startTrie, endTrie, startRootID, endRootID, start, end, maxLength)
+	if err != nil {
+		return nil, err
+	}
+	response.StartProof = append(response.StartProof, additionalProof...)
+	return response, nil
 }
 
 func (db *db) getChangeProof(
@@ -645,15 +668,39 @@ func (db *db) getChangeProof(
 
 func (db *db) VerifyChangeProof(ctx context.Context, proof *ChangeProof, start, end maybe.Maybe[[]byte], expectedEndRootID ids.ID) error {
 	var prefix []byte
+	verifyRootID := expectedEndRootID
 	if len(start.Value()) == 64 {
 		prefix = start.Value()[:32]
 		start = maybe.Some(start.Value()[32:])
 		if end.HasValue() {
 			end = maybe.Some(end.Value()[32:])
 		}
+
+		// If the proof is for a storage trie, the expected root ID should be
+		// recovered from the "additionalProof", included in StartProof.
+		proofDB := rawdb.NewMemoryDatabase()
+		for _, node := range proof.StartProof {
+			if err := proofDB.Put(node.Key.Bytes(), node.ValueOrHash.Value()); err != nil {
+				return err
+			}
+		}
+		val, err := trie.VerifyProof(
+			common.BytesToHash(expectedEndRootID[:]),
+			prefix,
+			proofDB,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %w", err)
+		}
+		account := new(types.StateAccount)
+		if err := rlp.DecodeBytes(val, account); err != nil {
+			return fmt.Errorf("failed to decode account: %w", err)
+		}
+
+		verifyRootID = ids.ID(account.Root)
 	}
 
-	if err := db.verifyChangeProof(ctx, prefix, proof, start, end, db.getExpectedID(prefix, expectedEndRootID)); err != nil {
+	if err := db.verifyChangeProof(ctx, prefix, proof, start, end, verifyRootID); err != nil {
 		return fmt.Errorf("failed to verify change proof: %w", err)
 	}
 	// HACK: tacking on start
