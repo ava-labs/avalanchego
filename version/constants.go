@@ -22,8 +22,8 @@ const (
 var (
 	Current = &Semantic{
 		Major: 1,
-		Minor: 11,
-		Patch: 13,
+		Minor: 12,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Name:  Client,
@@ -34,13 +34,13 @@ var (
 	MinimumCompatibleVersion = &Application{
 		Name:  Client,
 		Major: 1,
-		Minor: 11,
+		Minor: 12,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Name:  Client,
 		Major: 1,
-		Minor: 10,
+		Minor: 11,
 		Patch: 0,
 	}
 
