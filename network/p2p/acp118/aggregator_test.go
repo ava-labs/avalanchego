@@ -50,19 +50,17 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name                string
-		peers               map[ids.NodeID]p2p.Handler
-		ctx                 context.Context
-		signature           warp.BitSetSignature
-		validators          []*warp.Validator
-		quorumNum           uint64
-		quorumDen           uint64
-		wantTotalStake      int
-		wantMsg             *warp.Message
-		wantSigners         int
-		wantPossibleSigners []int
-		wantFinished        bool
-		wantErr             error
+		name           string
+		peers          map[ids.NodeID]p2p.Handler
+		ctx            context.Context
+		signature      warp.BitSetSignature
+		validators     []*warp.Validator
+		quorumNum      uint64
+		quorumDen      uint64
+		wantTotalStake int
+		wantSigners    int
+		wantFinished   bool
+		wantErr        error
 	}{
 		{
 			name: "single validator - less than threshold",
@@ -95,12 +93,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
-			wantTotalStake:      1,
-			wantSigners:         1,
-			wantPossibleSigners: []int{0},
-			wantFinished:        true,
-			quorumNum:           1,
-			quorumDen:           1,
+			wantTotalStake: 1,
+			wantSigners:    1,
+			wantFinished:   true,
+			quorumNum:      1,
+			quorumDen:      1,
 		},
 		{
 			name: "single validator - greater than threshold",
@@ -115,12 +112,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
-			wantTotalStake:      1,
-			wantSigners:         1,
-			wantPossibleSigners: []int{0},
-			wantFinished:        true,
-			quorumNum:           1,
-			quorumDen:           2,
+			wantTotalStake: 1,
+			wantSigners:    1,
+			wantFinished:   true,
+			quorumNum:      1,
+			quorumDen:      2,
 		},
 		{
 			name: "multiple validators - less than threshold - equal weights",
@@ -147,12 +143,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      3,
-			wantSigners:         1,
-			wantPossibleSigners: []int{0},
-			wantFinished:        true,
-			quorumNum:           2,
-			quorumDen:           3,
+			wantTotalStake: 3,
+			wantSigners:    1,
+			wantFinished:   true,
+			quorumNum:      2,
+			quorumDen:      3,
 		},
 		{
 			name: "multiple validators - equal to threshold - equal weights",
@@ -179,12 +174,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      3,
-			wantSigners:         2,
-			wantPossibleSigners: []int{0, 1},
-			wantFinished:        true,
-			quorumNum:           2,
-			quorumDen:           3,
+			wantTotalStake: 3,
+			wantSigners:    2,
+			wantFinished:   true,
+			quorumNum:      2,
+			quorumDen:      3,
 		},
 		{
 			name: "multiple validators - greater than threshold - equal weights",
@@ -211,12 +205,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      3,
-			wantSigners:         2,
-			wantPossibleSigners: []int{0, 1, 2},
-			wantFinished:        true,
-			quorumNum:           2,
-			quorumDen:           3,
+			wantTotalStake: 3,
+			wantSigners:    2,
+			wantFinished:   true,
+			quorumNum:      2,
+			quorumDen:      3,
 		},
 		{
 			name: "multiple validators - less than threshold - different weights",
@@ -243,12 +236,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      6,
-			wantSigners:         1,
-			wantPossibleSigners: []int{0},
-			wantFinished:        true,
-			quorumNum:           2,
-			quorumDen:           3,
+			wantTotalStake: 6,
+			wantSigners:    1,
+			wantFinished:   true,
+			quorumNum:      2,
+			quorumDen:      3,
 		},
 		{
 			name: "multiple validators - equal to threshold - different weights",
@@ -275,12 +267,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      6,
-			wantSigners:         2,
-			wantPossibleSigners: []int{0, 1},
-			wantFinished:        true,
-			quorumNum:           1,
-			quorumDen:           2,
+			wantTotalStake: 6,
+			wantSigners:    2,
+			wantFinished:   true,
+			quorumNum:      1,
+			quorumDen:      2,
 		},
 		{
 			name: "multiple validators - greater than threshold - different weights",
@@ -307,12 +298,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      6,
-			wantSigners:         2,
-			wantPossibleSigners: []int{0, 1},
-			wantFinished:        true,
-			quorumNum:           1,
-			quorumDen:           3,
+			wantTotalStake: 6,
+			wantSigners:    2,
+			wantFinished:   true,
+			quorumNum:      1,
+			quorumDen:      3,
 		},
 		{
 			name: "multiple validators - shared public keys",
@@ -329,12 +319,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0, nodeID1, nodeID2},
 				},
 			},
-			wantTotalStake:      1,
-			wantSigners:         1,
-			wantPossibleSigners: []int{0, 1, 2},
-			wantFinished:        true,
-			quorumNum:           2,
-			quorumDen:           3,
+			wantTotalStake: 1,
+			wantSigners:    1,
+			wantFinished:   true,
+			quorumNum:      2,
+			quorumDen:      3,
 		},
 		{
 			name: "multiple validators - unique and shared public keys",
@@ -356,12 +345,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID1, nodeID2},
 				},
 			},
-			wantTotalStake:      2,
-			wantSigners:         1,
-			wantPossibleSigners: []int{0, 1},
-			wantFinished:        true,
-			quorumNum:           2,
-			quorumDen:           3,
+			wantTotalStake: 2,
+			wantSigners:    1,
+			wantFinished:   true,
+			quorumNum:      2,
+			quorumDen:      3,
 		},
 		{
 			name: "single validator - context canceled",
@@ -456,12 +444,11 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantTotalStake:      3,
-			wantSigners:         3,
-			wantPossibleSigners: []int{0, 1, 2},
-			wantFinished:        true,
-			quorumNum:           1,
-			quorumDen:           1,
+			wantTotalStake: 3,
+			wantSigners:    3,
+			wantFinished:   true,
+			quorumNum:      1,
+			quorumDen:      1,
 		},
 	}
 
