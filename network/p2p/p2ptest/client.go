@@ -107,11 +107,8 @@ func NewClientWithPeers(
 
 	for nodeID := range peers {
 		peerSenders[nodeID].SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
-			// Send the request asynchronously to avoid deadlock when the server
-			// sends the response back to the client
-			nodeIDCopy := nodeID
 			go func() {
-				require.NoError(t, peerNetworks[clientNodeID].AppRequestFailed(ctx, nodeIDCopy, requestID, &common.AppError{
+				require.NoError(t, peerNetworks[clientNodeID].AppRequestFailed(ctx, nodeID, requestID, &common.AppError{
 					Code:    errorCode,
 					Message: errorMessage,
 				}))
