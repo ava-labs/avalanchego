@@ -43,20 +43,41 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	signer2 := warp.NewSigner(sk2, networkID, chainID)
 
 	tests := []struct {
-		name         string
-		peers        map[ids.NodeID]p2p.Handler
-		ctx          context.Context
-		validators   []*warp.Validator
-		quorumNum    uint64
-		quorumDen    uint64
-		wantMsg      *warp.Message
-		wantSigners  []int
-		wantFinished bool
-		wantErr      error
+		name                string
+		peers               map[ids.NodeID]p2p.Handler
+		ctx                 context.Context
+		validators          []*warp.Validator
+		quorumNum           uint64
+		quorumDen           uint64
+		wantTotalStake      int
+		wantMsg             *warp.Message
+		wantSigners         int
+		wantPossibleSigners []int
+		wantFinished        bool
+		wantErr             error
 	}{
-		// TODO test different weights
+		// TODO test message w/ signature
+		// TODO test shared pks
 		{
-			name: "meets threshold - 1/1 validators",
+			name: "single validator - less than threshold",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer0),
+			},
+			ctx: context.Background(),
+			validators: []*warp.Validator{
+				{
+					PublicKey: pk0,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
+				},
+			},
+			wantTotalStake: 1,
+			wantFinished:   true,
+			quorumNum:      1,
+			quorumDen:      1,
+		},
+		{
+			name: "single validator - equal to threshold",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
@@ -68,23 +89,39 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
-			wantSigners:  []int{0},
-			wantFinished: true,
-			quorumNum:    1,
-			quorumDen:    1,
+			wantTotalStake:      1,
+			wantSigners:         1,
+			wantPossibleSigners: []int{0},
+			wantFinished:        true,
+			quorumNum:           1,
+			quorumDen:           1,
 		},
 		{
-			name: "meets threshold - 1/3 validators",
+			name: "single validator - greater than threshold",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
-				nodeID1: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer1,
-				),
-				nodeID2: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer2,
-				),
+			},
+			ctx: context.Background(),
+			validators: []*warp.Validator{
+				{
+					PublicKey: pk0,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
+				},
+			},
+			wantTotalStake:      1,
+			wantSigners:         1,
+			wantPossibleSigners: []int{0},
+			wantFinished:        true,
+			quorumNum:           1,
+			quorumDen:           2,
+		},
+		{
+			name: "multiple validators - less than threshold - equal weights",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID1: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer1),
+				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
 			validators: []*warp.Validator{
@@ -104,20 +141,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantSigners:  []int{0},
-			wantFinished: true,
-			quorumNum:    1,
-			quorumDen:    3,
+			wantTotalStake:      3,
+			wantSigners:         1,
+			wantPossibleSigners: []int{0},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
 		},
 		{
-			name: "meets threshold - 2/3 validators",
+			name: "multiple validators - equal to threshold - equal weights",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
-				nodeID2: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer2,
-				),
+				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
 			validators: []*warp.Validator{
@@ -137,13 +173,15 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantSigners:  []int{0, 1},
-			wantFinished: true,
-			quorumNum:    2,
-			quorumDen:    3,
+			wantTotalStake:      3,
+			wantSigners:         2,
+			wantPossibleSigners: []int{0, 1},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
 		},
 		{
-			name: "aggregates from all validators - 3/3",
+			name: "multiple validators - greater than threshold - equal weights",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
@@ -167,19 +205,19 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			wantSigners:  []int{0, 1, 2},
-			wantFinished: true,
-			quorumNum:    1,
-			quorumDen:    1,
+			wantTotalStake:      3,
+			wantSigners:         2,
+			wantPossibleSigners: []int{0, 1, 2},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
 		},
 		{
-			name: "fails aggregation from some validators - 1/2",
+			name: "multiple validators - less than threshold - different weights",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
-				nodeID1: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer1,
-				),
+				nodeID1: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer1),
+				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
 			validators: []*warp.Validator{
@@ -190,60 +228,28 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				},
 				{
 					PublicKey: pk1,
-					Weight:    1,
-					NodeIDs:   []ids.NodeID{nodeID1},
-				},
-			},
-			quorumNum:    1,
-			quorumDen:    1,
-			wantSigners:  []int{0},
-			wantFinished: true,
-		},
-		{
-			name: "fails aggregation from some validators - 1/3",
-			peers: map[ids.NodeID]p2p.Handler{
-				nodeID0: NewHandler(&testVerifier{}, signer0),
-				nodeID1: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer1,
-				),
-				nodeID2: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer2,
-				),
-			},
-			ctx: context.Background(),
-			validators: []*warp.Validator{
-				{
-					PublicKey: pk0,
-					Weight:    1,
-					NodeIDs:   []ids.NodeID{nodeID0},
-				},
-				{
-					PublicKey: pk1,
-					Weight:    1,
+					Weight:    2,
 					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKey: pk2,
-					Weight:    1,
+					Weight:    3,
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			quorumNum:    2,
-			quorumDen:    3,
-			wantSigners:  []int{0},
-			wantFinished: true,
+			wantTotalStake:      6,
+			wantSigners:         1,
+			wantPossibleSigners: []int{0},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
 		},
 		{
-			name: "fails aggregation from some validators - 2/3",
+			name: "multiple validators - equal to threshold - equal weights",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
-				nodeID2: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer2,
-				),
+				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
 			validators: []*warp.Validator{
@@ -254,27 +260,28 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				},
 				{
 					PublicKey: pk1,
-					Weight:    1,
+					Weight:    2,
 					NodeIDs:   []ids.NodeID{nodeID1},
 				},
 				{
 					PublicKey: pk2,
-					Weight:    1,
+					Weight:    3,
 					NodeIDs:   []ids.NodeID{nodeID2},
 				},
 			},
-			quorumNum:    1,
-			quorumDen:    1,
-			wantSigners:  []int{0, 1},
-			wantFinished: true,
+			wantTotalStake:      6,
+			wantSigners:         2,
+			wantPossibleSigners: []int{0, 1},
+			wantFinished:        true,
+			quorumNum:           1,
+			quorumDen:           2,
 		},
 		{
-			name: "fails aggregation from all validators",
+			name: "multiple validators - greater than threshold - equal weights",
 			peers: map[ids.NodeID]p2p.Handler{
-				nodeID0: NewHandler(
-					&testVerifier{Errs: []*common.AppError{common.ErrUndefined}},
-					signer0,
-				),
+				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID1: NewHandler(&testVerifier{}, signer1),
+				nodeID2: NewHandler(&testVerifier{}, signer2),
 			},
 			ctx: context.Background(),
 			validators: []*warp.Validator{
@@ -283,13 +290,26 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Weight:    1,
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
+				{
+					PublicKey: pk1,
+					Weight:    2,
+					NodeIDs:   []ids.NodeID{nodeID1},
+				},
+				{
+					PublicKey: pk2,
+					Weight:    3,
+					NodeIDs:   []ids.NodeID{nodeID2},
+				},
 			},
-			wantFinished: true,
-			quorumNum:    1,
-			quorumDen:    1,
+			wantTotalStake:      6,
+			wantSigners:         2,
+			wantPossibleSigners: []int{0, 1, 2},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
 		},
 		{
-			name: "context canceled",
+			name: "single validator - context canceled",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 			},
@@ -306,8 +326,43 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					NodeIDs:   []ids.NodeID{nodeID0},
 				},
 			},
-			quorumNum: 0,
-			quorumDen: 1,
+			wantTotalStake: 1,
+			quorumNum:      1,
+			quorumDen:      1,
+		},
+		{
+			name: "multiple validators - context canceled",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID1: NewHandler(&testVerifier{}, signer1),
+				nodeID2: NewHandler(&testVerifier{}, signer2),
+			},
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				return ctx
+			}(),
+			validators: []*warp.Validator{
+				{
+					PublicKey: pk0,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
+				},
+				{
+					PublicKey: pk1,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1},
+				},
+				{
+					PublicKey: pk2,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID2},
+				},
+			},
+			wantTotalStake: 3,
+			quorumNum:      1,
+			quorumDen:      1,
 		},
 	}
 
@@ -354,21 +409,30 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 
 			bitSetSignature := gotMsg.Signature.(*warp.BitSetSignature)
 			bitSet := set.BitsFromBytes(bitSetSignature.Signers)
-			require.Equal(len(tt.wantSigners), bitSet.Len())
+			require.Equal(tt.wantSigners, bitSet.Len())
 
-			wantAggregatedStake := new(big.Int)
-			for _, i := range tt.wantSigners {
-				require.True(bitSet.Contains(i))
-				wantAggregatedStake.Add(wantAggregatedStake, new(big.Int).SetUint64(tt.validators[i].Weight))
+			pks := make([]*bls.PublicKey, 0)
+			wantAggregatedStake := uint64(0)
+			for i := 0; i < bitSet.BitLen(); i++ {
+				if !bitSet.Contains(i) {
+					continue
+				}
+
+				pks = append(pks, tt.validators[i].PublicKey)
+				wantAggregatedStake += tt.validators[i].Weight
 			}
 
-			wantTotalStake := new(big.Int)
-			for _, v := range tt.validators {
-				wantTotalStake.Add(wantTotalStake, new(big.Int).SetUint64(v.Weight))
+			if tt.wantSigners > 0 {
+				aggPk, err := bls.AggregatePublicKeys(pks)
+				require.NoError(err)
+				blsSig, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
+				require.NoError(err)
+				require.True(bls.Verify(aggPk, blsSig, unsignedMsg.Bytes()))
 			}
 
-			require.Equal(wantAggregatedStake, gotAggregatedStake)
-			require.Equal(wantTotalStake, gotTotalStake)
+			require.Equal(new(big.Int).SetUint64(wantAggregatedStake), gotAggregatedStake)
+			require.Equal(new(big.Int).SetUint64(uint64(tt.wantTotalStake)), gotTotalStake)
+
 		})
 	}
 }
