@@ -251,7 +251,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumDen:           3,
 		},
 		{
-			name: "multiple validators - equal to threshold - equal weights",
+			name: "multiple validators - equal to threshold - different weights",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
@@ -283,7 +283,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumDen:           2,
 		},
 		{
-			name: "multiple validators - greater than threshold - equal weights",
+			name: "multiple validators - greater than threshold - different weights",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
