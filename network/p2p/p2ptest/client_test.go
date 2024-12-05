@@ -27,13 +27,14 @@ func TestClient_AppGossip(t *testing.T) {
 		},
 	}
 
+	nodeID := ids.GenerateTestNodeID()
 	client := NewSelfClient(
 		t,
 		ctx,
-		ids.GenerateTestNodeID(),
+		nodeID,
 		testHandler,
 	)
-	require.NoError(client.AppGossip(ctx, common.SendConfig{}, []byte("foobar")))
+	require.NoError(client.AppGossip(ctx, common.SendConfig{NodeIDs: set.Of(nodeID)}, []byte("foobar")))
 	<-appGossipChan
 }
 

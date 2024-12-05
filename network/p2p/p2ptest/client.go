@@ -64,10 +64,10 @@ func NewClientWithPeers(
 		peerNetworks[nodeID] = peerNetwork
 	}
 
-	peerSenders[clientNodeID].SendAppGossipF = func(ctx context.Context, _ common.SendConfig, gossipBytes []byte) error {
+	peerSenders[clientNodeID].SendAppGossipF = func(ctx context.Context, sendConfig common.SendConfig, gossipBytes []byte) error {
 		// Send the request asynchronously to avoid deadlock when the server
 		// sends the response back to the client
-		for nodeID := range peers {
+		for nodeID := range sendConfig.NodeIDs {
 			go func() {
 				require.NoError(t, peerNetworks[nodeID].AppGossip(ctx, nodeID, gossipBytes))
 			}()
