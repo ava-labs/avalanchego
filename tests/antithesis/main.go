@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"math/big"
 	"path/filepath"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -31,13 +31,15 @@ import (
 	"github.com/ava-labs/subnet-evm/tests/utils"
 
 	ago_tests "github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	timerpkg "github.com/ava-labs/avalanchego/utils/timer"
 )
 
 const NumKeys = 5
 
 func main() {
-	tc := ago_tests.NewTestContext()
+	logger := ago_tests.NewDefaultLogger("")
+	tc := ago_tests.NewTestContext(logger)
 	defer tc.Cleanup()
 	require := require.New(tc)
 
@@ -60,7 +62,9 @@ func main() {
 	ctx := ago_tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
 
 	require.Len(c.ChainIDs, 1)
-	log.Printf("CHAIN IDS: %v", c.ChainIDs)
+	logger.Info("Starting testing",
+		zap.Strings("chainIDs", c.ChainIDs),
+	)
 	chainID, err := ids.FromString(c.ChainIDs[0])
 	require.NoError(err, "failed to parse chainID")
 
@@ -69,6 +73,7 @@ func main() {
 	genesisKey := tmpnet.HardhatKey.ToECDSA()
 	genesisWorkload := &workload{
 		id:     0,
+		log:    ago_tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
 		client: genesisClient,
 		key:    genesisKey,
 		uris:   c.URIs,
@@ -82,13 +87,14 @@ func main() {
 		key, err := crypto.ToECDSA(crypto.Keccak256([]byte{uint8(i)}))
 		require.NoError(err, "failed to generate key")
 
-		require.NoError(transferFunds(ctx, genesisClient, genesisKey, crypto.PubkeyToAddress(key.PublicKey), initialAmount))
+		require.NoError(transferFunds(ctx, genesisClient, genesisKey, crypto.PubkeyToAddress(key.PublicKey), initialAmount, logger))
 
 		client, err := ethclient.Dial(getChainURI(c.URIs[i%len(c.URIs)], chainID.String()))
 		require.NoError(err, "failed to dial chain")
 
 		workloads[i] = &workload{
 			id:     i,
+			log:    ago_tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
 			client: client,
 			key:    key,
 			uris:   c.URIs,
@@ -109,6 +115,7 @@ func main() {
 type workload struct {
 	id     int
 	client ethclient.Client
+	log    logging.Logger
 	key    *ecdsa.PrivateKey
 	uris   []string
 }
@@ -116,7 +123,7 @@ type workload struct {
 func (w *workload) run(ctx context.Context) {
 	timer := timerpkg.StoppedTimer()
 
-	tc := ago_tests.NewTestContext()
+	tc := ago_tests.NewTestContext(w.log)
 	defer tc.Cleanup()
 	require := require.New(tc)
 
@@ -132,12 +139,14 @@ func (w *workload) run(ctx context.Context) {
 	for {
 		// TODO(marun) Exercise a wider variety of transactions
 		recipientEthAddress := crypto.PubkeyToAddress(w.key.PublicKey)
-		err := transferFunds(ctx, w.client, w.key, recipientEthAddress, txAmount)
+		err := transferFunds(ctx, w.client, w.key, recipientEthAddress, txAmount, w.log)
 		if err != nil {
 			// Log the error and continue since the problem may be
 			// transient. require.NoError is only for errors that should stop
 			// execution.
-			log.Printf("failed to transfer funds: %s", err)
+			w.log.Info("failed to transfer funds",
+				zap.Error(err),
+			)
 		}
 
 		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
@@ -156,7 +165,7 @@ func getChainURI(nodeURI string, blockchainID string) string {
 	return fmt.Sprintf("%s/ext/bc/%s/rpc", nodeURI, blockchainID)
 }
 
-func transferFunds(ctx context.Context, client ethclient.Client, key *ecdsa.PrivateKey, recipientAddress common.Address, txAmount uint64) error {
+func transferFunds(ctx context.Context, client ethclient.Client, key *ecdsa.PrivateKey, recipientAddress common.Address, txAmount uint64, log logging.Logger) error {
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch chainID: %w", err)
@@ -188,17 +197,17 @@ func transferFunds(ctx context.Context, client ethclient.Client, key *ecdsa.Priv
 		return fmt.Errorf("failed to format transaction: %w", err)
 	}
 
-	log.Printf("sending transaction with ID %s and nonce %d\n", tx.Hash(), acceptedNonce)
+	log.Info("sending transaction", zap.Stringer("txID", tx.Hash()), zap.Uint64("nonce", acceptedNonce))
 	err = client.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	log.Printf("waiting for acceptance of transaction with ID %s\n", tx.Hash())
+	log.Info("waiting for acceptance of transaction", zap.Stringer("txID", tx.Hash()))
 	if _, err := bind.WaitMined(ctx, client, tx); err != nil {
 		return fmt.Errorf("failed to wait for receipt: %v", err)
 	}
-	log.Printf("confirmed acceptance of transaction with ID %s\n", tx.Hash())
+	log.Info("confirmed acceptance of transaction", zap.Stringer("txID", tx.Hash()))
 
 	return nil
 }

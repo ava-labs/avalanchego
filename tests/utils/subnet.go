@@ -64,7 +64,7 @@ func CreateSubnetsSuite(genesisFiles map[string]string) *SubnetSuite {
 	// each test case. Each test case has its own subnet, therefore all tests
 	// can run in parallel without any issue.
 	//
-	var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+	_ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		ctx, cancel := context.WithTimeout(context.Background(), BootAvalancheNodeTimeout)
 		defer cancel()
 
@@ -101,7 +101,7 @@ func CreateSubnetsSuite(genesisFiles map[string]string) *SubnetSuite {
 	// SynchronizedAfterSuite() takes two functions, the first runs after each test suite is done and the second
 	// function is executed once when all the tests are done. This function is used
 	// to gracefully shutdown the AvalancheGo node.
-	var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
+	_ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
 		require.NotNil(startCmd)
 		require.NoError(startCmd.Stop())
 	})
@@ -118,11 +118,7 @@ func CreateNewSubnet(ctx context.Context, genesisFilePath string) string {
 
 	// MakeWallet fetches the available UTXOs owned by [kc] on the network
 	// that [LocalAPIURI] is hosting.
-	wallet, err := wallet.MakeWallet(ctx, &wallet.WalletConfig{
-		URI:          DefaultLocalNodeURI,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-	})
+	wallet, err := wallet.MakeWallet(ctx, DefaultLocalNodeURI, kc, kc, wallet.WalletConfig{})
 	require.NoError(err)
 
 	pWallet := wallet.P()
