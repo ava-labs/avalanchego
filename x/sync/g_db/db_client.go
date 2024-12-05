@@ -148,21 +148,6 @@ func (c *DBClient) CommitChangeProof(ctx context.Context, proof *merkledb.Change
 	return err
 }
 
-func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
-	resp, err := c.client.GetProof(ctx, &pb.GetProofRequest{
-		Key: key,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var proof merkledb.Proof
-	if err := proof.UnmarshalProto(resp.Proof); err != nil {
-		return nil, err
-	}
-	return &proof, nil
-}
-
 func (c *DBClient) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
