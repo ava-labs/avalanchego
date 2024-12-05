@@ -287,7 +287,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
 				nodeID1: NewHandler(&testVerifier{}, signer1),
-				nodeID2: NewHandler(&testVerifier{}, signer2),
+				nodeID2: NewHandler(&testVerifier{Errs: []*common.AppError{common.ErrUndefined}}, signer2),
 			},
 			ctx: context.Background(),
 			validators: []*warp.Validator{
@@ -309,9 +309,9 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			},
 			wantTotalStake:      6,
 			wantSigners:         2,
-			wantPossibleSigners: []int{0, 1, 2},
+			wantPossibleSigners: []int{0, 1},
 			wantFinished:        true,
-			quorumNum:           2,
+			quorumNum:           1,
 			quorumDen:           3,
 		},
 		{
