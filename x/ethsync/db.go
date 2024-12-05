@@ -600,7 +600,7 @@ func (db *db) getChangeProof(
 	// 	fmt.Println("--> CHANGE kv", i, hex.EncodeToString(it.Key), hex.EncodeToString(it.Value.Value()))
 	// }
 	startKey := start.Value()
-	if len(startKey) == 0 && len(response.KeyChanges) > 0 {
+	if len(startKey) == 0 && (len(response.KeyChanges) > 0 || end.HasValue()) {
 		startKey = bytes.Repeat([]byte{0}, 32) // XXX
 	}
 
