@@ -462,7 +462,8 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			wantFinished:        true,
 			quorumNum:           1,
 			quorumDen:           1,
-		}}
+		},
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
