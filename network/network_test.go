@@ -175,7 +175,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		require.NoError(t, err)
 		nodeID := ids.NodeIDFromCert(cert)
 
-		blsKey, err := bls.NewSecretKey()
+		blsKey, err := bls.NewSigner()
 		require.NoError(t, err)
 
 		config := defaultConfig

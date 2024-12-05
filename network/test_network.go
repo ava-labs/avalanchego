@@ -96,7 +96,7 @@ func NewTestNetwork(
 		return nil, err
 	}
 
-	blsKey, err := bls.NewSecretKey()
+	blsKey, err := bls.NewSigner()
 	if err != nil {
 		return nil, err
 	}

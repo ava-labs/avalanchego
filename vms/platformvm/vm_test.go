@@ -314,7 +314,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		}
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	// create valid tx
@@ -470,7 +470,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1905,7 +1905,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -2121,7 +2121,7 @@ func TestPruneMempool(t *testing.T) {
 		endTime   = startTime.Add(vm.MinStakeDuration)
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{

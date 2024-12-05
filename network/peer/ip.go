@@ -32,14 +32,14 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner *bls.SecretKey) (*SignedIP, error) {
+func (ip *UnsignedIP) Sign(tlsSigner crypto.Signer, blsSigner bls.Signer) (*SignedIP, error) {
 	ipBytes := ip.bytes()
 	tlsSignature, err := tlsSigner.Sign(
 		rand.Reader,
 		hashing.ComputeHash256(ipBytes),
 		crypto.SHA256,
 	)
-	blsSignature := bls.SignProofOfPossession(blsSigner, ipBytes)
+	blsSignature := blsSigner.SignProofOfPossession(ipBytes)
 	return &SignedIP{
 		UnsignedIP:        *ip,
 		TLSSignature:      tlsSignature,

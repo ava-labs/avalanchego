@@ -39,13 +39,13 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		Upgrades:   upgrades,
 	})
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 	var (
 		subnetID      = ids.GenerateTestID()
 		startTime     = genesistest.DefaultValidatorStartTime
 		endTime       = startTime.Add(24 * time.Hour)
-		pk            = bls.PublicFromSecretKey(sk)
+		pk            = sk.PublicKey()
 		primaryStaker = &state.Staker{
 			TxID:            ids.GenerateTestID(),
 			NodeID:          ids.GenerateTestNodeID(),

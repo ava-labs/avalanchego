@@ -202,7 +202,7 @@ func TestNewPendingStaker(t *testing.T) {
 
 func generateStakerTx(require *require.Assertions) *txs.AddPermissionlessValidatorTx {
 	nodeID := ids.GenerateTestNodeID()
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 	pop := signer.NewProofOfPossession(sk)
 	subnetID := ids.GenerateTestID()

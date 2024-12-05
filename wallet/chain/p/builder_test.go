@@ -581,7 +581,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 		delegationShares       uint32 = reward.PercentDenominator
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	pop := signer.NewProofOfPossession(sk)
@@ -682,9 +682,9 @@ func TestAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 func TestConvertSubnetToL1Tx(t *testing.T) {
-	sk0, err := bls.NewSecretKey()
+	sk0, err := bls.NewSigner()
 	require.NoError(t, err)
-	sk1, err := bls.NewSecretKey()
+	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	var (
@@ -767,7 +767,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 		balance = units.Avax
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 
@@ -808,7 +808,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 	signers := set.NewBits(0)
 
 	unsignedBytes := unsignedWarp.Bytes()
-	sig := bls.Sign(sk, unsignedBytes)
+	sig := sk.Sign(unsignedBytes)
 	sigBytes := [bls.SignatureLen]byte{}
 	copy(sigBytes[:], bls.SignatureToBytes(sig))
 
@@ -890,7 +890,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	warp, err := warp.NewMessage(
@@ -899,10 +899,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
 				bls.SignatureToBytes(
-					bls.Sign(
-						sk,
-						unsignedWarp.Bytes(),
-					),
+					sk.Sign(unsignedWarp.Bytes()),
 				),
 			),
 		},

@@ -41,7 +41,7 @@ func TestProofOfPossession(t *testing.T) {
 func TestNewProofOfPossessionDeterministic(t *testing.T) {
 	require := require.New(t)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	blsPOP0 := NewProofOfPossession(sk)
@@ -60,7 +60,7 @@ func BenchmarkProofOfPossessionVerify(b *testing.B) {
 }
 
 func newProofOfPossession() (*ProofOfPossession, error) {
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	if err != nil {
 		return nil, err
 	}

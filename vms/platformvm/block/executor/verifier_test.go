@@ -1218,11 +1218,11 @@ func TestBlockExecutionWithComplexity(t *testing.T) {
 }
 
 func TestDeactivateLowBalanceL1Validators(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	var (
-		pk      = bls.PublicFromSecretKey(sk)
+		pk      = sk.PublicKey()
 		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
 
 		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {
