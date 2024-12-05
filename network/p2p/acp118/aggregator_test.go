@@ -42,10 +42,18 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 	pk2 := bls.PublicFromSecretKey(sk2)
 	signer2 := warp.NewSigner(sk2, networkID, chainID)
 
+	unsignedMsg, err := warp.NewUnsignedMessage(
+		networkID,
+		chainID,
+		[]byte("payload"),
+	)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name                string
 		peers               map[ids.NodeID]p2p.Handler
 		ctx                 context.Context
+		signature           warp.BitSetSignature
 		validators          []*warp.Validator
 		quorumNum           uint64
 		quorumDen           uint64
@@ -56,8 +64,6 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		wantFinished        bool
 		wantErr             error
 	}{
-		// TODO test message w/ signature
-		// TODO test shared pks
 		{
 			name: "single validator - less than threshold",
 			peers: map[ids.NodeID]p2p.Handler{
@@ -309,6 +315,55 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumDen:           3,
 		},
 		{
+			name: "multiple validators - shared public keys",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{}, signer1),
+				nodeID1: NewHandler(&testVerifier{}, signer1),
+				nodeID2: NewHandler(&testVerifier{}, signer1),
+			},
+			ctx: context.Background(),
+			validators: []*warp.Validator{
+				{
+					PublicKey: pk1,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0, nodeID1, nodeID2},
+				},
+			},
+			wantTotalStake:      1,
+			wantSigners:         1,
+			wantPossibleSigners: []int{0, 1, 2},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
+		},
+		{
+			name: "multiple validators - unique and shared public keys",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID1: NewHandler(&testVerifier{}, signer1),
+				nodeID2: NewHandler(&testVerifier{}, signer1),
+			},
+			ctx: context.Background(),
+			validators: []*warp.Validator{
+				{
+					PublicKey: pk0,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
+				},
+				{
+					PublicKey: pk1,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1, nodeID2},
+				},
+			},
+			wantTotalStake:      2,
+			wantSigners:         1,
+			wantPossibleSigners: []int{0, 1},
+			wantFinished:        true,
+			quorumNum:           2,
+			quorumDen:           3,
+		},
+		{
 			name: "single validator - context canceled",
 			peers: map[ids.NodeID]p2p.Handler{
 				nodeID0: NewHandler(&testVerifier{}, signer0),
@@ -364,7 +419,50 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			quorumNum:      1,
 			quorumDen:      1,
 		},
-	}
+		{
+			name: "multiple validators - resume aggregation on signature",
+			peers: map[ids.NodeID]p2p.Handler{
+				nodeID0: NewHandler(&testVerifier{}, signer0),
+				nodeID1: NewHandler(&testVerifier{}, signer1),
+				nodeID2: NewHandler(&testVerifier{}, signer2),
+			},
+			ctx: context.Background(),
+			signature: func() warp.BitSetSignature {
+				sig := warp.BitSetSignature{
+					Signers:   set.NewBits(0).Bytes(),
+					Signature: [96]byte{},
+				}
+
+				sigBytes, err := signer0.Sign(unsignedMsg)
+				require.NoError(t, err)
+				copy(sig.Signature[:], sigBytes)
+
+				return sig
+			}(),
+			validators: []*warp.Validator{
+				{
+					PublicKey: pk0,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID0},
+				},
+				{
+					PublicKey: pk1,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID1},
+				},
+				{
+					PublicKey: pk2,
+					Weight:    1,
+					NodeIDs:   []ids.NodeID{nodeID2},
+				},
+			},
+			wantTotalStake:      3,
+			wantSigners:         3,
+			wantPossibleSigners: []int{0, 1, 2},
+			wantFinished:        true,
+			quorumNum:           1,
+			quorumDen:           1,
+		}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -377,19 +475,9 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				p2p.NoOpHandler{},
 				tt.peers,
 			)
-
 			aggregator := NewSignatureAggregator(logging.NoLog{}, client)
 
-			unsignedMsg, err := warp.NewUnsignedMessage(
-				networkID,
-				chainID,
-				[]byte("payload"),
-			)
-			require.NoError(err)
-			msg, err := warp.NewMessage(
-				unsignedMsg,
-				&warp.BitSetSignature{Signature: [bls.SignatureLen]byte{}},
-			)
+			msg, err := warp.NewMessage(unsignedMsg, &tt.signature)
 			require.NoError(err)
 
 			gotMsg, gotAggregatedStake, gotTotalStake, finished, err := aggregator.AggregateSignatures(
@@ -407,8 +495,8 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 				return
 			}
 
-			bitSetSignature := gotMsg.Signature.(*warp.BitSetSignature)
-			bitSet := set.BitsFromBytes(bitSetSignature.Signers)
+			gotSignature := gotMsg.Signature.(*warp.BitSetSignature)
+			bitSet := set.BitsFromBytes(gotSignature.Signers)
 			require.Equal(tt.wantSigners, bitSet.Len())
 
 			pks := make([]*bls.PublicKey, 0)
@@ -425,14 +513,13 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			if tt.wantSigners > 0 {
 				aggPk, err := bls.AggregatePublicKeys(pks)
 				require.NoError(err)
-				blsSig, err := bls.SignatureFromBytes(bitSetSignature.Signature[:])
+				blsSig, err := bls.SignatureFromBytes(gotSignature.Signature[:])
 				require.NoError(err)
 				require.True(bls.Verify(aggPk, blsSig, unsignedMsg.Bytes()))
 			}
 
 			require.Equal(new(big.Int).SetUint64(wantAggregatedStake), gotAggregatedStake)
 			require.Equal(new(big.Int).SetUint64(uint64(tt.wantTotalStake)), gotTotalStake)
-
 		})
 	}
 }
