@@ -170,7 +170,7 @@ and initiates a new test when one is found.
 to the available storage of 30GB being insufficient for even state
 sync bootstrap.
  - Self-hosted github workers are not compatible with bootstrap testing
-due to the 5 day maximum duration for a job running on a self-hosted
+due to the 5-day maximum duration for a job running on a self-hosted
 runner. State sync bootstrap usually completes within 5 days, but full
 sync bootstrap usually takes much longer.
 
