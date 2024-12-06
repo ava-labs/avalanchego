@@ -78,8 +78,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		return nil, nil, nil, false, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
-	publicKeysToValidators := make(map[*bls.PublicKey]indexedValidator)
-	nodeIDsToPublicKeys := make(map[ids.NodeID]*bls.PublicKey)
+	nodeIDsToValidator := make(map[ids.NodeID]indexedValidator)
 	// TODO expose concrete type to avoid type casting
 	bitSetSignature, ok := message.Signature.(*warp.BitSetSignature)
 	if !ok {
@@ -88,31 +87,31 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	signerBitSet := set.BitsFromBytes(bitSetSignature.Signers)
 
-	nonSigners := make([]*bls.PublicKey, 0, len(validators))
+	nonSigners := make([]ids.NodeID, 0, len(validators))
 	aggregatedStakeWeight := new(big.Int)
 	totalStakeWeight := new(big.Int)
 	numRequests := 0
-	for i, v := range validators {
-		totalStakeWeight.Add(totalStakeWeight, new(big.Int).SetUint64(v.Weight))
+	for i, validator := range validators {
+		totalStakeWeight.Add(totalStakeWeight, new(big.Int).SetUint64(validator.Weight))
 
 		// Only try to aggregate signatures from validators that are not already in
 		// the signer bit set
 		if signerBitSet.Contains(i) {
-			aggregatedStakeWeight.Add(aggregatedStakeWeight, new(big.Int).SetUint64(v.Weight))
+			aggregatedStakeWeight.Add(aggregatedStakeWeight, new(big.Int).SetUint64(validator.Weight))
 			continue
 		}
 
-		publicKeysToValidators[v.PublicKey] = indexedValidator{
+		v := indexedValidator{
 			Index:     i,
-			Validator: v,
+			Validator: validator,
 		}
 
 		for _, nodeID := range v.NodeIDs {
 			numRequests += 1
-			nodeIDsToPublicKeys[nodeID] = v.PublicKey
+			nodeIDsToValidator[nodeID] = v
 		}
 
-		nonSigners = append(nonSigners, v.PublicKey)
+		nonSigners = append(nonSigners, v.NodeIDs...)
 	}
 
 	// Account for requested signatures + the signature that was provided
@@ -127,17 +126,13 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	results := make(chan result)
 	handler := responseHandler{
-		message:                message,
-		publicKeysToValidators: publicKeysToValidators,
-		nodeIDsToPublicKeys:    nodeIDsToPublicKeys,
-		results:                results,
+		message:             message,
+		nodeIDsToValidators: nodeIDsToValidator,
+		results:             results,
 	}
 
-	for _, pk := range nonSigners {
-		validator := publicKeysToValidators[pk]
-		if err := s.client.AppRequest(ctx, set.Of(validator.NodeIDs...), requestBytes, handler.HandleResponse); err != nil {
-			return nil, nil, nil, false, fmt.Errorf("failed to send aggregation request: %w", err)
-		}
+	if err := s.client.AppRequest(ctx, set.Of(nonSigners...), requestBytes, handler.HandleResponse); err != nil {
+		return nil, nil, nil, false, fmt.Errorf("failed to send aggregation request: %w", err)
 	}
 
 	minThreshold := new(big.Int).Mul(totalStakeWeight, new(big.Int).SetUint64(quorumNum))
@@ -219,10 +214,9 @@ func newWarpMessage(
 }
 
 type responseHandler struct {
-	message                *warp.Message
-	publicKeysToValidators map[*bls.PublicKey]indexedValidator
-	nodeIDsToPublicKeys    map[ids.NodeID]*bls.PublicKey
-	results                chan result
+	message             *warp.Message
+	nodeIDsToValidators map[ids.NodeID]indexedValidator
+	results             chan result
 }
 
 func (r *responseHandler) HandleResponse(
@@ -231,7 +225,7 @@ func (r *responseHandler) HandleResponse(
 	responseBytes []byte,
 	err error,
 ) {
-	validator := r.publicKeysToValidators[r.nodeIDsToPublicKeys[nodeID]]
+	validator := r.nodeIDsToValidators[nodeID]
 	if err != nil {
 		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
 		return
