@@ -135,10 +135,8 @@ func (s *SignatureAggregator) AggregateSignatures(
 
 	for _, pk := range nonSigners {
 		validator := publicKeysToValidators[pk]
-		for _, nodeID := range validator.NodeIDs {
-			if err := s.client.AppRequest(ctx, set.Of(nodeID), requestBytes, handler.HandleResponse); err != nil {
-				return nil, nil, nil, false, fmt.Errorf("failed to send aggregation request: %w", err)
-			}
+		if err := s.client.AppRequest(ctx, set.Of(validator.NodeIDs...), requestBytes, handler.HandleResponse); err != nil {
+			return nil, nil, nil, false, fmt.Errorf("failed to send aggregation request: %w", err)
 		}
 	}
 
