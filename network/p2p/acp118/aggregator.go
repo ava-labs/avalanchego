@@ -90,7 +90,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 	nonSigners := make([]ids.NodeID, 0, len(validators))
 	aggregatedStakeWeight := new(big.Int)
 	totalStakeWeight := new(big.Int)
-	numRequests := 0
 	for i, validator := range validators {
 		totalStakeWeight.Add(totalStakeWeight, new(big.Int).SetUint64(validator.Weight))
 
@@ -107,7 +106,6 @@ func (s *SignatureAggregator) AggregateSignatures(
 		}
 
 		for _, nodeID := range v.NodeIDs {
-			numRequests += 1
 			nodeIDsToValidator[nodeID] = v
 		}
 
@@ -138,7 +136,11 @@ func (s *SignatureAggregator) AggregateSignatures(
 	minThreshold := new(big.Int).Mul(totalStakeWeight, new(big.Int).SetUint64(quorumNum))
 	minThreshold.Div(minThreshold, new(big.Int).SetUint64(quorumDen))
 
-	for i := 0; i < numRequests; i++ {
+	// Block until:
+	// 1. The context is cancelled
+	// 2. We get responses from all validators
+	// 3. The specified security threshold is reached
+	for i := 0; i < len(nonSigners); i++ {
 		select {
 		case <-ctx.Done():
 			// Try to return whatever progress we have if the context is cancelled
@@ -158,6 +160,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 				continue
 			}
 
+			// Validators may share public keys so drop any duplicate signatures
 			if signerBitSet.Contains(result.Validator.Index) {
 				s.log.Debug(
 					"dropping duplicate signature",
