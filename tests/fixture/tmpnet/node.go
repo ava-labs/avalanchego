@@ -267,11 +267,11 @@ func (n *Node) EnsureBLSSigningKey() error {
 	}
 
 	// Generate a new signing key
-	newKey, err := bls.NewSecretKey()
+	newKey, err := bls.NewSigner()
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
-	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(bls.SecretKeyToBytes(newKey))
+	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(newKey.ToBytes())
 	return nil
 }
 
