@@ -1,11 +1,5 @@
 # Release Notes
 
-## Pending Release
-
-### Configs
-
-- Added `Sync` bool option to PebbleDB configs, defaults to `false` i.e `NoSync`
-
 ## [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)
 
 This upgrade consists of the following Avalanche Community Proposals (ACPs):
