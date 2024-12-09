@@ -35,6 +35,8 @@ var (
 
 	errInvalidOperation = errors.New("invalid operation")
 
+	DefaultSyncWrites = true
+
 	DefaultConfig = Config{
 		CacheSize:                   defaultCacheSize,
 		BytesPerSync:                512 * units.KiB,
@@ -51,6 +53,7 @@ type Database struct {
 	pebbleDB      *pebble.DB
 	closed        bool
 	openIterators set.Set[*iter]
+	writeOptions  *pebble.WriteOptions
 }
 
 type Config struct {
@@ -64,7 +67,7 @@ type Config struct {
 }
 
 // TODO: Add metrics
-func New(file string, configBytes []byte, log logging.Logger, _ prometheus.Registerer) (database.Database, error) {
+func New(file string, useSyncWrites bool, configBytes []byte, log logging.Logger, _ prometheus.Registerer) (database.Database, error) {
 	cfg := DefaultConfig
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &cfg); err != nil {
@@ -93,6 +96,7 @@ func New(file string, configBytes []byte, log logging.Logger, _ prometheus.Regis
 	return &Database{
 		pebbleDB:      db,
 		openIterators: set.Set[*iter]{},
+		writeOptions:  &pebble.WriteOptions{Sync: useSyncWrites},
 	}, err
 }
 
@@ -167,7 +171,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.pebbleDB.Set(key, value, pebble.Sync))
+	return updateError(db.pebbleDB.Set(key, value, db.writeOptions))
 }
 
 func (db *Database) Delete(key []byte) error {
@@ -178,7 +182,7 @@ func (db *Database) Delete(key []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.pebbleDB.Delete(key, pebble.Sync))
+	return updateError(db.pebbleDB.Delete(key, db.writeOptions))
 }
 
 func (db *Database) Compact(start []byte, end []byte) error {
