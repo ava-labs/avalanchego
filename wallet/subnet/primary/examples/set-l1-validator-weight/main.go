@@ -97,10 +97,7 @@ func main() {
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
 				bls.SignatureToBytes(
-					bls.Sign(
-						sk,
-						unsignedWarp.Bytes(),
-					),
+					sk.Sign(unsignedWarp.Bytes()),
 				),
 			),
 		},

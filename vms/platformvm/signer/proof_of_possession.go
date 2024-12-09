@@ -28,10 +28,10 @@ type ProofOfPossession struct {
 	publicKey *bls.PublicKey
 }
 
-func NewProofOfPossession(sk *bls.SecretKey) *ProofOfPossession {
-	pk := bls.PublicFromSecretKey(sk)
+func NewProofOfPossession(sk bls.Signer) *ProofOfPossession {
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToCompressedBytes(pk)
-	sig := bls.SignProofOfPossession(sk, pkBytes)
+	sig := sk.SignProofOfPossession(pkBytes)
 	sigBytes := bls.SignatureToBytes(sig)
 
 	pop := &ProofOfPossession{

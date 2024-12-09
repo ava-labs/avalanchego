@@ -22,10 +22,10 @@ func TestPublicKeyFromCompressedBytesWrongSize(t *testing.T) {
 func TestPublicKeyBytes(t *testing.T) {
 	require := require.New(t)
 
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(err)
 
-	pk := PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := PublicKeyToCompressedBytes(pk)
 
 	pk2, err := PublicKeyFromCompressedBytes(pkBytes)
@@ -39,10 +39,10 @@ func TestPublicKeyBytes(t *testing.T) {
 func TestAggregatePublicKeysNoop(t *testing.T) {
 	require := require.New(t)
 
-	sk, err := NewSecretKey()
+	sk, err := NewSigner()
 	require.NoError(err)
 
-	pk := PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := PublicKeyToCompressedBytes(pk)
 
 	aggPK, err := AggregatePublicKeys([]*PublicKey{pk})
