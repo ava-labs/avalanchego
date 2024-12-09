@@ -30,8 +30,6 @@ type Signer interface {
 	PublicKey() *PublicKey
 	Sign(msg []byte) *Signature
 	SignProofOfPossession(msg []byte) *Signature
-	// TODO: delete me
-	ToBytes() []byte
 }
 
 type LocalSigner struct {
@@ -59,7 +57,7 @@ func (s *LocalSigner) ToBytes() []byte {
 
 // SecretKeyFromBytes parses the big-endian format of the secret key into a
 // secret key.
-func SecretKeyFromBytes(skBytes []byte) (Signer, error) {
+func SecretKeyFromBytes(skBytes []byte) (*LocalSigner, error) {
 	sk := new(SecretKey).Deserialize(skBytes)
 	if sk == nil {
 		return nil, errFailedSecretKeyDeserialize
