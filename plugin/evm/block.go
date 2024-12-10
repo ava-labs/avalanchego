@@ -55,7 +55,7 @@ func (b *Block) Accept(context.Context) error {
 
 	// Although returning an error from Accept is considered fatal, it is good
 	// practice to cleanup the batch we were modifying in the case of an error.
-	defer vm.db.Abort()
+	defer vm.versiondb.Abort()
 
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 
@@ -74,7 +74,7 @@ func (b *Block) Accept(context.Context) error {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", b.ID(), err)
 	}
 
-	return b.vm.db.Commit()
+	return b.vm.versiondb.Commit()
 }
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements

@@ -4,6 +4,7 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	avalanchenode "github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -44,7 +46,7 @@ func NewStandaloneDatabase(dbConfig avalanchenode.DatabaseConfig, gatherer metri
 		db = memdb.New()
 	case pebbledb.Name:
 		dbPath := filepath.Join(dbConfig.Path, pebbledb.Name)
-		db, err = pebbledb.New(dbPath, dbConfig.Config, logger, dbRegisterer)
+		db, err = NewPebbleDB(dbPath, dbConfig.Config, logger, dbRegisterer)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
 		}
@@ -76,4 +78,21 @@ func NewStandaloneDatabase(dbConfig avalanchenode.DatabaseConfig, gatherer metri
 	}
 
 	return db, nil
+}
+
+func NewPebbleDB(file string, configBytes []byte, log logging.Logger, dbRegisterer prometheus.Registerer) (database.Database, error) {
+	cfg := pebbledb.DefaultConfig
+	// Use no sync for pebble db
+	cfg.Sync = false
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &cfg); err != nil {
+			return nil, err
+		}
+	}
+	// Marshal the config back to bytes to ensure that new defaults are applied
+	newCfgBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return pebbledb.New(file, newCfgBytes, log, dbRegisterer)
 }

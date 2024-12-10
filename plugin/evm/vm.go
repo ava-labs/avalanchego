@@ -195,14 +195,19 @@ type VM struct {
 	blockChain *core.BlockChain
 	miner      *miner.Miner
 
-	// [db] is the VM's current database managed by ChainState
-	db *versiondb.Database
+	// [versiondb] is the VM's current versioned database
+	versiondb *versiondb.Database
+
+	// [db] is the VM's current database
+	db database.Database
 
 	// metadataDB is used to store one off keys.
 	metadataDB database.Database
 
 	// [chaindb] is the database supplied to the Ethereum backend
 	chaindb ethdb.Database
+
+	usingStandaloneDB bool
 
 	// [acceptedBlockDB] is the database to store the last accepted
 	// block.
@@ -630,7 +635,7 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 		chaindb:              vm.chaindb,
 		metadataDB:           vm.metadataDB,
 		acceptedBlockDB:      vm.acceptedBlockDB,
-		db:                   vm.db,
+		db:                   vm.versiondb,
 		toEngine:             vm.toEngine,
 	})
 
@@ -880,6 +885,13 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 	vm.eth.Stop()
 	log.Info("Ethereum backend stop completed")
+	if vm.usingStandaloneDB {
+		if err := vm.db.Close(); err != nil {
+			log.Error("failed to close database: %w", err)
+		} else {
+			log.Info("Database closed")
+		}
+	}
 	vm.shutdownWg.Wait()
 	log.Info("Subnet-EVM Shutdown completed")
 	return nil
