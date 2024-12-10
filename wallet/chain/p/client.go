@@ -14,7 +14,7 @@ import (
 
 var _ wallet.Client = (*Client)(nil)
 
-const WalletID = 'P'
+const chainAlias = "P"
 
 func NewClient(
 	c platformvm.Client,
@@ -45,7 +45,7 @@ func (c *Client) IssueTx(
 	}
 
 	if f := ops.PostIssuanceHandler(); f != nil {
-		f(WalletID, txID, issuanceDuration)
+		f(chainAlias, txID, issuanceDuration)
 	}
 
 	if ops.AssumeDecided() {
@@ -59,7 +59,7 @@ func (c *Client) IssueTx(
 	issuanceToConfirmationDuration := totalDuration - issuanceDuration
 
 	if f := ops.PostConfirmationHandler(); f != nil {
-		f(WalletID, txID, totalDuration, issuanceToConfirmationDuration)
+		f(chainAlias, txID, totalDuration, issuanceToConfirmationDuration)
 	}
 
 	return c.backend.AcceptTx(ctx, tx)

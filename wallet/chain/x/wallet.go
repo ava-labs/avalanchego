@@ -19,8 +19,6 @@ import (
 
 var _ Wallet = (*wallet)(nil)
 
-const WalletID = 'X'
-
 type Wallet interface {
 	// Builder returns the builder that will be used to create the transactions.
 	Builder() builder.Builder
@@ -305,7 +303,7 @@ func (w *wallet) IssueTx(
 	}
 
 	if f := ops.PostIssuanceHandler(); f != nil {
-		f(WalletID, txID, issuanceDuration)
+		f(common.XChainAlias, txID, issuanceDuration)
 	}
 
 	if ops.AssumeDecided() {
@@ -319,7 +317,7 @@ func (w *wallet) IssueTx(
 	issuanceToConfirmationDuration := totalDuration - issuanceDuration
 
 	if f := ops.PostConfirmationHandler(); f != nil {
-		f(WalletID, txID, totalDuration, issuanceToConfirmationDuration)
+		f(common.XChainAlias, txID, totalDuration, issuanceToConfirmationDuration)
 	}
 
 	return w.backend.AcceptTx(ctx, tx)
