@@ -89,6 +89,7 @@ func New(file string, useSyncWrites bool, configBytes []byte, log logging.Logger
 
 	log.Info(
 		"opening pebble",
+		zap.Bool("useSyncWrites", useSyncWrites),
 		zap.Reflect("config", cfg),
 	)
 
