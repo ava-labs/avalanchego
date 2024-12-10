@@ -781,7 +781,7 @@ func (n *Node) initDatabase() error {
 		n.DB = memdb.New()
 	case pebbledb.Name:
 		dbPath := filepath.Join(n.Config.DatabaseConfig.Path, "pebble")
-		n.DB, err = pebbledb.New(dbPath, pebbledb.DefaultSyncWrites, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
+		n.DB, err = pebbledb.New(dbPath, n.Config.DatabaseConfig.Config, n.Log, dbRegisterer)
 		if err != nil {
 			return fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
 		}
