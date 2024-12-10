@@ -8,12 +8,12 @@ import (
 	"math/big"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -22,8 +22,8 @@ type PrimaryChainAlias string
 
 const (
 	PChainAlias PrimaryChainAlias = "P"
-	XChainAlias                   = "X"
-	CChainAlias                   = "C"
+	XChainAlias PrimaryChainAlias = "X"
+	CChainAlias PrimaryChainAlias = "C"
 
 	defaultPollFrequency = 100 * time.Millisecond
 )
