@@ -129,7 +129,7 @@ func (c *client) IssueTx(
 	ops := common.NewOptions(options)
 	if f := ops.PostIssuanceHandler(); f != nil {
 		txID := tx.ID()
-		f('P', txID, time.Duration(0))
+		f(common.PChainAlias, txID, time.Duration(0))
 	}
 	ctx := ops.Context()
 	return c.backend.AcceptTx(ctx, tx)

@@ -9,18 +9,29 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const defaultPollFrequency = 100 * time.Millisecond
+type PrimaryChainAlias string
+
+const (
+	PChainAlias PrimaryChainAlias = "P"
+	XChainAlias                   = "X"
+	CChainAlias                   = "C"
+
+	defaultPollFrequency = 100 * time.Millisecond
+)
 
 // Signature of the function that will be called after a transaction has been issued.
 type TxIssuanceHandler func(
-	// Identifies the primary chain ('P', 'X' or 'C')
-	chainChar rune,
+	// Identifies the primary chain ("P", "X" or "C")
+	chainAlias PrimaryChainAlias,
 	// ID of the confirmed transaction
 	txID ids.ID,
 	// The time from initiation to issuance
@@ -29,8 +40,8 @@ type TxIssuanceHandler func(
 
 // Signature of the function that will be called after a transaction has been confirmed.
 type TxConfirmationHandler func(
-	// Identifies the primary chain ('P', 'X' or 'C')
-	chainChar rune,
+	// Identifies the primary chain ("P", "X" or "C")
+	chainAlias PrimaryChainAlias,
 	// ID of the confirmed transaction
 	txID ids.ID,
 	// The time from initiation to confirmation (includes duration of issuance)
@@ -232,5 +243,29 @@ func WithPostIssuanceHandler(f TxIssuanceHandler) Option {
 func WithPostConfirmationHandler(f TxConfirmationHandler) Option {
 	return func(o *Options) {
 		o.postConfirmationHandler = f
+	}
+}
+
+func WithLoggedIssuranceAndConfirmation(log logging.Logger) Option {
+	return func(o *Options) {
+		WithPostIssuanceHandler(
+			func(chainAlias PrimaryChainAlias, txID ids.ID, duration time.Duration) {
+				log.Info("issued transaction",
+					zap.String("chainAlias", string(chainAlias)),
+					zap.Stringer("txID", txID),
+					zap.Duration("duration", duration),
+				)
+			},
+		)(o)
+		WithPostConfirmationHandler(
+			func(chainAlias PrimaryChainAlias, txID ids.ID, totalDuration time.Duration, issuanceToConfirmationDuration time.Duration) {
+				log.Info("confirmed transaction",
+					zap.String("chainAlias", string(chainAlias)),
+					zap.Stringer("txID", txID),
+					zap.Duration("totalDuration", totalDuration),
+					zap.Duration("issuanceToConfirmationDuration", issuanceToConfirmationDuration),
+				)
+			},
+		)(o)
 	}
 }
