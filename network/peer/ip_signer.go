@@ -18,7 +18,7 @@ type IPSigner struct {
 	ip        *utils.Atomic[netip.AddrPort]
 	clock     mockable.Clock
 	tlsSigner crypto.Signer
-	blsSigner *bls.SecretKey
+	blsSigner bls.Signer
 
 	// Must be held while accessing [signedIP]
 	signedIPLock sync.RWMutex
@@ -30,7 +30,7 @@ type IPSigner struct {
 func NewIPSigner(
 	ip *utils.Atomic[netip.AddrPort],
 	tlsSigner crypto.Signer,
-	blsSigner *bls.SecretKey,
+	blsSigner bls.Signer,
 ) *IPSigner {
 	return &IPSigner{
 		ip:        ip,
