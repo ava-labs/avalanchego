@@ -50,6 +50,14 @@ type TxConfirmationHandler func(
 	issuanceToConfirmationDuration time.Duration,
 )
 
+// Signature of function that can wrap a transaction issuance function
+// to enable e.g. retries on recoverable errors.
+type IssuanceWrapperFunc func(func() (ids.ID, error)) (ids.ID, error)
+
+// Signature of function that can wrap a transaction acceptance
+// function to enable e.g. retries on recoverable errors.
+type AcceptanceWrapperFunc func(func() error) error
+
 type Option func(*Options)
 
 type Options struct {
@@ -79,6 +87,13 @@ type Options struct {
 
 	postIssuanceHandler     TxIssuanceHandler
 	postConfirmationHandler TxConfirmationHandler
+
+	verificationURIs []string
+
+	log logging.Logger
+
+	issuanceWrapper   IssuanceWrapperFunc
+	acceptanceWrapper AcceptanceWrapperFunc
 }
 
 func NewOptions(ops []Option) *Options {
@@ -168,6 +183,35 @@ func (o *Options) PostIssuanceHandler() TxIssuanceHandler {
 
 func (o *Options) PostConfirmationHandler() TxConfirmationHandler {
 	return o.postConfirmationHandler
+}
+
+func (o *Options) VerificationURIs() []string {
+	return o.verificationURIs
+}
+
+func (o *Options) Log() logging.Logger {
+	if o.log == nil {
+		return logging.NoLog{}
+	}
+	return o.log
+}
+
+func (o *Options) IssuanceWrapper() IssuanceWrapperFunc {
+	if o.issuanceWrapper != nil {
+		return func(issueFunc func() (ids.ID, error)) (ids.ID, error) {
+			return issueFunc()
+		}
+	}
+	return o.issuanceWrapper
+}
+
+func (o *Options) AcceptanceWrapper() AcceptanceWrapperFunc {
+	if o.acceptanceWrapper != nil {
+		return func(awaitFunc func() error) error {
+			return awaitFunc()
+		}
+	}
+	return o.acceptanceWrapper
 }
 
 func WithContext(ctx context.Context) Option {
@@ -267,5 +311,29 @@ func WithLoggedIssuranceAndConfirmation(log logging.Logger) Option {
 				)
 			},
 		)(o)
+	}
+}
+
+func WithVerificationURIs(uris []string) Option {
+	return func(o *Options) {
+		o.verificationURIs = uris
+	}
+}
+
+func WithLog(log logging.Logger) Option {
+	return func(o *Options) {
+		o.log = log
+	}
+}
+
+func WithIssuanceWrapper(wrapper IssuanceWrapperFunc) Option {
+	return func(o *Options) {
+		o.issuanceWrapper = wrapper
+	}
+}
+
+func WithAwaitWrapper(wrapper AcceptanceWrapperFunc) Option {
+	return func(o *Options) {
+		o.acceptanceWrapper = wrapper
 	}
 }

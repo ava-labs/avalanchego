@@ -20,7 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-const bootstrapIndex = 0
+const (
+	bootstrapIndex = 0
+	workloadName   = "workload"
+)
 
 var (
 	errTargetPathEnvVarNotSet = errors.New("TARGET_PATH environment variable not set")
@@ -44,27 +47,19 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtim
 		return errImageTagEnvVarNotSet
 	}
 
-	// Subnet testing requires creating an initial db state for the bootstrap node
-	if len(network.Subnets) > 0 {
-		avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
-		if len(avalancheGoPath) == 0 {
-			return errAvalancheGoEvVarNotSet
-		}
+	avalancheGoPath := os.Getenv(tmpnet.AvalancheGoPathEnvName)
+	if len(avalancheGoPath) == 0 {
+		return errAvalancheGoEvVarNotSet
+	}
+	// Plugin dir configured here is only used for initializing the bootstrap db.
+	pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
+	if len(pluginDir) == 0 {
+		return errPluginDirEnvVarNotSet
+	}
 
-		// Plugin dir configured here is only used for initializing the bootstrap db.
-		pluginDir := os.Getenv(tmpnet.AvalancheGoPluginDirEnvName)
-		if len(pluginDir) == 0 {
-			return errPluginDirEnvVarNotSet
-		}
-
-		bootstrapVolumePath, err := getBootstrapVolumePath(targetPath)
-		if err != nil {
-			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
-		}
-
-		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
-			return fmt.Errorf("failed to initialize db volumes: %w", err)
-		}
+	// Copy network configuration and database to the compose volume paths.
+	if err := initVolumes(network, avalancheGoPath, pluginDir, targetPath); err != nil {
+		return fmt.Errorf("failed to initialize network data: %w", err)
 	}
 
 	nodeImageName := fmt.Sprintf("%s-node:%s", baseImageName, imageTag)
@@ -291,7 +286,7 @@ func keyMapToEnvVarMap(keyMap types.Mapping) types.Mapping {
 }
 
 // Retrieve the service name for a node at the given index. Common to
-// GenerateComposeConfig and InitDBVolumes to ensure consistency
+// GenerateComposeConfig and initVolumes to ensure consistency
 // between db volumes configuration and volume paths.
 func getServiceName(index int) string {
 	baseName := "avalanche"

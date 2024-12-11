@@ -66,14 +66,15 @@ func main() {
 
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 	walletSyncStartTime := time.Now()
-	wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: c.URIs[0]})
+	genesisLog := tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0))
+	wallet := newWallet(tc, genesisLog, kc, c.URIs[0], c.URIs)
 	tc.Log().Info("synced wallet",
 		zap.Duration("duration", time.Since(walletSyncStartTime)),
 	)
 
 	genesisWorkload := &workload{
 		id:     0,
-		log:    tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
+		log:    genesisLog,
 		wallet: wallet,
 		addrs:  set.Of(genesis.EWOQKey.Address()),
 		uris:   c.URIs,
@@ -121,14 +122,15 @@ func main() {
 		uri := c.URIs[i%len(c.URIs)]
 		kc := secp256k1fx.NewKeychain(key)
 		walletSyncStartTime := time.Now()
-		wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: uri})
+		workloadLog := tests.NewDefaultLogger(fmt.Sprintf("worker %d", i))
+		wallet := newWallet(tc, workloadLog, kc, uri, c.URIs)
 		tc.Log().Info("synced wallet",
 			zap.Duration("duration", time.Since(walletSyncStartTime)),
 		)
 
 		workloads[i] = &workload{
 			id:     i,
-			log:    tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
+			log:    workloadLog,
 			wallet: wallet,
 			addrs:  set.Of(addr),
 			uris:   c.URIs,
@@ -144,6 +146,16 @@ func main() {
 		go w.run(ctx)
 	}
 	genesisWorkload.run(ctx)
+}
+
+func newWallet(tc tests.TestContext, log logging.Logger, keychain *secp256k1fx.Keychain, nodeURI string, uris []string) *primary.Wallet {
+	wallet := e2e.NewWallet(tc, log, keychain, tmpnet.NodeURI{URI: nodeURI})
+	// Add options to ensure verification against all nodes with logging
+	return primary.NewWalletWithOptions(
+		wallet,
+		common.WithVerificationURIs(uris),
+		common.WithLog(log),
+	)
 }
 
 type workload struct {
@@ -245,6 +257,7 @@ func (w *workload) executeTest(ctx context.Context) {
 	case 5:
 		w.log.Info("executing banff.TestCustomAssetTransfer")
 		addr, _ := w.addrs.Peek()
+		// TODO(marun) need to supply node URIs
 		banff.TestCustomAssetTransfer(tc, *w.wallet, addr)
 	case 6:
 		w.log.Info("sleeping")

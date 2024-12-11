@@ -4,9 +4,14 @@
 package x
 
 import (
+	"context"
+	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -150,6 +155,7 @@ func NewWallet(
 		builder: builder,
 		signer:  signer,
 		client:  client,
+		log:     logging.NoLog{},
 	}
 }
 
@@ -158,6 +164,7 @@ type wallet struct {
 	builder builder.Builder
 	signer  signer.Signer
 	client  avm.Client
+	log     logging.Logger
 }
 
 func (w *wallet) Builder() builder.Builder {
@@ -296,7 +303,13 @@ func (w *wallet) IssueTx(
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	startTime := time.Now()
-	txID, err := w.client.IssueTx(ctx, tx.Bytes())
+	// TODO(marun) Connectivity problems possible
+	// - how to determine if an error is related to connectivity?
+	// - how to retry if a connectivity problem is detected?
+	txID, err := ops.IssuanceWrapper()(func() (ids.ID, error) {
+		return w.client.IssueTx(ctx, tx.Bytes())
+	})
+	// TODO(marun) How to account for retries?
 	issuanceDuration := time.Since(startTime)
 	if err != nil {
 		return err
@@ -310,9 +323,20 @@ func (w *wallet) IssueTx(
 		return w.backend.AcceptTx(ctx, tx)
 	}
 
-	if err := avm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency()); err != nil {
-		return err
+	if uris := ops.VerificationURIs(); len(uris) == 0 {
+		// Default case - wait for acceptance on only the API node.
+		if err := ops.AcceptanceWrapper()(func() error {
+			return avm.AwaitTxAccepted(w.client, ctx, txID, ops.PollFrequency())
+		}); err != nil {
+			return err
+		}
+	} else {
+		// Verify the transaction more extensively against the provided URIs
+		if err := w.awaitTxAccepted(ctx, txID, uris, ops); err != nil {
+			return err
+		}
 	}
+	// TODO(marun) How to account for retries?
 	totalDuration := time.Since(startTime)
 	issuanceToConfirmationDuration := totalDuration - issuanceDuration
 
@@ -321,4 +345,28 @@ func (w *wallet) IssueTx(
 	}
 
 	return w.backend.AcceptTx(ctx, tx)
+}
+
+// Verify the acceptance of the transaction on the provided URIs.
+func (w *wallet) awaitTxAccepted(ctx context.Context, txID ids.ID, uris []string, ops *common.Options) error {
+	log := ops.Log()
+
+	acceptanceWrapper := ops.AcceptanceWrapper()
+	for _, uri := range uris {
+		client := avm.NewClient(uri, "X")
+		if err := acceptanceWrapper(func() error {
+			return avm.AwaitTxAccepted(client, ctx, txID, ops.PollFrequency())
+		}); err != nil {
+			return fmt.Errorf("failed to confirm X-chain transaction %s on %s: %w", txID, uri, err)
+		}
+		log.Info("confirmed X-chain transaction",
+			zap.Stringer("txID", txID),
+			zap.String("uri", uri),
+		)
+	}
+	log.Info("confirmed X-chain transaction",
+		zap.Stringer("txID", txID),
+	)
+
+	return nil
 }

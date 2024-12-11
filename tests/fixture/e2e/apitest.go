@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 // TODO(marun) What else does a test need? e.g. node URIs?
@@ -18,7 +19,17 @@ func ExecuteAPITest(apiTest APITestFunction) {
 	tc := NewTestContext()
 	env := GetEnv(tc)
 	keychain := env.NewKeychain()
-	wallet := NewWallet(tc, keychain, env.GetRandomNodeURI())
+	log := tc.Log()
+	wallet := NewWallet(tc, log, keychain, env.GetRandomNodeURI())
+	uris := make([]string, len(env.URIs))
+	for i, uri := range env.URIs {
+		uris[i] = uri.URI
+	}
+	wallet = primary.NewWalletWithOptions(
+		wallet,
+		common.WithVerificationURIs(uris),
+		common.WithLog(log),
+	)
 	apiTest(tc, *wallet, keychain.Keys[0].Address())
 	_ = CheckBootstrapIsPossible(tc, env.GetNetwork())
 }
