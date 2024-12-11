@@ -225,7 +225,7 @@ pub struct Proposal<'p> {
 }
 
 #[async_trait]
-impl<'a> api::DbView for Proposal<'a> {
+impl api::DbView for Proposal<'_> {
     type Stream<'b>
         = MerkleKeyValueStream<'b, NodeStore<Arc<ImmutableProposal>, FileBacked>>
     where

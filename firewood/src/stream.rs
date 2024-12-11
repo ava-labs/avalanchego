@@ -74,7 +74,7 @@ impl From<Key> for NodeStreamState {
     }
 }
 
-impl<'a, T: TrieReader> FusedStream for MerkleNodeStream<'a, T> {
+impl<T: TrieReader> FusedStream for MerkleNodeStream<'_, T> {
     fn is_terminated(&self) -> bool {
         // The top of `iter_stack` is the next node to return.
         // If `iter_stack` is empty, there are no more nodes to visit.
@@ -93,7 +93,7 @@ impl<'a, T: TrieReader> MerkleNodeStream<'a, T> {
     }
 }
 
-impl<'a, T: TrieReader> Stream for MerkleNodeStream<'a, T> {
+impl<T: TrieReader> Stream for MerkleNodeStream<'_, T> {
     type Item = Result<(Key, Arc<Node>), api::Error>;
 
     fn poll_next(
@@ -271,13 +271,13 @@ enum MerkleKeyValueStreamState<'a, T> {
     Initialized { node_iter: MerkleNodeStream<'a, T> },
 }
 
-impl<'a, T, K: AsRef<[u8]>> From<K> for MerkleKeyValueStreamState<'a, T> {
+impl<T, K: AsRef<[u8]>> From<K> for MerkleKeyValueStreamState<'_, T> {
     fn from(key: K) -> Self {
         Self::_Uninitialized(key.as_ref().into())
     }
 }
 
-impl<'a, T: TrieReader> MerkleKeyValueStreamState<'a, T> {
+impl<T: TrieReader> MerkleKeyValueStreamState<'_, T> {
     /// Returns a new iterator that will iterate over all the key-value pairs in `merkle`.
     fn _new() -> Self {
         Self::_Uninitialized(Box::new([]))
@@ -300,7 +300,7 @@ impl<'a, T: TrieReader> From<&'a T> for MerkleKeyValueStream<'a, T> {
     }
 }
 
-impl<'a, T: TrieReader> FusedStream for MerkleKeyValueStream<'a, T> {
+impl<T: TrieReader> FusedStream for MerkleKeyValueStream<'_, T> {
     fn is_terminated(&self) -> bool {
         matches!(&self.state, MerkleKeyValueStreamState::Initialized { node_iter } if node_iter.is_terminated())
     }
@@ -317,7 +317,7 @@ impl<'a, T: TrieReader> MerkleKeyValueStream<'a, T> {
     }
 }
 
-impl<'a, T: TrieReader> Stream for MerkleKeyValueStream<'a, T> {
+impl<T: TrieReader> Stream for MerkleKeyValueStream<'_, T> {
     type Item = Result<(Key, Value), api::Error>;
 
     fn poll_next(
@@ -410,7 +410,7 @@ impl<'a, 'b, T: TrieReader> PathIterator<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T: TrieReader> Iterator for PathIterator<'a, 'b, T> {
+impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
     type Item = Result<PathIterItem, MerkleError>;
 
     fn next(&mut self) -> Option<Self::Item> {

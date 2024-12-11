@@ -37,7 +37,6 @@ pub trait ReadableStorage: Debug + Sync + Send {
     /// # Returns
     ///
     /// A `Result` containing a boxed `Read` trait object, or an `Error` if the operation fails.
-
     fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, Error>;
 
     /// Return the size of the underlying storage, in bytes

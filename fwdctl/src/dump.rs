@@ -69,5 +69,5 @@ fn u8_to_string(data: &[u8]) -> Cow<'_, str> {
 }
 
 fn key_parser(s: &str) -> Result<Box<[u8]>, std::io::Error> {
-    return Ok(Box::from(s.as_bytes()));
+    Ok(Box::from(s.as_bytes()))
 }

@@ -167,7 +167,6 @@ fn area_size_to_index(n: u64) -> Result<AreaIndex, Error> {
 pub type LinearAddress = NonZeroU64;
 
 /// Each [StoredArea] contains an [Area] which is either a [Node] or a [FreeArea].
-
 #[repr(u8)]
 #[derive(PartialEq, Eq, Clone, Debug, Deserialize, Serialize)]
 enum Area<T, U> {
@@ -600,7 +599,6 @@ impl NodeStoreHeader {
     /// The first SIZE bytes of the ReadableStorage are reserved for the
     /// [NodeStoreHeader].
     /// We also want it aligned to a disk block
-
     const SIZE: u64 = 2048;
 
     /// Number of extra bytes to write on the first creation of the NodeStoreHeader

@@ -107,7 +107,10 @@ impl<T> Proposal<T> {
 #[async_trait]
 impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
     // TODO: Replace with the correct stream type for an in-memory proposal implementation
-    type Stream<'a> = Empty<Result<(Box<[u8]>, Vec<u8>), api::Error>> where T: 'a;
+    type Stream<'a>
+        = Empty<Result<(Box<[u8]>, Vec<u8>), api::Error>>
+    where
+        T: 'a;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
         todo!();

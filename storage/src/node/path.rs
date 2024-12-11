@@ -152,9 +152,9 @@ pub struct NibblesIterator<'a> {
     tail: usize,
 }
 
-impl<'a> FusedIterator for NibblesIterator<'a> {}
+impl FusedIterator for NibblesIterator<'_> {}
 
-impl<'a> Iterator for NibblesIterator<'a> {
+impl Iterator for NibblesIterator<'_> {
     type Item = u8;
 
     #[cfg(feature = "branch_factor_256")]
@@ -216,7 +216,7 @@ impl<'a> NibblesIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for NibblesIterator<'a> {
+impl DoubleEndedIterator for NibblesIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.is_empty() {
             return None;

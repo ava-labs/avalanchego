@@ -81,7 +81,7 @@ impl<'de> Deserialize<'de> for TrieHash {
 
 struct TrieVisitor;
 
-impl<'de> Visitor<'de> for TrieVisitor {
+impl Visitor<'_> for TrieVisitor {
     type Value = TrieHash;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
