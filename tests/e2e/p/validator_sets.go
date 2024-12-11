@@ -9,6 +9,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 var _ = e2e.DescribePChain("[Validator Sets]", func() {
@@ -95,13 +98,15 @@ var _ = e2e.DescribePChain("[Validator Sets]", func() {
 			}
 
 			for height := uint64(0); height <= currentPChainHeight; height++ {
-				tc.Outf(" checked validator sets for height %d\n", height)
+				tc.Log().Info("checked validator sets",
+					zap.Uint64("height", height),
+				)
 				var observedValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
 				for _, pvmClient := range pvmClients {
 					validatorSet, err := pvmClient.GetValidatorsAt(
 						tc.DefaultContext(),
 						constants.PrimaryNetworkID,
-						height,
+						platformapi.Height(height),
 					)
 					require.NoError(err)
 					if observedValidatorSet == nil {

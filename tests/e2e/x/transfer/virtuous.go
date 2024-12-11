@@ -5,13 +5,13 @@
 package transfer
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
@@ -116,7 +116,9 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 			require.NoError(err)
 
 			runFunc := func(round int) {
-				tc.Outf("{{green}}\n\n\n\n\n\n---\n[ROUND #%02d]:{{/}}\n", round)
+				tc.Log().Info("starting new round",
+					zap.Int("round", round),
+				)
 
 				needPermute := round > 3
 				if needPermute {
@@ -133,7 +135,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				xContext := xBuilder.Context()
 				avaxAssetID := xContext.AVAXAssetID
 
-				wallets := make([]primary.Wallet, len(testKeys))
+				wallets := make([]*primary.Wallet, len(testKeys))
 				shortAddrs := make([]ids.ShortID, len(testKeys))
 				for i := range wallets {
 					shortAddrs[i] = testKeys[i].PublicKey().Address()
@@ -153,7 +155,11 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				require.NoError(err)
 				for _, uri := range rpcEps {
 					for _, metric := range []string{blksProcessingMetric, blksAcceptedMetric} {
-						tc.Outf("{{green}}%s at %q:{{/}} %v\n", metric, uri, metricsBeforeTx[uri][metric])
+						tc.Log().Info("metric before tx",
+							zap.String("metric", metric),
+							zap.String("uri", uri),
+							zap.Any("value", metricsBeforeTx[uri][metric]),
+						)
 					}
 				}
 
@@ -165,10 +171,9 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					bal := balances[avaxAssetID]
 					testBalances = append(testBalances, bal)
 
-					fmt.Printf(`CURRENT BALANCE %21d AVAX (SHORT ADDRESS %q)
-`,
-						bal,
-						testKeys[i].PublicKey().Address(),
+					tc.Log().Info("balance in AVAX",
+						zap.Uint64("balance", bal),
+						zap.Stringer("address", testKeys[i].PublicKey().Address()),
 					)
 				}
 				fromIdx := -1
@@ -218,27 +223,14 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					require.Contains(err.Error(), "insufficient funds")
 				})
 
-				fmt.Printf(`===
-TRANSFERRING
-
-FROM [%q]
-SENDER    CURRENT BALANCE     : %21d AVAX
-SENDER    NEW BALANCE (AFTER) : %21d AVAX
-
-TRANSFER AMOUNT FROM SENDER   : %21d AVAX
-
-TO [%q]
-RECEIVER  CURRENT BALANCE     : %21d AVAX
-RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
-===
-`,
-					shortAddrs[fromIdx],
-					senderOrigBal,
-					senderNewBal,
-					amountToTransfer,
-					shortAddrs[toIdx],
-					receiverOrigBal,
-					receiverNewBal,
+				tc.Log().Info("issuing transfer",
+					zap.Stringer("sender", shortAddrs[fromIdx]),
+					zap.Uint64("senderOriginalBalance", senderOrigBal),
+					zap.Uint64("senderNewBalance", senderNewBal),
+					zap.Uint64("amountToTransfer", amountToTransfer),
+					zap.Stringer("receiver", shortAddrs[toIdx]),
+					zap.Uint64("receiverOriginalBalance", receiverOrigBal),
+					zap.Uint64("receiverNewBalance", receiverNewBal),
 				)
 
 				tx, err := wallets[fromIdx].X().IssueBaseTx(
@@ -261,12 +253,16 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				balances, err := wallets[fromIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
 				senderCurBalX := balances[avaxAssetID]
-				tc.Outf("{{green}}first wallet balance:{{/}}  %d\n", senderCurBalX)
+				tc.Log().Info("first wallet balance",
+					zap.Uint64("balance", senderCurBalX),
+				)
 
 				balances, err = wallets[toIdx].X().Builder().GetFTBalance()
 				require.NoError(err)
 				receiverCurBalX := balances[avaxAssetID]
-				tc.Outf("{{green}}second wallet balance:{{/}} %d\n", receiverCurBalX)
+				tc.Log().Info("second wallet balance",
+					zap.Uint64("balance", receiverCurBalX),
+				)
 
 				require.Equal(senderCurBalX, senderNewBal)
 				require.Equal(receiverCurBalX, receiverNewBal)
@@ -305,5 +301,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				runFunc(i)
 				time.Sleep(time.Second)
 			}
+
+			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 		})
 })

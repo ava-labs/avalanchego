@@ -12,6 +12,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
@@ -102,27 +103,31 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			var err error
 			network, err = tmpnet.ReadNetwork(networkDir)
 			require.NoError(err)
-			tc.Outf("{{yellow}}Loaded a network configured at %s{{/}}\n", network.Dir)
+			tc.Log().Info("loaded a network",
+				zap.String("networkDir", networkDir),
+			)
 		}
 
 		if flagVars.StopNetwork() {
 			if len(networkSymlink) > 0 {
 				// Remove the symlink to avoid attempts to reuse the stopped network
-				tc.Outf("Removing symlink %s\n", networkSymlink)
+				tc.Log().Info("removing symlink",
+					zap.String("path", networkSymlink),
+				)
 				if err := os.Remove(networkSymlink); !errors.Is(err, os.ErrNotExist) {
 					require.NoError(err)
 				}
 			}
 			if network != nil {
-				tc.Outf("Stopping network\n")
+				tc.Log().Info("stopping network")
 				require.NoError(network.Stop(tc.DefaultContext()))
 			} else {
-				tc.Outf("No network to stop\n")
+				tc.Log().Warn("no network to stop")
 			}
 			os.Exit(0)
 		} else if network != nil && flagVars.RestartNetwork() {
 			// A network is only restarted if it is already running and stop was not requested
-			require.NoError(network.Restart(tc.DefaultContext(), tc.GetWriter()))
+			require.NoError(network.Restart(tc.DefaultContext(), tc.Log()))
 		}
 	}
 
@@ -135,6 +140,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			flagVars.AvalancheGoExecPath(),
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
+			flagVars.StartNetwork(),
 			flagVars.ReuseNetwork(),
 		)
 
@@ -158,6 +164,10 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}, DefaultTimeout, DefaultPollingInterval, "failed to see all chains bootstrap before timeout")
 	}
 
+	if flagVars.StartNetwork() {
+		os.Exit(0)
+	}
+
 	suiteConfig, _ := ginkgo.GinkgoConfiguration()
 	require.Greater(
 		len(network.PreFundedKeys),
@@ -167,7 +177,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
-	tc.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
+	tc.Log().Info("network nodes are available",
+		zap.Any("uris", uris),
+	)
 
 	return &TestEnvironment{
 		NetworkDir:                  network.Dir,
@@ -182,7 +194,10 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	te.testContext.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	te.testContext.Log().Info("targeting random node",
+		zap.Stringer("nodeID", nodeURI.NodeID),
+		zap.String("uri", nodeURI.URI),
+	)
 	return nodeURI
 }
 
@@ -214,6 +229,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
 		pluginDir,
 		te.PrivateNetworkShutdownDelay,
+		false, /* skipShutdown */
 		false, /* reuseNetwork */
 	)
 }

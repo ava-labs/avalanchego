@@ -33,30 +33,28 @@ func main() {
 
 	ctx := context.Background()
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		uri,
+		kc,
+		primary.WalletConfig{},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-	pBuilder := pWallet.Builder()
-	pContext := pBuilder.Context()
-	avaxAssetID := pContext.AVAXAssetID
+	// Get the chain context
+	context := wallet.Builder().Context()
 
 	issueTxStartTime := time.Now()
-	tx, err := pWallet.IssueBaseTx([]*avax.TransferableOutput{
+	tx, err := wallet.IssueBaseTx([]*avax.TransferableOutput{
 		{
 			Asset: avax.Asset{
-				ID: avaxAssetID,
+				ID: context.AVAXAssetID,
 			},
 			Out: &stakeable.LockOut{
 				Locktime: locktime,

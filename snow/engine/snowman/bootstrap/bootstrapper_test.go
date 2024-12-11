@@ -98,12 +98,11 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *blocktest
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        vdrs,
-		SampleK:                        vdrs.Count(ctx.SubnetID),
+		SampleK:                        vdrs.NumValidators(ctx.SubnetID),
 		StartupTracker:                 startupTracker,
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &enginetest.Timer{},
 		AncestorsMaxContainersReceived: 2000,
 		DB:                             memdb.New(),
 		VM:                             vm,
@@ -155,7 +154,6 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
 		BootstrapTracker:               &enginetest.BootstrapTracker{},
-		Timer:                          &enginetest.Timer{},
 		AncestorsMaxContainersReceived: 2000,
 		DB:                             memdb.New(),
 		VM:                             vm,
@@ -180,6 +178,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	}
 	bs, err := New(cfg, dummyCallback)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	vm.CantSetState = false
 	vm.CantConnected = true
@@ -236,6 +235,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -264,6 +264,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -309,6 +310,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -359,6 +361,7 @@ func TestBootstrapperEmptyResponse(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -407,6 +410,7 @@ func TestBootstrapperAncestors(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -452,6 +456,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -494,6 +499,7 @@ func TestRestartBootstrapping(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -558,6 +564,7 @@ func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -598,6 +605,7 @@ func TestBootstrapContinueAfterHalt(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	getBlockF := vm.GetBlockF
 	vm.GetBlockF = func(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
@@ -685,12 +693,11 @@ func TestBootstrapNoParseOnNew(t *testing.T) {
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            ctx,
 		Beacons:                        peers,
-		SampleK:                        peers.Count(ctx.SubnetID),
+		SampleK:                        peers.NumValidators(ctx.SubnetID),
 		StartupTracker:                 startupTracker,
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
-		Timer:                          &enginetest.Timer{},
 		AncestorsMaxContainersReceived: 2000,
 		DB:                             intervalDB,
 		VM:                             vm,
@@ -728,6 +735,7 @@ func TestBootstrapperReceiveStaleAncestorsMessage(t *testing.T) {
 		},
 	)
 	require.NoError(err)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 
 	require.NoError(bs.Start(context.Background(), 0))
 
@@ -772,6 +780,7 @@ func TestBootstrapperRollbackOnSetState(t *testing.T) {
 			return nil
 		},
 	)
+	bs.TimeoutRegistrar = &enginetest.Timer{}
 	require.NoError(err)
 
 	vm.SetStateF = func(context.Context, snow.State) error {

@@ -51,7 +51,15 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		require.NoError(err)
 		network.Genesis = genesis
 
-		e2e.StartNetwork(tc, network, avalancheGoExecPath, "" /* pluginDir */, 0 /* shutdownDelay */, false /* reuseNetwork */)
+		e2e.StartNetwork(
+			tc,
+			network,
+			avalancheGoExecPath,
+			"",    /* pluginDir */
+			0,     /* shutdownDelay */
+			false, /* skipShutdown */
+			false, /* reuseNetwork */
+		)
 
 		tc.By(fmt.Sprintf("restarting all nodes with %q binary", avalancheGoExecPathToUpgradeTo))
 		for _, node := range network.Nodes {
@@ -60,7 +68,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 
 			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
 
-			require.NoError(network.StartNode(tc.DefaultContext(), tc.GetWriter(), node))
+			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
 
 			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(tc, node)

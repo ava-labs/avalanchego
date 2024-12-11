@@ -70,7 +70,7 @@ type Bootstrapper struct {
 	Config
 	shouldHalt func() bool
 	*metrics
-
+	TimeoutRegistrar common.TimeoutRegistrar
 	// list of NoOpsHandler for messages dropped by bootstrapper
 	common.StateSummaryFrontierHandler
 	common.AcceptedStateSummaryHandler
@@ -119,7 +119,7 @@ type Bootstrapper struct {
 
 func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) error) (*Bootstrapper, error) {
 	metrics, err := newMetrics(config.Ctx.Registerer)
-	return &Bootstrapper{
+	bs := &Bootstrapper{
 		shouldHalt:                  config.ShouldHalt,
 		nonVerifyingParser:          config.NonVerifyingParse,
 		Config:                      config,
@@ -139,7 +139,19 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 
 		executedStateTransitions: math.MaxInt,
 		onFinished:               onFinished,
-	}, err
+	}
+
+	timeout := func() {
+		config.Ctx.Lock.Lock()
+		defer config.Ctx.Lock.Unlock()
+
+		if err := bs.Timeout(); err != nil {
+			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+		}
+	}
+	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
+
+	return bs, err
 }
 
 func (b *Bootstrapper) Context() *snow.ConsensusContext {
@@ -288,7 +300,7 @@ func (b *Bootstrapper) sendBootstrappingMessagesOrFinish(ctx context.Context) er
 	if numAccepted == 0 {
 		b.Ctx.Log.Debug("restarting bootstrap",
 			zap.String("reason", "no blocks accepted"),
-			zap.Int("numBeacons", b.Beacons.Count(b.Ctx.SubnetID)),
+			zap.Int("numBeacons", b.Beacons.NumValidators(b.Ctx.SubnetID)),
 		)
 		// Invariant: These functions are mutualy recursive. However, when
 		// [startBootstrapping] calls [sendMessagesOrFinish], it is guaranteed
@@ -703,8 +715,8 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		log("waiting for the remaining chains in this subnet to finish syncing")
 		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
 		// on the latest tip.
-		b.Config.Timer.RegisterTimeout(bootstrappingDelay)
 		b.awaitingTimeout = true
+		b.TimeoutRegistrar.RegisterTimeout(bootstrappingDelay)
 		return nil
 	}
 	return b.onFinished(ctx, b.requestID)
@@ -722,16 +734,16 @@ func (b *Bootstrapper) getLastAccepted(ctx context.Context) (snowman.Block, erro
 	return lastAccepted, nil
 }
 
-func (b *Bootstrapper) Timeout(ctx context.Context) error {
+func (b *Bootstrapper) Timeout() error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
 	b.awaitingTimeout = false
 
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
-		return b.restartBootstrapping(ctx)
+		return b.restartBootstrapping(context.TODO())
 	}
-	return b.onFinished(ctx, b.requestID)
+	return b.onFinished(context.TODO(), b.requestID)
 }
 
 func (b *Bootstrapper) restartBootstrapping(ctx context.Context) error {

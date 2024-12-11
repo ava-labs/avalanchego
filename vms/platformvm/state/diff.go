@@ -35,14 +35,17 @@ type diff struct {
 	parentID      ids.ID
 	stateVersions Versions
 
-	timestamp   time.Time
-	feeState    gas.State
-	accruedFees uint64
+	timestamp                   time.Time
+	feeState                    gas.State
+	l1ValidatorExcess           gas.Gas
+	accruedFees                 uint64
+	parentNumActiveL1Validators int
 
 	// Subnet ID --> supply of native asset of the subnet
 	currentSupply map[ids.ID]uint64
 
-	expiryDiff *expiryDiff
+	expiryDiff       *expiryDiff
+	l1ValidatorsDiff *l1ValidatorsDiff
 
 	currentStakerDiffs diffStakers
 	// map of subnetID -> nodeID -> total accrued delegatee rewards
@@ -52,8 +55,8 @@ type diff struct {
 	addedSubnetIDs []ids.ID
 	// Subnet ID --> Owner of the subnet
 	subnetOwners map[ids.ID]fx.Owner
-	// Subnet ID --> Manager of the subnet
-	subnetManagers map[ids.ID]chainIDAndAddr
+	// Subnet ID --> Conversion of the subnet
+	subnetToL1Conversions map[ids.ID]SubnetToL1Conversion
 	// Subnet ID --> Tx that transforms the subnet
 	transformedSubnets map[ids.ID]*txs.Tx
 
@@ -76,14 +79,17 @@ func NewDiff(
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
 	return &diff{
-		parentID:       parentID,
-		stateVersions:  stateVersions,
-		timestamp:      parentState.GetTimestamp(),
-		feeState:       parentState.GetFeeState(),
-		accruedFees:    parentState.GetAccruedFees(),
-		expiryDiff:     newExpiryDiff(),
-		subnetOwners:   make(map[ids.ID]fx.Owner),
-		subnetManagers: make(map[ids.ID]chainIDAndAddr),
+		parentID:                    parentID,
+		stateVersions:               stateVersions,
+		timestamp:                   parentState.GetTimestamp(),
+		feeState:                    parentState.GetFeeState(),
+		l1ValidatorExcess:           parentState.GetL1ValidatorExcess(),
+		accruedFees:                 parentState.GetAccruedFees(),
+		parentNumActiveL1Validators: parentState.NumActiveL1Validators(),
+		expiryDiff:                  newExpiryDiff(),
+		l1ValidatorsDiff:            newL1ValidatorsDiff(),
+		subnetOwners:                make(map[ids.ID]fx.Owner),
+		subnetToL1Conversions:       make(map[ids.ID]SubnetToL1Conversion),
 	}, nil
 }
 
@@ -115,6 +121,14 @@ func (d *diff) GetFeeState() gas.State {
 
 func (d *diff) SetFeeState(feeState gas.State) {
 	d.feeState = feeState
+}
+
+func (d *diff) GetL1ValidatorExcess() gas.Gas {
+	return d.l1ValidatorExcess
+}
+
+func (d *diff) SetL1ValidatorExcess(excess gas.Gas) {
+	d.l1ValidatorExcess = excess
 }
 
 func (d *diff) GetAccruedFees() uint64 {
@@ -182,6 +196,70 @@ func (d *diff) PutExpiry(entry ExpiryEntry) {
 
 func (d *diff) DeleteExpiry(entry ExpiryEntry) {
 	d.expiryDiff.DeleteExpiry(entry)
+}
+
+func (d *diff) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	parentIterator, err := parentState.GetActiveL1ValidatorsIterator()
+	if err != nil {
+		return nil, err
+	}
+
+	return d.l1ValidatorsDiff.getActiveL1ValidatorsIterator(parentIterator), nil
+}
+
+func (d *diff) NumActiveL1Validators() int {
+	return d.parentNumActiveL1Validators + d.l1ValidatorsDiff.netAddedActive
+}
+
+func (d *diff) WeightOfL1Validators(subnetID ids.ID) (uint64, error) {
+	if weight, modified := d.l1ValidatorsDiff.modifiedTotalWeight[subnetID]; modified {
+		return weight, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.WeightOfL1Validators(subnetID)
+}
+
+func (d *diff) GetL1Validator(validationID ids.ID) (L1Validator, error) {
+	if l1Validator, modified := d.l1ValidatorsDiff.modified[validationID]; modified {
+		if l1Validator.isDeleted() {
+			return L1Validator{}, database.ErrNotFound
+		}
+		return l1Validator, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return L1Validator{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.GetL1Validator(validationID)
+}
+
+func (d *diff) HasL1Validator(subnetID ids.ID, nodeID ids.NodeID) (bool, error) {
+	if has, modified := d.l1ValidatorsDiff.hasL1Validator(subnetID, nodeID); modified {
+		return has, nil
+	}
+
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return false, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return parentState.HasL1Validator(subnetID, nodeID)
+}
+
+func (d *diff) PutL1Validator(l1Validator L1Validator) error {
+	return d.l1ValidatorsDiff.putL1Validator(d, l1Validator)
 }
 
 func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -357,24 +435,21 @@ func (d *diff) SetSubnetOwner(subnetID ids.ID, owner fx.Owner) {
 	d.subnetOwners[subnetID] = owner
 }
 
-func (d *diff) GetSubnetManager(subnetID ids.ID) (ids.ID, []byte, error) {
-	if manager, exists := d.subnetManagers[subnetID]; exists {
-		return manager.ChainID, manager.Addr, nil
+func (d *diff) GetSubnetToL1Conversion(subnetID ids.ID) (SubnetToL1Conversion, error) {
+	if c, ok := d.subnetToL1Conversions[subnetID]; ok {
+		return c, nil
 	}
 
-	// If the subnet manager was not assigned in this diff, ask the parent state.
+	// If the subnet conversion was not assigned in this diff, ask the parent state.
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
-		return ids.Empty, nil, ErrMissingParentState
+		return SubnetToL1Conversion{}, ErrMissingParentState
 	}
-	return parentState.GetSubnetManager(subnetID)
+	return parentState.GetSubnetToL1Conversion(subnetID)
 }
 
-func (d *diff) SetSubnetManager(subnetID ids.ID, chainID ids.ID, addr []byte) {
-	d.subnetManagers[subnetID] = chainIDAndAddr{
-		ChainID: chainID,
-		Addr:    addr,
-	}
+func (d *diff) SetSubnetToL1Conversion(subnetID ids.ID, c SubnetToL1Conversion) {
+	d.subnetToL1Conversions[subnetID] = c
 }
 
 func (d *diff) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
@@ -485,6 +560,7 @@ func (d *diff) DeleteUTXO(utxoID ids.ID) {
 func (d *diff) Apply(baseState Chain) error {
 	baseState.SetTimestamp(d.timestamp)
 	baseState.SetFeeState(d.feeState)
+	baseState.SetL1ValidatorExcess(d.l1ValidatorExcess)
 	baseState.SetAccruedFees(d.accruedFees)
 	for subnetID, supply := range d.currentSupply {
 		baseState.SetCurrentSupply(subnetID, supply)
@@ -494,6 +570,26 @@ func (d *diff) Apply(baseState Chain) error {
 			baseState.PutExpiry(entry)
 		} else {
 			baseState.DeleteExpiry(entry)
+		}
+	}
+	// Ensure that all l1Validator deletions happen before any l1Validator
+	// additions. This ensures that a subnetID+nodeID pair that was deleted and
+	// then re-added in a single diff can't get reordered into the addition
+	// happening first; which would return an error.
+	for _, l1Validator := range d.l1ValidatorsDiff.modified {
+		if !l1Validator.isDeleted() {
+			continue
+		}
+		if err := baseState.PutL1Validator(l1Validator); err != nil {
+			return err
+		}
+	}
+	for _, l1Validator := range d.l1ValidatorsDiff.modified {
+		if l1Validator.isDeleted() {
+			continue
+		}
+		if err := baseState.PutL1Validator(l1Validator); err != nil {
+			return err
 		}
 	}
 	for _, subnetValidatorDiffs := range d.currentStakerDiffs.validatorDiffs {
@@ -576,8 +672,8 @@ func (d *diff) Apply(baseState Chain) error {
 	for subnetID, owner := range d.subnetOwners {
 		baseState.SetSubnetOwner(subnetID, owner)
 	}
-	for subnetID, manager := range d.subnetManagers {
-		baseState.SetSubnetManager(subnetID, manager.ChainID, manager.Addr)
+	for subnetID, c := range d.subnetToL1Conversions {
+		baseState.SetSubnetToL1Conversion(subnetID, c)
 	}
 	return nil
 }

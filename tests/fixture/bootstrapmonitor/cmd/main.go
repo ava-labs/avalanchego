@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/bootstrapmonitor"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -31,6 +30,7 @@ func main() {
 		podName           string
 		nodeContainerName string
 		dataDir           string
+		rawLogFormat      string
 	)
 	rootCmd := &cobra.Command{
 		Use:   commandName,
@@ -40,6 +40,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the pod")
 	rootCmd.PersistentFlags().StringVar(&nodeContainerName, "node-container-name", "", "The name of the node container in the pod")
 	rootCmd.PersistentFlags().StringVar(&dataDir, "data-dir", "", "The path of the data directory used for the bootstrap job")
+	rootCmd.PersistentFlags().StringVar(&rawLogFormat, "log-format", logging.AutoString, logging.FormatDescription)
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
@@ -55,14 +56,15 @@ func main() {
 	}
 	rootCmd.AddCommand(versionCmd)
 
-	// Use avalanchego logger for consistency
-	log := logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, os.Stdout, logging.Plain.ConsoleEncoder()))
-
 	initCmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a new bootstrap test",
 		RunE: func(*cobra.Command, []string) error {
 			if err := checkArgs(namespace, podName, nodeContainerName, dataDir); err != nil {
+				return err
+			}
+			log, err := newLogger(rawLogFormat)
+			if err != nil {
 				return err
 			}
 			return bootstrapmonitor.InitBootstrapTest(log, namespace, podName, nodeContainerName, dataDir)
@@ -87,6 +89,10 @@ func main() {
 			if imageCheckInterval <= 0 {
 				return errors.New("--image-check-interval must be greater than 0")
 			}
+			log, err := newLogger(rawLogFormat)
+			if err != nil {
+				return err
+			}
 			return bootstrapmonitor.WaitForCompletion(log, namespace, podName, nodeContainerName, dataDir, healthCheckInterval, imageCheckInterval)
 		},
 	}
@@ -95,7 +101,6 @@ func main() {
 	rootCmd.AddCommand(waitCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Error(commandName+" failed", zap.Error(err))
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -115,4 +120,13 @@ func checkArgs(namespace string, podName string, nodeContainerName string, dataD
 		return errors.New("--data-dir is required")
 	}
 	return nil
+}
+
+func newLogger(rawLogFormat string) (logging.Logger, error) {
+	writeCloser := os.Stdout
+	logFormat, err := logging.ToFormat(rawLogFormat, writeCloser.Fd())
+	if err != nil {
+		return nil, err
+	}
+	return logging.NewLogger("", logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder())), nil
 }

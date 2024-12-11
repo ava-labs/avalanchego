@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
-const testDynamicPrice = 100
+const testDynamicPrice = gas.Price(units.NanoAvax)
 
 var (
 	testStaticConfig = StaticConfig{
@@ -23,9 +23,9 @@ var (
 	}
 	testDynamicWeights = gas.Dimensions{
 		gas.Bandwidth: 1,
-		gas.DBRead:    200,
-		gas.DBWrite:   300,
-		gas.Compute:   0, // TODO: Populate
+		gas.DBRead:    2000,
+		gas.DBWrite:   20000,
+		gas.Compute:   10,
 	}
 
 	// TODO: Rather than hardcoding transactions, consider implementing and
@@ -76,9 +76,9 @@ var (
 				gas.Bandwidth: 691, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicBLSPoPVerifyCompute + intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 229_100,
+			expectedDynamicFee: 137_191 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessValidatorTx for subnet",
@@ -88,9 +88,9 @@ var (
 				gas.Bandwidth: 748, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBRead] + 2*intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessValidatorTxComplexities[gas.DBWrite] + 2*intrinsicInputDBWrite + 3*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 314_800,
+			expectedDynamicFee: 170_748 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessDelegatorTx for primary network",
@@ -100,9 +100,9 @@ var (
 				gas.Bandwidth: 499, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBRead] + 1*intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBWrite] + 1*intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 209_900,
+			expectedDynamicFee: 106_499 * units.NanoAvax,
 		},
 		{
 			name:              "AddPermissionlessDelegatorTx for subnet",
@@ -112,9 +112,9 @@ var (
 				gas.Bandwidth: 720, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBRead] + 2*intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddPermissionlessDelegatorTxComplexities[gas.DBWrite] + 2*intrinsicInputDBWrite + 3*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 312_000,
+			expectedDynamicFee: 150_720 * units.NanoAvax,
 		},
 		{
 			name:              "AddSubnetValidatorTx",
@@ -124,9 +124,9 @@ var (
 				gas.Bandwidth: 460, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicAddSubnetValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicAddSubnetValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 196_000,
+			expectedDynamicFee: 112_460 * units.NanoAvax,
 		},
 		{
 			name:              "BaseTx",
@@ -136,9 +136,9 @@ var (
 				gas.Bandwidth: 399, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicBaseTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicBaseTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 149_900,
+			expectedDynamicFee: 64_399 * units.NanoAvax,
 		},
 		{
 			name:              "CreateChainTx",
@@ -148,9 +148,9 @@ var (
 				gas.Bandwidth: 509, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicCreateChainTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicCreateChainTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 180_900,
+			expectedDynamicFee: 72_509 * units.NanoAvax,
 		},
 		{
 			name:              "CreateSubnetTx",
@@ -160,9 +160,9 @@ var (
 				gas.Bandwidth: 339, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicCreateSubnetTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicCreateSubnetTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 143_900,
+			expectedDynamicFee: 64_339 * units.NanoAvax,
 		},
 		{
 			name:              "ExportTx",
@@ -172,9 +172,9 @@ var (
 				gas.Bandwidth: 435, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicExportTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicExportTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 153_500,
+			expectedDynamicFee: 64_435 * units.NanoAvax,
 		},
 		{
 			name:              "ImportTx",
@@ -184,9 +184,9 @@ var (
 				gas.Bandwidth: 335, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicImportTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicImportTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 113_500,
+			expectedDynamicFee: 44_335 * units.NanoAvax,
 		},
 		{
 			name:              "RemoveSubnetValidatorTx",
@@ -196,9 +196,9 @@ var (
 				gas.Bandwidth: 436, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicRemoveSubnetValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicRemoveSubnetValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 193_600,
+			expectedDynamicFee: 108_436 * units.NanoAvax,
 		},
 		{
 			name:                  "TransformSubnetTx",
@@ -215,21 +215,69 @@ var (
 				gas.Bandwidth: 436, // The length of the tx in bytes
 				gas.DBRead:    IntrinsicTransferSubnetOwnershipTxComplexities[gas.DBRead] + intrinsicInputDBRead,
 				gas.DBWrite:   IntrinsicTransferSubnetOwnershipTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
 			},
-			expectedDynamicFee: 173_600,
+			expectedDynamicFee: 68_436 * units.NanoAvax,
 		},
 		{
-			name:                 "ConvertSubnetTx",
-			tx:                   "00000000002300015b380000000000000000000000000000000000000000000000000000000000000000000000012a16b813b6a4a64d8e9b3f11460b782fcc319364bc038915af56834b72043ce80000000700470de4d97cdcc00000000000000000000000010000000180fa21568b6a2ef338a773ba18bfc0cb493af926000000018d65db2676f4733a7d263ad14606ddbc2f1996bb2998358f4b6f1e01297d1da5000000002a16b813b6a4a64d8e9b3f11460b782fcc319364bc038915af56834b72043ce80000000500470de4d98c1f000000000100000000000000008d65db2676f4733a7d263ad14606ddbc2f1996bb2998358f4b6f1e01297d1da55fa29ed4356903dac2364713c60f57d8472c7dda4a5e08d88a88ad8ea71aed6000000007616464726573730000000a0000000100000000000000020000000900000001c990ecf3f39646c4c90cb1f5cc2a9a98c33df1a9a41a084e7f3e7b2afe10fd853068a20ad4ddf83c087b6311ab0fdab339ca529f57cda3329ca31b142987c223000000000900000001c990ecf3f39646c4c90cb1f5cc2a9a98c33df1a9a41a084e7f3e7b2afe10fd853068a20ad4ddf83c087b6311ab0fdab339ca529f57cda3329ca31b142987c22300",
+			name:                 "ConvertSubnetToL1Tx",
+			tx:                   "00000000002300003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f234262960000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001705f3d4415f990225d3df5ce437d7af2aa324b1bbce854ee34ab6f39882250d200000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f26fc0f94e000000010000000000000000a0673b4ee5ec44e57c8ab250dd7cd7b68d04421f64bd6559a4284a3ee358ff2b705f3d4415f990225d3df5ce437d7af2aa324b1bbce854ee34ab6f39882250d2000000000000000100000014c582872c37c81efa2c94ea347af49cdc23a830aa000000000000c137000000003b9aca00a3783a891cb41cadbfcf456da149f30e7af972677a162b984bef0779f254baac51ec042df1781d1295df80fb41c801269731fc6c25e1e5940dc3cb8509e30348fa712742cfdc83678acc9f95908eb98b89b28802fb559b4a2a6ff3216707c07f0ceb0b45a95f4f9a9540bbd3331d8ab4f233bffa4abb97fad9d59a1695f31b92a2b89e365facf7ab8c30de7c4a496d1e000000000000000000000000000000000000000a00000001000000000000000200000009000000011430759900fdf516cdeff6a1390dd7438585568a89c06142c44b3bf1178c4cae4bff44e955b19da08f0359d396a7a738b989bb46377e7465cd858ddd1e8dd3790100000009000000011430759900fdf516cdeff6a1390dd7438585568a89c06142c44b3bf1178c4cae4bff44e955b19da08f0359d396a7a738b989bb46377e7465cd858ddd1e8dd37901",
 			expectedStaticFeeErr: ErrUnsupportedTx,
 			expectedComplexity: gas.Dimensions{
-				gas.Bandwidth: 459, // The length of the tx in bytes
-				gas.DBRead:    IntrinsicConvertSubnetTxComplexities[gas.DBRead] + intrinsicInputDBRead,
-				gas.DBWrite:   IntrinsicConvertSubnetTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
-				gas.Compute:   0, // TODO: implement
+				gas.Bandwidth: 656, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicConvertSubnetToL1TxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicConvertSubnetToL1TxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite + intrinsicConvertSubnetToL1ValidatorDBWrite,
+				gas.Compute:   2*intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute,
 			},
-			expectedDynamicFee: 175_900,
+			expectedDynamicFee: 183_156 * units.NanoAvax,
+		},
+		{
+			name:                 "RegisterL1ValidatorTx",
+			tx:                   "00000000002400003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f1f88b552a000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001ca44ad45a63381b07074be7f82005c41550c989b967f40020f3bedc4b02191f300000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f234262404000000010000000000000000000000003b9aca00ab5cb0516b7afdb13727f766185b2b8da44e2653eef63c85f196701083e649289cce1a23c39eb471b2473bc6872aa3ea190de0fe66296cbdd4132c92c3430ff22f28f0b341b15905a005bbd66cc0f4056bc4be5934e4f3a57151a60060f429190000012f000000003039705f3d4415f990225d3df5ce437d7af2aa324b1bbce854ee34ab6f39882250d20000009c000000000001000000000000008e000000000001a0673b4ee5ec44e57c8ab250dd7cd7b68d04421f64bd6559a4284a3ee358ff2b000000145efc86a11c5b12cc95b2cf527c023f9cf6e0e8f6b62034315c5d11cea4190f6ea8997821c02483d29adb5e4567843f7a44c39b2ffa20c8520dc358702fb1ec29f2746dcc000000006705af280000000000000000000000000000000000000000000000010000000000000001018e99dc6ed736089c03b9a1275e0cf801524ed341fb10111f29c0390fa2f96cf6aa78539ec767e5cd523c606c7ede50e60ba6065a3685e770d979b0df74e3541b61ed63f037463776098576e385767a695de59352b44e515831c5ee7a8cc728f9000000010000000900000001a0950b9e6e866130f0d09e2a7bfdd0246513295237258afa942b1850dab79824605c796bbfc9223cf91935fb29c66f8b927690220b9b1c24d6f078054a3e346201",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 710, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicRegisterL1ValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead + intrinsicWarpDBReads,
+				gas.DBWrite:   IntrinsicRegisterL1ValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSPoPVerifyCompute + intrinsicBLSAggregateCompute + intrinsicBLSVerifyCompute,
+			},
+			expectedDynamicFee: 241_260 * units.NanoAvax,
+		},
+		{
+			name:                 "SetL1ValidatorWeightTx",
+			tx:                   "00000000002500003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f1f88b5100000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001389c41b6ed301e4c118bd23673268fd2054b772efcf25685a117b74bab7ae5e400000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f1f88b552a000000010000000000000000000000d7000000003039705f3d4415f990225d3df5ce437d7af2aa324b1bbce854ee34ab6f39882250d200000044000000000001000000000000003600000000000338e6e9fe31c6d070a8c792dbacf6d0aefb8eac2aded49cc0aa9f422d1fdd9ecd0000000000000001000000000000000500000000000000010187f4bb2c42869c56f023a1ca81045aff034acd490b8f15b5069025f982e605e077007fc588f7d56369a65df7574df3b70ff028ea173739c789525ab7eebfcb5c115b13cca8f02b362104b700c75bc95234109f3f1360ddcb4ec3caf6b0e821cb0000000100000009000000010a29f3c86d52908bf2efbc3f918a363df704c429d66c8d6615712a2a584a2a5f264a9e7b107c07122a06f31cadc2f51285884d36fe8df909a07467417f1d64cf00",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 518, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicSetL1ValidatorWeightTxComplexities[gas.DBRead] + intrinsicInputDBRead + intrinsicWarpDBReads,
+				gas.DBWrite:   IntrinsicSetL1ValidatorWeightTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute + intrinsicBLSAggregateCompute + intrinsicBLSVerifyCompute,
+			},
+			expectedDynamicFee: 206_568 * units.NanoAvax,
+		},
+		{
+			name:                 "IncreaseL1ValidatorBalanceTx",
+			tx:                   "00000000002600003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f1f88b4e52000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001f61ea7e3bb6d33da9901644f3c623e4537b7d1c276e9ef23bcc8e4150e494d6600000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f1f88b510000000001000000000000000038e6e9fe31c6d070a8c792dbacf6d0aefb8eac2aded49cc0aa9f422d1fdd9ecd0000000000000002000000010000000900000001cb56b56387be9186d86430fad5418db4d13e991b6805b6ba178b719e3f47ce001da52d6ed3173bfdd8b69940a135432abce493a10332e881f6c34cea3617595e00",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 339, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicIncreaseL1ValidatorBalanceTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicIncreaseL1ValidatorBalanceTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
+			},
+			expectedDynamicFee: 146_339 * units.NanoAvax,
+		},
+		{
+			name:                 "DisableL1ValidatorTx",
+			tx:                   "00000000002700003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007002386f1f88b4b9e000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001fd91c5c421468b13b09dda413bdbe1316c7c9417f2468b893071d4cb608a01da00000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f1f88b4e5200000001000000000000000038e6e9fe31c6d070a8c792dbacf6d0aefb8eac2aded49cc0aa9f422d1fdd9ecd0000000a00000000000000020000000900000001ff99bb626d898907a660701e2febaa311b4e644fe71add2d1a3f71748102c73f54d73c8370a9ae33e09c984bb8c03da4922bf208af836ec2daaa31cb42788bee010000000900000000",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 347, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicDisableL1ValidatorTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicDisableL1ValidatorTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   intrinsicSECP256k1FxSignatureCompute,
+			},
+			expectedDynamicFee: 166_347 * units.NanoAvax,
 		},
 	}
 )

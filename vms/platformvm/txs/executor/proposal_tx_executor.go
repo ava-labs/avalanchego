@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	_ txs.Visitor = (*ProposalTxExecutor)(nil)
+	_ txs.Visitor = (*proposalTxExecutor)(nil)
 
 	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
@@ -42,258 +42,303 @@ var (
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 )
 
-type ProposalTxExecutor struct {
+// ProposalTx executes the proposal transaction [tx].
+//
+// [onCommitState] will be modified to reflect the changes made to the state if
+// the proposal is committed.
+//
+// [onAbortState] will be modified to reflect the changes made to the state if
+// the proposal is aborted.
+//
+// Invariant: It is assumed that [onCommitState] and [onAbortState] represent
+// the same state when passed into this function.
+func ProposalTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	tx *txs.Tx,
+	onCommitState state.Diff,
+	onAbortState state.Diff,
+) error {
+	proposalExecutor := proposalTxExecutor{
+		backend:       backend,
+		feeCalculator: feeCalculator,
+		tx:            tx,
+		onCommitState: onCommitState,
+		onAbortState:  onAbortState,
+	}
+	if err := tx.Unsigned.Visit(&proposalExecutor); err != nil {
+		txID := tx.ID()
+		return fmt.Errorf("proposal tx %s failed execution: %w", txID, err)
+	}
+	return nil
+}
+
+type proposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
-	*Backend
-	FeeCalculator fee.Calculator
-	Tx            *txs.Tx
-	// [OnCommitState] is the state used for validation.
-	// [OnCommitState] is modified by this struct's methods to
+	backend       *Backend
+	feeCalculator fee.Calculator
+	tx            *txs.Tx
+	// [onCommitState] is the state used for validation.
+	// [onCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
-	//
-	// Invariant: Both [OnCommitState] and [OnAbortState] represent the same
-	//            state when provided to this struct.
-	OnCommitState state.Diff
-	// [OnAbortState] is modified by this struct's methods to
+	onCommitState state.Diff
+	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
-	OnAbortState state.Diff
+	onAbortState state.Diff
 }
 
-func (*ProposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
+func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (*proposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) ImportTx(*txs.ImportTx) error {
+func (*proposalTxExecutor) ImportTx(*txs.ImportTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) ExportTx(*txs.ExportTx) error {
+func (*proposalTxExecutor) ExportTx(*txs.ExportTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (*proposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (*proposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+func (*proposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+func (*proposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (*proposalTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) BaseTx(*txs.BaseTx) error {
+func (*proposalTxExecutor) BaseTx(*txs.BaseTx) error {
 	return ErrWrongTxType
 }
 
-func (*ProposalTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (*proposalTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
 
-func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (*proposalTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
-	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+	currentTimestamp := e.onCommitState.GetTimestamp()
+	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.UpgradeConfig.BanffTime,
+			e.backend.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
 	onAbortOuts, err := verifyAddValidatorTx(
-		e.Backend,
-		e.FeeCalculator,
-		e.OnCommitState,
-		e.Tx,
+		e.backend,
+		e.feeCalculator,
+		e.onCommitState,
+		e.tx,
 		tx,
 	)
 	if err != nil {
 		return err
 	}
 
-	txID := e.Tx.ID()
+	txID := e.tx.ID()
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	avax.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.onCommitState, tx.Ins)
 	// Produce the UTXOs
-	avax.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.onCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
 	}
 
-	if err := e.OnCommitState.PutPendingValidator(newStaker); err != nil {
+	if err := e.onCommitState.PutPendingValidator(newStaker); err != nil {
 		return err
 	}
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	avax.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.onAbortState, tx.Ins)
 	// Produce the UTXOs
-	avax.Produce(e.OnAbortState, txID, onAbortOuts)
+	avax.Produce(e.onAbortState, txID, onAbortOuts)
 	return nil
 }
 
-func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	// AddSubnetValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
-	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+	currentTimestamp := e.onCommitState.GetTimestamp()
+	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.UpgradeConfig.BanffTime,
+			e.backend.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
 	if err := verifyAddSubnetValidatorTx(
-		e.Backend,
-		e.FeeCalculator,
-		e.OnCommitState,
-		e.Tx,
+		e.backend,
+		e.feeCalculator,
+		e.onCommitState,
+		e.tx,
 		tx,
 	); err != nil {
 		return err
 	}
 
-	txID := e.Tx.ID()
+	txID := e.tx.ID()
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	avax.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.onCommitState, tx.Ins)
 	// Produce the UTXOs
-	avax.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.onCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
 	}
 
-	if err := e.OnCommitState.PutPendingValidator(newStaker); err != nil {
+	if err := e.onCommitState.PutPendingValidator(newStaker); err != nil {
 		return err
 	}
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	avax.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.onAbortState, tx.Ins)
 	// Produce the UTXOs
-	avax.Produce(e.OnAbortState, txID, tx.Outs)
+	avax.Produce(e.onAbortState, txID, tx.Outs)
 	return nil
 }
 
-func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	// AddDelegatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
-	currentTimestamp := e.OnCommitState.GetTimestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+	currentTimestamp := e.onCommitState.GetTimestamp()
+	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
 			ErrProposedAddStakerTxAfterBanff,
 			currentTimestamp,
-			e.Config.UpgradeConfig.BanffTime,
+			e.backend.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
 	onAbortOuts, err := verifyAddDelegatorTx(
-		e.Backend,
-		e.FeeCalculator,
-		e.OnCommitState,
-		e.Tx,
+		e.backend,
+		e.feeCalculator,
+		e.onCommitState,
+		e.tx,
 		tx,
 	)
 	if err != nil {
 		return err
 	}
 
-	txID := e.Tx.ID()
+	txID := e.tx.ID()
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	avax.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.onCommitState, tx.Ins)
 	// Produce the UTXOs
-	avax.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.onCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
 	}
 
-	e.OnCommitState.PutPendingDelegator(newStaker)
+	e.onCommitState.PutPendingDelegator(newStaker)
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	avax.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.onAbortState, tx.Ins)
 	// Produce the UTXOs
-	avax.Produce(e.OnAbortState, txID, onAbortOuts)
+	avax.Produce(e.onAbortState, txID, onAbortOuts)
 	return nil
 }
 
-func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	switch {
 	case tx == nil:
 		return txs.ErrNilTx
-	case len(e.Tx.Creds) != 0:
+	case len(e.tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
 
 	// Validate [newChainTime]
 	newChainTime := tx.Timestamp()
-	if e.Config.UpgradeConfig.IsBanffActivated(newChainTime) {
+	if e.backend.Config.UpgradeConfig.IsBanffActivated(newChainTime) {
 		return fmt.Errorf(
 			"%w: proposed timestamp (%s) >= Banff fork time (%s)",
 			ErrAdvanceTimeTxIssuedAfterBanff,
 			newChainTime,
-			e.Config.UpgradeConfig.BanffTime,
+			e.backend.Config.UpgradeConfig.BanffTime,
 		)
 	}
 
-	now := e.Clk.Time()
+	now := e.backend.Clk.Time()
 	if err := VerifyNewChainTime(
+		e.backend.Config.ValidatorFeeConfig,
 		newChainTime,
 		now,
-		e.OnCommitState,
+		e.onCommitState,
 	); err != nil {
 		return err
 	}
 
 	// Note that state doesn't change if this proposal is aborted
-	_, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
+	_, err := AdvanceTimeTo(e.backend, e.onCommitState, newChainTime)
 	return err
 }
 
-func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
 	switch {
 	case tx == nil:
 		return txs.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return ErrInvalidID
-	case len(e.Tx.Creds) != 0:
+	case len(e.tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
 
-	currentStakerIterator, err := e.OnCommitState.GetCurrentStakerIterator()
+	currentStakerIterator, err := e.onCommitState.GetCurrentStakerIterator()
 	if err != nil {
 		return err
 	}
@@ -313,7 +358,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// Verify that the chain's timestamp is the validator's end time
-	currentChainTime := e.OnCommitState.GetTimestamp()
+	currentChainTime := e.onCommitState.GetTimestamp()
 	if !stakerToReward.EndTime.Equal(currentChainTime) {
 		return fmt.Errorf(
 			"%w: TxID = %s with %s < %s",
@@ -324,7 +369,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		)
 	}
 
-	stakerTx, _, err := e.OnCommitState.GetTx(stakerToReward.TxID)
+	stakerTx, _, err := e.onCommitState.GetTx(stakerToReward.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
@@ -338,16 +383,16 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		}
 
 		// Handle staker lifecycle.
-		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
-		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
+		e.onCommitState.DeleteCurrentValidator(stakerToReward)
+		e.onAbortState.DeleteCurrentValidator(stakerToReward)
 	case txs.DelegatorTx:
 		if err := e.rewardDelegatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
 
 		// Handle staker lifecycle.
-		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
-		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
+		e.onCommitState.DeleteCurrentDelegator(stakerToReward)
+		e.onAbortState.DeleteCurrentDelegator(stakerToReward)
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
 		//            time and the current chain timestamp is == this staker's
@@ -357,7 +402,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// If the reward is aborted, then the current supply should be decreased.
-	currentSupply, err := e.OnAbortState.GetCurrentSupply(stakerToReward.SubnetID)
+	currentSupply, err := e.onAbortState.GetCurrentSupply(stakerToReward.SubnetID)
 	if err != nil {
 		return err
 	}
@@ -365,11 +410,11 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	if err != nil {
 		return err
 	}
-	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
+	e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 	return nil
 }
 
-func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
+func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
 	var (
 		txID    = validator.TxID
 		stake   = uValidatorTx.Stake()
@@ -389,8 +434,8 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 			Asset: out.Asset,
 			Out:   out.Output(),
 		}
-		e.OnCommitState.AddUTXO(utxo)
-		e.OnAbortState.AddUTXO(utxo)
+		e.onCommitState.AddUTXO(utxo)
+		e.onAbortState.AddUTXO(utxo)
 	}
 
 	utxosOffset := 0
@@ -399,7 +444,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	reward := validator.PotentialReward
 	if reward > 0 {
 		validationRewardsOwner := uValidatorTx.ValidationRewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(reward, validationRewardsOwner)
+		outIntf, err := e.backend.Fx.CreateOutput(reward, validationRewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}
@@ -416,14 +461,14 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 			Asset: stakeAsset,
 			Out:   out,
 		}
-		e.OnCommitState.AddUTXO(utxo)
-		e.OnCommitState.AddRewardUTXO(txID, utxo)
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(txID, utxo)
 
 		utxosOffset++
 	}
 
 	// Provide the accrued delegatee rewards from successful delegations here.
-	delegateeReward, err := e.OnCommitState.GetDelegateeReward(
+	delegateeReward, err := e.onCommitState.GetDelegateeReward(
 		validator.SubnetID,
 		validator.NodeID,
 	)
@@ -436,7 +481,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
-	outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+	outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 	if err != nil {
 		return fmt.Errorf("failed to create output: %w", err)
 	}
@@ -453,8 +498,8 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		Asset: stakeAsset,
 		Out:   out,
 	}
-	e.OnCommitState.AddUTXO(onCommitUtxo)
-	e.OnCommitState.AddRewardUTXO(txID, onCommitUtxo)
+	e.onCommitState.AddUTXO(onCommitUtxo)
+	e.onCommitState.AddRewardUTXO(txID, onCommitUtxo)
 
 	// Note: There is no [offset] if the RewardValidatorTx is
 	// aborted, because the validator reward is not awarded.
@@ -466,12 +511,12 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		Asset: stakeAsset,
 		Out:   out,
 	}
-	e.OnAbortState.AddUTXO(onAbortUtxo)
-	e.OnAbortState.AddRewardUTXO(txID, onAbortUtxo)
+	e.onAbortState.AddUTXO(onAbortUtxo)
+	e.onAbortState.AddRewardUTXO(txID, onAbortUtxo)
 	return nil
 }
 
-func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
+func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
 	var (
 		txID    = delegator.TxID
 		stake   = uDelegatorTx.Stake()
@@ -491,18 +536,18 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 			Asset: out.Asset,
 			Out:   out.Output(),
 		}
-		e.OnCommitState.AddUTXO(utxo)
-		e.OnAbortState.AddUTXO(utxo)
+		e.onCommitState.AddUTXO(utxo)
+		e.onAbortState.AddUTXO(utxo)
 	}
 
 	// We're (possibly) rewarding a delegator, so we need to fetch
 	// the validator they are delegated to.
-	validator, err := e.OnCommitState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
+	validator, err := e.onCommitState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
 	if err != nil {
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
-	vdrTxIntf, _, err := e.OnCommitState.GetTx(validator.TxID)
+	vdrTxIntf, _, err := e.onCommitState.GetTx(validator.TxID)
 	if err != nil {
 		return fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
@@ -525,7 +570,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	reward := delegatorReward
 	if reward > 0 {
 		rewardsOwner := uDelegatorTx.RewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(reward, rewardsOwner)
+		outIntf, err := e.backend.Fx.CreateOutput(reward, rewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}
@@ -542,8 +587,8 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 			Out:   out,
 		}
 
-		e.OnCommitState.AddUTXO(utxo)
-		e.OnCommitState.AddRewardUTXO(txID, utxo)
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(txID, utxo)
 
 		utxosOffset++
 	}
@@ -553,8 +598,8 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Reward the delegatee here
-	if e.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
-		previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
+	if e.backend.Config.UpgradeConfig.IsCortinaActivated(validator.StartTime) {
+		previousDelegateeReward, err := e.onCommitState.GetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
 		)
@@ -569,7 +614,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 
 		// For any validators starting after [CortinaTime], we defer rewarding the
 		// [reward] until their staking period is over.
-		err = e.OnCommitState.SetDelegateeReward(
+		err = e.onCommitState.SetDelegateeReward(
 			validator.SubnetID,
 			validator.NodeID,
 			newDelegateeReward,
@@ -581,7 +626,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		// For any validators who started prior to [CortinaTime], we issue the
 		// [delegateeReward] immediately.
 		delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+		outIntf, err := e.backend.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}
@@ -598,8 +643,8 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 			Out:   out,
 		}
 
-		e.OnCommitState.AddUTXO(utxo)
-		e.OnCommitState.AddRewardUTXO(txID, utxo)
+		e.onCommitState.AddUTXO(utxo)
+		e.onCommitState.AddRewardUTXO(txID, utxo)
 	}
 	return nil
 }

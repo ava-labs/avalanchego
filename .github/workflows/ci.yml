@@ -117,20 +117,21 @@ jobs:
       - name: Build AvalancheGo Binary
         shell: bash
         run: ./scripts/build.sh
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/tests.upgrade.sh
-          filter_by_owner: avalanchego-e2e
-          prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_id: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Upload tmpnet network dir
-        uses: ./.github/actions/upload-tmpnet-artifact
-        if: always()
-        with:
-          name: upgrade-tmpnet-data
+      # TODO: Reactivate test once v1.12.0 is published
+      # - name: Run e2e tests
+      #   uses: ./.github/actions/run-monitored-tmpnet-cmd
+      #   with:
+      #     run: ./scripts/tests.upgrade.sh
+      #     filter_by_owner: avalanchego-e2e
+      #     prometheus_id: ${{ secrets.PROMETHEUS_ID || '' }}
+      #     prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+      #     loki_id: ${{ secrets.LOKI_ID || '' }}
+      #     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      # - name: Upload tmpnet network dir
+      #   uses: ./.github/actions/upload-tmpnet-artifact
+      #   if: always()
+      #   with:
+      #     name: upgrade-tmpnet-data
   Lint:
     runs-on: ubuntu-latest
     steps:
@@ -212,7 +213,7 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Check that the avalanchego workload is sane
         shell: bash
-        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=60s
+        run: go run ./tests/antithesis/avalanchego --avalanchego-path=./build/avalanchego --duration=120s
       - name: Check image build for avalanchego test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh
@@ -232,7 +233,7 @@ jobs:
         run: ./scripts/build_xsvm.sh
       - name: Check that the xsvm workload is sane
         shell: bash
-        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=60s
+        run: go run ./tests/antithesis/xsvm --avalanchego-path=./build/avalanchego --duration=120s
       - name: Check image build for xsvm test setup
         shell: bash
         run: bash -x scripts/tests.build_antithesis_images.sh

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -87,15 +88,17 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			avaxAssetID = pContext.AVAXAssetID
 		)
 
-		tc.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
+		tc.Log().Info("fetching minimal stake amounts")
 		pChainClient := platformvm.NewClient(nodeURI.URI)
 		minValStake, minDelStake, err := pChainClient.GetMinStake(
 			tc.DefaultContext(),
 			constants.PlatformChainID,
 		)
 		require.NoError(err)
-		tc.Outf("{{green}} minimal validator stake: %d {{/}}\n", minValStake)
-		tc.Outf("{{green}} minimal delegator stake: %d {{/}}\n", minDelStake)
+		tc.Log().Info("fetched minimal stake amounts",
+			zap.Uint64("minValidatorStake", minValStake),
+			zap.Uint64("minDelegatorStake", minDelStake),
+		)
 
 		// Use a random node ID to ensure that repeated test runs will succeed
 		// against a network that persists across runs.
@@ -145,7 +148,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 
 			initialAVAXBalance := balances[avaxAssetID]
-			tc.Outf("{{blue}} P-chain balance before P->X export: %d {{/}}\n", initialAVAXBalance)
+			tc.Log().Info("retrieved P-chain balance before P->X export",
+				zap.Uint64("balance", initialAVAXBalance),
+			)
 
 			exportTx, err := pWallet.IssueExportTx(
 				xContext.BlockchainID,
@@ -172,7 +177,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 
 			finalAVAXBalance := balances[avaxAssetID]
-			tc.Outf("{{blue}} P-chain balance after P->X export: %d {{/}}\n", finalAVAXBalance)
+			tc.Log().Info("retrieved P-chain balance after P->X export",
+				zap.Uint64("balance", finalAVAXBalance),
+			)
 
 			require.Equal(initialAVAXBalance-toTransfer-exportFee, finalAVAXBalance)
 		})
@@ -182,7 +189,9 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 
 			initialAVAXBalance := balances[avaxAssetID]
-			tc.Outf("{{blue}} X-chain balance before P->X import: %d {{/}}\n", initialAVAXBalance)
+			tc.Log().Info("retrieved X-chain balance before P->X import",
+				zap.Uint64("balance", initialAVAXBalance),
+			)
 
 			_, err = xWallet.IssueImportTx(
 				constants.PlatformChainID,
@@ -196,9 +205,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			require.NoError(err)
 
 			finalAVAXBalance := balances[avaxAssetID]
-			tc.Outf("{{blue}} X-chain balance after P->X import: %d {{/}}\n", finalAVAXBalance)
+			tc.Log().Info("retrieved X-chain balance after P->X import",
+				zap.Uint64("balance", finalAVAXBalance),
+			)
 
 			require.Equal(initialAVAXBalance+toTransfer-xContext.BaseTxFee, finalAVAXBalance)
 		})
+
+		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

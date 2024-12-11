@@ -59,7 +59,10 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 	chainTime := env.clk.Time().Truncate(time.Second)
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
+	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(&iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
 
 	// wrong height
 	apricotChildBlk, err := block.NewApricotStandardBlock(
@@ -127,14 +130,15 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		), nil
 	}).AnyTimes()
 
-	// no pending stakers
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(iterator.Empty[*state.Staker]{}, nil).AnyTimes()
-	// no expiries
+	onParentAccept.EXPECT().GetActiveL1ValidatorsIterator().Return(iterator.Empty[state.L1Validator]{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetExpiryIterator().Return(iterator.Empty[state.ExpiryEntry]{}, nil).AnyTimes()
 
 	onParentAccept.EXPECT().GetTimestamp().Return(chainTime).AnyTimes()
 	onParentAccept.EXPECT().GetFeeState().Return(gas.State{}).AnyTimes()
+	onParentAccept.EXPECT().GetL1ValidatorExcess().Return(gas.Gas(0)).AnyTimes()
 	onParentAccept.EXPECT().GetAccruedFees().Return(uint64(0)).AnyTimes()
+	onParentAccept.EXPECT().NumActiveL1Validators().Return(0).AnyTimes()
 
 	txID := ids.GenerateTestID()
 	utxo := &avax.UTXO{

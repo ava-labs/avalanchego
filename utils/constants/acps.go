@@ -23,8 +23,22 @@ var (
 	// release, marked as implementable and not activated.
 	//
 	// See: https://github.com/orgs/avalanche-foundation/projects/1
-	CurrentACPs = set.Of[uint32]()
+	CurrentACPs = set.Of[uint32](
+		77,  // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/77-reinventing-subnets/README.md
+		103, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/103-dynamic-fees/README.md
+		118, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/118-warp-signature-request/README.md
+		125, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/125-basefee-reduction/README.md
+		131, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/131-cancun-eips/README.md
+		151, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/151-use-current-block-pchain-height-as-context/README.md
+	)
 
 	// ScheduledACPs are the ACPs included into the next upgrade.
-	ScheduledACPs = set.Of[uint32]()
+	ScheduledACPs = set.Of[uint32](
+		77,  // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/77-reinventing-subnets/README.md
+		103, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/103-dynamic-fees/README.md
+		118, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/118-warp-signature-request/README.md
+		125, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/125-basefee-reduction/README.md
+		131, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/131-cancun-eips/README.md
+		151, // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/151-use-current-block-pchain-height-as-context/README.md
+	)
 )

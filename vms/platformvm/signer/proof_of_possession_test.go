@@ -35,7 +35,7 @@ func TestProofOfPossession(t *testing.T) {
 	require.NoError(err)
 	newBLSPOP.ProofOfPossession = blsPOP.ProofOfPossession
 	err = newBLSPOP.Verify()
-	require.ErrorIs(err, errInvalidProofOfPossession)
+	require.ErrorIs(err, ErrInvalidProofOfPossession)
 }
 
 func TestNewProofOfPossessionDeterministic(t *testing.T) {
@@ -47,6 +47,16 @@ func TestNewProofOfPossessionDeterministic(t *testing.T) {
 	blsPOP0 := NewProofOfPossession(sk)
 	blsPOP1 := NewProofOfPossession(sk)
 	require.Equal(blsPOP0, blsPOP1)
+}
+
+func BenchmarkProofOfPossessionVerify(b *testing.B) {
+	pop, err := newProofOfPossession()
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for range b.N {
+		_ = pop.Verify()
+	}
 }
 
 func newProofOfPossession() (*ProofOfPossession, error) {

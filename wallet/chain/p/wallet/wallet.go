@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -135,16 +136,65 @@ type Wallet interface {
 		options ...common.Option,
 	) (*txs.Tx, error)
 
-	// IssueConvertSubnetTx creates, signs, and issues a transaction that
+	// IssueConvertSubnetToL1Tx creates, signs, and issues a transaction that
 	// converts the subnet to a Permissionless L1.
 	//
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
-	IssueConvertSubnetTx(
+	// - [validators] specifies the initial L1 validators of the L1
+	IssueConvertSubnetToL1Tx(
 		subnetID ids.ID,
 		chainID ids.ID,
 		address []byte,
+		validators []*txs.ConvertSubnetToL1Validator,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	// IssueRegisterL1ValidatorTx creates, signs, and issues a transaction that
+	// adds a validator to an L1.
+	//
+	// - [balance] that the validator should allocate to continuous fees
+	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
+	//   message
+	// - [message] is the Warp message that authorizes this validator to be
+	//   added
+	IssueRegisterL1ValidatorTx(
+		balance uint64,
+		proofOfPossession [bls.SignatureLen]byte,
+		message []byte,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	// IssueSetL1ValidatorWeightTx creates, signs, and issues a transaction that
+	// sets the weight of a validator on an L1.
+	//
+	// - [message] is the Warp message that authorizes this validator's weight
+	//   to be changed
+	IssueSetL1ValidatorWeightTx(
+		message []byte,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	// IssueIncreaseL1ValidatorBalanceTx creates, signs, and issues a
+	// transaction that increases the balance of a validator on an L1 for the
+	// continuous fee.
+	//
+	// - [validationID] of the validator
+	// - [balance] amount to increase the validator's balance by
+	IssueIncreaseL1ValidatorBalanceTx(
+		validationID ids.ID,
+		balance uint64,
+		options ...common.Option,
+	) (*txs.Tx, error)
+
+	// IssueDisableL1ValidatorTx creates, signs, and issues a transaction that
+	// disables an L1 validator and returns the remaining funds allocated to the
+	// continuous fee to the remaining balance owner.
+	//
+	// - [validationID] of the validator to disable
+	IssueDisableL1ValidatorTx(
+		validationID ids.ID,
 		options ...common.Option,
 	) (*txs.Tx, error)
 
@@ -388,13 +438,61 @@ func (w *wallet) IssueTransferSubnetOwnershipTx(
 	return w.IssueUnsignedTx(utx, options...)
 }
 
-func (w *wallet) IssueConvertSubnetTx(
+func (w *wallet) IssueConvertSubnetToL1Tx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
+	validators []*txs.ConvertSubnetToL1Validator,
 	options ...common.Option,
 ) (*txs.Tx, error) {
-	utx, err := w.builder.NewConvertSubnetTx(subnetID, chainID, address, options...)
+	utx, err := w.builder.NewConvertSubnetToL1Tx(subnetID, chainID, address, validators, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueRegisterL1ValidatorTx(
+	balance uint64,
+	proofOfPossession [bls.SignatureLen]byte,
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewRegisterL1ValidatorTx(balance, proofOfPossession, message, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueSetL1ValidatorWeightTx(
+	message []byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewSetL1ValidatorWeightTx(message, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueIncreaseL1ValidatorBalanceTx(
+	validationID ids.ID,
+	balance uint64,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewIncreaseL1ValidatorBalanceTx(validationID, balance, options...)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueDisableL1ValidatorTx(
+	validationID ids.ID,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	utx, err := w.builder.NewDisableL1ValidatorTx(validationID, options...)
 	if err != nil {
 		return nil, err
 	}

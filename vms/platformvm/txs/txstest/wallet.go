@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/signer"
@@ -28,10 +29,11 @@ import (
 func NewWallet(
 	t testing.TB,
 	ctx *snow.Context,
-	config *config.Config,
+	config *config.Internal,
 	state state.State,
 	kc *secp256k1fx.Keychain,
 	subnetIDs []ids.ID,
+	validationIDs []ids.ID,
 	chainIDs []ids.ID,
 ) wallet.Wallet {
 	var (
@@ -74,11 +76,23 @@ func NewWallet(
 		}
 	}
 
-	owners := make(map[ids.ID]fx.Owner, len(subnetIDs))
+	owners := make(map[ids.ID]fx.Owner, len(subnetIDs)+len(validationIDs))
 	for _, subnetID := range subnetIDs {
 		owner, err := state.GetSubnetOwner(subnetID)
 		require.NoError(err)
 		owners[subnetID] = owner
+	}
+	for _, validationID := range validationIDs {
+		l1Validator, err := state.GetL1Validator(validationID)
+		require.NoError(err)
+
+		var owner message.PChainOwner
+		_, err = txs.Codec.Unmarshal(l1Validator.DeactivationOwner, &owner)
+		require.NoError(err)
+		owners[validationID] = &secp256k1fx.OutputOwners{
+			Threshold: owner.Threshold,
+			Addrs:     owner.Addresses,
+		}
 	}
 
 	builderContext := newContext(ctx, config, state)

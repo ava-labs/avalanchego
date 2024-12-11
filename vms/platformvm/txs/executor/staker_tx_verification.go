@@ -41,7 +41,6 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
-	ErrRemoveValidatorManagedSubnet    = errors.New("RemoveSubnetValidatorTx cannot be used to remove a validator from a Subnet with a manager")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -253,7 +252,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -307,16 +306,6 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, err
 	}
 
-	if backend.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
-		_, _, err := chainState.GetSubnetManager(tx.Subnet)
-		if err == nil {
-			return nil, false, fmt.Errorf("%w: %q", ErrRemoveValidatorManagedSubnet, tx.Subnet)
-		}
-		if err != database.ErrNotFound {
-			return nil, false, err
-		}
-	}
-
 	isCurrentValidator := true
 	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
 	if err == database.ErrNotFound {
@@ -343,7 +332,7 @@ func verifyRemoveSubnetValidatorTx(
 		return vdr, isCurrentValidator, nil
 	}
 
-	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return nil, false, err
 	}
@@ -792,7 +781,7 @@ func verifyTransferSubnetOwnershipTx(
 		return nil
 	}
 
-	baseTxCreds, err := verifySubnetAuthorization(backend, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	baseTxCreds, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}

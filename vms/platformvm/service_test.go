@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
 	"testing"
 	"time"
 
@@ -89,6 +90,70 @@ func defaultService(t *testing.T, fork upgradetest.Fork) (*Service, *mutableShar
 			Size: stakerAttributesCacheSize,
 		},
 	}, mutableSharedMemory
+}
+
+func TestGetProposedHeight(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t, upgradetest.Latest)
+
+	reply := api.GetHeightResponse{}
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
+
+	minHeight, err := service.vm.GetMinimumHeight(context.Background())
+	require.NoError(err)
+	require.Equal(minHeight, uint64(reply.Height))
+
+	service.vm.ctx.Lock.Lock()
+
+	// issue any transaction to put into the new block
+	subnetID := testSubnet1.ID()
+	wallet := newWallet(t, service.vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
+	tx, err := wallet.IssueCreateChainTx(
+		subnetID,
+		[]byte{},
+		constants.AVMID,
+		[]ids.ID{},
+		"chain name",
+		common.WithMemo([]byte{}),
+	)
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+
+	// Get the last accepted block which should be genesis
+	genesisBlockID := service.vm.manager.LastAccepted()
+
+	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	service.vm.ctx.Lock.Lock()
+
+	block, err := service.vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	blk := block.(*blockexecutor.Block)
+	require.NoError(blk.Verify(context.Background()))
+
+	require.NoError(blk.Accept(context.Background()))
+
+	service.vm.ctx.Lock.Unlock()
+
+	latestBlockID := service.vm.manager.LastAccepted()
+	latestBlock, err := service.vm.manager.GetBlock(latestBlockID)
+	require.NoError(err)
+	require.NotEqual(genesisBlockID, latestBlockID)
+
+	// Confirm that the proposed height hasn't changed with the new block being accepted.
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
+	require.Equal(minHeight, uint64(reply.Height))
+
+	// Set the clock to beyond the proposer VM height of the most recent accepted block
+	service.vm.clock.Set(latestBlock.Timestamp().Add(31 * time.Second))
+
+	// Confirm that the proposed height has updated to the latest block height
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
+	require.Equal(latestBlock.Height(), uint64(reply.Height))
 }
 
 func TestExportKey(t *testing.T) {
@@ -373,7 +438,7 @@ func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t, upgradetest.Durango)
 
-	feeCalculator := state.PickFeeCalculator(&service.vm.Config, service.vm.state)
+	feeCalculator := state.PickFeeCalculator(&service.vm.Internal, service.vm.state)
 	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
 	require.NoError(err)
 
@@ -754,6 +819,142 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 }
 
+func TestGetValidatorsAt(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t, upgradetest.Latest)
+
+	genesis := genesistest.New(t, genesistest.Config{})
+
+	args := GetValidatorsAtArgs{}
+	response := GetValidatorsAtReply{}
+
+	service.vm.ctx.Lock.Lock()
+	lastAccepted := service.vm.manager.LastAccepted()
+	lastAcceptedBlk, err := service.vm.manager.GetBlock(lastAccepted)
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+
+	// Confirm that it returns the genesis validators given the latest height
+	args.Height = pchainapi.Height(lastAcceptedBlk.Height())
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators, len(genesis.Validators))
+
+	service.vm.ctx.Lock.Lock()
+
+	wallet := newWallet(t, service.vm, walletConfig{})
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+				End:    uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+				Wght:   service.vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		signer.NewProofOfPossession(sk),
+		service.vm.ctx.AVAXAssetID,
+		rewardsOwner,
+		rewardsOwner,
+		0,
+		common.WithMemo([]byte{}),
+	)
+
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	service.vm.ctx.Lock.Lock()
+
+	block, err := service.vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	blk := block.(*blockexecutor.Block)
+	require.NoError(blk.Verify(context.Background()))
+
+	require.NoError(blk.Accept(context.Background()))
+	service.vm.ctx.Lock.Unlock()
+
+	newLastAccepted := service.vm.manager.LastAccepted()
+	newLastAcceptedBlk, err := service.vm.manager.GetBlock(newLastAccepted)
+	require.NoError(err)
+	require.NotEqual(newLastAccepted, lastAccepted)
+
+	// Confirm that it returns the genesis validators + the new validator given the latest height
+	args.Height = pchainapi.Height(newLastAcceptedBlk.Height())
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators, len(genesis.Validators)+1)
+
+	// Confirm that [IsProposed] works. The proposed height should be the genesis height
+	args.Height = pchainapi.Height(pchainapi.ProposedHeight)
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators, len(genesis.Validators))
+
+	service.vm.ctx.Lock.Lock()
+
+	// set clock beyond the [validators.recentlyAcceptedWindowTTL] to bump the
+	// proposerVM height
+	service.vm.clock.Set(newLastAcceptedBlk.Timestamp().Add(40 * time.Second))
+	service.vm.ctx.Lock.Unlock()
+
+	// Resending the same request with [Height] set to [platformapi.ProposedHeight] should now
+	// include the new validator
+	require.NoError(service.GetValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators, len(genesis.Validators)+1)
+}
+
+func TestGetValidatorsAtArgsMarshalling(t *testing.T) {
+	subnetID, err := ids.FromString("u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name string
+		args GetValidatorsAtArgs
+		json string
+	}{
+		{
+			name: "specific height",
+			args: GetValidatorsAtArgs{
+				Height:   pchainapi.Height(12345),
+				SubnetID: subnetID,
+			},
+			json: `{"height":"12345","subnetID":"u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H"}`,
+		},
+		{
+			name: "proposed height",
+			args: GetValidatorsAtArgs{
+				Height:   pchainapi.ProposedHeight,
+				SubnetID: subnetID,
+			},
+			json: `{"height":"proposed","subnetID":"u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H"}`,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Test that marshalling produces the expected JSON
+			argsJSON, err := json.Marshal(test.args)
+			require.NoError(err)
+			require.JSONEq(test.json, string(argsJSON))
+
+			// Test that unmarshalling produces the expected args
+			var parsedArgs GetValidatorsAtArgs
+			require.NoError(json.Unmarshal(argsJSON, &parsedArgs))
+			require.Equal(test.args, parsedArgs)
+		})
+	}
+}
+
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
 	service, _ := defaultService(t, upgradetest.Latest)
@@ -795,7 +996,7 @@ func TestGetBlock(t *testing.T) {
 			service, _ := defaultService(t, upgradetest.Latest)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Config.CreateAssetTxFee = 100 * defaultTxFee
+			service.vm.Internal.CreateAssetTxFee = 100 * defaultTxFee
 
 			subnetID := testSubnet1.ID()
 			wallet := newWallet(t, service.vm, walletConfig{
@@ -1155,7 +1356,7 @@ func TestGetFeeConfig(t *testing.T) {
 			require := require.New(t)
 
 			service, _ := defaultService(t, upgradetest.Latest)
-			service.vm.Config.UpgradeConfig.EtnaTime = test.etnaTime
+			service.vm.Internal.UpgradeConfig.EtnaTime = test.etnaTime
 
 			var reply gas.Config
 			require.NoError(service.GetFeeConfig(nil, nil, &reply))

@@ -23,7 +23,6 @@ type Config struct {
 	StartupTracker   tracker.Startup
 	Sender           common.Sender
 	BootstrapTracker common.BootstrapTracker
-	Timer            common.Timer
 
 	// PeerTracker manages the set of nodes that we fetch the next block from.
 	PeerTracker *p2p.PeerTracker

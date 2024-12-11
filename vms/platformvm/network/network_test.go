@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/commonmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempoolmock"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
@@ -27,7 +28,7 @@ import (
 var (
 	errTest = errors.New("test error")
 
-	testConfig = Config{
+	testConfig = config.Network{
 		MaxValidatorSetStaleness:                    time.Second,
 		TargetGossipSize:                            1,
 		PushGossipNumValidators:                     1,
@@ -61,12 +62,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 	tx := &txs.Tx{}
 
 	type test struct {
-		name                      string
-		mempoolFunc               func(*gomock.Controller) pmempool.Mempool
-		txVerifier                testTxVerifier
-		partialSyncPrimaryNetwork bool
-		appSenderFunc             func(*gomock.Controller) common.AppSender
-		expectedErr               error
+		name          string
+		mempoolFunc   func(*gomock.Controller) pmempool.Mempool
+		txVerifier    testTxVerifier
+		appSenderFunc func(*gomock.Controller) common.AppSender
+		expectedErr   error
 	}
 
 	tests := []test{
@@ -129,17 +129,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			expectedErr: errTest,
 		},
 		{
-			name: "mempool is disabled if primary network is not being fully synced",
-			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
-				return mempoolmock.NewMempool(ctrl)
-			},
-			partialSyncPrimaryNetwork: true,
-			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
-				return commonmock.NewSender(ctrl)
-			},
-			expectedErr: errMempoolDisabledWithPartialSync,
-		},
-		{
 			name: "happy path",
 			mempoolFunc: func(ctrl *gomock.Controller) pmempool.Mempool {
 				mempool := mempoolmock.NewMempool(ctrl)
@@ -173,8 +162,11 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				snowCtx.ValidatorState,
 				tt.txVerifier,
 				tt.mempoolFunc(ctrl),
-				tt.partialSyncPrimaryNetwork,
+				false,
 				tt.appSenderFunc(ctrl),
+				nil,
+				nil,
+				nil,
 				prometheus.NewRegistry(),
 				testConfig,
 			)

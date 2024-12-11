@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
+const HandlerID = p2p.SignatureRequestHandlerID
+
 var _ p2p.Handler = (*Handler)(nil)
 
 // Verifier verifies that a warp message should be signed
@@ -39,16 +41,16 @@ func NewHandler(verifier Verifier, signer warp.Signer) *Handler {
 }
 
 // NewCachedHandler returns an instance of Handler that caches successful
-// requests.
+// signatures.
 func NewCachedHandler(
 	cacher cache.Cacher[ids.ID, []byte],
 	verifier Verifier,
 	signer warp.Signer,
 ) *Handler {
 	return &Handler{
-		cacher:   cacher,
-		verifier: verifier,
-		signer:   signer,
+		signatureCache: cacher,
+		verifier:       verifier,
+		signer:         signer,
 	}
 }
 
@@ -56,9 +58,9 @@ func NewCachedHandler(
 type Handler struct {
 	p2p.NoOpHandler
 
-	cacher   cache.Cacher[ids.ID, []byte]
-	verifier Verifier
-	signer   warp.Signer
+	signatureCache cache.Cacher[ids.ID, []byte]
+	verifier       Verifier
+	signer         warp.Signer
 }
 
 func (h *Handler) AppRequest(
@@ -84,8 +86,8 @@ func (h *Handler) AppRequest(
 	}
 
 	msgID := msg.ID()
-	if responseBytes, ok := h.cacher.Get(msgID); ok {
-		return responseBytes, nil
+	if signatureBytes, ok := h.signatureCache.Get(msgID); ok {
+		return signatureToResponse(signatureBytes)
 	}
 
 	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
@@ -100,6 +102,11 @@ func (h *Handler) AppRequest(
 		}
 	}
 
+	h.signatureCache.Put(msgID, signature)
+	return signatureToResponse(signature)
+}
+
+func signatureToResponse(signature []byte) ([]byte, *common.AppError) {
 	response := &sdk.SignatureResponse{
 		Signature: signature,
 	}
@@ -111,7 +118,5 @@ func (h *Handler) AppRequest(
 			Message: fmt.Sprintf("failed to marshal response: %s", err),
 		}
 	}
-
-	h.cacher.Put(msgID, responseBytes)
 	return responseBytes, nil
 }

@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 
 			var assetID ids.ID
 			tc.By("create new X-chain asset", func() {
-				assetTx, err := xWallet.IssueCreateAssetTx(
+				tx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
 					9,
@@ -59,13 +59,11 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
-				assetID = assetTx.ID()
-
-				tc.Outf("{{green}}created new X-chain asset{{/}}: %s\n", assetID)
+				assetID = tx.ID()
 			})
 
 			tc.By("export new X-chain asset to P-chain", func() {
-				tx, err := xWallet.IssueExportTx(
+				_, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
 						{
@@ -81,23 +79,19 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
-
-				tc.Outf("{{green}}issued X-chain export{{/}}: %s\n", tx.ID())
 			})
 
 			tc.By("import new asset from X-chain on the P-chain", func() {
-				tx, err := pWallet.IssueImportTx(
+				_, err := pWallet.IssueImportTx(
 					xChainID,
 					owner,
 					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
-
-				tc.Outf("{{green}}issued P-chain import{{/}}: %s\n", tx.ID())
 			})
 
 			tc.By("export asset from P-chain to the X-chain", func() {
-				tx, err := pWallet.IssueExportTx(
+				_, err := pWallet.IssueExportTx(
 					xChainID,
 					[]*avax.TransferableOutput{
 						{
@@ -113,19 +107,17 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
-
-				tc.Outf("{{green}}issued P-chain export{{/}}: %s\n", tx.ID())
 			})
 
 			tc.By("import asset from P-chain on the X-chain", func() {
-				tx, err := xWallet.IssueImportTx(
+				_, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					owner,
 					tc.WithDefaultContext(),
 				)
 				require.NoError(err)
-
-				tc.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())
 			})
+
+			_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 		})
 })

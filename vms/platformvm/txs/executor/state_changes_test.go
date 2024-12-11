@@ -9,15 +9,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
@@ -79,7 +83,11 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			// Ensure the invariant that [nextTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				mockable.MaxTime,
+			)
 			require.NoError(err)
 			require.False(nextTime.After(nextStakerChangeTime))
 
@@ -87,7 +95,7 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						DynamicFeeConfig: feeConfig,
 						UpgradeConfig:    upgradetest.GetConfig(test.fork),
 					},
@@ -185,7 +193,11 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 
 			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
 			// AdvanceTimeTo is maintained.
-			nextStakerChangeTime, err := state.GetNextStakerChangeTime(s, mockable.MaxTime)
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				mockable.MaxTime,
+			)
 			require.NoError(err)
 			require.False(newTime.After(nextStakerChangeTime))
 
@@ -195,7 +207,7 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 
 			validatorsModified, err := AdvanceTimeTo(
 				&Backend{
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 					},
 				},
@@ -211,6 +223,145 @@ func TestAdvanceTimeTo_RemovesStaleExpiries(t *testing.T) {
 				test.expectedExpiries,
 				iterator.ToSlice(expiryIterator),
 			)
+		})
+	}
+}
+
+func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
+	sk, err := bls.NewSecretKey()
+	require.NoError(t, err)
+
+	const (
+		secondsToAdvance = 3
+		timeToAdvance    = secondsToAdvance * time.Second
+	)
+
+	var (
+		pk      = bls.PublicFromSecretKey(sk)
+		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
+
+		newL1Validator = func(endAccumulatedFee uint64) state.L1Validator {
+			return state.L1Validator{
+				ValidationID:      ids.GenerateTestID(),
+				SubnetID:          ids.GenerateTestID(),
+				NodeID:            ids.GenerateTestNodeID(),
+				PublicKey:         pkBytes,
+				Weight:            1,
+				EndAccumulatedFee: endAccumulatedFee,
+			}
+		}
+		l1ValidatorToEvict0 = newL1Validator(3 * units.NanoAvax) // lasts 3 seconds
+		l1ValidatorToEvict1 = newL1Validator(3 * units.NanoAvax) // lasts 3 seconds
+		l1ValidatorToKeep   = newL1Validator(units.Avax)
+
+		currentTime = genesistest.DefaultValidatorStartTime
+		newTime     = currentTime.Add(timeToAdvance)
+
+		config = config.Internal{
+			ValidatorFeeConfig: fee.Config{
+				Capacity:                 genesis.LocalParams.ValidatorFeeConfig.Capacity,
+				Target:                   1,
+				MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
+				ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
+			},
+			UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+		}
+	)
+
+	tests := []struct {
+		name                 string
+		initialL1Validators  []state.L1Validator
+		expectedModified     bool
+		expectedL1Validators []state.L1Validator
+		expectedExcess       gas.Gas
+	}{
+		{
+			name:             "no L1 validators",
+			expectedModified: false,
+			expectedExcess:   0,
+		},
+		{
+			name: "evicted one",
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToEvict0,
+			},
+			expectedModified: true,
+			expectedExcess:   0,
+		},
+		{
+			name: "evicted all",
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToEvict0,
+				l1ValidatorToEvict1,
+			},
+			expectedModified: true,
+			expectedExcess:   3,
+		},
+		{
+			name: "evicted 2 of 3",
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToEvict0,
+				l1ValidatorToEvict1,
+				l1ValidatorToKeep,
+			},
+			expectedModified: true,
+			expectedL1Validators: []state.L1Validator{
+				l1ValidatorToKeep,
+			},
+			expectedExcess: 6,
+		},
+		{
+			name: "no evictions",
+			initialL1Validators: []state.L1Validator{
+				l1ValidatorToKeep,
+			},
+			expectedModified: false,
+			expectedL1Validators: []state.L1Validator{
+				l1ValidatorToKeep,
+			},
+			expectedExcess: 0,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				require = require.New(t)
+				s       = statetest.New(t, statetest.Config{})
+			)
+
+			for _, l1Validator := range test.initialL1Validators {
+				require.NoError(s.PutL1Validator(l1Validator))
+			}
+
+			// Ensure the invariant that [newTime <= nextStakerChangeTime] on
+			// AdvanceTimeTo is maintained.
+			nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+				genesis.LocalParams.ValidatorFeeConfig,
+				s,
+				mockable.MaxTime,
+			)
+			require.NoError(err)
+			require.False(newTime.After(nextStakerChangeTime))
+
+			validatorsModified, err := AdvanceTimeTo(
+				&Backend{
+					Config: &config,
+				},
+				s,
+				newTime,
+			)
+			require.NoError(err)
+			require.Equal(test.expectedModified, validatorsModified)
+
+			activeL1Validators, err := s.GetActiveL1ValidatorsIterator()
+			require.NoError(err)
+			require.Equal(
+				test.expectedL1Validators,
+				iterator.ToSlice(activeL1Validators),
+			)
+
+			require.Equal(test.expectedExcess, s.GetL1ValidatorExcess())
+			require.Equal(uint64(secondsToAdvance), s.GetAccruedFees())
 		})
 	}
 }
