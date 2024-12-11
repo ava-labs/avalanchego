@@ -21,6 +21,7 @@ log = { version = "0.4.20", optional = true }
 bytemuck = "1.7.0"
 bytemuck_derive = "1.7.0"
 bitfield = "0.17.0"
+fastrace = { version = "0.7.4" }
 
 [dev-dependencies]
 rand = "0.8.5"

@@ -12,11 +12,13 @@
 //
 
 use clap::{Parser, Subcommand};
+use fastrace_opentelemetry::OpenTelemetryReporter;
 use firewood::logger::trace;
 use log::LevelFilter;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
+use std::borrow::Cow;
 use std::error::Error;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::num::NonZeroUsize;
@@ -25,6 +27,15 @@ use std::time::Duration;
 
 use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
+
+use fastrace::collector::Config;
+
+use opentelemetry::trace::SpanKind;
+use opentelemetry::InstrumentationScope;
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::SpanExporter;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::Resource;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -130,6 +141,27 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let reporter = OpenTelemetryReporter::new(
+        SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint("http://127.0.0.1:4317".to_string())
+            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+            .with_timeout(Duration::from_secs(
+                opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
+            ))
+            .build()
+            .expect("initialize oltp exporter"),
+        SpanKind::Server,
+        Cow::Owned(Resource::new([KeyValue::new(
+            "service.name",
+            "avalabs.firewood.benchmark",
+        )])),
+        InstrumentationScope::builder("firewood")
+            .with_version(env!("CARGO_PKG_VERSION"))
+            .build(),
+    );
+    fastrace::set_reporter(reporter, Config::default());
+
     let args = Args::parse();
 
     if args.test_name == TestName::Single && args.batch_size > 1000 {
@@ -203,6 +235,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.stats_dump {
         println!("{}", prometheus_handle.render());
     }
+
+    fastrace::flush();
 
     Ok(())
 }

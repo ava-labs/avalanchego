@@ -4,6 +4,8 @@
 use std::error::Error;
 use std::time::Instant;
 
+use fastrace::prelude::SpanContext;
+use fastrace::{func_path, Span};
 use firewood::db::Db;
 use firewood::v2::api::{Db as _, Proposal as _};
 use log::info;
@@ -21,6 +23,9 @@ impl TestRunner for Create {
         let start = Instant::now();
 
         for key in 0..args.number_of_batches {
+            let root = Span::root(func_path!(), SpanContext::random());
+            let _guard = root.set_local_parent();
+
             let batch = Self::generate_inserts(key * keys, args.batch_size).collect();
 
             let proposal = db.propose(batch).await.expect("proposal should succeed");

@@ -135,6 +135,7 @@ impl RevisionManager {
     ///    This write can be delayed, but would mean that recovery will not roll forward to this revision.
     /// 8. Proposal Cleanup.
     ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
+    #[fastrace::trace(short_name = true)]
     pub fn commit(&mut self, proposal: ProposedRevision) -> Result<(), RevisionManagerError> {
         // 1. Commit check
         let current_revision = self.current_revision();

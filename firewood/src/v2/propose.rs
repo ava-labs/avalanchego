@@ -166,8 +166,6 @@ impl<T: api::DbView + Send + Sync> api::Proposal for Proposal<T> {
     }
 
     async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
-        // TODO: commit should modify the db; this will only work for
-        // emptydb at the moment
         match &self.base {
             ProposalBase::Proposal(base) => base.clone().commit().await,
             ProposalBase::View(_) => Ok(()),

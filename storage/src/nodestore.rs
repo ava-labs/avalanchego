@@ -6,6 +6,7 @@ use arc_swap::access::DynAccess;
 use arc_swap::ArcSwap;
 use bincode::{DefaultOptions, Options as _};
 use bytemuck_derive::{AnyBitPattern, NoUninit};
+use fastrace::local::LocalSpan;
 use metrics::counter;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -217,6 +218,8 @@ impl<T: ReadInMemoryNode, S: ReadableStorage> NodeStore<T, S> {
         debug_assert!(addr.get() % 8 == 0);
 
         let addr = addr.get() + 1; // skip the length byte
+
+        let _span = LocalSpan::enter_with_local_parent("read_and_deserialize");
 
         let area_stream = self.storage.stream_from(addr)?;
         let node = Node::from_reader(area_stream)?;
@@ -925,6 +928,7 @@ impl<T, S: WritableStorage> NodeStore<T, S> {
 
 impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Persist the freelist from this proposal to storage.
+    #[fastrace::trace(short_name = true)]
     pub fn flush_freelist(&self) -> Result<(), Error> {
         // Write the free lists to storage
         let free_list_bytes = bytemuck::bytes_of(&self.header.free_lists);
@@ -934,6 +938,7 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     }
 
     /// Persist all the nodes of a proposal to storage.
+    #[fastrace::trace(short_name = true)]
     pub fn flush_nodes(&self) -> Result<(), Error> {
         for (addr, (area_size_index, node)) in self.kind.new.iter() {
             let mut stored_area_bytes = Vec::new();
