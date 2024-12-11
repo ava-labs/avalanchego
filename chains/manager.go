@@ -186,7 +186,7 @@ type ManagerConfig struct {
 	SybilProtectionEnabled bool
 	StakingTLSSigner       crypto.Signer
 	StakingTLSCert         *staking.Certificate
-	StakingBLSKey          *bls.SecretKey
+	StakingBLSKey          bls.Signer
 	TracingEnabled         bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.
 	Tracer                    trace.Tracer
@@ -497,7 +497,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			SubnetID:        chainParams.SubnetID,
 			ChainID:         chainParams.ID,
 			NodeID:          m.NodeID,
-			PublicKey:       bls.PublicFromSecretKey(m.StakingBLSKey),
+			PublicKey:       m.StakingBLSKey.PublicKey(),
 			NetworkUpgrades: m.Upgrades,
 
 			XChainID:    m.XChainID,
