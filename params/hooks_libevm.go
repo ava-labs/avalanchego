@@ -163,8 +163,8 @@ func (a accessableState) GetSnowContext() *snow.Context {
 	return GetExtra(a.env.ChainConfig()).SnowCtx
 }
 
-func (a accessableState) Call(addr common.Address, input []byte, gas uint64, value *uint256.Int, _ ...vm.CallOption) (ret []byte, gasRemaining uint64, _ error) {
-	return a.env.Call(addr, input, gas, value)
+func (a accessableState) Call(addr common.Address, input []byte, gas uint64, value *uint256.Int, opts ...vm.CallOption) (ret []byte, gasRemaining uint64, _ error) {
+	return a.env.Call(addr, input, gas, value, opts...)
 }
 
 type precompileBlockContext struct {
