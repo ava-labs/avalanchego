@@ -4,15 +4,14 @@
 package tmpnet
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/clienttypes"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/libevm/core"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -149,15 +148,15 @@ func NewTestGenesis(
 
 	chainID := big.NewInt(int64(networkID))
 	// Define C-Chain genesis
-	cChainGenesis := &core.Genesis{
-		// TODO: remove this after Etna and set only the chainID
-		Config:     params.GetChainConfig(upgrade.Default, chainID), // upgrade will be again set by VM according to the snow.Context
-		Difficulty: big.NewInt(0),                                   // Difficulty is a mandatory field
-		Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()),      // This time enables Avalanche upgrades by default
-		GasLimit:   defaultGasLimit,
-		Alloc:      cChainBalances,
-	}
-	cChainGenesisBytes, err := json.Marshal(cChainGenesis)
+	chainConfig, chainConfigExtras := clienttypes.GetChainConfig(upgrade.Default, chainID)
+	cChainGenesisBytes, err := clienttypes.MarshalGenesis(
+		&core.Genesis{
+			Config:     chainConfig,
+			Difficulty: big.NewInt(0),                              // Difficulty is a mandatory field
+			Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), // This time enables Avalanche upgrades by default
+			GasLimit:   defaultGasLimit,
+			Alloc:      cChainBalances,
+		}, chainConfigExtras)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
 	}
