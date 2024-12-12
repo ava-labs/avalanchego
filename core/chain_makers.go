@@ -38,10 +38,10 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/holiman/uint256"
 )
@@ -383,7 +383,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		Time:       time,
 	}
-	if cm.config.IsSubnetEVM(time) {
+	if params.GetExtra(cm.config).IsSubnetEVM(time) {
 		feeConfig, _, err := cm.GetFeeConfigAt(parent.Header())
 		if err != nil {
 			panic(err)
@@ -495,9 +495,9 @@ func (cm *chainMaker) GetBlock(hash common.Hash, number uint64) *types.Block {
 }
 
 func (cm *chainMaker) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error) {
-	return cm.config.FeeConfig, nil, nil
+	return params.GetExtra(cm.config).FeeConfig, nil, nil
 }
 
 func (cm *chainMaker) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
-	return constants.BlackholeAddr, cm.config.AllowFeeRecipients, nil
+	return constants.BlackholeAddr, params.GetExtra(cm.config).AllowFeeRecipients, nil
 }

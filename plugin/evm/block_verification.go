@@ -28,6 +28,7 @@ func NewBlockValidator() BlockValidator {
 }
 
 func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
+	rulesExtra := params.GetRulesExtra(rules)
 	if b == nil || b.ethBlock == nil {
 		return errInvalidBlock
 	}
@@ -61,14 +62,14 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	// Check that the size of the header's Extra data field is correct for [rules].
 	headerExtraDataSize := len(ethHeader.Extra)
 	switch {
-	case rules.IsDurango:
+	case rulesExtra.IsDurango:
 		if headerExtraDataSize < params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be len >= %d but got %d",
 				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
 			)
 		}
-	case rules.IsSubnetEVM:
+	case rulesExtra.IsSubnetEVM:
 		if headerExtraDataSize != params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
 				"expected header ExtraData to be len %d but got %d",
@@ -84,7 +85,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		}
 	}
 
-	if rules.IsSubnetEVM {
+	if rulesExtra.IsSubnetEVM {
 		if ethHeader.BaseFee == nil {
 			return errNilBaseFeeSubnetEVM
 		}
@@ -115,7 +116,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		return errEmptyBlock
 	}
 
-	if !rules.IsSubnetEVM {
+	if !rulesExtra.IsSubnetEVM {
 		// Make sure that all the txs have the correct fee set.
 		for _, tx := range txs {
 			if tx.GasPrice().Cmp(legacyMinGasPrice) < 0 {
@@ -130,7 +131,7 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		return fmt.Errorf("block timestamp is too far in the future: %d > allowed %d", blockTimestamp, maxBlockTime)
 	}
 
-	if rules.IsSubnetEVM {
+	if rulesExtra.IsSubnetEVM {
 		switch {
 		// Make sure BlockGasCost is not nil
 		// NOTE: ethHeader.BlockGasCost correctness is checked in header verification

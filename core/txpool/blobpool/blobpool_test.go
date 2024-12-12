@@ -72,8 +72,8 @@ var testChainConfig *params.ChainConfig
 
 func init() {
 	testChainConfig = new(params.ChainConfig)
-	*testChainConfig = *params.TestChainConfig
-	testChainConfig.FeeConfig.MinBaseFee = new(big.Int).SetUint64(1)
+	*testChainConfig = params.Copy(params.TestChainConfig)
+	params.GetExtra(testChainConfig).FeeConfig.MinBaseFee = new(big.Int).SetUint64(1)
 
 	testChainConfig.CancunTime = new(uint64)
 	*testChainConfig.CancunTime = uint64(time.Now().Unix())
@@ -117,7 +117,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			Extra:    make([]byte, params.DynamicFeeExtraDataSize),
 		}
 		_, baseFee, err := dummy.CalcBaseFee(
-			bc.config, bc.config.FeeConfig, parent, blockTime,
+			bc.config, params.GetExtra(bc.config).FeeConfig, parent, blockTime,
 		)
 		if err != nil {
 			panic(err)
@@ -172,7 +172,7 @@ func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
 }
 
 func (bc *testBlockChain) GetFeeConfigAt(header *types.Header) (commontype.FeeConfig, *big.Int, error) {
-	return bc.config.FeeConfig, nil, nil
+	return params.GetExtra(bc.config).FeeConfig, nil, nil
 }
 
 // makeAddressReserver is a utility method to sanity check that accounts are

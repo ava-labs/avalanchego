@@ -105,12 +105,12 @@ func allowFeeRecipients(accessibleState contract.AccessibleState, caller common.
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(
-			ContractAddress,
-			topics,
-			data,
-			accessibleState.GetBlockContext().Number().Uint64(),
-		)
+		stateDB.AddLog(&contract.Log{
+			Address:     ContractAddress,
+			Topics:      topics,
+			Data:        data,
+			BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+		})
 	}
 	EnableAllowFeeRecipients(stateDB)
 	// Return the packed output and the remaining gas
@@ -162,7 +162,7 @@ func PackCurrentRewardAddressOutput(rewardAddress common.Address) ([]byte, error
 
 // GetStoredRewardAddress returns the current value of the address stored under rewardAddressStorageKey.
 // Returns an empty address and true if allow fee recipients is enabled, otherwise returns current reward address and false.
-func GetStoredRewardAddress(stateDB contract.StateDB) (common.Address, bool) {
+func GetStoredRewardAddress(stateDB contract.StateReader) (common.Address, bool) {
 	val := stateDB.GetState(ContractAddress, rewardAddressStorageKey)
 	return common.BytesToAddress(val.Bytes()), val == allowFeeRecipientsAddressValue
 }
@@ -233,12 +233,12 @@ func setRewardAddress(accessibleState contract.AccessibleState, caller common.Ad
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(
-			ContractAddress,
-			topics,
-			data,
-			accessibleState.GetBlockContext().Number().Uint64(),
-		)
+		stateDB.AddLog(&contract.Log{
+			Address:     ContractAddress,
+			Topics:      topics,
+			Data:        data,
+			BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+		})
 	}
 	StoreRewardAddress(stateDB, rewardAddress)
 	// Return the packed output and the remaining gas
@@ -296,12 +296,12 @@ func disableRewards(accessibleState contract.AccessibleState, caller common.Addr
 		if err != nil {
 			return nil, remainingGas, err
 		}
-		stateDB.AddLog(
-			ContractAddress,
-			topics,
-			data,
-			accessibleState.GetBlockContext().Number().Uint64(),
-		)
+		stateDB.AddLog(&contract.Log{
+			Address:     ContractAddress,
+			Topics:      topics,
+			Data:        data,
+			BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+		})
 	}
 	DisableFeeRewards(stateDB)
 	// Return the packed output and the remaining gas

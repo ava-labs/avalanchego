@@ -182,7 +182,6 @@ func SetupGenesisBlock(
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
-	storedcfg.SetEthUpgrades(storedcfg.NetworkUpgrades)
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	// we use last accepted block for cfg compatibility check. Note this allows
@@ -202,8 +201,8 @@ func SetupGenesisBlock(
 	} else {
 		compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
 		if compatErr != nil && ((height != 0 && compatErr.RewindToBlock != 0) || (timestamp != 0 && compatErr.RewindToTime != 0)) {
-			storedData, _ := storedcfg.ToWithUpgradesJSON().MarshalJSON()
-			newData, _ := newcfg.ToWithUpgradesJSON().MarshalJSON()
+			storedData, _ := params.ToWithUpgradesJSON(storedcfg).MarshalJSON()
+			newData, _ := params.ToWithUpgradesJSON(newcfg).MarshalJSON()
 			log.Error("found mismatch between config on database vs. new config", "storedConfig", string(storedData), "newConfig", string(newData), "err", compatErr)
 			return newcfg, stored, compatErr
 		}
@@ -304,11 +303,11 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	}
 	if conf := g.Config; conf != nil {
 		num := new(big.Int).SetUint64(g.Number)
-		if conf.IsSubnetEVM(g.Timestamp) {
+		if params.GetExtra(conf).IsSubnetEVM(g.Timestamp) {
 			if g.BaseFee != nil {
 				head.BaseFee = g.BaseFee
 			} else {
-				head.BaseFee = new(big.Int).Set(g.Config.FeeConfig.MinBaseFee)
+				head.BaseFee = new(big.Int).Set(params.GetExtra(g.Config).FeeConfig.MinBaseFee)
 			}
 		}
 		if conf.IsCancun(num, g.Timestamp) {
@@ -377,7 +376,7 @@ func (g *Genesis) MustCommit(db ethdb.Database, triedb *triedb.Database) *types.
 
 func (g *Genesis) Verify() error {
 	// Make sure genesis gas limit is consistent
-	gasLimitConfig := g.Config.FeeConfig.GasLimit.Uint64()
+	gasLimitConfig := params.GetExtra(g.Config).FeeConfig.GasLimit.Uint64()
 	if gasLimitConfig != g.GasLimit {
 		return fmt.Errorf(
 			"gas limit in fee config (%d) does not match gas limit in header (%d)",
@@ -386,7 +385,7 @@ func (g *Genesis) Verify() error {
 		)
 	}
 	// Verify config
-	if err := g.Config.Verify(); err != nil {
+	if err := params.GetExtra(g.Config).Verify(); err != nil {
 		return err
 	}
 	return nil

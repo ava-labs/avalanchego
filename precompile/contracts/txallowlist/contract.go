@@ -13,7 +13,7 @@ import (
 var TxAllowListPrecompile contract.StatefulPrecompiledContract = allowlist.CreateAllowListPrecompile(ContractAddress)
 
 // GetTxAllowListStatus returns the role of [address] for the tx allow list.
-func GetTxAllowListStatus(stateDB contract.StateDB, address common.Address) allowlist.Role {
+func GetTxAllowListStatus(stateDB contract.StateReader, address common.Address) allowlist.Role {
 	return allowlist.GetAllowListStatus(stateDB, ContractAddress, address)
 }
 

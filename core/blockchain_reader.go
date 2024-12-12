@@ -36,12 +36,12 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/event"
 )
 
@@ -365,9 +365,9 @@ func (bc *BlockChain) SubscribeAcceptedTransactionEvent(ch chan<- NewTxsEvent) e
 // Otherwise returns the fee config in the chain config.
 // Assumes that a valid configuration is stored when the precompile is activated.
 func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error) {
-	config := bc.Config()
-	if !config.IsPrecompileEnabled(feemanager.ContractAddress, parent.Time) {
-		return config.FeeConfig, common.Big0, nil
+	configExtra := params.GetExtra(bc.Config())
+	if !configExtra.IsPrecompileEnabled(feemanager.ContractAddress, parent.Time) {
+		return configExtra.FeeConfig, common.Big0, nil
 	}
 
 	// try to return it from the cache
@@ -399,13 +399,13 @@ func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 // If RewardManager is activated at [parent], returns the reward manager config in the precompile contract state.
 // If fee recipients are allowed, returns true in the second return value.
 func (bc *BlockChain) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
-	config := bc.Config()
-	if !config.IsSubnetEVM(parent.Time) {
+	configExtra := params.GetExtra(bc.Config())
+	if !configExtra.IsSubnetEVM(parent.Time) {
 		return constants.BlackholeAddr, false, nil
 	}
 
-	if !config.IsPrecompileEnabled(rewardmanager.ContractAddress, parent.Time) {
-		if bc.chainConfig.AllowFeeRecipients {
+	if !configExtra.IsPrecompileEnabled(rewardmanager.ContractAddress, parent.Time) {
+		if configExtra.AllowFeeRecipients {
 			return common.Address{}, true, nil
 		} else {
 			return constants.BlackholeAddr, false, nil

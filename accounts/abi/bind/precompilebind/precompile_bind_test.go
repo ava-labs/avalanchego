@@ -452,7 +452,7 @@ var bindTests = []struct {
 		`"github.com/stretchr/testify/require"
 		 "math/big"
 		 "github.com/ethereum/go-ethereum/common"
-		 "github.com/ava-labs/subnet-evm/core/state"
+		 "github.com/ava-labs/subnet-evm/core/extstate"
 		 "github.com/ava-labs/subnet-evm/precompile/allowlist"
 		`,
 		`
@@ -466,7 +466,7 @@ var bindTests = []struct {
 			require.Equal(t, testGreeting, unpackedGreeting)
 
 			// test that the allow list is generated correctly
-			stateDB := state.NewTestStateDB(t)
+			stateDB := extstate.NewTestStateDB(t)
 			address := common.BigToAddress(big.NewInt(1))
 			SetHelloWorldAllowListStatus(stateDB, address, allowlist.EnabledRole)
 			role := GetHelloWorldAllowListStatus(stateDB, address)
@@ -691,6 +691,11 @@ func TestPrecompileBind(t *testing.T) {
 	}
 	pwd, _ := os.Getwd()
 	replacer := exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/subnet-evm@v0.0.0", "-replace", "github.com/ava-labs/subnet-evm="+filepath.Join(pwd, "..", "..", "..", "..")) // Repo root
+	replacer.Dir = pkg
+	if out, err := replacer.CombinedOutput(); err != nil {
+		t.Fatalf("failed to replace binding test dependency to current source tree: %v\n%s", err, out)
+	}
+	replacer = exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ethereum/go-ethereum@v0.0.0", "-replace", "github.com/ethereum/go-ethereum=github.com/ava-labs/go-ethereum@v0.0.0-20241007222654-0752a11d4aee")
 	replacer.Dir = pkg
 	if out, err := replacer.CombinedOutput(); err != nil {
 		t.Fatalf("failed to replace binding test dependency to current source tree: %v\n%s", err, out)

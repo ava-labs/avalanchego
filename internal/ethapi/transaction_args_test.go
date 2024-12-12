@@ -35,7 +35,6 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -274,10 +273,8 @@ func newBackendMock() *backendMock {
 		PetersburgBlock:     big.NewInt(0),
 		IstanbulBlock:       big.NewInt(0),
 		MuirGlacierBlock:    big.NewInt(0),
-		NetworkUpgrades: params.NetworkUpgrades{
-			SubnetEVMTimestamp: utils.NewUint64(100),
-		},
-		CancunTime: &cancunTime,
+		LondonBlock:         big.NewInt(1100),
+		CancunTime:          &cancunTime,
 	}
 	return &backendMock{
 		current: &types.Header{
@@ -295,9 +292,11 @@ func newBackendMock() *backendMock {
 
 func (b *backendMock) setFork(fork string) error {
 	if fork == "legacy" {
-		b.current.Time = uint64(90) // Before SubnetEVMTimestamp
+		b.current.Number = big.NewInt(900)
+		b.current.Time = 555
 	} else if fork == "london" {
-		b.current.Time = uint64(110) // After SubnetEVMTimestamp
+		b.current.Number = big.NewInt(1100)
+		b.current.Time = 555
 	} else if fork == "cancun" {
 		b.current.Number = big.NewInt(1100)
 		b.current.Time = 700

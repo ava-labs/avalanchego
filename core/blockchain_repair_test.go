@@ -37,10 +37,10 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/triedb"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
@@ -527,14 +527,14 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 	defer db.Close() // Might double close, should be fine
 
 	// Initialize a fresh chain
-	chainConfig := *params.TestChainConfig
-	chainConfig.FeeConfig.MinBaseFee = big.NewInt(1)
+	chainConfig := params.Copy(params.TestChainConfig)
+	params.GetExtra(&chainConfig).FeeConfig.MinBaseFee = big.NewInt(1)
 	var (
 		require = require.New(t)
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
 		gspec   = &Genesis{
-			BaseFee: chainConfig.FeeConfig.MinBaseFee,
+			BaseFee: params.GetExtra(&chainConfig).FeeConfig.MinBaseFee,
 			Config:  &chainConfig,
 			Alloc:   GenesisAlloc{addr1: {Balance: big.NewInt(params.Ether)}},
 		}

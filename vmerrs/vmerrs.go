@@ -28,24 +28,26 @@ package vmerrs
 
 import (
 	"errors"
+
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 // List evm execution errors
 var (
-	ErrOutOfGas                    = errors.New("out of gas")
-	ErrCodeStoreOutOfGas           = errors.New("contract creation code storage out of gas")
-	ErrDepth                       = errors.New("max call depth exceeded")
-	ErrInsufficientBalance         = errors.New("insufficient balance for transfer")
-	ErrContractAddressCollision    = errors.New("contract address collision")
-	ErrExecutionReverted           = errors.New("execution reverted")
-	ErrMaxInitCodeSizeExceeded     = errors.New("max initcode size exceeded")
-	ErrMaxCodeSizeExceeded         = errors.New("max code size exceeded")
-	ErrInvalidJump                 = errors.New("invalid jump destination")
-	ErrWriteProtection             = errors.New("write protection")
-	ErrReturnDataOutOfBounds       = errors.New("return data out of bounds")
-	ErrGasUintOverflow             = errors.New("gas uint64 overflow")
-	ErrInvalidCode                 = errors.New("invalid code: must not begin with 0xef")
-	ErrNonceUintOverflow           = errors.New("nonce uint64 overflow")
+	ErrOutOfGas                    = vm.ErrOutOfGas
+	ErrCodeStoreOutOfGas           = vm.ErrCodeStoreOutOfGas
+	ErrDepth                       = vm.ErrDepth
+	ErrInsufficientBalance         = vm.ErrInsufficientBalance
+	ErrContractAddressCollision    = vm.ErrContractAddressCollision
+	ErrExecutionReverted           = vm.ErrExecutionReverted
+	ErrMaxInitCodeSizeExceeded     = vm.ErrMaxInitCodeSizeExceeded
+	ErrMaxCodeSizeExceeded         = vm.ErrMaxCodeSizeExceeded
+	ErrInvalidJump                 = vm.ErrInvalidJump
+	ErrWriteProtection             = vm.ErrWriteProtection
+	ErrReturnDataOutOfBounds       = vm.ErrReturnDataOutOfBounds
+	ErrGasUintOverflow             = vm.ErrGasUintOverflow
+	ErrInvalidCode                 = vm.ErrInvalidCode
+	ErrNonceUintOverflow           = vm.ErrNonceUintOverflow
 	ErrAddrProhibited              = errors.New("prohibited address cannot be sender or created contract address")
 	ErrInvalidCoinbase             = errors.New("invalid coinbase")
 	ErrSenderAddressNotAllowListed = errors.New("cannot issue transaction from non-allow listed address")

@@ -162,7 +162,7 @@ func TestCheckNetworkUpgradesCompatible(t *testing.T) {
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.upgrades1.CheckNetworkUpgradesCompatible(test.upgrades2, test.time)
+			err := test.upgrades1.checkNetworkUpgradesCompatible(test.upgrades2, test.time)
 			if test.expected {
 				require.Nil(t, err)
 			} else {

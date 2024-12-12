@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/eth/tracers/logger"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
@@ -22,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,7 +30,7 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 
 	// Initialize test accounts
 	accounts := newAccounts(3)
-	copyConfig := *params.TestChainConfig
+	copyConfig := params.Copy(params.TestChainConfig)
 	genesis := &core.Genesis{
 		Config: &copyConfig,
 		Alloc: types.GenesisAlloc{
@@ -52,7 +52,7 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
 	}
 
-	genesis.Config.PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).PrecompileUpgrades = []params.PrecompileUpgrade{
 		activateTxAllowListConfig,
 		deactivateTxAllowListConfig,
 	}
@@ -136,7 +136,7 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 
 	// Initialize test accounts
 	accounts := newAccounts(3)
-	copyConfig := *params.TestChainConfig
+	copyConfig := params.Copy(params.TestChainConfig)
 	genesis := &core.Genesis{
 		Config: &copyConfig,
 		Alloc: types.GenesisAlloc{
@@ -158,7 +158,7 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
 	}
 
-	genesis.Config.PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).PrecompileUpgrades = []params.PrecompileUpgrade{
 		activateTxAllowListConfig,
 		deactivateTxAllowListConfig,
 	}
@@ -200,7 +200,7 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 	// Initialize test accounts
 	// Note: the balances in this test have been increased compared to go-ethereum.
 	accounts := newAccounts(3)
-	copyConfig := *params.TestChainConfig
+	copyConfig := params.Copy(params.TestChainConfig)
 	genesis := &core.Genesis{
 		Config: &copyConfig,
 		Alloc: types.GenesisAlloc{
@@ -222,7 +222,7 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 		Config: txallowlist.NewDisableConfig(&deactivateAllowListTime),
 	}
 
-	genesis.Config.PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).PrecompileUpgrades = []params.PrecompileUpgrade{
 		activateTxAllowListConfig,
 		deactivateTxAllowListConfig,
 	}
@@ -297,7 +297,7 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 
 	// Initialize test accounts
 	accounts := newAccounts(3)
-	copyConfig := *params.TestChainConfig
+	copyConfig := params.Copy(params.TestChainConfig)
 	genesis := &core.Genesis{
 		Config: &copyConfig,
 		Alloc: types.GenesisAlloc{
@@ -319,7 +319,7 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 		},
 	}
 
-	genesis.Config.StateUpgrades = []params.StateUpgrade{
+	params.GetExtra(genesis.Config).StateUpgrades = []params.StateUpgrade{
 		activateStateUpgradeConfig,
 	}
 	genBlocks := 3

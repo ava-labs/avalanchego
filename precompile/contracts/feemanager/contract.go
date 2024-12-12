@@ -70,7 +70,7 @@ type FeeConfigABIStruct struct {
 }
 
 // GetFeeManagerStatus returns the role of [address] for the fee config manager list.
-func GetFeeManagerStatus(stateDB contract.StateDB, address common.Address) allowlist.Role {
+func GetFeeManagerStatus(stateDB contract.StateReader, address common.Address) allowlist.Role {
 	return allowlist.GetAllowListStatus(stateDB, ContractAddress, address)
 }
 
@@ -81,7 +81,7 @@ func SetFeeManagerStatus(stateDB contract.StateDB, address common.Address, role 
 }
 
 // GetStoredFeeConfig returns fee config from contract storage in given state
-func GetStoredFeeConfig(stateDB contract.StateDB) commontype.FeeConfig {
+func GetStoredFeeConfig(stateDB contract.StateReader) commontype.FeeConfig {
 	feeConfig := commontype.FeeConfig{}
 	for i := minFeeConfigFieldKey; i <= numFeeConfigField; i++ {
 		val := stateDB.GetState(ContractAddress, common.Hash{byte(i)})
@@ -110,7 +110,7 @@ func GetStoredFeeConfig(stateDB contract.StateDB) commontype.FeeConfig {
 	return feeConfig
 }
 
-func GetFeeConfigLastChangedAt(stateDB contract.StateDB) *big.Int {
+func GetFeeConfigLastChangedAt(stateDB contract.StateReader) *big.Int {
 	val := stateDB.GetState(ContractAddress, feeConfigLastChangedAtKey)
 	return val.Big()
 }
@@ -241,12 +241,12 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 			return nil, remainingGas, err
 		}
 
-		stateDB.AddLog(
-			ContractAddress,
-			topics,
-			data,
-			accessibleState.GetBlockContext().Number().Uint64(),
-		)
+		stateDB.AddLog(&contract.Log{
+			Address:     ContractAddress,
+			Topics:      topics,
+			Data:        data,
+			BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+		})
 	}
 
 	if err := StoreFeeConfig(stateDB, feeConfig, accessibleState.GetBlockContext()); err != nil {

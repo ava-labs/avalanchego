@@ -14,7 +14,7 @@ var ContractDeployerAllowListPrecompile contract.StatefulPrecompiledContract = a
 
 // GetContractDeployerAllowListStatus returns the role of [address] for the contract deployer
 // allow list.
-func GetContractDeployerAllowListStatus(stateDB contract.StateDB, address common.Address) allowlist.Role {
+func GetContractDeployerAllowListStatus(stateDB contract.StateReader, address common.Address) allowlist.Role {
 	return allowlist.GetAllowListStatus(stateDB, ContractAddress, address)
 }
 

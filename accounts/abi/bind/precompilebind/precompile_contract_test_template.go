@@ -14,7 +14,7 @@ import (
 	"testing"
 	"math/big"
 
-	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	{{- if .Contract.AllowList}}
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	{{- end}}
@@ -187,12 +187,12 @@ func Test{{.Contract.Type}}Run(t *testing.T) {
 	// and runs them all together.
 	// Even if you don't add any custom tests, keep this. This will still
 	// run the default allowlist tests.
-	allowlist.RunPrecompileWithAllowListTests(t, Module, state.NewTestStateDB, tests)
+	allowlist.RunPrecompileWithAllowListTests(t, Module, extstate.NewTestStateDB, tests)
 	{{- else}}
 	// Run tests.
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			test.Run(t, Module, state.NewTestStateDB(t))
+			test.Run(t, Module, extstate.NewTestStateDB(t))
 		})
 	}
 	{{- end}}
@@ -247,12 +247,12 @@ func Benchmark{{.Contract.Type}}(b *testing.B) {
 	// and benchmarks them all together.
 	// Even if you don't add any custom tests, keep this. This will still
 	// run the default allowlist tests.
-	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, tests)
+	allowlist.BenchPrecompileWithAllowList(b, Module, extstate.NewTestStateDB, tests)
 	{{- else}}
 	// Benchmark tests.
 	for name, test := range tests {
 		b.Run(name, func(b *testing.B) {
-			test.Bench(b, Module, state.NewTestStateDB(b))
+			test.Bench(b, Module, extstate.NewTestStateDB(b))
 		})
 	}
 	{{- end}}

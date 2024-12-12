@@ -6,14 +6,14 @@ package txallowlist
 import (
 	"testing"
 
-	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 )
 
 func TestTxAllowListRun(t *testing.T) {
-	allowlist.RunPrecompileWithAllowListTests(t, Module, state.NewTestStateDB, nil)
+	allowlist.RunPrecompileWithAllowListTests(t, Module, extstate.NewTestStateDB, nil)
 }
 
 func BenchmarkTxAllowList(b *testing.B) {
-	allowlist.BenchPrecompileWithAllowList(b, Module, state.NewTestStateDB, nil)
+	allowlist.BenchPrecompileWithAllowList(b, Module, extstate.NewTestStateDB, nil)
 }

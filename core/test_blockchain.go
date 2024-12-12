@@ -1483,9 +1483,9 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, gspec 
 
 	// Ensure that key1 has sufficient funds in the genesis block for all of the tests.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
-	config := *params.TestChainConfig
+	config := params.Copy(params.TestChainConfig)
 	// Set all of the required config parameters
-	config.GenesisPrecompiles = params.Precompiles{
+	params.GetExtra(&config).GenesisPrecompiles = params.Precompiles{
 		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{addr1}, nil, nil),
 		feemanager.ConfigKey:        feemanager.NewConfig(utils.NewUint64(0), []common.Address{addr1}, nil, nil, nil),
 	}
@@ -1611,7 +1611,7 @@ func TestStatefulPrecompiles(t *testing.T, create func(db ethdb.Database, gspec 
 
 				feeConfig, _, err := blockchain.GetFeeConfigAt(blockchain.Genesis().Header())
 				assert.NoError(err)
-				assert.EqualValues(config.FeeConfig, feeConfig)
+				assert.EqualValues(params.GetExtra(&config).FeeConfig, feeConfig)
 			},
 		},
 	}

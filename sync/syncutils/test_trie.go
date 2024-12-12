@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/subnet-evm/accounts/keystore"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/trie/trienode"
 	"github.com/ava-labs/subnet-evm/triedb"
+	"github.com/ava-labs/subnet-evm/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -147,12 +147,12 @@ func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 func FillAccounts(
 	t *testing.T, trieDB *triedb.Database, root common.Hash, numAccounts int,
 	onAccount func(*testing.T, int, types.StateAccount) types.StateAccount,
-) (common.Hash, map[*keystore.Key]*types.StateAccount) {
+) (common.Hash, map[*utils.Key]*types.StateAccount) {
 	var (
 		minBalance  = uint256.NewInt(3000000000000000000)
 		randBalance = uint256.NewInt(1000000000000000000)
 		maxNonce    = 10
-		accounts    = make(map[*keystore.Key]*types.StateAccount, numAccounts)
+		accounts    = make(map[*utils.Key]*types.StateAccount, numAccounts)
 	)
 
 	tr, err := trie.NewStateTrie(trie.TrieID(root), trieDB)
@@ -176,7 +176,7 @@ func FillAccounts(
 			t.Fatalf("failed to rlp encode account: %v", err)
 		}
 
-		key, err := keystore.NewKey(cryptoRand.Reader)
+		key, err := utils.NewKey(cryptoRand.Reader)
 		if err != nil {
 			t.Fatal(err)
 		}

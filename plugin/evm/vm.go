@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/prometheus/client_golang/prometheus"
 
-	avalancheNode "github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
@@ -55,8 +54,8 @@ import (
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"
 	// is added to a map of client-accessible tracers. In geth, this is done
 	// inside of cmd/geth.
-	_ "github.com/ava-labs/subnet-evm/eth/tracers/js"
-	_ "github.com/ava-labs/subnet-evm/eth/tracers/native"
+	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
+	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
 
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	// Force-load precompiles to trigger registration
@@ -347,11 +346,12 @@ func (vm *VM) Initialize(
 	}
 
 	// Set the Avalanche Context on the ChainConfig
-	g.Config.AvalancheContext = params.AvalancheContext{
+	configExtra := params.GetExtra(g.Config)
+	configExtra.AvalancheContext = params.AvalancheContext{
 		SnowCtx: chainCtx,
 	}
 
-	g.Config.SetNetworkUpgradeDefaults()
+	params.SetNetworkUpgradeDefaults(g.Config)
 
 	// Load airdrop file if provided
 	if vm.config.AirdropFile != "" {
@@ -363,9 +363,9 @@ func (vm *VM) Initialize(
 
 	vm.syntacticBlockValidator = NewBlockValidator()
 
-	if g.Config.FeeConfig == commontype.EmptyFeeConfig {
+	if configExtra.FeeConfig == commontype.EmptyFeeConfig {
 		log.Info("No fee config given in genesis, setting default fee config", "DefaultFeeConfig", params.DefaultFeeConfig)
-		g.Config.FeeConfig = params.DefaultFeeConfig
+		configExtra.FeeConfig = params.DefaultFeeConfig
 	}
 
 	// Apply upgradeBytes (if any) by unmarshalling them into [chainConfig.UpgradeConfig].
@@ -376,23 +376,23 @@ func (vm *VM) Initialize(
 		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
 			return fmt.Errorf("failed to parse upgrade bytes: %w", err)
 		}
-		g.Config.UpgradeConfig = upgradeConfig
+		configExtra.UpgradeConfig = upgradeConfig
 	}
 
-	if g.Config.UpgradeConfig.NetworkUpgradeOverrides != nil {
-		overrides := g.Config.UpgradeConfig.NetworkUpgradeOverrides
+	if configExtra.UpgradeConfig.NetworkUpgradeOverrides != nil {
+		overrides := configExtra.UpgradeConfig.NetworkUpgradeOverrides
 		marshaled, err := json.Marshal(overrides)
 		if err != nil {
 			log.Warn("Failed to marshal network upgrade overrides", "error", err, "overrides", overrides)
 		} else {
 			log.Info("Applying network upgrade overrides", "overrides", string(marshaled))
 		}
-		g.Config.Override(overrides)
+		configExtra.Override(overrides)
 	}
 
-	g.Config.SetEthUpgrades(g.Config.NetworkUpgrades)
+	params.SetEthUpgrades(g.Config, configExtra.NetworkUpgrades)
 
-	if err := g.Verify(); err != nil {
+	if err := configExtra.Verify(); err != nil {
 		return fmt.Errorf("failed to verify genesis: %w", err)
 	}
 
@@ -581,7 +581,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 	}
 	vm.eth.SetEtherbase(ethConfig.Miner.Etherbase)
 	vm.txPool = vm.eth.TxPool()
-	vm.txPool.SetMinFee(vm.chainConfig.FeeConfig.MinBaseFee)
+	vm.txPool.SetMinFee(vm.chainConfigExtra().FeeConfig.MinBaseFee)
 	vm.txPool.SetGasTip(big.NewInt(0))
 	vm.blockChain = vm.eth.BlockChain()
 	vm.miner = vm.eth.Miner()
@@ -1088,17 +1088,22 @@ func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
 	return state.GetNonce(address), nil
 }
 
+func (vm *VM) chainConfigExtra() *params.ChainConfigExtra {
+	return params.GetExtra(vm.chainConfig)
+}
+
 // currentRules returns the chain rules for the current block.
-func (vm *VM) currentRules() params.Rules {
+func (vm *VM) currentRules() params.RulesExtra {
 	header := vm.eth.APIBackend.CurrentHeader()
-	return vm.chainConfig.Rules(header.Number, header.Time)
+	rules := vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
+	return *params.GetRulesExtra(rules)
 }
 
 // requirePrimaryNetworkSigners returns true if warp messages from the primary
 // network must be signed by the primary network validators.
 // This is necessary when the subnet is not validating the primary network.
 func (vm *VM) requirePrimaryNetworkSigners() bool {
-	switch c := vm.currentRules().ActivePrecompiles[warpcontract.ContractAddress].(type) {
+	switch c := vm.currentRules().Precompiles[warpcontract.ContractAddress].(type) {
 	case *warpcontract.Config:
 		return c.RequirePrimaryNetworkSigners
 	default: // includes nil due to non-presence
@@ -1213,9 +1218,23 @@ func (vm *VM) useStandaloneDatabase(acceptedDB database.Database) (bool, error) 
 	return false, err
 }
 
+type DatabaseConfig struct {
+	// If true, all writes are to memory and are discarded at node shutdown.
+	ReadOnly bool `json:"readOnly"`
+
+	// Path to database
+	Path string `json:"path"`
+
+	// Name of the database type to use
+	Name string `json:"name"`
+
+	// Path to config file
+	Config []byte `json:"-"`
+}
+
 // getDatabaseConfig returns the database configuration for the chain
 // to be used by separate, standalone database.
-func getDatabaseConfig(config Config, chainDataDir string) (avalancheNode.DatabaseConfig, error) {
+func getDatabaseConfig(config Config, chainDataDir string) (DatabaseConfig, error) {
 	var (
 		configBytes []byte
 		err         error
@@ -1224,13 +1243,13 @@ func getDatabaseConfig(config Config, chainDataDir string) (avalancheNode.Databa
 		dbConfigContent := config.DatabaseConfigContent
 		configBytes, err = base64.StdEncoding.DecodeString(dbConfigContent)
 		if err != nil {
-			return avalancheNode.DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
+			return DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
 		}
 	} else if len(config.DatabaseConfigFile) != 0 {
 		configPath := config.DatabaseConfigFile
 		configBytes, err = os.ReadFile(configPath)
 		if err != nil {
-			return avalancheNode.DatabaseConfig{}, err
+			return DatabaseConfig{}, err
 		}
 	}
 
@@ -1239,7 +1258,7 @@ func getDatabaseConfig(config Config, chainDataDir string) (avalancheNode.Databa
 		dbPath = config.DatabasePath
 	}
 
-	return avalancheNode.DatabaseConfig{
+	return DatabaseConfig{
 		Name:     config.DatabaseType,
 		ReadOnly: config.DatabaseReadOnly,
 		Path:     dbPath,
@@ -1291,7 +1310,7 @@ func (vm *VM) initializeDBs(avaDB database.Database) error {
 }
 
 // createDatabase returns a new database instance with the provided configuration
-func (vm *VM) createDatabase(dbConfig avalancheNode.DatabaseConfig) (database.Database, error) {
+func (vm *VM) createDatabase(dbConfig DatabaseConfig) (database.Database, error) {
 	dbRegisterer, err := avalanchemetrics.MakeAndRegister(
 		vm.ctx.Metrics,
 		dbMetricsPrefix,

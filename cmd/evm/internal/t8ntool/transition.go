@@ -37,13 +37,13 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
-	"github.com/ava-labs/subnet-evm/eth/tracers/logger"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 )
@@ -204,8 +204,7 @@ func Transition(ctx *cli.Context) error {
 }
 
 func applyLondonChecks(env *stEnv, chainConfig *params.ChainConfig) error {
-	// NOTE: IsLondon replaced with IsSubnetEVM here
-	if !chainConfig.IsSubnetEVM(env.Timestamp) {
+	if !chainConfig.IsLondon(new(big.Int).SetUint64(env.Number)) {
 		return nil
 	}
 	// Sanity check, to not `panic` in state_transition

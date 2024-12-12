@@ -38,7 +38,7 @@ var (
 
 // GetAllowListStatus returns the allow list role of [address] for the precompile
 // at [precompileAddr]
-func GetAllowListStatus(state contract.StateDB, precompileAddr common.Address, address common.Address) Role {
+func GetAllowListStatus(state contract.StateReader, precompileAddr common.Address, address common.Address) Role {
 	// Generate the state key for [address]
 	addressKey := common.BytesToHash(address.Bytes())
 	return Role(state.GetState(precompileAddr, addressKey))
@@ -117,12 +117,12 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 			if err != nil {
 				return nil, remainingGas, err
 			}
-			stateDB.AddLog(
-				precompileAddr,
-				topics,
-				data,
-				evm.GetBlockContext().Number().Uint64(),
-			)
+			stateDB.AddLog(&contract.Log{
+				Address:     precompileAddr,
+				Topics:      topics,
+				Data:        data,
+				BlockNumber: evm.GetBlockContext().Number().Uint64(),
+			})
 		}
 
 		SetAllowListRole(stateDB, precompileAddr, modifyAddress, role)

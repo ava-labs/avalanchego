@@ -32,7 +32,7 @@ func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
 	return reflect.DeepEqual(n, other)
 }
 
-func (n *NetworkUpgrades) CheckNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ConfigCompatError {
+func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ConfigCompatError {
 	if isForkTimestampIncompatible(n.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp, time) {
 		return newTimestampCompatError("SubnetEVM fork block timestamp", n.SubnetEVMTimestamp, newcfg.SubnetEVMTimestamp)
 	}
@@ -102,23 +102,23 @@ func (n *NetworkUpgrades) Override(o *NetworkUpgrades) {
 
 // IsSubnetEVM returns whether [time] represents a block
 // with a timestamp after the SubnetEVM upgrade time.
-func (n *NetworkUpgrades) IsSubnetEVM(time uint64) bool {
+func (n NetworkUpgrades) IsSubnetEVM(time uint64) bool {
 	return isTimestampForked(n.SubnetEVMTimestamp, time)
 }
 
 // IsDurango returns whether [time] represents a block
 // with a timestamp after the Durango upgrade time.
-func (n *NetworkUpgrades) IsDurango(time uint64) bool {
+func (n NetworkUpgrades) IsDurango(time uint64) bool {
 	return isTimestampForked(n.DurangoTimestamp, time)
 }
 
 // IsEtna returns whether [time] represents a block
 // with a timestamp after the Etna upgrade time.
-func (n *NetworkUpgrades) IsEtna(time uint64) bool {
+func (n NetworkUpgrades) IsEtna(time uint64) bool {
 	return isTimestampForked(n.EtnaTimestamp, time)
 }
 
-func (n *NetworkUpgrades) Description() string {
+func (n NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))
 	banner += fmt.Sprintf(" - Durango Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", ptrToString(n.DurangoTimestamp))

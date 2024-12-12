@@ -31,9 +31,9 @@ func TestBuildGenesis(t *testing.T) {
 		testEthAddrs[1]: {Balance: genesisBalance},
 	}
 	genesis.Alloc = testAlloc
-	genesis.Config.FeeConfig = params.DefaultFeeConfig
+	params.GetExtra(genesis.Config).FeeConfig = params.DefaultFeeConfig
 	testGasLimit := big.NewInt(999999)
-	genesis.Config.FeeConfig.GasLimit = testGasLimit
+	params.GetExtra(genesis.Config).FeeConfig.GasLimit = testGasLimit
 	genesis.GasLimit = testGasLimit.Uint64()
 
 	args := &BuildGenesisArgs{GenesisData: genesis}
@@ -51,7 +51,7 @@ func TestBuildGenesis(t *testing.T) {
 	decodedGenesis := &core.Genesis{}
 	decodedGenesis.UnmarshalJSON(genesisBytes)
 	// test
-	assert.Equal(t, testGasLimit, decodedGenesis.Config.FeeConfig.GasLimit)
+	assert.Equal(t, testGasLimit, params.GetExtra(decodedGenesis.Config).FeeConfig.GasLimit)
 	assert.Equal(t, testAlloc, decodedGenesis.Alloc)
 }
 
@@ -69,9 +69,9 @@ func TestDecodeGenesis(t *testing.T) {
 		testEthAddrs[1]: {Balance: genesisBalance},
 	}
 	genesis.Alloc = testAlloc
-	genesis.Config.FeeConfig = params.DefaultFeeConfig
+	params.GetExtra(genesis.Config).FeeConfig = params.DefaultFeeConfig
 	testGasLimit := big.NewInt(999999)
-	genesis.Config.FeeConfig.GasLimit = testGasLimit
+	params.GetExtra(genesis.Config).FeeConfig.GasLimit = testGasLimit
 	genesis.GasLimit = testGasLimit.Uint64()
 
 	args := &BuildGenesisArgs{GenesisData: genesis}
@@ -91,6 +91,6 @@ func TestDecodeGenesis(t *testing.T) {
 	decodedGenesis := decReply.Genesis
 
 	// test
-	assert.Equal(t, testGasLimit, decodedGenesis.Config.FeeConfig.GasLimit)
+	assert.Equal(t, testGasLimit, params.GetExtra(decodedGenesis.Config).FeeConfig.GasLimit)
 	assert.Equal(t, testAlloc, decodedGenesis.Alloc)
 }

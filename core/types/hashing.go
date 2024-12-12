@@ -28,8 +28,6 @@ package types
 
 import (
 	"bytes"
-	"fmt"
-	"math"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -48,39 +46,11 @@ var encodeBufferPool = sync.Pool{
 	New: func() interface{} { return new(bytes.Buffer) },
 }
 
-// getPooledBuffer retrieves a buffer from the pool and creates a byte slice of the
-// requested size from it.
-//
-// The caller should return the *bytes.Buffer object back into encodeBufferPool after use!
-// The returned byte slice must not be used after returning the buffer.
-func getPooledBuffer(size uint64) ([]byte, *bytes.Buffer, error) {
-	if size > math.MaxInt {
-		return nil, nil, fmt.Errorf("can't get buffer of size %d", size)
-	}
-	buf := encodeBufferPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	buf.Grow(int(size))
-	b := buf.Bytes()[:int(size)]
-	return b, buf, nil
-}
-
 // rlpHash encodes x and hashes the encoded bytes.
 func rlpHash(x interface{}) (h common.Hash) {
 	sha := hasherPool.Get().(crypto.KeccakState)
 	defer hasherPool.Put(sha)
 	sha.Reset()
-	rlp.Encode(sha, x)
-	sha.Read(h[:])
-	return h
-}
-
-// prefixedRlpHash writes the prefix into the hasher before rlp-encoding x.
-// It's used for typed transactions.
-func prefixedRlpHash(prefix byte, x interface{}) (h common.Hash) {
-	sha := hasherPool.Get().(crypto.KeccakState)
-	defer hasherPool.Put(sha)
-	sha.Reset()
-	sha.Write([]byte{prefix})
 	rlp.Encode(sha, x)
 	sha.Read(h[:])
 	return h

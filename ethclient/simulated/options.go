@@ -21,6 +21,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
 	"github.com/ava-labs/subnet-evm/node"
+	"github.com/ava-labs/subnet-evm/params"
 )
 
 // WithBlockGasLimit configures the simulated backend to target a specific gas limit
@@ -28,7 +29,7 @@ import (
 func WithBlockGasLimit(gaslimit uint64) func(nodeConf *node.Config, ethConf *ethconfig.Config) {
 	return func(nodeConf *node.Config, ethConf *ethconfig.Config) {
 		ethConf.Genesis.GasLimit = gaslimit
-		ethConf.Genesis.Config.FeeConfig.GasLimit = new(big.Int).SetUint64(gaslimit)
+		params.GetExtra(ethConf.Genesis.Config).FeeConfig.GasLimit = new(big.Int).SetUint64(gaslimit)
 	}
 }
 
