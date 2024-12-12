@@ -277,7 +277,7 @@ func (args *TransactionArgs) setCancunFeeDefaults(ctx context.Context, head *typ
 	return nil
 }
 
-// setSubnetEVMFeeDefaults fills in reasonable default fee values for unspecified fields.
+// setSubnetEVMFeeDefault fills in reasonable default fee values for unspecified fields.
 func (args *TransactionArgs) setSubnetEVMFeeDefault(ctx context.Context, head *types.Header, b feeBackend) error {
 	// Set maxPriorityFeePerGas if it is missing.
 	if args.MaxPriorityFeePerGas == nil {
