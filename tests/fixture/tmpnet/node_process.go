@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +23,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -48,7 +48,13 @@ type NodeProcess struct {
 	pid int
 }
 
-func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
+type ProcessContext struct {
+	PID            int
+	URI            string
+	StakingAddress netip.AddrPort
+}
+
+func (p *NodeProcess) setProcessContext(processContext ProcessContext) {
 	p.pid = processContext.PID
 	p.node.URI = processContext.URI
 	p.node.StakingAddress = processContext.StakingAddress
@@ -59,12 +65,12 @@ func (p *NodeProcess) readState() error {
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
-		p.setProcessContext(node.ProcessContext{})
+		p.setProcessContext(ProcessContext{})
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to read node process context: %w", err)
 	}
-	processContext := node.ProcessContext{}
+	processContext := ProcessContext{}
 	if err := json.Unmarshal(bytes, &processContext); err != nil {
 		return fmt.Errorf("failed to unmarshal node process context: %w", err)
 	}
