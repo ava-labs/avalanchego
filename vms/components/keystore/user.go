@@ -4,6 +4,7 @@
 package keystore
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -63,7 +64,7 @@ func NewUserFromDB(db *encdb.Database) User {
 func (u *user) GetAddresses() ([]ids.ShortID, error) {
 	// Get user's addresses
 	addressBytes, err := u.db.Get(addressesKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// If user has no addresses, return empty list
 		return nil, nil
 	}
@@ -171,7 +172,7 @@ func GetKeychain(u User, addresses set.Set[ids.ShortID]) (*secp256k1fx.Keychain,
 	kc := secp256k1fx.NewKeychain()
 	for _, addr := range addrsList {
 		sk, err := u.GetKey(addr)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			continue
 		}
 		if err != nil {

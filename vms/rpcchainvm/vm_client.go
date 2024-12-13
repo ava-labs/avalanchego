@@ -654,7 +654,7 @@ func (vm *VMClient) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	err = errEnumToError[resp.Err]
-	if err == block.ErrStateSyncableVMNotImplemented {
+	if errors.Is(err, block.ErrStateSyncableVMNotImplemented) {
 		return false, nil
 	}
 	return resp.Enabled, err

@@ -91,7 +91,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, error) {
 	}
 
 	blkWrapperBytes, err := s.db.Get(blkID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.blkCache.Put(blkID, nil)
 		return nil, database.ErrNotFound
 	}

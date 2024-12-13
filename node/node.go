@@ -814,7 +814,7 @@ func (n *Node) initDatabase() error {
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
 	rawGenesisHash, err := n.DB.Get(genesisHashKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		rawGenesisHash = rawExpectedGenesisHash
 		err = n.DB.Put(genesisHashKey, rawGenesisHash)
 	}

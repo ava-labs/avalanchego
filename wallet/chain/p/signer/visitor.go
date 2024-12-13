@@ -253,7 +253,7 @@ func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput
 
 		utxoID := transferInput.InputID()
 		utxo, err := s.backend.GetUTXO(s.ctx, sourceChainID, utxoID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// If we don't have access to the UTXO, then we can't sign this
 			// transaction. However, we can attempt to partially sign it.
 			continue

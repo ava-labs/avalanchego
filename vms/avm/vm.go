@@ -653,7 +653,7 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 		}
 
 		utxo, err := vm.state.GetUTXO(utxoID.InputID())
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			vm.ctx.Log.Debug("dropping utxo from index",
 				zap.Stringer("txID", txID),
 				zap.Stringer("utxoTxID", utxoID.TxID),

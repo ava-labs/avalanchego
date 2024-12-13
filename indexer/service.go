@@ -4,6 +4,7 @@
 package indexer
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -139,7 +140,7 @@ func (s *service) IsAccepted(_ *http.Request, args *IsAcceptedArgs, reply *IsAcc
 		reply.IsAccepted = true
 		return nil
 	}
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		reply.IsAccepted = false
 		return nil
 	}

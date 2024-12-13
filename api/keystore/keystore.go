@@ -367,7 +367,7 @@ func (ks *keystore) getPassword(username string) (*password.Hash, error) {
 
 	// The user is not in memory; try the database
 	userBytes, err := ks.userDB.Get([]byte(username))
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// The user doesn't exist
 		return nil, nil
 	}

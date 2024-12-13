@@ -422,7 +422,7 @@ func (vm *VM) getPostDurangoSlotTime(
 
 func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	lastAccepted, err := vm.State.GetLastAccepted()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return vm.ChainVM.LastAccepted(ctx)
 	}
 	return lastAccepted, err
@@ -438,7 +438,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return err
 	}
 	proLastAcceptedID, err := vm.State.GetLastAccepted()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// If the last accepted block isn't indexed yet, then the underlying
 		// chain is the only chain and there is nothing to repair.
 		return nil
@@ -498,7 +498,7 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 
 func (vm *VM) setLastAcceptedMetadata(ctx context.Context) error {
 	lastAcceptedID, err := vm.GetLastAccepted()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// If the last accepted block wasn't a PostFork block, then we don't
 		// initialize the metadata.
 		vm.lastAcceptedHeight = 0

@@ -147,7 +147,7 @@ func (s *state) SetValue(e *Element) error {
 // current engine state.
 func (s *state) RemoveValue(key []byte) error {
 	value, err := s.loadValue(key)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// The value doesn't exist, so we should optimistically delete it
 		dbElem := dbElement{Present: false}
 		valueBytes, err := Codec.Marshal(CodecVersion, &dbElem)

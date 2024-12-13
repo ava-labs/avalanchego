@@ -102,7 +102,7 @@ func (s *txSigner) getImportSigners(ctx context.Context, sourceChainID ids.ID, i
 
 		utxoID := transferInput.InputID()
 		utxo, err := s.backend.GetUTXO(ctx, sourceChainID, utxoID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// If we don't have access to the UTXO, then we can't sign this
 			// transaction. However, we can attempt to partially sign it.
 			continue

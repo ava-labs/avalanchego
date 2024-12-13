@@ -5,6 +5,7 @@ package getter
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -115,7 +116,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	summaryIDs := make([]ids.ID, 0, heights.Len())
 	for height := range heights {
 		summary, err := gh.ssVM.GetStateSummary(ctx, height)
-		if err == block.ErrStateSyncableVMNotImplemented {
+		if errors.Is(err, block.ErrStateSyncableVMNotImplemented) {
 			gh.log.Debug("dropping GetAcceptedStateSummary message",
 				zap.String("reason", "state sync not supported"),
 				zap.Stringer("nodeID", nodeID),

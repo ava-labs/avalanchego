@@ -5,6 +5,7 @@ package admin
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
 )
@@ -23,7 +24,7 @@ func NewKeyValueReader(client Client) *KeyValueReader {
 
 func (r *KeyValueReader) Has(key []byte) (bool, error) {
 	_, err := r.client.DBGet(context.Background(), key)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	return err == nil, err

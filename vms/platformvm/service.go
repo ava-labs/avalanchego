@@ -640,7 +640,7 @@ func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *Ge
 		}
 
 		subnetOwner, err := s.vm.state.GetSubnetOwner(subnetID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -1245,7 +1245,7 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 	}
 
 	tx, _, err := state.GetTx(chainID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {

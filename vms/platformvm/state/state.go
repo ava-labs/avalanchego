@@ -1084,13 +1084,13 @@ func (s *state) GetSubnetOwner(subnetID ids.ID) (fx.Owner, error) {
 		})
 		return owner, nil
 	}
-	if err != database.ErrNotFound {
+	if !errors.Is(err, database.ErrNotFound) {
 		return nil, err
 	}
 
 	subnetIntf, _, err := s.GetTx(subnetID)
 	if err != nil {
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			s.subnetOwnerCache.Put(subnetID, fxOwnerAndSize{})
 		}
 		return nil, err
@@ -1149,7 +1149,7 @@ func (s *state) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error) {
 	}
 
 	transformSubnetTxID, err := database.GetID(s.transformedSubnetDB, subnetID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.transformedSubnetCache.Put(subnetID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -1230,7 +1230,7 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, status.Status, error) {
 		return tx.tx, tx.status, nil
 	}
 	txBytes, err := s.txDB.Get(txID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.txCache.Put(txID, nil)
 		return nil, status.Unknown, database.ErrNotFound
 	} else if err != nil {
@@ -1390,7 +1390,7 @@ func (s *state) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	}
 
 	supply, err := database.GetUInt64(s.supplyDB, subnetID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.supplyCache.Put(subnetID, nil)
 		return 0, database.ErrNotFound
 	}
@@ -1688,7 +1688,7 @@ func (s *state) loadMetadata() error {
 	// Lookup the most recently indexed range on disk. If we haven't started
 	// indexing the weights, then we keep the indexed heights as nil.
 	indexedHeightsBytes, err := s.singletonDB.Get(HeightsIndexedKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -2302,7 +2302,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (block.Block, error) {
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -2334,7 +2334,7 @@ func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	heightKey := database.PackUInt64(height)
 
 	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.blockIDCache.Put(height, ids.Empty)
 		return ids.Empty, database.ErrNotFound
 	}
@@ -2451,7 +2451,7 @@ func (s *state) updateValidatorManager(updateValidators bool) error {
 		}
 
 		priorL1Validator, err := s.getPersistedL1Validator(validationID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// Deleting a non-existent validator is a noop. This can happen if
 			// the validator was added and then immediately removed.
 			continue
@@ -3284,7 +3284,7 @@ func putFeeState(db database.KeyValueWriter, feeState gas.State) error {
 
 func getFeeState(db database.KeyValueReader) (gas.State, error) {
 	feeStateBytes, err := db.Get(FeeStateKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return gas.State{}, nil
 	}
 	if err != nil {

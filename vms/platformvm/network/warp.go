@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -110,7 +111,7 @@ func (s signatureRequestVerifier) verifySubnetToL1Conversion(
 	defer s.stateLock.Unlock()
 
 	conversion, err := s.state.GetSubnetToL1Conversion(subnetID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return &common.AppError{
 			Code:    ErrConversionDoesNotExist,
 			Message: fmt.Sprintf("subnet %q has not been converted", subnetID),
@@ -172,7 +173,7 @@ func (s signatureRequestVerifier) verifyL1ValidatorRegistered(
 
 	// Verify that the validator exists
 	_, err := s.state.GetL1Validator(validationID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return &common.AppError{
 			Code:    ErrValidationDoesNotExist,
 			Message: fmt.Sprintf("validation %q does not exist", validationID),
@@ -215,7 +216,7 @@ func (s signatureRequestVerifier) verifySubnetValidatorNotCurrentlyRegistered(
 
 	// Verify that the provided subnetID has been converted.
 	_, err = s.state.GetSubnetToL1Conversion(subnetID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return &common.AppError{
 			Code:    ErrConversionDoesNotExist,
 			Message: fmt.Sprintf("subnet %q has not been converted", subnetID),

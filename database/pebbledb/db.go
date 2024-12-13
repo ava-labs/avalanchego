@@ -139,7 +139,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 	}
 
 	_, closer, err := db.pebbleDB.Get(key)
-	if err == pebble.ErrNotFound {
+	if errors.Is(err, pebble.ErrNotFound) {
 		return false, nil
 	}
 	if err != nil {

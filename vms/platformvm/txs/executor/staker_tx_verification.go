@@ -52,7 +52,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	subnetValidator txs.Validator,
 ) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return fmt.Errorf(
 			"%s %w of the primary network",
 			subnetValidator.NodeID,
@@ -308,7 +308,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	isCurrentValidator := true
 	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		vdr, err = chainState.GetPendingValidator(tx.Subnet, tx.NodeID)
 		isCurrentValidator = false
 	}

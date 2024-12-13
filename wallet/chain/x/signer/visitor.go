@@ -110,7 +110,7 @@ func (s *visitor) getSigners(ctx context.Context, sourceChainID ids.ID, ins []*a
 
 		utxoID := transferInput.InputID()
 		utxo, err := s.backend.GetUTXO(ctx, sourceChainID, utxoID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// If we don't have access to the UTXO, then we can't sign this
 			// transaction. However, we can attempt to partially sign it.
 			continue
@@ -175,7 +175,7 @@ func (s *visitor) getOpsSigners(ctx context.Context, sourceChainID ids.ID, ops [
 		}
 		utxoID := op.UTXOIDs[0].InputID()
 		utxo, err := s.backend.GetUTXO(ctx, sourceChainID, utxoID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// If we don't have access to the UTXO, then we can't sign this
 			// transaction. However, we can attempt to partially sign it.
 			continue
