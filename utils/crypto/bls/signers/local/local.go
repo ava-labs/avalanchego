@@ -1,0 +1,74 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package local
+
+import (
+	"crypto/rand"
+	"errors"
+	"runtime"
+
+	"github.com/ava-labs/avalanchego/utils/crypto/bls" // Import the parent package
+	blst "github.com/supranational/blst/bindings/go"
+)
+
+const SecretKeyLen = blst.BLST_SCALAR_BYTES
+
+var (
+	ErrFailedSecretKeyDeserialize            = errors.New("couldn't deserialize secret key")
+	_                             bls.Signer = (*LocalSigner)(nil) // Use the Signer interface from the parent package
+)
+
+type secretKey = blst.SecretKey
+
+type LocalSigner struct {
+	sk *secretKey
+}
+
+// NewSecretKey generates a new secret key from the local source of
+// cryptographically secure randomness.
+func NewSigner() (*LocalSigner, error) {
+	var ikm [32]byte
+	_, err := rand.Read(ikm[:])
+	if err != nil {
+		return nil, err
+	}
+	sk := blst.KeyGen(ikm[:])
+	ikm = [32]byte{} // zero out the ikm
+
+	return &LocalSigner{sk: sk}, nil
+}
+
+// ToBytes returns the big-endian format of the secret key.
+func (s *LocalSigner) ToBytes() []byte {
+	return s.sk.Serialize()
+}
+
+// SecretKeyFromBytes parses the big-endian format of the secret key into a
+// secret key.
+func SecretKeyFromBytes(skBytes []byte) (*LocalSigner, error) {
+	sk := new(secretKey).Deserialize(skBytes)
+	if sk == nil {
+		return nil, ErrFailedSecretKeyDeserialize
+	}
+	runtime.SetFinalizer(sk, func(sk *secretKey) {
+		sk.Zeroize()
+	})
+	return &LocalSigner{sk: sk}, nil
+}
+
+// PublicKey returns the public key that corresponds to this secret
+// key.
+func (s *LocalSigner) PublicKey() *bls.PublicKey {
+	return new(bls.PublicKey).From(s.sk)
+}
+
+// Sign [msg] to authorize this message
+func (s *LocalSigner) Sign(msg []byte) *bls.Signature {
+	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteSignature)
+}
+
+// Sign [msg] to prove the ownership
+func (s *LocalSigner) SignProofOfPossession(msg []byte) *bls.Signature {
+	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession)
+}
