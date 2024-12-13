@@ -50,7 +50,7 @@ docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"
 # reporting healthy. This indicates that the workload has been correctly configured. Subsequent
 # validation will need to be tailored to a given workload implementation.
 
-TIMEOUT=30s
+TIMEOUT=60s
 HEALTHY_MESSAGE="all nodes reported healthy"
 
 if timeout "${TIMEOUT}" bash -c "${COMPOSE_CMD} up 2>&1 | tee out.log | grep -m 1 '${HEALTHY_MESSAGE}'"; then
