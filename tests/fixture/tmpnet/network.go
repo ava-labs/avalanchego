@@ -168,7 +168,7 @@ func BootstrapNewNetwork(
 
 // Stops the nodes of the network configured in the provided directory.
 func StopNetwork(ctx context.Context, dir string) error {
-	network, err := ReadNetwork(dir)
+	network, err := ReadNetwork(ctx, dir)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func StopNetwork(ctx context.Context, dir string) error {
 
 // Restarts the nodes of the network configured in the provided directory.
 func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
-	network, err := ReadNetwork(dir)
+	network, err := ReadNetwork(ctx, dir)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 }
 
 // Reads a network from the provided directory.
-func ReadNetwork(dir string) (*Network, error) {
+func ReadNetwork(ctx context.Context, dir string) (*Network, error) {
 	canonicalDir, err := toCanonicalDir(dir)
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func ReadNetwork(dir string) (*Network, error) {
 	network := &Network{
 		Dir: canonicalDir,
 	}
-	if err := network.Read(); err != nil {
+	if err := network.Read(ctx); err != nil {
 		return nil, fmt.Errorf("failed to read network: %w", err)
 	}
 	return network, nil
@@ -478,7 +478,9 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(node)
+	// TODO(marun) Need to move bootstrap configuration to the node runtime
+	// This will allow the staking ports to be cluster-internal
+	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(ctx, node)
 	if err != nil {
 		return err
 	}
@@ -533,7 +535,7 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
 	// Target all nodes, including the ephemeral ones
-	nodes, err := ReadNodes(n.Dir, true /* includeEphemeral */)
+	nodes, err := ReadNodes(ctx, n.Dir, true /* includeEphemeral */)
 	if err != nil {
 		return err
 	}
@@ -840,9 +842,9 @@ func (n *Network) GetNodeURIs() []NodeURI {
 
 // Retrieves bootstrap IPs and IDs for all nodes except the skipped one (this supports
 // collecting the bootstrap details for restarting a node).
-func (n *Network) getBootstrapIPsAndIDs(skippedNode *Node) ([]string, []string, error) {
+func (n *Network) getBootstrapIPsAndIDs(ctx context.Context, skippedNode *Node) ([]string, []string, error) {
 	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
-	nodes, err := ReadNodes(n.Dir, false /* includeEphemeral */)
+	nodes, err := ReadNodes(ctx, n.Dir, false /* includeEphemeral */)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
 	}

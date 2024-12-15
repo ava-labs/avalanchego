@@ -42,10 +42,10 @@ var (
 
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
-	readState() error
+	readState(ctx context.Context) error
 	SetDefaultFlags()
 	Start(log logging.Logger) error
-	InitiateStop() error
+	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
 	IsHealthy(ctx context.Context, log logging.Logger) (bool, error)
 }
@@ -135,13 +135,13 @@ func NewNodesOrPanic(count int) []*Node {
 }
 
 // Reads a node's configuration from the specified directory.
-func ReadNode(dataDir string) (*Node, error) {
+func ReadNode(ctx context.Context, dataDir string) (*Node, error) {
 	node := NewNode(dataDir)
-	return node, node.Read()
+	return node, node.Read(ctx)
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
+func ReadNodes(ctx context.Context, networkDir string, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
@@ -155,7 +155,7 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 		}
 
 		nodeDir := filepath.Join(networkDir, entry.Name())
-		node, err := ReadNode(nodeDir)
+		node, err := ReadNode(ctx, nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
 			continue
@@ -204,15 +204,15 @@ func (n *Node) InitiateStop(ctx context.Context) error {
 	if err := n.SaveMetricsSnapshot(ctx); err != nil {
 		return err
 	}
-	return n.getRuntime().InitiateStop()
+	return n.getRuntime().InitiateStop(ctx)
 }
 
 func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
-func (n *Node) readState() error {
-	return n.getRuntime().readState()
+func (n *Node) readState(ctx context.Context) error {
+	return n.getRuntime().readState(ctx)
 }
 
 func (n *Node) GetDataDir() string {
