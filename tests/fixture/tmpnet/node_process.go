@@ -54,7 +54,7 @@ func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
 	p.node.StakingAddress = processContext.StakingAddress
 }
 
-func (p *NodeProcess) readState() error {
+func (p *NodeProcess) readState(_ context.Context) error {
 	path := p.getProcessContextPath()
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -141,7 +141,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 }
 
 // Signals the node process to stop.
-func (p *NodeProcess) InitiateStop() error {
+func (p *NodeProcess) InitiateStop(_ context.Context) error {
 	proc, err := p.getProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -207,7 +207,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultNodeInitTimeout)
 	defer cancel()
 	for len(p.node.URI) == 0 {
-		err := p.readState()
+		err := p.readState(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read process context for node %q: %w", p.node.NodeID, err)
 		}
@@ -227,7 +227,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 func (p *NodeProcess) getProcess() (*os.Process, error) {
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
-	if err := p.readState(); err != nil {
+	if err := p.readState(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to read process context: %w", err)
 	}
 

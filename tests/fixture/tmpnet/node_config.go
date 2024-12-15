@@ -4,6 +4,7 @@
 package tmpnet
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -84,14 +85,14 @@ func (n *Node) writeConfig() error {
 	return nil
 }
 
-func (n *Node) Read() error {
+func (n *Node) Read(ctx context.Context) error {
 	if err := n.readFlags(); err != nil {
 		return err
 	}
 	if err := n.readConfig(); err != nil {
 		return err
 	}
-	return n.readState()
+	return n.readState(ctx)
 }
 
 func (n *Node) Write() error {
