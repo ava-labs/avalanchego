@@ -490,6 +490,12 @@ func TestServiceGetAllBalances(t *testing.T) {
 	require.Empty(reply.Balances)
 }
 
+
+func TestServiceGetTxFee(t *testing.T) {
+	// TODO: Implement this test
+}
+
+
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 
