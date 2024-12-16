@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -117,7 +118,7 @@ var (
 
 // New returns an instance of Node
 func New(
-	config *Config,
+	config *node.Config,
 	logFactory logging.Factory,
 	logger logging.Logger,
 ) (*Node, error) {
@@ -356,7 +357,7 @@ type Node struct {
 	APIServer server.Server
 
 	// This node's configuration
-	Config *Config
+	Config *node.Config
 
 	tracer trace.Tracer
 
