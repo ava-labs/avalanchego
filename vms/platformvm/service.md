@@ -840,7 +840,7 @@ platform.getFeeState() -> {
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getFeeConfig",
+    "method": "platform.getFeeState",
     "params": {},
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
@@ -852,12 +852,10 @@ curl -X POST --data '{
 {
     "jsonrpc": "2.0",
     "result": {
-        "weights": [1,1000,1000,4],
-        "maxCapacity": 1000000,
-        "maxPerSecond": 100000,
-        "targetPerSecond": 50000,
-        "minPrice": 1,
-        "excessConversionConstant": 2164043
+		    "capacity":973044,
+		    "excess":26956,
+		    "price":1,
+		    "timestamp":"2024-12-16T17:19:07Z"
     },
     "id": 1
 }
