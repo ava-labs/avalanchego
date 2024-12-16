@@ -650,7 +650,7 @@ func (n *Node) writeProcessContext() error {
 	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
 
 	// Write the process context to disk
-	processContext := &ProcessContext{
+	processContext := &node.ProcessContext{
 		PID:            os.Getpid(),
 		URI:            n.apiURI,
 		StakingAddress: n.stakingAddress, // Set by network initialization
