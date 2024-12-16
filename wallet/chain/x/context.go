@@ -46,7 +46,7 @@ func NewContextFromClients(
 		NetworkID:        networkID,
 		BlockchainID:     chainID,
 		AVAXAssetID:      asset.AssetID,
-		BaseTxFee:        uint64(txFees.TxFee),
-		CreateAssetTxFee: uint64(txFees.CreateAssetTxFee),
+		BaseTxFee:        txFees.TxFee,
+		CreateAssetTxFee: txFees.CreateAssetTxFee,
 	}, nil
 }

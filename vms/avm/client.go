@@ -73,7 +73,7 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
-		
+
 	// GetTxFee returns the cost to issue certain transactions
 	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeReply, error)
 
@@ -390,8 +390,8 @@ func (c *client) GetAllBalances(
 }
 
 type GetTxFeeReply struct {
-	TxFee                         uint64 `json:"txFee"`
-	CreateAssetTxFee              uint64 `json:"createAssetTxFee"`
+	TxFee            uint64 `json:"txFee"`
+	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
 }
 
 func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeReply, error) {

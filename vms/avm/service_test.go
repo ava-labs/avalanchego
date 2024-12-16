@@ -490,7 +490,6 @@ func TestServiceGetAllBalances(t *testing.T) {
 	require.Empty(reply.Balances)
 }
 
-
 func TestServiceGetTxFee(t *testing.T) {
 	require := require.New(t)
 
@@ -503,10 +502,9 @@ func TestServiceGetTxFee(t *testing.T) {
 	reply := GetTxFeeReply{}
 	require.NoError(service.GetTxFee(nil, nil, &reply))
 
-	require.Equal(uint64(testTxFee), reply.TxFee)
-	require.Equal(uint64(testTxFee), reply.CreateAssetTxFee)
+	require.Equal(testTxFee, reply.TxFee)
+	require.Equal(testTxFee, reply.CreateAssetTxFee)
 }
-
 
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
