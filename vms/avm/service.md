@@ -783,6 +783,47 @@ curl -X POST --data '{
 }
 ```
 
+### `info.getTxFee`
+
+Get the fees of the network.
+
+**Signature**:
+
+```
+info.getTxFee() ->
+{
+  txFee: uint64,
+  createAssetTxFee: uint64,
+}
+```
+
+- `txFee` is the default fee for making transactions.
+- `createAssetTxFee` is the fee for creating a new asset.
+
+All fees are denominated in nAVAX.
+
+**Example Call**:
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     : 1,
+    "method" :"avm.getTxFee",
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
+```
+
+**Example Response**:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "txFee": "1000000",
+    "createAssetTxFee": "10000000"
+  }
+}
+```
+
 ### `avm.getAssetDescription`
 
 Get information about an asset.

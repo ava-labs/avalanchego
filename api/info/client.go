@@ -90,7 +90,6 @@ func (c *client) Peers(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc
 	return res.Peers, err
 }
 
-
 func (c *client) IsBootstrapped(ctx context.Context, chainID string, options ...rpc.Option) (bool, error) {
 	res := &IsBootstrappedResponse{}
 	err := c.requester.SendRequest(ctx, "info.isBootstrapped", &IsBootstrappedArgs{

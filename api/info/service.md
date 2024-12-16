@@ -263,8 +263,8 @@ info.getNodeID() -> {
 
 - `nodeID` Node ID is the unique identifier of the node that you set to act as a validator on the Primary Network.
 - `nodePOP` is this node's BLS key and proof of possession. Nodes must register a BLS key to act as a validator on the Primary Network. Your node's POP is logged on startup and is accessible over this endpoint.
-    - `publicKey` is the 48 byte hex representation of the BLS key.
-    - `proofOfPossession` is the 96 byte hex representation of the BLS signature.
+  - `publicKey` is the 48 byte hex representation of the BLS key.
+  - `proofOfPossession` is the 96 byte hex representation of the BLS signature.
 
 **Example Call**:
 
@@ -379,69 +379,6 @@ curl -X POST --data '{
     }
   },
   "id": 1
-}
-```
-
-### `info.getTxFee`
-
-Get the fees of the network.
-
-**Signature**:
-
-```
-info.getTxFee() ->
-{
-  txFee: uint64,
-  createAssetTxFee: uint64,
-  createSubnetTxFee: uint64,
-  transformSubnetTxFee: uint64,
-  createBlockchainTxFee: uint64,
-  addPrimaryNetworkValidatorFee: uint64,
-  addPrimaryNetworkDelegatorFee: uint64,
-  addSubnetValidatorFee: uint64,
-  addSubnetDelegatorFee: uint64
-}
-```
-
-- `txFee` is the default fee for making transactions.
-- `createAssetTxFee` is the fee for creating a new asset.
-- `createSubnetTxFee` is the fee for creating a new Avalanche L1.
-- `transformSubnetTxFee` is the fee for converting a PoA Avalanche L1 into a PoS Avalanche L1.
-- `createBlockchainTxFee` is the fee for creating a new blockchain.
-- `addPrimaryNetworkValidatorFee` is the fee for adding a new primary network validator.
-- `addPrimaryNetworkDelegatorFee` is the fee for adding a new primary network delegator.
-- `addSubnetValidatorFee` is the fee for adding a new Avalanche L1 validator.
-- `addSubnetDelegatorFee` is the fee for adding a new Avalanche L1 delegator.
-
-All fees are denominated in nAVAX.
-
-**Example Call**:
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"info.getTxFee"
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
-```
-
-**Example Response**:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "txFee": "1000000",
-    "createAssetTxFee": "10000000",
-    "createSubnetTxFee": "1000000000",
-    "transformSubnetTxFee": "10000000000",
-    "createBlockchainTxFee": "1000000000",
-    "addPrimaryNetworkValidatorFee": "0",
-    "addPrimaryNetworkDelegatorFee": "0",
-    "addSubnetValidatorFee": "1000000",
-    "addSubnetDelegatorFee": "1000000"
-  }
 }
 ```
 
@@ -607,7 +544,7 @@ info.uptime() ->
 
 - `rewardingStakePercentage` is the percent of stake which thinks this node is above the uptime requirement.
 - `weightedAveragePercentage` is the stake-weighted average of all observed uptimes for this node.
-    
+
 **Example Call**:
 
 ```sh
@@ -677,21 +614,21 @@ curl -X POST --data '{
 {
   "jsonrpc": "2.0",
   "result": {
-      "apricotPhase1Time": "2020-12-05T05:00:00Z",
-      "apricotPhase2Time": "2020-12-05T05:00:00Z",
-      "apricotPhase3Time": "2020-12-05T05:00:00Z",
-      "apricotPhase4Time": "2020-12-05T05:00:00Z",
-      "apricotPhase4MinPChainHeight": 0,
-      "apricotPhase5Time": "2020-12-05T05:00:00Z",
-      "apricotPhasePre6Time": "2020-12-05T05:00:00Z",
-      "apricotPhase6Time": "2020-12-05T05:00:00Z",
-      "apricotPhasePost6Time": "2020-12-05T05:00:00Z",
-      "banffTime": "2020-12-05T05:00:00Z",
-      "cortinaTime": "2020-12-05T05:00:00Z",
-      "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
-      "durangoTime": "2020-12-05T05:00:00Z",
-      "etnaTime": "2024-10-09T20:00:00Z"
-    },
+    "apricotPhase1Time": "2020-12-05T05:00:00Z",
+    "apricotPhase2Time": "2020-12-05T05:00:00Z",
+    "apricotPhase3Time": "2020-12-05T05:00:00Z",
+    "apricotPhase4Time": "2020-12-05T05:00:00Z",
+    "apricotPhase4MinPChainHeight": 0,
+    "apricotPhase5Time": "2020-12-05T05:00:00Z",
+    "apricotPhasePre6Time": "2020-12-05T05:00:00Z",
+    "apricotPhase6Time": "2020-12-05T05:00:00Z",
+    "apricotPhasePost6Time": "2020-12-05T05:00:00Z",
+    "banffTime": "2020-12-05T05:00:00Z",
+    "cortinaTime": "2020-12-05T05:00:00Z",
+    "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
+    "durangoTime": "2020-12-05T05:00:00Z",
+    "etnaTime": "2024-10-09T20:00:00Z"
+  },
   "id": 1
 }
 ```
