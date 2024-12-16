@@ -47,12 +47,12 @@ type Info struct {
 }
 
 type Parameters struct {
-	Version     *version.Application
-	NodeID      ids.NodeID
-	NodePOP     *signer.ProofOfPossession
-	NetworkID   uint32
-	VMManager   vms.Manager
-	Upgrades    upgrade.Config
+	Version   *version.Application
+	NodeID    ids.NodeID
+	NodePOP   *signer.ProofOfPossession
+	NetworkID uint32
+	VMManager vms.Manager
+	Upgrades  upgrade.Config
 }
 
 func NewService(
