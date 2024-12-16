@@ -672,6 +672,17 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	return nil
 }
 
+func (s *Service) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "info"),
+		zap.String("method", "getTxFee"),
+	)
+
+	reply.TxFee = s.vm.TxFee
+	reply.CreateAssetTxFee = s.vm.CreateAssetTxFee
+	return nil
+}
+
 // Holder describes how much an address owns of an asset
 type Holder struct {
 	Amount  avajson.Uint64 `json:"amount"`

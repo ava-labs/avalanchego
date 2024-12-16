@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -52,7 +51,6 @@ type Parameters struct {
 	NodeID      ids.NodeID
 	NodePOP     *signer.ProofOfPossession
 	NetworkID   uint32
-	TxFeeConfig genesis.TxFeeConfig
 	VMManager   vms.Manager
 	Upgrades    upgrade.Config
 }
@@ -383,37 +381,6 @@ func (i *Info) Acps(_ *http.Request, _ *struct{}, reply *ACPsReply) error {
 		acp := reply.getACP(acpNum)
 		acp.AbstainWeight = json.Uint64(totalWeight) - acp.SupportWeight - acp.ObjectWeight
 	}
-	return nil
-}
-
-type GetTxFeeResponse struct {
-	TxFee                         json.Uint64 `json:"txFee"`
-	CreateAssetTxFee              json.Uint64 `json:"createAssetTxFee"`
-	CreateSubnetTxFee             json.Uint64 `json:"createSubnetTxFee"`
-	TransformSubnetTxFee          json.Uint64 `json:"transformSubnetTxFee"`
-	CreateBlockchainTxFee         json.Uint64 `json:"createBlockchainTxFee"`
-	AddPrimaryNetworkValidatorFee json.Uint64 `json:"addPrimaryNetworkValidatorFee"`
-	AddPrimaryNetworkDelegatorFee json.Uint64 `json:"addPrimaryNetworkDelegatorFee"`
-	AddSubnetValidatorFee         json.Uint64 `json:"addSubnetValidatorFee"`
-	AddSubnetDelegatorFee         json.Uint64 `json:"addSubnetDelegatorFee"`
-}
-
-// GetTxFee returns the transaction fee in nAVAX.
-func (i *Info) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
-	i.log.Debug("API called",
-		zap.String("service", "info"),
-		zap.String("method", "getTxFee"),
-	)
-
-	reply.TxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.TxFee)
-	reply.CreateAssetTxFee = json.Uint64(i.TxFeeConfig.CreateAssetTxFee)
-	reply.CreateSubnetTxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.CreateSubnetTxFee)
-	reply.TransformSubnetTxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.TransformSubnetTxFee)
-	reply.CreateBlockchainTxFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.CreateBlockchainTxFee)
-	reply.AddPrimaryNetworkValidatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddPrimaryNetworkValidatorFee)
-	reply.AddPrimaryNetworkDelegatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddPrimaryNetworkDelegatorFee)
-	reply.AddSubnetValidatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddSubnetValidatorFee)
-	reply.AddSubnetDelegatorFee = json.Uint64(i.TxFeeConfig.StaticFeeConfig.AddSubnetDelegatorFee)
 	return nil
 }
 

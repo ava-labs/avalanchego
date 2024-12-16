@@ -37,7 +37,7 @@ func NewContextFromClients(
 		return nil, err
 	}
 
-	txFees, err := infoClient.GetTxFee(ctx)
+	txFees, err := xChainClient.GetTxFee(ctx)
 	if err != nil {
 		return nil, err
 	}

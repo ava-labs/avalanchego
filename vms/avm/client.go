@@ -73,6 +73,11 @@ type Client interface {
 	//
 	// Deprecated: GetUTXOs should be used instead.
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
+		
+	// Get
+	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
+
+
 	// CreateAsset creates a new asset and returns its assetID
 	//
 	// Deprecated: Transactions should be issued using the
@@ -384,6 +389,18 @@ func (c *client) GetAllBalances(
 	}, res, options...)
 	return res.Balances, err
 }
+
+type GetTxFeeResponse struct {
+	TxFee                         uint64 `json:"txFee"`
+	CreateAssetTxFee              uint64 `json:"createAssetTxFee"`
+}
+
+func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeResponse, error) {
+	res := &GetTxFeeResponse{}
+	err := c.requester.SendRequest(ctx, "avm.getTxFee", struct{}{}, res, options...)
+	return res, err
+}
+
 
 // ClientHolder describes how much an address owns of an asset
 type ClientHolder struct {
