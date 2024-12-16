@@ -50,14 +50,13 @@ docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"
 # reporting healthy. This indicates that the workload has been correctly configured. Subsequent
 # validation will need to be tailored to a given workload implementation.
 
-TIMEOUT=60s
+TIMEOUT=30s
 HEALTHY_MESSAGE="all nodes reported healthy"
 
-if timeout "${TIMEOUT}" bash -c "${COMPOSE_CMD} up 2>&1 | tee out.log | grep -m 1 '${HEALTHY_MESSAGE}'"; then
+if timeout "${TIMEOUT}" bash -c "${COMPOSE_CMD} up 2>&1 | grep -m 1 '${HEALTHY_MESSAGE}'"; then
   echo "Saw log containing '${HEALTHY_MESSAGE}'"
   echo "Successfully invoked the antithesis test setup configured by ${IMAGE_NAME}:${IMAGE_TAG}"
 else
-  cat out.log
   echo "Failed to see log containing '${HEALTHY_MESSAGE}' within ${TIMEOUT}"
   exit 1
 fi
