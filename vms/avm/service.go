@@ -672,7 +672,7 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	return nil
 }
 
-func (s *Service) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeResponse) error {
+func (s *Service) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getTxFee"),

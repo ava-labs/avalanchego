@@ -1407,7 +1407,6 @@ func (n *Node) initInfoAPI() error {
 			NodeID:      n.ID,
 			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
 			NetworkID:   n.Config.NetworkID,
-			TxFeeConfig: n.Config.TxFeeConfig,
 			VMManager:   n.VMManager,
 			Upgrades:    n.Config.UpgradeConfig,
 		},

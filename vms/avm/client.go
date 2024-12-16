@@ -75,7 +75,7 @@ type Client interface {
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
 		
 	// GetTxFee returns the cost to issue certain transactions
-	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
+	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeReply, error)
 
 	// CreateAsset creates a new asset and returns its assetID
 	//
@@ -389,13 +389,13 @@ func (c *client) GetAllBalances(
 	return res.Balances, err
 }
 
-type GetTxFeeResponse struct {
+type GetTxFeeReply struct {
 	TxFee                         uint64 `json:"txFee"`
 	CreateAssetTxFee              uint64 `json:"createAssetTxFee"`
 }
 
-func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeResponse, error) {
-	res := &GetTxFeeResponse{}
+func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeReply, error) {
+	res := &GetTxFeeReply{}
 	err := c.requester.SendRequest(ctx, "avm.getTxFee", struct{}{}, res, options...)
 	return res, err
 }
