@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -37,7 +36,7 @@ type Internal struct {
 
 	// Static fees are active before Etna
 	CreateAssetTxFee uint64 // Override for CreateSubnet and CreateChain before AP3
-	StaticFeeConfig  txfee.StaticConfig
+	TxFee            uint64 
 
 	// Dynamic fees are active after Etna
 	DynamicFeeConfig gas.Config

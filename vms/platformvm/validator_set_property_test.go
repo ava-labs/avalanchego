@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -625,12 +624,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			TransformSubnetTxFee:  100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
+		TxFee:                 defaultTxFee,
 		MinValidatorStake: defaultMinValidatorStake,
 		MaxValidatorStake: defaultMaxValidatorStake,
 		MinDelegatorStake: defaultMinDelegatorStake,

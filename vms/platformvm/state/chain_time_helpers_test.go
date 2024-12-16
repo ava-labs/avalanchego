@@ -212,26 +212,13 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 func TestPickFeeCalculator(t *testing.T) {
 	var (
 		createAssetTxFee = genesis.LocalParams.CreateAssetTxFee
-		staticFeeConfig  = genesis.LocalParams.StaticFeeConfig
 		dynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
 	)
-
-	apricotPhase2StaticFeeConfig := staticFeeConfig
-	apricotPhase2StaticFeeConfig.CreateSubnetTxFee = createAssetTxFee
-	apricotPhase2StaticFeeConfig.CreateBlockchainTxFee = createAssetTxFee
 
 	tests := []struct {
 		fork     upgradetest.Fork
 		expected txfee.Calculator
 	}{
-		{
-			fork:     upgradetest.ApricotPhase2,
-			expected: txfee.NewStaticCalculator(apricotPhase2StaticFeeConfig),
-		},
-		{
-			fork:     upgradetest.ApricotPhase3,
-			expected: txfee.NewStaticCalculator(staticFeeConfig),
-		},
 		{
 			fork: upgradetest.Etna,
 			expected: txfee.NewDynamicCalculator(
@@ -245,7 +232,6 @@ func TestPickFeeCalculator(t *testing.T) {
 			var (
 				config = &config.Internal{
 					CreateAssetTxFee: createAssetTxFee,
-					StaticFeeConfig:  staticFeeConfig,
 					DynamicFeeConfig: dynamicFeeConfig,
 					UpgradeConfig:    upgradetest.GetConfig(test.fork),
 				}

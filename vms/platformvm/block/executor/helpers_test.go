@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -280,11 +279,7 @@ func defaultConfig(f upgradetest.Fork) *config.Internal {
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
+		TxFee:                 defaultTxFee,
 		MinValidatorStake: 5 * units.MilliAvax,
 		MaxValidatorStake: 500 * units.MilliAvax,
 		MinDelegatorStake: 1 * units.MilliAvax,

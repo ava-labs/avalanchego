@@ -148,9 +148,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		Asset: avax.Asset{
 			ID: snowtest.AVAXAssetID,
 		},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: env.config.StaticFeeConfig.CreateSubnetTxFee,
-		},
+		Out: &secp256k1fx.TransferOutput{},
 	}
 	utxoID := utxo.InputID()
 	onParentAccept.EXPECT().GetUTXO(utxoID).Return(utxo, nil).AnyTimes()
@@ -163,9 +161,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 			Ins: []*avax.TransferableInput{{
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
-				In: &secp256k1fx.TransferInput{
-					Amt: env.config.StaticFeeConfig.CreateSubnetTxFee,
-				},
+				In: &secp256k1fx.TransferInput{},
 			}},
 		}},
 		Owner: &secp256k1fx.OutputOwners{},

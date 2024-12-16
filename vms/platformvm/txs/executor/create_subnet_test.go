@@ -63,7 +63,6 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			}
 
 			config := *env.config
-			config.StaticFeeConfig.CreateSubnetTxFee = test.fee
 			wallet := newWallet(t, env, walletConfig{
 				config: &config,
 			})

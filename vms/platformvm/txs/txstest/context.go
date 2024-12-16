@@ -31,12 +31,8 @@ func newContext(
 			state.GetFeeState().Excess,
 			config.DynamicFeeConfig.ExcessConversionConstant,
 		)
-	case config.UpgradeConfig.IsApricotPhase3Activated(timestamp):
-		builderContext.StaticFeeConfig = config.StaticFeeConfig
 	default:
-		builderContext.StaticFeeConfig = config.StaticFeeConfig
-		builderContext.StaticFeeConfig.CreateSubnetTxFee = config.CreateAssetTxFee
-		builderContext.StaticFeeConfig.CreateBlockchainTxFee = config.CreateAssetTxFee
+		ctx.Log.Error("Etna not activated")
 	}
 	return builderContext
 }
