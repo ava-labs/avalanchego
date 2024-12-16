@@ -502,8 +502,8 @@ func TestServiceGetTxFee(t *testing.T) {
 	reply := GetTxFeeReply{}
 	require.NoError(service.GetTxFee(nil, nil, &reply))
 
-	require.Equal(testTxFee, reply.TxFee)
-	require.Equal(testTxFee, reply.CreateAssetTxFee)
+	require.Equal(avajson.Uint64(testTxFee), reply.TxFee)
+	require.Equal(avajson.Uint64(testTxFee), reply.CreateAssetTxFee)
 }
 
 func TestServiceGetTx(t *testing.T) {

@@ -672,14 +672,19 @@ func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, repl
 	return nil
 }
 
+type GetTxFeeReply struct {
+	TxFee            avajson.Uint64 `json:"txFee"`
+	CreateAssetTxFee avajson.Uint64 `json:"createAssetTxFee"`
+}
+
 func (s *Service) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "info"),
 		zap.String("method", "getTxFee"),
 	)
 
-	reply.TxFee = s.vm.TxFee
-	reply.CreateAssetTxFee = s.vm.CreateAssetTxFee
+	reply.TxFee = avajson.Uint64(s.vm.TxFee)
+	reply.CreateAssetTxFee = avajson.Uint64(s.vm.CreateAssetTxFee)
 	return nil
 }
 

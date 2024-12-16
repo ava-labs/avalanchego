@@ -389,11 +389,6 @@ func (c *client) GetAllBalances(
 	return res.Balances, err
 }
 
-type GetTxFeeReply struct {
-	TxFee            uint64 `json:"txFee"`
-	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
-}
-
 func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeReply, error) {
 	res := &GetTxFeeReply{}
 	err := c.requester.SendRequest(ctx, "avm.getTxFee", struct{}{}, res, options...)
