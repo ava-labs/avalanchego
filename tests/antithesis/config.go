@@ -74,8 +74,6 @@ func NewConfigWithSubnets(tc tests.TestContext, defaultNetwork *tmpnet.Network, 
 			ChainIDs: chainIDs,
 			Duration: duration,
 		}
-	} else {
-		tc.Log().Fatal("no URIs provided")
 	}
 
 	// Create a new network
