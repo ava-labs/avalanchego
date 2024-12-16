@@ -53,10 +53,11 @@ docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"
 TIMEOUT=30s
 HEALTHY_MESSAGE="all nodes reported healthy"
 
-if timeout "${TIMEOUT}" bash -c "${COMPOSE_CMD} up 2>&1 | grep -m 1 '${HEALTHY_MESSAGE}'"; then
+if timeout "${TIMEOUT}" bash -c "${COMPOSE_CMD} up 2>&1 | tee log.out | grep -m 1 '${HEALTHY_MESSAGE}'"; then
   echo "Saw log containing '${HEALTHY_MESSAGE}'"
   echo "Successfully invoked the antithesis test setup configured by ${IMAGE_NAME}:${IMAGE_TAG}"
 else
+  cat log.out
   echo "Failed to see log containing '${HEALTHY_MESSAGE}' within ${TIMEOUT}"
   exit 1
 fi
