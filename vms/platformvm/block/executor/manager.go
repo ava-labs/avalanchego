@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -132,6 +133,18 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		if _, isImportTx := tx.Unsigned.(*txs.ImportTx); isImportTx {
 			return ErrImportTxWhilePartialSyncing
 		}
+	}
+
+	complexity, err := fee.TxComplexity(tx.Unsigned)
+	if err != nil {
+		return fmt.Errorf("failed to calculate tx complexity: %w", err)
+	}
+	gas, err := complexity.ToGas(m.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+	if err != nil {
+		return fmt.Errorf("failed to calculate tx gas: %w", err)
+	}
+	if gas > m.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity {
+		return fmt.Errorf("tx exceeds maximum gas consumption: %d > %d", gas, m.txExecutorBackend.Config.DynamicFeeConfig.MaxCapacity)
 	}
 
 	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
