@@ -22,7 +22,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
