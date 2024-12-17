@@ -56,6 +56,7 @@ func (s signatureRequestVerifier) Verify(
 	_ context.Context,
 	unsignedMessage *warp.UnsignedMessage,
 	justification []byte,
+	_ ids.NodeID,
 ) *common.AppError {
 	msg, err := payload.ParseAddressedCall(unsignedMessage.Payload)
 	if err != nil {
