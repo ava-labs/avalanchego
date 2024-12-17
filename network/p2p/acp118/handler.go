@@ -28,6 +28,7 @@ type Verifier interface {
 		ctx context.Context,
 		message *warp.UnsignedMessage,
 		justification []byte,
+		nodeID ids.NodeID,
 	) *common.AppError
 }
 
@@ -65,7 +66,7 @@ type Handler struct {
 
 func (h *Handler) AppRequest(
 	ctx context.Context,
-	_ ids.NodeID,
+	nodeID ids.NodeID,
 	_ time.Time,
 	requestBytes []byte,
 ) ([]byte, *common.AppError) {
@@ -90,7 +91,7 @@ func (h *Handler) AppRequest(
 		return signatureToResponse(signatureBytes)
 	}
 
-	if err := h.verifier.Verify(ctx, msg, request.Justification); err != nil {
+	if err := h.verifier.Verify(ctx, msg, request.Justification, nodeID); err != nil {
 		return nil, err
 	}
 

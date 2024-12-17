@@ -26,25 +26,23 @@ func TestHandler(t *testing.T) {
 	tests := []struct {
 		name         string
 		cacher       cache.Cacher[ids.ID, []byte]
-		verifier     Verifier
+		verifierErrs []*common.AppError
 		expectedErrs []error
 	}{
 		{
 			name:   "signature fails verification",
 			cacher: &cache.Empty[ids.ID, []byte]{},
-			verifier: &testVerifier{
-				Errs: []*common.AppError{
-					{Code: 123},
-				},
+			verifierErrs: []*common.AppError{
+				{Code: 123},
 			},
 			expectedErrs: []error{
 				&common.AppError{Code: 123},
 			},
 		},
 		{
-			name:     "signature signed",
-			cacher:   &cache.Empty[ids.ID, []byte]{},
-			verifier: &testVerifier{},
+			name:         "signature signed",
+			cacher:       &cache.Empty[ids.ID, []byte]{},
+			verifierErrs: nil,
 			expectedErrs: []error{
 				nil,
 			},
@@ -54,11 +52,9 @@ func TestHandler(t *testing.T) {
 			cacher: &cache.LRU[ids.ID, []byte]{
 				Size: 1,
 			},
-			verifier: &testVerifier{
-				Errs: []*common.AppError{
-					nil,
-					{Code: 123}, // The valid response should be cached
-				},
+			verifierErrs: []*common.AppError{
+				nil,
+				{Code: 123}, // The valid response should be cached
 			},
 			expectedErrs: []error{
 				nil,
@@ -78,9 +74,10 @@ func TestHandler(t *testing.T) {
 			networkID := uint32(123)
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
-			h := NewCachedHandler(tt.cacher, tt.verifier, signer)
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
+			h := NewCachedHandler(tt.cacher, newTestVerifier(t, clientNodeID, tt.verifierErrs), signer)
+
 			c := p2ptest.NewClient(
 				t,
 				ctx,
@@ -108,7 +105,7 @@ func TestHandler(t *testing.T) {
 				expectedErr error
 				handled     = make(chan struct{})
 			)
-			onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+			onResponse := func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
 				defer func() {
 					handled <- struct{}{}
 				}()
@@ -131,6 +128,8 @@ func TestHandler(t *testing.T) {
 				if ok {
 					require.Equal(sig, response.Signature)
 				}
+
+				require.Equal(serverNodeID, nodeID)
 			}
 
 			for _, expectedErr = range tt.expectedErrs {
@@ -143,18 +142,31 @@ func TestHandler(t *testing.T) {
 
 // The zero value of testVerifier allows signing
 type testVerifier struct {
-	Errs []*common.AppError
+	t            *testing.T
+	errs         []*common.AppError
+	clientNodeID ids.NodeID
+}
+
+func newTestVerifier(t *testing.T, clientNodeID ids.NodeID, errs []*common.AppError) *testVerifier {
+	return &testVerifier{
+		t:            t,
+		errs:         errs,
+		clientNodeID: clientNodeID,
+	}
 }
 
 func (t *testVerifier) Verify(
-	context.Context,
-	*warp.UnsignedMessage,
-	[]byte,
+	_ context.Context,
+	_ *warp.UnsignedMessage,
+	justification []byte,
+	nodeID ids.NodeID,
 ) *common.AppError {
-	if len(t.Errs) == 0 {
+	require.Equal(t.t, t.clientNodeID, nodeID)
+	require.Equal(t.t, []byte("justification"), justification)
+	if len(t.errs) == 0 {
 		return nil
 	}
-	err := t.Errs[0]
-	t.Errs = t.Errs[1:]
+	err := t.errs[0]
+	t.errs = t.errs[1:]
 	return err
 }
