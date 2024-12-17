@@ -98,6 +98,6 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		Metrics:  metrics.NewPrefixGatherer(),
 
 		ValidatorState: validatorState,
-		ChainDataDir:   "",
+		ChainDataDir:   tb.TempDir(),
 	}
 }
