@@ -1403,12 +1403,12 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:     version.CurrentApp,
-			NodeID:      n.ID,
-			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:   n.Config.NetworkID,
-			VMManager:   n.VMManager,
-			Upgrades:    n.Config.UpgradeConfig,
+			Version:   version.CurrentApp,
+			NodeID:    n.ID,
+			NodePOP:   signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NetworkID: n.Config.NetworkID,
+			VMManager: n.VMManager,
+			Upgrades:  n.Config.UpgradeConfig,
 		},
 		n.Log,
 		n.vdrs,
