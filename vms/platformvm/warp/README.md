@@ -2,9 +2,9 @@
 
 Avalanche Interchain Messaging (ICM) provides a primitive for cross-chain communication on the Avalanche Network.
 
-The Avalanche P-Chain provides an index of every L1's validator set on the Avalanche Network, including the BLS public key of each validator (as of the [Banff Upgrade](https://github.com/ava-labs/avalanchego/releases/v1.9.0)). ICM utilizes the weighted validator sets stored on the P-Chain to build a cross-chain communication protocol between any two L1s on the Avalanche Network.
+The Avalanche P-Chain provides an index of every network's validator set on the Avalanche Network, including the BLS public key of each validator (as of the [Banff Upgrade](https://github.com/ava-labs/avalanchego/releases/v1.9.0)). ICM utilizes the weighted validator sets stored on the P-Chain to build a cross-chain communication protocol between any two networks on Avalanche.
 
-Any Virtual Machine (VM) on Avalanche can integrate Avalanche Interchain Messaging to send and receive messages across Avalanche L1s.
+Any Virtual Machine (VM) on Avalanche can integrate Avalanche Interchain Messaging to send and receive messages cross-chain.
 
 ## Background
 
@@ -16,9 +16,9 @@ This README assumes familiarity with:
 
 ## BLS Multi-Signatures with Public-Key Aggregation
 
-Avalanche Interchain Messaging utilizes BLS multi-signatures with public key aggregation in order to verify messages signed by another L1. When a validator joins an L1, the P-Chain records the validator's BLS public key and NodeID, as well as a proof of possession of the validator's BLS private key to defend against [rogue public-key attacks](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqaggsame).
+Avalanche Interchain Messaging utilizes BLS multi-signatures with public key aggregation in order to verify messages signed by another network. When a validator joins a network, the P-Chain records the validator's BLS public key and NodeID, as well as a proof of possession of the validator's BLS private key to defend against [rogue public-key attacks](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqaggsame).
 
-ICM utilizes the validator set's weights and public keys to verify that an aggregate signature has sufficient weight signing the message from the source L1.
+ICM utilizes the validator set's weights and public keys to verify that an aggregate signature has sufficient weight signing the message from the source network.
 
 BLS provides a way to aggregate signatures off chain into a single signature that can be efficiently verified on chain.
 
@@ -60,7 +60,7 @@ BitSetSignature:
 - `signers` encodes a bitset of which validators' signatures are included (a bitset is a byte array where each bit indicates membership of the element at that index in the set)
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
-BitSetSignatures are verified within the context of a specific P-Chain height. At any given P-Chain height, the PlatformVM serves a canonically ordered validator set for the source L1 (validator set is ordered lexicographically by the BLS public key's byte representation). The `signers` bitset encodes which validator signatures were included. A value of `1` at index `i` in `signers` bitset indicates that a corresponding signature from the same validator at index `i` in the canonical validator set was included in the aggregate signature.
+BitSetSignatures are verified within the context of a specific P-Chain height. At any given P-Chain height, the PlatformVM serves a canonically ordered validator set for the source network (validator set is ordered lexicographically by the BLS public key's byte representation). The `signers` bitset encodes which validator signatures were included. A value of `1` at index `i` in `signers` bitset indicates that a corresponding signature from the same validator at index `i` in the canonical validator set was included in the aggregate signature.
 
 The bitset tells the verifier which BLS public keys should be aggregated to verify the interchain message.
 
@@ -78,7 +78,7 @@ Signed Message:
 
 ## Sending an Avalanche Interchain Message
 
-A blockchain on Avalanche sends an Avalanche Interchain Message by coming to agreement on the message that every validator should be willing to sign. As an example, the VM of a blockchain may define that once a block is accepted, the VM should be willing to sign a message including the block hash in the payload to attest to any other L1 that the block was accepted. The contents of the payload, how to aggregate the signature (VM-to-VM communication, off-chain relayer, etc.), is left to the VM.
+A blockchain on Avalanche sends an Avalanche Interchain Message by coming to agreement on the message that every validator should be willing to sign. As an example, the VM of a blockchain may define that once a block is accepted, the VM should be willing to sign a message including the block hash in the payload to attest to any other network that the block was accepted. The contents of the payload, how to aggregate the signature (VM-to-VM communication, off-chain relayer, etc.), is left to the VM.
 
 Once the validator set of a blockchain is willing to sign an arbitrary message `M`, an aggregator performs the following process:
 
@@ -94,7 +94,7 @@ Avalanche Interchain Messages are verified within the context of a specific P-Ch
 
 To verify the message, the underlying VM utilizes this `warp` package to perform the following steps:
 
-1. Lookup the canonical validator set of the L1 sending the message at the P-Chain height
+1. Lookup the canonical validator set of the network sending the message at the P-Chain height
 2. Filter the canonical validator set to only the validators claimed by the signature
 3. Verify the weight of the included validators meets the required threshold defined by the receiving VM
 4. Aggregate the public keys of the claimed validators into a single aggregate public key
@@ -106,7 +106,7 @@ Once a message is verified, it is left to the VM to define the semantics of deli
 
 ### Processing Historical Avalanche Interchain Messages
 
-Verifying an Avalanche Interchain Message requires a lookup of validator sets at a specific P-Chain height. The P-Chain serves lookups maintaining validator set diffs that can be applied in-order to reconstruct the validator set of any L1 at any height.
+Verifying an Avalanche Interchain Message requires a lookup of validator sets at a specific P-Chain height. The P-Chain serves lookups maintaining validator set diffs that can be applied in-order to reconstruct the validator set of any network at any height.
 
 As the P-Chain grows, the number of validator set diffs that needs to be applied in order to reconstruct the validator set needed to verify an Avalanche Interchain Messages increases over time.
 
