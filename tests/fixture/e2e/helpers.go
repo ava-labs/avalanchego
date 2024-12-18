@@ -329,10 +329,10 @@ func StartNetwork(
 // NewPChainFeeCalculatorFromContext returns either a static or dynamic fee
 // calculator depending on the provided context.
 func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator {
-	// if context.GasPrice != 0 {
-	return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
-	// }
-	// return fee.NewStaticCalculator(context.StaticFeeConfig)
+	if context.GasPrice != 0 {
+		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
+	}
+	return fee.NewSimpleCalculator(context.TxFee)
 }
 
 // GetRepoRootPath strips the provided suffix from the current working

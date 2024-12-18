@@ -232,7 +232,6 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
-	// feeCalculator := state.NewStaticFeeCalculator(v.txExecutorBackend.Config, currentTimestamp)
 	feeCalculator := txfee.NewSimpleCalculator(0)
 	onAcceptState, atomicInputs, atomicRequests, err := executor.AtomicTx(
 		v.txExecutorBackend,

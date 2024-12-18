@@ -103,7 +103,6 @@ var (
 		Subnet: constants.PrimaryNetworkID,
 	}
 
-
 	testContextPostEtna = &builder.Context{
 		NetworkID:   constants.UnitTestID,
 		AVAXAssetID: avaxAssetID,
@@ -115,7 +114,7 @@ var (
 			gas.Compute:   1000,
 		},
 		GasPrice: 1,
-		TxFee: 0,
+		TxFee:    0,
 	}
 	dynamicFeeCalculator = fee.NewDynamicCalculator(
 		testContextPostEtna.ComplexityWeights,
@@ -463,7 +462,6 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	var (
 		utxos = []*avax.UTXO{
-			// makeUTXO(testContextPreEtna.StaticFeeConfig.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
 			makeUTXO(1 * units.NanoAvax), // small UTXO
 			makeUTXO(9 * units.Avax),     // large UTXO
 		}

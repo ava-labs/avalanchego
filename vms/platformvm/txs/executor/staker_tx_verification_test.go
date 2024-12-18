@@ -452,9 +452,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-						// StaticFeeConfig: fee.StaticConfig{
-						// 	AddSubnetValidatorFee: 1,
-						// },
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -500,9 +497,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-						// StaticFeeConfig: fee.StaticConfig{
-						// 	AddSubnetValidatorFee: 1,
-						// },
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,

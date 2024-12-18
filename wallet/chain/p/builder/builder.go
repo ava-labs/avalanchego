@@ -436,7 +436,6 @@ func (b *builder) NewAddValidatorTx(
 	avaxAssetID := b.context.AVAXAssetID
 	toBurn := map[ids.ID]uint64{
 		avaxAssetID: b.context.TxFee,
-		// StaticFeeConfig.AddPrimaryNetworkValidatorFee,
 	}
 	toStake := map[ids.ID]uint64{
 		avaxAssetID: vdr.Wght,
