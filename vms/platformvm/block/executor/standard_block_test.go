@@ -149,7 +149,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 			ID: snowtest.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt: env.config.StaticFeeConfig.CreateSubnetTxFee, // set to 0?
+			Amt: 0, // set to 0?
 		},
 	}
 	utxoID := utxo.InputID()
@@ -164,7 +164,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: env.config.StaticFeeConfig.CreateSubnetTxFee,
+					Amt: 0,
 				},
 			}},
 		}},
