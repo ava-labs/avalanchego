@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -69,7 +70,7 @@ func (utx *UnsignedExportTx) InputUTXOs() set.Set[ids.ID] {
 // Verify this transaction is well-formed
 func (utx *UnsignedExportTx) Verify(
 	ctx *snow.Context,
-	rules params.RulesExtra,
+	rules extras.Rules,
 ) error {
 	switch {
 	case utx == nil:
@@ -180,7 +181,7 @@ func (utx *UnsignedExportTx) SemanticVerify(
 	stx *Tx,
 	_ *Block,
 	baseFee *big.Int,
-	rules params.RulesExtra,
+	rules extras.Rules,
 ) error {
 	if err := utx.Verify(vm.ctx, rules); err != nil {
 		return err

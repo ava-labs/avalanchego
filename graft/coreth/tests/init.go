@@ -32,6 +32,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/utils"
 )
 
@@ -177,8 +178,8 @@ var Forks = map[string]*params.ChainConfig{
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 			},
 		},
@@ -197,8 +198,8 @@ var Forks = map[string]*params.ChainConfig{
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 			},
@@ -219,8 +220,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),
@@ -242,8 +243,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),
@@ -265,8 +266,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),
@@ -289,8 +290,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),
@@ -314,8 +315,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),
@@ -340,8 +341,8 @@ var Forks = map[string]*params.ChainConfig{
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),
@@ -369,8 +370,8 @@ var Forks = map[string]*params.ChainConfig{
 			ShanghaiTime:        utils.NewUint64(0),
 			CancunTime:          utils.NewUint64(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase3BlockTimestamp: utils.NewUint64(0),

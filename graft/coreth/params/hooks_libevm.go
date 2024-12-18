@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/coreth/nativeasset"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/precompile/contract"
 	"github.com/ava-labs/coreth/precompile/modules"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
@@ -18,6 +19,13 @@ import (
 	"github.com/holiman/uint256"
 	"golang.org/x/exp/maps"
 )
+
+type RulesExtra extras.Rules
+
+func GetRulesExtra(r Rules) *extras.Rules {
+	rules := payloads.PointerFromRules(&r)
+	return (*extras.Rules)(rules)
+}
 
 func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, state libevm.StateReader) (uint64, error) {
 	return gas, nil

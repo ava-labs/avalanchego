@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/coreth/utils"
@@ -257,7 +258,7 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 	_, _, err := SetupGenesisBlock(db, trieDB, genesis, genesisBlock.Hash(), false)
 	require.NoError(err)
 
-	params.GetExtra(genesis.Config).UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
+	params.GetExtra(genesis.Config).UpgradeConfig.PrecompileUpgrades = []extras.PrecompileUpgrade{
 		{
 			Config: warp.NewConfig(utils.NewUint64(51), 0, false),
 		},

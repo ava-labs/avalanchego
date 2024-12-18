@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 )
@@ -526,7 +527,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		tx        *Tx
 		signers   [][]*secp256k1.PrivateKey
 		baseFee   *big.Int
-		rules     params.RulesExtra
+		rules     extras.Rules
 		shouldErr bool
 	}{
 		{
@@ -1633,7 +1634,7 @@ func TestNewExportTx(t *testing.T) {
 	tests := []struct {
 		name               string
 		genesis            string
-		rules              params.RulesExtra
+		rules              extras.Rules
 		bal                uint64
 		expectedBurnedAVAX uint64
 	}{
@@ -1806,7 +1807,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 	tests := []struct {
 		name    string
 		genesis string
-		rules   params.RulesExtra
+		rules   extras.Rules
 		bal     uint64
 		balmc   uint64
 	}{
