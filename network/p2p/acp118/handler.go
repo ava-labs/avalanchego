@@ -26,9 +26,9 @@ var _ p2p.Handler = (*Handler)(nil)
 type Verifier interface {
 	Verify(
 		ctx context.Context,
+		nodeID ids.NodeID,
 		message *warp.UnsignedMessage,
 		justification []byte,
-		nodeID ids.NodeID,
 	) *common.AppError
 }
 
@@ -91,7 +91,7 @@ func (h *Handler) AppRequest(
 		return signatureToResponse(signatureBytes)
 	}
 
-	if err := h.verifier.Verify(ctx, msg, request.Justification, nodeID); err != nil {
+	if err := h.verifier.Verify(ctx, nodeID, msg, request.Justification); err != nil {
 		return nil, err
 	}
 

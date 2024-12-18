@@ -157,9 +157,9 @@ func newTestVerifier(t *testing.T, clientNodeID ids.NodeID, errs []*common.AppEr
 
 func (t *testVerifier) Verify(
 	_ context.Context,
+	nodeID ids.NodeID,
 	_ *warp.UnsignedMessage,
 	justification []byte,
-	nodeID ids.NodeID,
 ) *common.AppError {
 	require.Equal(t.t, t.clientNodeID, nodeID)
 	require.Equal(t.t, []byte("justification"), justification)

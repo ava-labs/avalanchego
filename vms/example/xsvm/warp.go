@@ -17,6 +17,6 @@ var _ acp118.Verifier = (*acp118Verifier)(nil)
 // acp118Verifier allows signing all warp messages
 type acp118Verifier struct{}
 
-func (acp118Verifier) Verify(context.Context, *warp.UnsignedMessage, []byte, ids.NodeID) *common.AppError {
+func (acp118Verifier) Verify(context.Context, ids.NodeID, *warp.UnsignedMessage, []byte) *common.AppError {
 	return nil
 }
