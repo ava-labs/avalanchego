@@ -115,7 +115,7 @@ var (
 			gas.Compute:   1000,
 		},
 		GasPrice: 1,
-		TxFee: 1, // this was added
+		TxFee: 0,
 	}
 	dynamicFeeCalculator = fee.NewDynamicCalculator(
 		testContextPostEtna.ComplexityWeights,

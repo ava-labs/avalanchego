@@ -272,7 +272,7 @@ func TestGenesis(t *testing.T) {
 				[]ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 				out.OutputOwners.Addrs,
 			)
-			require.Equal(genesisOut.Amt-vm.StaticFeeConfig.CreateSubnetTxFee, out.Amt)
+			require.Equal(genesisOut.Amt-vm.TxFee, out.Amt)
 		}
 	}
 

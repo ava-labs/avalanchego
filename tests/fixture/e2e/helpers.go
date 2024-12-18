@@ -330,7 +330,7 @@ func StartNetwork(
 // calculator depending on the provided context.
 func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator {
 	// if context.GasPrice != 0 {
-		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
+	return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
 	// }
 	// return fee.NewStaticCalculator(context.StaticFeeConfig)
 }

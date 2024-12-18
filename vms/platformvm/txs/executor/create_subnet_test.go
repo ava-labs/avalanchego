@@ -9,5 +9,5 @@ import (
 
 // Can we just delete these tests since its from Ap3 phase?
 func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
-	
+
 }

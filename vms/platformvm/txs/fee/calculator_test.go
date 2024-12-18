@@ -11,7 +11,7 @@ import (
 const testDynamicPrice = gas.Price(units.NanoAvax)
 
 var (
-	txFee = 1 * units.Avax
+	txFee              = 1 * units.Avax
 	testDynamicWeights = gas.Dimensions{
 		gas.Bandwidth: 1,
 		gas.DBRead:    2000,
