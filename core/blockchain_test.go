@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/coreth/core/state/pruner"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -425,7 +426,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	gspec := &Genesis{
 		Config: params.WithExtra(
 			&params.ChainConfig{HomesteadBlock: new(big.Int)},
-			&params.ChainConfigExtra{},
+			&extras.ChainConfig{},
 		),
 		Alloc: types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}

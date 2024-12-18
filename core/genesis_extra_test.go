@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/triedb"
@@ -57,8 +58,8 @@ func TestGenesisEthUpgrades(t *testing.T) {
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
 		},
-		&params.ChainConfigExtra{
-			NetworkUpgrades: params.NetworkUpgrades{
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
 				ApricotPhase1BlockTimestamp: utils.NewUint64(0),
 				ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 			},

@@ -1,7 +1,7 @@
 // (c) 2022, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package params
+package extras
 
 import (
 	"fmt"
@@ -194,7 +194,7 @@ func (n NetworkUpgrades) Description() string {
 	return banner
 }
 
-func getNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
+func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 	return NetworkUpgrades{
 		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase1Time),
 		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase2Time),
