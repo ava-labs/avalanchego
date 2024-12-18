@@ -418,31 +418,34 @@ func TestVerify(t *testing.T) {
 func TestVerifyProofOfPossession(t *testing.T) {
 	type test struct {
 		name          string
-		setup         func(*require.Assertions) (pk *bls.PublicKey, sig *bls.Signature, msg []byte)
+		signers       []func() (bls.Signer, error)
+		setup         func(*require.Assertions, bls.Signer) (pk *bls.PublicKey, sig *bls.Signature, msg []byte)
 		expectedValid bool
 	}
 
 	tests := []test{
 		{
 			name: "valid",
-			setup: func(require *require.Assertions) (*bls.PublicKey, *bls.Signature, []byte) {
-				sk, err := local.NewSigner()
-				require.NoError(err)
-				pk := sk.PublicKey()
+			signers: []func() (bls.Signer, error){
+				func() (bls.Signer, error) { return local.NewSigner() },
+			},
+			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
-				sig := sk.SignProofOfPossession(msg)
+				sig := signer.SignProofOfPossession(msg)
 				return pk, sig, msg
 			},
 			expectedValid: true,
 		},
 		{
 			name: "wrong message",
-			setup: func(require *require.Assertions) (*bls.PublicKey, *bls.Signature, []byte) {
-				sk, err := local.NewSigner()
-				require.NoError(err)
-				pk := sk.PublicKey()
+			signers: []func() (bls.Signer, error){
+				func() (bls.Signer, error) { return local.NewSigner() },
+			},
+			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
-				sig := sk.SignProofOfPossession(msg)
+				sig := signer.SignProofOfPossession(msg)
 				msg[0]++
 				return pk, sig, msg
 			},
@@ -450,11 +453,12 @@ func TestVerifyProofOfPossession(t *testing.T) {
 		},
 		{
 			name: "wrong pub key",
-			setup: func(require *require.Assertions) (*bls.PublicKey, *bls.Signature, []byte) {
-				sk, err := local.NewSigner()
-				require.NoError(err)
+			signers: []func() (bls.Signer, error){
+				func() (bls.Signer, error) { return local.NewSigner() },
+			},
+			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				msg := utils.RandomBytes(1234)
-				sig := sk.SignProofOfPossession(msg)
+				sig := signer.SignProofOfPossession(msg)
 
 				sk2, err := local.NewSigner()
 				require.NoError(err)
@@ -465,14 +469,15 @@ func TestVerifyProofOfPossession(t *testing.T) {
 		},
 		{
 			name: "wrong sig",
-			setup: func(require *require.Assertions) (*bls.PublicKey, *bls.Signature, []byte) {
-				sk, err := local.NewSigner()
-				require.NoError(err)
-				pk := sk.PublicKey()
+			signers: []func() (bls.Signer, error){
+				func() (bls.Signer, error) { return local.NewSigner() },
+			},
+			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
 
 				msg2 := utils.RandomBytes(1234)
-				sig2 := sk.SignProofOfPossession(msg2)
+				sig2 := signer.SignProofOfPossession(msg2)
 				return pk, sig2, msg
 			},
 			expectedValid: false,
@@ -482,11 +487,16 @@ func TestVerifyProofOfPossession(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			pk, sig, msg := tt.setup(require)
-			valid := bls.VerifyProofOfPossession(pk, sig, msg)
-			require.Equal(tt.expectedValid, valid)
-			valid = bls.Verify(pk, sig, msg)
-			require.False(valid)
+
+			for _, newSigner := range tt.signers {
+				signer, err := newSigner()
+				require.NoError(err)
+				pk, sig, msg := tt.setup(require, signer)
+				valid := bls.VerifyProofOfPossession(pk, sig, msg)
+				require.Equal(tt.expectedValid, valid)
+				valid = bls.Verify(pk, sig, msg)
+				require.False(valid)
+			}
 		})
 	}
 }
