@@ -1397,11 +1397,8 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	options ...common.Option,
 ) (*txs.AddPermissionlessValidatorTx, error) {
 	avaxAssetID := b.context.AVAXAssetID
-	toBurn := map[ids.ID]uint64{}
-	if vdr.Subnet == constants.PrimaryNetworkID {
-		toBurn[avaxAssetID] = b.context.TxFee
-	} else {
-		toBurn[avaxAssetID] = b.context.TxFee
+	toBurn := map[ids.ID]uint64{
+		avaxAssetID: b.context.TxFee,
 	}
 	toStake := map[ids.ID]uint64{
 		assetID: vdr.Wght,
