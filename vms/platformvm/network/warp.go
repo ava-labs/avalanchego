@@ -54,6 +54,7 @@ type signatureRequestVerifier struct {
 
 func (s signatureRequestVerifier) Verify(
 	_ context.Context,
+	_ ids.NodeID,
 	unsignedMessage *warp.UnsignedMessage,
 	justification []byte,
 ) *common.AppError {

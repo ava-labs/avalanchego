@@ -26,25 +26,22 @@ func TestHandler(t *testing.T) {
 	tests := []struct {
 		name         string
 		cacher       cache.Cacher[ids.ID, []byte]
-		verifier     Verifier
+		verifierErrs []*common.AppError
 		expectedErrs []error
 	}{
 		{
 			name:   "signature fails verification",
 			cacher: &cache.Empty[ids.ID, []byte]{},
-			verifier: &testVerifier{
-				Errs: []*common.AppError{
-					{Code: 123},
-				},
+			verifierErrs: []*common.AppError{
+				{Code: 123},
 			},
 			expectedErrs: []error{
 				&common.AppError{Code: 123},
 			},
 		},
 		{
-			name:     "signature signed",
-			cacher:   &cache.Empty[ids.ID, []byte]{},
-			verifier: &testVerifier{},
+			name:   "signature signed",
+			cacher: &cache.Empty[ids.ID, []byte]{},
 			expectedErrs: []error{
 				nil,
 			},
@@ -54,11 +51,9 @@ func TestHandler(t *testing.T) {
 			cacher: &cache.LRU[ids.ID, []byte]{
 				Size: 1,
 			},
-			verifier: &testVerifier{
-				Errs: []*common.AppError{
-					nil,
-					{Code: 123}, // The valid response should be cached
-				},
+			verifierErrs: []*common.AppError{
+				nil,
+				{Code: 123}, // The valid response should be cached
 			},
 			expectedErrs: []error{
 				nil,
@@ -78,9 +73,17 @@ func TestHandler(t *testing.T) {
 			networkID := uint32(123)
 			chainID := ids.GenerateTestID()
 			signer := warp.NewSigner(sk, networkID, chainID)
-			h := NewCachedHandler(tt.cacher, tt.verifier, signer)
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
+			justification := []byte("justification")
+			testVerifier := &testVerifier{
+				T:                     t,
+				Errs:                  tt.verifierErrs,
+				ClientNodeID:          clientNodeID,
+				ExpectedJustification: justification,
+			}
+			h := NewCachedHandler(tt.cacher, testVerifier, signer)
+
 			c := p2ptest.NewClient(
 				t,
 				ctx,
@@ -98,7 +101,7 @@ func TestHandler(t *testing.T) {
 
 			request := &sdk.SignatureRequest{
 				Message:       unsignedMessage.Bytes(),
-				Justification: []byte("justification"),
+				Justification: justification,
 			}
 
 			requestBytes, err := proto.Marshal(request)
@@ -143,14 +146,20 @@ func TestHandler(t *testing.T) {
 
 // The zero value of testVerifier allows signing
 type testVerifier struct {
-	Errs []*common.AppError
+	T                     *testing.T
+	Errs                  []*common.AppError
+	ClientNodeID          ids.NodeID
+	ExpectedJustification []byte
 }
 
 func (t *testVerifier) Verify(
-	context.Context,
-	*warp.UnsignedMessage,
-	[]byte,
+	_ context.Context,
+	nodeID ids.NodeID,
+	_ *warp.UnsignedMessage,
+	justification []byte,
 ) *common.AppError {
+	require.Equal(t.T, t.ClientNodeID, nodeID)
+	require.Equal(t.T, t.ExpectedJustification, justification)
 	if len(t.Errs) == 0 {
 		return nil
 	}
