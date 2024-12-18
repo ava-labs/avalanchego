@@ -215,7 +215,7 @@ func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, erro
 	blk, err := s.getBlock(ctx, blkID)
 	// If getBlock returns [database.ErrNotFound], State considers
 	// this a cacheable miss.
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.missingBlocks.Put(blkID, struct{}{})
 		return nil, err
 	} else if err != nil {

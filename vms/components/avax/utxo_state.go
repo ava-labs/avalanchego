@@ -4,6 +4,7 @@
 package avax
 
 import (
+	"errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -152,7 +153,7 @@ func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
 	}
 
 	bytes, err := s.utxoDB.Get(utxoID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		s.utxoCache.Put(utxoID, nil)
 		return nil, database.ErrNotFound
 	}
@@ -201,7 +202,7 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 
 func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	utxo, err := s.GetUTXO(utxoID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return nil
 	}
 	if err != nil {

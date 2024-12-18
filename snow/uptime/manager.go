@@ -186,7 +186,7 @@ func (m *manager) CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.T
 // time that the node has been connected.
 func (m *manager) updateUptime(nodeID ids.NodeID) error {
 	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// We don't track the uptimes of non-validators.
 		return nil
 	}

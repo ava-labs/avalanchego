@@ -95,7 +95,7 @@ func newState(
 
 func getNumJobs(d database.Database, jobs database.Iteratee) (uint64, error) {
 	numJobs, err := database.GetUInt64(d, numJobsKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// If we don't have a checkpoint, we need to initialize it.
 		count, err := database.Count(jobs)
 		return uint64(count), err

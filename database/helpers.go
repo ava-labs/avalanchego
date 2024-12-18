@@ -146,7 +146,7 @@ func WithDefault[V any](
 	def V,
 ) (V, error) {
 	v, err := get(db, key)
-	if err == ErrNotFound {
+	if errors.Is(err, ErrNotFound) {
 		return def, nil
 	}
 	return v, err

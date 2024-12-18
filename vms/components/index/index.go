@@ -214,7 +214,7 @@ func (i *indexer) Read(address []byte, assetID ids.ID, cursor, pageSize uint64) 
 func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
 	// verify whether the index is complete.
 	idxComplete, err := database.GetBool(db, idxCompleteKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// We've not run before. Mark whether indexing is enabled this run.
 		return database.PutBool(db, idxCompleteKey, enableIndexing)
 	} else if err != nil {

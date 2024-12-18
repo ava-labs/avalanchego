@@ -63,7 +63,7 @@ func GetAncestors(
 	// RemoteVM did not work, try local logic
 	startTime := time.Now()
 	blk, err := vm.GetBlock(ctx, blkID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// Special case ErrNotFound as an empty response: this signals
 		// the client to avoid contacting this node for further ancestors
 		// as they may have been pruned or unavailable due to state-sync.
@@ -80,7 +80,7 @@ func GetAncestors(
 	for numFetched := 1; numFetched < maxBlocksNum && time.Since(startTime) < maxBlocksRetrivalTime; numFetched++ {
 		parentID := blk.Parent()
 		blk, err = vm.GetBlock(ctx, parentID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// After state sync we may not have the full chain
 			break
 		}

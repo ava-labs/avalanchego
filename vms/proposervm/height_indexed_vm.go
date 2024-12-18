@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -76,7 +77,7 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 	// underflow.
 	heightToDelete := height - vm.NumHistoricalBlocks - 1
 	blockToDelete, err := vm.State.GetBlockIDAtHeight(heightToDelete)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// Block may have already been deleted. This can happen due to a
 		// proposervm rollback, the node having recently state-synced, or the
 		// user reconfiguring the node to store more historical blocks than a
@@ -108,7 +109,7 @@ func (vm *VM) pruneOldBlocks() error {
 	}
 
 	height, err := vm.State.GetMinimumHeight()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// Chain hasn't forked yet
 		return nil
 	}

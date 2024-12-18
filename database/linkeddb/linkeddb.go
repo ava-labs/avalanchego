@@ -4,6 +4,7 @@
 package linkeddb
 
 import (
+	"errors"
 	"slices"
 	"sync"
 
@@ -142,7 +143,7 @@ func (ldb *linkedDB) Delete(key []byte) error {
 	defer ldb.lock.Unlock()
 
 	currentNode, err := ldb.getNode(key)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
@@ -205,7 +206,7 @@ func (ldb *linkedDB) Delete(key []byte) error {
 
 func (ldb *linkedDB) IsEmpty() (bool, error) {
 	_, err := ldb.HeadKey()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return true, nil
 	}
 	return false, err
@@ -272,7 +273,7 @@ func (ldb *linkedDB) getHeadKey() ([]byte, error) {
 		ldb.headKey = headKey
 		return headKey, nil
 	}
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		ldb.headKeyIsSynced = true
 		ldb.headKeyExists = false
 		return nil, database.ErrNotFound
@@ -308,7 +309,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	}
 
 	nodeBytes, err := ldb.db.Get(nodeKey(key))
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		ldb.nodeCache.Put(keyStr, nil)
 		return node{}, err
 	}
@@ -380,7 +381,7 @@ func (it *iterator) Next() bool {
 	if !it.initialized {
 		it.initialized = true
 		headKey, err := it.ldb.getHeadKey()
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			it.exhausted = true
 			it.key = nil
 			it.value = nil
@@ -397,7 +398,7 @@ func (it *iterator) Next() bool {
 	}
 
 	nextNode, err := it.ldb.getNode(it.nextKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		it.exhausted = true
 		it.key = nil
 		it.value = nil

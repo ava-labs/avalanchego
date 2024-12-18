@@ -206,7 +206,7 @@ func getL1Validator(
 	}
 
 	bytes, err := db.Get(validationID[:])
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		cache.Put(validationID, maybe.Nothing[L1Validator]())
 		return L1Validator{}, database.ErrNotFound
 	}

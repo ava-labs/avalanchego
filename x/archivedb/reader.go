@@ -3,7 +3,10 @@
 
 package archivedb
 
-import "github.com/ava-labs/avalanchego/database"
+import (
+	"errors"
+	"github.com/ava-labs/avalanchego/database"
+)
 
 var _ database.KeyValueReader = (*Reader)(nil)
 
@@ -14,7 +17,7 @@ type Reader struct {
 
 func (r *Reader) Has(key []byte) (bool, error) {
 	_, err := r.Get(key)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		return false, nil
 	}
 	return true, err
