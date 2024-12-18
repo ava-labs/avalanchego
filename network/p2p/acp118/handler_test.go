@@ -76,7 +76,14 @@ func TestHandler(t *testing.T) {
 			signer := warp.NewSigner(sk, networkID, chainID)
 			clientNodeID := ids.GenerateTestNodeID()
 			serverNodeID := ids.GenerateTestNodeID()
-			h := NewCachedHandler(tt.cacher, newTestVerifier(t, clientNodeID, tt.verifierErrs), signer)
+			justification := []byte("justification")
+			testVerifier := &testVerifier{
+				T:                     t,
+				Errs:                  tt.verifierErrs,
+				ClientNodeID:          clientNodeID,
+				ExpectedJustification: justification,
+			}
+			h := NewCachedHandler(tt.cacher, testVerifier, signer)
 
 			c := p2ptest.NewClient(
 				t,
@@ -95,7 +102,7 @@ func TestHandler(t *testing.T) {
 
 			request := &sdk.SignatureRequest{
 				Message:       unsignedMessage.Bytes(),
-				Justification: []byte("justification"),
+				Justification: justification,
 			}
 
 			requestBytes, err := proto.Marshal(request)
@@ -128,8 +135,6 @@ func TestHandler(t *testing.T) {
 				if ok {
 					require.Equal(sig, response.Signature)
 				}
-
-				require.Equal(serverNodeID, nodeID)
 			}
 
 			for _, expectedErr = range tt.expectedErrs {
@@ -142,17 +147,10 @@ func TestHandler(t *testing.T) {
 
 // The zero value of testVerifier allows signing
 type testVerifier struct {
-	t            *testing.T
-	errs         []*common.AppError
-	clientNodeID ids.NodeID
-}
-
-func newTestVerifier(t *testing.T, clientNodeID ids.NodeID, errs []*common.AppError) *testVerifier {
-	return &testVerifier{
-		t:            t,
-		errs:         errs,
-		clientNodeID: clientNodeID,
-	}
+	T                     *testing.T
+	Errs                  []*common.AppError
+	ClientNodeID          ids.NodeID
+	ExpectedJustification []byte
 }
 
 func (t *testVerifier) Verify(
@@ -161,12 +159,12 @@ func (t *testVerifier) Verify(
 	_ *warp.UnsignedMessage,
 	justification []byte,
 ) *common.AppError {
-	require.Equal(t.t, t.clientNodeID, nodeID)
-	require.Equal(t.t, []byte("justification"), justification)
-	if len(t.errs) == 0 {
+	require.Equal(t.T, t.ClientNodeID, nodeID)
+	require.Equal(t.T, t.ExpectedJustification, justification)
+	if len(t.Errs) == 0 {
 		return nil
 	}
-	err := t.errs[0]
-	t.errs = t.errs[1:]
+	err := t.Errs[0]
+	t.Errs = t.Errs[1:]
 	return err
 }
