@@ -16,8 +16,8 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.11.3 fixes a regression in Coreth genesis for custom networks.
-DEFAULT_VERSION="1.11.3"
+# v1.12.0 is the earliest version that supports Etna.
+DEFAULT_VERSION="1.12.0"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
