@@ -4,5 +4,5 @@
 # shellcheck disable=SC2034
 
 # Don't export them as they're used in the context of other calls
-AVALANCHE_VERSION=${AVALANCHE_VERSION:-'v1.12.0-config-pebble-sync'}
+AVALANCHE_VERSION=${AVALANCHE_VERSION:-'v1.12.1'}
 GINKGO_VERSION=${GINKGO_VERSION:-'v2.2.0'}
