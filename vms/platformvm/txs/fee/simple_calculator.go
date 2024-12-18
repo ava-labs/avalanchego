@@ -5,7 +5,7 @@ package fee
 
 import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
-var _ Calculator = &SimpleCalculator{}
+var _ Calculator = (*SimpleCalculator)(nil)
 
 type SimpleCalculator struct {
 	txFee uint64
