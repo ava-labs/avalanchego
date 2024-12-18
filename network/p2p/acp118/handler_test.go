@@ -40,9 +40,8 @@ func TestHandler(t *testing.T) {
 			},
 		},
 		{
-			name:         "signature signed",
-			cacher:       &cache.Empty[ids.ID, []byte]{},
-			verifierErrs: nil,
+			name:   "signature signed",
+			cacher: &cache.Empty[ids.ID, []byte]{},
 			expectedErrs: []error{
 				nil,
 			},
@@ -112,7 +111,7 @@ func TestHandler(t *testing.T) {
 				expectedErr error
 				handled     = make(chan struct{})
 			)
-			onResponse := func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
+			onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
 				defer func() {
 					handled <- struct{}{}
 				}()
