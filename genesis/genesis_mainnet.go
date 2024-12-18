@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -24,16 +23,7 @@ var (
 	MainnetParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: 10 * units.MilliAvax,
-			StaticFeeConfig: txfee.StaticConfig{
-				TxFee:                         units.MilliAvax,
-				CreateSubnetTxFee:             1 * units.Avax,
-				TransformSubnetTxFee:          10 * units.Avax,
-				CreateBlockchainTxFee:         1 * units.Avax,
-				AddPrimaryNetworkValidatorFee: 0,
-				AddPrimaryNetworkDelegatorFee: 0,
-				AddSubnetValidatorFee:         units.MilliAvax,
-				AddSubnetDelegatorFee:         units.MilliAvax,
-			},
+			TxFee:            units.MilliAvax,
 			DynamicFeeConfig: gas.Config{
 				Weights: gas.Dimensions{
 					gas.Bandwidth: 1,     // Max block size ~1MB

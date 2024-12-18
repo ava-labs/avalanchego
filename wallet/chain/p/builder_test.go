@@ -5,7 +5,6 @@ package p
 
 import (
 	"math/rand"
-	"slices"
 	"testing"
 	"time"
 
@@ -104,23 +103,6 @@ var (
 		Subnet: constants.PrimaryNetworkID,
 	}
 
-	testContextPreEtna = &builder.Context{
-		NetworkID:   constants.UnitTestID,
-		AVAXAssetID: avaxAssetID,
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                         units.MicroAvax,
-			CreateSubnetTxFee:             19 * units.MicroAvax,
-			TransformSubnetTxFee:          789 * units.MicroAvax,
-			CreateBlockchainTxFee:         1234 * units.MicroAvax,
-			AddPrimaryNetworkValidatorFee: 19 * units.MilliAvax,
-			AddPrimaryNetworkDelegatorFee: 765 * units.MilliAvax,
-			AddSubnetValidatorFee:         1010 * units.MilliAvax,
-			AddSubnetDelegatorFee:         9 * units.Avax,
-		},
-	}
-	staticFeeCalculator = fee.NewStaticCalculator(
-		testContextPreEtna.StaticFeeConfig,
-	)
 
 	testContextPostEtna = &builder.Context{
 		NetworkID:   constants.UnitTestID,
@@ -133,25 +115,13 @@ var (
 			gas.Compute:   1000,
 		},
 		GasPrice: 1,
+		TxFee: 1, // this was added
 	}
 	dynamicFeeCalculator = fee.NewDynamicCalculator(
 		testContextPostEtna.ComplexityWeights,
 		testContextPostEtna.GasPrice,
 	)
 
-	testEnvironmentPreEtna = []environment{
-		{
-			name:          "Pre-Etna",
-			context:       testContextPreEtna,
-			feeCalculator: staticFeeCalculator,
-		},
-		{
-			name:          "Pre-Etna with memo",
-			context:       testContextPreEtna,
-			feeCalculator: staticFeeCalculator,
-			memo:          []byte("memo"),
-		},
-	}
 	testEnvironmentPostEtna = []environment{
 		{
 			name:          "Post-Etna",
@@ -165,10 +135,7 @@ var (
 			memo:          []byte("memo"),
 		},
 	}
-	testEnvironment = slices.Concat(
-		testEnvironmentPreEtna,
-		testEnvironmentPostEtna,
-	)
+	testEnvironment = testEnvironmentPostEtna // todo: before merge just have one var
 )
 
 type environment struct {
@@ -477,81 +444,6 @@ func TestExportTx(t *testing.T) {
 	}
 }
 
-func TestTransformSubnetTx(t *testing.T) {
-	const (
-		initialSupply                   = 40 * units.MegaAvax
-		maxSupply                       = 100 * units.MegaAvax
-		minConsumptionRate       uint64 = reward.PercentDenominator
-		maxConsumptionRate       uint64 = reward.PercentDenominator
-		minValidatorStake        uint64 = 1
-		maxValidatorStake               = 100 * units.MegaAvax
-		minStakeDuration                = time.Second
-		maxStakeDuration                = 365 * 24 * time.Hour
-		minDelegationFee         uint32 = 0
-		minDelegatorStake        uint64 = 1
-		maxValidatorWeightFactor byte   = 5
-		uptimeRequirement        uint32 = .80 * reward.PercentDenominator
-	)
-
-	// TransformSubnetTx is not valid to be issued post-Etna
-	for _, e := range testEnvironmentPreEtna {
-		t.Run(e.name, func(t *testing.T) {
-			var (
-				require    = require.New(t)
-				chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
-					constants.PlatformChainID: utxos,
-				})
-				backend = wallet.NewBackend(e.context, chainUTXOs, subnetOwners)
-				builder = builder.New(set.Of(utxoAddr, subnetAuthAddr), e.context, backend)
-			)
-
-			utx, err := builder.NewTransformSubnetTx(
-				subnetID,
-				subnetAssetID,
-				initialSupply,
-				maxSupply,
-				minConsumptionRate,
-				maxConsumptionRate,
-				minValidatorStake,
-				maxValidatorStake,
-				minStakeDuration,
-				maxStakeDuration,
-				minDelegationFee,
-				minDelegatorStake,
-				maxValidatorWeightFactor,
-				uptimeRequirement,
-				common.WithMemo(e.memo),
-			)
-			require.NoError(err)
-			require.Equal(subnetID, utx.Subnet)
-			require.Equal(subnetAssetID, utx.AssetID)
-			require.Equal(initialSupply, utx.InitialSupply)
-			require.Equal(maxSupply, utx.MaximumSupply)
-			require.Equal(minConsumptionRate, utx.MinConsumptionRate)
-			require.Equal(minValidatorStake, utx.MinValidatorStake)
-			require.Equal(maxValidatorStake, utx.MaxValidatorStake)
-			require.Equal(uint32(minStakeDuration/time.Second), utx.MinStakeDuration)
-			require.Equal(uint32(maxStakeDuration/time.Second), utx.MaxStakeDuration)
-			require.Equal(minDelegationFee, utx.MinDelegationFee)
-			require.Equal(minDelegatorStake, utx.MinDelegatorStake)
-			require.Equal(maxValidatorWeightFactor, utx.MaxValidatorWeightFactor)
-			require.Equal(uptimeRequirement, utx.UptimeRequirement)
-			require.Equal(types.JSONByteSlice(e.memo), utx.Memo)
-			requireFeeIsCorrect(
-				require,
-				e.feeCalculator,
-				utx,
-				&utx.BaseTx.BaseTx,
-				nil,
-				nil,
-				map[ids.ID]uint64{
-					subnetAssetID: maxSupply - initialSupply,
-				},
-			)
-		})
-	}
-}
-
 func TestAddPermissionlessValidatorTx(t *testing.T) {
 	var utxosOffset uint64 = 2024
 	makeUTXO := func(amount uint64) *avax.UTXO {
@@ -571,7 +463,7 @@ func TestAddPermissionlessValidatorTx(t *testing.T) {
 
 	var (
 		utxos = []*avax.UTXO{
-			makeUTXO(testContextPreEtna.StaticFeeConfig.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
+			// makeUTXO(testContextPreEtna.StaticFeeConfig.AddPrimaryNetworkValidatorFee), // UTXO to pay the fee
 			makeUTXO(1 * units.NanoAvax), // small UTXO
 			makeUTXO(9 * units.Avax),     // large UTXO
 		}

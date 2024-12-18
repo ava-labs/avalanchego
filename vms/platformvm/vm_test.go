@@ -56,7 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
@@ -94,12 +93,6 @@ var (
 
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
 
-	defaultStaticFeeConfig = fee.StaticConfig{
-		TxFee:                 defaultTxFee,
-		CreateSubnetTxFee:     100 * defaultTxFee,
-		TransformSubnetTxFee:  100 * defaultTxFee,
-		CreateBlockchainTxFee: 100 * defaultTxFee,
-	}
 	defaultDynamicFeeConfig = gas.Config{
 		Weights: gas.Dimensions{
 			gas.Bandwidth: 1,
@@ -133,7 +126,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticFeeConfig:        defaultStaticFeeConfig,
+		TxFee:                  defaultTxFee,
 		DynamicFeeConfig:       defaultDynamicFeeConfig,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,

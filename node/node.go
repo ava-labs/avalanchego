@@ -1214,7 +1214,7 @@ func (n *Node) initVMs() error {
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
 				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
-				StaticFeeConfig:           n.Config.StaticFeeConfig,
+				TxFee:                     n.Config.TxFee,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
@@ -1232,7 +1232,7 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				Upgrades:         n.Config.UpgradeConfig,
-				TxFee:            n.Config.StaticFeeConfig.TxFee,
+				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),

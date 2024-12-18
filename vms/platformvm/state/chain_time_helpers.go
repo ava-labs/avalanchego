@@ -134,16 +134,10 @@ func getNextL1ValidatorEvictionTime(
 	return nextTime, nil
 }
 
-// PickFeeCalculator creates either a static or a dynamic fee calculator,
-// depending on the active upgrade.
+// PickFeeCalculator creates a dynamic fee calculator.
 //
 // PickFeeCalculator does not modify [state].
 func PickFeeCalculator(config *config.Internal, state Chain) txfee.Calculator {
-	timestamp := state.GetTimestamp()
-	if !config.UpgradeConfig.IsEtnaActivated(timestamp) {
-		return NewStaticFeeCalculator(config, timestamp)
-	}
-
 	feeState := state.GetFeeState()
 	gasPrice := gas.CalculatePrice(
 		config.DynamicFeeConfig.MinPrice,
@@ -154,15 +148,4 @@ func PickFeeCalculator(config *config.Internal, state Chain) txfee.Calculator {
 		config.DynamicFeeConfig.Weights,
 		gasPrice,
 	)
-}
-
-// NewStaticFeeCalculator creates a static fee calculator, with the config set
-// to either the pre-AP3 or post-AP3 config.
-func NewStaticFeeCalculator(config *config.Internal, timestamp time.Time) txfee.Calculator {
-	feeConfig := config.StaticFeeConfig
-	if !config.UpgradeConfig.IsApricotPhase3Activated(timestamp) {
-		feeConfig.CreateSubnetTxFee = config.CreateAssetTxFee
-		feeConfig.CreateBlockchainTxFee = config.CreateAssetTxFee
-	}
-	return txfee.NewStaticCalculator(feeConfig)
 }
