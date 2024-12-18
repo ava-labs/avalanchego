@@ -173,10 +173,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	var (
-		// timestamp     = onCommitState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator = txfee.NewSimpleCalculator(0)
-	)
+	feeCalculator := txfee.NewSimpleCalculator(0)
 	return v.proposalBlock(
 		b,
 		b.Tx,
@@ -202,9 +199,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	var (
-		feeCalculator = txfee.NewSimpleCalculator(0)
-	)
+	feeCalculator := txfee.NewSimpleCalculator(0)
 	return v.standardBlock(
 		b,
 		b.Transactions,

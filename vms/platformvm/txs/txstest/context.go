@@ -16,12 +16,11 @@ func newContext(
 	config *config.Internal,
 	state state.State,
 ) *builder.Context {
-	var (
-		builderContext = &builder.Context{
-			NetworkID:   ctx.NetworkID,
-			AVAXAssetID: ctx.AVAXAssetID,
-		}
-	)
+	builderContext := &builder.Context{
+		NetworkID:   ctx.NetworkID,
+		AVAXAssetID: ctx.AVAXAssetID,
+	}
+
 	builderContext.ComplexityWeights = config.DynamicFeeConfig.Weights
 	builderContext.GasPrice = gas.CalculatePrice(
 		config.DynamicFeeConfig.MinPrice,

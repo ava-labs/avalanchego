@@ -16,11 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -194,12 +192,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			time:          genesistest.DefaultValidatorStartTime,
 			fee:           0,
 			expectedError: nil,
-		},
-		{
-			name:          "post-fork - incorrectly priced",
-			time:          ap3Time,
-			fee:           100*defaultTxFee - 1*units.NanoAvax,
-			expectedError: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name:          "post-fork - correctly priced",

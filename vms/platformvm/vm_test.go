@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
@@ -242,7 +243,7 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgradetest.Etna)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -256,6 +257,10 @@ func TestGenesis(t *testing.T) {
 	require.NotNil(genesisBlock)
 
 	genesisState := genesistest.New(t, genesistest.Config{})
+	feeCalculator := state.PickFeeCalculator(&vm.Internal, vm.state)
+	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
+	require.NoError(err)
+
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
 		genesisOut := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -272,7 +277,7 @@ func TestGenesis(t *testing.T) {
 				[]ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 				out.OutputOwners.Addrs,
 			)
-			require.Equal(genesisOut.Amt-vm.TxFee, out.Amt)
+			require.Equal(genesisOut.Amt-createSubnetFee, out.Amt)
 		}
 	}
 

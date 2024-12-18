@@ -222,11 +222,11 @@ func TestPickFeeCalculator(t *testing.T) {
 	}{
 		{
 			fork:     upgradetest.ApricotPhase2,
-			expected: txfee.NewSimpleCalculator(txFee),
+			expected: txfee.NewSimpleCalculator(0),
 		},
 		{
 			fork:     upgradetest.ApricotPhase3,
-			expected: txfee.NewSimpleCalculator(txFee),
+			expected: txfee.NewSimpleCalculator(0),
 		},
 		{
 			fork: upgradetest.Etna,
