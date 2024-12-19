@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
 )
 
 func TestSignatureBytes(t *testing.T) {
@@ -16,14 +18,14 @@ func TestSignatureBytes(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := NewSigner()
+	sk, err := local.NewSigner()
 	require.NoError(err)
 	sig := sk.Sign(msg)
-	sigBytes := SignatureToBytes(sig)
+	sigBytes := bls.SignatureToBytes(sig)
 
-	sig2, err := SignatureFromBytes(sigBytes)
+	sig2, err := bls.SignatureFromBytes(sigBytes)
 	require.NoError(err)
-	sig2Bytes := SignatureToBytes(sig2)
+	sig2Bytes := bls.SignatureToBytes(sig2)
 
 	require.Equal(sig, sig2)
 	require.Equal(sigBytes, sig2Bytes)
@@ -34,16 +36,16 @@ func TestAggregateSignaturesNoop(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := NewSigner()
+	sk, err := local.NewSigner()
 	require.NoError(err)
 
 	sig := sk.Sign(msg)
-	sigBytes := SignatureToBytes(sig)
+	sigBytes := bls.SignatureToBytes(sig)
 
-	aggSig, err := AggregateSignatures([]*Signature{sig})
+	aggSig, err := bls.AggregateSignatures([]*bls.Signature{sig})
 	require.NoError(err)
 
-	aggSigBytes := SignatureToBytes(aggSig)
+	aggSigBytes := bls.SignatureToBytes(aggSig)
 	require.NoError(err)
 
 	require.Equal(sig, aggSig)

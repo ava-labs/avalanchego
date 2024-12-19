@@ -13,9 +13,9 @@ const SignatureLen = blst.BLST_P2_COMPRESS_BYTES
 
 var (
 	ErrFailedSignatureDecompress  = errors.New("couldn't decompress signature")
-	errInvalidSignature           = errors.New("invalid signature")
-	errNoSignatures               = errors.New("no signatures")
-	errFailedSignatureAggregation = errors.New("couldn't aggregate signatures")
+	ErrInvalidSignature           = errors.New("invalid signature")
+	ErrNoSignatures               = errors.New("no signatures")
+	ErrFailedSignatureAggregation = errors.New("couldn't aggregate signatures")
 )
 
 type (
@@ -36,7 +36,7 @@ func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 		return nil, ErrFailedSignatureDecompress
 	}
 	if !sig.SigValidate(false) {
-		return nil, errInvalidSignature
+		return nil, ErrInvalidSignature
 	}
 	return sig, nil
 }
@@ -46,12 +46,12 @@ func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 // Invariant: all [sigs] have been validated.
 func AggregateSignatures(sigs []*Signature) (*Signature, error) {
 	if len(sigs) == 0 {
-		return nil, errNoSignatures
+		return nil, ErrNoSignatures
 	}
 
 	var agg AggregateSignature
 	if !agg.Aggregate(sigs, false) {
-		return nil, errFailedSignatureAggregation
+		return nil, ErrFailedSignatureAggregation
 	}
 	return agg.ToAffine(), nil
 }
