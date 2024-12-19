@@ -4,12 +4,14 @@
 package bls_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	jsonrpc "github.com/ava-labs/avalanchego/utils/crypto/bls/signers/json-rpc"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
 )
 
@@ -428,6 +430,20 @@ func TestVerifyProofOfPossession(t *testing.T) {
 			name: "valid",
 			signers: []func() (bls.Signer, error){
 				func() (bls.Signer, error) { return local.NewSigner() },
+				func() (bls.Signer, error) {
+					// do I need to make sure the server gets closed properly?
+					addr, err := jsonrpc.SignerServerListenAndServe()
+					if err != nil {
+						return nil, err
+					}
+
+					url := url.URL{
+						Scheme: "http",
+						Host:   addr.String(),
+					}
+
+					return jsonrpc.NewClient(url), nil
+				},
 			},
 			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
