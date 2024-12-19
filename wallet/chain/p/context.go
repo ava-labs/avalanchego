@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
@@ -45,38 +44,15 @@ func NewContextFromClients(
 		return nil, err
 	}
 
-	// TODO: After Etna is activated, assume the gas price is always non-zero.
-	if dynamicFeeConfig.MinPrice != 0 {
-		_, gasPrice, _, err := chainClient.GetFeeState(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		return &builder.Context{
-			NetworkID:         networkID,
-			AVAXAssetID:       avaxAssetID,
-			ComplexityWeights: dynamicFeeConfig.Weights,
-			GasPrice:          gasPriceMultiplier * gasPrice,
-		}, nil
-	}
-
-	staticFeeConfig, err := infoClient.GetTxFee(ctx)
+	_, gasPrice, _, err := chainClient.GetFeeState(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &builder.Context{
-		NetworkID:   networkID,
-		AVAXAssetID: avaxAssetID,
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                         uint64(staticFeeConfig.TxFee),
-			CreateSubnetTxFee:             uint64(staticFeeConfig.CreateSubnetTxFee),
-			TransformSubnetTxFee:          uint64(staticFeeConfig.TransformSubnetTxFee),
-			CreateBlockchainTxFee:         uint64(staticFeeConfig.CreateBlockchainTxFee),
-			AddPrimaryNetworkValidatorFee: uint64(staticFeeConfig.AddPrimaryNetworkValidatorFee),
-			AddPrimaryNetworkDelegatorFee: uint64(staticFeeConfig.AddPrimaryNetworkDelegatorFee),
-			AddSubnetValidatorFee:         uint64(staticFeeConfig.AddSubnetValidatorFee),
-			AddSubnetDelegatorFee:         uint64(staticFeeConfig.AddSubnetDelegatorFee),
-		},
+		NetworkID:         networkID,
+		AVAXAssetID:       avaxAssetID,
+		ComplexityWeights: dynamicFeeConfig.Weights,
+		GasPrice:          gasPriceMultiplier * gasPrice,
 	}, nil
 }

@@ -122,16 +122,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(DynamicFeesMinGasPriceKey, uint64(genesis.LocalParams.DynamicFeeConfig.MinPrice), "Minimum Gas price")
 	fs.Uint64(DynamicFeesExcessConversionConstantKey, uint64(genesis.LocalParams.DynamicFeeConfig.ExcessConversionConstant), "Constant to convert excess Gas to the Gas price")
 	// Static fees:
-	fs.Uint64(TxFeeKey, genesis.LocalParams.StaticFeeConfig.TxFee, "Transaction fee, in nAVAX")
+	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
 	fs.Uint64(CreateAssetTxFeeKey, genesis.LocalParams.CreateAssetTxFee, "Transaction fee, in nAVAX, for transactions that create new assets")
-	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
-	fs.Uint64(TransformSubnetTxFeeKey, genesis.LocalParams.StaticFeeConfig.TransformSubnetTxFee, "Transaction fee, in nAVAX, for transactions that transform subnets")
-	fs.Uint64(CreateBlockchainTxFeeKey, genesis.LocalParams.StaticFeeConfig.CreateBlockchainTxFee, "Transaction fee, in nAVAX, for transactions that create new blockchains")
-	fs.Uint64(AddPrimaryNetworkValidatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddPrimaryNetworkValidatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network validators")
-	fs.Uint64(AddPrimaryNetworkDelegatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddPrimaryNetworkDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new primary network delegators")
-	fs.Uint64(AddSubnetValidatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddSubnetValidatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet validators")
-	fs.Uint64(AddSubnetDelegatorFeeKey, genesis.LocalParams.StaticFeeConfig.AddSubnetDelegatorFee, "Transaction fee, in nAVAX, for transactions that add new subnet delegators")
-
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Must be one of {%s, %s, %s}", leveldb.Name, memdb.Name, pebbledb.Name))
 	fs.Bool(DBReadOnlyKey, false, "If true, database writes are to memory and never persisted. May still initialize database directory/files on disk if they don't exist")
