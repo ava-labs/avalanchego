@@ -679,7 +679,7 @@ type GetTxFeeReply struct {
 
 func (s *Service) GetTxFee(_ *http.Request, _ *struct{}, reply *GetTxFeeReply) error {
 	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "info"),
+		zap.String("service", "avm"),
 		zap.String("method", "getTxFee"),
 	)
 
