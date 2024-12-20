@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 	require := require.New(tc)
 
 	ginkgo.It("can upgrade versions", func() {
-		network := tmpnet.NewDefaultNetwork("avalanchego-upgrade")
+		network := tmpnet.NewDefaultNetwork(tc.Log(), "avalanchego-upgrade")
 
 		// Get the default genesis so we can modify it
 		genesis, err := network.DefaultGenesis()

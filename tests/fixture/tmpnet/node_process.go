@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,7 +90,9 @@ func (p *NodeProcess) SetDefaultFlags() {
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(log logging.Logger) error {
+func (p *NodeProcess) Start(_ context.Context) error {
+	log := p.node.getNetwork().Log
+
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -97,6 +100,20 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 	}
 	if proc != nil {
 		return errNodeAlreadyRunning
+	}
+
+	// This check is duplicative for a network that is starting, but ensures
+	// that individual node start/restart won't fail due to missing binaries.
+	pluginDir, err := p.node.getNetwork().GetPluginDir()
+	if err != nil {
+		return err
+	}
+	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
+	if err := checkVMBinaries(
+		log,
+		p.node.getNetwork().Subnets,
+		p.node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
+		return err
 	}
 
 	// Ensure a stale process context file is removed so that the
@@ -177,7 +194,19 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 	}
 }
 
-func (p *NodeProcess) IsHealthy(ctx context.Context, _ logging.Logger) (bool, error) {
+// Restarts the node
+func (p *NodeProcess) Restart(ctx context.Context) error {
+	// TODO(marun) This feels a bit strange
+	if err := p.node.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
+	}
+	if err := p.node.getNetwork().StartNode(ctx, p.node); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", p.node.NodeID, err)
+	}
+	return nil
+}
+
+func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
 	// API URI is current.
@@ -259,10 +288,10 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 func (p *NodeProcess) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
 	commonLabels := FlagsMap{
-		"network_uuid":      p.node.NetworkUUID,
+		"network_uuid":      p.node.getNetwork().UUID,
 		"node_id":           p.node.NodeID,
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
-		"network_owner":     p.node.NetworkOwner,
+		"network_owner":     p.node.getNetwork().Owner,
 		// prometheus/promtail ignore empty values so including these
 		// labels with empty values outside of a github worker (where
 		// the env vars will not be set) should not be a problem.
@@ -306,7 +335,7 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 func (p *NodeProcess) getMonitoringConfigPath(tmpnetDir string, name string) string {
 	// Ensure a unique filename to allow config files to be added and removed
 	// by multiple nodes without conflict.
-	return filepath.Join(tmpnetDir, name, "file_sd_configs", fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID))
+	return filepath.Join(tmpnetDir, name, "file_sd_configs", fmt.Sprintf("%s_%s.json", p.node.getNetwork().UUID, p.node.NodeID))
 }
 
 // Ensure the removal of the prometheus configuration file for this node.
@@ -345,6 +374,14 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 	}
 
 	return nil
+}
+
+func (p *NodeProcess) GetLocalURI(_ context.Context) (string, func(), error) {
+	return p.node.URI, func() {}, nil
+}
+
+func (p *NodeProcess) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
+	return p.node.StakingAddress, func() {}, nil
 }
 
 // watchLogFileForFatal waits for the specified file path to exist and then checks each of

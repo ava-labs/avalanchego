@@ -119,12 +119,15 @@ type Network struct {
 
 	// Subnets that have been enabled on the network
 	Subnets []*Subnet
+
+	Log logging.Logger
 }
 
-func NewDefaultNetwork(owner string) *Network {
+func NewDefaultNetwork(log logging.Logger, owner string) *Network {
 	return &Network{
 		Owner: owner,
 		Nodes: NewNodesOrPanic(DefaultNodeCount),
+		Log:   log,
 	}
 }
 
@@ -352,13 +355,13 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 
 	// Configure the networking for each node and start
 	for _, node := range nodesToStart {
-		if err := n.StartNode(ctx, log, node); err != nil {
+		if err := n.StartNode(ctx, node); err != nil {
 			return err
 		}
 	}
 
 	log.Info("waiting for nodes to report healthy")
-	if err := waitForHealthy(ctx, log, nodesToWaitFor); err != nil {
+	if err := waitForHealthy(ctx, nodesToWaitFor); err != nil {
 		return err
 	}
 	log.Info("started network",
@@ -421,7 +424,12 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, log, bootstrapNode.URI, false /* restartRequired */); err != nil {
+	localURI, cancel, err := bootstrapNode.GetLocalURI(ctx)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	if err := n.CreateSubnets(ctx, log, localURI, false /* restartRequired */); err != nil {
 		return err
 	}
 
@@ -450,7 +458,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	if err := bootstrapNode.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
 	}
-	if err := n.StartNode(ctx, log, bootstrapNode); err != nil {
+	if err := n.StartNode(ctx, bootstrapNode); err != nil {
 		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
 	}
 
@@ -459,22 +467,8 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 }
 
 // Starts the provided node after configuring it for the network.
-func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node) error {
-	// TODO(marun) Relegate the vm binary check to the NodeProcess since it doesn't make sense for kube
-
-	// This check is duplicative for a network that is starting, but ensures
-	// that individual node start/restart won't fail due to missing binaries.
-	pluginDir, err := n.GetPluginDir()
-	if err != nil {
-		return err
-	}
-
+func (n *Network) StartNode(ctx context.Context, node *Node) error {
 	if err := n.EnsureNodeConfig(node); err != nil {
-		return err
-	}
-
-	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
-	if err := checkVMBinaries(log, n.Subnets, node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
 		return err
 	}
 
@@ -491,7 +485,7 @@ func (n *Network) StartNode(ctx context.Context, log logging.Logger, node *Node)
 		return err
 	}
 
-	if err := node.Start(log); err != nil {
+	if err := node.Start(ctx); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
 		err = errors.Join(err, node.Stop(ctx))
@@ -520,12 +514,12 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 		return err
 	}
 
-	if err := node.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to stop node %s: %w", node.NodeID, err)
+	// TODO(marun) Move restart to a runtime method
+	// The need for the network though...
+	if err := node.Restart(ctx); err != nil {
+		return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
 	}
-	if err := n.StartNode(ctx, log, node); err != nil {
-		return fmt.Errorf("failed to start node %s: %w", node.NodeID, err)
-	}
+
 	log.Info("waiting for node to report healthy",
 		zap.Stringer("nodeID", node.NodeID),
 	)
@@ -535,7 +529,7 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 // Stops all nodes in the network.
 func (n *Network) Stop(ctx context.Context) error {
 	// Target all nodes, including the ephemeral ones
-	nodes, err := ReadNodes(ctx, n.Dir, true /* includeEphemeral */)
+	nodes, err := ReadNodes(ctx, n, true /* includeEphemeral */)
 	if err != nil {
 		return err
 	}
@@ -580,11 +574,8 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	flags := node.Flags
 
-	// Ensure nodes can label their metrics with the network uuid
-	node.NetworkUUID = n.UUID
-
-	// Ensure nodes can label metrics with an indication of the shared/private nature of the network
-	node.NetworkOwner = n.Owner
+	// Ensure the node has access to network configuration
+	node.network = n
 
 	// Set the network name if available
 	networkID := n.GetNetworkID()
@@ -675,6 +666,11 @@ func (n *Network) GetSubnet(name string) *Subnet {
 // to pick up configuration changes becomes the responsibility of the caller.
 func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI string, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
+	apiURI, cancel, err := n.Nodes[0].GetLocalURI(ctx)
+	if err != nil {
+		return err
+	}
+	defer cancel()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return fmt.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -699,7 +695,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		}
 
 		// Create the subnet on the network
-		if err := subnet.Create(ctx, n.Nodes[0].URI); err != nil {
+		if err := subnet.Create(ctx, apiURI); err != nil {
 			return err
 		}
 
@@ -780,7 +776,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	}
 
 	// Wait for nodes to become subnet validators
-	pChainClient := platformvm.NewClient(n.Nodes[0].URI)
+	pChainClient := platformvm.NewClient(apiURI)
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
@@ -788,7 +784,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, log, n.Nodes[0].URI); err != nil {
+		if err := subnet.CreateChains(ctx, log, apiURI); err != nil {
 			return err
 		}
 
@@ -827,13 +823,13 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	return nil
 }
 
-func (n *Network) GetURIForNodeID(nodeID ids.NodeID) (string, error) {
+func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 	for _, node := range n.Nodes {
 		if node.NodeID == nodeID {
-			return node.URI, nil
+			return node, nil
 		}
 	}
-	return "", fmt.Errorf("%s is not known to the network", nodeID)
+	return nil, fmt.Errorf("%s is not known to the network", nodeID)
 }
 
 func (n *Network) GetNodeURIs() []NodeURI {
@@ -844,7 +840,7 @@ func (n *Network) GetNodeURIs() []NodeURI {
 // collecting the bootstrap details for restarting a node).
 func (n *Network) getBootstrapIPsAndIDs(ctx context.Context, skippedNode *Node) ([]string, []string, error) {
 	// Collect staking addresses of non-ephemeral nodes for use in bootstrapping a node
-	nodes, err := ReadNodes(ctx, n.Dir, false /* includeEphemeral */)
+	nodes, err := ReadNodes(ctx, n, false /* includeEphemeral */)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read network's nodes: %w", err)
 	}
@@ -922,7 +918,7 @@ func (n *Network) GetGenesisFileContent() (string, error) {
 }
 
 // Waits until the provided nodes are healthy.
-func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) error {
+func waitForHealthy(ctx context.Context, nodes []*Node) error {
 	// TODO(marun) Change the network health interval to be longer for kube since the nodes will take longer to start
 	// Also maybe build in a wait for pod readiness?
 	ticker := time.NewTicker(networkHealthCheckInterval)
@@ -931,7 +927,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 	unhealthyNodes := set.Of(nodes...)
 	for {
 		for node := range unhealthyNodes {
-			healthy, err := node.IsHealthy(ctx, log)
+			healthy, err := node.IsHealthy(ctx)
 			if err != nil {
 				return err
 			}
@@ -940,8 +936,9 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 			}
 
 			unhealthyNodes.Remove(node)
-			log.Info("node is healthy",
+			node.getNetwork().Log.Info("node is healthy",
 				zap.Stringer("nodeID", node.NodeID),
+				// TODO(marun) This would need to be a local URI for kube.
 				zap.String("uri", node.URI),
 			)
 		}
