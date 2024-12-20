@@ -137,7 +137,7 @@ func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpne
 	require := require.New(tc)
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 	tc.DeferCleanup(func() {
 		tc.Log().Info("shutting down ephemeral node",
@@ -227,7 +227,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	}
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
@@ -246,7 +246,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 		if node.IsEphemeral {
 			continue
 		}
-		healthy, err := node.IsHealthy(tc.DefaultContext(), tc.Log())
+		healthy, err := node.IsHealthy(tc.DefaultContext())
 		require.NoError(err)
 		require.True(healthy, "primary validator %s is not healthy", node.NodeID)
 	}

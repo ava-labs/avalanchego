@@ -235,7 +235,8 @@ func (n *Node) getNetwork() *Network {
 	if n.network != nil {
 		return n.network
 	}
-	// TODO(marun) How desirable is this really?
+	// Tripwire for unexpected usage
+	// TODO(marun) Not appropriate for anything load-bearing
 	panic("no network set for the node")
 }
 

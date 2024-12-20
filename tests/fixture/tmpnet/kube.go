@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -152,7 +153,25 @@ func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
 		}
 		i++
 	}
+	sortEnvVars(envVars)
 	return envVars
+}
+
+func envVarsToJsonValue(envVars []corev1.EnvVar) []map[string]string {
+	jsonValue := make([]map[string]string, len(envVars))
+	for i, envVar := range envVars {
+		jsonValue[i] = map[string]string{
+			"name":  envVar.Name,
+			"value": envVar.Value,
+		}
+	}
+	return jsonValue
+}
+
+func sortEnvVars(envVars []corev1.EnvVar) {
+	sort.Slice(envVars, func(i, j int) bool {
+		return envVars[i].Name < envVars[j].Name
+	})
 }
 
 // WaitForNodeHealthy waits for the node running in the specified pod to report healthy.

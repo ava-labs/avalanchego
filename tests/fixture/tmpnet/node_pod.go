@@ -5,16 +5,20 @@ package tmpnet
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -32,31 +36,29 @@ const (
 	volumeName      = "data"
 	volumeMountPath = "/data"
 
+	statusCheckInterval = 500 * time.Millisecond
 	// TODO(marun) Need to make this configurable
 	volumeSize = "128Mi"
 )
 
 type NodePod struct {
 	node *Node
-
-	// TODO(marun) Consider adding loggers everywhere instead of passing them in
-	// log logging.Logger
 }
 
 func (p *NodePod) getPodContextPath() string {
 	return filepath.Join(p.node.GetDataDir(), "pod.json")
 }
 
-func (p *NodePod) setNodeAddresses(uri string, stakingAddress netip.AddrPort) {
-	p.node.URI = uri
-	p.node.StakingAddress = stakingAddress
+func (p *NodePod) setNotRunning() {
+	p.node.URI = ""
+	p.node.StakingAddress = netip.AddrPort{}
 }
 
 // TODO(marun) Factor out common elements from node process and node pod
 // On restart, readState is always called
 // TODO(marun) When the node is not found to be running, clear the node URI?
 func (p *NodePod) readState(ctx context.Context) error {
-	clientset, _, err := p.getClientsetAndConfig()
+	clientset, err := p.getClientset()
 	if err != nil {
 		return err
 	}
@@ -67,7 +69,7 @@ func (p *NodePod) readState(ctx context.Context) error {
 	// Check if the statefulset exists
 	scale, err := clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, statefulSetName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		p.setNodeAddresses("", netip.AddrPort{})
+		p.setNotRunning()
 		return nil
 	}
 	if err != nil {
@@ -76,7 +78,7 @@ func (p *NodePod) readState(ctx context.Context) error {
 
 	// Check if the statefulset is scaled down
 	if scale.Status.Replicas == 0 {
-		p.setNodeAddresses("", netip.AddrPort{})
+		p.setNotRunning()
 		return nil
 	}
 
@@ -96,7 +98,7 @@ func (p *NodePod) readState(ctx context.Context) error {
 		return fmt.Errorf("failed to parse pod IP: %w", err)
 	}
 
-	// Assume standard ports. No reason to vary when pods don't share port space.
+	// Assume default ports. No reason to vary when pods don't share port space.
 	p.node.URI = fmt.Sprintf("http://%s:%d", pod.Status.PodIP, config.DefaultHTTPPort)
 	p.node.StakingAddress = netip.AddrPortFrom(addr, config.DefaultStakingPort)
 
@@ -133,7 +135,7 @@ func (p *NodePod) Start(ctx context.Context) error {
 		statefulSetFlags,
 	)
 
-	clientset, _, err := p.getClientsetAndConfig()
+	clientset, err := p.getClientset()
 	if err != nil {
 		return err
 	}
@@ -155,7 +157,7 @@ func (p *NodePod) Start(ctx context.Context) error {
 
 // Stop the pod by setting the replicas to zero on the statefulset.
 func (p *NodePod) InitiateStop(ctx context.Context) error {
-	clientset, _, err := p.getClientsetAndConfig()
+	clientset, err := p.getClientset()
 	if err != nil {
 		return err
 	}
@@ -165,7 +167,7 @@ func (p *NodePod) InitiateStop(ctx context.Context) error {
 		return err
 	}
 	if scale.Spec.Replicas == 0 {
-		// TODO(marun) Ensure local state is cleared
+		p.setNotRunning()
 		return nil
 	}
 	scale.Spec.Replicas = 0
@@ -181,7 +183,7 @@ func (p *NodePod) InitiateStop(ctx context.Context) error {
 // Waits for the node process to stop.
 // TODO(marun) Consider using a watch instead
 func (p *NodePod) WaitForStopped(ctx context.Context) error {
-	clientset, _, err := p.getClientsetAndConfig()
+	clientset, err := p.getClientset()
 	if err != nil {
 		return err
 	}
@@ -193,14 +195,14 @@ func (p *NodePod) WaitForStopped(ctx context.Context) error {
 	for {
 		scale, err := clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, statefulSetName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			// TODO(marun) Perform cleanup - the statefulset does not exist
+			p.setNotRunning()
 			return nil
 		}
 		if err != nil {
 			return fmt.Errorf("failed to retrieve scale of statefulset: %w", err)
 		}
 		if scale.Status.Replicas == 0 {
-			// TODO(marun) Perform cleanup - the statefulset has been scaled down
+			p.setNotRunning()
 			return nil
 		}
 
@@ -216,10 +218,94 @@ func (p *NodePod) WaitForStopped(ctx context.Context) error {
 
 // Restarts the node
 func (p *NodePod) Restart(ctx context.Context) error {
-	// How to apply a configuration change?
-	// As soon as a configuration change is applied the pod will be restarted.
+	// Save node node to disk
+	if err := p.node.Write(); err != nil {
+		return err
+	}
 
-	return nil
+	// Retrieve the statefulset
+	statefulset, err := p.getStatefulSet(ctx)
+	if err != nil {
+		return err
+	}
+
+	patches := []map[string]any{}
+
+	// Compare the flags and image defined on the statefulset with the
+	// node's flags and image. Since conversion from FlagsMap to
+	// EnvVar is lossy (a flag value is `any` and EnvVar.Value is a
+	// string), need to compare on the []EnvVar side. So, no way to create
+	// FlagsMap from EnvVar.
+	// TODO(marun) Reconsider usage of FlagsMap instead of just map[string]string
+	container := statefulset.Spec.Template.Spec.Containers[0]
+	sortEnvVars(container.Env) // Ensure both are sorted
+	nodeEnv := flagsToEnvVarSlice(p.node.Flags)
+	if !slices.Equal(container.Env, nodeEnv) {
+		patches = append(patches, map[string]any{
+			"op":    "replace",
+			"path":  "/spec/template/spec/containers/0/env",
+			"value": envVarsToJsonValue(nodeEnv),
+		})
+	}
+
+	nodeImage := p.node.RuntimeConfig.KubeRuntimeConfig.ImageName
+	if container.Image != nodeImage {
+		patches = append(patches, map[string]any{
+			"op":    "replace",
+			"path":  "/spec/template/spec/containers/0/image",
+			"value": nodeImage,
+		})
+	}
+
+	if len(patches) == 0 {
+		p.node.getNetwork().Log.Info("skipped restart - configuration unchanged")
+		return nil
+	}
+
+	patchBytes, err := json.Marshal(patches)
+	if err != nil {
+		return err
+	}
+
+	clientset, err := p.getClientset()
+	if err != nil {
+		return err
+	}
+	runtimeConfig := p.runtimeConfig()
+
+	// Apply the patch to the StatefulSet
+	updatedStatefulSet, err := clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Patch(
+		ctx,
+		p.getStatefulSetName(),
+		types.JSONPatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	if err != nil {
+		return err
+	}
+
+	if updatedStatefulSet.Generation == statefulset.Generation {
+		// Generation unchanged - no rollout expected
+		return nil
+	}
+
+	replicas := int32(1)
+	return wait.PollImmediateInfinite(statusCheckInterval, func() (bool, error) {
+		statefulset, err := p.getStatefulSet(ctx)
+		if err != nil {
+			p.node.getNetwork().Log.Debug("failed to retrieve statefulset",
+				zap.Error(err),
+			)
+			return false, nil
+		}
+		status := statefulset.Status
+		return (status.ObservedGeneration >= updatedStatefulSet.Generation &&
+			status.Replicas == replicas &&
+			status.ReadyReplicas == replicas &&
+			status.CurrentReplicas == replicas &&
+			status.UpdatedReplicas == replicas), nil
+	})
 }
 
 func (p *NodePod) IsHealthy(ctx context.Context) (bool, error) {
@@ -245,21 +331,25 @@ func (p *NodePod) IsHealthy(ctx context.Context) (bool, error) {
 	return healthReply.Healthy, nil
 }
 
-func (p *NodePod) getClientsetAndConfig() (*kubernetes.Clientset, *restclient.Config, error) {
-	runtimeConfig := p.runtimeConfig()
+func (p *NodePod) getKubeconfig() (*restclient.Config, error) {
+	// TODO(marun) inClusterConfig requires an empty path. How best to ensure this?
 	kubeconfigPath := os.Getenv("KUBECONFIG")
 	if kubeconfigPath == "" {
-		kubeconfigPath = runtimeConfig.Kubeconfig
+		kubeconfigPath = p.runtimeConfig().Kubeconfig
 	}
-	kubeconfig, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	return clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+}
+
+func (p *NodePod) getClientset() (*kubernetes.Clientset, error) {
+	kubeconfig, err := p.getKubeconfig()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+		return nil, err
 	}
 	clientset, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create clientset: %w", err)
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
-	return clientset, kubeconfig, nil
+	return clientset, nil
 }
 
 func (p *NodePod) runtimeConfig() KubeRuntimeConfig {
@@ -267,7 +357,7 @@ func (p *NodePod) runtimeConfig() KubeRuntimeConfig {
 }
 
 func (p *NodePod) getStatefulSet(ctx context.Context) (*appsv1.StatefulSet, error) {
-	clientset, _, err := p.getClientsetAndConfig()
+	clientset, err := p.getClientset()
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +369,11 @@ func (p *NodePod) getStatefulSet(ctx context.Context) (*appsv1.StatefulSet, erro
 }
 
 func (p *NodePod) forwardPort(ctx context.Context, port int) (uint16, chan struct{}, error) {
-	clientset, kubeconfig, err := p.getClientsetAndConfig()
+	kubeconfig, err := p.getKubeconfig()
+	if err != nil {
+		return 0, nil, err
+	}
+	clientset, err := p.getClientset()
 	if err != nil {
 		return 0, nil, err
 	}

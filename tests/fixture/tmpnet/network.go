@@ -472,8 +472,6 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 		return err
 	}
 
-	// TODO(marun) Need to move bootstrap configuration to the node runtime
-	// This will allow the staking ports to be cluster-internal
 	bootstrapIPs, bootstrapIDs, err := n.getBootstrapIPsAndIDs(ctx, node)
 	if err != nil {
 		return err
@@ -514,8 +512,6 @@ func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Nod
 		return err
 	}
 
-	// TODO(marun) Move restart to a runtime method
-	// The need for the network though...
 	if err := node.Restart(ctx); err != nil {
 		return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
 	}
