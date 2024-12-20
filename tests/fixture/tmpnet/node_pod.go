@@ -19,7 +19,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/utils/logging"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,19 +39,24 @@ const (
 type NodePod struct {
 	node *Node
 
-	localURIPort         uint16
-	localURIPortStopChan chan struct{}
+	// TODO(marun) Consider adding loggers everywhere instead of passing them in
+	// log logging.Logger
 }
 
 func (p *NodePod) getPodContextPath() string {
 	return filepath.Join(p.node.GetDataDir(), "pod.json")
 }
 
+func (p *NodePod) setNodeAddresses(uri string, stakingAddress netip.AddrPort) {
+	p.node.URI = uri
+	p.node.StakingAddress = stakingAddress
+}
+
 // TODO(marun) Factor out common elements from node process and node pod
 // On restart, readState is always called
 // TODO(marun) When the node is not found to be running, clear the node URI?
 func (p *NodePod) readState(ctx context.Context) error {
-	clientset, kubeconfig, err := p.getClientsetAndConfig()
+	clientset, _, err := p.getClientsetAndConfig()
 	if err != nil {
 		return err
 	}
@@ -63,62 +67,38 @@ func (p *NodePod) readState(ctx context.Context) error {
 	// Check if the statefulset exists
 	scale, err := clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, statefulSetName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		// TODO(marun) Perform cleanup - the statefulset does not exist
+		p.setNodeAddresses("", netip.AddrPort{})
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	// Check if the statefulset is scaled up
+	// Check if the statefulset is scaled down
 	if scale.Status.Replicas == 0 {
+		p.setNodeAddresses("", netip.AddrPort{})
 		return nil
 	}
 
 	podName := statefulSetName + "-0"
 
 	// Wait for the pod to become ready (otherwise it won't be accepting network connections)
-	// TODO(marun) What to do when the pod does not actually exist (hasn't started)?
 	if err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
 		return err
 	}
 
-	// if inside cluster
-	//   - TODO(marun) support this
-	//   - use the pod IP
-	//   - use the standard http port
-	// if outside cluster
-	//   - use 127.0.0.1
-	//   - forward a local port to the pod IP + standard port
-
-	// TODO(marun) Handle restarts
-
-	// A forwarded connection enables connectivity without exposing the node external to the kube cluster
-	// TODO(marun) Detect if running in a cluster, where this won't be necessary
-	// TODO(marun) Without being able to reuse the forwarded connection, it won't be possible to interact directly with the node
-	//             So we need to be able to reuse that connection. Now, how to get it closed?
-
-	// TODO(marun) Need to forward the staking port as well (e.g. for L1 test)
-	p.localURIPort, p.localURIPortStopChan, err = enableLocalForwardForPod(
-		kubeconfig,
-		namespace,
-		podName,
-		config.DefaultHTTPPort,
-		io.Discard, // Ignore stdout output
-		os.Stderr,
-	)
+	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to enable local forward for pod: %w", err)
+		return err
 	}
-	localNodeURI := fmt.Sprintf("http://127.0.0.1:%d", p.localURIPort)
+	addr, err := netip.ParseAddr(pod.Status.PodIP)
+	if err != nil {
+		return fmt.Errorf("failed to parse pod IP: %w", err)
+	}
 
-	// TODO(marun) Clear on error
-	p.node.URI = localNodeURI
-	// The staking address will only be accessible inside the cluster (i.e. to bootstrap )
-	p.node.StakingAddress = netip.AddrPortFrom(
-		netip.AddrFrom4([4]byte{127, 0, 0, 1}),
-		9651,
-	)
+	// Assume standard ports. No reason to vary when pods don't share port space.
+	p.node.URI = fmt.Sprintf("http://%s:%d", pod.Status.PodIP, config.DefaultHTTPPort)
+	p.node.StakingAddress = netip.AddrPortFrom(addr, config.DefaultStakingPort)
 
 	return nil
 }
@@ -133,11 +113,11 @@ func (p *NodePod) getStatefulSetName() string {
 	unwantedNodeIDPrefix := "NodeID-"
 	startIndex := len(unwantedNodeIDPrefix)
 	endIndex := len(unwantedNodeIDPrefix) + 8
-	return p.node.NetworkUUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
+	return p.node.getNetwork().UUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
 
 // Start the node as a kubernetes statefulset.
-func (p *NodePod) Start(log logging.Logger) error {
+func (p *NodePod) Start(ctx context.Context) error {
 	// Create a statefulset for the pod and wait for it to become ready
 	runtimeConfig := p.node.RuntimeConfig.KubeRuntimeConfig
 	statefulSetFlags := p.node.Flags.Copy()
@@ -165,7 +145,7 @@ func (p *NodePod) Start(log logging.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to create statefulset: %w", err)
 	}
-	log.Debug("created statefulset",
+	p.node.getNetwork().Log.Debug("created statefulset",
 		zap.String("namespace", runtimeConfig.Namespace),
 		zap.String("name", createdStatefulSet.Name),
 	)
@@ -234,7 +214,15 @@ func (p *NodePod) WaitForStopped(ctx context.Context) error {
 	return nil
 }
 
-func (p *NodePod) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
+// Restarts the node
+func (p *NodePod) Restart(ctx context.Context) error {
+	// How to apply a configuration change?
+	// As soon as a configuration change is applied the pod will be restarted.
+
+	return nil
+}
+
+func (p *NodePod) IsHealthy(ctx context.Context) (bool, error) {
 	err := p.readState(ctx)
 	if err != nil {
 		return false, err
@@ -243,7 +231,14 @@ func (p *NodePod) IsHealthy(ctx context.Context, log logging.Logger) (bool, erro
 		return false, errNotRunning
 	}
 
-	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
+	// TODO(marun) Reuse this forwarded connection for more than a single health check
+	uri, cancel, err := p.GetLocalURI(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer cancel()
+
+	healthReply, err := CheckNodeHealth(ctx, uri)
 	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
 	}
@@ -281,4 +276,67 @@ func (p *NodePod) getStatefulSet(ctx context.Context) (*appsv1.StatefulSet, erro
 		p.getStatefulSetName(),
 		metav1.GetOptions{},
 	)
+}
+
+func (p *NodePod) forwardPort(ctx context.Context, port int) (uint16, chan struct{}, error) {
+	clientset, kubeconfig, err := p.getClientsetAndConfig()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	statefulSetName := p.getStatefulSetName()
+	namespace := p.runtimeConfig().Namespace
+
+	podName := statefulSetName + "-0"
+
+	// Wait for the pod to become ready (otherwise it won't be accepting network connections)
+	if err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
+		return 0, nil, err
+	}
+
+	forwardedPort, stopChan, err := enableLocalForwardForPod(
+		kubeconfig,
+		namespace,
+		podName,
+		port,
+		io.Discard, // Ignore stdout output
+		os.Stderr,
+	)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to enable local forward for pod: %w", err)
+	}
+	return forwardedPort, stopChan, nil
+}
+
+func (p *NodePod) GetLocalURI(ctx context.Context) (string, func(), error) {
+	if len(p.node.URI) == 0 {
+		return "", func() {}, errNotRunning
+	}
+
+	// TODO(marun) Auto-detect whether this test code is running inside the cluster
+	//             and use the URI directly
+
+	port, stopChan, err := p.forwardPort(ctx, config.DefaultHTTPPort)
+	if err != nil {
+		return "", nil, err
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", port), func() { close(stopChan) }, nil
+}
+
+func (p *NodePod) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+	if len(p.node.URI) == 0 {
+		return netip.AddrPort{}, func() {}, errNotRunning
+	}
+
+	// TODO(marun) Auto-detect whether this test code is running inside the cluster
+	//             and use the URI directly
+
+	port, stopChan, err := p.forwardPort(ctx, config.DefaultStakingPort)
+	if err != nil {
+		return netip.AddrPort{}, nil, err
+	}
+	return netip.AddrPortFrom(
+		netip.AddrFrom4([4]byte{127, 0, 0, 1}),
+		port,
+	), func() { close(stopChan) }, nil
 }

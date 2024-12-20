@@ -363,3 +363,11 @@ availability` that emits a link to grafana parametized to show results
 for the job. Additional links to grafana parametized to show results
 for individual network will appear in the logs displaying the start of
 those networks.
+
+## Concurrent usage
+
+The types (networks, nodes, etc) that tmpnet defines are not safe for
+concurrent usage. To avoid requiring an rpc daemon, tmpnet stores data on diskData is shared via the filesystem, and new instances
+can just be created for every usage. Since the  Add to this that tmpnet isn't intended to
+be multi-user either. Maybe not optimal in terms of scalability, but
+much simpler to work with for that lack.

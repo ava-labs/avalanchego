@@ -151,11 +151,11 @@ func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpne
 }
 
 // Wait for the given node to report healthy.
-func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
+func WaitForHealthy(tc tests.TestContext, node *tmpnet.Node) {
 	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
-	require.NoError(t, tmpnet.WaitForHealthy(ctx, node))
+	require.NoError(tc, tmpnet.WaitForHealthy(ctx, tc.Log(), node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
@@ -239,14 +239,14 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	})
 
 	// Check that the node becomes healthy within timeout
-	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), node))
+	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), tc.Log(), node))
 
 	// Ensure that the primary validators are still healthy
 	for _, node := range network.Nodes {
 		if node.IsEphemeral {
 			continue
 		}
-		healthy, err := node.IsHealthy(tc.DefaultContext())
+		healthy, err := node.IsHealthy(tc.DefaultContext(), tc.Log())
 		require.NoError(err)
 		require.True(healthy, "primary validator %s is not healthy", node.NodeID)
 	}
@@ -266,13 +266,12 @@ func StartNetwork(
 ) {
 	require := require.New(tc)
 
+	// TODO(marun) Need to configure the network runtime
 	err := tmpnet.BootstrapNewNetwork(
 		tc.DefaultContext(),
 		tc.Log(),
 		network,
 		DefaultNetworkDir,
-		avalancheGoExecPath,
-		pluginDir,
 	)
 	if err != nil {
 		// Ensure nodes are stopped if bootstrap fails. The network configuration
@@ -352,4 +351,11 @@ func GetRepoRootPath(suffix string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSuffix(cwd, suffix), nil
+}
+
+func GetLocalURI(tc tests.TestContext, node *tmpnet.Node) string {
+	uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return uri
 }
