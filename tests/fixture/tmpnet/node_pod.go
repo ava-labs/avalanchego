@@ -76,8 +76,8 @@ func (p *NodePod) readState(ctx context.Context) error {
 		return err
 	}
 
-	// Check if the statefulset is scaled down
-	if scale.Status.Replicas == 0 {
+	// Wait for the statefulset to have replicas?
+	if scale.Spec.Replicas == 0 {
 		p.setNotRunning()
 		return nil
 	}
