@@ -129,8 +129,9 @@ func NewNodesOrPanic(count int) []*Node {
 }
 
 // Reads a node's configuration from the specified directory.
-func ReadNode(ctx context.Context, dataDir string) (*Node, error) {
+func ReadNode(ctx context.Context, network *Network, dataDir string) (*Node, error) {
 	node := NewNode(dataDir)
+	node.network = network
 	return node, node.Read(ctx)
 }
 
@@ -149,7 +150,7 @@ func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]
 		}
 
 		nodeDir := filepath.Join(network.Dir, entry.Name())
-		node, err := ReadNode(ctx, nodeDir)
+		node, err := ReadNode(ctx, network, nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
 			continue
@@ -160,9 +161,6 @@ func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]
 		if !includeEphemeral && node.IsEphemeral {
 			continue
 		}
-
-		// Ensure the node has access to network configuration
-		node.network = network
 
 		nodes = append(nodes, node)
 	}

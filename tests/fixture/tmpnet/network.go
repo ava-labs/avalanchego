@@ -204,7 +204,9 @@ func ReadNetwork(ctx context.Context, dir string) (*Network, error) {
 
 // Initializes a new network with default configuration.
 func (n *Network) EnsureDefaultConfig(log logging.Logger) error {
-	log.Info("preparing configuration for new network")
+	n.Log = log
+
+	n.Log.Info("preparing configuration for new network")
 	// TODO(marun) Provide more detail about configuration of the new network?
 
 	// A UUID supports centralized metrics collection
