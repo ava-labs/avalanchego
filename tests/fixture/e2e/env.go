@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -101,7 +102,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 		if len(networkDir) > 0 {
 			var err error
-			network, err = tmpnet.ReadNetwork(networkDir)
+			network, err = tmpnet.ReadNetwork(tc.DefaultContext(), networkDir)
 			require.NoError(err)
 			tc.Log().Info("loaded a network",
 				zap.String("networkDir", networkDir),
@@ -146,10 +147,24 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 
 		// Wait for chains to have bootstrapped on all nodes
 		tc.Eventually(func() bool {
+			// Collect potentially-forwarded subnet URIs first to minimize use of the kube API.
+			uris := make(map[ids.NodeID]string)
 			for _, subnet := range network.Subnets {
 				for _, validatorID := range subnet.ValidatorIDs {
-					uri, err := network.GetURIForNodeID(validatorID)
+					if _, ok := uris[validatorID]; !ok {
+						continue
+					}
+					node, err := network.GetNode(validatorID)
 					require.NoError(err)
+					uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+					require.NoError(err)
+					defer cancel()
+					uris[validatorID] = uri
+				}
+			}
+
+			for _, subnet := range network.Subnets {
+				for _, uri := range uris {
 					infoClient := info.NewClient(uri)
 					for _, chain := range subnet.Chains {
 						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
@@ -175,6 +190,10 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		"not enough pre-funded keys for the requested number of parallel test processes",
 	)
 
+	// TODO(marun) Indicate that these URIs are only accessible inside
+	// the cluster and explain how to enable forwarding.
+	// - Maybe forward by default but make it clear that the forwarding is disabled on exit?
+	// - Maybe
 	uris := network.GetNodeURIs()
 	require.NotEmpty(uris, "network contains no nodes")
 	tc.Log().Info("network nodes are available",
@@ -203,7 +222,7 @@ func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
-	network, err := tmpnet.ReadNetwork(te.NetworkDir)
+	network, err := tmpnet.ReadNetwork(te.testContext.DefaultContext(), te.NetworkDir)
 	require.NoError(te.testContext, err)
 	return network
 }
@@ -217,7 +236,7 @@ func (te *TestEnvironment) NewKeychain() *secp256k1fx.Keychain {
 func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	require := require.New(te.testContext)
 	// Use the same configuration as the shared network
-	sharedNetwork, err := tmpnet.ReadNetwork(te.NetworkDir)
+	sharedNetwork, err := tmpnet.ReadNetwork(te.testContext.DefaultContext(), te.NetworkDir)
 	require.NoError(err)
 
 	pluginDir, err := sharedNetwork.DefaultFlags.GetStringVal(config.PluginDirKey)

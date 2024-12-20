@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -44,10 +43,13 @@ var (
 type NodeRuntime interface {
 	readState(ctx context.Context) error
 	SetDefaultFlags()
-	Start(log logging.Logger) error
+	Start(ctx context.Context) error
 	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
-	IsHealthy(ctx context.Context, log logging.Logger) (bool, error)
+	Restart(ctx context.Context) error
+	GetLocalURI(ctx context.Context) (string, func(), error)
+	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
+	IsHealthy(ctx context.Context) (bool, error)
 }
 
 // Configuration required to configure a node runtime. Only one of the fields should be set.
@@ -72,15 +74,7 @@ type KubeRuntimeConfig struct {
 
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
-	// Uniquely identifies the network the node is part of to enable monitoring.
-	NetworkUUID string
-
-	// Identify the entity associated with this network. This is
-	// intended to be used to label metrics to enable filtering
-	// results for a test run between the primary/shared network used
-	// by the majority of tests and private networks used by
-	// individual tests.
-	NetworkOwner string
+	network *Network
 
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
@@ -141,11 +135,11 @@ func ReadNode(ctx context.Context, dataDir string) (*Node, error) {
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(ctx context.Context, networkDir string, includeEphemeral bool) ([]*Node, error) {
+func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
-	entries, err := os.ReadDir(networkDir)
+	entries, err := os.ReadDir(network.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read dir: %w", err)
 	}
@@ -154,7 +148,7 @@ func ReadNodes(ctx context.Context, networkDir string, includeEphemeral bool) ([
 			continue
 		}
 
-		nodeDir := filepath.Join(networkDir, entry.Name())
+		nodeDir := filepath.Join(network.Dir, entry.Name())
 		node, err := ReadNode(ctx, nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
@@ -166,6 +160,9 @@ func ReadNodes(ctx context.Context, networkDir string, includeEphemeral bool) ([
 		if !includeEphemeral && node.IsEphemeral {
 			continue
 		}
+
+		// Ensure the node has access to network configuration
+		node.network = network
 
 		nodes = append(nodes, node)
 	}
@@ -192,12 +189,12 @@ func (n *Node) getRuntime() NodeRuntime {
 
 // Runtime methods
 
-func (n *Node) IsHealthy(ctx context.Context, log logging.Logger) (bool, error) {
-	return n.getRuntime().IsHealthy(ctx, log)
+func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
+	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(log logging.Logger) error {
-	return n.getRuntime().Start(log)
+func (n *Node) Start(ctx context.Context) error {
+	return n.getRuntime().Start(ctx)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
@@ -211,6 +208,10 @@ func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
+func (n *Node) Restart(ctx context.Context) error {
+	return n.getRuntime().Restart(ctx)
+}
+
 func (n *Node) readState(ctx context.Context) error {
 	return n.getRuntime().readState(ctx)
 }
@@ -219,13 +220,37 @@ func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
+func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
+	return n.getRuntime().GetLocalURI(ctx)
+}
+
+func (n *Node) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+	return n.getRuntime().GetLocalStakingAddress(ctx)
+}
+
+// getNetwork returns the network associated with the node. If not
+// network is set, a placeholder network will be returned as a simple
+// way of communicating an undesirable circumstance.
+func (n *Node) getNetwork() *Network {
+	if n.network != nil {
+		return n.network
+	}
+	// TODO(marun) How desirable is this really?
+	panic("no network set for the node")
+}
+
 // Writes the current state of the metrics endpoint to disk
 func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 	if len(n.URI) == 0 {
 		// No URI to request metrics from
 		return nil
 	}
-	uri := n.URI + "/ext/metrics"
+	baseURI, cancel, err := n.GetLocalURI(ctx)
+	if err != nil {
+		return nil
+	}
+	defer cancel()
+	uri := baseURI + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return err
@@ -387,6 +412,10 @@ func (n *Node) SaveAPIPort() error {
 	if err != nil {
 		return err
 	}
-	n.Flags[config.HTTPPortKey] = port
+
+	// Only save a non-default port
+	if port != string(config.DefaultHTTPPort) {
+		n.Flags[config.HTTPPortKey] = port
+	}
 	return nil
 }
