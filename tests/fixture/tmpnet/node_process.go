@@ -196,7 +196,6 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 
 // Restarts the node
 func (p *NodeProcess) Restart(ctx context.Context) error {
-	// TODO(marun) This feels a bit strange
 	if err := p.node.Stop(ctx); err != nil {
 		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
 	}
@@ -218,7 +217,13 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, errNotRunning
 	}
 
-	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
+	uri, cancel, err := p.node.GetLocalURI(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer cancel()
+
+	healthReply, err := CheckNodeHealth(ctx, uri)
 	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
 	}
