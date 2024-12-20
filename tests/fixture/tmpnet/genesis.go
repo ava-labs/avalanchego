@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -117,7 +117,7 @@ func NewTestGenesis(
 	cChainBalances := make(core.GenesisAlloc, len(keysToFund))
 	for _, key := range keysToFund {
 		xChainBalances[key.Address()] = defaultFundedKeyXChainAmount
-		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
+		cChainBalances[atomic.GetEthAddress(key)] = core.GenesisAccount{
 			Balance: defaultFundedKeyCChainAmount,
 		}
 	}

@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/require"
@@ -74,7 +74,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		)
 
 		tc.By("defining common configuration")
-		recipientEthAddress := evm.GetEthAddress(recipientKey)
+		recipientEthAddress := atomic.GetEthAddress(recipientKey)
 		// Use the same owner for sending to X-Chain and importing funds to P-Chain
 		recipientOwner := secp256k1fx.OutputOwners{
 			Threshold: 1,
