@@ -9,7 +9,8 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/ripemd160"
+	// TODO(marun) Can this be replaced?
+	"golang.org/x/crypto/ripemd160" //nolint:gosec
 )
 
 const (
@@ -51,7 +52,7 @@ func ComputeHash160Array(buf []byte) Hash160 {
 // ComputeHash160 computes a cryptographically strong 160 bit hash of the input
 // byte slice.
 func ComputeHash160(buf []byte) []byte {
-	ripe := ripemd160.New()
+	ripe := ripemd160.New() //nolint:gosec
 	_, err := io.Writer(ripe).Write(buf)
 	if err != nil {
 		panic(err)
