@@ -262,7 +262,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	require.NoError(err, "Image build failed: %s", output)
 }
 
-func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSet {
+func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet {
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
 		true, /* generateName */
@@ -283,8 +283,8 @@ func newNodeStatefulSet(name string, flags map[string]string) *appsv1.StatefulSe
 	return statefulSet
 }
 
-func defaultPodFlags() map[string]string {
-	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir)
+func defaultPodFlags() tmpnet.FlagsMap {
+	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir, true /* sybilProtectionEnabled */)
 }
 
 // waitForPodCondition waits until the specified pod reports the specified condition
