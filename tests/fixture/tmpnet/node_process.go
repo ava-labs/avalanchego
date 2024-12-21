@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +55,7 @@ func (p *NodeProcess) setProcessContext(processContext node.ProcessContext) {
 	p.node.StakingAddress = processContext.StakingAddress
 }
 
-func (p *NodeProcess) readState() error {
+func (p *NodeProcess) readState(_ context.Context) error {
 	path := p.getProcessContextPath()
 	bytes, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -72,12 +73,26 @@ func (p *NodeProcess) readState() error {
 	return nil
 }
 
+// SetDefaultFlags sets flag defaults for unset keys appropriate for a node running as a regular process.
+func (p *NodeProcess) SetDefaultFlags() {
+	if _, ok := p.node.Flags[config.HTTPPortKey]; !ok {
+		// Default to dynamic port allocation
+		p.node.Flags[config.HTTPPortKey] = 0
+	}
+	if _, ok := p.node.Flags[config.StakingPortKey]; !ok {
+		// Default to dynamic port allocation
+		p.node.Flags[config.StakingPortKey] = 0
+	}
+}
+
 // Start waits for the process context to be written which
 // indicates that the node will be accepting connections on
 // its staking port. The network will start faster with this
 // synchronization due to the avoidance of exponential backoff
 // if a node tries to connect to a beacon that is not ready.
-func (p *NodeProcess) Start(log logging.Logger) error {
+func (p *NodeProcess) Start(_ context.Context) error {
+	log := p.node.getNetwork().Log
+
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
@@ -85,6 +100,20 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 	}
 	if proc != nil {
 		return errNodeAlreadyRunning
+	}
+
+	// This check is duplicative for a network that is starting, but ensures
+	// that individual node start/restart won't fail due to missing binaries.
+	pluginDir, err := p.node.getNetwork().GetPluginDir()
+	if err != nil {
+		return err
+	}
+	// Check the VM binaries after EnsureNodeConfig to ensure node.RuntimeConfig is non-nil
+	if err := checkVMBinaries(
+		log,
+		p.node.getNetwork().Subnets,
+		p.node.RuntimeConfig.AvalancheGoPath, pluginDir); err != nil {
+		return err
 	}
 
 	// Ensure a stale process context file is removed so that the
@@ -129,7 +158,7 @@ func (p *NodeProcess) Start(log logging.Logger) error {
 }
 
 // Signals the node process to stop.
-func (p *NodeProcess) InitiateStop() error {
+func (p *NodeProcess) InitiateStop(_ context.Context) error {
 	proc, err := p.getProcess()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve process to stop: %w", err)
@@ -165,6 +194,17 @@ func (p *NodeProcess) WaitForStopped(ctx context.Context) error {
 	}
 }
 
+// Restarts the node
+func (p *NodeProcess) Restart(ctx context.Context) error {
+	if err := p.node.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
+	}
+	if err := p.node.getNetwork().StartNode(ctx, p.node); err != nil {
+		return fmt.Errorf("failed to start node %s: %w", p.node.NodeID, err)
+	}
+	return nil
+}
+
 func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	// Check that the node process is running as a precondition for
 	// checking health. getProcess will also ensure that the node's
@@ -177,8 +217,14 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 		return false, errNotRunning
 	}
 
-	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
+	uri, cancel, err := p.node.GetLocalURI(ctx)
 	if err != nil {
+		return false, err
+	}
+	defer cancel()
+
+	healthReply, err := CheckNodeHealth(ctx, uri)
+	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
 	}
 	return healthReply.Healthy, nil
@@ -195,7 +241,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultNodeInitTimeout)
 	defer cancel()
 	for len(p.node.URI) == 0 {
-		err := p.readState()
+		err := p.readState(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read process context for node %q: %w", p.node.NodeID, err)
 		}
@@ -215,7 +261,7 @@ func (p *NodeProcess) waitForProcessContext(ctx context.Context) error {
 func (p *NodeProcess) getProcess() (*os.Process, error) {
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
-	if err := p.readState(); err != nil {
+	if err := p.readState(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to read process context: %w", err)
 	}
 
@@ -247,10 +293,10 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 func (p *NodeProcess) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
 	commonLabels := FlagsMap{
-		"network_uuid":      p.node.NetworkUUID,
+		"network_uuid":      p.node.getNetwork().UUID,
 		"node_id":           p.node.NodeID,
 		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
-		"network_owner":     p.node.NetworkOwner,
+		"network_owner":     p.node.getNetwork().Owner,
 		// prometheus/promtail ignore empty values so including these
 		// labels with empty values outside of a github worker (where
 		// the env vars will not be set) should not be a problem.
@@ -294,7 +340,7 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 func (p *NodeProcess) getMonitoringConfigPath(tmpnetDir string, name string) string {
 	// Ensure a unique filename to allow config files to be added and removed
 	// by multiple nodes without conflict.
-	return filepath.Join(tmpnetDir, name, "file_sd_configs", fmt.Sprintf("%s_%s.json", p.node.NetworkUUID, p.node.NodeID))
+	return filepath.Join(tmpnetDir, name, "file_sd_configs", fmt.Sprintf("%s_%s.json", p.node.getNetwork().UUID, p.node.NodeID))
 }
 
 // Ensure the removal of the prometheus configuration file for this node.
@@ -333,6 +379,14 @@ func (p *NodeProcess) writeMonitoringConfigFile(tmpnetDir string, name string, c
 	}
 
 	return nil
+}
+
+func (p *NodeProcess) GetLocalURI(_ context.Context) (string, func(), error) {
+	return p.node.URI, func() {}, nil
+}
+
+func (p *NodeProcess) GetLocalStakingAddress(_ context.Context) (netip.AddrPort, func(), error) {
+	return p.node.StakingAddress, func() {}, nil
 }
 
 // watchLogFileForFatal waits for the specified file path to exist and then checks each of

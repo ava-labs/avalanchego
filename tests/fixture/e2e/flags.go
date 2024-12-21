@@ -17,7 +17,12 @@ import (
 const networkShutdownDelay = 12 * time.Second
 
 type FlagVars struct {
+	runtime              string
 	avalancheGoExecPath  string
+	kubeconfig           string
+	namespace            string
+	imageName            string
+	nodeRuntimeConfig    *tmpnet.NodeRuntimeConfig
 	pluginDir            string
 	networkDir           string
 	reuseNetwork         bool
@@ -29,12 +34,31 @@ type FlagVars struct {
 	activateEtna         bool
 }
 
-func (v *FlagVars) AvalancheGoExecPath() string {
-	return v.avalancheGoExecPath
+func (v *FlagVars) NodeRuntimeConfig() *tmpnet.NodeRuntimeConfig {
+	if v.nodeRuntimeConfig == nil {
+		if v.runtime != "kube" {
+			v.nodeRuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				AvalancheGoPath: v.avalancheGoExecPath,
+			}
+		} else {
+			v.nodeRuntimeConfig = &tmpnet.NodeRuntimeConfig{
+				KubeRuntimeConfig: &tmpnet.KubeRuntimeConfig{
+					Kubeconfig: v.kubeconfig,
+					Namespace:  v.namespace,
+					ImageName:  v.imageName,
+				},
+			}
+		}
+	}
+	return v.nodeRuntimeConfig
 }
 
 func (v *FlagVars) PluginDir() string {
-	return v.pluginDir
+	// TODO(marun) Will need to support this properly for VMs like subnet-evm
+	if v.runtime != "kube" {
+		return v.pluginDir
+	}
+	return ""
 }
 
 func (v *FlagVars) NetworkDir() string {
@@ -90,6 +114,12 @@ func getEnvWithDefault(envVar, defaultVal string) string {
 func RegisterFlags() *FlagVars {
 	vars := FlagVars{}
 	flag.StringVar(
+		&vars.runtime,
+		"runtime",
+		"process",
+		"[optional] the runtime to use to deploy nodes for the network. Valid options are 'process' and 'kube'.",
+	)
+	flag.StringVar(
 		&vars.avalancheGoExecPath,
 		"avalanchego-path",
 		os.Getenv(tmpnet.AvalancheGoPathEnvName),
@@ -97,6 +127,24 @@ func RegisterFlags() *FlagVars {
 			"[optional] avalanchego executable path if creating a new network. Also possible to configure via the %s env variable.",
 			tmpnet.AvalancheGoPathEnvName,
 		),
+	)
+	flag.StringVar(
+		&vars.kubeconfig,
+		"kubeconfig",
+		os.Getenv("KUBECONFIG"),
+		"The path to a kubernetes configuration file for the target cluster",
+	)
+	flag.StringVar(
+		&vars.namespace,
+		"namespace",
+		"tmpnet",
+		"The namespace in the target cluster to create nodes in",
+	)
+	flag.StringVar(
+		&vars.imageName,
+		"image-name",
+		"avaplatform/avalanchego:latest",
+		"The name of the docker image to use for creating nodes",
 	)
 	flag.StringVar(
 		&vars.pluginDir,

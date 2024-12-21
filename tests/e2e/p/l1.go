@@ -214,6 +214,8 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		)
 		require.NoError(err)
 
+		genesisNodeURI := e2e.GetLocalURI(tc, subnetGenesisNode)
+
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetToL1Tx", func() {
 			tx, err := pWallet.IssueConvertSubnetToL1Tx(
@@ -232,9 +234,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			)
 			require.NoError(err)
 
-			tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+			tc.By("ensuring the genesis peer has accepted the tx at "+genesisNodeURI, func() {
 				var (
-					client = platformvm.NewClient(subnetGenesisNode.URI)
+					client = platformvm.NewClient(genesisNodeURI)
 					txID   = tx.ID()
 				)
 				tc.Eventually(
@@ -432,9 +434,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+genesisNodeURI, func() {
 					var (
-						client = platformvm.NewClient(subnetGenesisNode.URI)
+						client = platformvm.NewClient(genesisNodeURI)
 						txID   = tx.ID()
 					)
 					tc.Eventually(
@@ -570,9 +572,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNode.URI, func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+genesisNodeURI, func() {
 					var (
-						client = platformvm.NewClient(subnetGenesisNode.URI)
+						client = platformvm.NewClient(genesisNodeURI)
 						txID   = tx.ID()
 					)
 					tc.Eventually(

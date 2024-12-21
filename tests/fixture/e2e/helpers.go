@@ -137,7 +137,7 @@ func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpne
 	require := require.New(tc)
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 	tc.DeferCleanup(func() {
 		tc.Log().Info("shutting down ephemeral node",
@@ -151,11 +151,11 @@ func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpne
 }
 
 // Wait for the given node to report healthy.
-func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
+func WaitForHealthy(tc tests.TestContext, node *tmpnet.Node) {
 	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
-	require.NoError(t, tmpnet.WaitForHealthy(ctx, node))
+	require.NoError(tc, tmpnet.WaitForHealthy(ctx, tc.Log(), node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
@@ -227,7 +227,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	}
 
 	node := tmpnet.NewEphemeralNode(flags)
-	require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
 	// StartNode will initiate node stop if an error is encountered during start,
 	// so no further cleanup effort is required if an error is seen here.
 
@@ -239,7 +239,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	})
 
 	// Check that the node becomes healthy within timeout
-	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), node))
+	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), tc.Log(), node))
 
 	// Ensure that the primary validators are still healthy
 	for _, node := range network.Nodes {
@@ -258,7 +258,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 func StartNetwork(
 	tc tests.TestContext,
 	network *tmpnet.Network,
-	avalancheGoExecPath string,
+	runtimeConfig *tmpnet.NodeRuntimeConfig,
 	pluginDir string,
 	shutdownDelay time.Duration,
 	skipShutdown bool,
@@ -266,13 +266,14 @@ func StartNetwork(
 ) {
 	require := require.New(tc)
 
+	network.DefaultRuntimeConfig = *runtimeConfig
+	network.DefaultFlags[config.PluginDirKey] = pluginDir
+
 	err := tmpnet.BootstrapNewNetwork(
 		tc.DefaultContext(),
 		tc.Log(),
 		network,
 		DefaultNetworkDir,
-		avalancheGoExecPath,
-		pluginDir,
 	)
 	if err != nil {
 		// Ensure nodes are stopped if bootstrap fails. The network configuration
@@ -352,4 +353,11 @@ func GetRepoRootPath(suffix string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSuffix(cwd, suffix), nil
+}
+
+func GetLocalURI(tc tests.TestContext, node *tmpnet.Node) string {
+	uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return uri
 }
