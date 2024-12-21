@@ -615,10 +615,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 
 	// Ensure the node runtime is configured
 	if node.RuntimeConfig == nil {
-		node.RuntimeConfig = &NodeRuntimeConfig{
-			AvalancheGoPath:   n.DefaultRuntimeConfig.AvalancheGoPath,
-			KubeRuntimeConfig: n.DefaultRuntimeConfig.KubeRuntimeConfig,
-		}
+		node.RuntimeConfig = &n.DefaultRuntimeConfig
 	}
 
 	// Ensure the node's data dir is configured
