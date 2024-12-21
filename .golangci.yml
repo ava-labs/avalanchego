@@ -46,11 +46,11 @@ linters:
   enable:
     - asciicheck
     - bodyclose
+    - copyloopvar
     - depguard
     - dupword
     - errcheck
     - errorlint
-    - exportloopref
     - forbidigo
     - gci
     - goconst

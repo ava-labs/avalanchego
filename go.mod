@@ -1,9 +1,12 @@
 module github.com/ava-labs/avalanchego
 
-// Changes to the minimum golang version must also be replicated in
-// CONTRIBUTING.md
-// README.md
-// go.mod (here)
+// - Changes to the minimum golang version must also be replicated in:
+//   - CONTRIBUTING.md
+//   - README.md
+//   - go.mod (here)
+//
+// - If updating between minor versions (e.g. 1.22.x -> 1.23.x):
+//   - Maybe update the version of golangci-lint (in scripts/lint.sh) in case the new golang version requires an updated linter?
 go 1.22.8
 
 require (
