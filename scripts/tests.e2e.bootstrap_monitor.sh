@@ -63,7 +63,5 @@ ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubern
 # call them without a qualifying path.
 PATH="${PWD}/bin:$PATH" bash -x "${PWD}/bin/kind-with-registry.sh"
 
-# TODO(marun) Factor out ginkgo installation to avoid duplicating it across test scripts
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-
-KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ginkgo -v ./tests/fixture/bootstrapmonitor/e2e
+KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" \
+          ./scripts/ginkgo.sh -v ./tests/fixture/bootstrapmonitor/e2e
