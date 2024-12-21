@@ -540,7 +540,7 @@ func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 
 			txJSON, err := json.MarshalIndent(test.tx, "", "\t")
 			require.NoError(err)
-			require.Equal(
+			require.JSONEq(
 				// Normalize newlines for Windows
 				strings.ReplaceAll(string(test.expectedJSON), "\r\n", "\n"),
 				string(txJSON),

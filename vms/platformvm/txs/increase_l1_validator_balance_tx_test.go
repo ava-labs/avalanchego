@@ -309,7 +309,7 @@ func TestIncreaseL1ValidatorBalanceTxSerialization(t *testing.T) {
 
 	txJSON, err := json.MarshalIndent(unsignedTx, "", "\t")
 	require.NoError(err)
-	require.Equal(
+	require.JSONEq(
 		// Normalize newlines for Windows
 		strings.ReplaceAll(string(increaseL1ValidatorBalanceTxJSON), "\r\n", "\n"),
 		string(txJSON),

@@ -615,7 +615,7 @@ func TestAddPermissionlessPrimaryDelegatorSerialization(t *testing.T) {
 
 	unsignedComplexAddPrimaryTxJSONBytes, err := json.MarshalIndent(unsignedComplexAddPrimaryTx, "", "\t")
 	require.NoError(err)
-	require.Equal(`{
+	require.JSONEq(`{
 	"networkID": 1,
 	"blockchainID": "11111111111111111111111111111111LpoYY",
 	"outputs": [
@@ -1371,7 +1371,7 @@ func TestAddPermissionlessSubnetDelegatorSerialization(t *testing.T) {
 
 	unsignedComplexAddSubnetTxJSONBytes, err := json.MarshalIndent(unsignedComplexAddSubnetTx, "", "\t")
 	require.NoError(err)
-	require.Equal(`{
+	require.JSONEq(`{
 	"networkID": 1,
 	"blockchainID": "11111111111111111111111111111111LpoYY",
 	"outputs": [
