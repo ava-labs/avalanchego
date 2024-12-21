@@ -6,8 +6,7 @@
 ## Running tests
 
 ```bash
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.0.0
-ACK_GINKGO_RC=true ginkgo build ./tests/e2e
+go run github.com/onsi/ginkgo/v2/ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
 ./tests/e2e/e2e.test \
