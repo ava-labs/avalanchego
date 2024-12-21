@@ -54,7 +54,9 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		e2e.StartNetwork(
 			tc,
 			network,
-			avalancheGoExecPath,
+			&tmpnet.NodeRuntimeConfig{
+				AvalancheGoPath: avalancheGoExecPath,
+			},
 			"",    /* pluginDir */
 			0,     /* shutdownDelay */
 			false, /* skipShutdown */
@@ -68,7 +70,7 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 
 			node.RuntimeConfig.AvalancheGoPath = avalancheGoExecPathToUpgradeTo
 
-			require.NoError(network.StartNode(tc.DefaultContext(), tc.Log(), node))
+			require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 			tc.By(fmt.Sprintf("waiting for node %q to report healthy after restart", node.NodeID))
 			e2e.WaitForHealthy(tc, node)

@@ -62,7 +62,12 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtim
 			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
 		}
 
-		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
+		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+			AvalancheGoPath: avalancheGoPath,
+		}
+		network.DefaultFlags[config.PluginDirKey] = pluginDir
+
+		if err := initBootstrapDB(network, bootstrapVolumePath); err != nil {
 			return fmt.Errorf("failed to initialize db volumes: %w", err)
 		}
 	}
