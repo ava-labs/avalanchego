@@ -57,7 +57,7 @@ type NodeRuntimeConfig struct {
 	// Path to the AvalancheGo binary if the node is running as a process.
 	AvalancheGoPath string
 	// The kubernetes configuration if the node is running as a pod.
-	KubeRuntimeConfig KubeRuntimeConfig
+	KubeRuntimeConfig *KubeRuntimeConfig
 }
 
 // Configuration required to configure a node running as a pod.

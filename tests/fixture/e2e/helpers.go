@@ -258,7 +258,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 func StartNetwork(
 	tc tests.TestContext,
 	network *tmpnet.Network,
-	avalancheGoExecPath string,
+	runtimeConfig *tmpnet.NodeRuntimeConfig,
 	pluginDir string,
 	shutdownDelay time.Duration,
 	skipShutdown bool,
@@ -266,7 +266,9 @@ func StartNetwork(
 ) {
 	require := require.New(tc)
 
-	// TODO(marun) Need to configure the network runtime
+	network.DefaultRuntimeConfig = *runtimeConfig
+	network.DefaultFlags[config.PluginDirKey] = pluginDir
+
 	err := tmpnet.BootstrapNewNetwork(
 		tc.DefaultContext(),
 		tc.Log(),
