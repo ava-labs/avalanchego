@@ -28,10 +28,12 @@ import (
 // access to the shared env to GetEnv which adds a test context.
 var env *TestEnvironment
 
-func InitSharedTestEnvironment(t require.TestingT, envBytes []byte) {
-	require := require.New(t)
+func InitSharedTestEnvironment(tc tests.TestContext, envBytes []byte) {
+	require := require.New(tc)
 	require.Nil(env, "env already initialized")
-	env = &TestEnvironment{}
+	env = &TestEnvironment{
+		testContext: tc,
+	}
 	require.NoError(json.Unmarshal(envBytes, env))
 
 	// Ginkgo parallelization is at the process level, so a given key
@@ -138,7 +140,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		StartNetwork(
 			tc,
 			network,
-			flagVars.AvalancheGoExecPath(),
+			flagVars.NodeRuntimeConfig(),
 			flagVars.PluginDir(),
 			flagVars.NetworkShutdownDelay(),
 			flagVars.StartNetwork(),
@@ -213,17 +215,29 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
+	// Retrieve a local URI in case of the node running in kube
+	localURI := ""
+	for _, node := range te.GetNetwork().Nodes {
+		if node.URI == nodeURI.URI {
+			localURI = GetLocalURI(te.testContext, node)
+		}
+	}
+	localNodeURI := tmpnet.NodeURI{
+		NodeID: nodeURI.NodeID,
+		URI:    localURI,
+	}
 	te.testContext.Log().Info("targeting random node",
-		zap.Stringer("nodeID", nodeURI.NodeID),
-		zap.String("uri", nodeURI.URI),
+		zap.Stringer("nodeID", localNodeURI.NodeID),
+		zap.String("uri", localNodeURI.URI),
 	)
-	return nodeURI
+	return localNodeURI
 }
 
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() *tmpnet.Network {
 	network, err := tmpnet.ReadNetwork(te.testContext.DefaultContext(), te.NetworkDir)
 	require.NoError(te.testContext, err)
+	network.Log = te.testContext.Log()
 	return network
 }
 
@@ -245,7 +259,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 	StartNetwork(
 		te.testContext,
 		network,
-		sharedNetwork.DefaultRuntimeConfig.AvalancheGoPath,
+		&sharedNetwork.DefaultRuntimeConfig,
 		pluginDir,
 		te.PrivateNetworkShutdownDelay,
 		false, /* skipShutdown */

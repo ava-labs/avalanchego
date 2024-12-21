@@ -121,7 +121,7 @@ func (p *NodePod) getStatefulSetName() string {
 // Start the node as a kubernetes statefulset.
 func (p *NodePod) Start(ctx context.Context) error {
 	// Create a statefulset for the pod and wait for it to become ready
-	runtimeConfig := p.node.RuntimeConfig.KubeRuntimeConfig
+	runtimeConfig := p.runtimeConfig()
 	statefulSetFlags := p.node.Flags.Copy()
 	statefulSetFlags[config.DataDirKey] = volumeMountPath
 	statefulSet := NewNodeStatefulSet(
@@ -248,7 +248,7 @@ func (p *NodePod) Restart(ctx context.Context) error {
 		})
 	}
 
-	nodeImage := p.node.RuntimeConfig.KubeRuntimeConfig.ImageName
+	nodeImage := p.runtimeConfig().ImageName
 	if container.Image != nodeImage {
 		patches = append(patches, map[string]any{
 			"op":    "replace",
@@ -352,7 +352,8 @@ func (p *NodePod) getClientset() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func (p *NodePod) runtimeConfig() KubeRuntimeConfig {
+func (p *NodePod) runtimeConfig() *KubeRuntimeConfig {
+	// TODO(marun) A NodePod runtime should only be used if KubeRuntimeConfig is non-nil
 	return p.node.RuntimeConfig.KubeRuntimeConfig
 }
 

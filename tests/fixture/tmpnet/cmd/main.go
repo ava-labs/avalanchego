@@ -88,7 +88,7 @@ func main() {
 				if len(imageName) == 0 {
 					return errors.New("--image-name is required")
 				}
-				runtimeConfig.KubeRuntimeConfig = tmpnet.KubeRuntimeConfig{
+				runtimeConfig.KubeRuntimeConfig = &tmpnet.KubeRuntimeConfig{
 					Kubeconfig: kubeconfig,
 					Namespace:  namespace,
 					ImageName:  imageName,
