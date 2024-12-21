@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -413,7 +414,7 @@ func (n *Node) SaveAPIPort() error {
 	}
 
 	// Only save a non-default port
-	if port != string(config.DefaultHTTPPort) {
+	if port != strconv.Itoa(config.DefaultHTTPPort) {
 		n.Flags[config.HTTPPortKey] = port
 	}
 	return nil

@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -36,11 +35,11 @@ import (
 )
 
 // DefaultPodFlags defines common flags for avalanchego nodes running in a pod.
-func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled bool) map[string]string {
-	return map[string]string{
+func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled bool) FlagsMap {
+	return FlagsMap{
 		config.DataDirKey:                dataDir,
 		config.NetworkNameKey:            networkName,
-		config.SybilProtectionEnabledKey: strconv.FormatBool(sybilProtectionEnabled),
+		config.SybilProtectionEnabledKey: sybilProtectionEnabled,
 		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
 		config.LogDisplayLevelKey:        logging.Info.String(),
 		config.LogLevelKey:               logging.Off.String(),
