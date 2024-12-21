@@ -320,7 +320,6 @@ func initTestTxIndex(t *testing.T, db *versiondb.Database, address ids.ShortID, 
 
 	for i, txID := range testTxs {
 		idxBytes := database.PackUInt64(uint64(i))
-		txID := txID
 		require.NoError(assetPrefixDB.Put(idxBytes, txID[:]))
 	}
 	_, err := db.CommitBatch()
