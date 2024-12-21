@@ -50,7 +50,7 @@ func TestFloat32(t *testing.T) {
 	for _, tt := range tests {
 		jsonBytes, err := tt.f.MarshalJSON()
 		require.NoError(err)
-		require.Equal(fmt.Sprintf(`"%s"`, tt.expectedStr), string(jsonBytes))
+		require.JSONEq(fmt.Sprintf(`"%s"`, tt.expectedStr), string(jsonBytes))
 
 		var f Float32
 		require.NoError(f.UnmarshalJSON(jsonBytes))

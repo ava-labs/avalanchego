@@ -56,7 +56,7 @@ func TestProcessContext(t *testing.T) {
 
 			contextJSON, err := json.MarshalIndent(test.context, "", "\t")
 			require.NoError(err)
-			require.Equal(test.expected, string(contextJSON))
+			require.JSONEq(test.expected, string(contextJSON))
 		})
 	}
 }

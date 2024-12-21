@@ -327,7 +327,7 @@ func TestRegisterL1ValidatorTxSerialization(t *testing.T) {
 
 	txJSON, err := json.MarshalIndent(unsignedTx, "", "\t")
 	require.NoError(err)
-	require.Equal(
+	require.JSONEq(
 		// Normalize newlines for Windows
 		strings.ReplaceAll(string(registerL1ValidatorTxJSON), "\r\n", "\n"),
 		string(txJSON),

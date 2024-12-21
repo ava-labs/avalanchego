@@ -432,7 +432,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 
 	unsignedComplexRemoveValidatorTxJSONBytes, err := json.MarshalIndent(unsignedComplexRemoveValidatorTx, "", "\t")
 	require.NoError(err)
-	require.Equal(`{
+	require.JSONEq(`{
 	"networkID": 1,
 	"blockchainID": "11111111111111111111111111111111LpoYY",
 	"outputs": [

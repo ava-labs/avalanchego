@@ -453,7 +453,7 @@ func TestTransferSubnetOwnershipTxSerialization(t *testing.T) {
 
 	unsignedComplexTransferSubnetOwnershipTxJSONBytes, err := json.MarshalIndent(unsignedComplexTransferSubnetOwnershipTx, "", "\t")
 	require.NoError(err)
-	require.Equal(`{
+	require.JSONEq(`{
 	"networkID": 1,
 	"blockchainID": "11111111111111111111111111111111LpoYY",
 	"outputs": [

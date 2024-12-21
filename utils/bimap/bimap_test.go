@@ -349,7 +349,7 @@ func TestBiMapJSON(t *testing.T) {
 	require.NoError(err)
 
 	expectedJSONBytes := []byte(`{"1":2,"2":3}`)
-	require.Equal(expectedJSONBytes, jsonBytes)
+	require.JSONEq(string(expectedJSONBytes), string(jsonBytes))
 
 	var unmarshalledMap BiMap[int, int]
 	require.NoError(json.Unmarshal(jsonBytes, &unmarshalledMap))
