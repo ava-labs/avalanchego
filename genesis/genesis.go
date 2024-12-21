@@ -495,7 +495,6 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 		currentAllocation.UnlockSchedule = nil
 
 		for _, unlock := range allocation.UnlockSchedule {
-			unlock := unlock
 			for currentNodeAmount+unlock.Amount > nodeWeight && len(allNodeAllocations) < numSplits-1 {
 				amountToAdd := nodeWeight - currentNodeAmount
 				currentAllocation.UnlockSchedule = append(currentAllocation.UnlockSchedule, LockedAmount{

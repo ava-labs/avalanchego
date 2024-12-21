@@ -253,7 +253,6 @@ func Test_Key_Token(t *testing.T) {
 	}
 
 	for i := 0; i < 256; i++ {
-		i := i
 		tests = append(tests, test{
 			name:       fmt.Sprintf("branch factor 256, byte %d", i),
 			inputBytes: []byte{byte(i)},

@@ -447,7 +447,6 @@ func (s *state) writeUTXOs() error {
 
 func (s *state) writeTxs() error {
 	for txID, tx := range s.addedTxs {
-		txID := txID
 		txBytes := tx.Bytes()
 
 		delete(s.addedTxs, txID)
@@ -474,7 +473,6 @@ func (s *state) writeBlockIDs() error {
 
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
-		blkID := blkID
 		blkBytes := blk.Bytes()
 
 		delete(s.addedBlocks, blkID)
