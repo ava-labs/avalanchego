@@ -55,7 +55,6 @@ func TestBeaconManager_DataRace(t *testing.T) {
 		})
 
 	for _, nodeID := range validatorIDs {
-		nodeID := nodeID
 		go func() {
 			b.Connected(nodeID, version.CurrentApp, constants.PrimaryNetworkID)
 			b.Connected(nodeID, version.CurrentApp, ids.GenerateTestID())

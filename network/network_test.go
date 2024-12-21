@@ -231,8 +231,6 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
-		config := config
-
 		config.Beacons = beacons
 		config.Validators = vdrs
 
@@ -461,8 +459,6 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
 
-		config := config
-
 		config.Beacons = beacons
 		config.Validators = vdrs
 		config.AllowPrivateIPs = false
@@ -540,8 +536,6 @@ func TestDialDeletesNonValidators(t *testing.T) {
 
 		beacons := validators.NewManager()
 		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
-
-		config := config
 
 		config.Beacons = beacons
 		config.Validators = vdrs
@@ -695,8 +689,6 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 
 		vdrs := validators.NewManager()
 		require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
-
-		config := config
 
 		config.Beacons = beacons
 		config.Validators = vdrs

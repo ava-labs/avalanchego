@@ -142,7 +142,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(requestID, innerMsg.RequestId)
 			summaryIDsBytes := make([][]byte, len(summaryIDs))
 			for i, id := range summaryIDs {
-				id := id
 				summaryIDsBytes[i] = id[:]
 			}
 			require.Equal(summaryIDsBytes, innerMsg.SummaryIds)
@@ -244,7 +243,6 @@ func TestInboundMsgBuilder(t *testing.T) {
 			require.Equal(requestID, innerMsg.RequestId)
 			containerIDsBytes := make([][]byte, len(containerIDs))
 			for i, id := range containerIDs {
-				id := id
 				containerIDsBytes[i] = id[:]
 			}
 			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
