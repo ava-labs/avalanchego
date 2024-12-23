@@ -12,7 +12,7 @@ fi
 ./scripts/start_kind_cluster.sh
 
 # TODO(marun) Make the namespace configurable
-PATH="${PWD}/bin:$PATH" kubectl create namespace tmpnet
+PATH="${PWD}/bin:$PATH" kubectl create namespace tmpnet || true
 
 # TODO(marun) Is the path still necessary?
-KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ./scripts/tests.e2e.sh --runtime=kube
+KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" bash -x ./scripts/tests.e2e.sh --runtime=kube

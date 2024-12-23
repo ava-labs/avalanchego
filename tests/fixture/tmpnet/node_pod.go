@@ -211,6 +211,8 @@ func (p *NodePod) WaitForStopped(ctx context.Context) error {
 
 // Restarts the node
 func (p *NodePod) Restart(ctx context.Context) error {
+	log := p.node.getNetwork().Log
+
 	// Save node to disk
 	if err := p.node.Write(); err != nil {
 		return err
@@ -251,7 +253,7 @@ func (p *NodePod) Restart(ctx context.Context) error {
 	}
 
 	if len(patches) == 0 {
-		p.node.getNetwork().Log.Info("skipped restart - configuration unchanged")
+		log.Info("skipped restart - configuration unchanged")
 		return nil
 	}
 
@@ -284,21 +286,42 @@ func (p *NodePod) Restart(ctx context.Context) error {
 	}
 
 	replicas := int32(1)
-	return wait.PollImmediateInfinite(statusCheckInterval, func() (bool, error) {
+	if err := wait.PollImmediateInfinite(statusCheckInterval, func() (bool, error) {
 		statefulset, err := p.getStatefulSet(ctx)
 		if err != nil {
-			p.node.getNetwork().Log.Debug("failed to retrieve statefulset",
+			log.Debug("failed to retrieve statefulset",
 				zap.Error(err),
 			)
 			return false, nil
 		}
 		status := statefulset.Status
-		return (status.ObservedGeneration >= updatedStatefulSet.Generation &&
+		finishedRollingOut := (status.ObservedGeneration >= updatedStatefulSet.Generation &&
 			status.Replicas == replicas &&
 			status.ReadyReplicas == replicas &&
 			status.CurrentReplicas == replicas &&
-			status.UpdatedReplicas == replicas), nil
-	})
+			status.UpdatedReplicas == replicas)
+		if finishedRollingOut {
+			log.Info("statefulset finished rolling out",
+				zap.String("namespace", statefulset.Namespace),
+				zap.String("name", statefulset.Name),
+			)
+		}
+		return finishedRollingOut, nil
+	}); err != nil {
+		return fmt.Errorf("failed to wait for statefulset to finish rolling out: %w", err)
+	}
+
+	if err := wait.PollImmediateInfinite(statusCheckInterval, func() (bool, error) {
+		_, err := p.IsHealthy(ctx)
+		// If no error is returned, the node must be accepting api
+		// calls which means it might become healthy if the other
+		// validators in the network are started.
+		return err == nil, nil
+	}); err != nil {
+		return fmt.Errorf("failed to wait for the node to start accepting connections: %w", err)
+	}
+
+	return nil
 }
 
 func (p *NodePod) IsHealthy(ctx context.Context) (bool, error) {
