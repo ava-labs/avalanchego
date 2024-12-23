@@ -446,22 +446,17 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 		zap.Stringer("nodeID", bootstrapNode.NodeID),
 	)
 
-	if len(n.Nodes) == 1 {
-		// Ensure the node is restarted to pick up subnet and chain configuration
-		return n.RestartNode(ctx, log, bootstrapNode)
-	}
-
-	// TODO(marun) This last restart of the bootstrap node might be unnecessary if:
+	// Ensure the node is restarted to pick up subnet and chain configuration
+	//
+	// TODO(marun) This restart of the bootstrap node might be unnecessary if:
 	// - sybil protection didn't change
 	// - the node is not a subnet validator
-
-	// Ensure the bootstrap node is restarted to pick up configuration changes. Avoid using
-	// RestartNode since the node won't be able to report healthy until other nodes are started.
-	if err := bootstrapNode.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to stop node %s: %w", bootstrapNode.NodeID, err)
+	if err := n.RestartNode(ctx, log, bootstrapNode); err != nil {
+		return err
 	}
-	if err := n.StartNode(ctx, bootstrapNode); err != nil {
-		return fmt.Errorf("failed to start node %s: %w", bootstrapNode.NodeID, err)
+
+	if len(n.Nodes) == 1 {
+		return nil
 	}
 
 	log.Info("starting remaining nodes")
