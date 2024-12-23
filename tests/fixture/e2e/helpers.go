@@ -270,7 +270,7 @@ func StartNetwork(
 	if network.DefaultFlags == nil {
 		network.DefaultFlags = make(tmpnet.FlagsMap)
 	}
-	network.DefaultFlags[config.PluginDirKey] = pluginDir
+	network.SetPluginDir(pluginDir)
 
 	err := tmpnet.BootstrapNewNetwork(
 		tc.DefaultContext(),
