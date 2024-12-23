@@ -27,7 +27,7 @@ echo ""
 # Ensure an absolute path to avoid dependency on the working directory
 # of script execution.
 AVALANCHEGO_PATH="$(realpath "${AVALANCHEGO_PATH:-./build/avalanchego}")"
-E2E_ARGS="${@:-"--avalanchego-path=${AVALANCHEGO_PATH}"}"
+E2E_ARGS="${*:-"--avalanchego-path=${AVALANCHEGO_PATH}"}"
 
 #################################
 # Determine ginkgo args

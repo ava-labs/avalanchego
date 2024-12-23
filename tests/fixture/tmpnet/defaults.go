@@ -54,6 +54,9 @@ func DefaultProcessFlags() FlagsMap {
 		config.StakingHostKey:     "127.0.0.1",
 		config.LogDisplayLevelKey: logging.Off.String(), // Display logging not needed since nodes run headless
 		config.LogLevelKey:        logging.Debug.String(),
+		// Default to dynamic port allocation
+		config.HTTPPortKey:    0,
+		config.StakingPortKey: 0,
 	}
 }
 
