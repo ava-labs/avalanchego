@@ -220,6 +220,13 @@ func (p *NodeProcess) IsHealthy(ctx context.Context) (bool, error) {
 	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
 	}
+	if err != nil {
+		p.node.getNetwork().Log.Debug("failed to check node health",
+			zap.Stringer("nodeID", p.node.NodeID),
+			zap.Error(err),
+		)
+		return false, nil
+	}
 	return healthReply.Healthy, nil
 }
 
