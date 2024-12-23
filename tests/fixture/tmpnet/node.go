@@ -172,15 +172,22 @@ func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		// TODO(marun) How to ensure the runtime config is validated?
-		if len(n.RuntimeConfig.AvalancheGoPath) > 0 {
+		runtime := "process"
+		if n.RuntimeConfig.KubeRuntimeConfig != nil {
+			runtime = "kube"
+		}
+		switch runtime {
+		case "process":
 			n.runtime = &NodeProcess{
 				node: n,
 			}
-		} else {
+		case "kube":
 			n.runtime = &NodePod{
 				node: n,
 			}
+		default:
+			// TODO(marun) Validate the runtime sooner and avoid an error condition
+			panic("unsupported runtime: " + runtime)
 		}
 	}
 	return n.runtime

@@ -35,11 +35,12 @@ type FlagVars struct {
 
 func (v *FlagVars) NodeRuntimeConfig() *tmpnet.NodeRuntimeConfig {
 	if v.nodeRuntimeConfig == nil {
-		if v.runtime != "kube" {
+		switch v.runtime {
+		case "process":
 			v.nodeRuntimeConfig = &tmpnet.NodeRuntimeConfig{
 				AvalancheGoPath: v.avalancheGoExecPath,
 			}
-		} else {
+		case "kube":
 			v.nodeRuntimeConfig = &tmpnet.NodeRuntimeConfig{
 				KubeRuntimeConfig: &tmpnet.KubeRuntimeConfig{
 					Kubeconfig: v.kubeconfig,
@@ -47,6 +48,9 @@ func (v *FlagVars) NodeRuntimeConfig() *tmpnet.NodeRuntimeConfig {
 					ImageName:  v.imageName,
 				},
 			}
+		default:
+			// TODO(marun) Make this an error condition instead of a panic
+			panic("unknown runtime: " + v.runtime)
 		}
 	}
 	return v.nodeRuntimeConfig
