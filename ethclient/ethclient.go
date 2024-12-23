@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
@@ -90,7 +89,6 @@ type Client interface {
 	SubscribeNewHead(context.Context, chan<- *types.Header) (interfaces.Subscription, error)
 	NetworkID(context.Context) (*big.Int, error)
 	BalanceAt(context.Context, common.Address, *big.Int) (*big.Int, error)
-	AssetBalanceAt(context.Context, common.Address, ids.ID, *big.Int) (*big.Int, error)
 	BalanceAtHash(ctx context.Context, account common.Address, blockHash common.Hash) (*big.Int, error)
 	StorageAt(context.Context, common.Address, common.Hash, *big.Int) ([]byte, error)
 	StorageAtHash(ctx context.Context, account common.Address, key common.Hash, blockHash common.Hash) ([]byte, error)
@@ -464,14 +462,6 @@ func (ec *client) NetworkID(ctx context.Context) (*big.Int, error) {
 func (ec *client) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
 	var result hexutil.Big
 	err := ec.c.CallContext(ctx, &result, "eth_getBalance", account, ToBlockNumArg(blockNumber))
-	return (*big.Int)(&result), err
-}
-
-// AssetBalanceAt returns the [assetID] balance of the given account
-// The block number can be nil, in which case the balance is taken from the latest known block.
-func (ec *client) AssetBalanceAt(ctx context.Context, account common.Address, assetID ids.ID, blockNumber *big.Int) (*big.Int, error) {
-	var result hexutil.Big
-	err := ec.c.CallContext(ctx, &result, "eth_getAssetBalance", account, ToBlockNumArg(blockNumber), assetID)
 	return (*big.Int)(&result), err
 }
 
