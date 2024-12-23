@@ -556,16 +556,16 @@ func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 	if err := n.RestartNodes(ctx, log, n.Nodes...); err != nil {
 		return err
 	}
-	return n.WaitForHealthy(ctx, log, n.Nodes...)
+	return WaitForHealthyNodes(ctx, log, n.Nodes...)
 }
 
 // Waits for the provided nodes to become healthy.
-func (n *Network) WaitForHealthy(ctx context.Context, log logging.Logger, nodes ...*Node) error {
+func WaitForHealthyNodes(ctx context.Context, log logging.Logger, nodes ...*Node) error {
 	for _, node := range nodes {
 		log.Info("waiting for node to become healthy",
 			zap.Stringer("nodeID", node.NodeID),
 		)
-		if err := WaitForHealthy(ctx, log, node); err != nil {
+		if err := WaitForHealthyNode(ctx, log, node); err != nil {
 			return err
 		}
 	}
@@ -750,7 +750,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			return err
 		}
 
-		if err := n.WaitForHealthy(ctx, log, runningNodes...); err != nil {
+		if err := WaitForHealthyNodes(ctx, log, runningNodes...); err != nil {
 			return err
 		}
 	}

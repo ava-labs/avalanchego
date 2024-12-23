@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -48,7 +50,7 @@ func CheckNodeHealth(ctx context.Context, uri string) (*health.APIReply, error) 
 }
 
 // WaitForHealthy blocks until Node.IsHealthy returns true or an error (including context timeout) is observed.
-func WaitForHealthy(ctx context.Context, log logging.Logger, node *Node) error {
+func WaitForHealthyNode(ctx context.Context, log logging.Logger, node *Node) error {
 	if _, ok := ctx.Deadline(); !ok {
 		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", node.NodeID)
 	}
@@ -61,6 +63,10 @@ func WaitForHealthy(ctx context.Context, log logging.Logger, node *Node) error {
 		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
 			return fmt.Errorf("%w for node %q", err, node.NodeID)
 		case err != nil:
+			log.Debug("Failed to query node health",
+				zap.Stringer("nodeID", node.NodeID),
+				zap.Error(err),
+			)
 			continue
 		case healthy:
 			return nil

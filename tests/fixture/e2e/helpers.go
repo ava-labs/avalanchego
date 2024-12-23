@@ -155,7 +155,7 @@ func WaitForHealthy(tc tests.TestContext, node *tmpnet.Node) {
 	// Need to use explicit context (vs DefaultContext()) to support use with DeferCleanup
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
-	require.NoError(tc, tmpnet.WaitForHealthy(ctx, tc.Log(), node))
+	require.NoError(tc, tmpnet.WaitForHealthyNode(ctx, tc.Log(), node))
 }
 
 // Sends an eth transaction, waits for the transaction receipt to be issued
@@ -239,7 +239,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 	})
 
 	// Check that the node becomes healthy within timeout
-	require.NoError(tmpnet.WaitForHealthy(tc.DefaultContext(), tc.Log(), node))
+	require.NoError(tmpnet.WaitForHealthyNode(tc.DefaultContext(), tc.Log(), node))
 
 	// Ensure that the primary validators are still healthy
 	for _, node := range network.Nodes {
