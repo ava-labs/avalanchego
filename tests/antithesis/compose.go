@@ -65,6 +65,10 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtim
 		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
 			AvalancheGoPath: avalancheGoPath,
 		}
+		// TODO(marun) Need to have a standard way of initializing a network
+		if network.DefaultFlags == nil {
+			network.DefaultFlags = tmpnet.FlagsMap{}
+		}
 		network.DefaultFlags[config.PluginDirKey] = pluginDir
 
 		if err := initBootstrapDB(network, bootstrapVolumePath); err != nil {
