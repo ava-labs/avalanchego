@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -104,18 +103,13 @@ func main() {
 
 			// Root dir will be defaulted on start if not provided
 
-			flags := make(tmpnet.FlagsMap)
-			if len(pluginDir) > 0 {
-				// Only set the plugin dir if one was provided since a missing dir is FATAL
-				flags[config.PluginDirKey] = pluginDir
-			}
-
 			network := &tmpnet.Network{
 				Owner:                networkOwner,
 				Nodes:                tmpnet.NewNodesOrPanic(int(nodeCount)),
 				DefaultRuntimeConfig: runtimeConfig,
-				DefaultFlags:         flags,
+				DefaultFlags:         tmpnet.FlagsMap{},
 			}
+			network.SetPluginDir(pluginDir)
 
 			// Extreme upper bound, should never take this long
 			networkStartTimeout := 2 * time.Minute
