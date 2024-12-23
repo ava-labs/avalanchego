@@ -11,8 +11,5 @@ fi
 
 ./scripts/start_kind_cluster.sh
 
-# TODO(marun) Factor out ginkgo installation to avoid duplicating it across test scripts
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-
 # TODO(marun) Is the path still necessary?
-KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ginkgo -v ./tests/e2e -- --runtime=kube
+KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" ./scripts/tests.e2e.sh --runtime=kube

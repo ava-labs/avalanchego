@@ -267,6 +267,9 @@ func StartNetwork(
 	require := require.New(tc)
 
 	network.DefaultRuntimeConfig = *runtimeConfig
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = make(tmpnet.FlagsMap)
+	}
 	network.DefaultFlags[config.PluginDirKey] = pluginDir
 
 	err := tmpnet.BootstrapNewNetwork(
@@ -276,6 +279,9 @@ func StartNetwork(
 		DefaultNetworkDir,
 	)
 	if err != nil {
+		tc.Log().Error("failed to bootstrap network",
+			zap.Error(err),
+		)
 		// Ensure nodes are stopped if bootstrap fails. The network configuration
 		// will remain on disk to enable troubleshooting.
 		err := network.Stop(tc.DefaultContext())
