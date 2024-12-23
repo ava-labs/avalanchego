@@ -137,6 +137,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 	// Start a new network
 	if network == nil {
 		network = desiredNetwork
+		// TODO(marun) This is the wrong place given that this code is reused by other repos
+		network.DefaultFlags.SetDefaults(tmpnet.DefaultTestFlags())
+		network.DefaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 		StartNetwork(
 			tc,
 			network,
