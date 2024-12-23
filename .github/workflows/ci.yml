@@ -68,7 +68,6 @@ jobs:
         with:
           name: e2e-tmpnet-data
   e2e_kube:
-    name: Run tests against nodes running on kube
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
