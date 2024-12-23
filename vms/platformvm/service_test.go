@@ -1276,7 +1276,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			expectedJSON, err := json.Marshal(expected)
 			require.NoError(err)
 
-			require.JSONEq(string(json.RawMessage(expectedJSON)), string(reply.Block))
+			require.JSONEq(string(expectedJSON), string(reply.Block))
 		})
 	}
 }
