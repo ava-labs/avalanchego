@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+TOOLS_DIR="$( dirname "${BASH_SOURCE[0]}" )"
+${TOOLS_DIR}/av tool kubectl "$@"

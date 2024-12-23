@@ -3,4 +3,5 @@
 set -euo pipefail
 
 # Run the ginkgo version from go.mod
-go run github.com/onsi/ginkgo/v2/ginkgo "${@}"
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+${AVALANCHE_PATH}/scripts/av.sh tool ginkgo "$@"
