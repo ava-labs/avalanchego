@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/netip"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -43,10 +42,6 @@ const (
 
 type NodePod struct {
 	node *Node
-}
-
-func (p *NodePod) getPodContextPath() string {
-	return filepath.Join(p.node.GetDataDir(), "pod.json")
 }
 
 func (p *NodePod) setNotRunning() {
@@ -140,7 +135,7 @@ func (p *NodePod) Start(ctx context.Context) error {
 		return err
 	}
 	createdStatefulSet, err := clientset.AppsV1().StatefulSets(runtimeConfig.Namespace).Create(
-		context.Background(),
+		ctx,
 		statefulSet,
 		metav1.CreateOptions{},
 	)
@@ -212,13 +207,11 @@ func (p *NodePod) WaitForStopped(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
-
-	return nil
 }
 
 // Restarts the node
 func (p *NodePod) Restart(ctx context.Context) error {
-	// Save node node to disk
+	// Save node to disk
 	if err := p.node.Write(); err != nil {
 		return err
 	}
@@ -244,7 +237,7 @@ func (p *NodePod) Restart(ctx context.Context) error {
 		patches = append(patches, map[string]any{
 			"op":    "replace",
 			"path":  "/spec/template/spec/containers/0/env",
-			"value": envVarsToJsonValue(nodeEnv),
+			"value": envVarsToJSONValue(nodeEnv),
 		})
 	}
 

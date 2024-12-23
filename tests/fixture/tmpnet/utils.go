@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -62,7 +64,10 @@ func WaitForHealthy(ctx context.Context, log logging.Logger, node *Node) error {
 			return fmt.Errorf("%w for node %q", err, node.NodeID)
 		case err != nil:
 			// Error is recoverable
-			// TODO(marun) Log the error to aid in troubleshooting once a logger is available
+			log.Debug("failed to query node health",
+				zap.Stringer("nodeID", node.NodeID),
+				zap.Error(err),
+			)
 			continue
 		case healthy:
 			return nil

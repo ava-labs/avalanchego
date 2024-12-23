@@ -496,7 +496,8 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 }
 
 // Restart a single node.
-func (n *Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
+// TODO(marun) This no longer needs to be a method of Network - fold it into the node restart method.
+func (*Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
 	// Ensure the node reuses the same API port across restarts to ensure
 	// consistent labeling of metrics. Otherwise prometheus's automatic
 	// addition of the `instance` label (host:port) results in
@@ -661,11 +662,6 @@ func (n *Network) GetSubnet(name string) *Subnet {
 // to pick up configuration changes becomes the responsibility of the caller.
 func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI string, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
-	apiURI, cancel, err := n.Nodes[0].GetLocalURI(ctx)
-	if err != nil {
-		return err
-	}
-	defer cancel()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return fmt.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
