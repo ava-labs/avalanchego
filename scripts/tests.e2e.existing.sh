@@ -22,7 +22,7 @@ function print_separator {
 function cleanup {
   print_separator
   echo "cleaning up reusable network"
-  ./scripts/ginkgo.sh -v ./tests/e2e -- --stop-network
+  ./tools/ginkgo -v ./tests/e2e -- --stop-network
 }
 trap cleanup EXIT
 
