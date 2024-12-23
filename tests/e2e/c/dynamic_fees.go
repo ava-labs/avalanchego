@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -155,7 +154,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			// Create a recipient address
 			var (
 				recipientKey        = e2e.NewPrivateKey(tc)
-				recipientEthAddress = atomic.GetEthAddress(recipientKey)
+				recipientEthAddress = utils.GetEthAddress(recipientKey)
 			)
 
 			// Create transaction
