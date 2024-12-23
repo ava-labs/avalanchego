@@ -5,7 +5,6 @@ package txs
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -299,11 +298,7 @@ func TestSetL1ValidatorWeightTxSerialization(t *testing.T) {
 
 	txJSON, err := json.MarshalIndent(unsignedTx, "", "\t")
 	require.NoError(err)
-	require.JSONEq(
-		// Normalize newlines for Windows
-		strings.ReplaceAll(string(setL1ValidatorWeightTxJSON), "\r\n", "\n"),
-		string(txJSON),
-	)
+	require.JSONEq(string(setL1ValidatorWeightTxJSON), string(txJSON))
 }
 
 func TestSetL1ValidatorWeightTxSyntacticVerify(t *testing.T) {
