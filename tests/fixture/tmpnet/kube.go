@@ -156,7 +156,7 @@ func flagsToEnvVarSlice(flags FlagsMap) []corev1.EnvVar {
 	return envVars
 }
 
-func envVarsToJsonValue(envVars []corev1.EnvVar) []map[string]string {
+func envVarsToJSONValue(envVars []corev1.EnvVar) []map[string]string {
 	jsonValue := make([]map[string]string, len(envVars))
 	for i, envVar := range envVars {
 		jsonValue[i] = map[string]string{
