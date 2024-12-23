@@ -451,7 +451,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	// TODO(marun) This restart of the bootstrap node might be unnecessary if:
 	// - sybil protection didn't change
 	// - the node is not a subnet validator
-	if err := n.RestartNodes(ctx, log, bootstrapNode); err != nil {
+	if err := n.RestartNodes(ctx, bootstrapNode); err != nil {
 		return err
 	}
 
@@ -494,7 +494,7 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 //
 // TODO(marun) This no longer needs to be a method of Network - fold
 // it into the node restart method.
-func (*Network) RestartNodes(ctx context.Context, log logging.Logger, nodes ...*Node) error {
+func (*Network) RestartNodes(ctx context.Context, nodes ...*Node) error {
 	for _, node := range nodes {
 		// Ensure the node reuses the same API port across restarts to ensure
 		// consistent labeling of metrics. Otherwise prometheus's automatic
@@ -553,7 +553,7 @@ func (n *Network) Stop(ctx context.Context) error {
 // Restarts all non-ephemeral nodes in the network.
 func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 	log.Info("restarting network")
-	if err := n.RestartNodes(ctx, log, n.Nodes...); err != nil {
+	if err := n.RestartNodes(ctx, n.Nodes...); err != nil {
 		return err
 	}
 	return WaitForHealthyNodes(ctx, log, n.Nodes...)
@@ -746,7 +746,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 			}
 		}
 
-		if err := n.RestartNodes(ctx, log, runningNodes...); err != nil {
+		if err := n.RestartNodes(ctx, runningNodes...); err != nil {
 			return err
 		}
 
@@ -820,7 +820,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		}
 	}
 
-	if err := n.RestartNodes(ctx, log, nodesToRestart...); err != nil {
+	if err := n.RestartNodes(ctx, nodesToRestart...); err != nil {
+		return err
+	}
+
+	if err := WaitForHealthyNodes(ctx, log, nodesToRestart...); err != nil {
 		return err
 	}
 
