@@ -67,6 +67,21 @@ jobs:
         if: always()
         with:
           name: e2e-tmpnet-data
+  e2e_kube:
+    name: Run tests against nodes running on kube
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+        # TODO(marun) Enable metrics collection.
+      - name: Run e2e tests
+        shell: bash
+        run: bash -x ./scripts/tests.e2e.kube.sh
+      - name: Upload tmpnet network dir
+        uses: ./.github/actions/upload-tmpnet-artifact
+        if: always()
+        with:
+          name: e2e-kube-tmpnet-data
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
