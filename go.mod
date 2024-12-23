@@ -6,7 +6,7 @@ module github.com/ava-labs/avalanchego
 //   - go.mod (here)
 //
 // - If updating between minor versions (e.g. 1.22.x -> 1.23.x):
-//   - Maybe update the version of golangci-lint (in scripts/lint.sh) in case the new golang version requires an updated linter?
+//   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.22.8
 
 require (
