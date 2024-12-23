@@ -27,6 +27,7 @@ func TestNetworkSerialization(t *testing.T) {
 	require.NoError(network.readNodes(ctx))
 
 	loadedNetwork, err := ReadNetwork(ctx, network.Dir)
+	loadedNetwork.Log = logging.NoLog{}
 	require.NoError(err)
 	for _, key := range loadedNetwork.PreFundedKeys {
 		// Address() enables comparison with the original network by
