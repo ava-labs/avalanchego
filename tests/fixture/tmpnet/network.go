@@ -451,7 +451,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	// TODO(marun) This restart of the bootstrap node might be unnecessary if:
 	// - sybil protection didn't change
 	// - the node is not a subnet validator
-	if err := n.RestartNode(ctx, log, bootstrapNode); err != nil {
+	if err := n.RestartNodes(ctx, log, bootstrapNode); err != nil {
 		return err
 	}
 
@@ -490,34 +490,34 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-// Restart a single node.
-// TODO(marun) This no longer needs to be a method of Network - fold it into the node restart method.
-func (*Network) RestartNode(ctx context.Context, log logging.Logger, node *Node) error {
-	// Ensure the node reuses the same API port across restarts to ensure
-	// consistent labeling of metrics. Otherwise prometheus's automatic
-	// addition of the `instance` label (host:port) results in
-	// segmentation of results for a given node every time the port
-	// changes on restart. This segmentation causes graphs on the grafana
-	// dashboards to display multiple series per graph for a given node,
-	// one for each port that the node used.
-	//
-	// There is a non-zero chance of the port being allocatted to a
-	// different process and the node subsequently being unable to start,
-	// but the alternative is having to update the grafana dashboards
-	// query-by-query to ensure that node metrics ignore the instance
-	// label.
-	if err := node.SaveAPIPort(); err != nil {
-		return err
-	}
+// Restart the provided nodes. Blocks on the nodes accepting API requests but not their health.
+//
+// TODO(marun) This no longer needs to be a method of Network - fold
+// it into the node restart method.
+func (*Network) RestartNodes(ctx context.Context, log logging.Logger, nodes ...*Node) error {
+	for _, node := range nodes {
+		// Ensure the node reuses the same API port across restarts to ensure
+		// consistent labeling of metrics. Otherwise prometheus's automatic
+		// addition of the `instance` label (host:port) results in
+		// segmentation of results for a given node every time the port
+		// changes on restart. This segmentation causes graphs on the grafana
+		// dashboards to display multiple series per graph for a given node,
+		// one for each port that the node used.
+		//
+		// There is a non-zero chance of the port being allocatted to a
+		// different process and the node subsequently being unable to start,
+		// but the alternative is having to update the grafana dashboards
+		// query-by-query to ensure that node metrics ignore the instance
+		// label.
+		if err := node.SaveAPIPort(); err != nil {
+			return err
+		}
 
-	if err := node.Restart(ctx); err != nil {
-		return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
+		if err := node.Restart(ctx); err != nil {
+			return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
+		}
 	}
-
-	log.Info("waiting for node to report healthy",
-		zap.Stringer("nodeID", node.NodeID),
-	)
-	return WaitForHealthy(ctx, log, node)
+	return nil
 }
 
 // Stops all nodes in the network.
@@ -553,8 +553,19 @@ func (n *Network) Stop(ctx context.Context) error {
 // Restarts all non-ephemeral nodes in the network.
 func (n *Network) Restart(ctx context.Context, log logging.Logger) error {
 	log.Info("restarting network")
-	for _, node := range n.Nodes {
-		if err := n.RestartNode(ctx, log, node); err != nil {
+	if err := n.RestartNodes(ctx, log, n.Nodes...); err != nil {
+		return err
+	}
+	return n.WaitForHealthy(ctx, log, n.Nodes...)
+}
+
+// Waits for the provided nodes to become healthy.
+func (n *Network) WaitForHealthy(ctx context.Context, log logging.Logger, nodes ...*Node) error {
+	for _, node := range nodes {
+		log.Info("waiting for node to become healthy",
+			zap.Stringer("nodeID", node.NodeID),
+		)
+		if err := WaitForHealthy(ctx, log, node); err != nil {
 			return err
 		}
 	}
@@ -728,14 +739,19 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
+		runningNodes := make([]*Node, 0, len(reconfiguredNodes))
 		for _, node := range reconfiguredNodes {
 			if len(node.URI) == 0 {
-				// Only running nodes should be restarted
-				continue
+				runningNodes = append(runningNodes, node)
 			}
-			if err := n.RestartNode(ctx, log, node); err != nil {
-				return err
-			}
+		}
+
+		if err := n.RestartNodes(ctx, log, runningNodes...); err != nil {
+			return err
+		}
+
+		if err := n.WaitForHealthy(ctx, log, runningNodes...); err != nil {
+			return err
 		}
 	}
 
@@ -797,13 +813,15 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 	log.Info("restarting node(s) to pick up chain configuration")
 
 	// Restart nodes to allow configuration for the new chains to take effect
+	nodesToRestart := make([]*Node, 0, len(n.Nodes))
 	for _, node := range n.Nodes {
-		if !validatorsToRestart.Contains(node.NodeID) {
-			continue
+		if validatorsToRestart.Contains(node.NodeID) {
+			nodesToRestart = append(nodesToRestart, node)
 		}
-		if err := n.RestartNode(ctx, log, node); err != nil {
-			return err
-		}
+	}
+
+	if err := n.RestartNodes(ctx, log, nodesToRestart...); err != nil {
+		return err
 	}
 
 	return nil
