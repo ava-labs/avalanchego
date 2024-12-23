@@ -2,5 +2,5 @@
 
 set -euo pipefail
 
-# Run the ginkgo version from go.mod
+# If an explicit version is not specified, go run uses the ginkgo version from go.mod
 go run github.com/onsi/ginkgo/v2/ginkgo "${@}"
