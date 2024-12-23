@@ -66,6 +66,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/ava-labs/coreth v0.14.1-0.20241211135815-fe45c3769992 h1:D+2XTrRhFxuDt0l4ux6BzPSCiiGPc6R7jNGsV9iddKE=
 github.com/ava-labs/coreth v0.14.1-0.20241211135815-fe45c3769992/go.mod h1:SN79q6EKPd0viuUZMIg0xxZyUfnvSalZRo8HDJR3JHs=
+github.com/ava-labs/coreth v0.14.1-0.20241223150855-397c5354780c h1:YJjLoHQz57ZhyCUWd3jXgGzLtY8P9esgzLmBipZEGYU=
+github.com/ava-labs/coreth v0.14.1-0.20241223150855-397c5354780c/go.mod h1:gShjxnVExTFC46i53acjNPVxlYb6SDX5fETFsZK/Gy0=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL66gtXOAwR/4KYBjOV03LTWgkEXvLePribLlJNu4g0=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=

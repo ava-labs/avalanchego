@@ -7,7 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -39,9 +39,9 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		tc.By("allocating a pre-funded key to send from and a recipient key to deliver to")
 		var (
 			senderKey           = env.PreFundedKey
-			senderEthAddress    = atomic.GetEthAddress(senderKey)
+			senderEthAddress    = utils.GetEthAddress(senderKey)
 			recipientKey        = e2e.NewPrivateKey(tc)
-			recipientEthAddress = atomic.GetEthAddress(recipientKey)
+			recipientEthAddress = utils.GetEthAddress(recipientKey)
 		)
 
 		tc.By("sending funds from one address to another on the C-Chain", func() {

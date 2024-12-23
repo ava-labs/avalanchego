@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/onsi/ginkgo/v2"
@@ -48,7 +49,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 		tc.By("allocating a pre-funded key")
 		key := privateNetwork.PreFundedKeys[0]
-		ethAddress := atomic.GetEthAddress(key)
+		ethAddress := utils.GetEthAddress(key)
 
 		tc.By("initializing a coreth client")
 		node := privateNetwork.Nodes[0]
