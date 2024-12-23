@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"io"
 
-	// TODO(marun) Can this be replaced?
+	// This algorithm does not represent a security risk since it is
+	// only used to convert a public key into an address during "Does
+	// this key own these funds" checks in the P-chain, X-chain, and
+	// C-chain.
 	"golang.org/x/crypto/ripemd160" //nolint:gosec
 )
 
@@ -52,6 +55,7 @@ func ComputeHash160Array(buf []byte) Hash160 {
 // ComputeHash160 computes a cryptographically strong 160 bit hash of the input
 // byte slice.
 func ComputeHash160(buf []byte) []byte {
+	// See comment on the import for why this is not a security risk
 	ripe := ripemd160.New() //nolint:gosec
 	_, err := io.Writer(ripe).Write(buf)
 	if err != nil {
