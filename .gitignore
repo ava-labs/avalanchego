@@ -62,3 +62,5 @@ tests/upgrade/upgrade.test
 vendor
 
 **/testdata
+
+.tool-downloads

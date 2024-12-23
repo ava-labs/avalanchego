@@ -47,10 +47,6 @@ function ensure_command {
   fi
 }
 
-# Ensure the kubectl command is available
-KUBECTL_VERSION=v1.30.2
-ensure_command kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
-
 # Ensure the kind command is available
 KIND_VERSION=v0.23.0
 ensure_command kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-${OS}-${ARCH}"
@@ -61,7 +57,7 @@ ensure_command "kind-with-registry.sh" "https://raw.githubusercontent.com/kubern
 # Deploy a kind cluster with a local registry. Include the local bin in the path to
 # ensure locally installed kind and kubectl are available since the script expects to
 # call them without a qualifying path.
-PATH="${PWD}/bin:$PATH" bash -x "${PWD}/bin/kind-with-registry.sh"
+PATH="${PWD}/tools:${PWD}/bin:$PATH" bash -x "${PWD}/bin/kind-with-registry.sh"
 
 KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" \
-          ./scripts/ginkgo.sh -v ./tests/fixture/bootstrapmonitor/e2e
+          ./tools/ginkgo -v ./tests/fixture/bootstrapmonitor/e2e

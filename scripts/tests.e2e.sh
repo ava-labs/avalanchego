@@ -31,7 +31,7 @@ E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
 
 #################################
 # Determine ginkgo args
-GINKGO_ARGS=""
+GINKGO_ARGS="--ginkgo.v"
 if [[ -n "${E2E_SERIAL:-}" ]]; then
   # Specs will be executed serially. This supports running e2e tests in CI
   # where parallel execution of tests that start new nodes beyond the
@@ -46,17 +46,17 @@ else
   # since the test binary isn't capable of executing specs in
   # parallel.
   echo "tests will be executed in parallel"
-  GINKGO_ARGS="-p"
+  GINKGO_ARGS=+" --ginkgo.p"
 fi
 # Reference: https://onsi.github.io/ginkgo/#spec-randomization
 if [[ -n "${E2E_RANDOM_SEED:-}" ]]; then
   # Supply a specific seed to simplify reproduction of test failures
-  GINKGO_ARGS+=" --seed=${E2E_RANDOM_SEED}"
+  GINKGO_ARGS+=" --ginkgo.seed=${E2E_RANDOM_SEED}"
 else
   # Execute in random order to identify unwanted dependency
-  GINKGO_ARGS+=" --randomize-all"
+  GINKGO_ARGS+=" --ginkgo.randomize-all"
 fi
 
 #################################
 # shellcheck disable=SC2086
-./scripts/ginkgo.sh ${GINKGO_ARGS} -v ./tests/e2e -- "${E2E_ARGS[@]}" "${@}"
+./tools/ginkgo ./tests/e2e -- ${GINKGO_ARGS} "${E2E_ARGS[@]}" "${@}"

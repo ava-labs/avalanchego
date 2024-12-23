@@ -8,7 +8,7 @@
 ```bash
 ./scripts/build.sh        # Builds avalanchego for use in deploying a test network
 ./scripts/build_xsvm.sh   # Builds xsvm for use in deploying a test network with a subnet
-./scripts/ginkgo.sh -v ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./tools/ginkgo ./tests/e2e -- --ginkgo.v --avalanchego-path=./build/avalanchego
 ```
 
 See [`tests.e2e.sh`](../../scripts/tests.e2e.sh) for an example.
@@ -24,7 +24,7 @@ primarily target the X-Chain:
 
 
 ```bash
-./scripts/ginkgo.sh -v --label-filter=x ./tests/e2e -- --avalanchego-path=./build/avalanchego
+./tools/ginkgo ./tests/e2e -- --ginkgo.v --ginkgo.label-filter=x --avalanchego-path=./build/avalanchego
 ```
 
 The ginkgo docs provide further detail on [how to compose label
@@ -97,5 +97,5 @@ these bootstrap checks during development, set the
 `E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
 
 ```bash
-E2E_SKIP_BOOTSTRAP_CHECKS=1 ./scripts/ginkgo.sh -v ./tests/e2e ...
+E2E_SKIP_BOOTSTRAP_CHECKS=1 ./tools/ginkgo ./tests/e2e ...
 ```
