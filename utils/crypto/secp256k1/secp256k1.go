@@ -10,12 +10,16 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	stdecdsa "crypto/ecdsa"
+
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -164,6 +168,10 @@ func (k *PublicKey) Address() ids.ShortID {
 		k.addr = addr
 	}
 	return k.addr
+}
+
+func (k *PublicKey) EthAddress() common.Address {
+	return crypto.PubkeyToAddress(*(k.ToECDSA()))
 }
 
 func (k *PublicKey) Bytes() []byte {

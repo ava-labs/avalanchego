@@ -22,7 +22,7 @@ func main() {
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	avaxAddr := key.Address()
-	ethAddr := secp256k1fx.PublicKeyToEthAddress(key.PublicKey())
+	ethAddr := key.PublicKey().EthAddress()
 
 	ctx := context.Background()
 
