@@ -6,7 +6,6 @@ package x
 import (
 	"math/big"
 
-	"github.com/ava-labs/coreth/utils"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -41,7 +40,7 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		pWallet := baseWallet.P()
 
 		tc.By("defining common configuration")
-		recipientEthAddress := utils.GetEthAddress(recipientKey)
+		recipientEthAddress := recipientKey.EthAddress()
 		xBuilder := xWallet.Builder()
 		xContext := xBuilder.Context()
 		cBuilder := cWallet.Builder()
