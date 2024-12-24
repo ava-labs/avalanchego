@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	stdecdsa "crypto/ecdsa"
-
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
