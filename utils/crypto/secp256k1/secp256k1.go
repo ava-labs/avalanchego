@@ -198,6 +198,10 @@ func (k *PrivateKey) Address() ids.ShortID {
 	return k.PublicKey().Address()
 }
 
+func (k *PrivateKey) EthAddress() common.Address {
+	return crypto.PubkeyToAddress(*(k.PublicKey().ToECDSA()))
+}
+
 func (k *PrivateKey) Sign(msg []byte) ([]byte, error) {
 	return k.SignHash(hashing.ComputeHash256(msg))
 }
