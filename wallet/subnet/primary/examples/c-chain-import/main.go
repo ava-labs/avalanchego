@@ -8,8 +8,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/coreth/utils"
-
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -24,7 +22,7 @@ func main() {
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	avaxAddr := key.Address()
-	ethAddr := utils.PublicKeyToEthAddress(key.PublicKey())
+	ethAddr := secp256k1fx.PublicKeyToEthAddress(key.PublicKey())
 
 	ctx := context.Background()
 

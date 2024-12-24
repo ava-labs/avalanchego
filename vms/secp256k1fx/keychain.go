@@ -55,7 +55,7 @@ func (kc *Keychain) Add(key *secp256k1.PrivateKey) {
 	avaxAddr := pk.Address()
 	if _, ok := kc.avaxAddrToKeyIndex[avaxAddr]; !ok {
 		kc.avaxAddrToKeyIndex[avaxAddr] = len(kc.Keys)
-		ethAddr := publicKeyToEthAddress(pk)
+		ethAddr := PublicKeyToEthAddress(pk)
 		kc.ethAddrToKeyIndex[ethAddr] = len(kc.Keys)
 		kc.Keys = append(kc.Keys, key)
 		kc.Addrs.Add(avaxAddr)
@@ -170,6 +170,6 @@ func (kc Keychain) get(id ids.ShortID) (*secp256k1.PrivateKey, bool) {
 	return nil, false
 }
 
-func publicKeyToEthAddress(pk *secp256k1.PublicKey) common.Address {
+func PublicKeyToEthAddress(pk *secp256k1.PublicKey) common.Address {
 	return crypto.PubkeyToAddress(*(pk.ToECDSA()))
 }
