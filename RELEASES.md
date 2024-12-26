@@ -241,7 +241,7 @@ The plugin version is updated to `37` all plugins must update to be compatible.
 - [ci] Remove defunct network outage sim workflow by @marun in https://github.com/ava-labs/avalanchego/pull/3234
 - chore: allow test-only imports in `*test` and `/tests/**` packages by @ARR4N in https://github.com/ava-labs/avalanchego/pull/3229
 - Add benchmarks for add and sub fee dimensions by @abi87 in https://github.com/ava-labs/avalanchego/pull/3222
-- Remove dead code by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3086
+- Remove deadcode by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/3086
 - Parallelize BatchedParseBlock by @yacovm in https://github.com/ava-labs/avalanchego/pull/3227
 - [ci] Lint on non-test code importing packages from /tests by @marun in https://github.com/ava-labs/avalanchego/pull/3214
 - Merge unlocked stake outputs by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3231
