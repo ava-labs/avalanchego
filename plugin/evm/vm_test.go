@@ -115,12 +115,6 @@ var (
 		return &cpy
 	}
 
-	activateEtna = func(cfg *params.ChainConfig, etnaTime uint64) *params.ChainConfig {
-		cpy := *cfg
-		cpy.EtnaTimestamp = &etnaTime
-		return &cpy
-	}
-
 	genesisJSONApricotPhase0     = genesisJSON(params.TestLaunchConfig)
 	genesisJSONApricotPhase1     = genesisJSON(params.TestApricotPhase1Config)
 	genesisJSONApricotPhase2     = genesisJSON(params.TestApricotPhase2Config)
@@ -3986,26 +3980,4 @@ func TestNoBlobsAllowed(t *testing.T) {
 	require.ErrorContains(err, "blobs not enabled on avalanche networks")
 	err = vmBlock.Verify(ctx)
 	require.ErrorContains(err, "blobs not enabled on avalanche networks")
-}
-
-func TestMinFeeSetAtEtna(t *testing.T) {
-	require := require.New(t)
-	now := time.Now()
-	etnaTime := uint64(now.Add(1 * time.Second).Unix())
-
-	genesis := genesisJSON(
-		activateEtna(params.TestEtnaChainConfig, etnaTime),
-	)
-	clock := mockable.Clock{}
-	clock.Set(now)
-
-	_, vm, _, _, _ := GenesisVMWithClock(t, false, genesis, "", "", clock)
-	initial := vm.txPool.MinFee()
-	require.Equal(params.ApricotPhase4MinBaseFee, initial.Int64())
-
-	require.Eventually(
-		func() bool { return params.EtnaMinBaseFee == vm.txPool.MinFee().Int64() },
-		5*time.Second,
-		1*time.Second,
-	)
 }

@@ -727,39 +727,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 	// Set the gas parameters for the tx pool to the minimum gas price for the
 	// latest upgrade.
 	vm.txPool.SetGasTip(big.NewInt(0))
-	vm.setMinFeeAtEtna()
+	vm.txPool.SetMinFee(big.NewInt(params.EtnaMinBaseFee))
 
 	vm.eth.Start()
 	return vm.initChainState(vm.blockChain.LastAcceptedBlock())
-}
-
-// TODO: remove this after Etna is activated
-func (vm *VM) setMinFeeAtEtna() {
-	now := vm.clock.Time()
-	if vm.chainConfig.EtnaTimestamp == nil {
-		// If Etna is not set, set the min fee according to the latest upgrade
-		vm.txPool.SetMinFee(big.NewInt(params.ApricotPhase4MinBaseFee))
-		return
-	} else if vm.chainConfig.IsEtna(uint64(now.Unix())) {
-		// If Etna is activated, set the min fee to the Etna min fee
-		vm.txPool.SetMinFee(big.NewInt(params.EtnaMinBaseFee))
-		return
-	}
-
-	vm.txPool.SetMinFee(big.NewInt(params.ApricotPhase4MinBaseFee))
-	vm.shutdownWg.Add(1)
-	go func() {
-		defer vm.shutdownWg.Done()
-
-		wait := utils.Uint64ToTime(vm.chainConfig.EtnaTimestamp).Sub(now)
-		t := time.NewTimer(wait)
-		select {
-		case <-t.C: // Wait for Etna to be activated
-			vm.txPool.SetMinFee(big.NewInt(params.EtnaMinBaseFee))
-		case <-vm.shutdownChan:
-		}
-		t.Stop()
-	}()
 }
 
 // initializeStateSyncClient initializes the client for performing state sync.
