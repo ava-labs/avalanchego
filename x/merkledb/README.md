@@ -69,7 +69,7 @@ In the diagram above, if `view1` were committed, `view2` would be invalidated. I
 
 MerkleDB instances can produce _merkle proofs_, sometimes just called "proofs." A merkle proof uses cryptography to prove that a given key-value pair is or isn't in the key-value store with a given root. That is, a MerkleDB instance with root ID `r` can create a proof that shows that it has a key-value pair `(k,v)`, or that `k` is not present.
 
-Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distirbuted key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.)
+Proofs can be useful as a client fetching data in a Byzantine environment. Suppose there are one or more servers, which may be Byzantine, serving a distributed key-value store using MerkleDB, and a client that wants to retrieve key-value pairs. Suppose also that the client can learn a "trusted" root ID, perhaps because it's posted on a blockchain. The client can request a key-value pair from a server, and use the returned proof to verify that the returned key-value pair is actually in the key-value store with (or isn't, as it were.)
 
 ```mermaid
 flowchart TD
