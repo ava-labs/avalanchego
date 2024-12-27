@@ -39,7 +39,7 @@ All messaging functions in `OutboundMsgBuilder` can be categorized as follows:
 - **Bootstrapping**
   - Nodes can ask other nodes for blocks to build their own copy of the chain. A node can fetch all blocks from the locally last accepted block to the current last accepted block in the network.
 - **Consensus**
-  - Once a node is up to tip they can participate in consensus! During consensus, a node conducts a poll to several different small random samples of the validator set. They can communicate decisons on whether or not they have accepted/rejected a block.
+  - Once a node is up to tip they can participate in consensus! During consensus, a node conducts a poll to several different small random samples of the validator set. They can communicate decisions on whether or not they have accepted/rejected a block.
 - **App**
   - VMs communicate application-specific messages to other nodes through app messages. A common example is mempool gossiping.
 
