@@ -22,7 +22,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -49,7 +48,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - name: Set timeout on Windows # Windows UT run slower and need a longer timeout
         shell: bash
         if: matrix.os == 'windows-latest'
@@ -77,7 +75,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -119,7 +116,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -164,7 +160,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - name: Install AvalancheGo Release
         shell: bash
         run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh
@@ -192,7 +187,6 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - shell: bash
         run: scripts/mock.gen.sh
       - shell: bash
@@ -213,7 +207,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.min_go_version }}
-          check-latest: true
       - name: Install AvalancheGo Release
         shell: bash
         run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh

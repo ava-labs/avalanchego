@@ -25,7 +25,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "~1.22.8"
-          check-latest: true
       - name: Set up arm64 cross compiler
         run: |
           sudo apt-get -y update
