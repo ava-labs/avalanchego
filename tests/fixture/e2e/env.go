@@ -198,14 +198,20 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		"not enough pre-funded keys for the requested number of parallel test processes",
 	)
 
-	// TODO(marun) Indicate that these URIs are only accessible inside
-	// the cluster and explain how to enable forwarding.
-	// - Maybe forward by default but make it clear that the forwarding is disabled on exit?
-	// - Maybe
-	uris := network.GetNodeURIs()
+	// TODO(marun) Maybe this should be part of tmpnet/network.go?
+	uris := make([]tmpnet.NodeURI, len(network.Nodes))
+	for i, node := range network.Nodes {
+		uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
+		require.NoError(err)
+		tc.DeferCleanup(cancel)
+		env.URIs[i] = tmpnet.NodeURI{
+			NodeID: node.NodeID,
+			URI:    uri,
+		}
+	}
 	require.NotEmpty(uris, "network contains no nodes")
 	tc.Log().Info("network nodes are available",
-		zap.Any("uris", uris),
+		zap.Any("nodeURIs", uris),
 	)
 
 	return &TestEnvironment{
@@ -221,22 +227,10 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 func (te *TestEnvironment) GetRandomNodeURI() tmpnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	nodeURI := te.URIs[r.Intn(len(te.URIs))]
-	// Retrieve a local URI in case of the node running in kube
-	localURI := ""
-	for _, node := range te.GetNetwork().Nodes {
-		if node.URI == nodeURI.URI {
-			localURI = GetLocalURI(te.testContext, node)
-		}
-	}
-	localNodeURI := tmpnet.NodeURI{
-		NodeID: nodeURI.NodeID,
-		URI:    localURI,
-	}
 	te.testContext.Log().Info("targeting random node",
-		zap.Stringer("nodeID", localNodeURI.NodeID),
-		zap.String("uri", localNodeURI.URI),
+		zap.Any("nodeURI", nodeURI),
 	)
-	return localNodeURI
+	return nodeURI
 }
 
 // Retrieve the network to target for testing.
