@@ -26,7 +26,6 @@ type FlagVars struct {
 	stopNetwork          bool
 	restartNetwork       bool
 	nodeCount            int
-	activateEtna         bool
 }
 
 func (v *FlagVars) AvalancheGoExecPath() string {
@@ -73,10 +72,6 @@ func (v *FlagVars) StopNetwork() bool {
 
 func (v *FlagVars) NodeCount() int {
 	return v.nodeCount
-}
-
-func (v *FlagVars) ActivateEtna() bool {
-	return v.activateEtna
 }
 
 func getEnvWithDefault(envVar, defaultVal string) string {
@@ -148,12 +143,6 @@ func RegisterFlags() *FlagVars {
 		"node-count",
 		tmpnet.DefaultNodeCount,
 		"number of nodes the network should initially consist of",
-	)
-	flag.BoolVar(
-		&vars.activateEtna,
-		"activate-etna",
-		false,
-		"[optional] activate the etna upgrade",
 	)
 
 	return &vars
