@@ -147,7 +147,7 @@ can be performed against master or an arbitrary branch:
  - Find the 'Run workflow' drop-down on the right and trigger the
    workflow against the desired branch. The default value for
    `image_tag` (`latest`) is used by scheduled test runs, so consider
-   supplying a different value to avoid interferring with the results
+   supplying a different value to avoid interfering with the results
    of the scheduled runs.
  - Wait for the publication job to complete successfully so that the
    images are available to be tested against.
