@@ -50,7 +50,7 @@ func (s *Service) Health(_ *http.Request, args *APIArgs, reply *APIReply) error 
 	return nil
 }
 
-// Liveness returns if the node is in need of a restart
+// Liveness returns if the node needs a restart
 func (s *Service) Liveness(_ *http.Request, args *APIArgs, reply *APIReply) error {
 	s.log.Debug("API called",
 		zap.String("service", "health"),
