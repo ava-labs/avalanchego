@@ -15,7 +15,7 @@ inputs:
     required: true
   loki_password:
     required: true
-  # The following inputs need never be provided by the caller. They
+  # The following inputs never need to be provided by the caller. They
   # default to context values that the action's steps are unable to
   # acccess directly.
   repository_owner:
