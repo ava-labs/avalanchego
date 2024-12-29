@@ -165,7 +165,7 @@ func (i *Info) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDRep
 	return nil
 }
 
-// GetNetworkNameReply is the result from calling GetNetworkName
+// GetNetworkNameReply is the result of calling GetNetworkName
 type GetNetworkNameReply struct {
 	NetworkName string `json:"networkName"`
 }
@@ -186,7 +186,7 @@ type GetBlockchainIDArgs struct {
 	Alias string `json:"alias"`
 }
 
-// GetBlockchainIDReply are the results from calling GetBlockchainID
+// GetBlockchainIDReply are the results of calling GetBlockchainID
 type GetBlockchainIDReply struct {
 	BlockchainID ids.ID `json:"blockchainID"`
 }
@@ -307,7 +307,7 @@ type UptimeResponse struct {
 	// Note that this is different from RewardingStakePercentage, which shows
 	// the percent of the network stake that thinks this node is above the
 	// uptime requirement. WeightedAveragePercentage is weighted by uptime.
-	// i.e If uptime requirement is 85 and a peer reports 40 percent it will be
+	// i.e If the uptime requirement is 85 and a peer reports 40 percent it will be
 	// counted (40*weight) in WeightedAveragePercentage but not in
 	// RewardingStakePercentage since 40 < 85
 	WeightedAveragePercentage json.Float64 `json:"weightedAveragePercentage"`
