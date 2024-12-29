@@ -58,7 +58,8 @@ func ComputeHash160Array(buf []byte) Hash160 {
 // ComputeHash160 computes a cryptographically strong 160 bit hash of the input
 // byte slice.
 func ComputeHash160(buf []byte) []byte {
-	// See comment on the import for why this is not a security risk
+	// See the comment on the ripemd160 import as to why the risk of use is
+	// considered acceptable.
 	ripe := ripemd160.New() //nolint:gosec
 	_, err := io.Writer(ripe).Write(buf)
 	if err != nil {
