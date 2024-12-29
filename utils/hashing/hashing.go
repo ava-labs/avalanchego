@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"io"
 
-	// This algorithm does not represent a security risk since it is
-	// only used to convert a public key into an address during "Does
-	// this key own these funds" checks in the P-chain, X-chain, and
-	// C-chain.
+	// This file generates addresses from public keys with ripemd160. Though ripemd160 is not
+	// generally recommended for use, the small size of the public key input is considered harder to
+	// attack than larger payloads.
+	//
+	// Bitcoin similarly uses ripemd160 to generate addresses from public keys.
+	//
+	// Reference: https://online.tugraz.at/tug_online/voe_main2.getvolltext?pCurrPk=17675
 	"golang.org/x/crypto/ripemd160" //nolint:gosec
 )
 
