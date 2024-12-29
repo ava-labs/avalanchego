@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       recipients:
-        description: 'Comma-seperated email addresses to send the test report to'
+        description: 'Comma-separated email addresses to send the test report to'
         required: true
         type: string
       image_tag:
