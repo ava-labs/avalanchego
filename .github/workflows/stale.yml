@@ -21,7 +21,7 @@ jobs:
 
           # Issue configuration
           days-before-issue-stale: 60
-          stale-issue-message: 'This issue has become stale because it has been open 60 days with no activity. Adding the `lifecycle/frozen` label will cause this issue to ignore lifecycle events.'
+          stale-issue-message: 'This issue has become stale because it has been open for 60 days with no activity. Adding the `lifecycle/frozen` label will cause this issue to ignore lifecycle events.'
           days-before-issue-close: -1
           stale-issue-label: lifecycle/stale
           exempt-issue-labels: lifecycle/frozen
