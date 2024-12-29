@@ -20,7 +20,7 @@ type Client interface {
 	Readiness(ctx context.Context, tags []string, options ...rpc.Option) (*APIReply, error)
 	// Health returns a summation of the health of the node
 	Health(ctx context.Context, tags []string, options ...rpc.Option) (*APIReply, error)
-	// Liveness returns if the node is in need of a restart
+	// Liveness returns if the node needs a restart
 	Liveness(ctx context.Context, tags []string, options ...rpc.Option) (*APIReply, error)
 }
 
