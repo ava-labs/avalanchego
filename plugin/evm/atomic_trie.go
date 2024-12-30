@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ava-labs/coreth/triedb"
@@ -52,7 +53,7 @@ type AtomicTrie interface {
 	OpenTrie(hash common.Hash) (*trie.Trie, error)
 
 	// UpdateTrie updates [tr] to inlude atomicOps for height.
-	UpdateTrie(tr *trie.Trie, height uint64, atomicOps map[ids.ID]*atomic.Requests) error
+	UpdateTrie(tr *trie.Trie, height uint64, atomicOps map[ids.ID]*avalancheatomic.Requests) error
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash starting at [cursor].
@@ -108,7 +109,7 @@ type AtomicTrieIterator interface {
 
 	// AtomicOps returns a map of blockchainIDs to the set of atomic requests
 	// for that blockchainID at the current block number
-	AtomicOps() *atomic.Requests
+	AtomicOps() *avalancheatomic.Requests
 
 	// Error returns error, if any encountered during this iteration
 	Error() error
@@ -221,9 +222,9 @@ func (a *atomicTrie) commit(height uint64, root common.Hash) error {
 	return a.updateLastCommitted(root, height)
 }
 
-func (a *atomicTrie) UpdateTrie(trie *trie.Trie, height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
+func (a *atomicTrie) UpdateTrie(trie *trie.Trie, height uint64, atomicOps map[ids.ID]*avalancheatomic.Requests) error {
 	for blockchainID, requests := range atomicOps {
-		valueBytes, err := a.codec.Marshal(codecVersion, requests)
+		valueBytes, err := a.codec.Marshal(atomic.CodecVersion, requests)
 		if err != nil {
 			// highly unlikely but possible if atomic.Element
 			// has a change that is unsupported by the codec

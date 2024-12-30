@@ -1,44 +1,50 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package atomic
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const (
+	X2CRateUint64       uint64 = 1_000_000_000
+	x2cRateMinus1Uint64 uint64 = X2CRateUint64 - 1
+)
+
 var (
-	errWrongBlockchainID = errors.New("wrong blockchain ID provided")
-	errWrongNetworkID    = errors.New("tx was issued with a different network ID")
-	errNilTx             = errors.New("tx is nil")
-	errNoValueOutput     = errors.New("output has no value")
-	errNoValueInput      = errors.New("input has no value")
-	errNilOutput         = errors.New("nil output")
-	errNilInput          = errors.New("nil input")
-	errEmptyAssetID      = errors.New("empty asset ID is not valid")
-	errNilBaseFee        = errors.New("cannot calculate dynamic fee with nil baseFee")
-	errFeeOverflow       = errors.New("overflow occurred while calculating the fee")
+	ErrWrongNetworkID = errors.New("tx was issued with a different network ID")
+	ErrNilTx          = errors.New("tx is nil")
+	errNoValueOutput  = errors.New("output has no value")
+	ErrNoValueInput   = errors.New("input has no value")
+	errNilOutput      = errors.New("nil output")
+	errNilInput       = errors.New("nil input")
+	errEmptyAssetID   = errors.New("empty asset ID is not valid")
+	errNilBaseFee     = errors.New("cannot calculate dynamic fee with nil baseFee")
+	errFeeOverflow    = errors.New("overflow occurred while calculating the fee")
 )
 
 // Constants for calculating the gas consumed by atomic transactions
@@ -46,6 +52,12 @@ var (
 	TxBytesGas   uint64 = 1
 	EVMOutputGas uint64 = (common.AddressLength + wrappers.LongLen + hashing.HashLen) * TxBytesGas
 	EVMInputGas  uint64 = (common.AddressLength+wrappers.LongLen+hashing.HashLen+wrappers.LongLen)*TxBytesGas + secp256k1fx.CostPerSignature
+	// X2CRate is the conversion rate between the smallest denomination on the X-Chain
+	// 1 nAVAX and the smallest denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
+	// This is only required for AVAX because the denomination of 1 AVAX is 9 decimal
+	// places on the X and P chains, but is 18 decimal places within the EVM.
+	X2CRate       = uint256.NewInt(X2CRateUint64)
+	x2cRateMinus1 = uint256.NewInt(x2cRateMinus1Uint64)
 )
 
 // EVMOutput defines an output that is added to the EVM state created by import transactions
@@ -98,7 +110,7 @@ func (in *EVMInput) Verify() error {
 	case in == nil:
 		return errNilInput
 	case in.Amount == 0:
-		return errNoValueInput
+		return ErrNoValueInput
 	case in.AssetID == ids.Empty:
 		return errEmptyAssetID
 	}
@@ -115,6 +127,39 @@ type UnsignedTx interface {
 	SignedBytes() []byte
 }
 
+type Backend struct {
+	Ctx          *snow.Context
+	Fx           fx.Fx
+	Rules        params.Rules
+	Bootstrapped bool
+	BlockFetcher BlockFetcher
+	SecpCache    *secp256k1.RecoverCache
+}
+
+type BlockFetcher interface {
+	LastAcceptedBlockInternal() snowman.Block
+	GetBlockInternal(context.Context, ids.ID) (snowman.Block, error)
+}
+
+type AtomicBlockContext interface {
+	AtomicTxs() []*Tx
+	snowman.Block
+}
+
+type StateDB interface {
+	AddBalance(common.Address, *uint256.Int)
+	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+
+	SubBalance(common.Address, *uint256.Int)
+	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+
+	GetBalance(common.Address) *uint256.Int
+	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
+
+	GetNonce(common.Address) uint64
+	SetNonce(common.Address, uint64)
+}
+
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type UnsignedAtomicTx interface {
 	UnsignedTx
@@ -124,13 +169,14 @@ type UnsignedAtomicTx interface {
 	// Verify attempts to verify that the transaction is well formed
 	Verify(ctx *snow.Context, rules params.Rules) error
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
+	// SemanticVerify this transaction is valid.
+	SemanticVerify(backend *Backend, stx *Tx, parent AtomicBlockContext, baseFee *big.Int) error
 	// AtomicOps returns the blockchainID and set of atomic requests that
 	// must be applied to shared memory for this transaction to be accepted.
 	// The set of atomic requests must be returned in a consistent order.
 	AtomicOps() (ids.ID, *atomic.Requests, error)
 
-	EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error
+	EVMStateTransfer(ctx *snow.Context, state StateDB) error
 }
 
 // Tx is a signed transaction
@@ -157,7 +203,7 @@ func (tx *Tx) Compare(other *Tx) int {
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
-	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedAtomicTx)
+	unsignedBytes, err := c.Marshal(CodecVersion, &tx.UnsignedAtomicTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedAtomicTx: %w", err)
 	}
@@ -178,7 +224,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(codecVersion, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal Tx: %w", err)
 	}
@@ -216,7 +262,7 @@ func (tx *Tx) BlockFeeContribution(fixedFee bool, avaxAssetID ids.ID, baseFee *b
 
 	// Calculate the amount of AVAX that has been burned above the required fee denominated
 	// in C-Chain native 18 decimal places
-	blockFeeContribution := new(big.Int).Mul(new(big.Int).SetUint64(excessBurned), x2cRate.ToBig())
+	blockFeeContribution := new(big.Int).Mul(new(big.Int).SetUint64(excessBurned), X2CRate.ToBig())
 	return blockFeeContribution, new(big.Int).SetUint64(gasUsed), nil
 }
 
@@ -255,7 +301,7 @@ func CalculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	bigCost := new(big.Int).SetUint64(cost)
 	fee := new(big.Int).Mul(bigCost, baseFee)
 	feeToRoundUp := new(big.Int).Add(fee, x2cRateMinus1.ToBig())
-	feeInNAVAX := new(big.Int).Div(feeToRoundUp, x2cRate.ToBig())
+	feeInNAVAX := new(big.Int).Div(feeToRoundUp, X2CRate.ToBig())
 	if !feeInNAVAX.IsUint64() {
 		// the fee is more than can fit in a uint64
 		return 0, errFeeOverflow
@@ -265,37 +311,4 @@ func CalculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 
 func calcBytesCost(len int) uint64 {
 	return uint64(len) * TxBytesGas
-}
-
-// mergeAtomicOps merges atomic requests represented by [txs]
-// to the [output] map, depending on whether [chainID] is present in the map.
-func mergeAtomicOps(txs []*Tx) (map[ids.ID]*atomic.Requests, error) {
-	if len(txs) > 1 {
-		// txs should be stored in order of txID to ensure consistency
-		// with txs initialized from the txID index.
-		copyTxs := make([]*Tx, len(txs))
-		copy(copyTxs, txs)
-		utils.Sort(copyTxs)
-		txs = copyTxs
-	}
-	output := make(map[ids.ID]*atomic.Requests)
-	for _, tx := range txs {
-		chainID, txRequests, err := tx.UnsignedAtomicTx.AtomicOps()
-		if err != nil {
-			return nil, err
-		}
-		mergeAtomicOpsToMap(output, chainID, txRequests)
-	}
-	return output, nil
-}
-
-// mergeAtomicOps merges atomic ops for [chainID] represented by [requests]
-// to the [output] map provided.
-func mergeAtomicOpsToMap(output map[ids.ID]*atomic.Requests, chainID ids.ID, requests *atomic.Requests) {
-	if request, exists := output[chainID]; exists {
-		request.PutRequests = append(request.PutRequests, requests.PutRequests...)
-		request.RemoveRequests = append(request.RemoveRequests, requests.RemoveRequests...)
-	} else {
-		output[chainID] = requests
-	}
 }

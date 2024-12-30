@@ -6,27 +6,28 @@ package evm
 import (
 	"testing"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTxHeap(t *testing.T) {
 	var (
-		tx0 = &Tx{
-			UnsignedAtomicTx: &UnsignedImportTx{
+		tx0 = &atomic.Tx{
+			UnsignedAtomicTx: &atomic.UnsignedImportTx{
 				NetworkID: 0,
 			},
 		}
 		tx0Bytes = []byte{0}
 
-		tx1 = &Tx{
-			UnsignedAtomicTx: &UnsignedImportTx{
+		tx1 = &atomic.Tx{
+			UnsignedAtomicTx: &atomic.UnsignedImportTx{
 				NetworkID: 1,
 			},
 		}
 		tx1Bytes = []byte{1}
 
-		tx2 = &Tx{
-			UnsignedAtomicTx: &UnsignedImportTx{
+		tx2 = &atomic.Tx{
+			UnsignedAtomicTx: &atomic.UnsignedImportTx{
 				NetworkID: 2,
 			},
 		}

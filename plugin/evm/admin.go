@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/coreth/plugin/evm/client"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -65,11 +66,7 @@ func (p *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) err
 	return p.profiler.LockProfile()
 }
 
-type SetLogLevelArgs struct {
-	Level string `json:"level"`
-}
-
-func (p *Admin) SetLogLevel(_ *http.Request, args *SetLogLevelArgs, reply *api.EmptyReply) error {
+func (p *Admin) SetLogLevel(_ *http.Request, args *client.SetLogLevelArgs, reply *api.EmptyReply) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
 
 	p.vm.ctx.Lock.Lock()

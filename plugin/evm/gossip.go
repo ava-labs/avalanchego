@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
+	syncatomic "sync/atomic"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 )
 
 const pendingTxsBuffer = 10
@@ -97,14 +98,14 @@ func (g GossipAtomicTxMarshaller) MarshalGossip(tx *GossipAtomicTx) ([]byte, err
 }
 
 func (g GossipAtomicTxMarshaller) UnmarshalGossip(bytes []byte) (*GossipAtomicTx, error) {
-	tx, err := ExtractAtomicTx(bytes, Codec)
+	tx, err := atomic.ExtractAtomicTx(bytes, atomic.Codec)
 	return &GossipAtomicTx{
 		Tx: tx,
 	}, err
 }
 
 type GossipAtomicTx struct {
-	Tx *Tx
+	Tx *atomic.Tx
 }
 
 func (tx *GossipAtomicTx) GossipID() ids.ID {
@@ -133,7 +134,7 @@ type GossipEthTxPool struct {
 
 	// subscribed is set to true when the gossip subscription is active
 	// mostly used for testing
-	subscribed atomic.Bool
+	subscribed syncatomic.Bool
 }
 
 // IsSubscribed returns whether or not the gossip subscription is active.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
@@ -47,15 +48,15 @@ func (h *GossipHandler) HandleAtomicTx(nodeID ids.NodeID, msg message.AtomicTxGo
 
 	// In the case that the gossip message contains a transaction,
 	// attempt to parse it and add it as a remote.
-	tx := Tx{}
-	if _, err := Codec.Unmarshal(msg.Tx, &tx); err != nil {
+	tx := atomic.Tx{}
+	if _, err := atomic.Codec.Unmarshal(msg.Tx, &tx); err != nil {
 		log.Trace(
 			"AppGossip provided invalid tx",
 			"err", err,
 		)
 		return nil
 	}
-	unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
+	unsignedBytes, err := atomic.Codec.Marshal(atomic.CodecVersion, &tx.UnsignedAtomicTx)
 	if err != nil {
 		log.Trace(
 			"AppGossip failed to marshal unsigned tx",

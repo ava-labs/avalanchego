@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/predicate"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/statesync"
@@ -291,7 +292,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		require.NoError(serverVM.Shutdown(context.Background()))
 	})
 	var (
-		importTx, exportTx *Tx
+		importTx, exportTx *atomic.Tx
 		err                error
 	)
 	generateAndAcceptBlocks(t, serverVM, numBlocks, func(i int, gen *core.BlockGen) {
@@ -336,8 +337,8 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	require.NoError(serverVM.db.Commit())
 
 	serverSharedMemories := newSharedMemories(serverAtomicMemory, serverVM.ctx.ChainID, serverVM.ctx.XChainID)
-	serverSharedMemories.assertOpsApplied(t, importTx.mustAtomicOps())
-	serverSharedMemories.assertOpsApplied(t, exportTx.mustAtomicOps())
+	serverSharedMemories.assertOpsApplied(t, mustAtomicOps(importTx))
+	serverSharedMemories.assertOpsApplied(t, mustAtomicOps(exportTx))
 
 	// make some accounts
 	trieDB := triedb.NewDatabase(serverVM.chaindb, nil)
@@ -406,7 +407,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	return &syncVMSetup{
 		serverVM:        serverVM,
 		serverAppSender: serverAppSender,
-		includedAtomicTxs: []*Tx{
+		includedAtomicTxs: []*atomic.Tx{
 			importTx,
 			exportTx,
 		},
@@ -425,13 +426,13 @@ type syncVMSetup struct {
 	serverVM        *VM
 	serverAppSender *enginetest.Sender
 
-	includedAtomicTxs []*Tx
+	includedAtomicTxs []*atomic.Tx
 	fundedAccounts    map[*keystore.Key]*types.StateAccount
 
 	syncerVM             *VM
 	syncerDB             database.Database
 	syncerEngineChan     <-chan commonEng.Message
-	syncerAtomicMemory   *atomic.Memory
+	syncerAtomicMemory   *avalancheatomic.Memory
 	shutdownOnceSyncerVM *shutdownOnceVM
 }
 
@@ -560,7 +561,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	syncerSharedMemories := newSharedMemories(syncerAtomicMemory, syncerVM.ctx.ChainID, syncerVM.ctx.XChainID)
 
 	for _, tx := range includedAtomicTxs {
-		syncerSharedMemories.assertOpsApplied(t, tx.mustAtomicOps())
+		syncerSharedMemories.assertOpsApplied(t, mustAtomicOps(tx))
 	}
 
 	// Generate blocks after we have entered normal consensus as well

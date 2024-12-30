@@ -8,10 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // ParseServiceAddress get address ID from address string, being it either localized (using address manager,
@@ -52,22 +49,4 @@ func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	}
 	hrp := constants.GetHRP(vm.ctx.NetworkID)
 	return address.Format(chainIDAlias, hrp, addr.Bytes())
-}
-
-// ParseEthAddress parses [addrStr] and returns an Ethereum address
-func ParseEthAddress(addrStr string) (common.Address, error) {
-	if !common.IsHexAddress(addrStr) {
-		return common.Address{}, errInvalidAddr
-	}
-	return common.HexToAddress(addrStr), nil
-}
-
-// GetEthAddress returns the ethereum address derived from [privKey]
-func GetEthAddress(privKey *secp256k1.PrivateKey) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey())
-}
-
-// PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
-func PublicKeyToEthAddress(pubKey *secp256k1.PublicKey) common.Address {
-	return crypto.PubkeyToAddress(*(pubKey.ToECDSA()))
 }

@@ -9,21 +9,21 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 )
 
 type TestUnsignedTx struct {
-	GasUsedV                    uint64           `serialize:"true"`
-	AcceptRequestsBlockchainIDV ids.ID           `serialize:"true"`
-	AcceptRequestsV             *atomic.Requests `serialize:"true"`
+	GasUsedV                    uint64                    `serialize:"true"`
+	AcceptRequestsBlockchainIDV ids.ID                    `serialize:"true"`
+	AcceptRequestsV             *avalancheatomic.Requests `serialize:"true"`
 	VerifyV                     error
 	IDV                         ids.ID `serialize:"true" json:"id"`
 	BurnedV                     uint64 `serialize:"true"`
@@ -34,7 +34,7 @@ type TestUnsignedTx struct {
 	EVMStateTransferV           error
 }
 
-var _ UnsignedAtomicTx = &TestUnsignedTx{}
+var _ atomic.UnsignedAtomicTx = &TestUnsignedTx{}
 
 // GasUsed implements the UnsignedAtomicTx interface
 func (t *TestUnsignedTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUsedV, nil }
@@ -43,7 +43,7 @@ func (t *TestUnsignedTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUs
 func (t *TestUnsignedTx) Verify(ctx *snow.Context, rules params.Rules) error { return t.VerifyV }
 
 // AtomicOps implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
+func (t *TestUnsignedTx) AtomicOps() (ids.ID, *avalancheatomic.Requests, error) {
 	return t.AcceptRequestsBlockchainIDV, t.AcceptRequestsV, nil
 }
 
@@ -66,12 +66,12 @@ func (t *TestUnsignedTx) SignedBytes() []byte { return t.SignedBytesV }
 func (t *TestUnsignedTx) InputUTXOs() set.Set[ids.ID] { return t.InputUTXOsV }
 
 // SemanticVerify implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error {
+func (t *TestUnsignedTx) SemanticVerify(backend *atomic.Backend, stx *atomic.Tx, parent atomic.AtomicBlockContext, baseFee *big.Int) error {
 	return t.SemanticVerifyV
 }
 
 // EVMStateTransfer implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
+func (t *TestUnsignedTx) EVMStateTransfer(ctx *snow.Context, state atomic.StateDB) error {
 	return t.EVMStateTransferV
 }
 
@@ -82,9 +82,9 @@ func testTxCodec() codec.Manager {
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TestUnsignedTx{}),
-		c.RegisterType(&atomic.Element{}),
-		c.RegisterType(&atomic.Requests{}),
-		codec.RegisterCodec(codecVersion, c),
+		c.RegisterType(&avalancheatomic.Element{}),
+		c.RegisterType(&avalancheatomic.Requests{}),
+		codec.RegisterCodec(atomic.CodecVersion, c),
 	)
 
 	if errs.Errored() {
@@ -95,12 +95,12 @@ func testTxCodec() codec.Manager {
 
 var blockChainID = ids.GenerateTestID()
 
-func testDataImportTx() *Tx {
-	return &Tx{
+func testDataImportTx() *atomic.Tx {
+	return &atomic.Tx{
 		UnsignedAtomicTx: &TestUnsignedTx{
 			IDV:                         ids.GenerateTestID(),
 			AcceptRequestsBlockchainIDV: blockChainID,
-			AcceptRequestsV: &atomic.Requests{
+			AcceptRequestsV: &avalancheatomic.Requests{
 				RemoveRequests: [][]byte{
 					utils.RandomBytes(32),
 					utils.RandomBytes(32),
@@ -110,13 +110,13 @@ func testDataImportTx() *Tx {
 	}
 }
 
-func testDataExportTx() *Tx {
-	return &Tx{
+func testDataExportTx() *atomic.Tx {
+	return &atomic.Tx{
 		UnsignedAtomicTx: &TestUnsignedTx{
 			IDV:                         ids.GenerateTestID(),
 			AcceptRequestsBlockchainIDV: blockChainID,
-			AcceptRequestsV: &atomic.Requests{
-				PutRequests: []*atomic.Element{
+			AcceptRequestsV: &avalancheatomic.Requests{
+				PutRequests: []*avalancheatomic.Element{
 					{
 						Key:   utils.RandomBytes(16),
 						Value: utils.RandomBytes(24),
@@ -131,7 +131,7 @@ func testDataExportTx() *Tx {
 	}
 }
 
-func newTestTx() *Tx {
+func newTestTx() *atomic.Tx {
 	txType := rand.Intn(2)
 	switch txType {
 	case 0:
@@ -143,8 +143,8 @@ func newTestTx() *Tx {
 	}
 }
 
-func newTestTxs(numTxs int) []*Tx {
-	txs := make([]*Tx, 0, numTxs)
+func newTestTxs(numTxs int) []*atomic.Tx {
+	txs := make([]*atomic.Tx, 0, numTxs)
 	for i := 0; i < numTxs; i++ {
 		txs = append(txs, newTestTx())
 	}

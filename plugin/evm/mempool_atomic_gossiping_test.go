@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +33,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			// generate a valid and conflicting tx
 			var (
-				tx, conflictingTx *Tx
+				tx, conflictingTx *atomic.Tx
 			)
 			if name == "import" {
 				importTxs := createImportTxOptions(t, vm, sharedMemory)
