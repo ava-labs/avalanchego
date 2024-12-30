@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/upgrade"
 	avalanchegoConstants "github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/holiman/uint256"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -41,6 +40,7 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/peer"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/triedb"
 	"github.com/ava-labs/coreth/triedb/hashdb"
@@ -84,7 +84,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -109,26 +108,11 @@ var (
 )
 
 const (
-	x2cRateUint64       uint64 = 1_000_000_000
-	x2cRateMinus1Uint64 uint64 = x2cRateUint64 - 1
-)
-
-var (
-	// x2cRate is the conversion rate between the smallest denomination on the X-Chain
-	// 1 nAVAX and the smallest denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
-	// This is only required for AVAX because the denomination of 1 AVAX is 9 decimal
-	// places on the X and P chains, but is 18 decimal places within the EVM.
-	x2cRate       = uint256.NewInt(x2cRateUint64)
-	x2cRateMinus1 = uint256.NewInt(x2cRateMinus1Uint64)
-)
-
-const (
 	// Max time from current time allowed for blocks, before they're considered future blocks
 	// and fail verification
 	maxFutureBlockTime = 10 * time.Second
 	maxUTXOsToFetch    = 1024
 	defaultMempoolSize = 4096
-	codecVersion       = uint16(0)
 
 	secpCacheSize          = 1024
 	decidedCacheSize       = 10 * units.MiB
@@ -184,30 +168,15 @@ var (
 	errEmptyBlock                     = errors.New("empty block")
 	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
 	errInvalidBlock                   = errors.New("invalid block")
-	errInvalidAddr                    = errors.New("invalid hex address")
 	errInsufficientAtomicTxFee        = errors.New("atomic tx fee too low for atomic mempool")
-	errAssetIDMismatch                = errors.New("asset IDs in the input don't match the utxo")
-	errNoImportInputs                 = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique          = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch     = errors.New("signature doesn't match public key")
-	errWrongChainID                   = errors.New("tx has wrong chain ID")
-	errInsufficientFunds              = errors.New("insufficient funds")
-	errNoExportOutputs                = errors.New("tx has no export outputs")
-	errOutputsNotSorted               = errors.New("tx outputs not sorted")
-	errOutputsNotSortedUnique         = errors.New("outputs not sorted and unique")
-	errOverflowExport                 = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce                   = errors.New("invalid nonce")
-	errConflictingAtomicInputs        = errors.New("invalid block due to conflicting atomic inputs")
 	errUnclesUnsupported              = errors.New("uncles unsupported")
 	errRejectedParent                 = errors.New("rejected parent")
-	errInsufficientFundsForFee        = errors.New("insufficient AVAX funds to pay transaction fee")
-	errNoEVMOutputs                   = errors.New("tx has no EVM outputs")
 	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	errConflictingAtomicTx            = errors.New("conflicting atomic tx present")
 	errTooManyAtomicTx                = errors.New("too many atomic tx")
-	errMissingAtomicTxs               = errors.New("cannot build a block with non-empty extra data and zero atomic transactions")
 	errInvalidHeaderPredicateResults  = errors.New("invalid header predicate results")
 )
 
@@ -295,7 +264,6 @@ type VM struct {
 	builder *blockBuilder
 
 	baseCodec codec.Registry
-	codec     codec.Manager
 	clock     mockable.Clock
 	mempool   *Mempool
 
@@ -574,8 +542,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to verify chain config: %w", err)
 	}
 
-	vm.codec = Codec
-
 	// TODO: read size from settings
 	vm.mempool, err = NewMempool(chainCtx, vm.sdkMetrics, defaultMempoolSize, vm.verifyTxAtTip)
 	if err != nil {
@@ -641,7 +607,7 @@ func (vm *VM) Initialize(
 	}
 
 	// initialize atomic repository
-	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, vm.codec, lastAcceptedHeight)
+	vm.atomicTxRepository, err = NewAtomicTxRepository(vm.db, atomic.Codec, lastAcceptedHeight)
 	if err != nil {
 		return fmt.Errorf("failed to create atomic repository: %w", err)
 	}
@@ -846,7 +812,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 			continue
 		}
 
-		atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
+		atomicTxBytes, err := atomic.Codec.Marshal(atomic.CodecVersion, tx)
 		if err != nil {
 			// Discard the transaction from the mempool and error if the transaction
 			// cannot be marshalled. This should never happen.
@@ -875,7 +841,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 // assumes that we are in at least Apricot Phase 5.
 func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 	var (
-		batchAtomicTxs    []*Tx
+		batchAtomicTxs    []*atomic.Tx
 		batchAtomicUTXOs  set.Set[ids.ID]
 		batchContribution *big.Int = new(big.Int).Set(common.Big0)
 		batchGasUsed      *big.Int = new(big.Int).Set(common.Big0)
@@ -950,7 +916,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(header *types.Header, state *state.
 	// If there is a non-zero number of transactions, marshal them and return the byte slice
 	// for the block's extra data along with the contribution and gas used.
 	if len(batchAtomicTxs) > 0 {
-		atomicTxBytes, err := vm.codec.Marshal(codecVersion, batchAtomicTxs)
+		atomicTxBytes, err := atomic.Codec.Marshal(atomic.CodecVersion, batchAtomicTxs)
 		if err != nil {
 			// If we fail to marshal the batch of atomic transactions for any reason,
 			// discard the entire set of current transactions.
@@ -988,7 +954,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		rules                      = vm.chainConfig.Rules(header.Number, header.Time)
 	)
 
-	txs, err := ExtractAtomicTxs(block.ExtData(), rules.IsApricotPhase5, vm.codec)
+	txs, err := atomic.ExtractAtomicTxs(block.ExtData(), rules.IsApricotPhase5, atomic.Codec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1573,61 +1539,22 @@ func (vm *VM) CreateStaticHandlers(context.Context) (map[string]http.Handler, er
  ******************************************************************************
  */
 
-// conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
-// or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
-// accepted, then nil will be returned immediately.
-// If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
-func (vm *VM) conflicts(inputs set.Set[ids.ID], ancestor *Block) error {
-	lastAcceptedBlock := vm.LastAcceptedBlock()
-	lastAcceptedHeight := lastAcceptedBlock.Height()
-	for ancestor.Height() > lastAcceptedHeight {
-		// If any of the atomic transactions in the ancestor conflict with [inputs]
-		// return an error.
-		for _, atomicTx := range ancestor.atomicTxs {
-			if inputs.Overlaps(atomicTx.InputUTXOs()) {
-				return errConflictingAtomicInputs
-			}
-		}
-
-		// Move up the chain.
-		nextAncestorID := ancestor.Parent()
-		// If the ancestor is unknown, then the parent failed
-		// verification when it was called.
-		// If the ancestor is rejected, then this block shouldn't be
-		// inserted into the canonical chain because the parent is
-		// will be missing.
-		// If the ancestor is processing, then the block may have
-		// been verified.
-		nextAncestorIntf, err := vm.GetBlockInternal(context.TODO(), nextAncestorID)
-		if err != nil {
-			return errRejectedParent
-		}
-		nextAncestor, ok := nextAncestorIntf.(*Block)
-		if !ok {
-			return fmt.Errorf("ancestor block %s had unexpected type %T", nextAncestor.ID(), nextAncestorIntf)
-		}
-		ancestor = nextAncestor
-	}
-
-	return nil
-}
-
 // getAtomicTx returns the requested transaction, status, and height.
 // If the status is Unknown, then the returned transaction will be nil.
-func (vm *VM) getAtomicTx(txID ids.ID) (*Tx, Status, uint64, error) {
+func (vm *VM) getAtomicTx(txID ids.ID) (*atomic.Tx, atomic.Status, uint64, error) {
 	if tx, height, err := vm.atomicTxRepository.GetByTxID(txID); err == nil {
-		return tx, Accepted, height, nil
+		return tx, atomic.Accepted, height, nil
 	} else if err != database.ErrNotFound {
-		return nil, Unknown, 0, err
+		return nil, atomic.Unknown, 0, err
 	}
 	tx, dropped, found := vm.mempool.GetTx(txID)
 	switch {
 	case found && dropped:
-		return tx, Dropped, 0, nil
+		return tx, atomic.Dropped, 0, nil
 	case found:
-		return tx, Processing, 0, nil
+		return tx, atomic.Processing, 0, nil
 	default:
-		return nil, Unknown, 0, nil
+		return nil, atomic.Unknown, 0, nil
 	}
 }
 
@@ -1658,7 +1585,7 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
-func (vm *VM) verifyTxAtTip(tx *Tx) error {
+func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	if txByteLen := len(tx.SignedBytes()); txByteLen > targetAtomicTxsSize {
 		return fmt.Errorf("tx size (%d) exceeds total atomic txs size target (%d)", txByteLen, targetAtomicTxsSize)
 	}
@@ -1699,7 +1626,7 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 // Note: verifyTx may modify [state]. If [state] needs to be properly maintained, the caller is responsible
 // for reverting to the correct snapshot after calling this function. If this function is called with a
 // throwaway state, then this is not necessary.
-func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *state.StateDB, rules params.Rules) error {
+func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, state *state.StateDB, rules params.Rules) error {
 	parentIntf, err := vm.GetBlockInternal(context.TODO(), ids.ID(parentHash))
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
@@ -1708,7 +1635,15 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *
 	if !ok {
 		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
 	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, baseFee, rules); err != nil {
+	atomicBackend := &atomic.Backend{
+		Ctx:          vm.ctx,
+		Fx:           &vm.fx,
+		Rules:        rules,
+		Bootstrapped: vm.bootstrapped.Get(),
+		BlockFetcher: vm,
+		SecpCache:    &vm.secpCache,
+	}
+	if err := tx.UnsignedAtomicTx.SemanticVerify(atomicBackend, tx, parent, baseFee); err != nil {
 		return err
 	}
 	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
@@ -1716,7 +1651,7 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *
 
 // verifyTxs verifies that [txs] are valid to be issued into a block with parent block [parentHash]
 // using [rules] as the current rule set.
-func (vm *VM) verifyTxs(txs []*Tx, parentHash common.Hash, baseFee *big.Int, height uint64, rules params.Rules) error {
+func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.Int, height uint64, rules params.Rules) error {
 	// Ensure that the parent was verified and inserted correctly.
 	if !vm.blockChain.HasBlock(parentHash, height-1) {
 		return errRejectedParent
@@ -1739,14 +1674,22 @@ func (vm *VM) verifyTxs(txs []*Tx, parentHash common.Hash, baseFee *big.Int, hei
 	// Ensure each tx in [txs] doesn't conflict with any other atomic tx in
 	// a processing ancestor block.
 	inputs := set.Set[ids.ID]{}
+	atomicBackend := &atomic.Backend{
+		Ctx:          vm.ctx,
+		Fx:           &vm.fx,
+		Rules:        rules,
+		Bootstrapped: vm.bootstrapped.Get(),
+		BlockFetcher: vm,
+		SecpCache:    &vm.secpCache,
+	}
 	for _, atomicTx := range txs {
 		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.SemanticVerify(vm, atomicTx, ancestor, baseFee, rules); err != nil {
+		if err := utx.SemanticVerify(atomicBackend, atomicTx, ancestor, baseFee); err != nil {
 			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, height)
 		}
 		txInputs := utx.InputUTXOs()
 		if inputs.Overlaps(txInputs) {
-			return errConflictingAtomicInputs
+			return atomic.ErrConflictingAtomicInputs
 		}
 		inputs.Union(txInputs)
 	}
@@ -1768,183 +1711,13 @@ func (vm *VM) GetAtomicUTXOs(
 
 	return avax.GetAtomicUTXOs(
 		vm.ctx.SharedMemory,
-		vm.codec,
+		atomic.Codec,
 		chainID,
 		addrs,
 		startAddr,
 		startUTXOID,
 		limit,
 	)
-}
-
-// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding
-// order) to total [amount] of [assetID] owned by [keys].
-// Note: we return [][]*secp256k1.PrivateKey even though each input
-// corresponds to a single key, so that the signers can be passed in to
-// [tx.Sign] which supports multiple keys on a single input.
-func (vm *VM) GetSpendableFunds(
-	keys []*secp256k1.PrivateKey,
-	assetID ids.ID,
-	amount uint64,
-) ([]EVMInput, [][]*secp256k1.PrivateKey, error) {
-	// Note: current state uses the state of the preferred block.
-	state, err := vm.blockChain.State()
-	if err != nil {
-		return nil, nil, err
-	}
-	inputs := []EVMInput{}
-	signers := [][]*secp256k1.PrivateKey{}
-	// Note: we assume that each key in [keys] is unique, so that iterating over
-	// the keys will not produce duplicated nonces in the returned EVMInput slice.
-	for _, key := range keys {
-		if amount == 0 {
-			break
-		}
-		addr := GetEthAddress(key)
-		var balance uint64
-		if assetID == vm.ctx.AVAXAssetID {
-			// If the asset is AVAX, we divide by the x2cRate to convert back to the correct
-			// denomination of AVAX that can be exported.
-			balance = new(uint256.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
-		} else {
-			balance = state.GetBalanceMultiCoin(addr, common.Hash(assetID)).Uint64()
-		}
-		if balance == 0 {
-			continue
-		}
-		if amount < balance {
-			balance = amount
-		}
-		nonce, err := vm.GetCurrentNonce(addr)
-		if err != nil {
-			return nil, nil, err
-		}
-		inputs = append(inputs, EVMInput{
-			Address: addr,
-			Amount:  balance,
-			AssetID: assetID,
-			Nonce:   nonce,
-		})
-		signers = append(signers, []*secp256k1.PrivateKey{key})
-		amount -= balance
-	}
-
-	if amount > 0 {
-		return nil, nil, errInsufficientFunds
-	}
-
-	return inputs, signers, nil
-}
-
-// GetSpendableAVAXWithFee returns a list of EVMInputs and keys (in corresponding
-// order) to total [amount] + [fee] of [AVAX] owned by [keys].
-// This function accounts for the added cost of the additional inputs needed to
-// create the transaction and makes sure to skip any keys with a balance that is
-// insufficient to cover the additional fee.
-// Note: we return [][]*secp256k1.PrivateKey even though each input
-// corresponds to a single key, so that the signers can be passed in to
-// [tx.Sign] which supports multiple keys on a single input.
-func (vm *VM) GetSpendableAVAXWithFee(
-	keys []*secp256k1.PrivateKey,
-	amount uint64,
-	cost uint64,
-	baseFee *big.Int,
-) ([]EVMInput, [][]*secp256k1.PrivateKey, error) {
-	// Note: current state uses the state of the preferred block.
-	state, err := vm.blockChain.State()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	initialFee, err := CalculateDynamicFee(cost, baseFee)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	newAmount, err := math.Add64(amount, initialFee)
-	if err != nil {
-		return nil, nil, err
-	}
-	amount = newAmount
-
-	inputs := []EVMInput{}
-	signers := [][]*secp256k1.PrivateKey{}
-	// Note: we assume that each key in [keys] is unique, so that iterating over
-	// the keys will not produce duplicated nonces in the returned EVMInput slice.
-	for _, key := range keys {
-		if amount == 0 {
-			break
-		}
-
-		prevFee, err := CalculateDynamicFee(cost, baseFee)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		newCost := cost + EVMInputGas
-		newFee, err := CalculateDynamicFee(newCost, baseFee)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		additionalFee := newFee - prevFee
-
-		addr := GetEthAddress(key)
-		// Since the asset is AVAX, we divide by the x2cRate to convert back to
-		// the correct denomination of AVAX that can be exported.
-		balance := new(uint256.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
-		// If the balance for [addr] is insufficient to cover the additional cost
-		// of adding an input to the transaction, skip adding the input altogether
-		if balance <= additionalFee {
-			continue
-		}
-
-		// Update the cost for the next iteration
-		cost = newCost
-
-		newAmount, err := math.Add64(amount, additionalFee)
-		if err != nil {
-			return nil, nil, err
-		}
-		amount = newAmount
-
-		// Use the entire [balance] as an input, but if the required [amount]
-		// is less than the balance, update the [inputAmount] to spend the
-		// minimum amount to finish the transaction.
-		inputAmount := balance
-		if amount < balance {
-			inputAmount = amount
-		}
-		nonce, err := vm.GetCurrentNonce(addr)
-		if err != nil {
-			return nil, nil, err
-		}
-		inputs = append(inputs, EVMInput{
-			Address: addr,
-			Amount:  inputAmount,
-			AssetID: vm.ctx.AVAXAssetID,
-			Nonce:   nonce,
-		})
-		signers = append(signers, []*secp256k1.PrivateKey{key})
-		amount -= inputAmount
-	}
-
-	if amount > 0 {
-		return nil, nil, errInsufficientFunds
-	}
-
-	return inputs, signers, nil
-}
-
-// GetCurrentNonce returns the nonce associated with the address at the
-// preferred block
-func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
-	// Note: current state uses the state of the preferred block.
-	state, err := vm.blockChain.State()
-	if err != nil {
-		return 0, err
-	}
-	return state.GetNonce(address), nil
 }
 
 // currentRules returns the chain rules for the current block.
@@ -2079,4 +1852,56 @@ func (vm *VM) stateSyncEnabled(lastAcceptedHeight uint64) bool {
 
 	// enable state sync by default if the chain is empty.
 	return lastAcceptedHeight == 0
+}
+
+func (vm *VM) newImportTx(
+	chainID ids.ID, // chain to import from
+	to common.Address, // Address of recipient
+	baseFee *big.Int, // fee to use post-AP3
+	keys []*secp256k1.PrivateKey, // Keys to import the funds
+) (*atomic.Tx, error) {
+	kc := secp256k1fx.NewKeychain()
+	for _, key := range keys {
+		kc.Add(key)
+	}
+
+	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
+	if err != nil {
+		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
+	}
+
+	return atomic.NewImportTx(vm.ctx, vm.currentRules(), vm.clock.Unix(), chainID, to, baseFee, kc, atomicUTXOs)
+}
+
+// newExportTx returns a new ExportTx
+func (vm *VM) newExportTx(
+	assetID ids.ID, // AssetID of the tokens to export
+	amount uint64, // Amount of tokens to export
+	chainID ids.ID, // Chain to send the UTXOs to
+	to ids.ShortID, // Address of chain recipient
+	baseFee *big.Int, // fee to use post-AP3
+	keys []*secp256k1.PrivateKey, // Pay the fee and provide the tokens
+) (*atomic.Tx, error) {
+	state, err := vm.blockChain.State()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the transaction
+	tx, err := atomic.NewExportTx(
+		vm.ctx,            // Context
+		vm.currentRules(), // VM rules
+		state,
+		assetID, // AssetID
+		amount,  // Amount
+		chainID, // ID of the chain to send the funds to
+		to,      // Address
+		baseFee,
+		keys, // Private keys
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }

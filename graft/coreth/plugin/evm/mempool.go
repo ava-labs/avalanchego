@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/metrics"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -58,12 +59,12 @@ type Mempool struct {
 	// maxSize is the maximum number of transactions allowed to be kept in mempool
 	maxSize int
 	// currentTxs is the set of transactions about to be added to a block.
-	currentTxs map[ids.ID]*Tx
+	currentTxs map[ids.ID]*atomic.Tx
 	// issuedTxs is the set of transactions that have been issued into a new block
-	issuedTxs map[ids.ID]*Tx
+	issuedTxs map[ids.ID]*atomic.Tx
 	// discardedTxs is an LRU Cache of transactions that have been discarded after failing
 	// verification.
-	discardedTxs *cache.LRU[ids.ID, *Tx]
+	discardedTxs *cache.LRU[ids.ID, *atomic.Tx]
 	// Pending is a channel of length one, which the mempool ensures has an item on
 	// it as long as there is an unissued transaction remaining in [txs]
 	Pending chan struct{}
@@ -71,17 +72,17 @@ type Mempool struct {
 	// NOTE: [txHeap] ONLY contains pending txs
 	txHeap *txHeap
 	// utxoSpenders maps utxoIDs to the transaction consuming them in the mempool
-	utxoSpenders map[ids.ID]*Tx
+	utxoSpenders map[ids.ID]*atomic.Tx
 	// bloom is a bloom filter containing the txs in the mempool
 	bloom *gossip.BloomFilter
 
 	metrics *mempoolMetrics
 
-	verify func(tx *Tx) error
+	verify func(tx *atomic.Tx) error
 }
 
 // NewMempool returns a Mempool with [maxSize]
-func NewMempool(ctx *snow.Context, registerer prometheus.Registerer, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
+func NewMempool(ctx *snow.Context, registerer prometheus.Registerer, maxSize int, verify func(tx *atomic.Tx) error) (*Mempool, error) {
 	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter", txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
@@ -89,13 +90,13 @@ func NewMempool(ctx *snow.Context, registerer prometheus.Registerer, maxSize int
 
 	return &Mempool{
 		ctx:          ctx,
-		issuedTxs:    make(map[ids.ID]*Tx),
-		discardedTxs: &cache.LRU[ids.ID, *Tx]{Size: discardedTxsCacheSize},
-		currentTxs:   make(map[ids.ID]*Tx),
+		issuedTxs:    make(map[ids.ID]*atomic.Tx),
+		discardedTxs: &cache.LRU[ids.ID, *atomic.Tx]{Size: discardedTxsCacheSize},
+		currentTxs:   make(map[ids.ID]*atomic.Tx),
 		Pending:      make(chan struct{}, 1),
 		txHeap:       newTxHeap(maxSize),
 		maxSize:      maxSize,
-		utxoSpenders: make(map[ids.ID]*Tx),
+		utxoSpenders: make(map[ids.ID]*atomic.Tx),
 		bloom:        bloom,
 		metrics:      newMempoolMetrics(),
 		verify:       verify,
@@ -117,7 +118,7 @@ func (m *Mempool) length() int {
 
 // atomicTxGasPrice is the [gasPrice] paid by a transaction to burn a given
 // amount of [AVAXAssetID] given the value of [gasUsed].
-func (m *Mempool) atomicTxGasPrice(tx *Tx) (uint64, error) {
+func (m *Mempool) atomicTxGasPrice(tx *atomic.Tx) (uint64, error) {
 	gasUsed, err := tx.GasUsed(true)
 	if err != nil {
 		return 0, err
@@ -158,7 +159,7 @@ func (m *Mempool) Add(tx *GossipAtomicTx) error {
 
 // AddTx attempts to add [tx] to the mempool and returns an error if
 // it could not be added to the mempool.
-func (m *Mempool) AddTx(tx *Tx) error {
+func (m *Mempool) AddTx(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -180,7 +181,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	return err
 }
 
-func (m *Mempool) AddLocalTx(tx *Tx) error {
+func (m *Mempool) AddLocalTx(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -192,8 +193,8 @@ func (m *Mempool) AddLocalTx(tx *Tx) error {
 	return err
 }
 
-// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
-func (m *Mempool) ForceAddTx(tx *Tx) error {
+// forceAddTx forcibly adds a *atomic.Tx to the mempool and bypasses all verification.
+func (m *Mempool) ForceAddTx(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -208,13 +209,13 @@ func (m *Mempool) ForceAddTx(tx *Tx) error {
 // checkConflictTx checks for any transactions in the mempool that spend the same input UTXOs as [tx].
 // If any conflicts are present, it returns the highest gas price of any conflicting transaction, the
 // txID of the corresponding tx and the full list of transactions that conflict with [tx].
-func (m *Mempool) checkConflictTx(tx *Tx) (uint64, ids.ID, []*Tx, error) {
+func (m *Mempool) checkConflictTx(tx *atomic.Tx) (uint64, ids.ID, []*atomic.Tx, error) {
 	utxoSet := tx.InputUTXOs()
 
 	var (
-		highestGasPrice             uint64 = 0
-		conflictingTxs              []*Tx  = make([]*Tx, 0)
-		highestGasPriceConflictTxID ids.ID = ids.ID{}
+		highestGasPrice             uint64       = 0
+		conflictingTxs              []*atomic.Tx = make([]*atomic.Tx, 0)
+		highestGasPriceConflictTxID ids.ID       = ids.ID{}
 	)
 	for utxoID := range utxoSet {
 		// Get current gas price of the existing tx in the mempool
@@ -239,7 +240,7 @@ func (m *Mempool) checkConflictTx(tx *Tx) (uint64, ids.ID, []*Tx, error) {
 
 // addTx adds [tx] to the mempool. Assumes [m.lock] is held.
 // If [force], skips conflict checks within the mempool.
-func (m *Mempool) addTx(tx *Tx, force bool) error {
+func (m *Mempool) addTx(tx *atomic.Tx, force bool) error {
 	txID := tx.ID()
 	// If [txID] has already been issued or is in the currentTxs map
 	// there's no need to add it.
@@ -371,7 +372,7 @@ func (m *Mempool) GetFilter() ([]byte, []byte) {
 }
 
 // NextTx returns a transaction to be issued from the mempool.
-func (m *Mempool) NextTx() (*Tx, bool) {
+func (m *Mempool) NextTx() (*atomic.Tx, bool) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -391,7 +392,7 @@ func (m *Mempool) NextTx() (*Tx, bool) {
 // GetPendingTx returns the transaction [txID] and true if it is
 // currently in the [txHeap] waiting to be issued into a block.
 // Returns nil, false otherwise.
-func (m *Mempool) GetPendingTx(txID ids.ID) (*Tx, bool) {
+func (m *Mempool) GetPendingTx(txID ids.ID) (*atomic.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -401,7 +402,7 @@ func (m *Mempool) GetPendingTx(txID ids.ID) (*Tx, bool) {
 // GetTx returns the transaction [txID] if it was issued
 // by this node and returns whether it was dropped and whether
 // it exists.
-func (m *Mempool) GetTx(txID ids.ID) (*Tx, bool, bool) {
+func (m *Mempool) GetTx(txID ids.ID) (*atomic.Tx, bool, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -484,7 +485,7 @@ func (m *Mempool) CancelCurrentTxs() {
 // cancelTx removes [tx] from current transactions and moves it back into the
 // tx heap.
 // assumes the lock is held.
-func (m *Mempool) cancelTx(tx *Tx) {
+func (m *Mempool) cancelTx(tx *atomic.Tx) {
 	// Add tx to heap sorted by gasPrice
 	gasPrice, err := m.atomicTxGasPrice(tx)
 	if err == nil {
@@ -526,7 +527,7 @@ func (m *Mempool) DiscardCurrentTxs() {
 
 // discardCurrentTx discards [tx] from the set of current transactions.
 // Assumes the lock is held.
-func (m *Mempool) discardCurrentTx(tx *Tx) {
+func (m *Mempool) discardCurrentTx(tx *atomic.Tx) {
 	m.removeSpenders(tx)
 	m.discardedTxs.Put(tx.ID(), tx)
 	delete(m.currentTxs, tx.ID())
@@ -540,7 +541,7 @@ func (m *Mempool) discardCurrentTx(tx *Tx) {
 // removeTx must be called for all conflicts before overwriting the utxoSpenders
 // map.
 // Assumes lock is held.
-func (m *Mempool) removeTx(tx *Tx, discard bool) {
+func (m *Mempool) removeTx(tx *atomic.Tx, discard bool) {
 	txID := tx.ID()
 
 	// Remove from [currentTxs], [txHeap], and [issuedTxs].
@@ -565,7 +566,7 @@ func (m *Mempool) removeTx(tx *Tx, discard bool) {
 // removeSpenders deletes the entries for all input UTXOs of [tx] from the
 // [utxoSpenders] map.
 // Assumes the lock is held.
-func (m *Mempool) removeSpenders(tx *Tx) {
+func (m *Mempool) removeSpenders(tx *atomic.Tx) {
 	for utxoID := range tx.InputUTXOs() {
 		delete(m.utxoSpenders, utxoID)
 	}
@@ -573,7 +574,7 @@ func (m *Mempool) removeSpenders(tx *Tx) {
 
 // RemoveTx removes [txID] from the mempool completely.
 // Evicts [tx] from the discarded cache if present.
-func (m *Mempool) RemoveTx(tx *Tx) {
+func (m *Mempool) RemoveTx(tx *atomic.Tx) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

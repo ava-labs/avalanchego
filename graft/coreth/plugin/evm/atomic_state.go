@@ -6,9 +6,10 @@ package evm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -25,7 +26,7 @@ type AtomicState interface {
 	Root() common.Hash
 	// Accept applies the state change to VM's persistent storage
 	// Changes are persisted atomically along with the provided [commitBatch].
-	Accept(commitBatch database.Batch, requests map[ids.ID]*atomic.Requests) error
+	Accept(commitBatch database.Batch, requests map[ids.ID]*avalancheatomic.Requests) error
 	// Reject frees memory associated with the state change.
 	Reject() error
 }
@@ -36,8 +37,8 @@ type atomicState struct {
 	backend     *atomicBackend
 	blockHash   common.Hash
 	blockHeight uint64
-	txs         []*Tx
-	atomicOps   map[ids.ID]*atomic.Requests
+	txs         []*atomic.Tx
+	atomicOps   map[ids.ID]*avalancheatomic.Requests
 	atomicRoot  common.Hash
 }
 
@@ -46,7 +47,7 @@ func (a *atomicState) Root() common.Hash {
 }
 
 // Accept applies the state change to VM's persistent storage.
-func (a *atomicState) Accept(commitBatch database.Batch, requests map[ids.ID]*atomic.Requests) error {
+func (a *atomicState) Accept(commitBatch database.Batch, requests map[ids.ID]*avalancheatomic.Requests) error {
 	// Add the new requests to the batch to be accepted
 	for chainID, requests := range requests {
 		mergeAtomicOpsToMap(a.atomicOps, chainID, requests)
@@ -83,7 +84,7 @@ func (a *atomicState) Accept(commitBatch database.Batch, requests map[ids.ID]*at
 	// to shared memory.
 	if a.backend.IsBonus(a.blockHeight, a.blockHash) {
 		log.Info("skipping atomic tx acceptance on bonus block", "block", a.blockHash)
-		return atomic.WriteAll(commitBatch, atomicChangesBatch)
+		return avalancheatomic.WriteAll(commitBatch, atomicChangesBatch)
 	}
 
 	// Otherwise, atomically commit pending changes in the version db with

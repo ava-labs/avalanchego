@@ -14,8 +14,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -30,7 +31,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 	var tests []test = []test{
 		{
 			gas:           1,
-			baseFee:       new(big.Int).Set(x2cRate.ToBig()),
+			baseFee:       new(big.Int).Set(atomic.X2CRate.ToBig()),
 			expectedValue: 1,
 		},
 		{
@@ -41,7 +42,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		cost, err := CalculateDynamicFee(test.gas, test.baseFee)
+		cost, err := atomic.CalculateDynamicFee(test.gas, test.baseFee)
 		if test.expectedErr == nil {
 			if err != nil {
 				t.Fatalf("Unexpectedly failed to calculate dynamic fee: %s", err)
@@ -59,7 +60,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 
 type atomicTxVerifyTest struct {
 	ctx         *snow.Context
-	generate    func(t *testing.T) UnsignedAtomicTx
+	generate    func(t *testing.T) atomic.UnsignedAtomicTx
 	rules       params.Rules
 	expectedErr string
 }
@@ -78,7 +79,7 @@ func executeTxVerifyTest(t *testing.T, test atomicTxVerifyTest) {
 
 type atomicTxTest struct {
 	// setup returns the atomic transaction for the test
-	setup func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx
+	setup func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx
 	// define a string that should be contained in the error message if the tx fails verification
 	// at some point. If the strings are empty, then the tx should pass verification at the
 	// respective step.
@@ -115,7 +116,15 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	}
 
 	lastAcceptedBlock := vm.LastAcceptedBlockInternal().(*Block)
-	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, lastAcceptedBlock, baseFee, rules); len(test.semanticVerifyErr) == 0 && err != nil {
+	backend := &atomic.Backend{
+		Ctx:          vm.ctx,
+		Fx:           &vm.fx,
+		Rules:        rules,
+		Bootstrapped: vm.bootstrapped.Get(),
+		BlockFetcher: vm,
+		SecpCache:    &vm.secpCache,
+	}
+	if err := tx.UnsignedAtomicTx.SemanticVerify(backend, tx, lastAcceptedBlock, baseFee); len(test.semanticVerifyErr) == 0 && err != nil {
 		t.Fatalf("SemanticVerify failed unexpectedly due to: %s", err)
 	} else if len(test.semanticVerifyErr) != 0 {
 		if err == nil {
@@ -191,18 +200,18 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 func TestEVMOutputCompare(t *testing.T) {
 	type test struct {
 		name     string
-		a, b     EVMOutput
+		a, b     atomic.EVMOutput
 		expected int
 	}
 
 	tests := []test{
 		{
 			name: "address less",
-			a: EVMOutput{
+			a: atomic.EVMOutput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
 			},
-			b: EVMOutput{
+			b: atomic.EVMOutput{
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{0},
 			},
@@ -210,11 +219,11 @@ func TestEVMOutputCompare(t *testing.T) {
 		},
 		{
 			name: "address greater; assetIDs equal",
-			a: EVMOutput{
+			a: atomic.EVMOutput{
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{},
 			},
-			b: EVMOutput{
+			b: atomic.EVMOutput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{},
 			},
@@ -222,11 +231,11 @@ func TestEVMOutputCompare(t *testing.T) {
 		},
 		{
 			name: "addresses equal; assetID less",
-			a: EVMOutput{
+			a: atomic.EVMOutput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{0},
 			},
-			b: EVMOutput{
+			b: atomic.EVMOutput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
 			},
@@ -234,8 +243,8 @@ func TestEVMOutputCompare(t *testing.T) {
 		},
 		{
 			name:     "equal",
-			a:        EVMOutput{},
-			b:        EVMOutput{},
+			a:        atomic.EVMOutput{},
+			b:        atomic.EVMOutput{},
 			expected: 0,
 		},
 	}
@@ -253,18 +262,18 @@ func TestEVMOutputCompare(t *testing.T) {
 func TestEVMInputCompare(t *testing.T) {
 	type test struct {
 		name     string
-		a, b     EVMInput
+		a, b     atomic.EVMInput
 		expected int
 	}
 
 	tests := []test{
 		{
 			name: "address less",
-			a: EVMInput{
+			a: atomic.EVMInput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
 			},
-			b: EVMInput{
+			b: atomic.EVMInput{
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{0},
 			},
@@ -272,11 +281,11 @@ func TestEVMInputCompare(t *testing.T) {
 		},
 		{
 			name: "address greater; assetIDs equal",
-			a: EVMInput{
+			a: atomic.EVMInput{
 				Address: common.BytesToAddress([]byte{0x02}),
 				AssetID: ids.ID{},
 			},
-			b: EVMInput{
+			b: atomic.EVMInput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{},
 			},
@@ -284,11 +293,11 @@ func TestEVMInputCompare(t *testing.T) {
 		},
 		{
 			name: "addresses equal; assetID less",
-			a: EVMInput{
+			a: atomic.EVMInput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{0},
 			},
-			b: EVMInput{
+			b: atomic.EVMInput{
 				Address: common.BytesToAddress([]byte{0x01}),
 				AssetID: ids.ID{1},
 			},
@@ -296,8 +305,8 @@ func TestEVMInputCompare(t *testing.T) {
 		},
 		{
 			name:     "equal",
-			a:        EVMInput{},
-			b:        EVMInput{},
+			a:        atomic.EVMInput{},
+			b:        atomic.EVMInput{},
 			expected: 0,
 		},
 	}

@@ -1,16 +1,14 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package atomic
 
 import (
 	"errors"
 	"fmt"
 )
 
-var (
-	errUnknownStatus = errors.New("unknown status")
-)
+var errUnknownStatus = errors.New("unknown status")
 
 // Status ...
 type Status uint32
