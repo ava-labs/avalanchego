@@ -178,7 +178,8 @@ must be the same with the number of given `--state-sync-ids`.
 
 Partial sync enables nodes that are not primary network validators to optionally sync
 only the P-chain on the primary network. Nodes that use this option can still track 
-Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
+Subnets. After the Etna upgrade, nodes that use this option can also validate L1s. 
+This config defaults to `false`. 
 
 ## Chain Configs
 
