@@ -1,9 +1,12 @@
 module github.com/ava-labs/avalanchego
 
-// Changes to the minimum golang version must also be replicated in
-// CONTRIBUTING.md
-// README.md
-// go.mod (here)
+// - Changes to the minimum golang version must also be replicated in:
+//   - CONTRIBUTING.md
+//   - README.md
+//   - go.mod (here)
+//
+// - If updating between minor versions (e.g. 1.22.x -> 1.23.x):
+//   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.22.8
 
 require (
@@ -56,11 +59,11 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 	golang.org/x/net v0.28.0
-	golang.org/x/sync v0.8.0
-	golang.org/x/term v0.23.0
+	golang.org/x/sync v0.10.0
+	golang.org/x/term v0.27.0
 	golang.org/x/time v0.3.0
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed
@@ -176,8 +179,8 @@ require (
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
