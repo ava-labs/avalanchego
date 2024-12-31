@@ -118,6 +118,7 @@ func main() {
 			return nil
 		},
 	}
+	// TODO(marun) Enable reuse of flags between tmpnetctl and e2e
 	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(tmpnet.RootDirEnvName), "The path to the root directory for temporary networks")
 	startNetworkCmd.PersistentFlags().StringVar(&avalancheGoPath, "avalanchego-path", os.Getenv(tmpnet.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	// TODO(marun) Use the same getEnvWithDefault strategy as the e2e flags to enable provision via env flag
