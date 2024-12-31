@@ -369,14 +369,14 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	}
 
 	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
-		defer m.finishWorkItem()
-
 		if err := m.handleChangeProofResponse(ctx, targetRootID, work, request, responseBytes, err); err != nil {
 			// TODO log responses
 			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			m.retryWork(work)
 			return
 		}
+
+		m.finishWorkItem()
 	}
 
 	if err := m.sendRequest(ctx, m.config.ChangeProofClient, requestBytes, onResponse); err != nil {
@@ -427,14 +427,14 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
-		defer m.finishWorkItem()
-
 		if err := m.handleRangeProofResponse(ctx, targetRootID, work, request, responseBytes, appErr); err != nil {
 			// TODO log responses
 			m.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			m.retryWork(work)
 			return
 		}
+
+		m.finishWorkItem()
 	}
 
 	if err := m.sendRequest(ctx, m.config.RangeProofClient, requestBytes, onResponse); err != nil {
@@ -466,6 +466,7 @@ func (m *Manager) retryWork(work *workItem) {
 
 	m.workLock.Lock()
 	m.unprocessedWork.Insert(work)
+	m.processingWorkItems--
 	m.workLock.Unlock()
 	m.unprocessedWorkCond.Signal()
 }
