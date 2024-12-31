@@ -9,23 +9,24 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
 )
 
 func TestSecretKeyFromBytesZero(t *testing.T) {
 	require := require.New(t)
 
-	var skArr [SecretKeyLen]byte
+	var skArr [local.SecretKeyLen]byte
 	skBytes := skArr[:]
-	_, err := SecretKeyFromBytes(skBytes)
-	require.ErrorIs(err, errFailedSecretKeyDeserialize)
+	_, err := local.SecretKeyFromBytes(skBytes)
+	require.ErrorIs(err, local.ErrFailedSecretKeyDeserialize)
 }
 
 func TestSecretKeyFromBytesWrongSize(t *testing.T) {
 	require := require.New(t)
 
-	skBytes := utils.RandomBytes(SecretKeyLen + 1)
-	_, err := SecretKeyFromBytes(skBytes)
-	require.ErrorIs(err, errFailedSecretKeyDeserialize)
+	skBytes := utils.RandomBytes(local.SecretKeyLen + 1)
+	_, err := local.SecretKeyFromBytes(skBytes)
+	require.ErrorIs(err, local.ErrFailedSecretKeyDeserialize)
 }
 
 func TestSecretKeyBytes(t *testing.T) {
@@ -33,12 +34,12 @@ func TestSecretKeyBytes(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := NewSigner()
+	sk, err := local.NewSigner()
 	require.NoError(err)
 	sig := sk.Sign(msg)
 	skBytes := sk.ToBytes()
 
-	sk2, err := SecretKeyFromBytes(skBytes)
+	sk2, err := local.SecretKeyFromBytes(skBytes)
 	require.NoError(err)
 	sig2 := sk2.Sign(msg)
 	sk2Bytes := sk2.ToBytes()
