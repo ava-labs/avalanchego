@@ -3,4 +3,4 @@
 
 package block
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -source=block.go -destination=mock_block.go -exclude_interfaces=BanffBlock
+//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -destination=mock_block.go . Block
