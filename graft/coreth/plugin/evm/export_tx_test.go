@@ -1944,7 +1944,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := vm.mempool.AddTx(tx); err != nil {
+			if err := vm.mempool.AddRemoteTx(tx); err != nil {
 				t.Fatal(err)
 			}
 

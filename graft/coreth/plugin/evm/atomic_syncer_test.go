@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/handlers"
@@ -64,7 +65,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight 
 	// next trie.
 	for i, checkpoint := range checkpoints {
 		// Create syncer targeting the current [syncTrie].
-		syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight, defaultStateSyncRequestSize)
+		syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight, config.DefaultStateSyncRequestSize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,7 +92,7 @@ func testAtomicSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight 
 	}
 
 	// Create syncer targeting the current [targetRoot].
-	syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight, defaultStateSyncRequestSize)
+	syncer, err := atomicBackend.Syncer(mockClient, targetRoot, targetHeight, config.DefaultStateSyncRequestSize)
 	if err != nil {
 		t.Fatal(err)
 	}
