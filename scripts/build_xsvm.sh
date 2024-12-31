@@ -12,8 +12,13 @@ source ./scripts/constants.sh
 echo "Building xsvm plugin..."
 go build -o ./build/xsvm ./vms/example/xsvm/cmd/xsvm/
 
-PLUGIN_DIR="$HOME/.avalanchego/plugins"
-PLUGIN_PATH="${PLUGIN_DIR}/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"
-echo "Symlinking ./build/xsvm to ${PLUGIN_PATH}"
-mkdir -p "${PLUGIN_DIR}"
-ln -sf "${PWD}/build/xsvm" "${PLUGIN_PATH}"
+# Symlink to both global and local plugin directories to simplify usage for testing.
+# TODO(marun) Maybe the local directory is sufficient?
+GLOBAL_PLUGIN_PATH="$HOME/.avalanchego/plugins"
+LOCAL_PLUGIN_PATH="${PWD}/build/plugins"
+for plugin_dir in "${GLOBAL_PLUGIN_PATH}" "${LOCAL_PLUGIN_PATH}"; do
+  PLUGIN_PATH="${plugin_dir}/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH"
+  echo "Symlinking ./build/xsvm to ${PLUGIN_PATH}"
+  mkdir -p "${plugin_dir}"
+  ln -sf "${PWD}/build/xsvm" "${PLUGIN_PATH}"
+done
