@@ -3,4 +3,4 @@
 
 package common
 
-//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -source=sender.go -destination=${GOPACKAGE}mock/sender.go -mock_names=Sender=Sender -exclude_interfaces=StateSummarySender,AcceptedStateSummarySender,FrontierSender,AcceptedSender,FetchSender,AppSender,QuerySender,Gossiper
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/sender.go -mock_names=Sender=Sender . Sender

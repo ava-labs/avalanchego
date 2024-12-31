@@ -3,4 +3,4 @@
 
 package txs
 
-//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -source=tx.go -destination=${GOPACKAGE}mock/tx.go -mock_names=UnsignedTx=UnsignedTx
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/tx.go -mock_names=UnsignedTx=UnsignedTx . UnsignedTx
