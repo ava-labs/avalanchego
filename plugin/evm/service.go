@@ -196,7 +196,7 @@ func (service *AvaxAPI) Import(_ *http.Request, args *client.ImportArgs, respons
 	if err := service.vm.mempool.AddLocalTx(tx); err != nil {
 		return err
 	}
-	service.vm.atomicTxPushGossiper.Add(&GossipAtomicTx{tx})
+	service.vm.atomicTxPushGossiper.Add(&atomic.GossipAtomicTx{Tx: tx})
 	return nil
 }
 
@@ -280,7 +280,7 @@ func (service *AvaxAPI) Export(_ *http.Request, args *client.ExportArgs, respons
 	if err := service.vm.mempool.AddLocalTx(tx); err != nil {
 		return err
 	}
-	service.vm.atomicTxPushGossiper.Add(&GossipAtomicTx{tx})
+	service.vm.atomicTxPushGossiper.Add(&atomic.GossipAtomicTx{Tx: tx})
 	return nil
 }
 
@@ -390,7 +390,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	if err := service.vm.mempool.AddLocalTx(tx); err != nil {
 		return err
 	}
-	service.vm.atomicTxPushGossiper.Add(&GossipAtomicTx{tx})
+	service.vm.atomicTxPushGossiper.Add(&atomic.GossipAtomicTx{Tx: tx})
 	return nil
 }
 

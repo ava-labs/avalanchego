@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 
@@ -400,7 +401,7 @@ func TestVMConfigDefaults(t *testing.T) {
 	configJSON := fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0]))
 	_, vm, _, _, _ := GenesisVM(t, false, "", configJSON, "")
 
-	var vmConfig Config
+	var vmConfig config.Config
 	vmConfig.SetDefaults()
 	vmConfig.RPCTxFeeCap = txFeeCap
 	vmConfig.EnabledEthAPIs = enabledEthAPIs
@@ -412,7 +413,7 @@ func TestVMNilConfig(t *testing.T) {
 	_, vm, _, _, _ := GenesisVM(t, false, "", "", "")
 
 	// VM Config should match defaults if no config is passed in
-	var vmConfig Config
+	var vmConfig config.Config
 	vmConfig.SetDefaults()
 	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
 	require.NoError(t, vm.Shutdown(context.Background()))
@@ -1094,8 +1095,8 @@ func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := vm.mempool.AddLocalTx(reissuanceTx1); !errors.Is(err, errConflictingAtomicTx) {
-				t.Fatalf("Expected to fail with err: %s, but found err: %s", errConflictingAtomicTx, err)
+			if err := vm.mempool.AddLocalTx(reissuanceTx1); !errors.Is(err, atomic.ErrConflictingAtomicTx) {
+				t.Fatalf("Expected to fail with err: %s, but found err: %s", atomic.ErrConflictingAtomicTx, err)
 			}
 
 			assert.True(t, vm.mempool.Has(importTx1.ID()))
@@ -1118,12 +1119,12 @@ func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
 			issuedTxs, evictedTxs := issueTxs(t, vm, sharedMemory)
 
 			for i, tx := range issuedTxs {
-				_, issued := vm.mempool.txHeap.Get(tx.ID())
+				_, issued := vm.mempool.GetPendingTx(tx.ID())
 				assert.True(t, issued, "expected issued tx at index %d to be issued", i)
 			}
 
 			for i, tx := range evictedTxs {
-				_, discarded := vm.mempool.discardedTxs.Get(tx.ID())
+				_, discarded, _ := vm.mempool.GetTx(tx.ID())
 				assert.True(t, discarded, "expected discarded tx at index %d to be discarded", i)
 			}
 		})
@@ -3039,7 +3040,7 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatal("Should have failed to issue due to an invalid export tx")
 	}
 
-	if err := vm.mempool.AddTx(exportTx2); err == nil {
+	if err := vm.mempool.AddRemoteTx(exportTx2); err == nil {
 		t.Fatal("Should have failed to add because conflicting")
 	}
 
@@ -3576,8 +3577,8 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	vm.mempool.AddTx(importTxs[1])
-	vm.mempool.AddTx(importTxs[2])
+	vm.mempool.AddRemoteTx(importTxs[1])
+	vm.mempool.AddRemoteTx(importTxs[2])
 
 	if _, err := vm.BuildBlock(context.Background()); err == nil {
 		t.Fatal("Expected build block to fail due to empty block")

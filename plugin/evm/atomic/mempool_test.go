@@ -1,14 +1,13 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package atomic
 
 import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +20,7 @@ func TestMempoolAddTx(t *testing.T) {
 	txs := make([]*GossipAtomicTx, 0)
 	for i := 0; i < 3_000; i++ {
 		tx := &GossipAtomicTx{
-			Tx: &atomic.Tx{
+			Tx: &Tx{
 				UnsignedAtomicTx: &TestUnsignedTx{
 					IDV: ids.GenerateTestID(),
 				},
@@ -44,7 +43,7 @@ func TestMempoolAdd(t *testing.T) {
 	require.NoError(err)
 
 	tx := &GossipAtomicTx{
-		Tx: &atomic.Tx{
+		Tx: &Tx{
 			UnsignedAtomicTx: &TestUnsignedTx{
 				IDV: ids.GenerateTestID(),
 			},

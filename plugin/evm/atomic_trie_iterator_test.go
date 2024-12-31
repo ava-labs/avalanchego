@@ -6,32 +6,33 @@ package evm
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testSharedMemory() atomic.SharedMemory {
-	m := atomic.NewMemory(memdb.New())
+func testSharedMemory() avalancheatomic.SharedMemory {
+	m := avalancheatomic.NewMemory(memdb.New())
 	return m.NewSharedMemory(testCChainID)
 }
 
 func TestIteratorCanIterate(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
-	codec := testTxCodec()
+	codec := atomic.TestTxCodec
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	assert.NoError(t, err)
 
 	// create state with multiple transactions
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
-	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+	operationsMap := make(map[uint64]map[ids.ID]*avalancheatomic.Requests)
 	writeTxs(t, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	// create an atomic trie
@@ -64,14 +65,14 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	require := require.New(t)
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
-	codec := testTxCodec()
+	codec := atomic.TestTxCodec
 	repo, err := NewAtomicTxRepository(db, codec, lastAcceptedHeight)
 	require.NoError(err)
 
 	// create state with multiple transactions
 	// since each test transaction generates random ID for blockchainID we should get
 	// multiple blockchain IDs per block in the overall combined atomic operation map
-	operationsMap := make(map[uint64]map[ids.ID]*atomic.Requests)
+	operationsMap := make(map[uint64]map[ids.ID]*avalancheatomic.Requests)
 	writeTxs(t, repo, 1, lastAcceptedHeight, constTxsPerHeight(3), nil, operationsMap)
 
 	// create an atomic trie

@@ -1,13 +1,14 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package config
 
 import (
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/coreth/core/txpool/legacypool"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ethereum/go-ethereum/common"
@@ -59,7 +60,7 @@ const (
 	// - normal bootstrap processing time: ~14 blocks / second
 	// - state sync time: ~6 hrs.
 	defaultStateSyncMinBlocks   = 300_000
-	defaultStateSyncRequestSize = 1024 // the number of key/values to ask peers for per request
+	DefaultStateSyncRequestSize = 1024 // the number of key/values to ask peers for per request
 )
 
 var (
@@ -277,7 +278,7 @@ func (c *Config) SetDefaults() {
 	c.StateSyncServerTrieCache = defaultStateSyncServerTrieCache
 	c.StateSyncCommitInterval = defaultSyncableCommitInterval
 	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
-	c.StateSyncRequestSize = defaultStateSyncRequestSize
+	c.StateSyncRequestSize = DefaultStateSyncRequestSize
 	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
 	c.AcceptedCacheSize = defaultAcceptedCacheSize
 }
@@ -302,7 +303,17 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 }
 
 // Validate returns an error if this is an invalid config.
-func (c *Config) Validate() error {
+func (c *Config) Validate(networkID uint32) error {
+	// Ensure that non-standard commit interval is not allowed for production networks
+	if constants.ProductionNetworkIDs.Contains(networkID) {
+		if c.CommitInterval != defaultCommitInterval {
+			return fmt.Errorf("cannot start non-local network with commit interval %d different than %d", c.CommitInterval, defaultCommitInterval)
+		}
+		if c.StateSyncCommitInterval != defaultSyncableCommitInterval {
+			return fmt.Errorf("cannot start non-local network with syncable interval %d different than %d", c.StateSyncCommitInterval, defaultSyncableCommitInterval)
+		}
+	}
+
 	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
 		return fmt.Errorf("cannot enable populate missing tries while offline pruning (enabled: %t)/pruning (enabled: %t) are enabled", c.OfflinePruning, c.Pruning)
 	}
