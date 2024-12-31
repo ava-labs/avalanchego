@@ -31,6 +31,7 @@ import (
 type Router struct {
 	ctrl     *gomock.Controller
 	recorder *RouterMockRecorder
+	isgomock struct{}
 }
 
 // RouterMockRecorder is the mock recorder for Router.

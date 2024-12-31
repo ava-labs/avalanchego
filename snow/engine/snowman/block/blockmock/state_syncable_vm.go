@@ -21,6 +21,7 @@ import (
 type StateSyncableVM struct {
 	ctrl     *gomock.Controller
 	recorder *StateSyncableVMMockRecorder
+	isgomock struct{}
 }
 
 // StateSyncableVMMockRecorder is the mock recorder for StateSyncableVM.
@@ -71,33 +72,33 @@ func (mr *StateSyncableVMMockRecorder) GetOngoingSyncStateSummary(arg0 any) *gom
 }
 
 // GetStateSummary mocks base method.
-func (m *StateSyncableVM) GetStateSummary(arg0 context.Context, arg1 uint64) (block.StateSummary, error) {
+func (m *StateSyncableVM) GetStateSummary(ctx context.Context, summaryHeight uint64) (block.StateSummary, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStateSummary", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetStateSummary", ctx, summaryHeight)
 	ret0, _ := ret[0].(block.StateSummary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetStateSummary indicates an expected call of GetStateSummary.
-func (mr *StateSyncableVMMockRecorder) GetStateSummary(arg0, arg1 any) *gomock.Call {
+func (mr *StateSyncableVMMockRecorder) GetStateSummary(ctx, summaryHeight any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateSummary", reflect.TypeOf((*StateSyncableVM)(nil).GetStateSummary), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStateSummary", reflect.TypeOf((*StateSyncableVM)(nil).GetStateSummary), ctx, summaryHeight)
 }
 
 // ParseStateSummary mocks base method.
-func (m *StateSyncableVM) ParseStateSummary(arg0 context.Context, arg1 []byte) (block.StateSummary, error) {
+func (m *StateSyncableVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseStateSummary", arg0, arg1)
+	ret := m.ctrl.Call(m, "ParseStateSummary", ctx, summaryBytes)
 	ret0, _ := ret[0].(block.StateSummary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseStateSummary indicates an expected call of ParseStateSummary.
-func (mr *StateSyncableVMMockRecorder) ParseStateSummary(arg0, arg1 any) *gomock.Call {
+func (mr *StateSyncableVMMockRecorder) ParseStateSummary(ctx, summaryBytes any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseStateSummary", reflect.TypeOf((*StateSyncableVM)(nil).ParseStateSummary), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseStateSummary", reflect.TypeOf((*StateSyncableVM)(nil).ParseStateSummary), ctx, summaryBytes)
 }
 
 // StateSyncEnabled mocks base method.

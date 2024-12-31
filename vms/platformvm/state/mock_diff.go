@@ -27,6 +27,7 @@ import (
 type MockDiff struct {
 	ctrl     *gomock.Controller
 	recorder *MockDiffMockRecorder
+	isgomock struct{}
 }
 
 // MockDiffMockRecorder is the mock recorder for MockDiff.

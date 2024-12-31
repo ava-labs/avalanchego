@@ -24,6 +24,7 @@ import (
 type UnsignedTx struct {
 	ctrl     *gomock.Controller
 	recorder *UnsignedTxMockRecorder
+	isgomock struct{}
 }
 
 // UnsignedTxMockRecorder is the mock recorder for UnsignedTx.

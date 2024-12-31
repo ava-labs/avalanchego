@@ -20,6 +20,7 @@ import (
 type Targeter struct {
 	ctrl     *gomock.Controller
 	recorder *TargeterMockRecorder
+	isgomock struct{}
 }
 
 // TargeterMockRecorder is the mock recorder for Targeter.
@@ -40,15 +41,15 @@ func (m *Targeter) EXPECT() *TargeterMockRecorder {
 }
 
 // TargetUsage mocks base method.
-func (m *Targeter) TargetUsage(arg0 ids.NodeID) float64 {
+func (m *Targeter) TargetUsage(nodeID ids.NodeID) float64 {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TargetUsage", arg0)
+	ret := m.ctrl.Call(m, "TargetUsage", nodeID)
 	ret0, _ := ret[0].(float64)
 	return ret0
 }
 
 // TargetUsage indicates an expected call of TargetUsage.
-func (mr *TargeterMockRecorder) TargetUsage(arg0 any) *gomock.Call {
+func (mr *TargeterMockRecorder) TargetUsage(nodeID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TargetUsage", reflect.TypeOf((*Targeter)(nil).TargetUsage), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TargetUsage", reflect.TypeOf((*Targeter)(nil).TargetUsage), nodeID)
 }

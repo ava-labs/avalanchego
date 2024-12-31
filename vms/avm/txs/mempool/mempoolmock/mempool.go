@@ -21,6 +21,7 @@ import (
 type Mempool struct {
 	ctrl     *gomock.Controller
 	recorder *MempoolMockRecorder
+	isgomock struct{}
 }
 
 // MempoolMockRecorder is the mock recorder for Mempool.
@@ -41,58 +42,58 @@ func (m *Mempool) EXPECT() *MempoolMockRecorder {
 }
 
 // Add mocks base method.
-func (m *Mempool) Add(arg0 *txs.Tx) error {
+func (m *Mempool) Add(tx *txs.Tx) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", arg0)
+	ret := m.ctrl.Call(m, "Add", tx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MempoolMockRecorder) Add(arg0 any) *gomock.Call {
+func (mr *MempoolMockRecorder) Add(tx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*Mempool)(nil).Add), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*Mempool)(nil).Add), tx)
 }
 
 // Get mocks base method.
-func (m *Mempool) Get(arg0 ids.ID) (*txs.Tx, bool) {
+func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0)
+	ret := m.ctrl.Call(m, "Get", txID)
 	ret0, _ := ret[0].(*txs.Tx)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MempoolMockRecorder) Get(arg0 any) *gomock.Call {
+func (mr *MempoolMockRecorder) Get(txID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*Mempool)(nil).Get), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*Mempool)(nil).Get), txID)
 }
 
 // GetDropReason mocks base method.
-func (m *Mempool) GetDropReason(arg0 ids.ID) error {
+func (m *Mempool) GetDropReason(txID ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDropReason", arg0)
+	ret := m.ctrl.Call(m, "GetDropReason", txID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // GetDropReason indicates an expected call of GetDropReason.
-func (mr *MempoolMockRecorder) GetDropReason(arg0 any) *gomock.Call {
+func (mr *MempoolMockRecorder) GetDropReason(txID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDropReason", reflect.TypeOf((*Mempool)(nil).GetDropReason), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDropReason", reflect.TypeOf((*Mempool)(nil).GetDropReason), txID)
 }
 
 // Iterate mocks base method.
-func (m *Mempool) Iterate(arg0 func(*txs.Tx) bool) {
+func (m *Mempool) Iterate(f func(*txs.Tx) bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Iterate", arg0)
+	m.ctrl.Call(m, "Iterate", f)
 }
 
 // Iterate indicates an expected call of Iterate.
-func (mr *MempoolMockRecorder) Iterate(arg0 any) *gomock.Call {
+func (mr *MempoolMockRecorder) Iterate(f any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Iterate", reflect.TypeOf((*Mempool)(nil).Iterate), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Iterate", reflect.TypeOf((*Mempool)(nil).Iterate), f)
 }
 
 // Len mocks base method.
@@ -110,15 +111,15 @@ func (mr *MempoolMockRecorder) Len() *gomock.Call {
 }
 
 // MarkDropped mocks base method.
-func (m *Mempool) MarkDropped(arg0 ids.ID, arg1 error) {
+func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "MarkDropped", arg0, arg1)
+	m.ctrl.Call(m, "MarkDropped", txID, reason)
 }
 
 // MarkDropped indicates an expected call of MarkDropped.
-func (mr *MempoolMockRecorder) MarkDropped(arg0, arg1 any) *gomock.Call {
+func (mr *MempoolMockRecorder) MarkDropped(txID, reason any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkDropped", reflect.TypeOf((*Mempool)(nil).MarkDropped), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkDropped", reflect.TypeOf((*Mempool)(nil).MarkDropped), txID, reason)
 }
 
 // Peek mocks base method.
@@ -137,19 +138,19 @@ func (mr *MempoolMockRecorder) Peek() *gomock.Call {
 }
 
 // Remove mocks base method.
-func (m *Mempool) Remove(arg0 ...*txs.Tx) {
+func (m *Mempool) Remove(txs ...*txs.Tx) {
 	m.ctrl.T.Helper()
 	varargs := []any{}
-	for _, a := range arg0 {
+	for _, a := range txs {
 		varargs = append(varargs, a)
 	}
 	m.ctrl.Call(m, "Remove", varargs...)
 }
 
 // Remove indicates an expected call of Remove.
-func (mr *MempoolMockRecorder) Remove(arg0 ...any) *gomock.Call {
+func (mr *MempoolMockRecorder) Remove(txs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*Mempool)(nil).Remove), arg0...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*Mempool)(nil).Remove), txs...)
 }
 
 // RequestBuildBlock mocks base method.

@@ -3,4 +3,4 @@
 
 package uptime
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/calculator.go -mock_names=Calculator=Calculator . Calculator
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/calculator.go -mock_names=Calculator=Calculator . Calculator

@@ -20,6 +20,7 @@ import (
 type OutboundMessage struct {
 	ctrl     *gomock.Controller
 	recorder *OutboundMessageMockRecorder
+	isgomock struct{}
 }
 
 // OutboundMessageMockRecorder is the mock recorder for OutboundMessage.

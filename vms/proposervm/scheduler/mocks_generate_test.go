@@ -3,4 +3,4 @@
 
 package scheduler
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/scheduler.go -mock_names=Scheduler=Scheduler . Scheduler
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/scheduler.go -mock_names=Scheduler=Scheduler . Scheduler

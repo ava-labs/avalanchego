@@ -3,7 +3,7 @@
 
 package block
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/build_block_with_context_chain_vm.go -mock_names=BuildBlockWithContextChainVM=BuildBlockWithContextChainVM . BuildBlockWithContextChainVM
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/chain_vm.go -mock_names=ChainVM=ChainVM . ChainVM
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/state_syncable_vm.go -mock_names=StateSyncableVM=StateSyncableVM . StateSyncableVM
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/with_verify_context.go -mock_names=WithVerifyContext=WithVerifyContext . WithVerifyContext
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/build_block_with_context_chain_vm.go -mock_names=BuildBlockWithContextChainVM=BuildBlockWithContextChainVM . BuildBlockWithContextChainVM
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/chain_vm.go -mock_names=ChainVM=ChainVM . ChainVM
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/state_syncable_vm.go -mock_names=StateSyncableVM=StateSyncableVM . StateSyncableVM
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/with_verify_context.go -mock_names=WithVerifyContext=WithVerifyContext . WithVerifyContext

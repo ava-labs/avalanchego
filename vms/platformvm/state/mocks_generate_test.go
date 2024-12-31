@@ -3,6 +3,6 @@
 
 package state
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -source=diff.go -destination=mock_diff.go
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -source=state.go -destination=mock_state.go -exclude_interfaces=Chain
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -source=state.go -destination=mock_chain.go -exclude_interfaces=State
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE} -source=diff.go -destination=mock_diff.go
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE} -source=state.go -destination=mock_state.go -exclude_interfaces=Chain
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE} -source=state.go -destination=mock_chain.go -exclude_interfaces=State

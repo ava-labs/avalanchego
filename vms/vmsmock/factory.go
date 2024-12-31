@@ -20,6 +20,7 @@ import (
 type Factory struct {
 	ctrl     *gomock.Controller
 	recorder *FactoryMockRecorder
+	isgomock struct{}
 }
 
 // FactoryMockRecorder is the mock recorder for Factory.

@@ -19,6 +19,7 @@ import (
 type Verifiable struct {
 	ctrl     *gomock.Controller
 	recorder *VerifiableMockRecorder
+	isgomock struct{}
 }
 
 // VerifiableMockRecorder is the mock recorder for Verifiable.

@@ -3,4 +3,4 @@
 
 package atomic
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/shared_memory.go -mock_names=SharedMemory=SharedMemory . SharedMemory
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/shared_memory.go -mock_names=SharedMemory=SharedMemory . SharedMemory

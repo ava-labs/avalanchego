@@ -24,6 +24,7 @@ import (
 type ExternalSender struct {
 	ctrl     *gomock.Controller
 	recorder *ExternalSenderMockRecorder
+	isgomock struct{}
 }
 
 // ExternalSenderMockRecorder is the mock recorder for ExternalSender.

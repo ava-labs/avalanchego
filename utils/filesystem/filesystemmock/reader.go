@@ -20,6 +20,7 @@ import (
 type Reader struct {
 	ctrl     *gomock.Controller
 	recorder *ReaderMockRecorder
+	isgomock struct{}
 }
 
 // ReaderMockRecorder is the mock recorder for Reader.

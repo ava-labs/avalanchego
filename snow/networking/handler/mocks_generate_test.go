@@ -3,4 +3,4 @@
 
 package handler
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/handler.go -mock_names=Handler=Handler . Handler
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/handler.go -mock_names=Handler=Handler . Handler

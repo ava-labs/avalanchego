@@ -19,6 +19,7 @@ import (
 type Iterator struct {
 	ctrl     *gomock.Controller
 	recorder *IteratorMockRecorder
+	isgomock struct{}
 }
 
 // IteratorMockRecorder is the mock recorder for Iterator.

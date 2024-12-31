@@ -20,6 +20,7 @@ import (
 type Signer struct {
 	ctrl     *gomock.Controller
 	recorder *SignerMockRecorder
+	isgomock struct{}
 }
 
 // SignerMockRecorder is the mock recorder for Signer.

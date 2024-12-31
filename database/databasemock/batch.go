@@ -20,6 +20,7 @@ import (
 type Batch struct {
 	ctrl     *gomock.Controller
 	recorder *BatchMockRecorder
+	isgomock struct{}
 }
 
 // BatchMockRecorder is the mock recorder for Batch.
@@ -40,17 +41,17 @@ func (m *Batch) EXPECT() *BatchMockRecorder {
 }
 
 // Delete mocks base method.
-func (m *Batch) Delete(arg0 []byte) error {
+func (m *Batch) Delete(key []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", arg0)
+	ret := m.ctrl.Call(m, "Delete", key)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *BatchMockRecorder) Delete(arg0 any) *gomock.Call {
+func (mr *BatchMockRecorder) Delete(key any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*Batch)(nil).Delete), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*Batch)(nil).Delete), key)
 }
 
 // Inner mocks base method.
@@ -68,31 +69,31 @@ func (mr *BatchMockRecorder) Inner() *gomock.Call {
 }
 
 // Put mocks base method.
-func (m *Batch) Put(arg0, arg1 []byte) error {
+func (m *Batch) Put(key, value []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", arg0, arg1)
+	ret := m.ctrl.Call(m, "Put", key, value)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Put indicates an expected call of Put.
-func (mr *BatchMockRecorder) Put(arg0, arg1 any) *gomock.Call {
+func (mr *BatchMockRecorder) Put(key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*Batch)(nil).Put), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*Batch)(nil).Put), key, value)
 }
 
 // Replay mocks base method.
-func (m *Batch) Replay(arg0 database.KeyValueWriterDeleter) error {
+func (m *Batch) Replay(w database.KeyValueWriterDeleter) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Replay", arg0)
+	ret := m.ctrl.Call(m, "Replay", w)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Replay indicates an expected call of Replay.
-func (mr *BatchMockRecorder) Replay(arg0 any) *gomock.Call {
+func (mr *BatchMockRecorder) Replay(w any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replay", reflect.TypeOf((*Batch)(nil).Replay), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replay", reflect.TypeOf((*Batch)(nil).Replay), w)
 }
 
 // Reset mocks base method.

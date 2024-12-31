@@ -21,6 +21,7 @@ import (
 type VMGetter struct {
 	ctrl     *gomock.Controller
 	recorder *VMGetterMockRecorder
+	isgomock struct{}
 }
 
 // VMGetterMockRecorder is the mock recorder for VMGetter.

@@ -20,6 +20,7 @@ import (
 type Manager struct {
 	ctrl     *gomock.Controller
 	recorder *ManagerMockRecorder
+	isgomock struct{}
 }
 
 // ManagerMockRecorder is the mock recorder for Manager.
@@ -40,60 +41,60 @@ func (m *Manager) EXPECT() *ManagerMockRecorder {
 }
 
 // Marshal mocks base method.
-func (m *Manager) Marshal(arg0 uint16, arg1 any) ([]byte, error) {
+func (m *Manager) Marshal(version uint16, source any) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Marshal", arg0, arg1)
+	ret := m.ctrl.Call(m, "Marshal", version, source)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Marshal indicates an expected call of Marshal.
-func (mr *ManagerMockRecorder) Marshal(arg0, arg1 any) *gomock.Call {
+func (mr *ManagerMockRecorder) Marshal(version, source any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Marshal", reflect.TypeOf((*Manager)(nil).Marshal), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Marshal", reflect.TypeOf((*Manager)(nil).Marshal), version, source)
 }
 
 // RegisterCodec mocks base method.
-func (m *Manager) RegisterCodec(arg0 uint16, arg1 codec.Codec) error {
+func (m *Manager) RegisterCodec(version uint16, codec codec.Codec) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegisterCodec", arg0, arg1)
+	ret := m.ctrl.Call(m, "RegisterCodec", version, codec)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RegisterCodec indicates an expected call of RegisterCodec.
-func (mr *ManagerMockRecorder) RegisterCodec(arg0, arg1 any) *gomock.Call {
+func (mr *ManagerMockRecorder) RegisterCodec(version, codec any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterCodec", reflect.TypeOf((*Manager)(nil).RegisterCodec), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterCodec", reflect.TypeOf((*Manager)(nil).RegisterCodec), version, codec)
 }
 
 // Size mocks base method.
-func (m *Manager) Size(arg0 uint16, arg1 any) (int, error) {
+func (m *Manager) Size(version uint16, value any) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Size", arg0, arg1)
+	ret := m.ctrl.Call(m, "Size", version, value)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Size indicates an expected call of Size.
-func (mr *ManagerMockRecorder) Size(arg0, arg1 any) *gomock.Call {
+func (mr *ManagerMockRecorder) Size(version, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Size", reflect.TypeOf((*Manager)(nil).Size), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Size", reflect.TypeOf((*Manager)(nil).Size), version, value)
 }
 
 // Unmarshal mocks base method.
-func (m *Manager) Unmarshal(arg0 []byte, arg1 any) (uint16, error) {
+func (m *Manager) Unmarshal(source []byte, destination any) (uint16, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Unmarshal", arg0, arg1)
+	ret := m.ctrl.Call(m, "Unmarshal", source, destination)
 	ret0, _ := ret[0].(uint16)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Unmarshal indicates an expected call of Unmarshal.
-func (mr *ManagerMockRecorder) Unmarshal(arg0, arg1 any) *gomock.Call {
+func (mr *ManagerMockRecorder) Unmarshal(source, destination any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unmarshal", reflect.TypeOf((*Manager)(nil).Unmarshal), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unmarshal", reflect.TypeOf((*Manager)(nil).Unmarshal), source, destination)
 }

@@ -19,6 +19,7 @@ import (
 type Hasher struct {
 	ctrl     *gomock.Controller
 	recorder *HasherMockRecorder
+	isgomock struct{}
 }
 
 // HasherMockRecorder is the mock recorder for Hasher.

@@ -20,6 +20,7 @@ import (
 type TransferableIn struct {
 	ctrl     *gomock.Controller
 	recorder *TransferableInMockRecorder
+	isgomock struct{}
 }
 
 // TransferableInMockRecorder is the mock recorder for TransferableIn.
@@ -69,15 +70,15 @@ func (mr *TransferableInMockRecorder) Cost() *gomock.Call {
 }
 
 // InitCtx mocks base method.
-func (m *TransferableIn) InitCtx(arg0 *snow.Context) {
+func (m *TransferableIn) InitCtx(ctx *snow.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "InitCtx", arg0)
+	m.ctrl.Call(m, "InitCtx", ctx)
 }
 
 // InitCtx indicates an expected call of InitCtx.
-func (mr *TransferableInMockRecorder) InitCtx(arg0 any) *gomock.Call {
+func (mr *TransferableInMockRecorder) InitCtx(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*TransferableIn)(nil).InitCtx), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*TransferableIn)(nil).InitCtx), ctx)
 }
 
 // Verify mocks base method.

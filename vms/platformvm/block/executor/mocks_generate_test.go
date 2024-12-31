@@ -3,4 +3,4 @@
 
 package executor
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -source=manager.go -destination=${GOPACKAGE}mock/manager.go -mock_names=Manager=Manager
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -source=manager.go -destination=${GOPACKAGE}mock/manager.go -mock_names=Manager=Manager

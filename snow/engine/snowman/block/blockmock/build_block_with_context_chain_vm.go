@@ -22,6 +22,7 @@ import (
 type BuildBlockWithContextChainVM struct {
 	ctrl     *gomock.Controller
 	recorder *BuildBlockWithContextChainVMMockRecorder
+	isgomock struct{}
 }
 
 // BuildBlockWithContextChainVMMockRecorder is the mock recorder for BuildBlockWithContextChainVM.
@@ -42,16 +43,16 @@ func (m *BuildBlockWithContextChainVM) EXPECT() *BuildBlockWithContextChainVMMoc
 }
 
 // BuildBlockWithContext mocks base method.
-func (m *BuildBlockWithContextChainVM) BuildBlockWithContext(arg0 context.Context, arg1 *block.Context) (snowman.Block, error) {
+func (m *BuildBlockWithContextChainVM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BuildBlockWithContext", arg0, arg1)
+	ret := m.ctrl.Call(m, "BuildBlockWithContext", ctx, blockCtx)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BuildBlockWithContext indicates an expected call of BuildBlockWithContext.
-func (mr *BuildBlockWithContextChainVMMockRecorder) BuildBlockWithContext(arg0, arg1 any) *gomock.Call {
+func (mr *BuildBlockWithContextChainVMMockRecorder) BuildBlockWithContext(ctx, blockCtx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildBlockWithContext", reflect.TypeOf((*BuildBlockWithContextChainVM)(nil).BuildBlockWithContext), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildBlockWithContext", reflect.TypeOf((*BuildBlockWithContextChainVM)(nil).BuildBlockWithContext), ctx, blockCtx)
 }

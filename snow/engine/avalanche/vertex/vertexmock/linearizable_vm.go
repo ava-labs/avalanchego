@@ -29,6 +29,7 @@ import (
 type LinearizableVM struct {
 	ctrl     *gomock.Controller
 	recorder *LinearizableVMMockRecorder
+	isgomock struct{}
 }
 
 // LinearizableVMMockRecorder is the mock recorder for LinearizableVM.
@@ -49,59 +50,59 @@ func (m *LinearizableVM) EXPECT() *LinearizableVMMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *LinearizableVM) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
+func (m *LinearizableVM) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AppGossip", ctx, nodeID, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppGossip indicates an expected call of AppGossip.
-func (mr *LinearizableVMMockRecorder) AppGossip(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) AppGossip(ctx, nodeID, msg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppGossip", reflect.TypeOf((*LinearizableVM)(nil).AppGossip), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppGossip", reflect.TypeOf((*LinearizableVM)(nil).AppGossip), ctx, nodeID, msg)
 }
 
 // AppRequest mocks base method.
-func (m *LinearizableVM) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 time.Time, arg4 []byte) error {
+func (m *LinearizableVM) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequest", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "AppRequest", ctx, nodeID, requestID, deadline, request)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppRequest indicates an expected call of AppRequest.
-func (mr *LinearizableVMMockRecorder) AppRequest(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) AppRequest(ctx, nodeID, requestID, deadline, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequest", reflect.TypeOf((*LinearizableVM)(nil).AppRequest), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequest", reflect.TypeOf((*LinearizableVM)(nil).AppRequest), ctx, nodeID, requestID, deadline, request)
 }
 
 // AppRequestFailed mocks base method.
-func (m *LinearizableVM) AppRequestFailed(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 *common.AppError) error {
+func (m *LinearizableVM) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppRequestFailed", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "AppRequestFailed", ctx, nodeID, requestID, appErr)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppRequestFailed indicates an expected call of AppRequestFailed.
-func (mr *LinearizableVMMockRecorder) AppRequestFailed(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) AppRequestFailed(ctx, nodeID, requestID, appErr any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*LinearizableVM)(nil).AppRequestFailed), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppRequestFailed", reflect.TypeOf((*LinearizableVM)(nil).AppRequestFailed), ctx, nodeID, requestID, appErr)
 }
 
 // AppResponse mocks base method.
-func (m *LinearizableVM) AppResponse(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3 []byte) error {
+func (m *LinearizableVM) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppResponse", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "AppResponse", ctx, nodeID, requestID, response)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AppResponse indicates an expected call of AppResponse.
-func (mr *LinearizableVMMockRecorder) AppResponse(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) AppResponse(ctx, nodeID, requestID, response any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppResponse", reflect.TypeOf((*LinearizableVM)(nil).AppResponse), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppResponse", reflect.TypeOf((*LinearizableVM)(nil).AppResponse), ctx, nodeID, requestID, response)
 }
 
 // BuildBlock mocks base method.
@@ -120,17 +121,17 @@ func (mr *LinearizableVMMockRecorder) BuildBlock(arg0 any) *gomock.Call {
 }
 
 // Connected mocks base method.
-func (m *LinearizableVM) Connected(arg0 context.Context, arg1 ids.NodeID, arg2 *version.Application) error {
+func (m *LinearizableVM) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connected", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "Connected", ctx, nodeID, nodeVersion)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Connected indicates an expected call of Connected.
-func (mr *LinearizableVMMockRecorder) Connected(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Connected(ctx, nodeID, nodeVersion any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*LinearizableVM)(nil).Connected), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connected", reflect.TypeOf((*LinearizableVM)(nil).Connected), ctx, nodeID, nodeVersion)
 }
 
 // CreateHandlers mocks base method.
@@ -149,47 +150,47 @@ func (mr *LinearizableVMMockRecorder) CreateHandlers(arg0 any) *gomock.Call {
 }
 
 // Disconnected mocks base method.
-func (m *LinearizableVM) Disconnected(arg0 context.Context, arg1 ids.NodeID) error {
+func (m *LinearizableVM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Disconnected", arg0, arg1)
+	ret := m.ctrl.Call(m, "Disconnected", ctx, nodeID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Disconnected indicates an expected call of Disconnected.
-func (mr *LinearizableVMMockRecorder) Disconnected(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Disconnected(ctx, nodeID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*LinearizableVM)(nil).Disconnected), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnected", reflect.TypeOf((*LinearizableVM)(nil).Disconnected), ctx, nodeID)
 }
 
 // GetBlock mocks base method.
-func (m *LinearizableVM) GetBlock(arg0 context.Context, arg1 ids.ID) (snowman.Block, error) {
+func (m *LinearizableVM) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlock", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetBlock", ctx, blkID)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBlock indicates an expected call of GetBlock.
-func (mr *LinearizableVMMockRecorder) GetBlock(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) GetBlock(ctx, blkID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*LinearizableVM)(nil).GetBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*LinearizableVM)(nil).GetBlock), ctx, blkID)
 }
 
 // GetBlockIDAtHeight mocks base method.
-func (m *LinearizableVM) GetBlockIDAtHeight(arg0 context.Context, arg1 uint64) (ids.ID, error) {
+func (m *LinearizableVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0, arg1)
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", ctx, height)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
-func (mr *LinearizableVMMockRecorder) GetBlockIDAtHeight(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) GetBlockIDAtHeight(ctx, height any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*LinearizableVM)(nil).GetBlockIDAtHeight), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*LinearizableVM)(nil).GetBlockIDAtHeight), ctx, height)
 }
 
 // HealthCheck mocks base method.
@@ -208,17 +209,17 @@ func (mr *LinearizableVMMockRecorder) HealthCheck(arg0 any) *gomock.Call {
 }
 
 // Initialize mocks base method.
-func (m *LinearizableVM) Initialize(arg0 context.Context, arg1 *snow.Context, arg2 database.Database, arg3, arg4, arg5 []byte, arg6 chan<- common.Message, arg7 []*common.Fx, arg8 common.AppSender) error {
+func (m *LinearizableVM) Initialize(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes, upgradeBytes, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Initialize", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+	ret := m.ctrl.Call(m, "Initialize", ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Initialize indicates an expected call of Initialize.
-func (mr *LinearizableVMMockRecorder) Initialize(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Initialize(ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Initialize", reflect.TypeOf((*LinearizableVM)(nil).Initialize), ctx, chainCtx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
 
 // LastAccepted mocks base method.
@@ -237,75 +238,75 @@ func (mr *LinearizableVMMockRecorder) LastAccepted(arg0 any) *gomock.Call {
 }
 
 // Linearize mocks base method.
-func (m *LinearizableVM) Linearize(arg0 context.Context, arg1 ids.ID) error {
+func (m *LinearizableVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Linearize", arg0, arg1)
+	ret := m.ctrl.Call(m, "Linearize", ctx, stopVertexID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Linearize indicates an expected call of Linearize.
-func (mr *LinearizableVMMockRecorder) Linearize(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) Linearize(ctx, stopVertexID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Linearize", reflect.TypeOf((*LinearizableVM)(nil).Linearize), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Linearize", reflect.TypeOf((*LinearizableVM)(nil).Linearize), ctx, stopVertexID)
 }
 
 // ParseBlock mocks base method.
-func (m *LinearizableVM) ParseBlock(arg0 context.Context, arg1 []byte) (snowman.Block, error) {
+func (m *LinearizableVM) ParseBlock(ctx context.Context, blockBytes []byte) (snowman.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseBlock", arg0, arg1)
+	ret := m.ctrl.Call(m, "ParseBlock", ctx, blockBytes)
 	ret0, _ := ret[0].(snowman.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseBlock indicates an expected call of ParseBlock.
-func (mr *LinearizableVMMockRecorder) ParseBlock(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) ParseBlock(ctx, blockBytes any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*LinearizableVM)(nil).ParseBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseBlock", reflect.TypeOf((*LinearizableVM)(nil).ParseBlock), ctx, blockBytes)
 }
 
 // ParseTx mocks base method.
-func (m *LinearizableVM) ParseTx(arg0 context.Context, arg1 []byte) (snowstorm.Tx, error) {
+func (m *LinearizableVM) ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseTx", arg0, arg1)
+	ret := m.ctrl.Call(m, "ParseTx", ctx, txBytes)
 	ret0, _ := ret[0].(snowstorm.Tx)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ParseTx indicates an expected call of ParseTx.
-func (mr *LinearizableVMMockRecorder) ParseTx(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) ParseTx(ctx, txBytes any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseTx", reflect.TypeOf((*LinearizableVM)(nil).ParseTx), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseTx", reflect.TypeOf((*LinearizableVM)(nil).ParseTx), ctx, txBytes)
 }
 
 // SetPreference mocks base method.
-func (m *LinearizableVM) SetPreference(arg0 context.Context, arg1 ids.ID) error {
+func (m *LinearizableVM) SetPreference(ctx context.Context, blkID ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPreference", arg0, arg1)
+	ret := m.ctrl.Call(m, "SetPreference", ctx, blkID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetPreference indicates an expected call of SetPreference.
-func (mr *LinearizableVMMockRecorder) SetPreference(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) SetPreference(ctx, blkID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*LinearizableVM)(nil).SetPreference), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*LinearizableVM)(nil).SetPreference), ctx, blkID)
 }
 
 // SetState mocks base method.
-func (m *LinearizableVM) SetState(arg0 context.Context, arg1 snow.State) error {
+func (m *LinearizableVM) SetState(ctx context.Context, state snow.State) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetState", arg0, arg1)
+	ret := m.ctrl.Call(m, "SetState", ctx, state)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetState indicates an expected call of SetState.
-func (mr *LinearizableVMMockRecorder) SetState(arg0, arg1 any) *gomock.Call {
+func (mr *LinearizableVMMockRecorder) SetState(ctx, state any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*LinearizableVM)(nil).SetState), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetState", reflect.TypeOf((*LinearizableVM)(nil).SetState), ctx, state)
 }
 
 // Shutdown mocks base method.

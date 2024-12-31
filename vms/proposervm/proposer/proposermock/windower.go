@@ -22,6 +22,7 @@ import (
 type Windower struct {
 	ctrl     *gomock.Controller
 	recorder *WindowerMockRecorder
+	isgomock struct{}
 }
 
 // WindowerMockRecorder is the mock recorder for Windower.
@@ -42,61 +43,61 @@ func (m *Windower) EXPECT() *WindowerMockRecorder {
 }
 
 // Delay mocks base method.
-func (m *Windower) Delay(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID, arg4 int) (time.Duration, error) {
+func (m *Windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delay", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "Delay", ctx, blockHeight, pChainHeight, validatorID, maxWindows)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Delay indicates an expected call of Delay.
-func (mr *WindowerMockRecorder) Delay(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *WindowerMockRecorder) Delay(ctx, blockHeight, pChainHeight, validatorID, maxWindows any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delay", reflect.TypeOf((*Windower)(nil).Delay), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delay", reflect.TypeOf((*Windower)(nil).Delay), ctx, blockHeight, pChainHeight, validatorID, maxWindows)
 }
 
 // ExpectedProposer mocks base method.
-func (m *Windower) ExpectedProposer(arg0 context.Context, arg1, arg2, arg3 uint64) (ids.NodeID, error) {
+func (m *Windower) ExpectedProposer(ctx context.Context, blockHeight, pChainHeight, slot uint64) (ids.NodeID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExpectedProposer", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "ExpectedProposer", ctx, blockHeight, pChainHeight, slot)
 	ret0, _ := ret[0].(ids.NodeID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ExpectedProposer indicates an expected call of ExpectedProposer.
-func (mr *WindowerMockRecorder) ExpectedProposer(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *WindowerMockRecorder) ExpectedProposer(ctx, blockHeight, pChainHeight, slot any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpectedProposer", reflect.TypeOf((*Windower)(nil).ExpectedProposer), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpectedProposer", reflect.TypeOf((*Windower)(nil).ExpectedProposer), ctx, blockHeight, pChainHeight, slot)
 }
 
 // MinDelayForProposer mocks base method.
-func (m *Windower) MinDelayForProposer(arg0 context.Context, arg1, arg2 uint64, arg3 ids.NodeID, arg4 uint64) (time.Duration, error) {
+func (m *Windower) MinDelayForProposer(ctx context.Context, blockHeight, pChainHeight uint64, nodeID ids.NodeID, startSlot uint64) (time.Duration, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MinDelayForProposer", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "MinDelayForProposer", ctx, blockHeight, pChainHeight, nodeID, startSlot)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // MinDelayForProposer indicates an expected call of MinDelayForProposer.
-func (mr *WindowerMockRecorder) MinDelayForProposer(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *WindowerMockRecorder) MinDelayForProposer(ctx, blockHeight, pChainHeight, nodeID, startSlot any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MinDelayForProposer", reflect.TypeOf((*Windower)(nil).MinDelayForProposer), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MinDelayForProposer", reflect.TypeOf((*Windower)(nil).MinDelayForProposer), ctx, blockHeight, pChainHeight, nodeID, startSlot)
 }
 
 // Proposers mocks base method.
-func (m *Windower) Proposers(arg0 context.Context, arg1, arg2 uint64, arg3 int) ([]ids.NodeID, error) {
+func (m *Windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint64, maxWindows int) ([]ids.NodeID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Proposers", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "Proposers", ctx, blockHeight, pChainHeight, maxWindows)
 	ret0, _ := ret[0].([]ids.NodeID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Proposers indicates an expected call of Proposers.
-func (mr *WindowerMockRecorder) Proposers(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *WindowerMockRecorder) Proposers(ctx, blockHeight, pChainHeight, maxWindows any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Proposers", reflect.TypeOf((*Windower)(nil).Proposers), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Proposers", reflect.TypeOf((*Windower)(nil).Proposers), ctx, blockHeight, pChainHeight, maxWindows)
 }

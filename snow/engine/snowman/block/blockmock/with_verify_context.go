@@ -21,6 +21,7 @@ import (
 type WithVerifyContext struct {
 	ctrl     *gomock.Controller
 	recorder *WithVerifyContextMockRecorder
+	isgomock struct{}
 }
 
 // WithVerifyContextMockRecorder is the mock recorder for WithVerifyContext.

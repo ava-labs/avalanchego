@@ -57,8 +57,8 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 
 - To **add** an interface that needs a corresponding mock generated:
   - if the file `mocks_generate_test.go` exists in the package where the interface is located, either:
-    - modify its `//go:generate go run go.uber.org/mock/mockgen@v0.4` to generate a mock for your interface (preferred); or
-    - add another `//go:generate go run go.uber.org/mock/mockgen@v0.4` to generate a mock for your interface according to specific mock generation settings
+    - modify its `//go:generate go run go.uber.org/mock/mockgen@v0.5` to generate a mock for your interface (preferred); or
+    - add another `//go:generate go run go.uber.org/mock/mockgen@v0.5` to generate a mock for your interface according to specific mock generation settings
   - if the file `mocks_generate_test.go` does not exist in the package where the interface is located, create it with content (adapt as needed):
 
     ```go
@@ -67,7 +67,7 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 
     package mypackage
 
-    //go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -destination=mocks_test.go . YourInterface
+    //go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE} -destination=mocks_test.go . YourInterface
     ```
 
     Notes:

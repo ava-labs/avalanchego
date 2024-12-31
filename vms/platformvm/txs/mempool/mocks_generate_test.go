@@ -3,4 +3,4 @@
 
 package mempool
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/mempool.go -mock_names=Mempool=Mempool . Mempool
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/mempool.go -mock_names=Mempool=Mempool . Mempool

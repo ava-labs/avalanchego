@@ -22,6 +22,7 @@ import (
 type Block struct {
 	ctrl     *gomock.Controller
 	recorder *BlockMockRecorder
+	isgomock struct{}
 }
 
 // BlockMockRecorder is the mock recorder for Block.

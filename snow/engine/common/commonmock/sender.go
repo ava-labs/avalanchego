@@ -23,6 +23,7 @@ import (
 type Sender struct {
 	ctrl     *gomock.Controller
 	recorder *SenderMockRecorder
+	isgomock struct{}
 }
 
 // SenderMockRecorder is the mock recorder for Sender.

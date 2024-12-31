@@ -3,5 +3,5 @@
 
 package registry
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/vm_getter.go -mock_names=VMGetter=VMGetter . VMGetter
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/vm_registry.go -mock_names=VMRegistry=VMRegistry . VMRegistry
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/vm_getter.go -mock_names=VMGetter=VMGetter . VMGetter
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/vm_registry.go -mock_names=VMRegistry=VMRegistry . VMRegistry

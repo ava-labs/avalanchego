@@ -3,4 +3,4 @@
 
 package avax
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/transferable_in.go -mock_names=TransferableIn=TransferableIn . TransferableIn
+//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/transferable_in.go -mock_names=TransferableIn=TransferableIn . TransferableIn
