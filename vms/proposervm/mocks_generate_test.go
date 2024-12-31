@@ -3,4 +3,4 @@
 
 package proposervm
 
-//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -destination=mock_post_fork_block.go . PostForkBlock
+//go:generate go run go.uber.org/mock/mockgen@v0.4 -package=${GOPACKAGE} -destination=mocks_test.go . PostForkBlock
