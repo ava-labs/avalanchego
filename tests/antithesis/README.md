@@ -151,7 +151,10 @@ can be performed against master or an arbitrary branch:
    of the scheduled runs.
  - Wait for the publication job to complete successfully so that the
    images are available to be tested against.
- - Select the [Trigger Antithesis Test Runs](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-runs.yml)
+ - Select either the [Trigger Antithesis Avalanchego
+   Setup](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-avalanchego.yml)
+   or [Trigger Antithesis XSVM
+   Setup](https://github.com/ava-labs/avalanchego/actions/workflows/trigger-antithesis-xsvm.yml)
    workflow on the left.
  - Find the 'Run workflow' drop-down on the right and trigger the
    workflow against the desired branch. The branch only determines the
