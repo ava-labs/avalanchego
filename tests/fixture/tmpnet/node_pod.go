@@ -30,6 +30,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
+// TODO(marun) need an easy way to cleanup stale nodes (maybe this suggests something cli-based)
+
 const (
 	containerName   = "avago"
 	volumeName      = "data"
@@ -37,7 +39,12 @@ const (
 
 	statusCheckInterval = 500 * time.Millisecond
 	// TODO(marun) Need to make this configurable
-	volumeSize = "128Mi"
+	// - EBS volume sizes are in GiB.
+	// - A node will report unhealthy if less than 1GiB is available.
+	// - On the local storage provider configured by kind, the volume
+	// size doesn't matter size the volumes are just paths on the host
+	// filesystem.
+	volumeSize = "2Gi"
 )
 
 type NodePod struct {
@@ -101,7 +108,11 @@ func (p *NodePod) readState(ctx context.Context) error {
 }
 
 func (p *NodePod) SetDefaultFlags() {
-	p.node.Flags.SetDefaults(DefaultKubeFlags())
+	// Only include the plugin dir if there are subnets to track to ensure an immutable path can be used
+	// TODO(marun) Revisit this comment
+	trackSubnets, err := p.node.Flags.GetStringVal(config.TrackSubnetsKey)
+	includePluginDir := err == nil && len(trackSubnets) > 0
+	p.node.Flags.SetDefaults(DefaultKubeFlags(includePluginDir))
 }
 
 // TODO(marun) Maybe better with a timestamp used as input to generateName and include uuid and node id as labels?
@@ -113,12 +124,21 @@ func (p *NodePod) getStatefulSetName() string {
 	return p.node.getNetwork().UUID + "-" + strings.ToLower(nodeIDString[startIndex:endIndex])
 }
 
+func (p *NodePod) getFlagsForPod() FlagsMap {
+	flags := p.node.Flags.Copy()
+	flags[config.DataDirKey] = volumeMountPath
+	// TODO(marun) Simplify this with SetDefaultFlags
+	trackSubnets, err := p.node.Flags.GetStringVal(config.TrackSubnetsKey)
+	if err == nil && len(trackSubnets) > 0 {
+		flags[config.PluginDirKey] = "/avalanchego/build/plugins"
+	}
+	return flags
+}
+
 // Start the node as a kubernetes statefulset.
 func (p *NodePod) Start(ctx context.Context) error {
 	// Create a statefulset for the pod and wait for it to become ready
 	runtimeConfig := p.runtimeConfig()
-	statefulSetFlags := p.node.Flags.Copy()
-	statefulSetFlags[config.DataDirKey] = volumeMountPath
 	statefulSet := NewNodeStatefulSet(
 		p.getStatefulSetName(),
 		false, // generateName
@@ -127,7 +147,7 @@ func (p *NodePod) Start(ctx context.Context) error {
 		volumeName,
 		volumeSize,
 		volumeMountPath,
-		statefulSetFlags,
+		p.getFlagsForPod(),
 	)
 
 	clientset, err := p.getClientset()
@@ -234,7 +254,7 @@ func (p *NodePod) Restart(ctx context.Context) error {
 	// TODO(marun) Reconsider usage of FlagsMap instead of just map[string]string
 	container := statefulset.Spec.Template.Spec.Containers[0]
 	sortEnvVars(container.Env) // Ensure both are sorted
-	nodeEnv := flagsToEnvVarSlice(p.node.Flags)
+	nodeEnv := flagsToEnvVarSlice(p.getFlagsForPod())
 	if !slices.Equal(container.Env, nodeEnv) {
 		patches = append(patches, map[string]any{
 			"op":    "replace",
@@ -343,6 +363,9 @@ func (p *NodePod) IsHealthy(ctx context.Context) (bool, error) {
 	healthReply, err := CheckNodeHealth(ctx, uri)
 	if errors.Is(ErrUnrecoverableNodeHealthCheck, err) {
 		return false, err
+	} else if err != nil {
+		// TODO(maybe debug log the error?)
+		return false, nil
 	}
 	return healthReply.Healthy, nil
 }
@@ -435,7 +458,7 @@ func (p *NodePod) GetLocalURI(ctx context.Context) (string, func(), error) {
 }
 
 func (p *NodePod) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
-	if len(p.node.URI) == 0 {
+	if p.node.StakingAddress == (netip.AddrPort{}) {
 		return netip.AddrPort{}, func() {}, errNotRunning
 	}
 
