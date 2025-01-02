@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -80,7 +81,7 @@ func (te *TestEnvironment) Marshal() []byte {
 }
 
 // Initialize a new test environment with a shared network (either pre-existing or newly created).
-func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
+func NewTestEnvironment(tc tests.TestContext, log logging.Logger, flagVars *FlagVars, desiredNetwork *tmpnet.Network) *TestEnvironment {
 	require := require.New(tc)
 
 	var network *tmpnet.Network
@@ -106,7 +107,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			var err error
 			network, err = tmpnet.ReadNetwork(tc.DefaultContext(), networkDir)
 			require.NoError(err)
-			tc.Log().Info("loaded a network",
+			log.Info("loaded a network",
 				zap.String("networkDir", networkDir),
 			)
 		}
@@ -114,7 +115,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		if flagVars.StopNetwork() {
 			if len(networkSymlink) > 0 {
 				// Remove the symlink to avoid attempts to reuse the stopped network
-				tc.Log().Info("removing symlink",
+				log.Info("removing symlink",
 					zap.String("path", networkSymlink),
 				)
 				if err := os.Remove(networkSymlink); !errors.Is(err, os.ErrNotExist) {
@@ -122,15 +123,15 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				}
 			}
 			if network != nil {
-				tc.Log().Info("stopping network")
+				log.Info("stopping network")
 				require.NoError(network.Stop(tc.DefaultContext()))
 			} else {
-				tc.Log().Warn("no network to stop")
+				log.Warn("no network to stop")
 			}
 			os.Exit(0)
 		} else if network != nil && flagVars.RestartNetwork() {
 			// A network is only restarted if it is already running and stop was not requested
-			require.NoError(network.Restart(tc.DefaultContext(), tc.Log()))
+			require.NoError(network.Restart(tc.DefaultContext(), log))
 		}
 	}
 
@@ -145,6 +146,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		network.DefaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 		StartNetwork(
 			tc,
+			log,
 			network,
 			flagVars.NodeRuntimeConfig(),
 			flagVars.PluginDir(),
@@ -175,7 +177,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				for nodeID, uri := range uris {
 					infoClient := info.NewClient(uri)
 					for _, chain := range subnet.Chains {
-						tc.Log().Info("checking if chain is bootstrapped",
+						log.Info("checking if chain is bootstrapped",
 							zap.Stringer("chainID", chain.ChainID),
 							zap.Stringer("nodeID", nodeID),
 						)
@@ -214,7 +216,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		}
 	}
 	require.NotEmpty(uris, "network contains no nodes")
-	tc.Log().Info("network nodes are available",
+	log.Info("network nodes are available",
 		zap.Any("nodeURIs", uris),
 	)
 
@@ -262,6 +264,7 @@ func (te *TestEnvironment) StartPrivateNetwork(network *tmpnet.Network) {
 
 	StartNetwork(
 		te.testContext,
+		te.testContext.Log(),
 		network,
 		&sharedNetwork.DefaultRuntimeConfig,
 		pluginDir,

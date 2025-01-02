@@ -11,6 +11,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
@@ -51,8 +52,15 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		require.NoError(err)
 		network.Genesis = genesis
 
+		// Use a logger with full details for network setup since there
+		// won't be any ginkgo logs with timestamps to provide context.
+		// TODO(marun) Maybe make this internal to StartNetwork?
+		log, err := tests.LoggerForFormat("", "auto")
+		require.NoError(err)
+
 		e2e.StartNetwork(
 			tc,
+			log,
 			network,
 			&tmpnet.NodeRuntimeConfig{
 				AvalancheGoPath: avalancheGoExecPath,
