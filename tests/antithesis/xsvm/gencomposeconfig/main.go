@@ -23,7 +23,12 @@ func main() {
 	network.Subnets = []*tmpnet.Subnet{
 		subnet.NewXSVMOrPanic("xsvm", genesis.VMRQKey, network.Nodes...),
 	}
-	if err := antithesis.GenerateComposeConfig(network, baseImageName, "" /* runtimePluginDir */); err != nil {
+
+	// Path to the plugin dir on subnet-evm node images that will be run by docker compose.
+	// TODO(marun) Make this a reusable constant and avoid having to specify it?
+	runtimePluginDir := "/avalanchego/build/plugins"
+
+	if err := antithesis.GenerateComposeConfig(network, baseImageName, runtimePluginDir); err != nil {
 		tests.NewDefaultLogger("").Fatal("failed to generate compose config",
 			zap.Error(err),
 		)

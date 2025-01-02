@@ -284,7 +284,8 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 }
 
 func defaultPodFlags() tmpnet.FlagsMap {
-	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir, true /* sybilProtectionEnabled */)
+	// TODO(marun) DefaultPodFlags is only used by bootstrap monitor - maybe inline
+	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir, false /* sybilProtectionEnabled */)
 }
 
 // waitForPodCondition waits until the specified pod reports the specified condition
