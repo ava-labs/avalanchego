@@ -12,59 +12,6 @@ sidebar_position: 0
 
 You can specify the configuration of a node with the arguments below.
 
-## Data Directory
-
-#### `--data-dir` (string)
-
-Sets the base data directory where default sub-directories will be placed unless otherwise specified.
-Defaults to `$HOME/.avalanchego`.
-
-## Config File
-
-#### `--config-file` (string)
-
-Path to a JSON file that specifies this node's configuration. Command line
-arguments will override arguments set in the config file. This flag is ignored
-if `--config-file-content` is specified.
-
-Example JSON config file:
-
-```json
-{
-  "log-level": "debug"
-}
-```
-
-:::tip
-[Install Script](/nodes/run/with-installer/installing-avalanchego.md) creates the
-node config file at `~/.avalanchego/configs/node.json`. No default file is
-created if [AvalancheGo is built from source](/nodes/run/node-manually.md), you
-would need to create it manually if needed.
-:::
-
-#### `--config-file-content` (string)
-
-As an alternative to `--config-file`, it allows specifying base64 encoded config
-content.
-
-#### `--config-file-content-type` (string)
-
-Specifies the format of the base64 encoded config content. JSON, TOML, YAML are
-among currently supported file format (see
-[here](https://github.com/spf13/viper#reading-config-files) for full list). Defaults to `JSON`.
-
-## Avalanche Community Proposals
-
-#### `--acp-support` (array of integers)
-
-The `--acp-support` flag allows an AvalancheGo node to indicate support for a
-set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
-
-#### `--acp-object` (array of integers)
-
-The `--acp-object` flag allows an AvalancheGo node to indicate objection for a
-set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
-
 ## APIs
 
 #### `--api-admin-enabled` (boolean)
@@ -98,18 +45,27 @@ See [here](/reference/avalanchego/keystore-api.md) for more information.
 If set to `false`, this node will not expose the Metrics API. Defaults to
 `true`. See [here](/reference/avalanchego/metrics-api.md) for more information.
 
-#### `--http-shutdown-wait` (duration)
+## Avalanche Community Proposals
 
-Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown.
-The `/health` endpoint will return unhealthy during this duration (if the Health
-API is enabled.) Defaults to `0s`.
+#### `--acp-support` (array of integers)
 
-#### `--http-shutdown-timeout` (duration)
+The `--acp-support` flag allows an AvalancheGo node to indicate support for a
+set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
 
-Maximum duration to wait for existing connections to complete during node
-shutdown. Defaults to `10s`.
+#### `--acp-object` (array of integers)
+
+The `--acp-object` flag allows an AvalancheGo node to indicate objection for a
+set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
 
 ## Bootstrapping
+
+#### `--bootstrap-ancestors-max-containers-sent` (uint)
+
+Max number of containers in an `Ancestors` message sent by this node. Defaults to `2000`.
+
+#### `--bootstrap-ancestors-max-containers-received` (unit)
+
+This node reads at most this many containers from an incoming `Ancestors` message. Defaults to `2000`.
 
 #### `--bootstrap-beacon-connection-timeout` (duration)
 
@@ -131,6 +87,11 @@ this field would be `--bootstrap-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number
 of given IPs here must be same with number of given `--bootstrap-ids`. The
 default value depends on the network ID.
 
+#### `--bootstrap-max-time-get-ancestors` (duration)
+
+Max Time to spend fetching a container and its ancestors when responding to a GetAncestors message.
+Defaults to `50ms`.
+
 #### `--bootstrap-retry-enabled` (boolean)
 
 If set to `false`, will not retry bootstrapping if it fails. Defaults to `true`.
@@ -138,48 +99,6 @@ If set to `false`, will not retry bootstrapping if it fails. Defaults to `true`.
 #### `--bootstrap-retry-warn-frequency` (uint)
 
 Specifies how many times bootstrap should be retried before warning the operator. Defaults to `50`.
-
-#### `--bootstrap-ancestors-max-containers-sent` (uint)
-
-Max number of containers in an `Ancestors` message sent by this node. Defaults to `2000`.
-
-#### `--bootstrap-ancestors-max-containers-received` (unit)
-
-This node reads at most this many containers from an incoming `Ancestors` message. Defaults to `2000`.
-
-#### `--bootstrap-max-time-get-ancestors` (duration)
-
-Max Time to spend fetching a container and its ancestors when responding to a GetAncestors message.
-Defaults to `50ms`.
-
-## State Syncing
-
-#### `--state-sync-ids` (string)
-
-State sync IDs is a comma-separated list of validator IDs. The specified
-validators will be contacted to get and authenticate the starting point (state
-summary) for state sync. An example setting of this field would be
-`--state-sync-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"`.
-The number of given IDs here must be same with number of given
-`--state-sync-ips`. The default value is empty, which results in all validators
-being sampled.
-
-#### `--state-sync-ips` (string)
-
-State sync IPs is a comma-separated list of IP:port pairs. These IP Addresses
-will be contacted to get and authenticate the starting point (state summary) for
-state sync. An example setting of this field would be
-`--state-sync-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number of given IPs here
-must be the same with the number of given `--state-sync-ids`.
-
-## Partial Sync Primary Network
-
-#### `--partial-sync-primary-network` (string)
-
-Partial sync enables nodes that are not primary network validators to optionally sync
-only the P-chain on the primary network. Nodes that use this option can still track 
-Subnets. After the Etna upgrade, nodes that use this option can also validate L1s. 
-This config defaults to `false`. 
 
 ## Chain Configs
 
@@ -267,6 +186,76 @@ aliases for Blockchains.
 
 Chain specific data directory. Defaults to `$HOME/.avalanchego/chainData`.
 
+## Config File
+
+#### `--config-file` (string)
+
+Path to a JSON file that specifies this node's configuration. Command line
+arguments will override arguments set in the config file. This flag is ignored
+if `--config-file-content` is specified.
+
+Example JSON config file:
+
+```json
+{
+  "log-level": "debug"
+}
+```
+
+:::tip
+[Install Script](https://docs.avax.network/tooling/avalanche-go-installer) creates the
+node config file at `~/.avalanchego/configs/node.json`. No default file is
+created if [AvalancheGo is built from source](https://docs.avax.network/nodes/run-a-node/manually), you
+would need to create it manually if needed.
+:::
+
+#### `--config-file-content` (string)
+
+As an alternative to `--config-file`, it allows specifying base64 encoded config
+content.
+
+#### `--config-file-content-type` (string)
+
+Specifies the format of the base64 encoded config content. JSON, TOML, YAML are
+among currently supported file format (see
+[here](https://github.com/spf13/viper#reading-config-files) for full list). Defaults to `JSON`.
+
+## Data Directory
+
+#### `--data-dir` (string)
+
+Sets the base data directory where default sub-directories will be placed unless otherwise specified.
+Defaults to `$HOME/.avalanchego`.
+
+## Partial Sync Primary Network
+
+#### `--partial-sync-primary-network` (string)
+
+Partial sync enables nodes that are not primary network validators to optionally sync
+only the P-chain on the primary network. Nodes that use this option can still track
+Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
+This config defaults to `false`.
+
+## State Syncing
+
+#### `--state-sync-ids` (string)
+
+State sync IDs is a comma-separated list of validator IDs. The specified
+validators will be contacted to get and authenticate the starting point (state
+summary) for state sync. An example setting of this field would be
+`--state-sync-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"`.
+The number of given IDs here must be same with number of given
+`--state-sync-ips`. The default value is empty, which results in all validators
+being sampled.
+
+#### `--state-sync-ips` (string)
+
+State sync IPs is a comma-separated list of IP:port pairs. These IP Addresses
+will be contacted to get and authenticate the starting point (state summary) for
+state sync. An example setting of this field would be
+`--state-sync-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number of given IPs here
+must be the same with the number of given `--state-sync-ids`.
+
 ## Database
 
 ##### `--db-dir` (string, file path)
@@ -305,120 +294,120 @@ Any keys not given will receive the default value.
 
 ```go
 {
-	// BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
-	// Use -1 for zero.
-	//
-	// The default value is 12MiB.
-	"blockCacheCapacity": int
+// BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
+// Use -1 for zero.
+//
+// The default value is 12MiB.
+"blockCacheCapacity": int
 
-	// BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
-	// block.
-	//
-	// The default value is 4KiB.
-	"blockSize": int
+// BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
+// block.
+//
+// The default value is 4KiB.
+"blockSize": int
 
-	// CompactionExpandLimitFactor limits compaction size after expanded.
-	// This will be multiplied by table size limit at compaction target level.
-	//
-	// The default value is 25.
-	"compactionExpandLimitFactor": int
+// CompactionExpandLimitFactor limits compaction size after expanded.
+// This will be multiplied by table size limit at compaction target level.
+//
+// The default value is 25.
+"compactionExpandLimitFactor": int
 
-	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
-	// that a single 'sorted table' generates.  This will be multiplied by
-	// table size limit at grandparent level.
-	//
-	// The default value is 10.
-	"compactionGPOverlapsFactor": int
+// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
+// that a single 'sorted table' generates.  This will be multiplied by
+// table size limit at grandparent level.
+//
+// The default value is 10.
+"compactionGPOverlapsFactor": int
 
-	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
-	// trigger compaction.
-	//
-	// The default value is 4.
-	"compactionL0Trigger": int
+// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
+// trigger compaction.
+//
+// The default value is 4.
+"compactionL0Trigger": int
 
-	// CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
-	// level-0.
-	// This will be multiplied by table size limit at compaction target level.
-	//
-	// The default value is 1.
-	"compactionSourceLimitFactor": int
+// CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
+// level-0.
+// This will be multiplied by table size limit at compaction target level.
+//
+// The default value is 1.
+"compactionSourceLimitFactor": int
 
-	// CompactionTableSize limits size of 'sorted table' that compaction generates.
-	// The limits for each level will be calculated as:
-	//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
-	// The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
-	//
-	// The default value is 2MiB.
-	"compactionTableSize": int
+// CompactionTableSize limits size of 'sorted table' that compaction generates.
+// The limits for each level will be calculated as:
+//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
+// The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
+//
+// The default value is 2MiB.
+"compactionTableSize": int
 
-	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
-	//
-	// The default value is 1.
-	"compactionTableSizeMultiplier": float
+// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
+//
+// The default value is 1.
+"compactionTableSizeMultiplier": float
 
-	// CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
-	// CompactionTableSize.
-	// Use zero to skip a level.
-	//
-	// The default value is nil.
-	"compactionTableSizeMultiplierPerLevel": []float
+// CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
+// CompactionTableSize.
+// Use zero to skip a level.
+//
+// The default value is nil.
+"compactionTableSizeMultiplierPerLevel": []float
 
-	// CompactionTotalSize limits total size of 'sorted table' for each level.
-	// The limits for each level will be calculated as:
-	//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
-	// The multiplier for each level can also fine-tuned using
-	// CompactionTotalSizeMultiplierPerLevel.
-	//
-	// The default value is 10MiB.
-	"compactionTotalSize": int
+// CompactionTotalSize limits total size of 'sorted table' for each level.
+// The limits for each level will be calculated as:
+//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
+// The multiplier for each level can also fine-tuned using
+// CompactionTotalSizeMultiplierPerLevel.
+//
+// The default value is 10MiB.
+"compactionTotalSize": int
 
-	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
-	//
-	// The default value is 10.
-	"compactionTotalSizeMultiplier": float
+// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
+//
+// The default value is 10.
+"compactionTotalSizeMultiplier": float
 
-	// DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
-	// The purpose of 'seeks triggered compaction' is to optimize database so
-	// that 'level seeks' can be minimized, however this might generate many
-	// small compaction which may not preferable.
-	//
-	// The default is true.
-	"disableSeeksCompaction": bool
+// DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
+// The purpose of 'seeks triggered compaction' is to optimize database so
+// that 'level seeks' can be minimized, however this might generate many
+// small compaction which may not preferable.
+//
+// The default is true.
+"disableSeeksCompaction": bool
 
-	// OpenFilesCacheCapacity defines the capacity of the open files caching.
-	// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
-	//
-	// The default value is 1024.
-	"openFilesCacheCapacity": int
+// OpenFilesCacheCapacity defines the capacity of the open files caching.
+// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
+//
+// The default value is 1024.
+"openFilesCacheCapacity": int
 
-	// WriteBuffer defines maximum size of a 'memdb' before flushed to
-	// 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
-	// unsorted journal.
-	//
-	// LevelDB may held up to two 'memdb' at the same time.
-	//
-	// The default value is 6MiB.
-	"writeBuffer": int
+// WriteBuffer defines maximum size of a 'memdb' before flushed to
+// 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
+// unsorted journal.
+//
+// LevelDB may held up to two 'memdb' at the same time.
+//
+// The default value is 6MiB.
+"writeBuffer": int
 
-	// FilterBitsPerKey is the number of bits to add to the bloom filter per
-	// key.
-	//
-	// The default value is 10.
-	"filterBitsPerKey": int
+// FilterBitsPerKey is the number of bits to add to the bloom filter per
+// key.
+//
+// The default value is 10.
+"filterBitsPerKey": int
 
-	// MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
-	// When the MANIFEST-****** file grows beyond this size, LevelDB will create
-	// a new MANIFEST file.
-	//
-	// The default value is infinity.
-	"maxManifestFileSize": int
+// MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
+// When the MANIFEST-****** file grows beyond this size, LevelDB will create
+// a new MANIFEST file.
+//
+// The default value is infinity.
+"maxManifestFileSize": int
 
-	// MetricUpdateFrequency is the frequency to poll LevelDB metrics in
-	// nanoseconds.
-	// If <= 0, LevelDB metrics aren't polled.
-	//
-	// The default value is 10s.
-	"metricUpdateFrequency": int
+// MetricUpdateFrequency is the frequency to poll LevelDB metrics in
+// nanoseconds.
+// If <= 0, LevelDB metrics aren't polled.
+//
+// The default value is 10s.
+"metricUpdateFrequency": int
 }
 ```
 
@@ -454,6 +443,18 @@ As an alternative to `--genesis-file`, it allows specifying base64 encoded genes
 
 ## HTTP Server
 
+#### `--http-allowed-hosts` (string)
+
+List of acceptable host names in API requests. Provide the wildcard (`'*'`) to accept
+requests from all hosts. API requests where the `Host` field is empty or an IP address
+will always be accepted. An API call whose HTTP `Host` field isn't acceptable will
+receive a 403 error code. Defaults to `localhost`.
+
+#### `--http-allowed-origins` (string)
+
+Origins to allow on the HTTP port. Defaults to `*` which allows all origins. Example:
+`"https://*.avax.network https://*.avax-test.network"`
+
 #### `--http-host` (string)
 
 The address that HTTP APIs listen on. Defaults to `127.0.0.1`. This means that
@@ -461,11 +462,39 @@ by default, your node can only handle API calls made from the same machine. To
 allow API calls from other machines, use `--http-host=`. You can also enter
 domain names as parameter.
 
+#### `--http-idle-timeout` (string)
+
+Maximum duration to wait for the next request when keep-alives are enabled. If
+`--http-idle-timeout` is zero, the value of `--http-read-timeout` is used. If both are zero,
+there is no timeout.
+
 #### `--http-port` (int)
 
 Each node runs an HTTP server that provides the APIs for interacting with the
 node and the Avalanche network. This argument specifies the port that the HTTP
 server will listen on. The default value is `9650`.
+
+#### `--http-read-timeout` (string)
+
+Maximum duration for reading the entire request, including the body. A zero or
+negative value means there will be no timeout.
+
+#### `--http-read-header-timeout` (string)
+
+Maximum duration to read request headers. The connection’s read deadline is
+reset after reading the headers. If `--http-read-header-timeout` is zero, the
+value of `--http-read-timeout` is used. If both are zero, there is no timeout.
+
+#### `--http-shutdown-timeout` (duration)
+
+Maximum duration to wait for existing connections to complete during node
+shutdown. Defaults to `10s`.
+
+#### `--http-shutdown-wait` (duration)
+
+Duration to wait after receiving SIGTERM or SIGINT before initiating shutdown.
+The `/health` endpoint will return unhealthy during this duration (if the Health
+API is enabled.) Defaults to `0s`.
 
 #### `--http-tls-cert-file` (string, file path)
 
@@ -499,40 +528,11 @@ content of the TLS private key used by the node for the HTTPS server. Note that
 full private key content, with the leading and trailing header, must be base64
 encoded. This must be specified when `--http-tls-enabled=true`.
 
-#### `--http-read-timeout` (string)
-
-Maximum duration for reading the entire request, including the body. A zero or
-negative value means there will be no timeout.
-
-#### `--http-read-header-timeout` (string)
-
-Maximum duration to read request headers. The connection’s read deadline is
-reset after reading the headers. If `--http-read-header-timeout` is zero, the
-value of `--http-read-timeout` is used. If both are zero, there is no timeout.
-
 #### `--http-write-timeout` (string)
 
 Maximum duration before timing out writes of the response. It is reset whenever
 a new request’s header is read. A zero or negative value means there will be no
 timeout.
-
-#### `--http-idle-timeout` (string)
-
-Maximum duration to wait for the next request when keep-alives are enabled. If
-`--http-idle-timeout` is zero, the value of `--http-read-timeout` is used. If both are zero,
-there is no timeout.
-
-#### `--http-allowed-origins` (string)
-
-Origins to allow on the HTTP port. Defaults to `*` which allows all origins. Example:
-`"https://*.avax.network https://*.avax-test.network"`
-
-#### `--http-allowed-hosts` (string)
-
-List of acceptable host names in API requests. Provide the wildcard (`'*'`) to accept
-requests from all hosts. API requests where the `Host` field is empty or an IP address
-will always be accepted. An API call whose HTTP `Host` field isn't acceptable will
-receive a 403 error code. Defaults to `localhost`.
 
 ## File Descriptor Limit
 
@@ -1313,7 +1313,7 @@ Defaults to `0`.
 
 Frequency to gossip peers to other nodes. Defaults to `1m`.
 
-#### ` --network-peer-read-buffer-size` (int)
+#### `--network-peer-read-buffer-size` (int)
 
 Size of the buffer that peer messages are read into (there is one buffer per
 peer), defaults to `8` KiB (8192 Bytes).
