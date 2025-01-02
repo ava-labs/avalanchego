@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -259,6 +260,7 @@ func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tm
 // Start a temporary network with the provided avalanchego binary.
 func StartNetwork(
 	tc tests.TestContext,
+	log logging.Logger,
 	network *tmpnet.Network,
 	runtimeConfig *tmpnet.NodeRuntimeConfig,
 	pluginDir string,
@@ -276,21 +278,23 @@ func StartNetwork(
 
 	err := tmpnet.BootstrapNewNetwork(
 		tc.DefaultContext(),
-		tc.Log(),
+		log,
 		network,
 		DefaultNetworkDir,
 	)
 	if err != nil {
-		tc.Log().Error("failed to bootstrap network",
+		log.Error("failed to bootstrap network",
 			zap.Error(err),
 		)
 		// Ensure nodes are stopped if bootstrap fails. The network configuration
 		// will remain on disk to enable troubleshooting.
-		err := network.Stop(tc.DefaultContext())
-		require.NoError(err, "failed to stop network after bootstrap failure")
+		stopErr := network.Stop(tc.DefaultContext())
+		require.NoError(stopErr, "failed to stop network after bootstrap failure")
+		// TODO(marun) How to avoid double failure reporting?
+		require.FailNow("failed to bootstrap network")
 	}
 
-	tc.Log().Info("network started successfully")
+	log.Info("network started successfully")
 
 	symlinkPath, err := tmpnet.GetReusableNetworkPathForOwner(network.Owner)
 	require.NoError(err)
@@ -299,7 +303,7 @@ func StartNetwork(
 		// Symlink the path of the created network to the default owner path (e.g. latest_avalanchego-e2e)
 		// to enable easy discovery for reuse.
 		require.NoError(os.Symlink(network.Dir, symlinkPath))
-		tc.Log().Info("symlinked network dir for reuse",
+		log.Info("symlinked network dir for reuse",
 			zap.String("networkDir", network.Dir),
 			zap.String("symlinkPath", symlinkPath),
 		)
@@ -307,7 +311,7 @@ func StartNetwork(
 
 	tc.DeferCleanup(func() {
 		if reuseNetwork {
-			tc.Log().Info("skipping shutdown for network intended for reuse",
+			log.Info("skipping shutdown for network intended for reuse",
 				zap.String("networkDir", network.Dir),
 				zap.String("symlinkPath", symlinkPath),
 			)
@@ -315,20 +319,20 @@ func StartNetwork(
 		}
 
 		if skipShutdown {
-			tc.Log().Info("skipping shutdown for network",
+			log.Info("skipping shutdown for network",
 				zap.String("networkDir", network.Dir),
 			)
 			return
 		}
 
 		if shutdownDelay > 0 {
-			tc.Log().Info("delaying network shutdown to ensure final metrics scrape",
+			log.Info("delaying network shutdown to ensure final metrics scrape",
 				zap.Duration("delay", shutdownDelay),
 			)
 			time.Sleep(shutdownDelay)
 		}
 
-		tc.Log().Info("shutting down network")
+		log.Info("shutting down network")
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer cancel()
 		require.NoError(network.Stop(ctx))
