@@ -186,10 +186,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		var (
 			networkID           = env.GetNetwork().GetNetworkID()
 			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
+			stakingAddress      = e2e.GetLocalStakingAddress(tc, subnetGenesisNode)
 		)
 		genesisPeer, err := peer.StartTestPeer(
 			tc.DefaultContext(),
-			subnetGenesisNode.StakingAddress,
+			stakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
 				tc.Log().Info("received a message",

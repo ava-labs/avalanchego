@@ -172,9 +172,13 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 			}
 
 			for _, subnet := range network.Subnets {
-				for _, uri := range uris {
+				for nodeID, uri := range uris {
 					infoClient := info.NewClient(uri)
 					for _, chain := range subnet.Chains {
+						tc.Log().Info("checking if chain is bootstrapped",
+							zap.Stringer("chainID", chain.ChainID),
+							zap.Stringer("nodeID", nodeID),
+						)
 						isBootstrapped, err := infoClient.IsBootstrapped(tc.DefaultContext(), chain.ChainID.String())
 						// Ignore errors since a chain id that is not yet known will result in a recoverable error.
 						if err != nil || !isBootstrapped {
@@ -204,7 +208,7 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		uri, cancel, err := node.GetLocalURI(tc.DefaultContext())
 		require.NoError(err)
 		tc.DeferCleanup(cancel)
-		env.URIs[i] = tmpnet.NodeURI{
+		uris[i] = tmpnet.NodeURI{
 			NodeID: node.NodeID,
 			URI:    uri,
 		}

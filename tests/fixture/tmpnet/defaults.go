@@ -61,12 +61,17 @@ func DefaultProcessFlags() FlagsMap {
 }
 
 // Flags appropriate for a node running as a local process
-func DefaultKubeFlags() FlagsMap {
-	return FlagsMap{
+func DefaultKubeFlags(includePluginDir bool) FlagsMap {
+	flags := FlagsMap{
 		config.HTTPHostKey:        "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for readiness check
 		config.LogDisplayLevelKey: logging.Info.String(),
-		config.LogLevelKey:        logging.Off.String(), // Assume collection of stdout logs
+		// TODO(marun) Revert
+		config.LogLevelKey: logging.Info.String(), // Assume collection of stdout logs
 	}
+	if includePluginDir {
+		flags[config.PluginDirKey] = "/avalanchego/build/plugins"
+	}
+	return flags
 }
 
 // Flags required by e2e testing
@@ -85,7 +90,8 @@ func DefaultChainConfigs() map[string]FlagsMap {
 		// defined in the `github.com/ava-labs/coreth/evm` package.
 		"C": {
 			"warp-api-enabled": true,
-			"log-level":        "trace",
+			// TODO(marun) Revert
+			"log-level": "info",
 		},
 	}
 }

@@ -99,6 +99,8 @@ func NewNodeStatefulSet(
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": name,
+						// TODO(marun) Need to add more labels when running tests via e.g. github actions (repo, workflow, job details, run)
+						"promtail-collect": "true",
 					},
 				},
 				Spec: corev1.PodSpec{

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -138,6 +139,7 @@ func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpne
 
 	node := tmpnet.NewEphemeralNode(flags)
 	require.NoError(network.StartNode(tc.DefaultContext(), node))
+	WaitForHealthy(tc, node)
 
 	tc.DeferCleanup(func() {
 		tc.Log().Info("shutting down ephemeral node",
@@ -366,4 +368,11 @@ func GetLocalURI(tc tests.TestContext, node *tmpnet.Node) string {
 	require.NoError(tc, err)
 	tc.DeferCleanup(cancel)
 	return uri
+}
+
+func GetLocalStakingAddress(tc tests.TestContext, node *tmpnet.Node) netip.AddrPort {
+	stakingAddress, cancel, err := node.GetLocalStakingAddress(tc.DefaultContext())
+	require.NoError(tc, err)
+	tc.DeferCleanup(cancel)
+	return stakingAddress
 }
