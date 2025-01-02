@@ -3,4 +3,4 @@
 
 package keychain
 
-//go:generate go run go.uber.org/mock/mockgen@v0.5 -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/ledger.go -mock_names=Ledger=Ledger . Ledger
+//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/ledger.go -mock_names=Ledger=Ledger . Ledger
