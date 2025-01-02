@@ -98,8 +98,6 @@ func newTestVerifier(t testing.TB, c testVerifierConfig) *verifier {
 		},
 		txExecutorBackend: &executor.Backend{
 			Config: &config.Internal{
-				CreateAssetTxFee:       genesis.LocalParams.CreateAssetTxFee,
-				TxFee:                  genesis.LocalParams.TxFee,
 				DynamicFeeConfig:       genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig:     genesis.LocalParams.ValidatorFeeConfig,
 				SybilProtectionEnabled: true,

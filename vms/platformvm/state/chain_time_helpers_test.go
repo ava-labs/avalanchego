@@ -211,8 +211,6 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 
 func TestPickFeeCalculator(t *testing.T) {
 	var (
-		createAssetTxFee = genesis.LocalParams.CreateAssetTxFee
-		txFee            = genesis.LocalParams.TxFee
 		dynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
 	)
 
@@ -240,8 +238,6 @@ func TestPickFeeCalculator(t *testing.T) {
 		t.Run(test.fork.String(), func(t *testing.T) {
 			var (
 				config = &config.Internal{
-					CreateAssetTxFee: createAssetTxFee,
-					TxFee:            txFee,
 					DynamicFeeConfig: dynamicFeeConfig,
 					UpgradeConfig:    upgradetest.GetConfig(test.fork),
 				}

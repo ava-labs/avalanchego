@@ -80,8 +80,6 @@ const (
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-
-	defaultTxFee = 100 * units.NanoAvax
 )
 
 var (
@@ -127,7 +125,6 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
 		DynamicFeeConfig:       defaultDynamicFeeConfig,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,

@@ -18,7 +18,6 @@ type Context struct {
 	AVAXAssetID       ids.ID
 	ComplexityWeights gas.Dimensions
 	GasPrice          gas.Price
-	TxFee             uint64
 }
 
 func NewSnowContext(networkID uint32, avaxAssetID ids.ID) (*snow.Context, error) {

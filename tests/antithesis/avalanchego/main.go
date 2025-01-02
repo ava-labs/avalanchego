@@ -475,11 +475,7 @@ func (w *workload) issueXToPTransfer(ctx context.Context) {
 		avaxAssetID   = xContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
 		xBaseTxFee    = xContext.BaseTxFee
-		pBuilder      = pWallet.Builder()
-		pContext      = pBuilder.Context()
-		pBaseTxFee    = pContext.TxFee
-		txFees        = xBaseTxFee + pBaseTxFee
-		neededBalance = txFees + units.Avax
+		neededBalance = xBaseTxFee + units.Avax
 	)
 	if avaxBalance < neededBalance {
 		w.log.Info("skipping X-chain tx issuance due to insufficient balance",
@@ -581,9 +577,7 @@ func (w *workload) issuePToXTransfer(ctx context.Context) {
 		pContext      = pBuilder.Context()
 		avaxAssetID   = pContext.AVAXAssetID
 		avaxBalance   = balances[avaxAssetID]
-		pBaseTxFee    = pContext.TxFee
-		xBaseTxFee    = xContext.BaseTxFee
-		txFees        = pBaseTxFee + xBaseTxFee
+		txFees        = xContext.BaseTxFee
 		neededBalance = txFees + units.Schmeckle
 	)
 	if avaxBalance < neededBalance {

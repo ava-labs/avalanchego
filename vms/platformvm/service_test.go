@@ -996,8 +996,6 @@ func TestGetBlock(t *testing.T) {
 			service, _ := defaultService(t)
 			service.vm.ctx.Lock.Lock()
 
-			service.vm.Internal.CreateAssetTxFee = 100 * defaultTxFee
-
 			subnetID := testSubnet1.ID()
 			wallet := newWallet(t, service.vm, walletConfig{
 				subnetIDs: []ids.ID{subnetID},

@@ -215,7 +215,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env.state.SetTimestamp(test.time) // to duly set fee
 
 			config := *env.config
-			config.TxFee = test.fee
 			subnetID := testSubnet1.ID()
 			wallet := newWallet(t, env, walletConfig{
 				config:    &config,

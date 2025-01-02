@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
-	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -59,7 +59,7 @@ var (
 				// hardcode the result.
 				ExcessConversionConstant: 2_164_043, // Double every 30s
 			},
-			ValidatorFeeConfig: validatorfee.Config{
+			ValidatorFeeConfig: fee.Config{
 				Capacity: 20_000,
 				Target:   10_000,
 				MinPrice: gas.Price(1 * units.NanoAvax),

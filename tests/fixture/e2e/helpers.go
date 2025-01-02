@@ -332,7 +332,7 @@ func NewPChainFeeCalculatorFromContext(context *builder.Context) fee.Calculator 
 	if context.GasPrice != 0 {
 		return fee.NewDynamicCalculator(context.ComplexityWeights, context.GasPrice)
 	}
-	return fee.NewSimpleCalculator(context.TxFee)
+	return fee.NewSimpleCalculator(0)
 }
 
 // GetRepoRootPath strips the provided suffix from the current working

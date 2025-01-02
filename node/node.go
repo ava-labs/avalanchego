@@ -1213,8 +1213,6 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
-				TxFee:                     n.Config.TxFee,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,

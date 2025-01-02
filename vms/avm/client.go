@@ -75,7 +75,7 @@ type Client interface {
 	GetAllBalances(ctx context.Context, addr ids.ShortID, includePartial bool, options ...rpc.Option) ([]Balance, error)
 
 	// GetTxFee returns the cost to issue certain transactions
-	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeReply, error)
+	GetTxFee(context.Context, ...rpc.Option) (uint64, uint64, error)
 
 	// CreateAsset creates a new asset and returns its assetID
 	//
@@ -389,10 +389,10 @@ func (c *client) GetAllBalances(
 	return res.Balances, err
 }
 
-func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeReply, error) {
+func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (uint64, uint64, error) {
 	res := &GetTxFeeReply{}
 	err := c.requester.SendRequest(ctx, "avm.getTxFee", struct{}{}, res, options...)
-	return res, err
+	return uint64(res.TxFee), uint64(res.CreateAssetTxFee), err
 }
 
 // ClientHolder describes how much an address owns of an asset

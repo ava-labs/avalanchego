@@ -47,9 +47,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
-
-	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 const (
@@ -783,7 +782,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				MinPrice:                 gas.Price(v.GetUint64(DynamicFeesMinGasPriceKey)),
 				ExcessConversionConstant: gas.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
 			},
-			ValidatorFeeConfig: validatorfee.Config{
+			ValidatorFeeConfig: fee.Config{
 				Capacity:                 gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
 				Target:                   gas.Gas(v.GetUint64(ValidatorFeesTargetKey)),
 				MinPrice:                 gas.Price(v.GetUint64(ValidatorFeesMinPriceKey)),

@@ -624,7 +624,6 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		TxFee:                  defaultTxFee,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,
 		MinDelegatorStake:      defaultMinDelegatorStake,
