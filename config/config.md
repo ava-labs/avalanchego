@@ -227,35 +227,6 @@ among currently supported file format (see
 Sets the base data directory where default sub-directories will be placed unless otherwise specified.
 Defaults to `$HOME/.avalanchego`.
 
-## Partial Sync Primary Network
-
-#### `--partial-sync-primary-network` (string)
-
-Partial sync enables nodes that are not primary network validators to optionally sync
-only the P-chain on the primary network. Nodes that use this option can still track
-Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
-This config defaults to `false`.
-
-## State Syncing
-
-#### `--state-sync-ids` (string)
-
-State sync IDs is a comma-separated list of validator IDs. The specified
-validators will be contacted to get and authenticate the starting point (state
-summary) for state sync. An example setting of this field would be
-`--state-sync-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"`.
-The number of given IDs here must be same with number of given
-`--state-sync-ips`. The default value is empty, which results in all validators
-being sampled.
-
-#### `--state-sync-ips` (string)
-
-State sync IPs is a comma-separated list of IP:port pairs. These IP Addresses
-will be contacted to get and authenticate the starting point (state summary) for
-state sync. An example setting of this field would be
-`--state-sync-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number of given IPs here
-must be the same with the number of given `--state-sync-ids`.
-
 ## Database
 
 ##### `--db-dir` (string, file path)
@@ -411,6 +382,13 @@ Any keys not given will receive the default value.
 }
 ```
 
+## File Descriptor Limit
+
+#### `--fd-limit` (int)
+
+Attempts to raise the process file descriptor limit to at least this value and
+error if the value is above the system max. Linux default `32768`.
+
 ## Genesis
 
 #### `--genesis-file` (string)
@@ -534,13 +512,6 @@ Maximum duration before timing out writes of the response. It is reset whenever
 a new request’s header is read. A zero or negative value means there will be no
 timeout.
 
-## File Descriptor Limit
-
-#### `--fd-limit` (int)
-
-Attempts to raise the process file descriptor limit to at least this value and
-error if the value is above the system max. Linux default `32768`.
-
 ## Logging
 
 #### `--log-level` (string, `{verbo, debug, trace, info, warn, error, fatal, off}`)
@@ -641,6 +612,15 @@ Defaults to `0.1`.
 
 Type of exporter to use for tracing. Options are [`grpc`,`http`]. Defaults to `grpc`.
 
+## Partial Sync Primary Network
+
+#### `--partial-sync-primary-network` (string)
+
+Partial sync enables nodes that are not primary network validators to optionally sync
+only the P-chain on the primary network. Nodes that use this option can still track
+Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
+This config defaults to `false`.
+
 ## Public IP
 
 Validators must know one of their public facing IP addresses so they can enable
@@ -666,6 +646,26 @@ mappings, if applicable. Default to 5 minutes.
 
 When provided, the node will use that service to periodically resolve/update its
 public IP. Only acceptable values are `ifconfigCo`, `opendns` or `ifconfigMe`.
+
+## State Syncing
+
+#### `--state-sync-ids` (string)
+
+State sync IDs is a comma-separated list of validator IDs. The specified
+validators will be contacted to get and authenticate the starting point (state
+summary) for state sync. An example setting of this field would be
+`--state-sync-ids="NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg,NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"`.
+The number of given IDs here must be same with number of given
+`--state-sync-ips`. The default value is empty, which results in all validators
+being sampled.
+
+#### `--state-sync-ips` (string)
+
+State sync IPs is a comma-separated list of IP:port pairs. These IP Addresses
+will be contacted to get and authenticate the starting point (state summary) for
+state sync. An example setting of this field would be
+`--state-sync-ips="127.0.0.1:12345,1.2.3.4:5678"`. The number of given IPs here
+must be the same with the number of given `--state-sync-ids`.
 
 ## Staking
 
