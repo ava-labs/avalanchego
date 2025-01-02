@@ -427,7 +427,7 @@ func TestGetTx(t *testing.T) {
 					tx.Unsigned.InitCtx(service.vm.ctx)
 					expectedTxJSON, err := json.Marshal(tx)
 					require.NoError(err)
-					require.Equal(expectedTxJSON, []byte(response.Tx))
+					require.JSONEq(string(expectedTxJSON), string(response.Tx))
 				}
 			})
 		}
@@ -1041,7 +1041,7 @@ func TestGetBlock(t *testing.T) {
 				statelessBlock.InitCtx(service.vm.ctx)
 				expectedBlockJSON, err := json.Marshal(statelessBlock)
 				require.NoError(err)
-				require.Equal(expectedBlockJSON, []byte(response.Block))
+				require.JSONEq(string(expectedBlockJSON), string(response.Block))
 			default:
 				var blockStr string
 				require.NoError(json.Unmarshal(response.Block, &blockStr))
@@ -1274,7 +1274,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			expectedJSON, err := json.Marshal(expected)
 			require.NoError(err)
 
-			require.Equal(json.RawMessage(expectedJSON), reply.Block)
+			require.JSONEq(string(expectedJSON), string(reply.Block))
 		})
 	}
 }

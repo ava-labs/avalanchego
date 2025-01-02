@@ -989,10 +989,10 @@ avm.getBlockByHeight({
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "avm.getBlockByHeight”,
+    "method": "avm.getBlockByHeight",
     "params": {
-        “height”: “275686313486”,
-        "encoding": “hex”
+        "height": "275686313486",
+        "encoding": "hex"
     },
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
