@@ -136,11 +136,19 @@ func NewEthClient(tc tests.TestContext, nodeURI tmpnet.NodeURI) ethclient.Client
 
 // Adds an ephemeral node intended to be used by a single test.
 func AddEphemeralNode(tc tests.TestContext, network *tmpnet.Network, flags tmpnet.FlagsMap) *tmpnet.Node {
+	return AddEphemeralNodeWithWaitForHealth(tc, network, flags, true)
+}
+
+// Adds an ephemeral node intended to be used by a single test with an optional health check.
+// TODO(marun) Need to figure out a nicer way to handle the case of ephemeral nodes that aren't expected to become healthy
+func AddEphemeralNodeWithWaitForHealth(tc tests.TestContext, network *tmpnet.Network, flags tmpnet.FlagsMap, waitForHealth bool) *tmpnet.Node {
 	require := require.New(tc)
 
 	node := tmpnet.NewEphemeralNode(flags)
 	require.NoError(network.StartNode(tc.DefaultContext(), node))
-	WaitForHealthy(tc, node)
+	if waitForHealth {
+		WaitForHealthy(tc, node)
+	}
 
 	tc.DeferCleanup(func() {
 		tc.Log().Info("shutting down ephemeral node",
