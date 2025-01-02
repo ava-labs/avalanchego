@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 			// the same node ID.
 			config.DataDirKey: fmt.Sprintf("%s-second", node1Flags[config.DataDirKey]),
 		}
-		node2 := e2e.AddEphemeralNode(tc, network, node2Flags)
+		node2 := e2e.AddEphemeralNodeWithWaitForHealth(tc, network, node2Flags, false /* waitForHealth */)
 
 		tc.By("checking that the second new node fails to become healthy before timeout")
 		err := tmpnet.WaitForHealthyNode(tc.DefaultContext(), tc.Log(), node2)
