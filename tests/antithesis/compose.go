@@ -34,6 +34,12 @@ var (
 // the subnet will be created and written to the target path. The runtimePluginDir should be set if the node
 // image used for the test setup uses a path other than the default (~/.avalanchego/plugins).
 func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtimePluginDir string) error {
+	// TODO(marun) Is there a better way to ensure parity between the configuration that initializes the database and the configuration used at runtime?
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = tmpnet.FlagsMap{}
+	}
+	network.DefaultFlags.SetDefaults(tmpnet.DefaultTestFlags())
+
 	targetPath := os.Getenv("TARGET_PATH")
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
