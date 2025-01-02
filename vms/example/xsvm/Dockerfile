@@ -25,6 +25,6 @@ RUN ./scripts/build_xsvm.sh
 FROM $AVALANCHEGO_NODE_IMAGE AS execution
 
 # Copy the xsvm binary to the container plugin path
-COPY --from=builder $BUILDER_WORKDIR/build/xsvm /avalanchego/build/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
+COPY --from=builder /build/build/xsvm /avalanchego/build/plugins/v3m4wPxaHpvGr8qfMeyK6PRW3idZrPHmYcMTt7oXdK47yurVH
 
 # The node image's entrypoint will be reused.

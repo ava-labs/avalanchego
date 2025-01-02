@@ -14,5 +14,7 @@ fi
 # TODO(marun) Make the namespace configurable
 PATH="${PWD}/bin:$PATH" kubectl create namespace tmpnet || true
 
+bash -x ./scripts/build_xsvm_image.sh
+
 # TODO(marun) Is the path still necessary?
-KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" bash -x ./scripts/tests.e2e.sh --runtime=kube
+E2E_SERIAL=1 KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" bash -x ./scripts/tests.e2e.sh --runtime=kube --image-name=localhost:5001/avalanchego-xsvm:latest
