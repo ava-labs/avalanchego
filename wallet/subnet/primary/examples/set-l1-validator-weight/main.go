@@ -42,14 +42,13 @@ func main() {
 		log.Fatalf("failed to parse secret key: %s\n", err)
 	}
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
 	ctx := context.Background()
-	wallet, err := primary.MakeWallet(
+	wallet, err := primary.MakePWallet(
 		ctx,
 		uri,
-		kc,
 		kc,
 		primary.WalletConfig{},
 	)
@@ -58,9 +57,8 @@ func main() {
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-	context := pWallet.Builder().Context()
+	// Get the chain context
+	context := wallet.Builder().Context()
 
 	addressedCallPayload, err := message.NewL1ValidatorWeight(
 		validationID,
@@ -99,10 +97,7 @@ func main() {
 			Signers: set.NewBits(0).Bytes(),
 			Signature: ([bls.SignatureLen]byte)(
 				bls.SignatureToBytes(
-					bls.Sign(
-						sk,
-						unsignedWarp.Bytes(),
-					),
+					sk.Sign(unsignedWarp.Bytes()),
 				),
 			),
 		},
@@ -112,7 +107,7 @@ func main() {
 	}
 
 	setWeightStartTime := time.Now()
-	setWeightTx, err := pWallet.IssueSetL1ValidatorWeightTx(
+	setWeightTx, err := wallet.IssueSetL1ValidatorWeightTx(
 		warp.Bytes(),
 	)
 	if err != nil {
