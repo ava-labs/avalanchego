@@ -47,7 +47,7 @@ func DefaultPodFlags(networkName string, dataDir string, sybilProtectionEnabled 
 	}
 }
 
-// newNodeStatefulSet returns a statefulset for an avalanchego node.
+// NewNodeStatefulSet returns a statefulset for an avalanchego node.
 func NewNodeStatefulSet(
 	name string,
 	generateName bool,
@@ -56,6 +56,7 @@ func NewNodeStatefulSet(
 	volumeName string,
 	volumeSize string,
 	volumeMountPath string,
+	labels map[string]string,
 	flags FlagsMap,
 ) *appsv1.StatefulSet {
 	var objectMeta metav1.ObjectMeta
@@ -68,6 +69,15 @@ func NewNodeStatefulSet(
 			Name: name,
 		}
 	}
+
+	podLabels := map[string]string{
+		"app":              name,
+		"promtail-collect": "true",
+	}
+	for label, value := range labels {
+		podLabels[label] = value
+	}
+
 	return &appsv1.StatefulSet{
 		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
@@ -97,11 +107,7 @@ func NewNodeStatefulSet(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": name,
-						// TODO(marun) Need to add more labels when running tests via e.g. github actions (repo, workflow, job details, run)
-						"promtail-collect": "true",
-					},
+					Labels: podLabels,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{

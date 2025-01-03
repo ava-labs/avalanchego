@@ -426,3 +426,29 @@ func (n *Node) SaveAPIPort() error {
 	}
 	return nil
 }
+
+var githubLabels = []string{
+	"repo",
+	"workflow",
+	"run_id",
+	"run_number",
+	"run_attempt",
+	"job_id",
+}
+
+func (n *Node) getPodLabels() map[string]string {
+	labels := map[string]string{
+		"network_uuid":      n.getNetwork().UUID,
+		"node_id":           n.NodeID.String(),
+		"is_ephemeral_node": strconv.FormatBool(n.IsEphemeral),
+		"network_owner":     n.getNetwork().Owner,
+	}
+	// Include the values of github labels if available
+	for _, label := range githubLabels {
+		value := os.Getenv("GH_" + strings.ToUpper(label))
+		if len(value) > 0 {
+			labels[label] = value
+		}
+	}
+	return labels
+}
