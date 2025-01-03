@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // PrivateKey-vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE => P-local1g65uqn6t77p656w64023nh8nd9updzmxyymev2
@@ -42,16 +40,7 @@ var (
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
 			CreateAssetTxFee: units.MilliAvax,
-			StaticFeeConfig: txfee.StaticConfig{
-				TxFee:                         units.MilliAvax,
-				CreateSubnetTxFee:             100 * units.MilliAvax,
-				TransformSubnetTxFee:          100 * units.MilliAvax,
-				CreateBlockchainTxFee:         100 * units.MilliAvax,
-				AddPrimaryNetworkValidatorFee: 0,
-				AddPrimaryNetworkDelegatorFee: 0,
-				AddSubnetValidatorFee:         units.MilliAvax,
-				AddSubnetDelegatorFee:         units.MilliAvax,
-			},
+			TxFee:            units.MilliAvax,
 			DynamicFeeConfig: gas.Config{
 				Weights: gas.Dimensions{
 					gas.Bandwidth: 1,     // Max block size ~1MB
@@ -69,7 +58,7 @@ var (
 				// hardcode the result.
 				ExcessConversionConstant: 2_164_043, // Double every 30s
 			},
-			ValidatorFeeConfig: validatorfee.Config{
+			ValidatorFeeConfig: fee.Config{
 				Capacity: 20_000,
 				Target:   10_000,
 				MinPrice: gas.Price(1 * units.NanoAvax),

@@ -37,7 +37,7 @@ func NewContextFromClients(
 		return nil, err
 	}
 
-	txFees, err := infoClient.GetTxFee(ctx)
+	baseTxFee, createAssetTxFee, err := xChainClient.GetTxFee(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func NewContextFromClients(
 		NetworkID:        networkID,
 		BlockchainID:     chainID,
 		AVAXAssetID:      asset.AssetID,
-		BaseTxFee:        uint64(txFees.TxFee),
-		CreateAssetTxFee: uint64(txFees.CreateAssetTxFee),
+		BaseTxFee:        baseTxFee,
+		CreateAssetTxFee: createAssetTxFee,
 	}, nil
 }

@@ -27,7 +27,6 @@ type Client interface {
 	GetBlockchainID(context.Context, string, ...rpc.Option) (ids.ID, error)
 	Peers(context.Context, []ids.NodeID, ...rpc.Option) ([]Peer, error)
 	IsBootstrapped(context.Context, string, ...rpc.Option) (bool, error)
-	GetTxFee(context.Context, ...rpc.Option) (*GetTxFeeResponse, error)
 	Upgrades(context.Context, ...rpc.Option) (*upgrade.Config, error)
 	Uptime(context.Context, ...rpc.Option) (*UptimeResponse, error)
 	GetVMs(context.Context, ...rpc.Option) (map[ids.ID][]string, error)
@@ -97,12 +96,6 @@ func (c *client) IsBootstrapped(ctx context.Context, chainID string, options ...
 		Chain: chainID,
 	}, res, options...)
 	return res.IsBootstrapped, err
-}
-
-func (c *client) GetTxFee(ctx context.Context, options ...rpc.Option) (*GetTxFeeResponse, error) {
-	res := &GetTxFeeResponse{}
-	err := c.requester.SendRequest(ctx, "info.getTxFee", struct{}{}, res, options...)
-	return res, err
 }
 
 func (c *client) Upgrades(ctx context.Context, options ...rpc.Option) (*upgrade.Config, error) {

@@ -1733,56 +1733,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-
-				// Set dependency expectations.
-				env.state.EXPECT().GetTimestamp().Return(env.latestForkTime).AnyTimes()
-				env.state.EXPECT().GetCurrentValidator(env.unsignedTx.Subnet, env.unsignedTx.NodeID).Return(env.staker, nil).Times(1)
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.EXPECT().GetSubnetOwner(env.unsignedTx.Subnet).Return(subnetOwner, nil).Times(1)
-				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
-				env.flowChecker.EXPECT().VerifySpend(
-					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
-				).Return(nil).Times(1)
-				env.state.EXPECT().DeleteCurrentValidator(env.staker)
-				env.state.EXPECT().DeleteUTXO(gomock.Any()).Times(len(env.unsignedTx.Ins))
-				env.state.EXPECT().AddUTXO(gomock.Any()).Times(len(env.unsignedTx.Outs))
-
-				// This isn't actually called, but is added here as a regression
-				// test to ensure that converted subnets can still remove
-				// permissioned validators.
-				env.state.EXPECT().GetSubnetToL1Conversion(env.unsignedTx.Subnet).Return(
-					state.SubnetToL1Conversion{
-						ConversionID: ids.GenerateTestID(),
-						ChainID:      ids.GenerateTestID(),
-						Addr:         []byte("address"),
-					},
-					nil,
-				).AnyTimes()
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-				}
-				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
-			},
-			expectedErr: nil,
-		},
-		{
 			name: "tx fails syntactic verification",
 			newExecutor: func(ctrl *gomock.Controller) (*txs.RemoveSubnetValidatorTx, *standardTxExecutor) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
@@ -2492,14 +2442,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			expectedErr: errIsImmutable,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "too many active validators",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
@@ -2877,14 +2819,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "fee calculation overflow",
@@ -3421,14 +3355,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "insufficient fee",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.feeCalculator = txfee.NewDynamicCalculator(
@@ -3871,14 +3797,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "fee overflow",
 			updateTx: func(tx *txs.IncreaseL1ValidatorBalanceTx) {
 				tx.Balance = math.MaxUint64
@@ -4181,15 +4099,6 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
 			},
 			expectedErr: errUnauthorizedModification,
-		},
-		{
-			name:         "invalid fee calculation",
-			validationID: validationID,
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name:         "already deactivated",
