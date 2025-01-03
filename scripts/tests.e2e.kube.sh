@@ -29,4 +29,4 @@ else
 fi
 
 # TODO(marun) Is the path still necessary?
-E2E_SERIAL=1 bash -x ./scripts/tests.e2e.sh --runtime=kube --image-name=localhost:5001/avalanchego-xsvm
+E2E_SERIAL=1 KUBECONFIG="$HOME/.kube/config" PATH="${PWD}/bin:$PATH" bash -x ./scripts/tests.e2e.sh --runtime=kube --image-name=localhost:5001/avalanchego-xsvm
