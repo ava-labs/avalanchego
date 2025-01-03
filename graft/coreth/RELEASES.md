@@ -3,6 +3,7 @@
 ## [v0.14.1](https://github.com/ava-labs/coreth/releases/tag/v0.14.1)
 - Remove API eth_getAssetBalance that was used to query ANT balances (deprecated since v0.10.0)
 - Remove legacy gossip handler and metrics (deprecated since v0.10.0)
+- Refactored trie_prefetcher.go to be structurally similar to [upstream](https://github.com/ethereum/go-ethereum/tree/v1.13.14).
 
 ## [v0.14.0](https://github.com/ava-labs/coreth/releases/tag/v0.14.0)
 - Minor version update to correspond to avalanchego v1.12.0 / Etna.
