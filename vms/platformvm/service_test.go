@@ -1405,14 +1405,14 @@ func FuzzGetFeeState(f *testing.F) {
 func TestGetCurrentValidatorsForL1(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 
-	otherSK, err := bls.NewSecretKey()
+	otherSK, err := bls.NewSigner()
 	require.NoError(t, err)
-	otherPK := bls.PublicFromSecretKey(otherSK)
+	otherPK := otherSK.PublicKey()
 	otherPKBytes := bls.PublicKeyToUncompressedBytes(otherPK)
 	now := time.Now()
 
