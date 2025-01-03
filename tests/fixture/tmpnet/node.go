@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -42,29 +42,40 @@ var (
 
 // NodeRuntime defines the methods required to support running a node.
 type NodeRuntime interface {
-	readState() error
-	Start(log logging.Logger) error
-	InitiateStop() error
+	readState(ctx context.Context) error
+	SetDefaultFlags()
+	Start(ctx context.Context) error
+	InitiateStop(ctx context.Context) error
 	WaitForStopped(ctx context.Context) error
+	Restart(ctx context.Context) error
+	GetLocalURI(ctx context.Context) (string, func(), error)
+	GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error)
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
-// Configuration required to configure a node runtime.
+// Configuration required to configure a node runtime. Only one of the fields should be set.
 type NodeRuntimeConfig struct {
+	// Path to the AvalancheGo binary if the node is running as a process.
 	AvalancheGoPath string
+	// The kubernetes configuration if the node is running as a pod.
+	KubeRuntimeConfig *KubeRuntimeConfig
+}
+
+// Configuration required to configure a node running as a pod.
+type KubeRuntimeConfig struct {
+	// Path to the kubeconfig file to use.
+	Kubeconfig string
+	// Namespace the node will be deployed to. For simplicity all
+	// nodes in the same network are deployed to the same namespace to
+	// ensure they can communicate freely.
+	Namespace string
+	// The name of the image the node should run.
+	ImageName string
 }
 
 // Node supports configuring and running a node participating in a temporary network.
 type Node struct {
-	// Uniquely identifies the network the node is part of to enable monitoring.
-	NetworkUUID string
-
-	// Identify the entity associated with this network. This is
-	// intended to be used to label metrics to enable filtering
-	// results for a test run between the primary/shared network used
-	// by the majority of tests and private networks used by
-	// individual tests.
-	NetworkOwner string
+	network *Network
 
 	// Set by EnsureNodeID which is also called when the node is read.
 	NodeID ids.NodeID
@@ -119,17 +130,18 @@ func NewNodesOrPanic(count int) []*Node {
 }
 
 // Reads a node's configuration from the specified directory.
-func ReadNode(dataDir string) (*Node, error) {
+func ReadNode(ctx context.Context, network *Network, dataDir string) (*Node, error) {
 	node := NewNode(dataDir)
-	return node, node.Read()
+	node.network = network
+	return node, node.Read(ctx)
 }
 
 // Reads nodes from the specified network directory.
-func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
+func ReadNodes(ctx context.Context, network *Network, includeEphemeral bool) ([]*Node, error) {
 	nodes := []*Node{}
 
 	// Node configuration is stored in child directories
-	entries, err := os.ReadDir(networkDir)
+	entries, err := os.ReadDir(network.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read dir: %w", err)
 	}
@@ -138,8 +150,8 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 			continue
 		}
 
-		nodeDir := filepath.Join(networkDir, entry.Name())
-		node, err := ReadNode(nodeDir)
+		nodeDir := filepath.Join(network.Dir, entry.Name())
+		node, err := ReadNode(ctx, network, nodeDir)
 		if errors.Is(err, os.ErrNotExist) {
 			// If no config file exists, assume this is not the path of a node
 			continue
@@ -160,8 +172,22 @@ func ReadNodes(networkDir string, includeEphemeral bool) ([]*Node, error) {
 // Retrieves the runtime for the node.
 func (n *Node) getRuntime() NodeRuntime {
 	if n.runtime == nil {
-		n.runtime = &NodeProcess{
-			node: n,
+		runtime := "process"
+		if n.RuntimeConfig.KubeRuntimeConfig != nil {
+			runtime = "kube"
+		}
+		switch runtime {
+		case "process":
+			n.runtime = &NodeProcess{
+				node: n,
+			}
+		case "kube":
+			n.runtime = &NodePod{
+				node: n,
+			}
+		default:
+			// TODO(marun) Validate the runtime sooner and avoid an error condition
+			panic("unsupported runtime: " + runtime)
 		}
 	}
 	return n.runtime
@@ -173,27 +199,51 @@ func (n *Node) IsHealthy(ctx context.Context) (bool, error) {
 	return n.getRuntime().IsHealthy(ctx)
 }
 
-func (n *Node) Start(log logging.Logger) error {
-	return n.getRuntime().Start(log)
+func (n *Node) Start(ctx context.Context) error {
+	return n.getRuntime().Start(ctx)
 }
 
 func (n *Node) InitiateStop(ctx context.Context) error {
 	if err := n.SaveMetricsSnapshot(ctx); err != nil {
 		return err
 	}
-	return n.getRuntime().InitiateStop()
+	return n.getRuntime().InitiateStop(ctx)
 }
 
 func (n *Node) WaitForStopped(ctx context.Context) error {
 	return n.getRuntime().WaitForStopped(ctx)
 }
 
-func (n *Node) readState() error {
-	return n.getRuntime().readState()
+func (n *Node) Restart(ctx context.Context) error {
+	return n.getRuntime().Restart(ctx)
+}
+
+func (n *Node) readState(ctx context.Context) error {
+	return n.getRuntime().readState(ctx)
 }
 
 func (n *Node) GetDataDir() string {
 	return cast.ToString(n.Flags[config.DataDirKey])
+}
+
+func (n *Node) GetLocalURI(ctx context.Context) (string, func(), error) {
+	return n.getRuntime().GetLocalURI(ctx)
+}
+
+func (n *Node) GetLocalStakingAddress(ctx context.Context) (netip.AddrPort, func(), error) {
+	return n.getRuntime().GetLocalStakingAddress(ctx)
+}
+
+// getNetwork returns the network associated with the node. If not
+// network is set, a placeholder network will be returned as a simple
+// way of communicating an undesirable circumstance.
+func (n *Node) getNetwork() *Network {
+	if n.network != nil {
+		return n.network
+	}
+	// Tripwire for unexpected usage
+	// TODO(marun) Not appropriate for anything load-bearing
+	panic("no network set for the node")
 }
 
 // Writes the current state of the metrics endpoint to disk
@@ -202,7 +252,12 @@ func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 		// No URI to request metrics from
 		return nil
 	}
-	uri := n.URI + "/ext/metrics"
+	baseURI, cancel, err := n.GetLocalURI(ctx)
+	if err != nil {
+		return nil
+	}
+	defer cancel()
+	uri := baseURI + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return err
@@ -225,21 +280,6 @@ func (n *Node) Stop(ctx context.Context) error {
 		return err
 	}
 	return n.WaitForStopped(ctx)
-}
-
-// Sets networking configuration for the node.
-// Convenience method for setting networking flags.
-func (n *Node) SetNetworkingConfig(bootstrapIDs []string, bootstrapIPs []string) {
-	if _, ok := n.Flags[config.HTTPPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.HTTPPortKey] = 0
-	}
-	if _, ok := n.Flags[config.StakingPortKey]; !ok {
-		// Default to dynamic port allocation
-		n.Flags[config.StakingPortKey] = 0
-	}
-	n.Flags[config.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-	n.Flags[config.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
 }
 
 // Ensures staking and signing keys are generated if not already present and
@@ -379,6 +419,36 @@ func (n *Node) SaveAPIPort() error {
 	if err != nil {
 		return err
 	}
-	n.Flags[config.HTTPPortKey] = port
+
+	// Only save a non-default port
+	if port != strconv.Itoa(config.DefaultHTTPPort) {
+		n.Flags[config.HTTPPortKey] = port
+	}
 	return nil
+}
+
+var githubLabels = []string{
+	"repo",
+	"workflow",
+	"run_id",
+	"run_number",
+	"run_attempt",
+	"job_id",
+}
+
+func (n *Node) getPodLabels() map[string]string {
+	labels := map[string]string{
+		"network_uuid":      n.getNetwork().UUID,
+		"node_id":           n.NodeID.String(),
+		"is_ephemeral_node": strconv.FormatBool(n.IsEphemeral),
+		"network_owner":     n.getNetwork().Owner,
+	}
+	// Include the values of github labels if available
+	for _, label := range githubLabels {
+		value := os.Getenv("GH_" + strings.ToUpper(label))
+		if len(value) > 0 {
+			labels[label] = value
+		}
+	}
+	return labels
 }

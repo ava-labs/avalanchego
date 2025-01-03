@@ -34,6 +34,12 @@ var (
 // the subnet will be created and written to the target path. The runtimePluginDir should be set if the node
 // image used for the test setup uses a path other than the default (~/.avalanchego/plugins).
 func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtimePluginDir string) error {
+	// TODO(marun) Is there a better way to ensure parity between the configuration that initializes the database and the configuration used at runtime?
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = tmpnet.FlagsMap{}
+	}
+	network.DefaultFlags.SetDefaults(tmpnet.DefaultTestFlags())
+
 	targetPath := os.Getenv("TARGET_PATH")
 	if len(targetPath) == 0 {
 		return errTargetPathEnvVarNotSet
@@ -62,7 +68,16 @@ func GenerateComposeConfig(network *tmpnet.Network, baseImageName string, runtim
 			return fmt.Errorf("failed to get bootstrap volume path: %w", err)
 		}
 
-		if err := initBootstrapDB(network, avalancheGoPath, pluginDir, bootstrapVolumePath); err != nil {
+		network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+			AvalancheGoPath: avalancheGoPath,
+		}
+		// TODO(marun) Need to have a standard way of initializing a network
+		if network.DefaultFlags == nil {
+			network.DefaultFlags = tmpnet.FlagsMap{}
+		}
+		network.DefaultFlags[config.PluginDirKey] = pluginDir
+
+		if err := initBootstrapDB(network, bootstrapVolumePath); err != nil {
 			return fmt.Errorf("failed to initialize db volumes: %w", err)
 		}
 	}
