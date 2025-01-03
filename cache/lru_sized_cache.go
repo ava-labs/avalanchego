@@ -12,12 +12,20 @@ import (
 
 var _ Cacher[struct{}, any] = (*sizedLRU[struct{}, any])(nil)
 
+// sizedElement is used to store the element + size, so we dont call size fn when removing
+// (and also is solving issues of mutating values after they were inserted,
+// which may alter the size)
+type sizedElement[V any] struct {
+	value V
+	size  int
+}
+
 // sizedLRU is a key value store with bounded size. If the size is attempted to
 // be exceeded, then elements are removed from the cache until the bound is
 // honored, based on evicting the least recently used value.
 type sizedLRU[K comparable, V any] struct {
 	lock        sync.Mutex
-	elements    *linked.Hashmap[K, V]
+	elements    *linked.Hashmap[K, *sizedElement[V]]
 	maxSize     int
 	currentSize int
 	size        func(K, V) int
@@ -25,7 +33,7 @@ type sizedLRU[K comparable, V any] struct {
 
 func NewSizedLRU[K comparable, V any](maxSize int, size func(K, V) int) Cacher[K, V] {
 	return &sizedLRU[K, V]{
-		elements: linked.NewHashmap[K, V](),
+		elements: linked.NewHashmap[K, *sizedElement[V]](),
 		maxSize:  maxSize,
 		size:     size,
 	}
@@ -80,35 +88,38 @@ func (c *sizedLRU[K, V]) put(key K, value V) {
 		return
 	}
 
-	if oldValue, ok := c.elements.Get(key); ok {
-		c.currentSize -= c.size(key, oldValue)
+	if oldElement, ok := c.elements.Get(key); ok {
+		c.currentSize -= oldElement.size
 	}
 
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
 	for c.currentSize > c.maxSize-newEntrySize {
-		oldestKey, oldestValue, _ := c.elements.Oldest()
+		oldestKey, oldestElement, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
-		c.currentSize -= c.size(oldestKey, oldestValue)
+		c.currentSize -= oldestElement.size
 	}
 
-	c.elements.Put(key, value)
+	c.elements.Put(key, &sizedElement[V]{
+		value: value,
+		size:  newEntrySize,
+	})
 	c.currentSize += newEntrySize
 }
 
 func (c *sizedLRU[K, V]) get(key K) (V, bool) {
-	value, ok := c.elements.Get(key)
+	element, ok := c.elements.Get(key)
 	if !ok {
 		return utils.Zero[V](), false
 	}
 
-	c.elements.Put(key, value) // Mark [k] as MRU.
-	return value, true
+	c.elements.Put(key, element) // Mark [k] as MRU.
+	return element.value, true
 }
 
 func (c *sizedLRU[K, _]) evict(key K) {
-	if value, ok := c.elements.Get(key); ok {
+	if element, ok := c.elements.Get(key); ok {
 		c.elements.Delete(key)
-		c.currentSize -= c.size(key, value)
+		c.currentSize -= element.size
 	}
 }
 
