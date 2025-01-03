@@ -56,8 +56,6 @@ import (
 const (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-
-	defaultTxFee = 100 * units.NanoAvax
 )
 
 var testSubnet1 *txs.Tx
