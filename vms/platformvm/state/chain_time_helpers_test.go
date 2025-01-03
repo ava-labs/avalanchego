@@ -210,9 +210,7 @@ func TestGetNextStakerChangeTime(t *testing.T) {
 }
 
 func TestPickFeeCalculator(t *testing.T) {
-	var (
-		dynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	)
+	dynamicFeeConfig := genesis.LocalParams.DynamicFeeConfig
 
 	tests := []struct {
 		fork     upgradetest.Fork
