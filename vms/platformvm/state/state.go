@@ -214,9 +214,9 @@ type State interface {
 
 	SetHeight(height uint64)
 
-	// GetCurrentValidators returns legacy stakers, L1 validators for the given subnetID along with current P-chain height.
-	// Note: This is most convenient to fetch validators of an L1. Even though it can still return
-	// stakers of a subnet, it is not recommended to use this method to fetch stakers of a subnet.
+	// GetCurrentValidators returns subnet and L1 validators for the given subnetID along with current P-chain height.
+	// This method works for both subnets and L1s. Depending of the requested subnet/L1 validator schema, the return values can include
+	// return only subnet validator, only L1 validators or both if there are initial stakers in the L1 conversion.
 	GetCurrentValidators(subnetID ids.ID) ([]*Staker, []L1Validator, uint64, error)
 
 	// Discard uncommitted changes to the database.

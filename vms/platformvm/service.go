@@ -839,14 +839,7 @@ func (s *Service) getL1Validators(subnetID ids.ID, nodeIDs set.Set[ids.NodeID]) 
 		if nodeIDs.Len() != 0 && !nodeIDs.Contains(nodeID) {
 			continue
 		}
-		weight := avajson.Uint64(staker.Weight)
-		apiStaker := platformapi.Staker{
-			TxID:      staker.TxID,
-			StartTime: avajson.Uint64(staker.StartTime.Unix()),
-			EndTime:   avajson.Uint64(staker.EndTime.Unix()),
-			Weight:    weight,
-			NodeID:    nodeID,
-		}
+		apiStaker := toPlatformStaker(staker)
 		validators = append(validators, apiStaker)
 	}
 
@@ -918,16 +911,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 	}
 
 	for _, currentStaker := range targetStakers {
-		nodeID := currentStaker.NodeID
-		weight := avajson.Uint64(currentStaker.Weight)
-		apiStaker := platformapi.Staker{
-			TxID:        currentStaker.TxID,
-			StartTime:   avajson.Uint64(currentStaker.StartTime.Unix()),
-			EndTime:     avajson.Uint64(currentStaker.EndTime.Unix()),
-			Weight:      weight,
-			StakeAmount: &weight,
-			NodeID:      nodeID,
-		}
+		apiStaker := toPlatformStaker(currentStaker)
 		potentialReward := avajson.Uint64(currentStaker.PotentialReward)
 
 		delegateeReward, err := s.vm.state.GetDelegateeReward(currentStaker.SubnetID, currentStaker.NodeID)
@@ -2169,4 +2153,14 @@ func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked ma
 		)
 	}
 	return stakedOuts
+}
+
+func toPlatformStaker(staker *state.Staker) platformapi.Staker {
+	return platformapi.Staker{
+		TxID:      staker.TxID,
+		StartTime: avajson.Uint64(staker.StartTime.Unix()),
+		EndTime:   avajson.Uint64(staker.EndTime.Unix()),
+		Weight:    avajson.Uint64(staker.Weight),
+		NodeID:    staker.NodeID,
+	}
 }

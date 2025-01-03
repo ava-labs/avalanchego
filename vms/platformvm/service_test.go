@@ -1562,14 +1562,14 @@ func TestGetCurrentValidatorsForL1(t *testing.T) {
 					},
 				}
 
-				remaningBalanceOwner := message.PChainOwner{
+				remainingBalanceOwner := message.PChainOwner{
 					Threshold: 1,
 					Addresses: []ids.ShortID{
 						ids.GenerateTestShortID(),
 					},
 				}
 
-				remainingBalanceOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, remaningBalanceOwner)
+				remainingBalanceOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, remainingBalanceOwner)
 				require.NoError(err)
 				deactivationOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, deactivationOwner)
 				require.NoError(err)
