@@ -271,6 +271,7 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 		volumeName,
 		volumeSize,
 		nodeDataDir,
+		nil,
 		flags,
 	)
 

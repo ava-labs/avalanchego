@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -292,21 +291,7 @@ func (p *NodeProcess) getProcess() (*os.Process, error) {
 // Write monitoring configuration enabling collection of metrics and logs from the node.
 func (p *NodeProcess) writeMonitoringConfig() error {
 	// Ensure labeling that uniquely identifies the node and its network
-	commonLabels := FlagsMap{
-		"network_uuid":      p.node.getNetwork().UUID,
-		"node_id":           p.node.NodeID,
-		"is_ephemeral_node": strconv.FormatBool(p.node.IsEphemeral),
-		"network_owner":     p.node.getNetwork().Owner,
-		// prometheus/promtail ignore empty values so including these
-		// labels with empty values outside of a github worker (where
-		// the env vars will not be set) should not be a problem.
-		"gh_repo":        os.Getenv("GH_REPO"),
-		"gh_workflow":    os.Getenv("GH_WORKFLOW"),
-		"gh_run_id":      os.Getenv("GH_RUN_ID"),
-		"gh_run_number":  os.Getenv("GH_RUN_NUMBER"),
-		"gh_run_attempt": os.Getenv("GH_RUN_ATTEMPT"),
-		"gh_job_id":      os.Getenv("GH_JOB_ID"),
-	}
+	commonLabels := p.node.getPodLabels()
 
 	tmpnetDir, err := getTmpnetPath()
 	if err != nil {
@@ -326,7 +311,13 @@ func (p *NodeProcess) writeMonitoringConfig() error {
 	promtailLabels := FlagsMap{
 		"__path__": filepath.Join(p.node.GetDataDir(), "logs", "*.log"),
 	}
-	promtailLabels.SetDefaults(commonLabels)
+	// TODO(marun) Need to reconcile between map[string]string and map[string]any
+	for k, v := range commonLabels {
+		if _, ok := promtailLabels[k]; ok {
+			continue
+		}
+		promtailLabels[k] = v
+	}
 	promtailConfig := []FlagsMap{
 		{
 			"targets": []string{"localhost"},

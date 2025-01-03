@@ -147,6 +147,7 @@ func (p *NodePod) Start(ctx context.Context) error {
 		volumeName,
 		volumeSize,
 		volumeMountPath,
+		p.node.getPodLabels(),
 		p.getFlagsForPod(),
 	)
 

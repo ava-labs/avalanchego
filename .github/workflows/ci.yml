@@ -76,6 +76,9 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: bash -x ./scripts/tests.e2e.kube.sh
+        env:
+          LOKI_USERNAME: ${{ secrets.LOKI_ID || '' }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Upload tmpnet network dir
         uses: ./.github/actions/upload-tmpnet-artifact
         if: always()
