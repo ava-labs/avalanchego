@@ -12,9 +12,11 @@ import (
 
 var _ Cacher[struct{}, any] = (*sizedLRU[struct{}, any])(nil)
 
-// sizedElement is used to store the element + size, so we dont call size fn when removing
-// (and also is solving issues of mutating values after they were inserted,
-// which may alter the size)
+// sizedElement is used to store the element with its size, so we don't
+// calculate the size multiple times.
+//
+// This ensures that any inconsistencies returned by the size function can not
+// corrupt the cache.
 type sizedElement[V any] struct {
 	value V
 	size  int
