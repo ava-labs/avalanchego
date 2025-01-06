@@ -111,8 +111,8 @@ func (s *Server) Hijack(context.Context, *emptypb.Empty) (*responsewriterpb.Hija
 	remote := conn.RemoteAddr()
 
 	return &responsewriterpb.HijackResponse{
-		LocalNetwork:  localsigner.Network(),
-		LocalString:   localsigner.String(),
+		LocalNetwork:  local.Network(),
+		LocalString:   local.String(),
 		RemoteNetwork: remote.Network(),
 		RemoteString:  remote.String(),
 		ServerAddr:    serverListener.Addr().String(),

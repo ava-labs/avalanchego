@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -38,7 +39,7 @@ func main() {
 		log.Fatalf("failed to decode secret key: %s\n", err)
 	}
 
-	sk, err := bls.SecretKeyFromBytes(blsSKBytes)
+	sk, err := localsigner.SecretKeyFromBytes(blsSKBytes)
 	if err != nil {
 		log.Fatalf("failed to parse secret key: %s\n", err)
 	}
