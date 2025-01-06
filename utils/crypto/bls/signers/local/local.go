@@ -12,8 +12,6 @@ import (
 	blst "github.com/supranational/blst/bindings/go"
 )
 
-const SecretKeyLen = blst.BLST_SCALAR_BYTES
-
 var (
 	ErrFailedSecretKeyDeserialize            = errors.New("couldn't deserialize secret key")
 	_                             bls.Signer = (*LocalSigner)(nil) // Use the Signer interface from the parent package
