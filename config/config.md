@@ -265,120 +265,120 @@ Any keys not given will receive the default value.
 
 ```json
 {
-  // BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
-  // Use -1 for zero.
-  //
-  // The default value is 12MiB.
-  "blockCacheCapacity": int,
+	// BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
+	// Use -1 for zero.
+	//
+	// The default value is 12MiB.
+	"blockCacheCapacity": int,
 
-  // BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
-  // block.
-  //
-  // The default value is 4KiB.
-  "blockSize": int,
+	// BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
+	// block.
+	//
+	// The default value is 4KiB.
+	"blockSize": int,
 
-  // CompactionExpandLimitFactor limits compaction size after expanded.
-  // This will be multiplied by table size limit at compaction target level.
-  //
-  // The default value is 25.
-  "compactionExpandLimitFactor": int,
+	// CompactionExpandLimitFactor limits compaction size after expanded.
+	// This will be multiplied by table size limit at compaction target level.
+	//
+	// The default value is 25.
+	"compactionExpandLimitFactor": int,
 
-  // CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
-  // that a single 'sorted table' generates.  This will be multiplied by
-  // table size limit at grandparent level.
-  //
-  // The default value is 10.
-  "compactionGPOverlapsFactor": int,
+	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
+	// that a single 'sorted table' generates.  This will be multiplied by
+	// table size limit at grandparent level.
+	//
+	// The default value is 10.
+	"compactionGPOverlapsFactor": int,
 
-  // CompactionL0Trigger defines number of 'sorted table' at level-0 that will
-  // trigger compaction.
-  //
-  // The default value is 4.
-  "compactionL0Trigger": int,
+	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
+	// trigger compaction.
+	//
+	// The default value is 4.
+	"compactionL0Trigger": int,
 
-  // CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
-  // level-0.
-  // This will be multiplied by table size limit at compaction target level.
-  //
-  // The default value is 1.
-  "compactionSourceLimitFactor": int,
+	// CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
+	// level-0.
+	// This will be multiplied by table size limit at compaction target level.
+	//
+	// The default value is 1.
+	"compactionSourceLimitFactor": int,
 
-  // CompactionTableSize limits size of 'sorted table' that compaction generates.
-  // The limits for each level will be calculated as:
-  //   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
-  // The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
-  //
-  // The default value is 2MiB.
-  "compactionTableSize": int,
+	// CompactionTableSize limits size of 'sorted table' that compaction generates.
+	// The limits for each level will be calculated as:
+	//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
+	// The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
+	//
+	// The default value is 2MiB.
+	"compactionTableSize": int,
 
-  // CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
-  //
-  // The default value is 1.
-  "compactionTableSizeMultiplier": float,
+	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
+	//
+	// The default value is 1.
+	"compactionTableSizeMultiplier": float,
 
-  // CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
-  // CompactionTableSize.
-  // Use zero to skip a level.
-  //
-  // The default value is nil.
-  "compactionTableSizeMultiplierPerLevel": []float,
+	// CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
+	// CompactionTableSize.
+	// Use zero to skip a level.
+	//
+	// The default value is nil.
+	"compactionTableSizeMultiplierPerLevel": []float,
 
-  // CompactionTotalSize limits total size of 'sorted table' for each level.
-  // The limits for each level will be calculated as:
-  //   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
-  // The multiplier for each level can also fine-tuned using
-  // CompactionTotalSizeMultiplierPerLevel.
-  //
-  // The default value is 10MiB.
-  "compactionTotalSize": int,
+	// CompactionTotalSize limits total size of 'sorted table' for each level.
+	// The limits for each level will be calculated as:
+	//   CompactionTotalSize * (CompactionTotalSizeMultiplier ^ Level)
+	// The multiplier for each level can also fine-tuned using
+	// CompactionTotalSizeMultiplierPerLevel.
+	//
+	// The default value is 10MiB.
+	"compactionTotalSize": int,
 
-  // CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
-  //
-  // The default value is 10.
-  "compactionTotalSizeMultiplier": float,
+	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
+	//
+	// The default value is 10.
+	"compactionTotalSizeMultiplier": float,
 
-  // DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
-  // The purpose of 'seeks triggered compaction' is to optimize database so
-  // that 'level seeks' can be minimized, however this might generate many
-  // small compaction which may not preferable.
-  //
-  // The default is true.
-  "disableSeeksCompaction": bool,
+	// DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
+	// The purpose of 'seeks triggered compaction' is to optimize database so
+	// that 'level seeks' can be minimized, however this might generate many
+	// small compaction which may not preferable.
+	//
+	// The default is true.
+	"disableSeeksCompaction": bool,
 
-  // OpenFilesCacheCapacity defines the capacity of the open files caching.
-  // Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
-  //
-  // The default value is 1024.
-  "openFilesCacheCapacity": int,
+	// OpenFilesCacheCapacity defines the capacity of the open files caching.
+	// Use -1 for zero, this has same effect as specifying NoCacher to OpenFilesCacher.
+	//
+	// The default value is 1024.
+	"openFilesCacheCapacity": int,
 
-  // WriteBuffer defines maximum size of a 'memdb' before flushed to
-  // 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
-  // unsorted journal.
-  //
-  // LevelDB may held up to two 'memdb' at the same time.
-  //
-  // The default value is 6MiB.
-  "writeBuffer": int,
+	// WriteBuffer defines maximum size of a 'memdb' before flushed to
+	// 'sorted table'. 'memdb' is an in-memory DB backed by an on-disk
+	// unsorted journal.
+	//
+	// LevelDB may held up to two 'memdb' at the same time.
+	//
+	// The default value is 6MiB.
+	"writeBuffer": int,
 
-  // FilterBitsPerKey is the number of bits to add to the bloom filter per
-  // key.
-  //
-  // The default value is 10.
-  "filterBitsPerKey": int,
+	// FilterBitsPerKey is the number of bits to add to the bloom filter per
+	// key.
+	//
+	// The default value is 10.
+	"filterBitsPerKey": int,
 
-  // MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
-  // When the MANIFEST-****** file grows beyond this size, LevelDB will create
-  // a new MANIFEST file.
-  //
-  // The default value is infinity.
-  "maxManifestFileSize": int,
+	// MaxManifestFileSize is the maximum size limit of the MANIFEST-****** file.
+	// When the MANIFEST-****** file grows beyond this size, LevelDB will create
+	// a new MANIFEST file.
+	//
+	// The default value is infinity.
+	"maxManifestFileSize": int,
 
-  // MetricUpdateFrequency is the frequency to poll LevelDB metrics in
-  // nanoseconds.
-  // If <= 0, LevelDB metrics aren't polled.
-  //
-  // The default value is 10s.
-  "metricUpdateFrequency": int,
+	// MetricUpdateFrequency is the frequency to poll LevelDB metrics in
+	// nanoseconds.
+	// If <= 0, LevelDB metrics aren't polled.
+	//
+	// The default value is 10s.
+	"metricUpdateFrequency": int,
 }
 ```
 
