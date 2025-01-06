@@ -61,6 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -1490,6 +1491,32 @@ func (n *Node) initHealthAPI() error {
 	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
+	}
+
+	wrongBLSKeyCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+		vdr, ok := n.vdrs.GetValidator(constants.PrimaryNetworkID, n.ID)
+		if !ok {
+			return "node is not a validator", nil
+		}
+
+		vdrPK := vdr.PublicKey
+		if vdrPK == nil {
+			return "validator doesn't have a BLS key", nil
+		}
+
+		nodePK := n.Config.StakingSigningKey.PublicKey()
+		if nodePK.Equals(vdrPK) {
+			return "node has the correct BLS key", nil
+		}
+		return nil, fmt.Errorf("node has BLS key 0x%x, but is registered to the validator set with 0x%x",
+			bls.PublicKeyToCompressedBytes(nodePK),
+			bls.PublicKeyToCompressedBytes(vdrPK),
+		)
+	})
+
+	err = n.health.RegisterHealthCheck("bls", wrongBLSKeyCheck, health.ApplicationTag)
+	if err != nil {
+		return fmt.Errorf("couldn't register bls health check: %w", err)
 	}
 
 	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
