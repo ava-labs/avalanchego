@@ -34,7 +34,7 @@ var (
 		// Ref: https://subnets.avax.network/x-chain/block/0
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga"),
 		DurangoTime:               time.Date(2024, time.March, 6, 16, 0, 0, 0, time.UTC),
-		EtnaTime:                  UnscheduledActivationTime,
+		EtnaTime:                  time.Date(2024, time.December, 16, 17, 0, 0, 0, time.UTC),
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -54,7 +54,7 @@ var (
 		// Ref: https://subnets-test.avax.network/x-chain/block/0
 		CortinaXChainStopVertexID: ids.FromStringOrPanic("2D1cmbiG36BqQMRyHt4kFhWarmatA1ighSpND3FeFgz3vFVtCZ"),
 		DurangoTime:               time.Date(2024, time.February, 13, 16, 0, 0, 0, time.UTC),
-		EtnaTime:                  UnscheduledActivationTime,
+		EtnaTime:                  time.Date(2024, time.November, 25, 16, 0, 0, 0, time.UTC),
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -70,9 +70,7 @@ var (
 		CortinaTime:                  InitiallyActiveTime,
 		CortinaXChainStopVertexID:    ids.Empty,
 		DurangoTime:                  InitiallyActiveTime,
-		// Etna is left unactivated by default on local networks. It can be configured to
-		// activate by overriding the activation time in the upgrade file.
-		EtnaTime: UnscheduledActivationTime,
+		EtnaTime:                     InitiallyActiveTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")

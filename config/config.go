@@ -20,12 +20,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -645,9 +645,9 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 }
 
-func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
+func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := bls.NewSecretKey()
+		key, err := bls.NewSigner()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
 		}
@@ -685,7 +685,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		return nil, errMissingStakingSigningKeyFile
 	}
 
-	key, err := bls.NewSecretKey()
+	key, err := bls.NewSigner()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
 	}
@@ -694,7 +694,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
 	}
 
-	keyBytes := bls.SecretKeyToBytes(key)
+	keyBytes := key.ToBytes()
 	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
 		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
 	}

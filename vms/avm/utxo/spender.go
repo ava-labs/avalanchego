@@ -189,9 +189,6 @@ func (s *spender) SpendNFT(
 	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
-		// makes sure that the variable isn't overwritten with the next iteration
-		utxo := utxo
-
 		if len(ops) > 0 {
 			// we have already been able to create the operation needed
 			break
@@ -311,9 +308,6 @@ func (s *spender) Mint(
 	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
-		// makes sure that the variable isn't overwritten with the next iteration
-		utxo := utxo
-
 		assetID := utxo.AssetID()
 		amount := amounts[assetID]
 		if amount == 0 {
@@ -385,9 +379,6 @@ func (s *spender) MintNFT(
 	keys := [][]*secp256k1.PrivateKey{}
 
 	for _, utxo := range utxos {
-		// makes sure that the variable isn't overwritten with the next iteration
-		utxo := utxo
-
 		if len(ops) > 0 {
 			// we have already been able to create the operation needed
 			break

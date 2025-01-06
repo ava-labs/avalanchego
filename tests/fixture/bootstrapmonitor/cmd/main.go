@@ -50,7 +50,7 @@ func main() {
 			if len(version.GitCommit) > 0 {
 				msg += ", commit=" + version.GitCommit
 			}
-			fmt.Fprintf(os.Stdout, msg+"\n")
+			fmt.Fprintln(os.Stdout, msg)
 			return nil
 		},
 	}

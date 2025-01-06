@@ -20,13 +20,6 @@ fi
 # the instructions to build non-portable BLST.
 source ./scripts/constants.sh
 
-#################################
-echo "building e2e.test"
-# to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-ACK_GINKGO_RC=true ginkgo build ./tests/e2e
-./tests/e2e/e2e.test --help
-
 # Enable subnet testing by building xsvm
 ./scripts/build_xsvm.sh
 echo ""
@@ -66,4 +59,4 @@ fi
 
 #################################
 # shellcheck disable=SC2086
-ginkgo ${GINKGO_ARGS} -v ./tests/e2e/e2e.test -- "${E2E_ARGS[@]}" "${@}"
+./scripts/ginkgo.sh ${GINKGO_ARGS} -v ./tests/e2e -- "${E2E_ARGS[@]}" "${@}"

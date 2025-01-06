@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
@@ -23,7 +24,8 @@ import (
 var (
 	_ Manager = (*manager)(nil)
 
-	ErrChainNotSynced = errors.New("chain not synced")
+	ErrChainNotSynced              = errors.New("chain not synced")
+	ErrImportTxWhilePartialSyncing = errors.New("issuing an import tx is not allowed while partial syncing")
 )
 
 type Manager interface {
@@ -124,6 +126,15 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		return ErrChainNotSynced
 	}
 
+	// If partial sync is enabled, this node isn't guaranteed to have the full
+	// UTXO set from shared memory. To avoid issuing invalid transactions,
+	// issuance of an ImportTx during this state is completely disallowed.
+	if m.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		if _, isImportTx := tx.Unsigned.(*txs.ImportTx); isImportTx {
+			return ErrImportTxWhilePartialSyncing
+		}
+	}
+
 	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed to fetch P-chain height: %w", err)
@@ -156,6 +167,24 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	_, err = executor.AdvanceTimeTo(m.txExecutorBackend, stateDiff, nextBlkTime)
 	if err != nil {
 		return fmt.Errorf("failed to advance the chain time: %w", err)
+	}
+
+	if timestamp := stateDiff.GetTimestamp(); m.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
+		complexity, err := fee.TxComplexity(tx.Unsigned)
+		if err != nil {
+			return fmt.Errorf("failed to calculate tx complexity: %w", err)
+		}
+		gas, err := complexity.ToGas(m.txExecutorBackend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return fmt.Errorf("failed to calculate tx gas: %w", err)
+		}
+
+		// TODO: After the mempool is updated, convert this check to use the
+		// maximum mempool capacity.
+		feeState := stateDiff.GetFeeState()
+		if gas > feeState.Capacity {
+			return fmt.Errorf("tx exceeds current gas capacity: %d > %d", gas, feeState.Capacity)
+		}
 	}
 
 	feeCalculator := state.PickFeeCalculator(m.txExecutorBackend.Config, stateDiff)

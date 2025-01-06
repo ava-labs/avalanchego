@@ -2266,7 +2266,6 @@ func (s *state) CommitBatch() (database.Batch, error) {
 
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
-		blkID := blkID
 		blkBytes := blk.Bytes()
 		blkHeight := blk.Height()
 		heightKey := database.PackUInt64(blkHeight)
@@ -2889,8 +2888,6 @@ func (s *state) writeL1Validators() error {
 
 func (s *state) writeTXs() error {
 	for txID, txStatus := range s.addedTxs {
-		txID := txID
-
 		stx := txBytesAndStatus{
 			Tx:     txStatus.tx.Bytes(),
 			Status: txStatus.status,
@@ -2965,8 +2962,6 @@ func (s *state) writeSubnets() error {
 
 func (s *state) writeSubnetOwners() error {
 	for subnetID, owner := range s.subnetOwners {
-		subnetID := subnetID
-		owner := owner
 		delete(s.subnetOwners, subnetID)
 
 		ownerBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, &owner)
@@ -3022,7 +3017,6 @@ func (s *state) writeTransformedSubnets() error {
 
 func (s *state) writeSubnetSupplies() error {
 	for subnetID, supply := range s.modifiedSupplies {
-		supply := supply
 		delete(s.modifiedSupplies, subnetID)
 		s.supplyCache.Put(subnetID, &supply)
 		if err := database.PutUInt64(s.supplyDB, subnetID[:], supply); err != nil {

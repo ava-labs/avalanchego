@@ -60,13 +60,12 @@ func main() {
 		log.Fatalf("failed to calculate conversionID: %s\n", err)
 	}
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(
+	wallet, err := primary.MakePWallet(
 		ctx,
 		uri,
-		kc,
 		kc,
 		primary.WalletConfig{
 			SubnetIDs: []ids.ID{subnetID},
@@ -77,11 +76,8 @@ func main() {
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-
 	convertSubnetToL1StartTime := time.Now()
-	convertSubnetToL1Tx, err := pWallet.IssueConvertSubnetToL1Tx(
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
 		address,
