@@ -63,16 +63,8 @@ find "/tmp/avalanchego-v${VERSION}"
 source ./scripts/constants.sh
 
 #################################
-echo "building upgrade.test"
-# to install the ginkgo binary (required for test build and run)
-go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-ACK_GINKGO_RC=true ginkgo build ./tests/upgrade
-./tests/upgrade/upgrade.test --help
-
-#################################
 # By default, it runs all upgrade test cases!
 echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
-./tests/upgrade/upgrade.test \
-  --ginkgo.v \
+./scripts/ginkgo.sh -v ./tests/upgrade -- \
   --avalanchego-path="/tmp/avalanchego-v${VERSION}/avalanchego" \
   --avalanchego-path-to-upgrade-to="${AVALANCHEGO_PATH}"

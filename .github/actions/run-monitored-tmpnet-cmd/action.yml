@@ -17,7 +17,7 @@ inputs:
     required: true
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to
-  # acccess directly.
+  # access directly.
   repository_owner:
     default: ${{ github.repository_owner }}
   repository_name:

@@ -283,7 +283,6 @@ func (s *state) DisableCaching() {
 
 func (s *state) AddMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
-		missingID := missingID
 		if err := s.missingJobIDs.Put(missingID[:], nil); err != nil {
 			return err
 		}
@@ -293,7 +292,6 @@ func (s *state) AddMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 
 func (s *state) RemoveMissingJobIDs(missingIDs set.Set[ids.ID]) error {
 	for missingID := range missingIDs {
-		missingID := missingID
 		if err := s.missingJobIDs.Delete(missingID[:]); err != nil {
 			return err
 		}

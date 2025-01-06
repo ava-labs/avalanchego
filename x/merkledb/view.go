@@ -486,8 +486,8 @@ func (v *view) CommitToDB(ctx context.Context) error {
 	return v.commitToDB(ctx)
 }
 
-// Commits the changes from [trieToCommit] to this view,
-// this view to its parent, and so on until committing to the db.
+// Commits the changes from [trieToCommit] to the db.
+// Assumes that its parent view has already been committed to the db.
 // Assumes [v.db.commitLock] is held.
 func (v *view) commitToDB(ctx context.Context) error {
 	v.commitLock.Lock()

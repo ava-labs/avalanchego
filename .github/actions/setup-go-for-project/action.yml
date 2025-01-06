@@ -1,5 +1,5 @@
 # This action targets the project default version of setup-go. For
-# workers with old NodeJS incompabible with newer versions of
+# workers with old NodeJS incompatible with newer versions of
 # setup-go, try setup-go-for-project-v3.
 #
 # Since github actions do not support dynamically configuring the
@@ -22,4 +22,3 @@ runs:
       uses: actions/setup-go@v5
       with:
         go-version: '${{ env.GO_VERSION }}'
-        check-latest: true
