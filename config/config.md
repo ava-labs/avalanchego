@@ -445,7 +445,7 @@ These are the main properties in the JSON file:
 - `cChainGenesis`: The genesis info to be passed to the C-Chain.
 - `message`: A message to include in the genesis. Not required.
 
-For an example of a JSON representation of genesis data, see [genesis_local.json](https://github.com/ava-labs/avalanchego/blob/master/genesis/genesis_local.json).
+For an example of a JSON representation of genesis data, see [genesis_localsigner.json](https://github.com/ava-labs/avalanchego/blob/master/genesis/genesis_localsigner.json).
 
 #### `--genesis-file-content` (string)
 

@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json"
 )
 
 type signerService struct {
-	signer *local.LocalSigner
+	signer *localsigner.LocalSigner
 }
 
 type Server struct {
@@ -23,7 +23,7 @@ type Server struct {
 }
 
 func NewSignerService() *signerService {
-	signer, err := local.NewSigner()
+	signer, err := localsigner.NewSigner()
 
 	if err != nil {
 		panic(err)

@@ -35,7 +35,7 @@ var (
 	VMRQKey *secp256k1.PrivateKey
 	EWOQKey *secp256k1.PrivateKey
 
-	//go:embed genesis_local.json
+	//go:embed genesis_localsigner.json
 	localGenesisConfigJSON []byte
 
 	// LocalParams are the params used for local networks

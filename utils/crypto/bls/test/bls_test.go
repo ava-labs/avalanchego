@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	jsonrpc "github.com/ava-labs/avalanchego/utils/crypto/bls/signers/json-rpc"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 )
 
 type Signer interface {
@@ -31,7 +31,7 @@ func (s jsonRPCSigner) Close() error {
 }
 
 type localSigner struct {
-	*local.LocalSigner
+	*localsigner.LocalSigner
 }
 
 func (s localSigner) Close() error {
@@ -39,7 +39,7 @@ func (s localSigner) Close() error {
 }
 
 var localSignerFn = func() (Signer, error) {
-	signer, err := local.NewSigner()
+	signer, err := localsigner.NewSigner()
 	return &localSigner{LocalSigner: signer}, err
 }
 var serverSignerFn = func() (Signer, error) {
@@ -80,9 +80,9 @@ func TestAggregation(t *testing.T) {
 			name:    "valid",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -125,9 +125,9 @@ func TestAggregation(t *testing.T) {
 		{
 			name: "wrong message",
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -154,9 +154,9 @@ func TestAggregation(t *testing.T) {
 			name:    "one sig over different message",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -182,11 +182,11 @@ func TestAggregation(t *testing.T) {
 			name:    "one incorrect pubkey",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk3, err := local.NewSigner()
+				sk3, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -211,9 +211,9 @@ func TestAggregation(t *testing.T) {
 			name:    "num pubkeys > num sigs",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -237,9 +237,9 @@ func TestAggregation(t *testing.T) {
 			name:    "num pubkeys < num sigs",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -263,9 +263,9 @@ func TestAggregation(t *testing.T) {
 			name:    "no pub keys",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				msg := utils.RandomBytes(1234)
@@ -285,9 +285,9 @@ func TestAggregation(t *testing.T) {
 			name:    "no sigs",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-				sk1, err := local.NewSigner()
+				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				pks := []*bls.PublicKey{
@@ -339,7 +339,7 @@ func TestAggregationThreshold(t *testing.T) {
 	defer sk1.Close()
 
 	require.NoError(err)
-	sk2, err := local.NewSigner()
+	sk2, err := localsigner.NewSigner()
 	require.NoError(err)
 
 	// All the public keys would be registered on chain
@@ -427,7 +427,7 @@ func TestVerify(t *testing.T) {
 				msg := utils.RandomBytes(1234)
 				sig := signer.Sign(msg)
 
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 				pk := sk2.PublicKey()
 				return pk, sig, msg
@@ -504,7 +504,7 @@ func TestVerifyProofOfPossession(t *testing.T) {
 				msg := utils.RandomBytes(1234)
 				sig := signer.SignProofOfPossession(msg)
 
-				sk2, err := local.NewSigner()
+				sk2, err := localsigner.NewSigner()
 				require.NoError(err)
 				pk := sk2.PublicKey()
 				return pk, sig, msg

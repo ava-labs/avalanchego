@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package bls
+package bls_test
 
 import (
 	"testing"
@@ -9,24 +9,25 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 )
 
 func TestSecretKeyFromBytesZero(t *testing.T) {
 	require := require.New(t)
 
-	var skArr [SecretKeyLen]byte
+	var skArr [bls.SecretKeyLen]byte
 	skBytes := skArr[:]
-	_, err := local.SecretKeyFromBytes(skBytes)
-	require.ErrorIs(err, local.ErrFailedSecretKeyDeserialize)
+	_, err := localsigner.SecretKeyFromBytes(skBytes)
+	require.ErrorIs(err, localsigner.ErrFailedSecretKeyDeserialize)
 }
 
 func TestSecretKeyFromBytesWrongSize(t *testing.T) {
 	require := require.New(t)
 
-	skBytes := utils.RandomBytes(SecretKeyLen + 1)
-	_, err := local.SecretKeyFromBytes(skBytes)
-	require.ErrorIs(err, local.ErrFailedSecretKeyDeserialize)
+	skBytes := utils.RandomBytes(bls.SecretKeyLen + 1)
+	_, err := localsigner.SecretKeyFromBytes(skBytes)
+	require.ErrorIs(err, localsigner.ErrFailedSecretKeyDeserialize)
 }
 
 func TestSecretKeyBytes(t *testing.T) {
@@ -34,12 +35,12 @@ func TestSecretKeyBytes(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(err)
 	sig := sk.Sign(msg)
 	skBytes := sk.ToBytes()
 
-	sk2, err := local.SecretKeyFromBytes(skBytes)
+	sk2, err := localsigner.SecretKeyFromBytes(skBytes)
 	require.NoError(err)
 	sig2 := sk2.Sign(msg)
 	sk2Bytes := sk2.ToBytes()

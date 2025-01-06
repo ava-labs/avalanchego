@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 )
 
 func BenchmarkSign(b *testing.B) {
-	privateKey, err := local.NewSigner()
+	privateKey, err := localsigner.NewSigner()
 	require.NoError(b, err)
 	for _, messageSize := range sizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
@@ -53,7 +53,7 @@ func BenchmarkSign(b *testing.B) {
 }
 
 func BenchmarkVerify(b *testing.B) {
-	privateKey, err := local.NewSigner()
+	privateKey, err := localsigner.NewSigner()
 	require.NoError(b, err)
 	publicKey := privateKey.PublicKey()
 
@@ -74,7 +74,7 @@ func BenchmarkVerify(b *testing.B) {
 func BenchmarkAggregatePublicKeys(b *testing.B) {
 	keys := make([]*bls.PublicKey, biggestSize)
 	for i := range keys {
-		privateKey, err := local.NewSigner()
+		privateKey, err := localsigner.NewSigner()
 		require.NoError(b, err)
 
 		keys[i] = privateKey.PublicKey()
@@ -91,7 +91,7 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 }
 
 func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(b, err)
 
 	pk := sk.PublicKey()
@@ -103,7 +103,7 @@ func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
 }
 
 func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(b, err)
 
 	pk := sk.PublicKey()
@@ -116,7 +116,7 @@ func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
 }
 
 func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(b, err)
 
 	pk := sk.PublicKey()
@@ -128,7 +128,7 @@ func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
 }
 
 func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(b, err)
 
 	pk := sk.PublicKey()
@@ -141,7 +141,7 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 }
 
 func BenchmarkSignatureFromBytes(b *testing.B) {
-	privateKey, err := local.NewSigner()
+	privateKey, err := localsigner.NewSigner()
 	require.NoError(b, err)
 
 	message := utils.RandomBytes(32)

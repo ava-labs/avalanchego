@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -84,7 +84,7 @@ func NewTestNetworkConfig(
 		return nil, err
 	}
 
-	blsKey, err := local.NewSigner()
+	blsKey, err := localsigner.NewSigner()
 	if err != nil {
 		return nil, err
 	}

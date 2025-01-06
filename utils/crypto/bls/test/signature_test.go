@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package bls
+package bls_test
 
 import (
 	"testing"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/local"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 )
 
 func TestSignatureBytes(t *testing.T) {
@@ -18,7 +18,7 @@ func TestSignatureBytes(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(err)
 	sig := sk.Sign(msg)
 	sigBytes := bls.SignatureToBytes(sig)
@@ -36,7 +36,7 @@ func TestAggregateSignaturesNoop(t *testing.T) {
 
 	msg := utils.RandomBytes(1234)
 
-	sk, err := local.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(err)
 
 	sig := sk.Sign(msg)
