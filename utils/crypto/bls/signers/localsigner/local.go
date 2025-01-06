@@ -14,7 +14,7 @@ import (
 
 var (
 	ErrFailedSecretKeyDeserialize            = errors.New("couldn't deserialize secret key")
-	_                             bls.Signer = (*LocalSigner)(nil) // Use the Signer interface from the parent package
+	_                             bls.Signer = (*LocalSigner)(nil)
 )
 
 type secretKey = blst.SecretKey
