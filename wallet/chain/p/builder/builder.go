@@ -151,42 +151,64 @@ type Builder interface {
 		options ...common.Option,
 	) (*txs.TransferSubnetOwnershipTx, error)
 
-	// NewConvertSubnetTx converts the subnet to a Permissionless L1.
+	// NewConvertSubnetToL1Tx converts the subnet to a Permissionless L1.
 	//
 	// - [subnetID] specifies the subnet to be converted
 	// - [chainID] specifies which chain the manager is deployed on
 	// - [address] specifies the address of the manager
-	// - [validators] specifies the initial SoVs of the L1
-	NewConvertSubnetTx(
+	// - [validators] specifies the initial L1 validators of the L1
+	NewConvertSubnetToL1Tx(
 		subnetID ids.ID,
 		chainID ids.ID,
 		address []byte,
-		validators []*txs.ConvertSubnetValidator,
+		validators []*txs.ConvertSubnetToL1Validator,
 		options ...common.Option,
-	) (*txs.ConvertSubnetTx, error)
+	) (*txs.ConvertSubnetToL1Tx, error)
 
-	// RegisterSubnetValidatorTx adds a validator to an L1.
+	// NewRegisterL1ValidatorTx adds a validator to an L1.
 	//
 	// - [balance] that the validator should allocate to continuous fees
 	// - [proofOfPossession] is the BLS PoP for the key included in the Warp
 	//   message
 	// - [message] is the Warp message that authorizes this validator to be
 	//   added
-	NewRegisterSubnetValidatorTx(
+	NewRegisterL1ValidatorTx(
 		balance uint64,
 		proofOfPossession [bls.SignatureLen]byte,
 		message []byte,
 		options ...common.Option,
-	) (*txs.RegisterSubnetValidatorTx, error)
+	) (*txs.RegisterL1ValidatorTx, error)
 
-	// NewSetSubnetValidatorWeightTx sets the weight of a validator on an L1.
+	// NewSetL1ValidatorWeightTx sets the weight of a validator on an L1.
 	//
 	// - [message] is the Warp message that authorizes this validator's weight
 	//   to be changed
-	NewSetSubnetValidatorWeightTx(
+	NewSetL1ValidatorWeightTx(
 		message []byte,
 		options ...common.Option,
-	) (*txs.SetSubnetValidatorWeightTx, error)
+	) (*txs.SetL1ValidatorWeightTx, error)
+
+	// NewIncreaseL1ValidatorBalanceTx increases the balance of a validator on
+	// an L1 for the continuous fee.
+	// the continuous fee.
+	//
+	// - [validationID] of the validator
+	// - [balance] amount to increase the validator's balance by
+	NewIncreaseL1ValidatorBalanceTx(
+		validationID ids.ID,
+		balance uint64,
+		options ...common.Option,
+	) (*txs.IncreaseL1ValidatorBalanceTx, error)
+
+	// NewDisableL1ValidatorTx disables an L1 validator and returns the
+	// remaining funds allocated to the continuous fee to the remaining balance
+	// owner.
+	//
+	// - [validationID] of the validator to disable
+	NewDisableL1ValidatorTx(
+		validationID ids.ID,
+		options ...common.Option,
+	) (*txs.DisableL1ValidatorTx, error)
 
 	// NewImportTx creates an import transaction that attempts to consume all
 	// the available UTXOs and import the funds to [to].
@@ -301,7 +323,7 @@ type Builder interface {
 
 type Backend interface {
 	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetSubnetOwner(ctx context.Context, subnetID ids.ID) (fx.Owner, error)
+	GetOwner(ctx context.Context, ownerID ids.ID) (fx.Owner, error)
 }
 
 type builder struct {
@@ -458,7 +480,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(vdr.Subnet, ops)
+	subnetAuth, err := b.authorize(vdr.Subnet, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +538,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +641,7 @@ func (b *builder) NewCreateChainTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -750,7 +772,7 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -804,13 +826,13 @@ func (b *builder) NewTransferSubnetOwnershipTx(
 	return tx, b.initCtx(tx)
 }
 
-func (b *builder) NewConvertSubnetTx(
+func (b *builder) NewConvertSubnetToL1Tx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetValidator,
+	validators []*txs.ConvertSubnetToL1Validator,
 	options ...common.Option,
-) (*txs.ConvertSubnetTx, error) {
+) (*txs.ConvertSubnetToL1Tx, error) {
 	var avaxToBurn uint64
 	for _, vdr := range validators {
 		var err error
@@ -827,7 +849,7 @@ func (b *builder) NewConvertSubnetTx(
 		toStake = map[ids.ID]uint64{}
 		ops     = common.NewOptions(options)
 	)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -840,7 +862,7 @@ func (b *builder) NewConvertSubnetTx(
 	bytesComplexity := gas.Dimensions{
 		gas.Bandwidth: additionalBytes,
 	}
-	validatorComplexity, err := fee.ConvertSubnetValidatorComplexity(validators...)
+	validatorComplexity, err := fee.ConvertSubnetToL1ValidatorComplexity(validators...)
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +870,7 @@ func (b *builder) NewConvertSubnetTx(
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := fee.IntrinsicConvertSubnetTxComplexities.Add(
+	complexity, err := fee.IntrinsicConvertSubnetToL1TxComplexities.Add(
 		&bytesComplexity,
 		&validatorComplexity,
 		&authComplexity,
@@ -870,7 +892,7 @@ func (b *builder) NewConvertSubnetTx(
 	}
 
 	utils.Sort(validators)
-	tx := &txs.ConvertSubnetTx{
+	tx := &txs.ConvertSubnetToL1Tx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
 			BlockchainID: constants.PlatformChainID,
@@ -887,12 +909,12 @@ func (b *builder) NewConvertSubnetTx(
 	return tx, b.initCtx(tx)
 }
 
-func (b *builder) NewRegisterSubnetValidatorTx(
+func (b *builder) NewRegisterL1ValidatorTx(
 	balance uint64,
 	proofOfPossession [bls.SignatureLen]byte,
 	message []byte,
 	options ...common.Option,
-) (*txs.RegisterSubnetValidatorTx, error) {
+) (*txs.RegisterL1ValidatorTx, error) {
 	var (
 		toBurn = map[ids.ID]uint64{
 			b.context.AVAXAssetID: balance,
@@ -909,7 +931,7 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := fee.IntrinsicRegisterSubnetValidatorTxComplexities.Add(
+	complexity, err := fee.IntrinsicRegisterL1ValidatorTxComplexities.Add(
 		&memoComplexity,
 		&warpComplexity,
 	)
@@ -929,7 +951,7 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 		return nil, err
 	}
 
-	tx := &txs.RegisterSubnetValidatorTx{
+	tx := &txs.RegisterL1ValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
 			BlockchainID: constants.PlatformChainID,
@@ -944,10 +966,10 @@ func (b *builder) NewRegisterSubnetValidatorTx(
 	return tx, b.initCtx(tx)
 }
 
-func (b *builder) NewSetSubnetValidatorWeightTx(
+func (b *builder) NewSetL1ValidatorWeightTx(
 	message []byte,
 	options ...common.Option,
-) (*txs.SetSubnetValidatorWeightTx, error) {
+) (*txs.SetL1ValidatorWeightTx, error) {
 	var (
 		toBurn         = map[ids.ID]uint64{}
 		toStake        = map[ids.ID]uint64{}
@@ -961,7 +983,7 @@ func (b *builder) NewSetSubnetValidatorWeightTx(
 	if err != nil {
 		return nil, err
 	}
-	complexity, err := fee.IntrinsicSetSubnetValidatorWeightTxComplexities.Add(
+	complexity, err := fee.IntrinsicSetL1ValidatorWeightTxComplexities.Add(
 		&memoComplexity,
 		&warpComplexity,
 	)
@@ -981,7 +1003,7 @@ func (b *builder) NewSetSubnetValidatorWeightTx(
 		return nil, err
 	}
 
-	tx := &txs.SetSubnetValidatorWeightTx{
+	tx := &txs.SetL1ValidatorWeightTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.context.NetworkID,
 			BlockchainID: constants.PlatformChainID,
@@ -990,6 +1012,112 @@ func (b *builder) NewSetSubnetValidatorWeightTx(
 			Memo:         memo,
 		}},
 		Message: message,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewIncreaseL1ValidatorBalanceTx(
+	validationID ids.ID,
+	balance uint64,
+	options ...common.Option,
+) (*txs.IncreaseL1ValidatorBalanceTx, error) {
+	var (
+		toBurn = map[ids.ID]uint64{
+			b.context.AVAXAssetID: balance,
+		}
+		toStake        = map[ids.ID]uint64{}
+		ops            = common.NewOptions(options)
+		memo           = ops.Memo()
+		memoComplexity = gas.Dimensions{
+			gas.Bandwidth: uint64(len(memo)),
+		}
+	)
+	complexity, err := fee.IntrinsicIncreaseL1ValidatorBalanceTxComplexities.Add(
+		&memoComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.IncreaseL1ValidatorBalanceTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		ValidationID: validationID,
+		Balance:      balance,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewDisableL1ValidatorTx(
+	validationID ids.ID,
+	options ...common.Option,
+) (*txs.DisableL1ValidatorTx, error) {
+	var (
+		toBurn  = map[ids.ID]uint64{}
+		toStake = map[ids.ID]uint64{}
+		ops     = common.NewOptions(options)
+	)
+	disableAuth, err := b.authorize(validationID, ops)
+	if err != nil {
+		return nil, err
+	}
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	authComplexity, err := fee.AuthComplexity(disableAuth)
+	if err != nil {
+		return nil, err
+	}
+
+	complexity, err := fee.IntrinsicDisableL1ValidatorTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.DisableL1ValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		ValidationID: validationID,
+		DisableAuth:  disableAuth,
 	}
 	return tx, b.initCtx(tx)
 }
@@ -1215,7 +1343,7 @@ func (b *builder) NewTransformSubnetTx(
 	toStake := map[ids.ID]uint64{}
 
 	ops := common.NewOptions(options)
-	subnetAuth, err := b.authorizeSubnet(subnetID, ops)
+	subnetAuth, err := b.authorize(subnetID, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -1754,12 +1882,12 @@ func (b *builder) spend(
 	return s.inputs, s.changeOutputs, s.stakeOutputs, nil
 }
 
-func (b *builder) authorizeSubnet(subnetID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
-	ownerIntf, err := b.backend.GetSubnetOwner(options.Context(), subnetID)
+func (b *builder) authorize(ownerID ids.ID, options *common.Options) (*secp256k1fx.Input, error) {
+	ownerIntf, err := b.backend.GetOwner(options.Context(), ownerID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to fetch subnet owner for %q: %w",
-			subnetID,
+			"failed to fetch owner for %q: %w",
+			ownerID,
 			err,
 		)
 	}

@@ -17,22 +17,24 @@ import (
 var _ State = (*tracedState)(nil)
 
 type tracedState struct {
-	s                   State
-	getMinimumHeightTag string
-	getCurrentHeightTag string
-	getSubnetIDTag      string
-	getValidatorSetTag  string
-	tracer              trace.Tracer
+	s                         State
+	getMinimumHeightTag       string
+	getCurrentHeightTag       string
+	getSubnetIDTag            string
+	getValidatorSetTag        string
+	getCurrentValidatorSetTag string
+	tracer                    trace.Tracer
 }
 
 func Trace(s State, name string, tracer trace.Tracer) State {
 	return &tracedState{
-		s:                   s,
-		getMinimumHeightTag: name + ".GetMinimumHeight",
-		getCurrentHeightTag: name + ".GetCurrentHeight",
-		getSubnetIDTag:      name + ".GetSubnetID",
-		getValidatorSetTag:  name + ".GetValidatorSet",
-		tracer:              tracer,
+		s:                         s,
+		getMinimumHeightTag:       name + ".GetMinimumHeight",
+		getCurrentHeightTag:       name + ".GetCurrentHeight",
+		getSubnetIDTag:            name + ".GetSubnetID",
+		getValidatorSetTag:        name + ".GetValidatorSet",
+		getCurrentValidatorSetTag: name + ".GetCurrentValidatorSet",
+		tracer:                    tracer,
 	}
 }
 
@@ -51,7 +53,7 @@ func (s *tracedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
 }
 
 func (s *tracedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
-	ctx, span := s.tracer.Start(ctx, s.getValidatorSetTag, oteltrace.WithAttributes(
+	ctx, span := s.tracer.Start(ctx, s.getSubnetIDTag, oteltrace.WithAttributes(
 		attribute.Stringer("chainID", chainID),
 	))
 	defer span.End()
@@ -71,4 +73,16 @@ func (s *tracedState) GetValidatorSet(
 	defer span.End()
 
 	return s.s.GetValidatorSet(ctx, height, subnetID)
+}
+
+func (s *tracedState) GetCurrentValidatorSet(
+	ctx context.Context,
+	subnetID ids.ID,
+) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
+	ctx, span := s.tracer.Start(ctx, s.getCurrentValidatorSetTag, oteltrace.WithAttributes(
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
+
+	return s.s.GetCurrentValidatorSet(ctx, subnetID)
 }

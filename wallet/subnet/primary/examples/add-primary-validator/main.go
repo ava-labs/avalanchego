@@ -39,27 +39,25 @@ func main() {
 	}
 	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          uri,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		uri,
+		kc,
+		primary.WalletConfig{},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-	pBuilder := pWallet.Builder()
-	pContext := pBuilder.Context()
-	avaxAssetID := pContext.AVAXAssetID
+	// Get the chain context
+	context := wallet.Builder().Context()
 
 	addValidatorStartTime := time.Now()
-	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
+	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -67,7 +65,7 @@ func main() {
 			Wght:   weight,
 		}},
 		nodePOP,
-		avaxAssetID,
+		context.AVAXAssetID,
 		&secp256k1fx.OutputOwners{
 			Threshold: 1,
 			Addrs:     []ids.ShortID{validatorRewardAddr},

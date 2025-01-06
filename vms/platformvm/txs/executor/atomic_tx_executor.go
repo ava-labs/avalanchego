@@ -108,15 +108,23 @@ func (*atomicTxExecutor) BaseTx(*txs.BaseTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (*atomicTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) error {
+func (*atomicTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*atomicTxExecutor) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeightTx) error {
+func (*atomicTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
+	return ErrWrongTxType
+}
+
+func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+	return ErrWrongTxType
+}
+
+func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 

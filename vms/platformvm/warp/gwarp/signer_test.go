@@ -21,7 +21,7 @@ import (
 type testSigner struct {
 	client    *Client
 	server    warp.Signer
-	sk        *bls.SecretKey
+	sk        bls.Signer
 	networkID uint32
 	chainID   ids.ID
 }
@@ -29,7 +29,7 @@ type testSigner struct {
 func setupSigner(t testing.TB) *testSigner {
 	require := require.New(t)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	chainID := ids.GenerateTestID()

@@ -47,15 +47,23 @@ func (*staticVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
-func (*staticVisitor) ConvertSubnetTx(*txs.ConvertSubnetTx) error {
+func (*staticVisitor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
 	return ErrUnsupportedTx
 }
 
-func (*staticVisitor) RegisterSubnetValidatorTx(*txs.RegisterSubnetValidatorTx) error {
+func (*staticVisitor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
-func (*staticVisitor) SetSubnetValidatorWeightTx(*txs.SetSubnetValidatorWeightTx) error {
+func (*staticVisitor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
+	return ErrUnsupportedTx
+}
+
+func (*staticVisitor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+	return ErrUnsupportedTx
+}
+
+func (*staticVisitor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	return ErrUnsupportedTx
 }
 

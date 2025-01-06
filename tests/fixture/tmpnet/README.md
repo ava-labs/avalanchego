@@ -199,7 +199,7 @@ The chain configuration for a temporary network is stored at
 by all nodes in the network. The C-Chain config will be generated with
 reasonable defaults if not supplied. X-Chain and P-Chain will use
 implicit defaults. The configuration for custom chains can be provided
-with subnet configuration and will be writen to the appropriate path.
+with subnet configuration and will be written to the appropriate path.
 
 Each node in the network can override network-level chain
 configuration by setting `--chain-config-dir` to an explicit value and

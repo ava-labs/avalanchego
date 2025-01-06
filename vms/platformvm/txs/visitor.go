@@ -27,7 +27,9 @@ type Visitor interface {
 	BaseTx(*BaseTx) error
 
 	// Etna Transactions:
-	ConvertSubnetTx(*ConvertSubnetTx) error
-	RegisterSubnetValidatorTx(*RegisterSubnetValidatorTx) error
-	SetSubnetValidatorWeightTx(*SetSubnetValidatorWeightTx) error
+	ConvertSubnetToL1Tx(*ConvertSubnetToL1Tx) error
+	RegisterL1ValidatorTx(*RegisterL1ValidatorTx) error
+	SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error
+	IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error
+	DisableL1ValidatorTx(*DisableL1ValidatorTx) error
 }

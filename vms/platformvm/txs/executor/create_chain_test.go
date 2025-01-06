@@ -58,7 +58,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 		tx,
 		stateDiff,
 	)
-	require.ErrorIs(err, errUnauthorizedSubnetModification)
+	require.ErrorIs(err, errUnauthorizedModification)
 }
 
 // Ensure Execute fails when an incorrect control signature is given
@@ -101,7 +101,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		tx,
 		stateDiff,
 	)
-	require.ErrorIs(err, errUnauthorizedSubnetModification)
+	require.ErrorIs(err, errUnauthorizedModification)
 }
 
 // Ensure Execute fails when the Subnet the blockchain specifies as
@@ -282,9 +282,9 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
-	stateDiff.SetSubnetConversion(
+	stateDiff.SetSubnetToL1Conversion(
 		subnetID,
-		state.SubnetConversion{
+		state.SubnetToL1Conversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte("address"),

@@ -34,15 +34,15 @@ type backend struct {
 
 	context *builder.Context
 
-	subnetOwnerLock sync.RWMutex
-	subnetOwner     map[ids.ID]fx.Owner // subnetID -> owner
+	ownersLock sync.RWMutex
+	owners     map[ids.ID]fx.Owner // subnetID or validationID -> owner
 }
 
-func NewBackend(context *builder.Context, utxos common.ChainUTXOs, subnetOwner map[ids.ID]fx.Owner) Backend {
+func NewBackend(context *builder.Context, utxos common.ChainUTXOs, owners map[ids.ID]fx.Owner) Backend {
 	return &backend{
-		ChainUTXOs:  utxos,
-		context:     context,
-		subnetOwner: subnetOwner,
+		ChainUTXOs: utxos,
+		context:    context,
+		owners:     owners,
 	}
 }
 
@@ -79,20 +79,20 @@ func (b *backend) removeUTXOs(ctx context.Context, sourceChain ids.ID, utxoIDs s
 	return nil
 }
 
-func (b *backend) GetSubnetOwner(_ context.Context, subnetID ids.ID) (fx.Owner, error) {
-	b.subnetOwnerLock.RLock()
-	defer b.subnetOwnerLock.RUnlock()
+func (b *backend) GetOwner(_ context.Context, ownerID ids.ID) (fx.Owner, error) {
+	b.ownersLock.RLock()
+	defer b.ownersLock.RUnlock()
 
-	owner, exists := b.subnetOwner[subnetID]
+	owner, exists := b.owners[ownerID]
 	if !exists {
 		return nil, database.ErrNotFound
 	}
 	return owner, nil
 }
 
-func (b *backend) setSubnetOwner(subnetID ids.ID, owner fx.Owner) {
-	b.subnetOwnerLock.Lock()
-	defer b.subnetOwnerLock.Unlock()
+func (b *backend) setOwner(ownerID ids.ID, owner fx.Owner) {
+	b.ownersLock.Lock()
+	defer b.ownersLock.Unlock()
 
-	b.subnetOwner[subnetID] = owner
+	b.owners[ownerID] = owner
 }
