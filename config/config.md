@@ -263,7 +263,7 @@ As an alternative to `--db-config-file`, it allows specifying base64 encoded dat
 A LevelDB config file must be JSON and may have these keys.
 Any keys not given will receive the default value.
 
-```json
+```go
 {
 	// BlockCacheCapacity defines the capacity of the 'sorted table' block caching.
 	// Use -1 for zero.
