@@ -177,9 +177,9 @@ must be the same with the number of given `--state-sync-ids`.
 #### `--partial-sync-primary-network` (string)
 
 Partial sync enables nodes that are not primary network validators to optionally sync
-only the P-chain on the primary network. Nodes that use this option can still track 
-Subnets. After the Etna upgrade, nodes that use this option can also validate L1s. 
-This config defaults to `false`. 
+only the P-chain on the primary network. Nodes that use this option can still track
+Subnets. After the Etna upgrade, nodes that use this option can also validate L1s.
+This config defaults to `false`.
 
 ## Chain Configs
 
@@ -841,43 +841,6 @@ Timeout before killing an unresponsive chain. Defaults to `5s`.
 Transaction fee, in nAVAX, for transactions that create new assets. Defaults to
 `10000000` nAVAX (.01 AVAX) per transaction. This can only be changed on a local
 network.
-
-#### `--create-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local
-network.
-
-#### `--create-blockchain-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new blockchains.
-Defaults to `1000000000` nAVAX (1 AVAX) per transaction. This can only be
-changed on a local network.
-
-#### `--transform-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that transform Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local network.
-
-#### `--add-primary-network-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network validators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-primary-network-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network delegators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-subnet-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet validators.
-Defaults to `10000000` nAVAX (.01 AVAX).
-
-#### `--add-subnet-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet delegators.
-Defaults to `10000000` nAVAX (.01 AVAX).
 
 #### `--min-delegator-stake` (int)
 
