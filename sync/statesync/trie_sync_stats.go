@@ -79,7 +79,7 @@ func (t *trieSyncStats) incLeafs(segment *trieSegment, count uint64, remaining u
 	}
 }
 
-// estimateSegmentsInProgressTime retrns the ETA for all trie segments
+// estimateSegmentsInProgressTime returns the ETA for all trie segments
 // in progress to finish (uses the one with most remaining leafs to estimate).
 func (t *trieSyncStats) estimateSegmentsInProgressTime() time.Duration {
 	if len(t.remainingLeafs) == 0 {

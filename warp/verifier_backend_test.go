@@ -56,7 +56,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 			},
 		},
 		"offchain message": {
@@ -65,7 +65,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 			},
 		},
 		"unknown message": {
@@ -78,7 +78,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
 				require.EqualValues(t, 1, stats.messageParseFail.Snapshot().Count())
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: ParseErrCode},
 		},
@@ -177,7 +177,7 @@ func TestBlockSignatures(t *testing.T) {
 				return toMessageBytes(knownBlkID), signature[:]
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.EqualValues(t, 0, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 0, stats.blockValidationFail.Snapshot().Count())
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
 			},
 		},
@@ -187,7 +187,7 @@ func TestBlockSignatures(t *testing.T) {
 				return toMessageBytes(unknownBlockID), nil
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.EqualValues(t, 1, stats.blockSignatureValidationFail.Snapshot().Count())
+				require.EqualValues(t, 1, stats.blockValidationFail.Snapshot().Count())
 				require.EqualValues(t, 0, stats.messageParseFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: VerifyErrCode},

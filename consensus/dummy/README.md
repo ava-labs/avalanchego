@@ -18,7 +18,7 @@ The dynamic fee algorithm aims to adjust the base fee to handle network congesti
 
 - EIP-1559 is intended for Ethereum where a block is produced roughly every 10s
 - C-Chain typically produces blocks every 2 seconds, but the dynamic fee algorithm needs to handle the case that the network quiesces and there are no blocks for a long period of time
-- Since C-Chain produces blocks at a different cadence, it adapts EIP-1559 to sum the amount of gas consumed within a 10 second interval instead of using only the amount of gas consumed in the parent block
+- Since C-Chain produces blocks at a different cadence, it adapts EIP-1559 to sum the amount of gas consumed within a 10-second interval instead of using only the amount of gas consumed in the parent block
 
 ## Consensus Engine Callbacks
 

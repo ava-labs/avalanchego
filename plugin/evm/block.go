@@ -143,7 +143,7 @@ func (b *Block) Accept(context.Context) error {
 
 	// Although returning an error from Accept is considered fatal, it is good
 	// practice to cleanup the batch we were modifying in the case of an error.
-	defer vm.db.Abort()
+	defer vm.versiondb.Abort()
 
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 
@@ -176,7 +176,7 @@ func (b *Block) Accept(context.Context) error {
 	}
 	// Get pending operations on the vm's versionDB so we can apply them atomically
 	// with the shared memory changes.
-	vdbBatch, err := b.vm.db.CommitBatch()
+	vdbBatch, err := b.vm.versiondb.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("could not create commit batch processing block[%s]: %w", b.ID(), err)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -155,6 +156,12 @@ func TestOffChainMessages(t *testing.T) {
 				expectedSignatureBytes, err := warpSigner.Sign(msg)
 				require.NoError(err)
 				require.Equal(expectedSignatureBytes, signature[:])
+			},
+		},
+		"unknown message": {
+			check: func(require *require.Assertions, b Backend) {
+				_, err := b.GetMessage(testUnsignedMessage.ID())
+				require.ErrorIs(err, database.ErrNotFound)
 			},
 		},
 		"invalid message": {
