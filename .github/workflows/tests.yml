@@ -35,6 +35,10 @@ jobs:
       - name: Run actionlint
         shell: bash
         run: scripts/actionlint.sh
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code
 
   unit_test:
     name: Golang Unit Tests (${{ matrix.os }})

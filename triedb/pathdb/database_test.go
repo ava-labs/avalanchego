@@ -228,7 +228,11 @@ func (t *tester) generate(parent common.Hash) (common.Hash, *trienode.MergedNode
 		dirties = make(map[common.Hash]struct{})
 	)
 	for i := 0; i < 20; i++ {
-		switch rand.Intn(opLen) {
+		op := createAccountOp
+		if i > 0 {
+			op = rand.Intn(opLen)
+		}
+		switch op {
 		case createAccountOp:
 			// account creation
 			addr := testutil.RandomAddress()
