@@ -38,7 +38,7 @@ var (
 func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
 	require.NoError(t, err)
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk, err := localsigner.SecretKeyFromBytes(skBytes)
 	require.NoError(t, err)
 
 	var (

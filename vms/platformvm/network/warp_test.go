@@ -241,7 +241,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 	skBytes, err := hex.DecodeString("36a33c536d283dfa599d0a70839c67ded6c954e346c5e8e5b4794e2299907887")
 	require.NoError(t, err)
 
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk, err := localsigner.SecretKeyFromBytes(skBytes)
 	require.NoError(t, err)
 
 	var (
