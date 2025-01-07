@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 )
 
 func TestSignedIpVerify(t *testing.T) {
@@ -21,7 +22,7 @@ func TestSignedIpVerify(t *testing.T) {
 	cert1, err := staking.ParseCertificate(tlsCert1.Leaf.Raw)
 	require.NoError(t, err)
 	tlsKey1 := tlsCert1.PrivateKey.(crypto.Signer)
-	blsKey1, err := bls.NewSigner()
+	blsKey1, err := localsigner.NewSigner()
 	require.NoError(t, err)
 
 	tlsCert2, err := staking.NewTLSCert()

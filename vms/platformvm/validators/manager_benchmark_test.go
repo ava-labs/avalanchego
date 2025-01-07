@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -109,7 +109,7 @@ func addPrimaryValidator(
 	endTime time.Time,
 	height uint64,
 ) (ids.NodeID, error) {
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}

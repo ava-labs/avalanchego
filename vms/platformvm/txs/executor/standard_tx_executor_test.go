@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -1450,7 +1451,7 @@ func TestDurangoMemoField(t *testing.T) {
 					chainTime = env.state.GetTimestamp()
 					endTime   = chainTime.Add(defaultMaxStakingDuration)
 				)
-				sk, err := bls.NewSigner()
+				sk, err := localsigner.NewSigner()
 				require.NoError(err)
 
 				wallet := newWallet(t, env, walletConfig{})
@@ -2547,7 +2548,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			sk, err := bls.NewSigner()
+			sk, err := localsigner.NewSigner()
 			require.NoError(err)
 
 			// Create the ConvertSubnetToL1Tx
@@ -2748,7 +2749,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	initialSK, err := bls.NewSigner()
+	initialSK, err := localsigner.NewSigner()
 	require.NoError(t, err)
 
 	const (
@@ -2801,7 +2802,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	const weight = 1
 
 	// Create the Warp message
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(t, err)
 	pop := signer.NewProofOfPossession(sk)
 	pk := sk.PublicKey()
@@ -3278,7 +3279,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(t, err)
 
 	const (
@@ -3781,7 +3782,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(t, err)
 
 	const (
@@ -4077,7 +4078,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the subnet conversion
-	sk, err := bls.NewSigner()
+	sk, err := localsigner.NewSigner()
 	require.NoError(t, err)
 
 	const (

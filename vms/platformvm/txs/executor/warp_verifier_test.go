@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -25,7 +26,7 @@ func TestVerifyWarpMessages(t *testing.T) {
 		subnetID     = ids.GenerateTestID()
 		chainID      = ids.GenerateTestID()
 		newValidator = func() (bls.Signer, *validators.GetValidatorOutput) {
-			sk, err := bls.NewSigner()
+			sk, err := localsigner.NewSigner()
 			require.NoError(t, err)
 
 			return sk, &validators.GetValidatorOutput{
