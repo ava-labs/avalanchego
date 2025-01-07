@@ -8,8 +8,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
-
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -24,7 +22,7 @@ func main() {
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	avaxAddr := key.Address()
-	ethAddr := evm.PublicKeyToEthAddress(key.PublicKey())
+	ethAddr := key.PublicKey().EthAddress()
 
 	ctx := context.Background()
 

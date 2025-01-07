@@ -8,9 +8,10 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/plugin/evm"
+	"github.com/ava-labs/coreth/plugin/evm/client"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -62,7 +63,7 @@ type AVAXState struct {
 	PCTX    *pbuilder.Context
 	XClient avm.Client
 	XCTX    *xbuilder.Context
-	CClient evm.Client
+	CClient client.Client
 	CCTX    *c.Context
 	UTXOs   walletcommon.UTXOs
 }
@@ -78,7 +79,7 @@ func FetchState(
 	infoClient := info.NewClient(uri)
 	pClient := platformvm.NewClient(uri)
 	xClient := avm.NewClient(uri, "X")
-	cClient := evm.NewCChainClient(uri)
+	cClient := client.NewCChainClient(uri)
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, pClient)
 	if err != nil {
@@ -115,7 +116,7 @@ func FetchState(
 		{
 			id:     cCTX.BlockchainID,
 			client: cClient,
-			codec:  evm.Codec,
+			codec:  atomic.Codec,
 		},
 	}
 	for _, destinationChain := range chains {

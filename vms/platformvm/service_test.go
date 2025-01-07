@@ -312,7 +312,7 @@ func TestGetTx(t *testing.T) {
 			func(t testing.TB, s *Service) *txs.Tx {
 				wallet := newWallet(t, s.vm, walletConfig{})
 
-				sk, err := bls.NewSecretKey()
+				sk, err := bls.NewSigner()
 				require.NoError(t, err)
 
 				rewardsOwner := &secp256k1fx.OutputOwners{
@@ -427,7 +427,7 @@ func TestGetTx(t *testing.T) {
 					tx.Unsigned.InitCtx(service.vm.ctx)
 					expectedTxJSON, err := json.Marshal(tx)
 					require.NoError(err)
-					require.Equal(expectedTxJSON, []byte(response.Tx))
+					require.JSONEq(string(expectedTxJSON), string(response.Tx))
 				}
 			})
 		}
@@ -848,7 +848,7 @@ func TestGetValidatorsAt(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1043,7 +1043,7 @@ func TestGetBlock(t *testing.T) {
 				statelessBlock.InitCtx(service.vm.ctx)
 				expectedBlockJSON, err := json.Marshal(statelessBlock)
 				require.NoError(err)
-				require.Equal(expectedBlockJSON, []byte(response.Block))
+				require.JSONEq(string(expectedBlockJSON), string(response.Block))
 			default:
 				var blockStr string
 				require.NoError(json.Unmarshal(response.Block, &blockStr))
@@ -1073,11 +1073,11 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 	}
 	{
 		nodeID := ids.GenerateTestNodeID()
-		sk, err := bls.NewSecretKey()
+		sk, err := bls.NewSigner()
 		require.NoError(err)
 		reply.Validators[nodeID] = &validators.GetValidatorOutput{
 			NodeID:    nodeID,
-			PublicKey: bls.PublicFromSecretKey(sk),
+			PublicKey: sk.PublicKey(),
 			Weight:    math.MaxUint64,
 		}
 	}
@@ -1276,7 +1276,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			expectedJSON, err := json.Marshal(expected)
 			require.NoError(err)
 
-			require.Equal(json.RawMessage(expectedJSON), reply.Block)
+			require.JSONEq(string(expectedJSON), string(reply.Block))
 		})
 	}
 }

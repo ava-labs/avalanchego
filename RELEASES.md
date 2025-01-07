@@ -1,5 +1,34 @@
 # Release Notes
 
+## [v1.12.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.1)
+
+This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `38` and is compatible with version `v1.12.0`.
+
+### Configs
+
+- Added PebbleDB option `sync` which defaults to `true`
+
+### Fixes
+
+- Fixed P-chain mempool verification to disallow transactions that exceed the available chain capacity
+
+### What's Changed
+
+- Expose test network cfg by @cam-schultz in https://github.com/ava-labs/avalanchego/pull/3573
+- encapsulate signer by @richardpringle in https://github.com/ava-labs/avalanchego/pull/3576
+- use pebble nosync by default by @ceyonur in https://github.com/ava-labs/avalanchego/pull/3581
+- fix: feeState API call in docs by @ashucoder9 in https://github.com/ava-labs/avalanchego/pull/3596
+- Format Service.MD by @samliok in https://github.com/ava-labs/avalanchego/pull/3599
+- Verify tx gas isn't too large in VerifyTx by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3604
+- Add already implemented merkledb.View to MerkleDB interface by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3593
+- Add tempdir in for chain ctx data dir by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/3594
+- Improve block building and verification logging by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/3605
+- Bump golang.org/x/crypto from 0.26.0 to 0.31.0 by @dependabot in https://github.com/ava-labs/avalanchego/pull/3608
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.0...v1.12.1
+
 ## [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)
 
 This upgrade consists of the following Avalanche Community Proposals (ACPs):
@@ -2031,7 +2060,7 @@ The plugin version is unchanged at `27` and compatible with versions `v1.10.5 - 
 
 ### APIs
 
-- Modifed `platform.getValidatorsAt` to also return BLS public keys
+- Modified `platform.getValidatorsAt` to also return BLS public keys
 
 ### Configs
 
