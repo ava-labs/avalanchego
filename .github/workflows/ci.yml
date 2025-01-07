@@ -132,7 +132,6 @@ jobs:
       - uses: bufbuild/buf-action@v1
         with:
           input: "proto"
-          github_token: ${{ github.token }}
           pr_comment: false
           version: 1.35.0
   check_generated_protobuf:
@@ -144,7 +143,6 @@ jobs:
       - uses: bufbuild/buf-action@v1
         with:
           setup_only: true
-          github_token: ${{ github.token }}
           version: 1.35.0
       - shell: bash
         run: scripts/protobuf_codegen.sh
