@@ -42,7 +42,8 @@ func Serve(service *signerService) (*Server, error) {
 	}
 
 	httpServer := &http.Server{
-		Handler: server,
+		Handler:           server,
+		ReadHeaderTimeout: 1 * time.Second,
 	}
 
 	listener, err := net.Listen("tcp", "")

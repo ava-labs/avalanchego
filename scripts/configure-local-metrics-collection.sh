@@ -15,7 +15,7 @@ METRICS_UUID="$(uuidgen)"
 echo "Configuring metrics and log collection for a local node with API port ${API_PORT} and logs path ${LOGS_PATH}"
 
 PROMETHEUS_CONFIG_PATH="${HOME}/.tmpnet/prometheus/file_sd_configs"
-PROMETHEUS_CONFIG_FILE="${PROMETHEUS_CONFIG_PATH}/localsigner.json"
+PROMETHEUS_CONFIG_FILE="${PROMETHEUS_CONFIG_PATH}/local.json"
 mkdir -p "${PROMETHEUS_CONFIG_PATH}"
 cat > "${PROMETHEUS_CONFIG_FILE}" <<EOL
 [
@@ -32,7 +32,7 @@ EOL
 echo "Wrote prometheus configuration to ${PROMETHEUS_CONFIG_FILE}"
 
 PROMTAIL_CONFIG_PATH="${HOME}/.tmpnet/promtail/file_sd_configs"
-PROMTAIL_CONFIG_FILE="${PROMTAIL_CONFIG_PATH}/localsigner.json"
+PROMTAIL_CONFIG_FILE="${PROMTAIL_CONFIG_PATH}/local.json"
 mkdir -p "${PROMTAIL_CONFIG_PATH}"
 cat > "${PROMTAIL_CONFIG_FILE}" <<EOL
 [
