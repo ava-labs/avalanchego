@@ -84,6 +84,10 @@ jobs:
         run: echo "TIMEOUT=1200s" >> "$GITHUB_ENV"
       - run: go mod download
         shell: bash
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code
       - name: Mocks are up to date
         shell: bash
         run: |
