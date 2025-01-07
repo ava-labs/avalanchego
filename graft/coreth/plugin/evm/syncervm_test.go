@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
+	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/database"
 	"github.com/ava-labs/coreth/predicate"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/statesync"
@@ -334,7 +335,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	serverAtomicTrie := serverVM.atomicTrie.(*atomicTrie)
 	serverAtomicTrie.commitInterval = test.syncableInterval
 	require.NoError(serverAtomicTrie.commit(test.syncableInterval, serverAtomicTrie.LastAcceptedRoot()))
-	require.NoError(serverVM.db.Commit())
+	require.NoError(serverVM.versiondb.Commit())
 
 	serverSharedMemories := newSharedMemories(serverAtomicMemory, serverVM.ctx.ChainID, serverVM.ctx.XChainID)
 	serverSharedMemories.assertOpsApplied(t, mustAtomicOps(importTx))
@@ -430,7 +431,7 @@ type syncVMSetup struct {
 	fundedAccounts    map[*keystore.Key]*types.StateAccount
 
 	syncerVM             *VM
-	syncerDB             database.Database
+	syncerDB             avalanchedatabase.Database
 	syncerEngineChan     <-chan commonEng.Message
 	syncerAtomicMemory   *avalancheatomic.Memory
 	shutdownOnceSyncerVM *shutdownOnceVM
@@ -491,7 +492,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	if test.expectedErr != nil {
 		require.ErrorIs(err, test.expectedErr)
 		// Note we re-open the database here to avoid a closed error when the test is for a shutdown VM.
-		chaindb := Database{prefixdb.NewNested(ethDBPrefix, syncerVM.db)}
+		chaindb := database.WrapDatabase(prefixdb.NewNested(ethDBPrefix, syncerVM.db))
 		assertSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
 		return
 	}

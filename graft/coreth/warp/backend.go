@@ -180,7 +180,7 @@ func (b *backend) GetMessage(messageID ids.ID) (*avalancheWarp.UnsignedMessage, 
 
 	unsignedMessageBytes, err := b.db.Get(messageID[:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get warp message %s from db: %w", messageID.String(), err)
+		return nil, err
 	}
 
 	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(unsignedMessageBytes)

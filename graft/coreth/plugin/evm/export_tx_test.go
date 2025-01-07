@@ -1011,7 +1011,7 @@ func TestExportTxAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitBatch, err := vm.db.CommitBatch()
+	commitBatch, err := vm.versiondb.CommitBatch()
 	if err != nil {
 		t.Fatalf("Failed to create commit batch for VM due to %s", err)
 	}
@@ -1800,7 +1800,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatalf("burned wrong amount of AVAX - expected %d burned %d", test.expectedBurnedAVAX, burnedAVAX)
 			}
 
-			commitBatch, err := vm.db.CommitBatch()
+			commitBatch, err := vm.versiondb.CommitBatch()
 			if err != nil {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
@@ -2000,7 +2000,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal("newExportTx created an invalid transaction", err)
 			}
 
-			commitBatch, err := vm.db.CommitBatch()
+			commitBatch, err := vm.versiondb.CommitBatch()
 			if err != nil {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
