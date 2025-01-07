@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json"
+
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
 )
 
 type signerService struct {
@@ -24,7 +25,6 @@ type Server struct {
 
 func NewSignerService() *signerService {
 	signer, err := localsigner.NewSigner()
-
 	if err != nil {
 		panic(err)
 	}

@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/gorilla/rpc/v2/json2"
+
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 type Client struct {
@@ -24,13 +25,11 @@ func NewClient(url url.URL) *Client {
 
 func (client *Client) call(method string, params []interface{}, result interface{}) error {
 	requestBody, err := json2.EncodeClientRequest(method, params)
-
 	if err != nil {
 		return err
 	}
 
 	resp, err := client.http.Post(client.url.String(), "application/json", bytes.NewBuffer(requestBody))
-
 	if err != nil {
 		return err
 	}
@@ -42,7 +41,6 @@ func (c *Client) PublicKey() *bls.PublicKey {
 	reply := new(PublicKeyReply)
 
 	err := c.call("Signer.PublicKey", []interface{}{PublicKeyArgs{}}, reply)
-
 	if err != nil {
 		panic(err)
 	}
@@ -58,7 +56,6 @@ func (c *Client) Sign(msg []byte) *bls.Signature {
 	// request the public key from the json-rpc server
 	reply := new(SignReply)
 	err := c.call("Signer.Sign", []interface{}{SignArgs{msg}}, reply)
-
 	// TODO: handle this
 	if err != nil {
 		panic(err)
@@ -77,7 +74,6 @@ func (c *Client) SignProofOfPossession(msg []byte) *bls.Signature {
 	// request the public key from the json-rpc server
 	reply := new(SignReply)
 	err := c.call("Signer.SignProofOfPossession", []interface{}{SignArgs{msg}}, reply)
-
 	// TODO: handle this
 	if err != nil {
 		panic(err)

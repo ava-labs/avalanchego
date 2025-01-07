@@ -12,8 +12,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	jsonrpc "github.com/ava-labs/avalanchego/utils/crypto/bls/signers/json-rpc"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signers/localsigner"
+
+	jsonrpc "github.com/ava-labs/avalanchego/utils/crypto/bls/signers/json-rpc"
 )
 
 type Signer interface {
@@ -42,6 +43,7 @@ var localSignerFn = func() (Signer, error) {
 	signer, err := localsigner.NewSigner()
 	return &localSigner{LocalSigner: signer}, err
 }
+
 var serverSignerFn = func() (Signer, error) {
 	// do I need to make sure the server gets closed properly?
 	service := jsonrpc.NewSignerService()
@@ -107,7 +109,6 @@ func TestAggregation(t *testing.T) {
 			name:    "valid single key",
 			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
-
 				pks := []*bls.PublicKey{
 					signer.PublicKey(),
 				}
