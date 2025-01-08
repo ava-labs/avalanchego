@@ -9,13 +9,13 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
 ### Configs
 
 - Removed static fee config flags
-  - `CreateSubnetTxFeeKey`
-  - `TransformSubnetTxFeeKey`
-  - `CreateBlockchainTxFeeKey`
-  - `AddPrimaryNetworkValidatorFeeKey`
-  - `AddPrimaryNetworkDelegatorFeeKey`
-  - `AddSubnetValidatorFeeKey`
-  - `AddSubnetDelegatorFeeKey`
+  - `--create-subnet-tx-fee`
+  - `--transform-subnet-tx-fee`
+  - `--create-blockchain-tx-fee`
+  - `--add-primary-network-validator-fee`
+  - `--add-primary-network-delegator-fee`
+  - `--add-subnet-validator-fee`
+  - `--add-subnet-delegator-fee`
 
 ### What's Changed
 
