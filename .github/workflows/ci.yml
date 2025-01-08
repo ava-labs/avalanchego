@@ -133,6 +133,10 @@ jobs:
         with:
           input: "proto"
           pr_comment: false
+          # buf-action defaults to pushing on non-fork branch pushes
+          # which is never desirable for this job. The buf-push job is
+          # responsible for pushes.
+          push: false
           version: 1.35.0
   check_generated_protobuf:
     name: Up-to-date protobuf
