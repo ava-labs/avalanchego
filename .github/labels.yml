@@ -52,6 +52,9 @@
 - name: "go"
   color: "16e2e2"
   description: "Pull requests that update Go code"
+- name: "needs Go upgrade"
+  color: "16e2e2"
+  description: "This requires a minor upgrade of Go to be supported"
 
 # Avalanchego specific labels
 - name: "antithesis"
