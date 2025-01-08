@@ -402,7 +402,8 @@ func TestVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "valid",
+			name:    "valid",
+			signers: signerFns,
 			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
@@ -412,7 +413,8 @@ func TestVerify(t *testing.T) {
 			expectedValid: true,
 		},
 		{
-			name: "wrong message",
+			name:    "wrong message",
+			signers: signerFns,
 			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
@@ -423,7 +425,8 @@ func TestVerify(t *testing.T) {
 			expectedValid: false,
 		},
 		{
-			name: "wrong pub key",
+			name:    "wrong pub key",
+			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				msg := utils.RandomBytes(1234)
 				sig := signer.Sign(msg)
@@ -436,7 +439,8 @@ func TestVerify(t *testing.T) {
 			expectedValid: false,
 		},
 		{
-			name: "wrong sig",
+			name:    "wrong sig",
+			signers: signerFns,
 			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
