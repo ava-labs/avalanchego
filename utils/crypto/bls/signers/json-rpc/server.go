@@ -84,17 +84,17 @@ func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
-func (s *signerService) PublicKey(r *http.Request, args *PublicKeyArgs, reply *PublicKeyReply) error {
+func (s *signerService) PublicKey(_ *http.Request, _ *PublicKeyArgs, reply *PublicKeyReply) error {
 	*reply = toPkReply(s.signer.PublicKey())
 	return nil
 }
 
-func (s *signerService) Sign(r *http.Request, args *struct{ Msg []byte }, reply *SignReply) error {
+func (s *signerService) Sign(_ *http.Request, args *struct{ Msg []byte }, reply *SignReply) error {
 	*reply = toSignReply(s.signer.Sign(args.Msg))
 	return nil
 }
 
-func (s *signerService) SignProofOfPossession(r *http.Request, args *struct{ Msg []byte }, reply *SignProofOfPossessionReply) error {
+func (s *signerService) SignProofOfPossession(_ *http.Request, args *struct{ Msg []byte }, reply *SignProofOfPossessionReply) error {
 	*reply = toSignProofOfPossessionReply(s.signer.SignProofOfPossession(args.Msg))
 	return nil
 }

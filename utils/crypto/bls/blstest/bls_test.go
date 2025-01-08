@@ -35,7 +35,7 @@ type localSigner struct {
 	*localsigner.LocalSigner
 }
 
-func (s localSigner) Close() error {
+func (localSigner) Close() error {
 	return nil
 }
 
@@ -108,7 +108,7 @@ func TestAggregation(t *testing.T) {
 		{
 			name:    "valid single key",
 			signers: signerFns,
-			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
+			setup: func(_ *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
 				pks := []*bls.PublicKey{
 					signer.PublicKey(),
 				}
@@ -403,7 +403,7 @@ func TestVerify(t *testing.T) {
 	tests := []test{
 		{
 			name: "valid",
-			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
 				sig := signer.Sign(msg)
@@ -413,7 +413,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name: "wrong message",
-			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
 				sig := signer.Sign(msg)
@@ -437,7 +437,7 @@ func TestVerify(t *testing.T) {
 		},
 		{
 			name: "wrong sig",
-			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
 
@@ -478,7 +478,7 @@ func TestVerifyProofOfPossession(t *testing.T) {
 		{
 			name:    "valid",
 			signers: signerFns,
-			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
 				sig := signer.SignProofOfPossession(msg)
@@ -489,7 +489,7 @@ func TestVerifyProofOfPossession(t *testing.T) {
 		{
 			name:    "wrong message",
 			signers: signerFns,
-			setup: func(require *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
+			setup: func(_ *require.Assertions, signer bls.Signer) (*bls.PublicKey, *bls.Signature, []byte) {
 				pk := signer.PublicKey()
 				msg := utils.RandomBytes(1234)
 				sig := signer.SignProofOfPossession(msg)

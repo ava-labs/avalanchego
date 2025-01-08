@@ -5,13 +5,17 @@ package jsonrpc
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/gorilla/rpc/v2/json2"
 
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
+
+var _ bls.Signer = (*Client)(nil)
 
 type Client struct {
 	// http client
@@ -26,16 +30,26 @@ func NewClient(url url.URL) *Client {
 	}
 }
 
-func (client *Client) call(method string, params []interface{}, result interface{}) error {
+func (c *Client) call(method string, params []interface{}, result interface{}) error {
 	requestBody, err := json2.EncodeClientRequest(method, params)
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.http.Post(client.url.String(), "application/json", bytes.NewBuffer(requestBody))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel() // Ensure the context is canceled to release resources
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url.String(), bytes.NewBuffer(requestBody))
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
 	return json2.DecodeClientResponse(resp.Body, result)
 }
