@@ -124,7 +124,8 @@ func TestAggregation(t *testing.T) {
 			expectedValid: true,
 		},
 		{
-			name: "wrong message",
+			name:    "wrong message",
+			signers: signerFns,
 			setup: func(require *require.Assertions, signer bls.Signer) ([]*bls.PublicKey, []*bls.Signature, []byte) {
 				sk1, err := localsigner.NewSigner()
 				require.NoError(err)
@@ -307,9 +308,10 @@ func TestAggregation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, newSigner := range tt.signers {
-				require := require.New(t)
+			require := require.New(t)
+			require.NotEmpty(tt.signers)
 
+			for _, newSigner := range tt.signers {
 				signer, err := newSigner()
 				require.NoError(err)
 
@@ -455,8 +457,10 @@ func TestVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			require.NotEmpty(tt.signers)
+
 			for _, newSigner := range tt.signers {
-				require := require.New(t)
 				signer, err := newSigner()
 				require.NoError(err)
 				pk, sig, msg := tt.setup(require, signer)
