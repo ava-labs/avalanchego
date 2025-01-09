@@ -129,21 +129,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bufbuild/buf-setup-action@v1.31.0
-        with:
-          github_token: ${{ github.token }}
-      - uses: bufbuild/buf-lint-action@v1
+      - uses: bufbuild/buf-action@v1
         with:
           input: "proto"
+          pr_comment: false
+          # buf-action defaults to pushing on non-fork branch pushes
+          # which is never desirable for this job. The buf-push job is
+          # responsible for pushes.
+          push: false
+          version: 1.35.0
   check_generated_protobuf:
     name: Up-to-date protobuf
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
-      - uses: bufbuild/buf-setup-action@v1.31.0
+      - uses: bufbuild/buf-action@v1
         with:
-          github_token: ${{ github.token }}
+          setup_only: true
+          version: 1.35.0
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash
