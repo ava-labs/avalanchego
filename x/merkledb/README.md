@@ -278,6 +278,7 @@ Change proofs are useful for applying changes between revisions. For example, su
 
 #### Visualisation
 
+Changed hashes highlighted in green.
 ```mermaid
 flowchart TD
     classDef green fill:lightgreen;
