@@ -228,7 +228,11 @@ func (t *tester) generate(parent common.Hash) (common.Hash, *trienode.MergedNode
 		dirties = make(map[common.Hash]struct{})
 	)
 	for i := 0; i < 20; i++ {
-		switch rand.Intn(opLen) {
+		op := createAccountOp
+		if i > 0 {
+			op = rand.Intn(opLen)
+		}
+		switch op {
 		case createAccountOp:
 			// account creation
 			addr := testutil.RandomAddress()
@@ -315,7 +319,7 @@ func (t *tester) generate(parent common.Hash) (common.Hash, *trienode.MergedNode
 	return root, ctx.nodes, triestate.New(ctx.accountOrigin, ctx.storageOrigin, nil)
 }
 
-// lastRoot returns the latest root hash, or empty if nothing is cached.
+// lastHash returns the latest root hash, or empty if nothing is cached.
 func (t *tester) lastHash() common.Hash {
 	if len(t.roots) == 0 {
 		return common.Hash{}

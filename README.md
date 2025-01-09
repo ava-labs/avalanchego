@@ -3,7 +3,7 @@
 [Avalanche](https://docs.avax.network/intro) is a network composed of multiple blockchains.
 Each blockchain is an instance of a Virtual Machine (VM), much like an object in an object-oriented language is an instance of a class.
 That is, the VM defines the behavior of the blockchain.
-Coreth (from core Ethereum) is the [Virtual Machine (VM)](https://docs.avax.network/learn/avalanche/virtual-machines) that defines the Contract Chain (C-Chain).
+Coreth (from core Ethereum) is the [Virtual Machine (VM)](https://docs.avax.network/learn/virtual-machines) that defines the Contract Chain (C-Chain).
 This chain implements the Ethereum Virtual Machine and supports Solidity smart contracts as well as most other Ethereum client functionality.
 
 ## Building

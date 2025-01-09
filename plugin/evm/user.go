@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/libevm/common"
 )
 
@@ -47,7 +48,7 @@ func (u *user) getAddresses() ([]common.Address, error) {
 		return nil, err
 	}
 	addresses := []common.Address{}
-	if _, err := Codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := atomic.Codec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
@@ -69,7 +70,7 @@ func (u *user) putAddress(privKey *secp256k1.PrivateKey) error {
 		return errKeyNil
 	}
 
-	address := GetEthAddress(privKey) // address the privKey controls
+	address := privKey.EthAddress() // address the privKey controls
 	controlsAddress, err := u.controlsAddress(address)
 	if err != nil {
 		return err
@@ -93,7 +94,7 @@ func (u *user) putAddress(privKey *secp256k1.PrivateKey) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := Codec.Marshal(codecVersion, addresses)
+	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, addresses)
 	if err != nil {
 		return err
 	}

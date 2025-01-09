@@ -172,8 +172,9 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, reexec u
 		if err != nil {
 			return nil, nil, fmt.Errorf("state reset after block %d failed: %v", current.NumberU64(), err)
 		}
-		// Note: In subnet-evm, the state reference is held by passing true to [statedb.Commit].
-		// Drop the parent state to prevent accumulating too many nodes in memory.
+		// Hold the state reference and also drop the parent state
+		// to prevent accumulating too many nodes in memory.
+		tdb.Reference(root, common.Hash{})
 		if parent != (common.Hash{}) {
 			tdb.Dereference(parent)
 		}

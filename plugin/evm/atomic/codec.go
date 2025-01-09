@@ -1,9 +1,10 @@
 // (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package atomic
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -12,8 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Codec does serialization and deserialization
-var Codec codec.Manager
+const CodecVersion = uint16(0)
+
+var (
+	// Codec does serialization and deserialization
+	Codec codec.Manager
+
+	errMissingAtomicTxs = errors.New("cannot build a block with non-empty extra data and zero atomic transactions")
+)
 
 func init() {
 	Codec = codec.NewDefaultManager()
@@ -35,7 +42,7 @@ func init() {
 		lc.RegisterType(&secp256k1fx.Credential{}),
 		lc.RegisterType(&secp256k1fx.Input{}),
 		lc.RegisterType(&secp256k1fx.OutputOwners{}),
-		Codec.RegisterCodec(codecVersion, lc),
+		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

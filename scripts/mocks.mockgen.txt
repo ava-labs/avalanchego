@@ -1,2 +1,0 @@
-github.com/ava-labs/coreth/precompile/precompileconfig=Predicater,Config,ChainConfig,Accepter=precompile/precompileconfig/mocks.go
-github.com/ava-labs/coreth/precompile/contract=BlockContext,AccessibleState,StateDB=precompile/contract/mocks.go

@@ -7,6 +7,7 @@ import (
 	"container/heap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 )
 
 // txEntry is used to track the [gasPrice] transactions pay to be included in
@@ -14,7 +15,7 @@ import (
 type txEntry struct {
 	id       ids.ID
 	gasPrice uint64
-	tx       *Tx
+	tx       *atomic.Tx
 	index    int
 }
 
@@ -91,7 +92,7 @@ func newTxHeap(maxSize int) *txHeap {
 	}
 }
 
-func (th *txHeap) Push(tx *Tx, gasPrice uint64) {
+func (th *txHeap) Push(tx *atomic.Tx, gasPrice uint64) {
 	txID := tx.ID()
 	oldLen := th.Len()
 	heap.Push(th.maxHeap, &txEntry{
@@ -109,28 +110,28 @@ func (th *txHeap) Push(tx *Tx, gasPrice uint64) {
 }
 
 // Assumes there is non-zero items in [txHeap]
-func (th *txHeap) PeekMax() (*Tx, uint64) {
+func (th *txHeap) PeekMax() (*atomic.Tx, uint64) {
 	txEntry := th.maxHeap.items[0]
 	return txEntry.tx, txEntry.gasPrice
 }
 
 // Assumes there is non-zero items in [txHeap]
-func (th *txHeap) PeekMin() (*Tx, uint64) {
+func (th *txHeap) PeekMin() (*atomic.Tx, uint64) {
 	txEntry := th.minHeap.items[0]
 	return txEntry.tx, txEntry.gasPrice
 }
 
 // Assumes there is non-zero items in [txHeap]
-func (th *txHeap) PopMax() *Tx {
+func (th *txHeap) PopMax() *atomic.Tx {
 	return th.Remove(th.maxHeap.items[0].id)
 }
 
 // Assumes there is non-zero items in [txHeap]
-func (th *txHeap) PopMin() *Tx {
+func (th *txHeap) PopMin() *atomic.Tx {
 	return th.Remove(th.minHeap.items[0].id)
 }
 
-func (th *txHeap) Remove(id ids.ID) *Tx {
+func (th *txHeap) Remove(id ids.ID) *atomic.Tx {
 	maxEntry, ok := th.maxHeap.Get(id)
 	if !ok {
 		return nil
@@ -150,7 +151,7 @@ func (th *txHeap) Len() int {
 	return th.maxHeap.Len()
 }
 
-func (th *txHeap) Get(id ids.ID) (*Tx, bool) {
+func (th *txHeap) Get(id ids.ID) (*atomic.Tx, bool) {
 	txEntry, ok := th.maxHeap.Get(id)
 	if !ok {
 		return nil, false

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
+	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/database"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -52,7 +54,7 @@ type AtomicTrie interface {
 	OpenTrie(hash common.Hash) (*trie.Trie, error)
 
 	// UpdateTrie updates [tr] to inlude atomicOps for height.
-	UpdateTrie(tr *trie.Trie, height uint64, atomicOps map[ids.ID]*atomic.Requests) error
+	UpdateTrie(tr *trie.Trie, height uint64, atomicOps map[ids.ID]*avalancheatomic.Requests) error
 
 	// Iterator returns an AtomicTrieIterator to iterate the trie at the given
 	// root hash starting at [cursor].
@@ -108,7 +110,7 @@ type AtomicTrieIterator interface {
 
 	// AtomicOps returns a map of blockchainIDs to the set of atomic requests
 	// for that blockchainID at the current block number
-	AtomicOps() *atomic.Requests
+	AtomicOps() *avalancheatomic.Requests
 
 	// Error returns error, if any encountered during this iteration
 	Error() error
@@ -116,12 +118,12 @@ type AtomicTrieIterator interface {
 
 // atomicTrie implements the AtomicTrie interface
 type atomicTrie struct {
-	commitInterval      uint64            // commit interval, same as commitHeightInterval by default
-	metadataDB          database.Database // Underlying database containing the atomic trie metadata
-	trieDB              *triedb.Database  // Trie database
-	lastCommittedRoot   common.Hash       // trie root of the most recent commit
-	lastCommittedHeight uint64            // index height of the most recent commit
-	lastAcceptedRoot    common.Hash       // most recent trie root passed to accept trie or the root of the atomic trie on intialization.
+	commitInterval      uint64                     // commit interval, same as commitHeightInterval by default
+	metadataDB          avalanchedatabase.Database // Underlying database containing the atomic trie metadata
+	trieDB              *triedb.Database           // Trie database
+	lastCommittedRoot   common.Hash                // trie root of the most recent commit
+	lastCommittedHeight uint64                     // index height of the most recent commit
+	lastAcceptedRoot    common.Hash                // most recent trie root passed to accept trie or the root of the atomic trie on intialization.
 	codec               codec.Manager
 	memoryCap           common.StorageSize
 	tipBuffer           *core.BoundedBuffer[common.Hash]
@@ -130,7 +132,7 @@ type atomicTrie struct {
 // newAtomicTrie returns a new instance of a atomicTrie with a configurable commitHeightInterval, used in testing.
 // Initializes the trie before returning it.
 func newAtomicTrie(
-	atomicTrieDB database.Database, metadataDB database.Database,
+	atomicTrieDB avalanchedatabase.Database, metadataDB avalanchedatabase.Database,
 	codec codec.Manager, lastAcceptedHeight uint64, commitHeightInterval uint64,
 ) (*atomicTrie, error) {
 	root, height, err := lastCommittedRootIfExists(metadataDB)
@@ -152,7 +154,7 @@ func newAtomicTrie(
 	}
 
 	trieDB := triedb.NewDatabase(
-		rawdb.NewDatabase(Database{atomicTrieDB}),
+		rawdb.NewDatabase(database.WrapDatabase(atomicTrieDB)),
 		&triedb.Config{
 			DBOverride: hashdb.Config{
 				CleanCacheSize: 64 * units.MiB, // Allocate 64MB of memory for clean cache
@@ -181,17 +183,17 @@ func newAtomicTrie(
 // else returns empty common.Hash{} and 0
 // returns error only if there are issues with the underlying data store
 // or if values present in the database are not as expected
-func lastCommittedRootIfExists(db database.Database) (common.Hash, uint64, error) {
+func lastCommittedRootIfExists(db avalanchedatabase.Database) (common.Hash, uint64, error) {
 	// read the last committed entry if it exists and set the root hash
 	lastCommittedHeightBytes, err := db.Get(lastCommittedKey)
 	switch {
-	case err == database.ErrNotFound:
+	case err == avalanchedatabase.ErrNotFound:
 		return common.Hash{}, 0, nil
 	case err != nil:
 		return common.Hash{}, 0, err
 	}
 
-	height, err := database.ParseUInt64(lastCommittedHeightBytes)
+	height, err := avalanchedatabase.ParseUInt64(lastCommittedHeightBytes)
 	if err != nil {
 		return common.Hash{}, 0, fmt.Errorf("expected value at lastCommittedKey to be a valid uint64: %w", err)
 	}
@@ -221,9 +223,9 @@ func (a *atomicTrie) commit(height uint64, root common.Hash) error {
 	return a.updateLastCommitted(root, height)
 }
 
-func (a *atomicTrie) UpdateTrie(trie *trie.Trie, height uint64, atomicOps map[ids.ID]*atomic.Requests) error {
+func (a *atomicTrie) UpdateTrie(trie *trie.Trie, height uint64, atomicOps map[ids.ID]*avalancheatomic.Requests) error {
 	for blockchainID, requests := range atomicOps {
-		valueBytes, err := a.codec.Marshal(codecVersion, requests)
+		valueBytes, err := a.codec.Marshal(atomic.CodecVersion, requests)
 		if err != nil {
 			// highly unlikely but possible if atomic.Element
 			// has a change that is unsupported by the codec
@@ -250,7 +252,7 @@ func (a *atomicTrie) LastCommitted() (common.Hash, uint64) {
 // updateLastCommitted adds [height] -> [root] to the index and marks it as the last committed
 // root/height pair.
 func (a *atomicTrie) updateLastCommitted(root common.Hash, height uint64) error {
-	heightBytes := database.PackUInt64(height)
+	heightBytes := avalanchedatabase.PackUInt64(height)
 
 	// now save the trie hash against the height it was committed at
 	if err := a.metadataDB.Put(heightBytes, root[:]); err != nil {
@@ -296,7 +298,7 @@ func (a *atomicTrie) Root(height uint64) (common.Hash, error) {
 
 // getRoot is a helper function to return the committed atomic trie root hash at [height]
 // from [metadataDB].
-func getRoot(metadataDB database.Database, height uint64) (common.Hash, error) {
+func getRoot(metadataDB avalanchedatabase.Database, height uint64) (common.Hash, error) {
 	if height == 0 {
 		// if root is queried at height == 0, return the empty root hash
 		// this may occur if peers ask for the most recent state summary
@@ -304,10 +306,10 @@ func getRoot(metadataDB database.Database, height uint64) (common.Hash, error) {
 		return types.EmptyRootHash, nil
 	}
 
-	heightBytes := database.PackUInt64(height)
+	heightBytes := avalanchedatabase.PackUInt64(height)
 	hash, err := metadataDB.Get(heightBytes)
 	switch {
-	case err == database.ErrNotFound:
+	case err == avalanchedatabase.ErrNotFound:
 		return common.Hash{}, nil
 	case err != nil:
 		return common.Hash{}, err

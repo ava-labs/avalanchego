@@ -142,7 +142,7 @@ func TestWaitDeployedCornerCases(t *testing.T) {
 
 	// Create a transaction that is not mined.
 	tx = types.NewContractCreation(1, big.NewInt(0), 3000000, gasPrice, common.FromHex(code))
-	tx, _ = types.SignTx(tx, types.LatestSigner(params.TestChainConfig), testKey)
+	tx, _ = types.SignTx(tx, types.LatestSignerForChainID(big.NewInt(1337)), testKey)
 
 	go func() {
 		contextCanceled := errors.New("context canceled")
@@ -151,6 +151,8 @@ func TestWaitDeployedCornerCases(t *testing.T) {
 		}
 	}()
 
-	backend.Client().SendTransaction(ctx, tx)
+	if err := backend.Client().SendTransaction(ctx, tx); err != nil {
+		t.Fatalf("Failed to send transaction: %s", err)
+	}
 	cancel()
 }

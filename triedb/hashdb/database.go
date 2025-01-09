@@ -100,9 +100,9 @@ type cache interface {
 
 // Config contains the settings for database.
 type Config struct {
-	CleanCacheSize int    // Maximum memory allowance (in bytes) for caching clean nodes
-	StatsPrefix    string // Prefix for cache stats (disabled if empty)
-	ReferenceRoot  bool   // Whether to reference the root node on update
+	CleanCacheSize                  int    // Maximum memory allowance (in bytes) for caching clean nodes
+	StatsPrefix                     string // Prefix for cache stats (disabled if empty)
+	ReferenceRootAtomicallyOnUpdate bool   // Whether to reference the root node on update
 }
 
 func (c Config) BackendConstructor(diskdb ethdb.Database, config *triedb.Config) triedb.DBOverride {
@@ -195,7 +195,7 @@ func New(diskdb ethdb.Database, config *Config, resolver ChildResolver) *Databas
 		resolver:      resolver,
 		cleans:        cleans,
 		dirties:       make(map[common.Hash]*cachedNode),
-		referenceRoot: config.ReferenceRoot,
+		referenceRoot: config.ReferenceRootAtomicallyOnUpdate,
 	}
 }
 
@@ -645,7 +645,7 @@ func (db *Database) Initialized(genesisRoot common.Hash) bool {
 
 // Update inserts the dirty nodes in provided nodeset into database and link the
 // account trie with multiple storage tries if necessary.
-// If ReferenceRoot was enabled in the config, it will also add a reference from
+// If ReferenceRootAtomicallyOnUpdate was enabled in the config, it will also add a reference from
 // the root to the metaroot while holding the db's lock.
 func (db *Database) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set) error {
 	// Ensure the parent state is present and signal a warning if not.
