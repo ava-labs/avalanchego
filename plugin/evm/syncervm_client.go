@@ -276,7 +276,14 @@ func (client *stateSyncerClient) syncBlocks(ctx context.Context, fromHash common
 
 func (client *stateSyncerClient) syncAtomicTrie(ctx context.Context) error {
 	log.Info("atomic tx: sync starting", "root", client.syncSummary.AtomicRoot)
-	atomicSyncer, err := client.atomicBackend.Syncer(client.client, client.syncSummary.AtomicRoot, client.syncSummary.BlockNumber, client.stateSyncRequestSize)
+	atomicSyncer, err := newAtomicSyncer(
+		client.client,
+		client.db,
+		client.atomicBackend.AtomicTrie(),
+		client.syncSummary.AtomicRoot,
+		client.syncSummary.BlockNumber,
+		client.stateSyncRequestSize,
+	)
 	if err != nil {
 		return err
 	}
