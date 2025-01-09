@@ -17,7 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	
-	"avalabs.org/ffi/v2"
+	"github.com/ava-labs/firewood/ffi/v2"
 )
 
 const (
@@ -198,8 +198,8 @@ func createGoldenDatabase(databaseEntries uint64) error {
 	if err != nil {
 		return fmt.Errorf("unable to rename golden staging directory : %v", err)
 	}
-	// fmt.Printf("Completed initialization with hash of %v\n", root.Hex())
-	fmt.Printf("Completed initialization with hash of TODO\n")
+	root := fwdb.RootHash()
+	fmt.Printf("Completed initialization with hash of %v\n", root.Hex())
 	return nil
 }
 

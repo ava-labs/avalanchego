@@ -3,7 +3,6 @@ module github.com/ava-labs/avalanchego/x/merkledb/benchmarks_fw
 go 1.22.3
 
 require (
-	avalabs.org/ffi/v2 v2.0.0-20220322163400-3b3b3b3b3b3b
 	github.com/prometheus/client_golang v1.20.3
 	github.com/spf13/cobra v1.5.0
 	github.com/stretchr/testify v1.9.0
@@ -12,6 +11,7 @@ require (
 require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
+	github.com/ava-labs/firewood/ffi/v2 v2.0.0-20250109003708-c6875687cd88 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
@@ -72,5 +72,3 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )
-
-replace avalabs.org/ffi/v2 => /Users/rkuris/open-source/firewood/ffi
