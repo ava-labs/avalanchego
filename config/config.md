@@ -399,6 +399,7 @@ specified. If not given, uses default genesis data.
 
 See the documentation for the genesis JSON format [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/README.md) and an example used for the local network genesis [here](https://github.com/ava-labs/avalanchego/blob/master/genesis/).
 
+
 #### `--genesis-file-content` (string)
 
 As an alternative to `--genesis-file`, it allows specifying base64 encoded genesis data to use.
