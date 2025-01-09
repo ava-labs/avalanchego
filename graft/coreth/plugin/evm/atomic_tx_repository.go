@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 )
 
 const (
@@ -39,10 +40,10 @@ var (
 // atomic transactions
 type AtomicTxRepository interface {
 	GetIndexHeight() (uint64, error)
-	GetByTxID(txID ids.ID) (*Tx, uint64, error)
-	GetByHeight(height uint64) ([]*Tx, error)
-	Write(height uint64, txs []*Tx) error
-	WriteBonus(height uint64, txs []*Tx) error
+	GetByTxID(txID ids.ID) (*atomic.Tx, uint64, error)
+	GetByHeight(height uint64) ([]*atomic.Tx, error)
+	Write(height uint64, txs []*atomic.Tx) error
+	WriteBonus(height uint64, txs []*atomic.Tx) error
 
 	IterateByHeight(start uint64) database.Iterator
 	Codec() codec.Manager
@@ -136,7 +137,7 @@ func (a *atomicTxRepository) initializeHeightIndex(lastAcceptedHeight uint64) er
 
 		// Get the tx iter is pointing to, len(txs) == 1 is expected here.
 		txBytes := iterValue[wrappers.LongLen+wrappers.IntLen:]
-		tx, err := ExtractAtomicTx(txBytes, a.codec)
+		tx, err := atomic.ExtractAtomicTx(txBytes, a.codec)
 		if err != nil {
 			return err
 		}
@@ -198,10 +199,10 @@ func (a *atomicTxRepository) GetIndexHeight() (uint64, error) {
 	return indexHeight, nil
 }
 
-// GetByTxID queries [acceptedAtomicTxDB] for the [txID], parses a [*Tx] object
+// GetByTxID queries [acceptedAtomicTxDB] for the [txID], parses a [*atomic.Tx] object
 // if an entry is found, and returns it with the block height the atomic tx it
 // represents was accepted on, along with an optional error.
-func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
+func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*atomic.Tx, uint64, error) {
 	indexedTxBytes, err := a.acceptedAtomicTxDB.Get(txID[:])
 	if err != nil {
 		return nil, 0, err
@@ -215,7 +216,7 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 	packer := wrappers.Packer{Bytes: indexedTxBytes}
 	height := packer.UnpackLong()
 	txBytes := packer.UnpackBytes()
-	tx, err := ExtractAtomicTx(txBytes, a.codec)
+	tx, err := atomic.ExtractAtomicTx(txBytes, a.codec)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -229,40 +230,40 @@ func (a *atomicTxRepository) GetByTxID(txID ids.ID) (*Tx, uint64, error) {
 // no atomic transactions in the block accepted at [height].
 // If [height] is greater than the last accepted height, then this will always return
 // [database.ErrNotFound]
-func (a *atomicTxRepository) GetByHeight(height uint64) ([]*Tx, error) {
+func (a *atomicTxRepository) GetByHeight(height uint64) ([]*atomic.Tx, error) {
 	heightBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(heightBytes, height)
 
 	return a.getByHeightBytes(heightBytes)
 }
 
-func (a *atomicTxRepository) getByHeightBytes(heightBytes []byte) ([]*Tx, error) {
+func (a *atomicTxRepository) getByHeightBytes(heightBytes []byte) ([]*atomic.Tx, error) {
 	txsBytes, err := a.acceptedAtomicTxByHeightDB.Get(heightBytes)
 	if err != nil {
 		return nil, err
 	}
-	return ExtractAtomicTxsBatch(txsBytes, a.codec)
+	return atomic.ExtractAtomicTxsBatch(txsBytes, a.codec)
 }
 
 // Write updates indexes maintained on atomic txs, so they can be queried
 // by txID or height. This method must be called only once per height,
 // and [txs] must include all atomic txs for the block accepted at the
 // corresponding height.
-func (a *atomicTxRepository) Write(height uint64, txs []*Tx) error {
+func (a *atomicTxRepository) Write(height uint64, txs []*atomic.Tx) error {
 	return a.write(height, txs, false)
 }
 
 // WriteBonus is similar to Write, except the [txID] => [height] is not
 // overwritten if already exists.
-func (a *atomicTxRepository) WriteBonus(height uint64, txs []*Tx) error {
+func (a *atomicTxRepository) WriteBonus(height uint64, txs []*atomic.Tx) error {
 	return a.write(height, txs, true)
 }
 
-func (a *atomicTxRepository) write(height uint64, txs []*Tx, bonus bool) error {
+func (a *atomicTxRepository) write(height uint64, txs []*atomic.Tx, bonus bool) error {
 	if len(txs) > 1 {
 		// txs should be stored in order of txID to ensure consistency
 		// with txs initialized from the txID index.
-		copyTxs := make([]*Tx, len(txs))
+		copyTxs := make([]*atomic.Tx, len(txs))
 		copy(copyTxs, txs)
 		utils.Sort(copyTxs)
 		txs = copyTxs
@@ -300,8 +301,8 @@ func (a *atomicTxRepository) write(height uint64, txs []*Tx, bonus bool) error {
 
 // indexTxByID writes [tx] into the [acceptedAtomicTxDB] stored as
 // [height] + [tx bytes]
-func (a *atomicTxRepository) indexTxByID(heightBytes []byte, tx *Tx) error {
-	txBytes, err := a.codec.Marshal(codecVersion, tx)
+func (a *atomicTxRepository) indexTxByID(heightBytes []byte, tx *atomic.Tx) error {
+	txBytes, err := a.codec.Marshal(atomic.CodecVersion, tx)
 	if err != nil {
 		return err
 	}
@@ -320,8 +321,8 @@ func (a *atomicTxRepository) indexTxByID(heightBytes []byte, tx *Tx) error {
 }
 
 // indexTxsAtHeight adds [height] -> [txs] to the [acceptedAtomicTxByHeightDB]
-func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*Tx) error {
-	txsBytes, err := a.codec.Marshal(codecVersion, txs)
+func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*atomic.Tx) error {
+	txsBytes, err := a.codec.Marshal(atomic.CodecVersion, txs)
 	if err != nil {
 		return err
 	}
@@ -335,7 +336,7 @@ func (a *atomicTxRepository) indexTxsAtHeight(heightBytes []byte, txs []*Tx) err
 // [tx] to the slice of transactions stored there.
 // This function is used while initializing the atomic repository to re-index the atomic transactions
 // by txID into the height -> txs index.
-func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *Tx) error {
+func (a *atomicTxRepository) appendTxToHeightIndex(heightBytes []byte, tx *atomic.Tx) error {
 	txs, err := a.getByHeightBytes(heightBytes)
 	if err != nil && err != database.ErrNotFound {
 		return err

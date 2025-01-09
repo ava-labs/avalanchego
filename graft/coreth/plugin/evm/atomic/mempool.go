@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package atomic
 
 import (
 	"errors"
@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/metrics"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/libevm/log"
 )
 
@@ -23,8 +24,11 @@ const (
 )
 
 var (
-	errTxAlreadyKnown = errors.New("tx already known")
-	errNoGasUsed      = errors.New("no gas used")
+	errTxAlreadyKnown          = errors.New("tx already known")
+	errNoGasUsed               = errors.New("no gas used")
+	ErrConflictingAtomicTx     = errors.New("conflicting atomic tx present")
+	ErrInsufficientAtomicTxFee = errors.New("atomic tx fee too low for atomic mempool")
+	ErrTooManyAtomicTx         = errors.New("too many atomic tx")
 
 	_ gossip.Set[*GossipAtomicTx] = (*Mempool)(nil)
 )
@@ -82,7 +86,11 @@ type Mempool struct {
 
 // NewMempool returns a Mempool with [maxSize]
 func NewMempool(ctx *snow.Context, registerer prometheus.Registerer, maxSize int, verify func(tx *Tx) error) (*Mempool, error) {
-	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter", txGossipBloomMinTargetElements, txGossipBloomTargetFalsePositiveRate, txGossipBloomResetFalsePositiveRate)
+	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter",
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
+		config.TxGossipBloomResetFalsePositiveRate,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
 	}
@@ -136,35 +144,19 @@ func (m *Mempool) Add(tx *GossipAtomicTx) error {
 	m.ctx.Lock.RLock()
 	defer m.ctx.Lock.RUnlock()
 
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	err := m.addTx(tx.Tx, false)
-	if errors.Is(err, errTxAlreadyKnown) {
-		return err
-	}
-
-	if err != nil {
-		txID := tx.Tx.ID()
-		m.discardedTxs.Put(txID, tx.Tx)
-		log.Debug("failed to issue remote tx to mempool",
-			"txID", txID,
-			"err", err,
-		)
-	}
-
-	return err
+	return m.AddRemoteTx(tx.Tx)
 }
 
-// AddTx attempts to add [tx] to the mempool and returns an error if
+// AddRemoteTx attempts to add [tx] to the mempool and returns an error if
 // it could not be added to the mempool.
-func (m *Mempool) AddTx(tx *Tx) error {
+func (m *Mempool) AddRemoteTx(tx *Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	err := m.addTx(tx, false)
+	err := m.addTx(tx, false, false)
+	// Do not attempt to discard the tx if it was already known
 	if errors.Is(err, errTxAlreadyKnown) {
-		return nil
+		return err
 	}
 
 	if err != nil {
@@ -184,7 +176,7 @@ func (m *Mempool) AddLocalTx(tx *Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	err := m.addTx(tx, false)
+	err := m.addTx(tx, true, false)
 	if errors.Is(err, errTxAlreadyKnown) {
 		return nil
 	}
@@ -192,17 +184,12 @@ func (m *Mempool) AddLocalTx(tx *Tx) error {
 	return err
 }
 
-// forceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
+// ForceAddTx forcibly adds a *Tx to the mempool and bypasses all verification.
 func (m *Mempool) ForceAddTx(tx *Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	err := m.addTx(tx, true)
-	if errors.Is(err, errTxAlreadyKnown) {
-		return nil
-	}
-
-	return nil
+	return m.addTx(tx, true, true)
 }
 
 // checkConflictTx checks for any transactions in the mempool that spend the same input UTXOs as [tx].
@@ -239,7 +226,7 @@ func (m *Mempool) checkConflictTx(tx *Tx) (uint64, ids.ID, []*Tx, error) {
 
 // addTx adds [tx] to the mempool. Assumes [m.lock] is held.
 // If [force], skips conflict checks within the mempool.
-func (m *Mempool) addTx(tx *Tx, force bool) error {
+func (m *Mempool) addTx(tx *Tx, local bool, force bool) error {
 	txID := tx.ID()
 	// If [txID] has already been issued or is in the currentTxs map
 	// there's no need to add it.
@@ -251,6 +238,11 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	}
 	if _, exists := m.txHeap.Get(txID); exists {
 		return fmt.Errorf("%w: tx %s is pending", errTxAlreadyKnown, tx.ID())
+	}
+	if !local {
+		if _, exists := m.discardedTxs.Get(txID); exists {
+			return fmt.Errorf("%w: tx %s was discarded", errTxAlreadyKnown, tx.ID())
+		}
 	}
 	if !force && m.verify != nil {
 		if err := m.verify(tx); err != nil {
@@ -270,7 +262,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 		if highestGasPrice >= gasPrice {
 			return fmt.Errorf(
 				"%w: issued tx (%s) gas price %d <= conflict tx (%s) gas price %d (%d total conflicts in mempool)",
-				errConflictingAtomicTx,
+				ErrConflictingAtomicTx,
 				txID,
 				gasPrice,
 				highestGasPriceConflictTxID,
@@ -295,7 +287,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 			if minGasPrice >= gasPrice {
 				return fmt.Errorf(
 					"%w currentMin=%d provided=%d",
-					errInsufficientAtomicTxFee,
+					ErrInsufficientAtomicTxFee,
 					minGasPrice,
 					gasPrice,
 				)
@@ -305,7 +297,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 		} else {
 			// This could occur if we have used our entire size allowance on
 			// transactions that are currently processing.
-			return errTooManyAtomicTx
+			return ErrTooManyAtomicTx
 		}
 	}
 
@@ -329,7 +321,7 @@ func (m *Mempool) addTx(tx *Tx, force bool) error {
 	}
 
 	m.bloom.Add(&GossipAtomicTx{Tx: tx})
-	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*txGossipBloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.TxGossipBloomChurnMultiplier)
 	if err != nil {
 		return err
 	}

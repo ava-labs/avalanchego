@@ -24,14 +24,14 @@ type handlerStats struct {
 
 func newStats() *handlerStats {
 	return &handlerStats{
-		messageSignatureRequest:         metrics.GetOrRegisterCounter("message_signature_request_count", nil),
-		messageSignatureHit:             metrics.GetOrRegisterCounter("message_signature_request_hit", nil),
-		messageSignatureMiss:            metrics.GetOrRegisterCounter("message_signature_request_miss", nil),
-		messageSignatureRequestDuration: metrics.GetOrRegisterGauge("message_signature_request_duration", nil),
-		blockSignatureRequest:           metrics.GetOrRegisterCounter("block_signature_request_count", nil),
-		blockSignatureHit:               metrics.GetOrRegisterCounter("block_signature_request_hit", nil),
-		blockSignatureMiss:              metrics.GetOrRegisterCounter("block_signature_request_miss", nil),
-		blockSignatureRequestDuration:   metrics.GetOrRegisterGauge("block_signature_request_duration", nil),
+		messageSignatureRequest:         metrics.NewRegisteredCounter("message_signature_request_count", nil),
+		messageSignatureHit:             metrics.NewRegisteredCounter("message_signature_request_hit", nil),
+		messageSignatureMiss:            metrics.NewRegisteredCounter("message_signature_request_miss", nil),
+		messageSignatureRequestDuration: metrics.NewRegisteredGauge("message_signature_request_duration", nil),
+		blockSignatureRequest:           metrics.NewRegisteredCounter("block_signature_request_count", nil),
+		blockSignatureHit:               metrics.NewRegisteredCounter("block_signature_request_hit", nil),
+		blockSignatureMiss:              metrics.NewRegisteredCounter("block_signature_request_miss", nil),
+		blockSignatureRequestDuration:   metrics.NewRegisteredGauge("block_signature_request_duration", nil),
 	}
 }
 
@@ -46,14 +46,4 @@ func (h *handlerStats) IncBlockSignatureHit()     { h.blockSignatureHit.Inc(1) }
 func (h *handlerStats) IncBlockSignatureMiss()    { h.blockSignatureMiss.Inc(1) }
 func (h *handlerStats) UpdateBlockSignatureRequestTime(duration time.Duration) {
 	h.blockSignatureRequestDuration.Inc(int64(duration))
-}
-func (h *handlerStats) Clear() {
-	h.messageSignatureRequest.Clear()
-	h.messageSignatureHit.Clear()
-	h.messageSignatureMiss.Clear()
-	h.messageSignatureRequestDuration.Update(0)
-	h.blockSignatureRequest.Clear()
-	h.blockSignatureHit.Clear()
-	h.blockSignatureMiss.Clear()
-	h.blockSignatureRequestDuration.Update(0)
 }

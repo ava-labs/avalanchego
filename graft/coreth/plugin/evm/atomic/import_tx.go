@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package atomic
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/holiman/uint256"
@@ -32,8 +31,19 @@ import (
 var (
 	_                           UnsignedAtomicTx       = &UnsignedImportTx{}
 	_                           secp256k1fx.UnsignedTx = &UnsignedImportTx{}
-	errImportNonAVAXInputBanff                         = errors.New("import input cannot contain non-AVAX in Banff")
-	errImportNonAVAXOutputBanff                        = errors.New("import output cannot contain non-AVAX in Banff")
+	ErrImportNonAVAXInputBanff                         = errors.New("import input cannot contain non-AVAX in Banff")
+	ErrImportNonAVAXOutputBanff                        = errors.New("import output cannot contain non-AVAX in Banff")
+	ErrNoImportInputs                                  = errors.New("tx has no imported inputs")
+	ErrConflictingAtomicInputs                         = errors.New("invalid block due to conflicting atomic inputs")
+	ErrWrongChainID                                    = errors.New("tx has wrong chain ID")
+	ErrNoEVMOutputs                                    = errors.New("tx has no EVM outputs")
+	ErrInputsNotSortedUnique                           = errors.New("inputs not sorted and unique")
+	ErrOutputsNotSortedUnique                          = errors.New("outputs not sorted and unique")
+	ErrOutputsNotSorted                                = errors.New("tx outputs not sorted")
+	ErrAssetIDMismatch                                 = errors.New("asset IDs in the input don't match the utxo")
+	errNilBaseFeeApricotPhase3                         = errors.New("nil base fee is invalid after apricotPhase3")
+	errInsufficientFundsForFee                         = errors.New("insufficient AVAX funds to pay transaction fee")
+	errRejectedParent                                  = errors.New("rejected parent")
 )
 
 // UnsignedImportTx is an unsigned ImportTx
@@ -67,15 +77,15 @@ func (utx *UnsignedImportTx) Verify(
 ) error {
 	switch {
 	case utx == nil:
-		return errNilTx
+		return ErrNilTx
 	case len(utx.ImportedInputs) == 0:
-		return errNoImportInputs
+		return ErrNoImportInputs
 	case utx.NetworkID != ctx.NetworkID:
-		return errWrongNetworkID
+		return ErrWrongNetworkID
 	case ctx.ChainID != utx.BlockchainID:
-		return errWrongBlockchainID
+		return ErrWrongChainID
 	case rules.IsApricotPhase3 && len(utx.Outs) == 0:
-		return errNoEVMOutputs
+		return ErrNoEVMOutputs
 	}
 
 	// Make sure that the tx has a valid peer chain ID
@@ -83,11 +93,11 @@ func (utx *UnsignedImportTx) Verify(
 		// Note that SameSubnet verifies that [tx.SourceChain] isn't this
 		// chain's ID
 		if err := verify.SameSubnet(context.TODO(), ctx, utx.SourceChain); err != nil {
-			return errWrongChainID
+			return ErrWrongChainID
 		}
 	} else {
 		if utx.SourceChain != ctx.XChainID {
-			return errWrongChainID
+			return ErrWrongChainID
 		}
 	}
 
@@ -96,7 +106,7 @@ func (utx *UnsignedImportTx) Verify(
 			return fmt.Errorf("EVM Output failed verification: %w", err)
 		}
 		if rules.IsBanff && out.AssetID != ctx.AVAXAssetID {
-			return errImportNonAVAXOutputBanff
+			return ErrImportNonAVAXOutputBanff
 		}
 	}
 
@@ -105,20 +115,20 @@ func (utx *UnsignedImportTx) Verify(
 			return fmt.Errorf("atomic input failed verification: %w", err)
 		}
 		if rules.IsBanff && in.AssetID() != ctx.AVAXAssetID {
-			return errImportNonAVAXInputBanff
+			return ErrImportNonAVAXInputBanff
 		}
 	}
 	if !utils.IsSortedAndUnique(utx.ImportedInputs) {
-		return errInputsNotSortedUnique
+		return ErrInputsNotSortedUnique
 	}
 
 	if rules.IsApricotPhase2 {
 		if !utils.IsSortedAndUnique(utx.Outs) {
-			return errOutputsNotSortedUnique
+			return ErrOutputsNotSortedUnique
 		}
 	} else if rules.IsApricotPhase1 {
 		if !slices.IsSortedFunc(utx.Outs, EVMOutput.Compare) {
-			return errOutputsNotSorted
+			return ErrOutputsNotSorted
 		}
 	}
 
@@ -178,13 +188,14 @@ func (utx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
 
 // SemanticVerify this transaction is valid.
 func (utx *UnsignedImportTx) SemanticVerify(
-	vm *VM,
+	backend *Backend,
 	stx *Tx,
-	parent *Block,
+	parent AtomicBlockContext,
 	baseFee *big.Int,
-	rules extras.Rules,
 ) error {
-	if err := utx.Verify(vm.ctx, rules); err != nil {
+	ctx := backend.Ctx
+	rules := backend.Rules
+	if err := utx.Verify(ctx, rules); err != nil {
 		return err
 	}
 
@@ -201,11 +212,11 @@ func (utx *UnsignedImportTx) SemanticVerify(
 		if err != nil {
 			return err
 		}
-		fc.Produce(vm.ctx.AVAXAssetID, txFee)
+		fc.Produce(ctx.AVAXAssetID, txFee)
 
 	// Apply fees to import transactions as of Apricot Phase 2
 	case rules.IsApricotPhase2:
-		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
+		fc.Produce(ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
 	}
 	for _, out := range utx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
@@ -222,7 +233,7 @@ func (utx *UnsignedImportTx) SemanticVerify(
 		return fmt.Errorf("import tx contained mismatched number of inputs/credentials (%d vs. %d)", len(utx.ImportedInputs), len(stx.Creds))
 	}
 
-	if !vm.bootstrapped {
+	if !backend.Bootstrapped {
 		// Allow for force committing during bootstrapping
 		return nil
 	}
@@ -233,7 +244,7 @@ func (utx *UnsignedImportTx) SemanticVerify(
 		utxoIDs[i] = inputID[:]
 	}
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
-	allUTXOBytes, err := vm.ctx.SharedMemory.Get(utx.SourceChain, utxoIDs)
+	allUTXOBytes, err := ctx.SharedMemory.Get(utx.SourceChain, utxoIDs)
 	if err != nil {
 		return fmt.Errorf("failed to fetch import UTXOs from %s due to: %w", utx.SourceChain, err)
 	}
@@ -242,7 +253,7 @@ func (utx *UnsignedImportTx) SemanticVerify(
 		utxoBytes := allUTXOBytes[i]
 
 		utxo := &avax.UTXO{}
-		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+		if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
 			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
 		}
 
@@ -251,15 +262,15 @@ func (utx *UnsignedImportTx) SemanticVerify(
 		utxoAssetID := utxo.AssetID()
 		inAssetID := in.AssetID()
 		if utxoAssetID != inAssetID {
-			return errAssetIDMismatch
+			return ErrAssetIDMismatch
 		}
 
-		if err := vm.fx.VerifyTransfer(utx, in.In, cred, utxo.Out); err != nil {
+		if err := backend.Fx.VerifyTransfer(utx, in.In, cred, utxo.Out); err != nil {
 			return fmt.Errorf("import tx transfer failed verification: %w", err)
 		}
 	}
 
-	return vm.conflicts(utx.InputUTXOs(), parent)
+	return conflicts(backend, utx.InputUTXOs(), parent)
 }
 
 // AtomicOps returns imported inputs spent on this transaction
@@ -276,28 +287,11 @@ func (utx *UnsignedImportTx) AtomicOps() (ids.ID, *atomic.Requests, error) {
 	return utx.SourceChain, &atomic.Requests{RemoveRequests: utxoIDs}, nil
 }
 
-// newImportTx returns a new ImportTx
-func (vm *VM) newImportTx(
-	chainID ids.ID, // chain to import from
-	to common.Address, // Address of recipient
-	baseFee *big.Int, // fee to use post-AP3
-	keys []*secp256k1.PrivateKey, // Keys to import the funds
-) (*Tx, error) {
-	kc := secp256k1fx.NewKeychain()
-	for _, key := range keys {
-		kc.Add(key)
-	}
-
-	atomicUTXOs, _, _, err := vm.GetAtomicUTXOs(chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, -1)
-	if err != nil {
-		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
-	}
-
-	return vm.newImportTxWithUTXOs(chainID, to, baseFee, kc, atomicUTXOs)
-}
-
-// newImportTx returns a new ImportTx
-func (vm *VM) newImportTxWithUTXOs(
+// NewImportTx returns a new ImportTx
+func NewImportTx(
+	ctx *snow.Context,
+	rules extras.Rules,
+	time uint64,
 	chainID ids.ID, // chain to import from
 	to common.Address, // Address of recipient
 	baseFee *big.Int, // fee to use post-AP3
@@ -308,9 +302,8 @@ func (vm *VM) newImportTxWithUTXOs(
 	signers := [][]*secp256k1.PrivateKey{}
 
 	importedAmount := make(map[ids.ID]uint64)
-	now := vm.clock.Unix()
 	for _, utxo := range atomicUTXOs {
-		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, now)
+		inputIntf, utxoSigners, err := kc.Spend(utxo.Out, time)
 		if err != nil {
 			continue
 		}
@@ -331,7 +324,7 @@ func (vm *VM) newImportTxWithUTXOs(
 		signers = append(signers, utxoSigners)
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
-	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
+	importedAVAXAmount := importedAmount[ctx.AVAXAssetID]
 
 	outs := make([]EVMOutput, 0, len(importedAmount))
 	// This will create unique outputs (in the context of sorting)
@@ -339,7 +332,7 @@ func (vm *VM) newImportTxWithUTXOs(
 	for assetID, amount := range importedAmount {
 		// Skip the AVAX amount since it is included separately to account for
 		// the fee
-		if assetID == vm.ctx.AVAXAssetID || amount == 0 {
+		if assetID == ctx.AVAXAssetID || amount == 0 {
 			continue
 		}
 		outs = append(outs, EVMOutput{
@@ -348,8 +341,6 @@ func (vm *VM) newImportTxWithUTXOs(
 			AssetID: assetID,
 		})
 	}
-
-	rules := vm.currentRules()
 
 	var (
 		txFeeWithoutChange uint64
@@ -361,14 +352,14 @@ func (vm *VM) newImportTxWithUTXOs(
 			return nil, errNilBaseFeeApricotPhase3
 		}
 		utx := &UnsignedImportTx{
-			NetworkID:      vm.ctx.NetworkID,
-			BlockchainID:   vm.ctx.ChainID,
+			NetworkID:      ctx.NetworkID,
+			BlockchainID:   ctx.ChainID,
 			Outs:           outs,
 			ImportedInputs: importedInputs,
 			SourceChain:    chainID,
 		}
 		tx := &Tx{UnsignedAtomicTx: utx}
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Sign(Codec, nil); err != nil {
 			return nil, err
 		}
 
@@ -400,7 +391,7 @@ func (vm *VM) newImportTxWithUTXOs(
 		outs = append(outs, EVMOutput{
 			Address: to,
 			Amount:  importedAVAXAmount - txFeeWithChange,
-			AssetID: vm.ctx.AVAXAssetID,
+			AssetID: ctx.AVAXAssetID,
 		})
 	}
 
@@ -408,35 +399,35 @@ func (vm *VM) newImportTxWithUTXOs(
 	// Note: this can happen if there is exactly enough AVAX to pay the
 	// transaction fee, but no other funds to be imported.
 	if len(outs) == 0 {
-		return nil, errNoEVMOutputs
+		return nil, ErrNoEVMOutputs
 	}
 
 	utils.Sort(outs)
 
 	// Create the transaction
 	utx := &UnsignedImportTx{
-		NetworkID:      vm.ctx.NetworkID,
-		BlockchainID:   vm.ctx.ChainID,
+		NetworkID:      ctx.NetworkID,
+		BlockchainID:   ctx.ChainID,
 		Outs:           outs,
 		ImportedInputs: importedInputs,
 		SourceChain:    chainID,
 	}
 	tx := &Tx{UnsignedAtomicTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.currentRules())
+	return tx, utx.Verify(ctx, rules)
 }
 
 // EVMStateTransfer performs the state transfer to increase the balances of
 // accounts accordingly with the imported EVMOutputs
-func (utx *UnsignedImportTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
+func (utx *UnsignedImportTx) EVMStateTransfer(ctx *snow.Context, state StateDB) error {
 	for _, to := range utx.Outs {
 		if to.AssetID == ctx.AVAXAssetID {
 			log.Debug("import_tx", "src", utx.SourceChain, "addr", to.Address, "amount", to.Amount, "assetID", "AVAX")
 			// If the asset is AVAX, convert the input amount in nAVAX to gWei by
 			// multiplying by the x2c rate.
-			amount := new(uint256.Int).Mul(uint256.NewInt(to.Amount), x2cRate)
+			amount := new(uint256.Int).Mul(uint256.NewInt(to.Amount), X2CRate)
 			state.AddBalance(to.Address, amount)
 		} else {
 			log.Debug("import_tx", "src", utx.SourceChain, "addr", to.Address, "amount", to.Amount, "assetID", to.AssetID)
@@ -444,5 +435,45 @@ func (utx *UnsignedImportTx) EVMStateTransfer(ctx *snow.Context, state *state.St
 			state.AddBalanceMultiCoin(to.Address, common.Hash(to.AssetID), amount)
 		}
 	}
+	return nil
+}
+
+// conflicts returns an error if [inputs] conflicts with any of the atomic inputs contained in [ancestor]
+// or any of its ancestor blocks going back to the last accepted block in its ancestry. If [ancestor] is
+// accepted, then nil will be returned immediately.
+// If the ancestry of [ancestor] cannot be fetched, then [errRejectedParent] may be returned.
+func conflicts(backend *Backend, inputs set.Set[ids.ID], ancestor AtomicBlockContext) error {
+	fetcher := backend.BlockFetcher
+	lastAcceptedBlock := fetcher.LastAcceptedBlockInternal()
+	lastAcceptedHeight := lastAcceptedBlock.Height()
+	for ancestor.Height() > lastAcceptedHeight {
+		// If any of the atomic transactions in the ancestor conflict with [inputs]
+		// return an error.
+		for _, atomicTx := range ancestor.AtomicTxs() {
+			if inputs.Overlaps(atomicTx.InputUTXOs()) {
+				return ErrConflictingAtomicInputs
+			}
+		}
+
+		// Move up the chain.
+		nextAncestorID := ancestor.Parent()
+		// If the ancestor is unknown, then the parent failed
+		// verification when it was called.
+		// If the ancestor is rejected, then this block shouldn't be
+		// inserted into the canonical chain because the parent is
+		// will be missing.
+		// If the ancestor is processing, then the block may have
+		// been verified.
+		nextAncestorIntf, err := fetcher.GetBlockInternal(context.TODO(), nextAncestorID)
+		if err != nil {
+			return errRejectedParent
+		}
+		nextAncestor, ok := nextAncestorIntf.(AtomicBlockContext)
+		if !ok {
+			return fmt.Errorf("ancestor block %s had unexpected type %T", nextAncestor.ID(), nextAncestorIntf)
+		}
+		ancestor = nextAncestor
+	}
+
 	return nil
 }

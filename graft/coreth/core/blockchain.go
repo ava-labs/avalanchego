@@ -179,9 +179,9 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 	config := &triedb.Config{Preimages: c.Preimages}
 	if c.StateScheme == rawdb.HashScheme || c.StateScheme == "" {
 		config.DBOverride = hashdb.Config{
-			CleanCacheSize: c.TrieCleanLimit * 1024 * 1024,
-			StatsPrefix:    trieCleanCacheStatsNamespace,
-			ReferenceRoot:  true, // Automatically reference root nodes when an update is made
+			CleanCacheSize:                  c.TrieCleanLimit * 1024 * 1024,
+			StatsPrefix:                     trieCleanCacheStatsNamespace,
+			ReferenceRootAtomicallyOnUpdate: true, // Automatically reference root nodes when an update is made
 		}.BackendConstructor
 	}
 	if c.StateScheme == rawdb.PathScheme {
@@ -1282,16 +1282,6 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	blockContentValidationTimer.Inc(time.Since(substart).Milliseconds())
 
 	// No validation errors for the block
-	var activeState *state.StateDB
-	defer func() {
-		// The chain importer is starting and stopping trie prefetchers. If a bad
-		// block or other error is hit however, an early return may not properly
-		// terminate the background threads. This defer ensures that we clean up
-		// and dangling prefetcher, without deferring each and holding on live refs.
-		if activeState != nil {
-			activeState.StopPrefetcher()
-		}
-	}()
 
 	// Retrieve the parent block to determine which root to build state on
 	substart = time.Now()
@@ -1310,8 +1300,8 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	blockStateInitTimer.Inc(time.Since(substart).Milliseconds())
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", bc.cacheConfig.TriePrefetcherParallelism)
-	activeState = statedb
+	statedb.StartPrefetcher("chain", state.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	defer statedb.StopPrefetcher()
 
 	// Process block using the parent state as reference point
 	pstart := time.Now()
@@ -1669,10 +1659,8 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	}
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", bc.cacheConfig.TriePrefetcherParallelism)
-	defer func() {
-		statedb.StopPrefetcher()
-	}()
+	statedb.StartPrefetcher("chain", state.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	defer statedb.StopPrefetcher()
 
 	// Process previously stored block
 	receipts, _, usedGas, err := bc.processor.Process(current, parent.Header(), statedb, vm.Config{})

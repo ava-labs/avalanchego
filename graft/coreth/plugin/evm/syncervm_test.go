@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -34,6 +34,8 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/database"
 	"github.com/ava-labs/coreth/predicate"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/statesync"
@@ -291,7 +293,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		require.NoError(serverVM.Shutdown(context.Background()))
 	})
 	var (
-		importTx, exportTx *Tx
+		importTx, exportTx *atomic.Tx
 		err                error
 	)
 	generateAndAcceptBlocks(t, serverVM, numBlocks, func(i int, gen *core.BlockGen) {
@@ -333,11 +335,11 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	serverAtomicTrie := serverVM.atomicTrie.(*atomicTrie)
 	serverAtomicTrie.commitInterval = test.syncableInterval
 	require.NoError(serverAtomicTrie.commit(test.syncableInterval, serverAtomicTrie.LastAcceptedRoot()))
-	require.NoError(serverVM.db.Commit())
+	require.NoError(serverVM.versiondb.Commit())
 
 	serverSharedMemories := newSharedMemories(serverAtomicMemory, serverVM.ctx.ChainID, serverVM.ctx.XChainID)
-	serverSharedMemories.assertOpsApplied(t, importTx.mustAtomicOps())
-	serverSharedMemories.assertOpsApplied(t, exportTx.mustAtomicOps())
+	serverSharedMemories.assertOpsApplied(t, mustAtomicOps(importTx))
+	serverSharedMemories.assertOpsApplied(t, mustAtomicOps(exportTx))
 
 	// make some accounts
 	trieDB := triedb.NewDatabase(serverVM.chaindb, nil)
@@ -406,7 +408,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	return &syncVMSetup{
 		serverVM:        serverVM,
 		serverAppSender: serverAppSender,
-		includedAtomicTxs: []*Tx{
+		includedAtomicTxs: []*atomic.Tx{
 			importTx,
 			exportTx,
 		},
@@ -425,13 +427,13 @@ type syncVMSetup struct {
 	serverVM        *VM
 	serverAppSender *enginetest.Sender
 
-	includedAtomicTxs []*Tx
+	includedAtomicTxs []*atomic.Tx
 	fundedAccounts    map[*utils.Key]*types.StateAccount
 
 	syncerVM             *VM
-	syncerDB             database.Database
+	syncerDB             avalanchedatabase.Database
 	syncerEngineChan     <-chan commonEng.Message
-	syncerAtomicMemory   *atomic.Memory
+	syncerAtomicMemory   *avalancheatomic.Memory
 	shutdownOnceSyncerVM *shutdownOnceVM
 }
 
@@ -490,7 +492,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	if test.expectedErr != nil {
 		require.ErrorIs(err, test.expectedErr)
 		// Note we re-open the database here to avoid a closed error when the test is for a shutdown VM.
-		chaindb := Database{prefixdb.NewNested(ethDBPrefix, syncerVM.db)}
+		chaindb := database.WrapDatabase(prefixdb.NewNested(ethDBPrefix, syncerVM.db))
 		assertSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
 		return
 	}
@@ -554,13 +556,13 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 
 	// check we can transition to [NormalOp] state and continue to process blocks.
 	require.NoError(syncerVM.SetState(context.Background(), snow.NormalOp))
-	require.True(syncerVM.bootstrapped)
+	require.True(syncerVM.bootstrapped.Get())
 
 	// check atomic memory was synced properly
 	syncerSharedMemories := newSharedMemories(syncerAtomicMemory, syncerVM.ctx.ChainID, syncerVM.ctx.XChainID)
 
 	for _, tx := range includedAtomicTxs {
-		syncerSharedMemories.assertOpsApplied(t, tx.mustAtomicOps())
+		syncerSharedMemories.assertOpsApplied(t, mustAtomicOps(tx))
 	}
 
 	// Generate blocks after we have entered normal consensus as well
