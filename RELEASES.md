@@ -17,6 +17,11 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `--add-subnet-validator-fee`
   - `--add-subnet-delegator-fee`
 
+### APIs
+
+- Removed `info.GetTxFee`
+- Added `avm.GetTxFee`
+  
 ### What's Changed
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.1...v1.12.2
