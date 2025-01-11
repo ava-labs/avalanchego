@@ -120,7 +120,7 @@ var (
 		testContextPostEtna.GasPrice,
 	)
 
-	testEnvironmentPostEtna = []environment{
+	testEnvironment = []environment{
 		{
 			name:          "Post-Etna",
 			context:       testContextPostEtna,
@@ -133,7 +133,6 @@ var (
 			memo:          []byte("memo"),
 		},
 	}
-	testEnvironment = testEnvironmentPostEtna // todo: before merge just have one var
 )
 
 type environment struct {
@@ -608,7 +607,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 			},
 		}
 	)
-	for _, e := range testEnvironmentPostEtna {
+	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
 				require    = require.New(t)
@@ -711,7 +710,7 @@ func TestRegisterL1ValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 	warpMessageBytes := warp.Bytes()
 
-	for _, e := range testEnvironmentPostEtna {
+	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
 				require    = require.New(t)
@@ -796,7 +795,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 	require.NoError(t, err)
 
 	warpMessageBytes := warp.Bytes()
-	for _, e := range testEnvironmentPostEtna {
+	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
 				require    = require.New(t)
@@ -830,7 +829,7 @@ func TestSetL1ValidatorWeightTx(t *testing.T) {
 func TestIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	const balance = units.Avax
 	validationID := ids.GenerateTestID()
-	for _, e := range testEnvironmentPostEtna {
+	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
 				require    = require.New(t)
@@ -866,7 +865,7 @@ func TestIncreaseL1ValidatorBalanceTx(t *testing.T) {
 }
 
 func TestDisableL1ValidatorTx(t *testing.T) {
-	for _, e := range testEnvironmentPostEtna {
+	for _, e := range testEnvironment {
 		t.Run(e.name, func(t *testing.T) {
 			var (
 				require    = require.New(t)
