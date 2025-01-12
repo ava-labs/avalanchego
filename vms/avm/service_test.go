@@ -490,6 +490,22 @@ func TestServiceGetAllBalances(t *testing.T) {
 	require.Empty(reply.Balances)
 }
 
+func TestServiceGetTxFee(t *testing.T) {
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		fork: upgradetest.Latest,
+	})
+	service := &Service{vm: env.vm}
+	env.vm.ctx.Lock.Unlock()
+
+	reply := GetTxFeeReply{}
+	require.NoError(service.GetTxFee(nil, nil, &reply))
+
+	require.Equal(avajson.Uint64(testTxFee), reply.TxFee)
+	require.Equal(avajson.Uint64(testTxFee), reply.CreateAssetTxFee)
+}
+
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
 

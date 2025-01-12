@@ -1765,7 +1765,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				cfg := &config.Internal{
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
 				}
-				feeCalculator := state.NewStaticFeeCalculator(cfg, env.state.GetTimestamp())
+				feeCalculator := txfee.NewSimpleCalculator(0)
 				e := &standardTxExecutor{
 					backend: &Backend{
 						Config:       cfg,
@@ -2492,14 +2492,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			expectedErr: errIsImmutable,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "too many active validators",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
@@ -2877,14 +2869,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				common.WithMemo([]byte("memo!")),
 			},
 			expectedErr: avax.ErrMemoTooLarge,
-		},
-		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name: "fee calculation overflow",
@@ -3421,14 +3405,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "insufficient fee",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.feeCalculator = txfee.NewDynamicCalculator(
@@ -3871,14 +3847,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
-			name: "invalid fee calculation",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
-		},
-		{
 			name: "fee overflow",
 			updateTx: func(tx *txs.IncreaseL1ValidatorBalanceTx) {
 				tx.Balance = math.MaxUint64
@@ -4181,15 +4149,6 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
 			},
 			expectedErr: errUnauthorizedModification,
-		},
-		{
-			name:         "invalid fee calculation",
-			validationID: validationID,
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.feeCalculator = txfee.NewStaticCalculator(e.backend.Config.StaticFeeConfig)
-				return nil
-			},
-			expectedErr: txfee.ErrUnsupportedTx,
 		},
 		{
 			name:         "already deactivated",
