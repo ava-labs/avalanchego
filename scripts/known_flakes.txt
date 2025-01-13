@@ -6,6 +6,7 @@ TestGolangBindings
 TestMempoolEthTxsAppGossipHandling
 TestResumeSyncAccountsTrieInterrupted
 TestResyncNewRootAfterDeletes
+TestTimedUnlock
 TestTransactionSkipIndexing
 TestVMShutdownWhileSyncing
 TestWaitDeployedCornerCases

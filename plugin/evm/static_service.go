@@ -8,8 +8,8 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 var (

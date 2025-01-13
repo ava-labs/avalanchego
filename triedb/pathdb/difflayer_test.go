@@ -30,10 +30,10 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/trie/testutil"
+	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ava-labs/subnet-evm/trie/testutil"
-	"github.com/ava-labs/subnet-evm/trie/trienode"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func emptyLayer() *diskLayer {

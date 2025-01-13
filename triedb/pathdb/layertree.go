@@ -31,10 +31,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/trie/trienode"
+	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/trie/trienode"
-	"github.com/ava-labs/subnet-evm/trie/triestate"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // layerTree is a group of state layers identified by the state root.

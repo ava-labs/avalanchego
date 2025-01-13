@@ -31,9 +31,10 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/ava-labs/libevm/common"
+	ethsnapshot "github.com/ava-labs/libevm/core/state/snapshot"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 // Iterator is an iterator to step over all the accounts or the specific
@@ -69,13 +70,7 @@ type AccountIterator interface {
 
 // StorageIterator is an iterator to step over the specific storage in a snapshot,
 // which may or may not be composed of multiple layers.
-type StorageIterator interface {
-	Iterator
-
-	// Slot returns the storage slot the iterator is currently at. An error will
-	// be returned if the iterator becomes invalid
-	Slot() []byte
-}
+type StorageIterator = ethsnapshot.StorageIterator
 
 // diffAccountIterator is an account iterator that steps over the accounts (both
 // live and deleted) contained within a single diff layer. Higher order iterators

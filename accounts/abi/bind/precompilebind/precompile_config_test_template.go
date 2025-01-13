@@ -19,7 +19,7 @@ import (
 	{{- if .Contract.AllowList}}
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 	{{- end}}
 	"go.uber.org/mock/gomock"
 )

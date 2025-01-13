@@ -31,11 +31,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie/testutil"
+	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/trie/testutil"
-	"github.com/ava-labs/subnet-evm/trie/triestate"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // randomStateSet generates a random state change set.

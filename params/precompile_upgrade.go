@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 var errNoKey = errors.New("PrecompileUpgrade cannot be empty")

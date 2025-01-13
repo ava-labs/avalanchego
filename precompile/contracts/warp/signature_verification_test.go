@@ -212,8 +212,8 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := bls.Sign(testVdrs[0].sk, unsignedBytes)
-				vdr1Sig := bls.Sign(testVdrs[1].sk, unsignedBytes)
+				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
+				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr1Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -284,7 +284,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := bls.Sign(testVdrs[0].sk, unsignedBytes)
+				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
 				aggSigBytes := [bls.SignatureLen]byte{}
 				copy(aggSigBytes[:], bls.SignatureToBytes(vdr0Sig))
 
@@ -323,10 +323,10 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := bls.Sign(testVdrs[0].sk, unsignedBytes)
+				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
 				// Give sig from vdr[2] even though the bit vector says it
 				// should be from vdr[1]
-				vdr2Sig := bls.Sign(testVdrs[2].sk, unsignedBytes)
+				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -367,7 +367,7 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := bls.Sign(testVdrs[0].sk, unsignedBytes)
+				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
 				// Don't give the sig from vdr[1]
 				aggSigBytes := [bls.SignatureLen]byte{}
 				copy(aggSigBytes[:], bls.SignatureToBytes(vdr0Sig))
@@ -407,11 +407,11 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig := bls.Sign(testVdrs[0].sk, unsignedBytes)
-				vdr1Sig := bls.Sign(testVdrs[1].sk, unsignedBytes)
+				vdr0Sig := testVdrs[0].sk.Sign(unsignedBytes)
+				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
 				// Give sig from vdr[2] even though the bit vector doesn't have
 				// it
-				vdr2Sig := bls.Sign(testVdrs[2].sk, unsignedBytes)
+				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -454,8 +454,8 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(2)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := bls.Sign(testVdrs[1].sk, unsignedBytes)
-				vdr2Sig := bls.Sign(testVdrs[2].sk, unsignedBytes)
+				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
+				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -498,8 +498,8 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(2)
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := bls.Sign(testVdrs[1].sk, unsignedBytes)
-				vdr2Sig := bls.Sign(testVdrs[2].sk, unsignedBytes)
+				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
+				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -559,8 +559,8 @@ func TestSignatureVerification(t *testing.T) {
 				signers.Add(1) // vdr[2]
 
 				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig := bls.Sign(testVdrs[1].sk, unsignedBytes)
-				vdr2Sig := bls.Sign(testVdrs[2].sk, unsignedBytes)
+				vdr1Sig := testVdrs[1].sk.Sign(unsignedBytes)
+				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
 				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
 				require.NoError(err)
 				aggSigBytes := [bls.SignatureLen]byte{}
@@ -621,7 +621,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				unsignedBytes := unsignedMsg.Bytes()
 				// Because vdr[1] and vdr[2] share a key, only one of them sign.
-				vdr2Sig := bls.Sign(testVdrs[2].sk, unsignedBytes)
+				vdr2Sig := testVdrs[2].sk.Sign(unsignedBytes)
 				aggSigBytes := [bls.SignatureLen]byte{}
 				copy(aggSigBytes[:], bls.SignatureToBytes(vdr2Sig))
 

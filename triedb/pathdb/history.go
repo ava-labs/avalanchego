@@ -32,8 +32,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/subnet-evm/trie/triestate"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/trie/triestate"
 	"golang.org/x/exp/slices"
 )
 

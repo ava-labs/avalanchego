@@ -6,8 +6,8 @@ package modules
 import (
 	"bytes"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 type Module struct {

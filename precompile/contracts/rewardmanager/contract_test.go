@@ -6,7 +6,7 @@ package rewardmanager
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 

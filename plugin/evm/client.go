@@ -10,6 +10,7 @@ import (
 	"golang.org/x/exp/slog"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -24,24 +25,26 @@ type Client interface {
 	LockProfile(ctx context.Context, options ...rpc.Option) error
 	SetLogLevel(ctx context.Context, level slog.Level, options ...rpc.Option) error
 	GetVMConfig(ctx context.Context, options ...rpc.Option) (*Config, error)
+	GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]CurrentValidator, error)
 }
 
 // Client implementation for interacting with EVM [chain]
 type client struct {
-	adminRequester rpc.EndpointRequester
+	adminRequester      rpc.EndpointRequester
+	validatorsRequester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with EVM [chain]
 func NewClient(uri, chain string) Client {
+	requestUri := fmt.Sprintf("%s/ext/bc/%s", uri, chain)
 	return &client{
-		adminRequester: rpc.NewEndpointRequester(fmt.Sprintf("%s/ext/bc/%s/admin", uri, chain)),
+		adminRequester: rpc.NewEndpointRequester(
+			requestUri + "/admin",
+		),
+		validatorsRequester: rpc.NewEndpointRequester(
+			requestUri + "/validators",
+		),
 	}
-}
-
-// NewCChainClient returns a Client for interacting with the C Chain
-func NewCChainClient(uri string) Client {
-	// TODO: Update for Subnet-EVM compatibility
-	return NewClient(uri, "C")
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
@@ -72,4 +75,13 @@ func (c *client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*Confi
 	res := &ConfigReply{}
 	err := c.adminRequester.SendRequest(ctx, "admin.getVMConfig", struct{}{}, res, options...)
 	return res.Config, err
+}
+
+// GetCurrentValidators returns the current validators
+func (c *client) GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]CurrentValidator, error) {
+	res := &GetCurrentValidatorsResponse{}
+	err := c.validatorsRequester.SendRequest(ctx, "validators.getCurrentValidators", &GetCurrentValidatorsRequest{
+		NodeIDs: nodeIDs,
+	}, res, options...)
+	return res.Validators, err
 }

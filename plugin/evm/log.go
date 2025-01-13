@@ -10,13 +10,13 @@ import (
 	"runtime"
 	"strings"
 
+	ethlog "github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/log"
-	gethlog "github.com/ethereum/go-ethereum/log"
 	"golang.org/x/exp/slog"
 )
 
 type SubnetEVMLogger struct {
-	gethlog.Logger
+	ethlog.Logger
 
 	logLevel *slog.LevelVar
 }
@@ -47,14 +47,14 @@ func InitLogger(alias string, level string, jsonFormat bool, writer io.Writer) (
 
 	// Create handler
 	c := SubnetEVMLogger{
-		Logger:   gethlog.NewLogger(handler),
+		Logger:   ethlog.NewLogger(handler),
 		logLevel: logLevel,
 	}
 
 	if err := c.SetLogLevel(level); err != nil {
 		return SubnetEVMLogger{}, err
 	}
-	gethlog.SetDefault(c.Logger)
+	ethlog.SetDefault(c.Logger)
 	return c, nil
 }
 

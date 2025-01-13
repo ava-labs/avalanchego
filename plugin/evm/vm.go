@@ -5,7 +5,6 @@ package evm
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
@@ -40,7 +40,8 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/peer"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/triedb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
 	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 
 	warpcontract "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
@@ -54,26 +55,21 @@ import (
 	// We must import this package (not referenced elsewhere) so that the native "callTracer"
 	// is added to a map of client-accessible tracers. In geth, this is done
 	// inside of cmd/geth.
-	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
-	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
+	_ "github.com/ava-labs/libevm/eth/tracers/js"
+	_ "github.com/ava-labs/libevm/eth/tracers/native"
 
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/subnet-evm/precompile/registry"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/meterdb"
-	"github.com/ava-labs/avalanchego/database/pebbledb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -83,14 +79,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
-	avalanchemetrics "github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
-	avalancheconstants "github.com/ava-labs/avalanchego/utils/constants"
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -115,7 +110,6 @@ const (
 	ethMetricsPrefix        = "eth"
 	sdkMetricsPrefix        = "sdk"
 	chainStateMetricsPrefix = "chain_state"
-	dbMetricsPrefix         = "db"
 
 	// gossip constants
 	pushGossipDiscardedElements          = 16_384
@@ -135,16 +129,18 @@ const (
 	adminEndpoint        = "/admin"
 	ethRPCEndpoint       = "/rpc"
 	ethWSEndpoint        = "/ws"
+	validatorsEndpoint   = "/validators"
 	ethTxGossipNamespace = "eth_tx_gossip"
 )
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey = []byte("last_accepted_key")
-	acceptedPrefix  = []byte("snowman_accepted")
-	metadataPrefix  = []byte("metadata")
-	warpPrefix      = []byte("warp")
-	ethDBPrefix     = []byte("ethdb")
+	lastAcceptedKey    = []byte("last_accepted_key")
+	acceptedPrefix     = []byte("snowman_accepted")
+	metadataPrefix     = []byte("metadata")
+	warpPrefix         = []byte("warp")
+	ethDBPrefix        = []byte("ethdb")
+	validatorsDBPrefix = []byte("validators")
 )
 
 var (
@@ -199,8 +195,11 @@ type VM struct {
 	blockChain *core.BlockChain
 	miner      *miner.Miner
 
-	// [db] is the VM's current database managed by ChainState
-	db *versiondb.Database
+	// [versiondb] is the VM's current versioned database
+	versiondb *versiondb.Database
+
+	// [db] is the VM's current database
+	db database.Database
 
 	// metadataDB is used to store one off keys.
 	metadataDB database.Database
@@ -208,12 +207,16 @@ type VM struct {
 	// [chaindb] is the database supplied to the Ethereum backend
 	chaindb ethdb.Database
 
+	usingStandaloneDB bool
+
 	// [acceptedBlockDB] is the database to store the last accepted
 	// block.
 	acceptedBlockDB database.Database
 	// [warpDB] is used to store warp message signatures
 	// set to a prefixDB with the prefix [warpPrefix]
 	warpDB database.Database
+
+	validatorsDB database.Database
 
 	toEngine chan<- commonEng.Message
 
@@ -233,12 +236,12 @@ type VM struct {
 	client       peer.NetworkClient
 	networkCodec codec.Manager
 
-	validators *p2p.Validators
+	p2pValidators *p2p.Validators
 
 	// Metrics
 	sdkMetrics *prometheus.Registry
 
-	bootstrapped bool
+	bootstrapped avalancheUtils.Atomic[bool]
 
 	logger SubnetEVMLogger
 	// State sync server and client
@@ -254,6 +257,8 @@ type VM struct {
 	ethTxGossipHandler p2p.Handler
 	ethTxPushGossiper  avalancheUtils.Atomic[*gossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper  gossip.Gossiper
+
+	validatorsManager interfaces.Manager
 
 	chainAlias string
 	// RPC handlers (should be stopped before closing chaindb)
@@ -328,12 +333,9 @@ func (vm *VM) Initialize(
 	}
 
 	if vm.config.InspectDatabase {
-		start := time.Now()
-		log.Info("Starting database inspection")
-		if err := rawdb.InspectDatabase(vm.chaindb, nil, nil); err != nil {
+		if err := vm.inspectDatabases(); err != nil {
 			return err
 		}
-		log.Info("Completed database inspection", "elapsed", time.Since(start))
 	}
 
 	g := new(core.Genesis)
@@ -486,10 +488,15 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to initialize p2p network: %w", err)
 	}
-	vm.validators = p2p.NewValidators(p2pNetwork.Peers, vm.ctx.Log, vm.ctx.SubnetID, vm.ctx.ValidatorState, maxValidatorSetStaleness)
+	vm.p2pValidators = p2p.NewValidators(p2pNetwork.Peers, vm.ctx.Log, vm.ctx.SubnetID, vm.ctx.ValidatorState, maxValidatorSetStaleness)
 	vm.networkCodec = message.Codec
 	vm.Network = peer.NewNetwork(p2pNetwork, appSender, vm.networkCodec, chainCtx.NodeID, vm.config.MaxOutboundActiveRequests)
 	vm.client = peer.NewNetworkClient(vm.Network)
+
+	vm.validatorsManager, err = validators.NewManager(vm.ctx, vm.validatorsDB, &vm.clock)
+	if err != nil {
+		return fmt.Errorf("failed to initialize validators manager: %w", err)
+	}
 
 	// Initialize warp backend
 	offchainWarpMessages := make([][]byte, len(vm.config.WarpOffChainMessages))
@@ -514,6 +521,7 @@ func (vm *VM) Initialize(
 		vm.ctx.ChainID,
 		vm.ctx.WarpSigner,
 		vm,
+		vm.validatorsManager,
 		vm.warpDB,
 		meteredCache,
 		offchainWarpMessages,
@@ -628,7 +636,7 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 		chaindb:              vm.chaindb,
 		metadataDB:           vm.metadataDB,
 		acceptedBlockDB:      vm.acceptedBlockDB,
-		db:                   vm.db,
+		db:                   vm.versiondb,
 		toEngine:             vm.toEngine,
 	})
 
@@ -674,47 +682,73 @@ func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
 func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	switch state {
 	case snow.StateSyncing:
-		vm.bootstrapped = false
+		vm.bootstrapped.Set(false)
 		return nil
 	case snow.Bootstrapping:
-		vm.bootstrapped = false
-		if err := vm.StateSyncClient.Error(); err != nil {
-			return err
-		}
-		// After starting bootstrapping, do not attempt to resume a previous state sync.
-		if err := vm.StateSyncClient.ClearOngoingSummary(); err != nil {
-			return err
-		}
-		// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
-		// Note calling this function has no effect if snapshots are already initialized.
-		vm.blockChain.InitializeSnapshots()
-		return nil
+		return vm.onBootstrapStarted()
 	case snow.NormalOp:
-		// Initialize goroutines related to block building once we enter normal operation as there is no need to handle mempool gossip before this point.
-		if err := vm.initBlockBuilding(); err != nil {
-			return fmt.Errorf("failed to initialize block building: %w", err)
-		}
-		vm.bootstrapped = true
-		return nil
+		return vm.onNormalOperationsStarted()
 	default:
 		return snow.ErrUnknownState
 	}
 }
 
-// initBlockBuilding starts goroutines to manage block building
-func (vm *VM) initBlockBuilding() error {
+// onBootstrapStarted marks this VM as bootstrapping
+func (vm *VM) onBootstrapStarted() error {
+	vm.bootstrapped.Set(false)
+	if err := vm.StateSyncClient.Error(); err != nil {
+		return err
+	}
+	// After starting bootstrapping, do not attempt to resume a previous state sync.
+	if err := vm.StateSyncClient.ClearOngoingSummary(); err != nil {
+		return err
+	}
+	// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
+	// Note calling this function has no effect if snapshots are already initialized.
+	vm.blockChain.InitializeSnapshots()
+
+	return nil
+}
+
+// onNormalOperationsStarted marks this VM as bootstrapped
+func (vm *VM) onNormalOperationsStarted() error {
+	if vm.bootstrapped.Get() {
+		return nil
+	}
+	vm.bootstrapped.Set(true)
+
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
+	// sync validators first
+	if err := vm.validatorsManager.Sync(ctx); err != nil {
+		return fmt.Errorf("failed to update validators: %w", err)
+	}
+	vdrIDs := vm.validatorsManager.GetNodeIDs().List()
+	// Then start tracking with updated validators
+	// StartTracking initializes the uptime tracking with the known validators
+	// and update their uptime to account for the time we were being offline.
+	if err := vm.validatorsManager.StartTracking(vdrIDs); err != nil {
+		return fmt.Errorf("failed to start tracking uptime: %w", err)
+	}
+	// dispatch validator set update
+	vm.shutdownWg.Add(1)
+	go func() {
+		vm.validatorsManager.DispatchSync(ctx)
+		vm.shutdownWg.Done()
+	}()
+
+	// Initialize goroutines related to block building
+	// once we enter normal operation as there is no need to handle mempool gossip before this point.
 	ethTxGossipMarshaller := GossipEthTxMarshaller{}
-	ethTxGossipClient := vm.Network.NewClient(p2p.TxGossipHandlerID, p2p.WithValidatorSampling(vm.validators))
+	ethTxGossipClient := vm.Network.NewClient(p2p.TxGossipHandlerID, p2p.WithValidatorSampling(vm.p2pValidators))
 	ethTxGossipMetrics, err := gossip.NewMetrics(vm.sdkMetrics, ethTxGossipNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to initialize eth tx gossip metrics: %w", err)
 	}
 	ethTxPool, err := NewGossipEthTxPool(vm.txPool, vm.sdkMetrics)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize gossip eth tx pool: %w", err)
 	}
 	vm.shutdownWg.Add(1)
 	go func() {
@@ -737,7 +771,7 @@ func (vm *VM) initBlockBuilding() error {
 		ethTxPushGossiper, err = gossip.NewPushGossiper[*GossipEthTx](
 			ethTxGossipMarshaller,
 			ethTxPool,
-			vm.validators,
+			vm.p2pValidators,
 			ethTxGossipClient,
 			ethTxGossipMetrics,
 			pushGossipParams,
@@ -767,12 +801,12 @@ func (vm *VM) initBlockBuilding() error {
 			txGossipTargetMessageSize,
 			txGossipThrottlingPeriod,
 			txGossipThrottlingLimit,
-			vm.validators,
+			vm.p2pValidators,
 		)
 	}
 
 	if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, vm.ethTxGossipHandler); err != nil {
-		return err
+		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
 	}
 
 	if vm.ethTxPullGossiper == nil {
@@ -788,7 +822,7 @@ func (vm *VM) initBlockBuilding() error {
 		vm.ethTxPullGossiper = gossip.ValidatorGossiper{
 			Gossiper:   ethTxPullGossiper,
 			NodeID:     vm.ctx.NodeID,
-			Validators: vm.validators,
+			Validators: vm.p2pValidators,
 		}
 	}
 
@@ -814,9 +848,9 @@ func (vm *VM) setAppRequestHandlers() {
 	evmTrieDB := triedb.NewDatabase(
 		vm.chaindb,
 		&triedb.Config{
-			HashDB: &hashdb.Config{
+			DBOverride: hashdb.Config{
 				CleanCacheSize: vm.config.StateSyncServerTrieCache * units.MiB,
-			},
+			}.BackendConstructor,
 		},
 	)
 
@@ -832,6 +866,15 @@ func (vm *VM) Shutdown(context.Context) error {
 	if vm.cancel != nil {
 		vm.cancel()
 	}
+	if vm.bootstrapped.Get() {
+		vdrIDs := vm.validatorsManager.GetNodeIDs().List()
+		if err := vm.validatorsManager.StopTracking(vdrIDs); err != nil {
+			return fmt.Errorf("failed to stop tracking uptime: %w", err)
+		}
+		if err := vm.validatorsManager.WriteState(); err != nil {
+			return fmt.Errorf("failed to write validator: %w", err)
+		}
+	}
 	vm.Network.Shutdown()
 	if err := vm.StateSyncClient.Shutdown(); err != nil {
 		log.Error("error stopping state syncer", "err", err)
@@ -843,6 +886,13 @@ func (vm *VM) Shutdown(context.Context) error {
 	}
 	vm.eth.Stop()
 	log.Info("Ethereum backend stop completed")
+	if vm.usingStandaloneDB {
+		if err := vm.db.Close(); err != nil {
+			log.Error("failed to close database: %w", err)
+		} else {
+			log.Info("Database closed")
+		}
+	}
 	vm.shutdownWg.Wait()
 	log.Info("Subnet-EVM Shutdown completed")
 	return nil
@@ -1028,6 +1078,16 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		enabledAPIs = append(enabledAPIs, "subnet-evm-admin")
 	}
 
+	if vm.config.ValidatorsAPIEnabled {
+		validatorsAPI, err := newHandler("validators", &ValidatorsAPI{vm})
+		if err != nil {
+			return nil, fmt.Errorf("failed to register service for validators API due to %w", err)
+		}
+		apis[validatorsEndpoint] = validatorsAPI
+		enabledAPIs = append(enabledAPIs, "validators")
+	}
+
+	// RPC APIs
 	if vm.config.SnowmanAPIEnabled {
 		if err := handler.RegisterName("snowman", &SnowmanAPI{vm}); err != nil {
 			return nil, err
@@ -1200,167 +1260,17 @@ func attachEthService(handler *rpc.Server, apis []rpc.API, names []string) error
 	return nil
 }
 
-// useStandaloneDatabase returns true if the chain can and should use a standalone database
-// other than given by [db] in Initialize()
-func (vm *VM) useStandaloneDatabase(acceptedDB database.Database) (bool, error) {
-	// no config provided, use default
-	standaloneDBFlag := vm.config.UseStandaloneDatabase
-	if standaloneDBFlag != nil {
-		return standaloneDBFlag.Bool(), nil
+func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
+	if err := vm.validatorsManager.Connect(nodeID); err != nil {
+		return fmt.Errorf("uptime manager failed to connect node %s: %w", nodeID, err)
 	}
-
-	// check if the chain can use a standalone database
-	_, err := acceptedDB.Get(lastAcceptedKey)
-	if err == database.ErrNotFound {
-		// If there is nothing in the database, we can use the standalone database
-		return true, nil
-	}
-	return false, err
+	return vm.Network.Connected(ctx, nodeID, version)
 }
 
-type DatabaseConfig struct {
-	// If true, all writes are to memory and are discarded at node shutdown.
-	ReadOnly bool `json:"readOnly"`
-
-	// Path to database
-	Path string `json:"path"`
-
-	// Name of the database type to use
-	Name string `json:"name"`
-
-	// Path to config file
-	Config []byte `json:"-"`
-}
-
-// getDatabaseConfig returns the database configuration for the chain
-// to be used by separate, standalone database.
-func getDatabaseConfig(config Config, chainDataDir string) (DatabaseConfig, error) {
-	var (
-		configBytes []byte
-		err         error
-	)
-	if len(config.DatabaseConfigContent) != 0 {
-		dbConfigContent := config.DatabaseConfigContent
-		configBytes, err = base64.StdEncoding.DecodeString(dbConfigContent)
-		if err != nil {
-			return DatabaseConfig{}, fmt.Errorf("unable to decode base64 content: %w", err)
-		}
-	} else if len(config.DatabaseConfigFile) != 0 {
-		configPath := config.DatabaseConfigFile
-		configBytes, err = os.ReadFile(configPath)
-		if err != nil {
-			return DatabaseConfig{}, err
-		}
+func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+	if err := vm.validatorsManager.Disconnect(nodeID); err != nil {
+		return fmt.Errorf("uptime manager failed to disconnect node %s: %w", nodeID, err)
 	}
 
-	dbPath := filepath.Join(chainDataDir, "db")
-	if len(config.DatabasePath) != 0 {
-		dbPath = config.DatabasePath
-	}
-
-	return DatabaseConfig{
-		Name:     config.DatabaseType,
-		ReadOnly: config.DatabaseReadOnly,
-		Path:     dbPath,
-		Config:   configBytes,
-	}, nil
-}
-
-// initializeDBs initializes the databases used by the VM.
-// If [useStandaloneDB] is true, the chain will use a standalone database for its state.
-// Otherwise, the chain will use the provided [avaDB] for its state.
-func (vm *VM) initializeDBs(avaDB database.Database) error {
-	db := avaDB
-	// skip standalone database initialization if we are running in unit tests
-	if vm.ctx.NetworkID != avalancheconstants.UnitTestID {
-		// first initialize the accepted block database to check if we need to use a standalone database
-		verDB := versiondb.New(avaDB)
-		acceptedDB := prefixdb.New(acceptedPrefix, verDB)
-		useStandAloneDB, err := vm.useStandaloneDatabase(acceptedDB)
-		if err != nil {
-			return err
-		}
-		if useStandAloneDB {
-			// If we are using a standalone database, we need to create a new database
-			// for the chain state.
-			dbConfig, err := getDatabaseConfig(vm.config, vm.ctx.ChainDataDir)
-			if err != nil {
-				return err
-			}
-			log.Info("Using standalone database for the chain state", "DatabaseConfig", dbConfig)
-			db, err = vm.createDatabase(dbConfig)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Use NewNested rather than New so that the structure of the database
-	// remains the same regardless of the provided baseDB type.
-	vm.chaindb = rawdb.NewDatabase(Database{prefixdb.NewNested(ethDBPrefix, db)})
-	vm.db = versiondb.New(db)
-	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
-	vm.metadataDB = prefixdb.New(metadataPrefix, vm.db)
-	// Note warpDB is not part of versiondb because it is not necessary
-	// that warp signatures are committed to the database atomically with
-	// the last accepted block.
-	// [warpDB] is used to store warp message signatures
-	// set to a prefixDB with the prefix [warpPrefix]
-	vm.warpDB = prefixdb.New(warpPrefix, db)
-	return nil
-}
-
-// createDatabase returns a new database instance with the provided configuration
-func (vm *VM) createDatabase(dbConfig DatabaseConfig) (database.Database, error) {
-	dbRegisterer, err := avalanchemetrics.MakeAndRegister(
-		vm.ctx.Metrics,
-		dbMetricsPrefix,
-	)
-	if err != nil {
-		return nil, err
-	}
-	var db database.Database
-	// start the db
-	switch dbConfig.Name {
-	case leveldb.Name:
-		dbPath := filepath.Join(dbConfig.Path, leveldb.Name)
-		db, err = leveldb.New(dbPath, dbConfig.Config, vm.ctx.Log, dbRegisterer)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create %s at %s: %w", leveldb.Name, dbPath, err)
-		}
-	case memdb.Name:
-		db = memdb.New()
-	case pebbledb.Name:
-		dbPath := filepath.Join(dbConfig.Path, pebbledb.Name)
-		db, err = pebbledb.New(dbPath, dbConfig.Config, vm.ctx.Log, dbRegisterer)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create %s at %s: %w", pebbledb.Name, dbPath, err)
-		}
-	default:
-		return nil, fmt.Errorf(
-			"db-type was %q but should have been one of {%s, %s, %s}",
-			dbConfig.Name,
-			leveldb.Name,
-			memdb.Name,
-			pebbledb.Name,
-		)
-	}
-
-	if dbConfig.ReadOnly && dbConfig.Name != memdb.Name {
-		db = versiondb.New(db)
-	}
-
-	meterDBReg, err := avalanchemetrics.MakeAndRegister(
-		vm.ctx.Metrics,
-		"meterdb",
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err = meterdb.New(meterDBReg, db)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create meterdb: %w", err)
-	}
-
-	return db, nil
+	return vm.Network.Disconnected(ctx, nodeID)
 }

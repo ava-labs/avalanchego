@@ -29,7 +29,7 @@ package vmerrs
 import (
 	"errors"
 
-	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ava-labs/libevm/core/vm"
 )
 
 // List evm execution errors

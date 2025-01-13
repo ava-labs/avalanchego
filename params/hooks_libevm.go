@@ -8,25 +8,18 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/subnet-evm/constants"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/predicate"
-	"github.com/ava-labs/subnet-evm/vmerrs"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/libevm"
 	"github.com/holiman/uint256"
 )
 
 func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, state libevm.StateReader) (uint64, error) {
-	// IsProhibited
-	if ac.Self == constants.BlackholeAddr || modules.ReservedAddress(ac.Self) {
-		return gas, vmerrs.ErrAddrProhibited
-	}
-
 	// If the allow list is enabled, check that [ac.Origin] has permission to deploy a contract.
 	if r.IsPrecompileEnabled(deployerallowlist.ContractAddress) {
 		allowListRole := deployerallowlist.GetContractDeployerAllowListStatus(state, ac.Origin)

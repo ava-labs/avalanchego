@@ -4,9 +4,9 @@
 package deployerallowlist
 
 import (
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 var _ precompileconfig.Config = &Config{}

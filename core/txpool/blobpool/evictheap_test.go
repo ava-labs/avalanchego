@@ -31,8 +31,8 @@ import (
 	mrand "math/rand"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
 

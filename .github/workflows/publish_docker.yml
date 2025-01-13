@@ -17,13 +17,17 @@ on:
 
 jobs:
   publish_docker_image:
-    name: Publish Docker Image
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Publish image to Dockerhub
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and publish images to DockerHub
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
           DOCKER_REPO: "avaplatform/subnet-evm"
-        run: .github/workflows/publish_docker_image.sh ${{ inputs.vm_id }}
+          VM_ID: ${{ inputs.vm_id }}
+          PUBLISH: 1
+          PLATFORMS: "linux/amd64,linux/arm64"
+        run: scripts/build_docker_image.sh

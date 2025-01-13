@@ -13,7 +13,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/libevm/common"
 )
 
 // CUSTOM CODE STARTS HERE

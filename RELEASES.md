@@ -2,6 +2,18 @@
 
 ## Pending Release
 
+* Refactored trie_prefetcher.go to be structurally similar to upstream.
+
+## [v0.7.0](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.0)
+
+### Updates
+
+- Changed default write option from `Sync` to `NoSync` in PebbleDB
+
+### Fixes
+
+- Fixed database close on shutdown
+
 ## [v0.6.11](https://github.com/ava-labs/subnet-evm/releases/tag/v0.6.11)
 
 This release focuses on Standalone DB and database configs.

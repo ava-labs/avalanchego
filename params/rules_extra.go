@@ -4,8 +4,8 @@
 package params
 
 import (
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func GetRulesExtra(r Rules) *RulesExtra {

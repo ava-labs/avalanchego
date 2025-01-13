@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // TxIndexProgress is the struct describing the progress for transaction indexing.

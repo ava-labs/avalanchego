@@ -30,11 +30,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/trie"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

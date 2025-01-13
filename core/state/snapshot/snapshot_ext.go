@@ -3,9 +3,9 @@ package snapshot
 import (
 	"time"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 func (t *Tree) DiskAccountIterator(seek common.Hash) AccountIterator {
@@ -23,9 +23,19 @@ func (t *Tree) DiskStorageIterator(account common.Hash, seek common.Hash) Storag
 	return it
 }
 
+type SnapshotIterable interface {
+	Snapshot
+
+	// AccountIterator creates an account iterator over an arbitrary layer.
+	AccountIterator(seek common.Hash) AccountIterator
+
+	// StorageIterator creates a storage iterator over an arbitrary layer.
+	StorageIterator(account common.Hash, seek common.Hash) (StorageIterator, bool)
+}
+
 // NewDiskLayer creates a diskLayer for direct access to the contents of the on-disk
 // snapshot. Does not perform any validation.
-func NewDiskLayer(diskdb ethdb.KeyValueStore) Snapshot {
+func NewDiskLayer(diskdb ethdb.KeyValueStore) SnapshotIterable {
 	return &diskLayer{
 		diskdb:  diskdb,
 		created: time.Now(),

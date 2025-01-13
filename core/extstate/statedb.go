@@ -4,17 +4,18 @@
 package extstate
 
 import (
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/predicate"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 type VmStateDB interface {
 	vm.StateDB
+	Logs() []*types.Log
+
 	GetTxHash() common.Hash
-	GetLogData() (topics [][]common.Hash, data [][]byte)
 }
 
 type StateDB struct {
@@ -29,6 +30,16 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 	rulesExtra := params.GetRulesExtra(rules)
 	s.predicateStorageSlots = predicate.PreparePredicateStorageSlots(rulesExtra, list)
 	s.VmStateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
+}
+
+// GetLogData returns the underlying topics and data from each log included in the StateDB
+// Test helper function.
+func (s *StateDB) GetLogData() (topics [][]common.Hash, data [][]byte) {
+	for _, log := range s.Logs() {
+		topics = append(topics, log.Topics)
+		data = append(data, common.CopyBytes(log.Data))
+	}
+	return topics, data
 }
 
 // GetPredicateStorageSlots returns the storage slots associated with the address, index pair.

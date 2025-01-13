@@ -10,11 +10,11 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/libevm/common"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/ethereum/go-ethereum/common"
-	gethparams "github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -265,7 +265,7 @@ func configTimestampEqual(x, y *uint64) bool {
 
 // ConfigCompatError is raised if the locally-stored blockchain is initialised with a
 // ChainConfig that would alter the past.
-type ConfigCompatError = gethparams.ConfigCompatError
+type ConfigCompatError = ethparams.ConfigCompatError
 
 func newTimestampCompatError(what string, storedtime, newtime *uint64) *ConfigCompatError {
 	var rew *uint64

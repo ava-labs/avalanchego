@@ -23,7 +23,7 @@ import (
 func TestMessageSignatureHandler(t *testing.T) {
 	database := memdb.New()
 	snowCtx := utils.TestSnowContext()
-	blsSecretKey, err := bls.NewSecretKey()
+	blsSecretKey, err := bls.NewSigner()
 	require.NoError(t, err)
 	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
 
@@ -33,7 +33,7 @@ func TestMessageSignatureHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	messageSignatureCache := &cache.LRU[ids.ID, []byte]{Size: 100}
-	backend, err := warp.NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, database, messageSignatureCache, [][]byte{offchainMessage.Bytes()})
+	backend, err := warp.NewBackend(snowCtx.NetworkID, snowCtx.ChainID, warpSigner, warptest.EmptyBlockClient, warptest.NoOpValidatorReader{}, database, messageSignatureCache, [][]byte{offchainMessage.Bytes()})
 	require.NoError(t, err)
 
 	msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, []byte("test"))
@@ -127,7 +127,7 @@ func TestMessageSignatureHandler(t *testing.T) {
 func TestBlockSignatureHandler(t *testing.T) {
 	database := memdb.New()
 	snowCtx := utils.TestSnowContext()
-	blsSecretKey, err := bls.NewSecretKey()
+	blsSecretKey, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	warpSigner := avalancheWarp.NewSigner(blsSecretKey, snowCtx.NetworkID, snowCtx.ChainID)
@@ -139,6 +139,7 @@ func TestBlockSignatureHandler(t *testing.T) {
 		snowCtx.ChainID,
 		warpSigner,
 		blockClient,
+		warptest.NoOpValidatorReader{},
 		database,
 		messageSignatureCache,
 		nil,

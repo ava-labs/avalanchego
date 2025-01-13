@@ -13,7 +13,7 @@ import (
 // has been up for TotalUptime seconds.
 type ValidatorUptime struct {
 	ValidationID ids.ID `serialize:"true"`
-	TotalUptime  uint64 `serialize:"true"`
+	TotalUptime  uint64 `serialize:"true"` // in seconds
 
 	bytes []byte
 }

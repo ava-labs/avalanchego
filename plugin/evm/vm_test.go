@@ -17,10 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/log"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -33,14 +34,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
-	avalancheConstants "github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
@@ -56,22 +55,18 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
-	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
-	testNetworkID   uint32 = avagoconstants.UnitTestID
-	testCChainID           = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
-	testXChainID           = ids.ID{'t', 'e', 's', 't', 'x'}
-	testMinGasPrice int64  = 225_000_000_000
+	testNetworkID uint32 = avagoconstants.UnitTestID
+
+	testMinGasPrice int64 = 225_000_000_000
 	testKeys        []*ecdsa.PrivateKey
 	testEthAddrs    []common.Address // testEthAddrs[i] corresponds to testKeys[i]
-	testAvaxAssetID = ids.ID{1, 2, 3}
 	username        = "Johns"
 	password        = "CjasdjhiPeirbSenfeI13" // #nosec G101
 
@@ -137,40 +132,6 @@ func buildGenesisTest(t *testing.T, genesisJSON string) []byte {
 	return genesisBytes
 }
 
-func NewContext() *snow.Context {
-	ctx := utils.TestSnowContext()
-	ctx.NodeID = ids.GenerateTestNodeID()
-	ctx.NetworkID = testNetworkID
-	ctx.ChainID = testCChainID
-	ctx.AVAXAssetID = testAvaxAssetID
-	ctx.XChainID = testXChainID
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-	_ = aliaser.Alias(testCChainID, "C")
-	_ = aliaser.Alias(testCChainID, testCChainID.String())
-	_ = aliaser.Alias(testXChainID, "X")
-	_ = aliaser.Alias(testXChainID, testXChainID.String())
-	ctx.ValidatorState = &validatorstest.State{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				avalancheConstants.PlatformChainID: avalancheConstants.PrimaryNetworkID,
-				testXChainID:                       avalancheConstants.PrimaryNetworkID,
-				testCChainID:                       avalancheConstants.PrimaryNetworkID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errors.New("unknown chain")
-			}
-			return subnetID, nil
-		},
-	}
-	blsSecretKey, err := bls.NewSecretKey()
-	if err != nil {
-		panic(err)
-	}
-	ctx.WarpSigner = avalancheWarp.NewSigner(blsSecretKey, ctx.NetworkID, ctx.ChainID)
-	ctx.PublicKey = bls.PublicFromSecretKey(blsSecretKey)
-	return ctx
-}
-
 // setupGenesis sets up the genesis
 // If [genesisJSON] is empty, defaults to using [genesisJSONLatest]
 func setupGenesis(
@@ -186,7 +147,7 @@ func setupGenesis(
 		genesisJSON = genesisJSONLatest
 	}
 	genesisBytes := buildGenesisTest(t, genesisJSON)
-	ctx := NewContext()
+	ctx := utils.TestSnowContext()
 
 	baseDB := memdb.New()
 
@@ -492,7 +453,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	if err := restartedVM.Initialize(
 		context.Background(),
-		NewContext(),
+		utils.TestSnowContext(),
 		dbManager,
 		genesisBytes,
 		[]byte(""),
@@ -1957,7 +1918,7 @@ func TestConfigureLogLevel(t *testing.T) {
 				}
 			}
 
-			// If the VM was not initialized, do not attept to shut it down
+			// If the VM was not initialized, do not attempt to shut it down
 			if err == nil {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {
@@ -3150,4 +3111,65 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			errCheck(err)
 		})
 	}
+}
+
+func TestStandaloneDB(t *testing.T) {
+	vm := &VM{}
+	ctx := utils.TestSnowContext()
+	baseDB := memdb.New()
+	atomicMemory := atomic.NewMemory(prefixdb.New([]byte{0}, baseDB))
+	ctx.SharedMemory = atomicMemory.NewSharedMemory(ctx.ChainID)
+	issuer := make(chan commonEng.Message, 1)
+	sharedDB := prefixdb.New([]byte{1}, baseDB)
+	genesisBytes := buildGenesisTest(t, genesisJSONLatest)
+	// alter network ID to use standalone database
+	ctx.NetworkID = 123456
+	appSender := &enginetest.Sender{T: t}
+	appSender.CantSendAppGossip = true
+	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
+	configJSON := `{"database-type": "memdb"}`
+
+	isDBEmpty := func(db database.Database) bool {
+		it := db.NewIterator()
+		defer it.Release()
+		return !it.Next()
+	}
+	// Ensure that the database is empty
+	require.True(t, isDBEmpty(baseDB))
+
+	err := vm.Initialize(
+		context.Background(),
+		ctx,
+		sharedDB,
+		genesisBytes,
+		nil,
+		[]byte(configJSON),
+		issuer,
+		[]*commonEng.Fx{},
+		appSender,
+	)
+	defer vm.Shutdown(context.Background())
+	require.NoError(t, err, "error initializing VM")
+	require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
+
+	// Issue a block
+	acceptedBlockEvent := make(chan core.ChainEvent, 1)
+	vm.blockChain.SubscribeChainAcceptedEvent(acceptedBlockEvent)
+	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0])
+	require.NoError(t, err)
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
+	require.NoError(t, errs[0])
+
+	// accept block
+	blk := issueAndAccept(t, issuer, vm)
+	newBlock := <-acceptedBlockEvent
+	require.Equal(t, newBlock.Block.Hash(), common.Hash(blk.ID()))
+
+	// Ensure that the shared database is empty
+	assert.True(t, isDBEmpty(baseDB))
+	// Ensure that the standalone database is not empty
+	assert.False(t, isDBEmpty(vm.db))
+	assert.False(t, isDBEmpty(vm.acceptedBlockDB))
 }

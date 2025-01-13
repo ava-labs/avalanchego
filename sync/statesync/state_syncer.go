@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	syncclient "github.com/ava-labs/subnet-evm/sync/client"
-	"github.com/ava-labs/subnet-evm/triedb"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -35,12 +35,12 @@ type StateSyncerConfig struct {
 
 // stateSync keeps the state of the entire state sync operation.
 type stateSync struct {
-	db        ethdb.Database    // database we are syncing
-	root      common.Hash       // root of the EVM state we are syncing to
-	trieDB    *triedb.Database  // trieDB on top of db we are syncing. used to restore any existing tries.
-	snapshot  snapshot.Snapshot // used to access the database we are syncing as a snapshot.
-	batchSize int               // write batches when they reach this size
-	client    syncclient.Client // used to contact peers over the network
+	db        ethdb.Database            // database we are syncing
+	root      common.Hash               // root of the EVM state we are syncing to
+	trieDB    *triedb.Database          // trieDB on top of db we are syncing. used to restore any existing tries.
+	snapshot  snapshot.SnapshotIterable // used to access the database we are syncing as a snapshot.
+	batchSize int                       // write batches when they reach this size
+	client    syncclient.Client         // used to contact peers over the network
 
 	segments   chan syncclient.LeafSyncTask   // channel of tasks to sync
 	syncer     *syncclient.CallbackLeafSyncer // performs the sync, looping over each task's range and invoking specified callbacks

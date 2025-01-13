@@ -14,6 +14,9 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/subnet-evm/eth"
@@ -21,9 +24,6 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	syncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"github.com/ava-labs/subnet-evm/sync/statesync"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -299,7 +299,7 @@ func (client *stateSyncerClient) Shutdown() error {
 }
 
 // finishSync is responsible for updating disk and memory pointers so the VM is prepared
-// for bootstrapping. Executes any shared memory operations from the atomic trie to shared memory.
+// for bootstrapping.
 func (client *stateSyncerClient) finishSync() error {
 	stateBlock, err := client.state.GetBlock(context.TODO(), ids.ID(client.syncSummary.BlockHash))
 	if err != nil {
@@ -349,8 +349,6 @@ func (client *stateSyncerClient) finishSync() error {
 
 // updateVMMarkers updates the following markers in the VM's database
 // and commits them atomically:
-// - updates atomic trie so it will have necessary metadata for the last committed root
-// - updates atomic trie so it will resume applying operations to shared memory on initialize
 // - updates lastAcceptedKey
 // - removes state sync progress markers
 func (client *stateSyncerClient) updateVMMarkers() error {

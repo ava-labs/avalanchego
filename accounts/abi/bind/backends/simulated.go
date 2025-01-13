@@ -29,11 +29,11 @@ package backends
 import (
 	"context"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient/simulated"
 	"github.com/ava-labs/subnet-evm/interfaces"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // Verify that SimulatedBackend implements required interfaces

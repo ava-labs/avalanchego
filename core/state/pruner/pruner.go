@@ -37,22 +37,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/trie"
-	"github.com/ava-labs/subnet-evm/triedb"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
 	// stateBloomFilePrefix is the filename prefix of state bloom filter.
 	stateBloomFilePrefix = "statebloom"
 
-	// stateBloomFilePrefix is the filename suffix of state bloom filter.
+	// stateBloomFileSuffix is the filename suffix of state bloom filter.
 	stateBloomFileSuffix = "bf.gz"
 
 	// stateBloomFileTempSuffix is the filename suffix of state bloom filter

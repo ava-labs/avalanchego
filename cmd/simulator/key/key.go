@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/common"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ava-labs/libevm/common"
+	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
 type Key struct {

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to include in artifact name"
+        description: "Tag to checkout & release"
         required: true
   push:
     tags:
@@ -20,11 +20,11 @@ jobs:
         with:
           fetch-depth: 0
           path: subnet-evm
+          ref: ${{ github.event.inputs.tag }}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "~1.22.8"
-          check-latest: true
       - name: Set up arm64 cross compiler
         run: |
           sudo apt-get -y update

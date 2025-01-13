@@ -8,13 +8,13 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/libevm/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ethereum/go-ethereum/common"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
 )
 
-type Log = gethtypes.Log
+type Log = ethtypes.Log
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
@@ -67,7 +67,7 @@ type ConfigurationBlockContext interface {
 
 type BlockContext interface {
 	ConfigurationBlockContext
-	// GetPredicateResults returns a the result of verifying the predicates of the
+	// GetPredicateResults returns the result of verifying the predicates of the
 	// given transaction, precompile address pair as a byte array.
 	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) []byte
 }

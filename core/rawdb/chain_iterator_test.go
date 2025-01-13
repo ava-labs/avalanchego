@@ -33,8 +33,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestChainIterator(t *testing.T) {

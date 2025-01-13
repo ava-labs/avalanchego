@@ -15,7 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
 )
 
 var (
@@ -56,6 +57,7 @@ type backend struct {
 	db                        database.Database
 	warpSigner                avalancheWarp.Signer
 	blockClient               BlockClient
+	validatorReader           interfaces.ValidatorReader
 	signatureCache            cache.Cacher[ids.ID, []byte]
 	messageCache              *cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]
 	offchainAddressedCallMsgs map[ids.ID]*avalancheWarp.UnsignedMessage
@@ -68,6 +70,7 @@ func NewBackend(
 	sourceChainID ids.ID,
 	warpSigner avalancheWarp.Signer,
 	blockClient BlockClient,
+	validatorReader interfaces.ValidatorReader,
 	db database.Database,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	offchainMessages [][]byte,
@@ -79,6 +82,7 @@ func NewBackend(
 		warpSigner:                warpSigner,
 		blockClient:               blockClient,
 		signatureCache:            signatureCache,
+		validatorReader:           validatorReader,
 		messageCache:              &cache.LRU[ids.ID, *avalancheWarp.UnsignedMessage]{Size: messageCacheSize},
 		stats:                     newVerifierStats(),
 		offchainAddressedCallMsgs: make(map[ids.ID]*avalancheWarp.UnsignedMessage),
@@ -180,7 +184,7 @@ func (b *backend) GetMessage(messageID ids.ID) (*avalancheWarp.UnsignedMessage, 
 
 	unsignedMessageBytes, err := b.db.Get(messageID[:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get warp message %s from db: %w", messageID.String(), err)
+		return nil, err
 	}
 
 	unsignedMessage, err := avalancheWarp.ParseUnsignedMessage(unsignedMessageBytes)

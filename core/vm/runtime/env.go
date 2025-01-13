@@ -27,8 +27,8 @@
 package runtime
 
 import (
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 func NewEnv(cfg *Config) *vm.EVM {

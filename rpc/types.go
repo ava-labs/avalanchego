@@ -34,8 +34,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 )
 
 // API describes the set of methods offered over the RPC interface
@@ -62,7 +62,7 @@ type ServerCodec interface {
 type jsonWriter interface {
 	// writeJSON writes a message to the connection.
 	writeJSON(ctx context.Context, msg interface{}, isError bool) error
-	// writeJSON writes a message to the connection with the option of skipping the deadline.
+	// writeJSONSkipDeadline writes a message to the connection with the option of skipping the deadline.
 	writeJSONSkipDeadline(ctx context.Context, msg interface{}, isError bool, skip bool) error
 	// Closed returns a channel which is closed when the connection is closed.
 	closed() <-chan interface{}

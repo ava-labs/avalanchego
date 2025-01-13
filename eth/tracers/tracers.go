@@ -21,20 +21,20 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/core/vm"
-	gethtracers "github.com/ethereum/go-ethereum/eth/tracers"
+	"github.com/ava-labs/libevm/core/vm"
+	ethtracers "github.com/ava-labs/libevm/eth/tracers"
 )
 
 // Context contains some contextual infos for a transaction execution that is not
 // available from within the EVM object.
-type Context = gethtracers.Context
+type Context = ethtracers.Context
 
 // Tracer interface extends vm.EVMLogger and additionally
 // allows collecting the tracing result.
-type Tracer = gethtracers.Tracer
+type Tracer = ethtracers.Tracer
 
 // DefaultDirectory is the collection of tracers bundled by default.
-var DefaultDirectory = gethtracers.DefaultDirectory
+var DefaultDirectory = ethtracers.DefaultDirectory
 
 const (
 	memoryPadLimit = 1024 * 1024
