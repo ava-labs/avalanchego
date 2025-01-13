@@ -78,8 +78,6 @@ data:
         - source_labels:
             - __meta_kubernetes_pod_node_name
           target_label: __host__
-        - action: labelmap
-          regex: __meta_kubernetes_pod_label_(.+)
         - action: replace
           replacement: $1
           separator: /
@@ -105,6 +103,27 @@ data:
             - __meta_kubernetes_pod_uid
             - __meta_kubernetes_pod_container_name
           target_label: __path__
+        - source_labels: [__meta_kubernetes_pod_label_is_ephemeral_node]
+          target_label: is_ephemeral_node
+        - source_labels: [__meta_kubernetes_pod_label_network_owner]
+          target_label: network_owner
+        - source_labels: [__meta_kubernetes_pod_label_network_uuid]
+          target_label: network_uuid
+        - source_labels: [__meta_kubernetes_pod_label_node_id]
+          target_label: node_id
+        - source_labels: [__meta_kubernetes_pod_label_repo]
+          target_label: repo
+        - source_labels: [__meta_kubernetes_pod_label_workflow]
+          target_label: workflow
+        - source_labels: [__meta_kubernetes_pod_label_run_id]
+          target_label: run_id
+        - source_labels: [__meta_kubernetes_pod_label_run_number]
+          target_label: run_number
+        - source_labels: [__meta_kubernetes_pod_label_run_attempt]
+          target_label: run_attempt
+        - source_labels: [__meta_kubernetes_pod_label_job_id]
+          target_label: job_id
+          # TODO(marun) Add cluster identifier as a label
 
 ---
 apiVersion: apps/v1

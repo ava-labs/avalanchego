@@ -101,6 +101,7 @@ data:
             target_label: run_attempt
           - source_labels: [__meta_kubernetes_pod_label_job_id]
             target_label: job_id
+          # TODO(marun) Add cluster identifier as a label
 
     remote_write:
     - url: "https://prometheus-poc.avax-dev.network/api/v1/write"
