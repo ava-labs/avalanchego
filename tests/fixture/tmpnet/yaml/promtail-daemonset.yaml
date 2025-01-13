@@ -1,63 +1,53 @@
---- # Daemonset.yaml
-# Requires a secret that includes LOKI_USERNAME and LOKI_PASSWORD
-apiVersion: apps/v1
-kind: DaemonSet
+# A secret called loki-credentials must be created separately with keys `username` and `password`
+---
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: promtail-daemonset
-spec:
-  selector:
-    matchLabels:
-      name: promtail
-  template:
-    metadata:
-      labels:
-        name: promtail
-    spec:
-      serviceAccount: promtail-serviceaccount
-      containers:
-      - name: promtail-container
-        image: grafana/promtail:3.3.2 # Pin latest version
-        args:
-        - -config.file=/etc/promtail/promtail.yaml
-        - -config.expand-env=true
-        env:
-        - name: 'HOSTNAME' # needed when using kubernetes_sd_configs
-          valueFrom:
-            fieldRef:
-              fieldPath: 'spec.nodeName'
-        - name: LOKI_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: loki-credentials
-              key: LOKI_USERNAME
-        - name: LOKI_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: loki-credentials
-              key: LOKI_PASSWORD
-        volumeMounts:
-        - name: logs
-          mountPath: /var/log
-        - name: promtail-config
-          mountPath: /etc/promtail
-        - mountPath: /var/lib/docker/containers
-          name: varlibdockercontainers
-          readOnly: true
-      volumes:
-      - name: logs
-        hostPath:
-          path: /var/log
-      - name: varlibdockercontainers
-        hostPath:
-          path: /var/lib/docker/containers
-      - name: promtail-config
-        configMap:
-          name: promtail-config
---- # configmap.yaml
+  name: ci-monitoring
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail-serviceaccount
+  namespace: ci-monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promtail-clusterrole
+rules:
+  - apiGroups: [""]
+    resources:
+    - nodes
+    - services
+    - pods
+    verbs:
+    - get
+    - watch
+    - list
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promtail-clusterrolebinding
+subjects:
+    - kind: ServiceAccount
+      name: promtail-serviceaccount
+      namespace: ci-monitoring
+roleRef:
+    kind: ClusterRole
+    name: promtail-clusterrole
+    apiGroup: rbac.authorization.k8s.io
+
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: promtail-config
+  namespace: ci-monitoring
 data:
   promtail.yaml: |
     server:
@@ -71,7 +61,6 @@ data:
         password: ${LOKI_PASSWORD}
 
     positions:
-      # TODO(marun) Make sure this positions file is on a PVC when deploying for real so that it survives restarts
       filename: /tmp/positions.yaml
     target_config:
       sync_period: 10s
@@ -82,7 +71,8 @@ data:
       pipeline_stages:
         - docker: {}
       relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_promtail_collect]
+        # TODO(marun) Ensure consistency with prometheus labeling
+        - source_labels: [__meta_kubernetes_pod_annotation_promtail_collect]
           action: keep
           regex: true
         - source_labels:
@@ -116,39 +106,60 @@ data:
             - __meta_kubernetes_pod_container_name
           target_label: __path__
 
---- # Clusterrole.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+---
+apiVersion: apps/v1
+kind: DaemonSet
 metadata:
-  name: promtail-clusterrole
-rules:
-  - apiGroups: [""]
-    resources:
-    - nodes
-    - services
-    - pods
-    verbs:
-    - get
-    - watch
-    - list
-
---- # ServiceAccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: promtail-serviceaccount
-
---- # Rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: promtail-clusterrolebinding
-subjects:
-    - kind: ServiceAccount
-      name: promtail-serviceaccount
-      # TODO(marun) Need to configure this for the dest namespace
-      namespace: default
-roleRef:
-    kind: ClusterRole
-    name: promtail-clusterrole
-    apiGroup: rbac.authorization.k8s.io
+  name: promtail-daemonset
+  namespace: ci-monitoring
+spec:
+  selector:
+    matchLabels:
+      name: promtail
+  template:
+    metadata:
+      labels:
+        name: promtail
+    spec:
+      serviceAccount: promtail-serviceaccount
+      containers:
+      - name: promtail-container
+        image: grafana/promtail:3.3.2 # Pin latest version
+        args:
+        - -config.file=/etc/promtail/promtail.yaml
+        - -config.expand-env=true # Enable subsitution of env variables in the configuration i.e. for credentials
+        env:
+        - name: 'HOSTNAME' # needed when using kubernetes_sd_configs
+          valueFrom:
+            fieldRef:
+              fieldPath: 'spec.nodeName'
+        - name: LOKI_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: loki-credentials
+              key: username
+        - name: LOKI_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: loki-credentials
+              key: password
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log
+          readOnly: true
+        - name: promtail-config
+          mountPath: /etc/promtail
+          readOnly: true
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+      volumes:
+      - name: logs
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: promtail-config
+        configMap:
+          name: promtail-config

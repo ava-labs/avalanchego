@@ -71,8 +71,7 @@ func NewNodeStatefulSet(
 	}
 
 	podLabels := map[string]string{
-		"app":              name,
-		"promtail-collect": "true",
+		"app": name,
 	}
 	for label, value := range labels {
 		podLabels[label] = value
@@ -108,6 +107,12 @@ func NewNodeStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
+					Annotations: map[string]string{
+						// TODO(marun) Specify the port prometheus should target
+						"prometheus.io/scrape": "true",
+						"prometheus.io/path":   "/ext/metrics",
+						"promtail/collect":     "true",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{

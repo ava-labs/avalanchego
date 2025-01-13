@@ -80,11 +80,12 @@ jobs:
           PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           LOKI_USERNAME: ${{ secrets.LOKI_ID || '' }}
           LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Upload tmpnet network dir
-        uses: ./.github/actions/upload-tmpnet-artifact
-        if: always()
-        with:
-          name: e2e-kube-tmpnet-data
+          GH_REPO: ${{ github.repository_owner }}/${{ github.event.repository.name }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
