@@ -67,8 +67,6 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batches ...database
 		Batches:  make([]*sharedmemorypb.Batch, len(batches)),
 	}
 	for key, value := range requests {
-		key := key
-
 		chainReq := &sharedmemorypb.AtomicRequest{
 			RemoveRequests: value.RemoveRequests,
 			PutRequests:    make([]*sharedmemorypb.Element, len(value.PutRequests)),

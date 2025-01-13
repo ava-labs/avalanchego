@@ -21,9 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Signature verification costs were conservatively based on benchmarks run on
+// an AWS c5.xlarge instance.
 const (
 	intrinsicValidatorBandwidth = ids.NodeIDLen + // nodeID
 		wrappers.LongLen + // start
@@ -64,6 +67,8 @@ const (
 	intrinsicSECP256k1FxSignatureBandwidth = wrappers.IntLen + // signature index
 		secp256k1.SignatureLen // signature length
 
+	intrinsicSECP256k1FxSignatureCompute = 200 // secp256k1 signature verification time is around 200us
+
 	intrinsicConvertSubnetToL1ValidatorBandwidth = wrappers.IntLen + // nodeID length
 		wrappers.LongLen + // weight
 		wrappers.LongLen + // balance
@@ -71,6 +76,13 @@ const (
 		wrappers.IntLen + // remaining balance owner num addresses
 		wrappers.IntLen + // deactivation owner threshold
 		wrappers.IntLen // deactivation owner num addresses
+
+	intrinsicBLSAggregateCompute           = 5     // BLS public key aggregation time is around 5us
+	intrinsicBLSVerifyCompute              = 1_000 // BLS verification time is around 1000us
+	intrinsicBLSPublicKeyValidationCompute = 50    // BLS public key validation time is around 50us
+	intrinsicBLSPoPVerifyCompute           = intrinsicBLSPublicKeyValidationCompute + intrinsicBLSVerifyCompute
+
+	intrinsicWarpDBReads = 3 + 20 // chainID -> subnetID mapping + apply weight diffs + apply pk diffs + diff application reads
 
 	intrinsicPoPBandwidth = bls.PublicKeyLen + // public key
 		bls.SignatureLen // signature
@@ -90,9 +102,8 @@ var (
 			intrinsicSubnetValidatorBandwidth + // subnetValidator
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  2,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBRead:  3, // get subnet auth + check for subnet transformation + check for subnet conversion
+		gas.DBWrite: 3, // put current staker + write weight diff + write pk diff
 	}
 	IntrinsicCreateChainTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -103,32 +114,23 @@ var (
 			wrappers.IntLen + // genesis length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  1,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBRead:  3, // get subnet auth + check for subnet transformation + check for subnet conversion
+		gas.DBWrite: 1, // put chain
 	}
 	IntrinsicCreateSubnetTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.IntLen, // owner typeID
-		gas.DBRead:  0,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBWrite: 1, // write subnet owner
 	}
 	IntrinsicImportTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // source chainID
 			wrappers.IntLen, // num importing inputs
-		gas.DBRead:  0,
-		gas.DBWrite: 0,
-		gas.Compute: 0,
 	}
 	IntrinsicExportTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // destination chainID
 			wrappers.IntLen, // num exported outputs
-		gas.DBRead:  0,
-		gas.DBWrite: 0,
-		gas.Compute: 0,
 	}
 	IntrinsicRemoveSubnetValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -136,9 +138,8 @@ var (
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  2,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBRead:  1, // read subnet auth
+		gas.DBWrite: 3, // delete validator + write weight diff + write pk diff
 	}
 	IntrinsicAddPermissionlessValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -149,9 +150,8 @@ var (
 			wrappers.IntLen + // validator rewards typeID
 			wrappers.IntLen + // delegator rewards typeID
 			wrappers.IntLen, // delegation shares
-		gas.DBRead:  1,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBRead:  1, // get staking config
+		gas.DBWrite: 3, // put current staker + write weight diff + write pk diff
 	}
 	IntrinsicAddPermissionlessDelegatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -159,9 +159,8 @@ var (
 			ids.IDLen + // subnetID
 			wrappers.IntLen + // num stake outs
 			wrappers.IntLen, // delegator rewards typeID
-		gas.DBRead:  1,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBRead:  1, // get staking config
+		gas.DBWrite: 2, // put current staker + write weight diff
 	}
 	IntrinsicTransferSubnetOwnershipTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -169,9 +168,8 @@ var (
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen + // owner typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  1,
-		gas.DBWrite: 1,
-		gas.Compute: 0,
+		gas.DBRead:  1, // read subnet auth
+		gas.DBWrite: 1, // set subnet owner
 	}
 	IntrinsicBaseTxComplexities = gas.Dimensions{
 		gas.Bandwidth: codec.VersionSize + // codecVersion
@@ -182,9 +180,6 @@ var (
 			wrappers.IntLen + // number of inputs
 			wrappers.IntLen + // length of memo
 			wrappers.IntLen, // number of credentials
-		gas.DBRead:  0,
-		gas.DBWrite: 0,
-		gas.Compute: 0,
 	}
 	IntrinsicConvertSubnetToL1TxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
@@ -194,42 +189,38 @@ var (
 			wrappers.IntLen + // validators length
 			wrappers.IntLen + // subnetAuth typeID
 			wrappers.IntLen, // subnetAuthCredential typeID
-		gas.DBRead:  2, // subnet auth + manager lookup
-		gas.DBWrite: 2, // manager + weight
-		gas.Compute: 0,
+		gas.DBRead:  3, // subnet auth + transformation lookup + conversion lookup
+		gas.DBWrite: 2, // write conversion manager + total weight
 	}
 	IntrinsicRegisterL1ValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.LongLen + // balance
 			bls.SignatureLen + // proof of possession
 			wrappers.IntLen, // message length
-		gas.DBRead:  0, // TODO
-		gas.DBWrite: 0, // TODO
-		gas.Compute: 0, // TODO: Include PoP verification time
+		gas.DBRead:  5, // conversion owner + expiry lookup + sov lookup + subnetID/nodeID lookup + weight lookup
+		gas.DBWrite: 6, // write current staker + expiry + write weight diff + write pk diff + subnetID/nodeID lookup + weight lookup
+		gas.Compute: intrinsicBLSPoPVerifyCompute,
 	}
 	IntrinsicSetL1ValidatorWeightTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			wrappers.IntLen, // message length
-		gas.DBRead:  0, // TODO
-		gas.DBWrite: 0, // TODO
-		gas.Compute: 0,
+		gas.DBRead:  3, // read staker + read conversion + read weight
+		gas.DBWrite: 5, // remaining balance utxo + write weight diff + write pk diff + weights lookup + validator write
 	}
 	IntrinsicIncreaseL1ValidatorBalanceTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // validationID
 			wrappers.LongLen, // balance
-		gas.DBRead:  0, // TODO
-		gas.DBWrite: 0, // TODO
-		gas.Compute: 0,
+		gas.DBRead:  1, // read staker
+		gas.DBWrite: 5, // weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 	IntrinsicDisableL1ValidatorTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // validationID
 			wrappers.IntLen + // auth typeID
 			wrappers.IntLen, // authCredential typeID
-		gas.DBRead:  0, // TODO
-		gas.DBWrite: 0, // TODO
-		gas.Compute: 0,
+		gas.DBRead:  1, // read staker
+		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
 	errUnsupportedOutput = errors.New("unsupported output type")
@@ -279,9 +270,7 @@ func OutputComplexity(outs ...*avax.TransferableOutput) (gas.Dimensions, error) 
 func outputComplexity(out *avax.TransferableOutput) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicOutputBandwidth + intrinsicSECP256k1FxOutputBandwidth,
-		gas.DBRead:    0,
 		gas.DBWrite:   intrinsicOutputDBWrite,
-		gas.Compute:   0,
 	}
 
 	outIntf := out.Out
@@ -327,7 +316,6 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 		gas.Bandwidth: intrinsicInputBandwidth + intrinsicSECP256k1FxTransferableInputBandwidth,
 		gas.DBRead:    intrinsicInputDBRead,
 		gas.DBWrite:   intrinsicInputDBWrite,
-		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
 	inIntf := in.In
@@ -342,11 +330,21 @@ func inputComplexity(in *avax.TransferableInput) (gas.Dimensions, error) {
 	}
 
 	numSignatures := uint64(len(secp256k1In.SigIndices))
+	// Add signature bandwidth
 	signatureBandwidth, err := math.Mul(numSignatures, intrinsicSECP256k1FxSignatureBandwidth)
 	if err != nil {
 		return gas.Dimensions{}, err
 	}
 	complexity[gas.Bandwidth], err = math.Add(complexity[gas.Bandwidth], signatureBandwidth)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
+	// Add signature compute
+	complexity[gas.Compute], err = math.Mul(numSignatures, intrinsicSECP256k1FxSignatureCompute)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
 	return complexity, err
 }
 
@@ -371,9 +369,7 @@ func ConvertSubnetToL1ValidatorComplexity(l1Validators ...*txs.ConvertSubnetToL1
 func convertSubnetToL1ValidatorComplexity(l1Validator *txs.ConvertSubnetToL1Validator) (gas.Dimensions, error) {
 	complexity := gas.Dimensions{
 		gas.Bandwidth: intrinsicConvertSubnetToL1ValidatorBandwidth,
-		gas.DBRead:    0,
 		gas.DBWrite:   intrinsicConvertSubnetToL1ValidatorDBWrite,
-		gas.Compute:   0, // TODO: Add compute complexity
 	}
 
 	signerComplexity, err := SignerComplexity(&l1Validator.Signer)
@@ -418,9 +414,6 @@ func OwnerComplexity(ownerIntf fx.Owner) (gas.Dimensions, error) {
 
 	return gas.Dimensions{
 		gas.Bandwidth: bandwidth,
-		gas.DBRead:    0,
-		gas.DBWrite:   0,
-		gas.Compute:   0,
 	}, nil
 }
 
@@ -445,11 +438,14 @@ func AuthComplexity(authIntf verify.Verifiable) (gas.Dimensions, error) {
 		return gas.Dimensions{}, err
 	}
 
+	signatureCompute, err := math.Mul(numSignatures, intrinsicSECP256k1FxSignatureCompute)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
 	return gas.Dimensions{
 		gas.Bandwidth: bandwidth,
-		gas.DBRead:    0,
-		gas.DBWrite:   0,
-		gas.Compute:   0, // TODO: Add compute complexity
+		gas.Compute:   signatureCompute,
 	}, nil
 }
 
@@ -462,9 +458,7 @@ func SignerComplexity(s signer.Signer) (gas.Dimensions, error) {
 	case *signer.ProofOfPossession:
 		return gas.Dimensions{
 			gas.Bandwidth: intrinsicPoPBandwidth,
-			gas.DBRead:    0,
-			gas.DBWrite:   0,
-			gas.Compute:   0, // TODO: Add compute complexity
+			gas.Compute:   intrinsicBLSPoPVerifyCompute,
 		}, nil
 	default:
 		return gas.Dimensions{}, errUnsupportedSigner
@@ -473,9 +467,29 @@ func SignerComplexity(s signer.Signer) (gas.Dimensions, error) {
 
 // WarpComplexity returns the complexity a warp message adds to a transaction.
 func WarpComplexity(message []byte) (gas.Dimensions, error) {
-	// TODO: Implement me
+	msg, err := warp.ParseMessage(message)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
+	numSigners, err := msg.Signature.NumSigners()
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+	aggregationCompute, err := math.Mul(uint64(numSigners), intrinsicBLSAggregateCompute)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
+	compute, err := math.Add(aggregationCompute, intrinsicBLSVerifyCompute)
+	if err != nil {
+		return gas.Dimensions{}, err
+	}
+
 	return gas.Dimensions{
 		gas.Bandwidth: uint64(len(message)),
+		gas.DBRead:    intrinsicWarpDBReads,
+		gas.Compute:   compute,
 	}, nil
 }
 
@@ -534,9 +548,6 @@ func (c *complexityVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	}
 	dynamicComplexity := gas.Dimensions{
 		gas.Bandwidth: bandwidth,
-		gas.DBRead:    0,
-		gas.DBWrite:   0,
-		gas.Compute:   0,
 	}
 
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
@@ -576,7 +587,6 @@ func (c *complexityVisitor) ImportTx(tx *txs.ImportTx) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Should imported inputs be more complex?
 	inputsComplexity, err := InputComplexity(tx.ImportedInputs...)
 	if err != nil {
 		return err
@@ -593,7 +603,6 @@ func (c *complexityVisitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Should exported outputs be more complex?
 	outputsComplexity, err := OutputComplexity(tx.ExportedOutputs...)
 	if err != nil {
 		return err
@@ -622,7 +631,6 @@ func (c *complexityVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidato
 }
 
 func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	// TODO: Should we include additional complexity for subnets?
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err
@@ -654,7 +662,6 @@ func (c *complexityVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionle
 }
 
 func (c *complexityVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	// TODO: Should we include additional complexity for subnets?
 	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
 	if err != nil {
 		return err

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -147,8 +148,7 @@ func stringMapToEnvVarSlice(mapping map[string]string) []corev1.EnvVar {
 // WaitForNodeHealthy waits for the node running in the specified pod to report healthy.
 func WaitForNodeHealthy(
 	ctx context.Context,
-	// TODO(marun) Use an actual logger
-	logFunc func(format string, args ...interface{}),
+	log logging.Logger,
 	kubeconfig *restclient.Config,
 	namespace string,
 	podName string,
@@ -183,7 +183,9 @@ func WaitForNodeHealthy(
 			return false, err
 		} else if err != nil {
 			// Error is potentially recoverable - log and continue
-			logFunc("Error checking node health: %v", err)
+			log.Debug("failed to check node health",
+				zap.Error(err),
+			)
 			return false, nil
 		}
 		return healthReply.Healthy, nil

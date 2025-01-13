@@ -33,12 +33,12 @@ func (db *Database) NewBatch() database.Batch {
 
 func (b *batch) Put(key, value []byte) error {
 	b.size += len(key) + len(value) + pebbleByteOverHead
-	return b.batch.Set(key, value, pebble.Sync)
+	return b.batch.Set(key, value, b.db.writeOptions)
 }
 
 func (b *batch) Delete(key []byte) error {
 	b.size += len(key) + pebbleByteOverHead
-	return b.batch.Delete(key, pebble.Sync)
+	return b.batch.Delete(key, b.db.writeOptions)
 }
 
 func (b *batch) Size() int {
@@ -67,7 +67,7 @@ func (b *batch) Write() error {
 	}
 
 	b.written = true
-	return updateError(b.batch.Commit(pebble.Sync))
+	return updateError(b.batch.Commit(b.db.writeOptions))
 }
 
 func (b *batch) Reset() {

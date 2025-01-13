@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -453,9 +452,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-						StaticFeeConfig: fee.StaticConfig{
-							AddSubnetValidatorFee: 1,
-						},
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -501,9 +497,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					FlowChecker: flowChecker,
 					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-						StaticFeeConfig: fee.StaticConfig{
-							AddSubnetValidatorFee: 1,
-						},
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,

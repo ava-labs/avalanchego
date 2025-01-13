@@ -22,25 +22,24 @@ func main() {
 
 	ctx := context.Background()
 
-	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
 	// [uri] is hosting and registers [validationID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:           uri,
-		AVAXKeychain:  kc,
-		EthKeychain:   kc,
-		ValidationIDs: []ids.ID{validationID},
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		uri,
+		kc,
+		primary.WalletConfig{
+			ValidationIDs: []ids.ID{validationID},
+		},
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the P-chain wallet
-	pWallet := wallet.P()
-
 	disableL1ValidatorStartTime := time.Now()
-	disableL1ValidatorTx, err := pWallet.IssueDisableL1ValidatorTx(
+	disableL1ValidatorTx, err := wallet.IssueDisableL1ValidatorTx(
 		validationID,
 	)
 	if err != nil {

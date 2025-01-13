@@ -6,13 +6,14 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"log"
+	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/subnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
@@ -36,7 +38,8 @@ const (
 )
 
 func main() {
-	tc := tests.NewTestContext()
+	// TODO(marun) Support choosing the log format
+	tc := tests.NewTestContext(tests.NewDefaultLogger(""))
 	defer tc.Cleanup()
 	require := require.New(tc)
 
@@ -54,14 +57,19 @@ func main() {
 	ctx := tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
 
 	require.Len(c.ChainIDs, 1)
-	log.Printf("CHAIN IDS: %v", c.ChainIDs)
+	tc.Log().Debug("raw chain ID",
+		zap.String("chainID", c.ChainIDs[0]),
+	)
 	chainID, err := ids.FromString(c.ChainIDs[0])
 	require.NoError(err, "failed to parse chainID")
-
-	log.Printf("Using uris %v and chainID %s", c.URIs, chainID)
+	tc.Log().Info("node and chain configuration",
+		zap.Stringer("chainID", chainID),
+		zap.Strings("uris", c.URIs),
+	)
 
 	genesisWorkload := &workload{
 		id:      0,
+		log:     tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
 		chainID: chainID,
 		key:     genesis.VMRQKey,
 		addrs:   set.Of(genesis.VMRQKey.Address()),
@@ -92,12 +100,16 @@ func main() {
 			},
 		)
 		require.NoError(err, "failed to issue initial funding transfer")
-		log.Printf("issued initial funding transfer %s in %s", transferTxStatus.TxID, time.Since(baseStartTime))
+		tc.Log().Info("issued initial funding transfer",
+			zap.Stringer("txID", transferTxStatus.TxID),
+			zap.Duration("duration", time.Since(baseStartTime)),
+		)
 
 		genesisWorkload.confirmTransferTx(ctx, transferTxStatus)
 
 		workloads[i] = &workload{
 			id:      i,
+			log:     tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
 			chainID: chainID,
 			key:     key,
 			addrs:   set.Of(addr),
@@ -118,6 +130,7 @@ func main() {
 
 type workload struct {
 	id      int
+	log     logging.Logger
 	chainID ids.ID
 	key     *secp256k1.PrivateKey
 	addrs   set.Set[ids.ShortID]
@@ -127,7 +140,7 @@ type workload struct {
 func (w *workload) run(ctx context.Context) {
 	timer := timerpkg.StoppedTimer()
 
-	tc := tests.NewTestContext()
+	tc := tests.NewTestContext(w.log)
 	defer tc.Cleanup()
 	require := require.New(tc)
 
@@ -136,14 +149,19 @@ func (w *workload) run(ctx context.Context) {
 	client := api.NewClient(uri, w.chainID.String())
 	balance, err := client.Balance(ctx, w.key.Address(), w.chainID)
 	require.NoError(err, "failed to fetch balance")
-	log.Printf("worker %d starting with a balance of %d", w.id, balance)
+	w.log.Info("worker starting",
+		zap.Int("worker", w.id),
+		zap.Uint64("balance", balance),
+	)
 	assert.Reachable("worker starting", map[string]any{
 		"worker":  w.id,
 		"balance": balance,
 	})
 
 	for {
-		log.Printf("worker %d executing transfer", w.id)
+		w.log.Info("executing transfer",
+			zap.Int("worker", w.id),
+		)
 		destAddress, _ := w.addrs.Peek()
 		txStatus, err := transfer.Transfer(
 			ctx,
@@ -157,9 +175,16 @@ func (w *workload) run(ctx context.Context) {
 			},
 		)
 		if err != nil {
-			log.Printf("worker %d failed to issue transfer: %s", w.id, err)
+			w.log.Warn("failed to issue transfer",
+				zap.Int("worker", w.id),
+				zap.Error(err),
+			)
 		} else {
-			log.Printf("worker %d issued transfer %s in %s", w.id, txStatus.TxID, time.Since(txStatus.StartTime))
+			w.log.Info("issued transfer",
+				zap.Int("worker", w.id),
+				zap.Stringer("txID", txStatus.TxID),
+				zap.Duration("duration", time.Since(txStatus.StartTime)),
+			)
 			w.confirmTransferTx(ctx, txStatus)
 		}
 
@@ -179,9 +204,17 @@ func (w *workload) confirmTransferTx(ctx context.Context, tx *status.TxIssuance)
 	for _, uri := range w.uris {
 		client := api.NewClient(uri, w.chainID.String())
 		if err := api.AwaitTxAccepted(ctx, client, w.key.Address(), tx.Nonce, PollingInterval); err != nil {
-			log.Printf("worker %d failed to confirm transaction %s on %s: %s", w.id, tx.TxID, uri, err)
+			w.log.Warn("failed to confirm transaction",
+				zap.Int("worker", w.id),
+				zap.Stringer("txID", tx.TxID),
+				zap.String("uri", uri),
+				zap.Error(err),
+			)
 			return
 		}
 	}
-	log.Printf("worker %d confirmed transaction %s on all nodes", w.id, tx.TxID)
+	w.log.Info("confirmed transaction on all nodes",
+		zap.Int("worker", w.id),
+		zap.Stringer("txID", tx.TxID),
+	)
 }

@@ -173,10 +173,7 @@ func (v *verifier) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		return err
 	}
 
-	var (
-		timestamp     = onCommitState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
-	)
+	feeCalculator := txfee.NewSimpleCalculator(0)
 	return v.proposalBlock(
 		b,
 		b.Tx,
@@ -202,10 +199,7 @@ func (v *verifier) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
 		return err
 	}
 
-	var (
-		timestamp     = onAcceptState.GetTimestamp() // Equal to parent timestamp
-		feeCalculator = state.NewStaticFeeCalculator(v.txExecutorBackend.Config, timestamp)
-	)
+	feeCalculator := txfee.NewSimpleCalculator(0)
 	return v.standardBlock(
 		b,
 		b.Transactions,
@@ -233,7 +227,7 @@ func (v *verifier) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
-	feeCalculator := state.NewStaticFeeCalculator(v.txExecutorBackend.Config, currentTimestamp)
+	feeCalculator := txfee.NewSimpleCalculator(0)
 	onAcceptState, atomicInputs, atomicRequests, err := executor.AtomicTx(
 		v.txExecutorBackend,
 		feeCalculator,
@@ -525,14 +519,14 @@ func (v *verifier) processStandardTxs(txs []*txs.Tx, feeCalculator txfee.Calcula
 
 			blockComplexity, err = blockComplexity.Add(&txComplexity)
 			if err != nil {
-				return nil, nil, nil, 0, err
+				return nil, nil, nil, 0, fmt.Errorf("block complexity overflow: %w", err)
 			}
 		}
 
 		var err error
 		gasConsumed, err = blockComplexity.ToGas(v.txExecutorBackend.Config.DynamicFeeConfig.Weights)
 		if err != nil {
-			return nil, nil, nil, 0, err
+			return nil, nil, nil, 0, fmt.Errorf("block gas overflow: %w", err)
 		}
 
 		// If this block exceeds the available capacity, ConsumeGas will return

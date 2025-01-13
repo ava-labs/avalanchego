@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const Alias = "P"
@@ -17,7 +16,6 @@ const Alias = "P"
 type Context struct {
 	NetworkID         uint32
 	AVAXAssetID       ids.ID
-	StaticFeeConfig   fee.StaticConfig
 	ComplexityWeights gas.Dimensions
 	GasPrice          gas.Price
 }

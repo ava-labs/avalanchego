@@ -712,7 +712,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			SubnetID:       tx.Subnet,
 			ManagerChainID: tx.ChainID,
 			ManagerAddress: tx.Address,
-			Validators:     make([]message.SubnetToL1ConverstionValidatorData, len(tx.Validators)),
+			Validators:     make([]message.SubnetToL1ConversionValidatorData, len(tx.Validators)),
 		}
 	)
 	for i, vdr := range tx.Validators {
@@ -763,7 +763,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 			return err
 		}
 
-		subnetToL1ConversionData.Validators[i] = message.SubnetToL1ConverstionValidatorData{
+		subnetToL1ConversionData.Validators[i] = message.SubnetToL1ConversionValidatorData{
 			NodeID:       vdr.NodeID,
 			BLSPublicKey: vdr.Signer.PublicKey,
 			Weight:       vdr.Weight,

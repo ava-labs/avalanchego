@@ -111,7 +111,7 @@ func newRawTestPeer(t *testing.T, config Config) *rawTestPeer {
 		1,
 	))
 	tls := tlsCert.PrivateKey.(crypto.Signer)
-	bls, err := bls.NewSecretKey()
+	bls, err := bls.NewSigner()
 	require.NoError(err)
 
 	config.IPSigner = NewIPSigner(ip, tls, bls)
@@ -322,17 +322,17 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require.NoError(rawPeer0.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
 		rawPeer1.config.MyNodeID,
-		bls.PublicFromSecretKey(rawPeer1.config.IPSigner.blsSigner),
+		rawPeer1.config.IPSigner.blsSigner.PublicKey(),
 		ids.GenerateTestID(),
 		1,
 	))
 
-	bogusBLSKey, err := bls.NewSecretKey()
+	bogusBLSKey, err := bls.NewSigner()
 	require.NoError(err)
 	require.NoError(rawPeer1.config.Validators.AddStaker(
 		constants.PrimaryNetworkID,
 		rawPeer0.config.MyNodeID,
-		bls.PublicFromSecretKey(bogusBLSKey), // This is the wrong BLS key for this peer
+		bogusBLSKey.PublicKey(), // This is the wrong BLS key for this peer
 		ids.GenerateTestID(),
 		1,
 	))
@@ -348,7 +348,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 func TestShouldDisconnect(t *testing.T) {
 	peerID := ids.GenerateTestNodeID()
 	txID := ids.GenerateTestID()
-	blsKey, err := bls.NewSecretKey()
+	blsKey, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -458,7 +458,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -478,7 +478,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -502,7 +502,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -522,7 +522,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -546,7 +546,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -556,7 +556,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: bls.SignProofOfPossession(blsKey, []byte("wrong message")),
+					BLSSignature: blsKey.SignProofOfPossession([]byte("wrong message")),
 				},
 			},
 			expectedPeer: &peer{
@@ -568,7 +568,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -578,7 +578,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: bls.SignProofOfPossession(blsKey, []byte("wrong message")),
+					BLSSignature: blsKey.SignProofOfPossession([]byte("wrong message")),
 				},
 			},
 			expectedShouldDisconnect: true,
@@ -594,7 +594,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -604,7 +604,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: bls.SignProofOfPossession(blsKey, (&UnsignedIP{}).bytes()),
+					BLSSignature: blsKey.SignProofOfPossession((&UnsignedIP{}).bytes()),
 				},
 			},
 			expectedPeer: &peer{
@@ -616,7 +616,7 @@ func TestShouldDisconnect(t *testing.T) {
 						require.NoError(t, vdrs.AddStaker(
 							constants.PrimaryNetworkID,
 							peerID,
-							bls.PublicFromSecretKey(blsKey),
+							blsKey.PublicKey(),
 							txID,
 							1,
 						))
@@ -626,7 +626,7 @@ func TestShouldDisconnect(t *testing.T) {
 				id:      peerID,
 				version: version.CurrentApp,
 				ip: &SignedIP{
-					BLSSignature: bls.SignProofOfPossession(blsKey, (&UnsignedIP{}).bytes()),
+					BLSSignature: blsKey.SignProofOfPossession((&UnsignedIP{}).bytes()),
 				},
 				txIDOfVerifiedBLSKey: txID,
 			},

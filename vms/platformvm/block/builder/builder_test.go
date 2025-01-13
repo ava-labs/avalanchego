@@ -112,7 +112,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		validatorEndTime      = validatorStartTime.Add(360 * 24 * time.Hour)
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardOwners := &secp256k1fx.OutputOwners{
@@ -320,7 +320,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 		validatorEndTime = now.Add(env.config.MaxStakeDuration)
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -353,7 +353,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	// Add a validator ending past [MaxStakeDuration]
 	validator2EndTime := now.Add(env.config.MaxStakeDuration + time.Second)
 
-	sk, err = bls.NewSecretKey()
+	sk, err = bls.NewSigner()
 	require.NoError(err)
 
 	tx2, err := wallet.IssueAddPermissionlessValidatorTx(

@@ -38,22 +38,21 @@ func createFunc(c *cobra.Command, args []string) error {
 	ctx := c.Context()
 	kc := secp256k1fx.NewKeychain(config.PrivateKey)
 
-	// NewWalletFromURI fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting.
+	// MakePWallet fetches the available UTXOs owned by [kc] on the P-chain that
+	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          config.URI,
-		AVAXKeychain: kc,
-		EthKeychain:  kc,
-		SubnetIDs:    []ids.ID{config.SubnetID},
-	})
+	wallet, err := primary.MakePWallet(
+		ctx,
+		config.URI,
+		kc,
+		primary.WalletConfig{
+			SubnetIDs: []ids.ID{config.SubnetID},
+		},
+	)
 	if err != nil {
 		return err
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
-
-	// Get the P-chain wallet
-	pWallet := wallet.P()
 
 	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
 		Timestamp: 0,
@@ -69,7 +68,7 @@ func createFunc(c *cobra.Command, args []string) error {
 	}
 
 	createChainStartTime := time.Now()
-	createChainTxID, err := pWallet.IssueCreateChainTx(
+	createChainTxID, err := wallet.IssueCreateChainTx(
 		config.SubnetID,
 		genesisBytes,
 		constants.XSVMID,

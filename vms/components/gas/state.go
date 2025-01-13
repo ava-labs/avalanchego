@@ -5,6 +5,7 @@ package gas
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -44,7 +45,7 @@ func (s State) AdvanceTime(
 func (s State) ConsumeGas(gas Gas) (State, error) {
 	newCapacity, err := safemath.Sub(uint64(s.Capacity), uint64(gas))
 	if err != nil {
-		return State{}, ErrInsufficientCapacity
+		return State{}, fmt.Errorf("%w: capacity (%d) < gas (%d)", ErrInsufficientCapacity, s.Capacity, gas)
 	}
 
 	newExcess, err := safemath.Add(uint64(s.Excess), uint64(gas))

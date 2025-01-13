@@ -6,7 +6,6 @@ package txs
 import (
 	"encoding/hex"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -540,17 +539,13 @@ func TestConvertSubnetToL1TxSerialization(t *testing.T) {
 
 			txJSON, err := json.MarshalIndent(test.tx, "", "\t")
 			require.NoError(err)
-			require.Equal(
-				// Normalize newlines for Windows
-				strings.ReplaceAll(string(test.expectedJSON), "\r\n", "\n"),
-				string(txJSON),
-			)
+			require.JSONEq(string(test.expectedJSON), string(txJSON))
 		})
 	}
 }
 
 func TestConvertSubnetToL1TxSyntacticVerify(t *testing.T) {
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(t, err)
 
 	var (

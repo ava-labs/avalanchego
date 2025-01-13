@@ -56,7 +56,6 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	}
 
 	for _, result := range results {
-		result := result
 		v.e.Ctx.Log.Debug("finishing poll",
 			zap.Stringer("result", &result),
 		)

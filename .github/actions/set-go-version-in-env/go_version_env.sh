@@ -11,4 +11,4 @@ set -euo pipefail
 # 3 directories above this script
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../../.. && pwd )
 
-echo GO_VERSION="~$(sed -n -e 's/^go //p' "${AVALANCHE_PATH}"/go.mod)"
+echo GO_VERSION="$(sed -n -e 's/^go //p' "${AVALANCHE_PATH}"/go.mod)"

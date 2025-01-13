@@ -109,7 +109,7 @@ func addPrimaryValidator(
 	endTime time.Time,
 	height uint64,
 ) (ids.NodeID, error) {
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}
@@ -118,7 +118,7 @@ func addPrimaryValidator(
 	if err := s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
-		PublicKey:       bls.PublicFromSecretKey(sk),
+		PublicKey:       sk.PublicKey(),
 		SubnetID:        constants.PrimaryNetworkID,
 		Weight:          2 * units.MegaAvax,
 		StartTime:       startTime,

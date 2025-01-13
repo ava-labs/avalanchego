@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -108,6 +109,11 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	}
 
 	if err := g.txVerifier.VerifyTx(tx); err != nil {
+		g.log.Debug("transaction failed verification",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		g.Mempool.MarkDropped(txID, err)
 		return fmt.Errorf("failed verification: %w", err)
 	}

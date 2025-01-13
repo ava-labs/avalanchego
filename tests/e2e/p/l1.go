@@ -13,9 +13,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -44,6 +44,7 @@ import (
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	platformvmpb "github.com/ava-labs/avalanchego/proto/pb/platformvm"
 	snowvalidators "github.com/ava-labs/avalanchego/snow/validators"
+	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	platformvmvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	warpmessage "github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
@@ -68,17 +69,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 	ginkgo.It("creates and updates L1 validators", func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
-
-		tc.By("verifying Etna is activated", func() {
-			infoClient := info.NewClient(nodeURI.URI)
-			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
-			require.NoError(err)
-
-			now := time.Now()
-			if !upgrades.IsEtnaActivated(now) {
-				ginkgo.Skip("Etna is not activated. L1s are enabled post-Etna, skipping test.")
-			}
-		})
 
 		tc.By("loading the wallet")
 		var (
@@ -156,7 +146,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			height, err := pClient.GetHeight(tc.DefaultContext())
 			require.NoError(err)
 
-			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, height)
+			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, platformapi.Height(height))
 			require.NoError(err)
 			require.Equal(expectedValidators, subnetValidators)
 		}
@@ -202,7 +192,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			subnetGenesisNode.StakingAddress,
 			networkID,
 			router.InboundHandlerFunc(func(_ context.Context, m p2pmessage.InboundMessage) {
-				tc.Outf("received %s %s from %s\n", m.Op(), m.Message(), m.NodeID())
+				tc.Log().Info("received a message",
+					zap.Stringer("op", m.Op()),
+					zap.Stringer("message", m.Message()),
+					zap.Stringer("from", m.NodeID()),
+				)
 				genesisPeerMessages.PushRight(m)
 			}),
 		)
@@ -249,7 +243,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				SubnetID:       subnetID,
 				ManagerChainID: chainID,
 				ManagerAddress: address,
-				Validators: []warpmessage.SubnetToL1ConverstionValidatorData{
+				Validators: []warpmessage.SubnetToL1ConversionValidatorData{
 					{
 						NodeID:       subnetGenesisNode.NodeID.Bytes(),
 						BLSPublicKey: genesisNodePoP.PublicKey,

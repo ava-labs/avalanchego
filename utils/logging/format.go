@@ -14,14 +14,29 @@ import (
 
 // Format modes available
 const (
-	Plain Format = iota
+	Auto Format = iota
+	Plain
 	Colors
 	JSON
+
+	AutoString   = "auto"
+	PlainString  = "plain"
+	ColorsString = "colors"
+	JSONString   = "json"
+
+	FormatDescription = "The structure of log format. Defaults to 'auto' which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of {auto, plain, colors, json}"
 
 	termTimeFormat = "[01-02|15:04:05.000]"
 )
 
 var (
+	formatJSON = []string{
+		`"auto"`,
+		`"plain"`,
+		`"colors"`,
+		`"json"`,
+	}
+
 	errUnknownFormat = errors.New("unknown format")
 
 	defaultEncoderConfig = zapcore.EncoderConfig{
@@ -51,34 +66,28 @@ type Format int
 
 // ToFormat chooses a highlighting mode
 func ToFormat(h string, fd uintptr) (Format, error) {
-	switch strings.ToUpper(h) {
-	case "PLAIN":
-		return Plain, nil
-	case "COLORS":
-		return Colors, nil
-	case "JSON":
-		return JSON, nil
-	case "AUTO":
+	switch strings.ToLower(h) {
+	case AutoString:
 		if !term.IsTerminal(int(fd)) {
 			return Plain, nil
 		}
 		return Colors, nil
+	case PlainString:
+		return Plain, nil
+	case ColorsString:
+		return Colors, nil
+	case JSONString:
+		return JSON, nil
 	default:
 		return Plain, fmt.Errorf("unknown format mode: %s", h)
 	}
 }
 
 func (f Format) MarshalJSON() ([]byte, error) {
-	switch f {
-	case Plain:
-		return []byte(`"PLAIN"`), nil
-	case Colors:
-		return []byte(`"COLORS"`), nil
-	case JSON:
-		return []byte(`"JSON"`), nil
-	default:
+	if f < 0 || int(f) >= len(formatJSON) {
 		return nil, errUnknownFormat
 	}
+	return []byte(formatJSON[f]), nil
 }
 
 func (f Format) WrapPrefix(prefix string) string {
@@ -91,7 +100,7 @@ func (f Format) WrapPrefix(prefix string) string {
 func (f Format) ConsoleEncoder() zapcore.Encoder {
 	switch f {
 	case Colors:
-		return zapcore.NewConsoleEncoder(newTermEncoderConfig(consoleColorLevelEncoder))
+		return zapcore.NewConsoleEncoder(newTermEncoderConfig(ConsoleColorLevelEncoder))
 	case JSON:
 		return zapcore.NewJSONEncoder(jsonEncoderConfig)
 	default:
@@ -124,7 +133,7 @@ func jsonLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(Level(l).LowerString())
 }
 
-func consoleColorLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+func ConsoleColorLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 	s, ok := levelToCapitalColorString[Level(l)]
 	if !ok {
 		s = unknownLevelColor.Wrap(l.String())

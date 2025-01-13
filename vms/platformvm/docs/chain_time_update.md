@@ -20,7 +20,7 @@ Before the Banff fork activation, `ChainTime` was incremented by an `AdvanceTime
 2. *Synchronicity*: proposed time must not be greater than node’s current time plus a synchronicity bound (currently set to 10 seconds).
 3. *No Skipping*: proposed time must be less than or equal to the next staking event, that is start/end of any staker.
 
-Note that *Synchronicity* makes sure that `ChainTime` approximates “real” time flow. If we dropped synchronicity requirement, a staker could declare any staking time and immediately push `ChainTime` to the end, so as to pocket a reward without having actually carried out any activity in the “real” time.
+Note that *Synchronicity* makes sure that `ChainTime` approximates "real" time flow. If we dropped synchronicity requirement, a staker could declare any staking time and immediately push `ChainTime` to the end, so as to pocket a reward without having actually carried out any activity in the "real" time.
 
 ## Post Banff fork context
 

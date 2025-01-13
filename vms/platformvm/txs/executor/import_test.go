@@ -50,9 +50,7 @@ func TestNewImportTx(t *testing.T) {
 				env,
 				sourceKey,
 				env.ctx.XChainID,
-				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee - 1,
-				},
+				map[ids.ID]uint64{},
 				randSrc,
 			),
 			expectedErr: builder.ErrInsufficientFunds,
@@ -66,7 +64,7 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee,
+					env.ctx.AVAXAssetID: 1,
 				},
 				randSrc,
 			),
@@ -81,7 +79,7 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.CChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee,
+					env.ctx.AVAXAssetID: 1,
 				},
 				randSrc,
 			),
@@ -97,8 +95,7 @@ func TestNewImportTx(t *testing.T) {
 				sourceKey,
 				env.ctx.XChainID,
 				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: env.config.StaticFeeConfig.TxFee,
-					customAssetID:       1,
+					customAssetID: 1,
 				},
 				randSrc,
 			),
@@ -148,7 +145,7 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			require.Equal(env.config.StaticFeeConfig.TxFee, totalIn-totalOut)
+			require.Equal(totalIn, totalOut)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

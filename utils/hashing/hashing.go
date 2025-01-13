@@ -9,7 +9,14 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/ripemd160"
+	// This file generates addresses from public keys with ripemd160. Though ripemd160 is not
+	// generally recommended for use, the small size of the public key input is considered harder to
+	// attack than larger payloads.
+	//
+	// Bitcoin similarly uses ripemd160 to generate addresses from public keys.
+	//
+	// Reference: https://online.tugraz.at/tug_online/voe_main2.getvolltext?pCurrPk=17675
+	"golang.org/x/crypto/ripemd160" //nolint:gosec
 )
 
 const (
@@ -51,7 +58,9 @@ func ComputeHash160Array(buf []byte) Hash160 {
 // ComputeHash160 computes a cryptographically strong 160 bit hash of the input
 // byte slice.
 func ComputeHash160(buf []byte) []byte {
-	ripe := ripemd160.New()
+	// See the comment on the ripemd160 import as to why the risk of use is
+	// considered acceptable.
+	ripe := ripemd160.New() //nolint:gosec
 	_, err := io.Writer(ripe).Write(buf)
 	if err != nil {
 		panic(err)

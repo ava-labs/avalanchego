@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
@@ -166,6 +168,10 @@ func (k *PublicKey) Address() ids.ShortID {
 	return k.addr
 }
 
+func (k *PublicKey) EthAddress() common.Address {
+	return crypto.PubkeyToAddress(*(k.ToECDSA()))
+}
+
 func (k *PublicKey) Bytes() []byte {
 	if k.bytes == nil {
 		k.bytes = k.pk.SerializeCompressed()
@@ -188,6 +194,10 @@ func (k *PrivateKey) PublicKey() *PublicKey {
 
 func (k *PrivateKey) Address() ids.ShortID {
 	return k.PublicKey().Address()
+}
+
+func (k *PrivateKey) EthAddress() common.Address {
+	return crypto.PubkeyToAddress(*(k.PublicKey().ToECDSA()))
 }
 
 func (k *PrivateKey) Sign(msg []byte) ([]byte, error) {

@@ -151,7 +151,7 @@ type Prefetcher interface {
 type MerkleDB interface {
 	database.Database
 	Clearer
-	Trie
+	View
 	MerkleRootGetter
 	ProofGetter
 	ChangeProofer

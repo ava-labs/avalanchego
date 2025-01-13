@@ -20,12 +20,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -47,10 +47,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
-
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 const (
@@ -645,9 +643,9 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 }
 
-func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
+func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
 	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := bls.NewSecretKey()
+		key, err := bls.NewSigner()
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
 		}
@@ -685,7 +683,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		return nil, errMissingStakingSigningKeyFile
 	}
 
-	key, err := bls.NewSecretKey()
+	key, err := bls.NewSigner()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
 	}
@@ -694,7 +692,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
 	}
 
-	keyBytes := bls.SecretKeyToBytes(key)
+	keyBytes := key.ToBytes()
 	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
 		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
 	}
@@ -770,16 +768,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		return genesis.TxFeeConfig{
 			CreateAssetTxFee: v.GetUint64(CreateAssetTxFeeKey),
-			StaticFeeConfig: txfee.StaticConfig{
-				TxFee:                         v.GetUint64(TxFeeKey),
-				CreateSubnetTxFee:             v.GetUint64(CreateSubnetTxFeeKey),
-				TransformSubnetTxFee:          v.GetUint64(TransformSubnetTxFeeKey),
-				CreateBlockchainTxFee:         v.GetUint64(CreateBlockchainTxFeeKey),
-				AddPrimaryNetworkValidatorFee: v.GetUint64(AddPrimaryNetworkValidatorFeeKey),
-				AddPrimaryNetworkDelegatorFee: v.GetUint64(AddPrimaryNetworkDelegatorFeeKey),
-				AddSubnetValidatorFee:         v.GetUint64(AddSubnetValidatorFeeKey),
-				AddSubnetDelegatorFee:         v.GetUint64(AddSubnetDelegatorFeeKey),
-			},
+			TxFee:            v.GetUint64(TxFeeKey),
 			DynamicFeeConfig: gas.Config{
 				Weights: gas.Dimensions{
 					gas.Bandwidth: v.GetUint64(DynamicFeesBandwidthWeightKey),
@@ -793,7 +782,7 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 				MinPrice:                 gas.Price(v.GetUint64(DynamicFeesMinGasPriceKey)),
 				ExcessConversionConstant: gas.Gas(v.GetUint64(DynamicFeesExcessConversionConstantKey)),
 			},
-			ValidatorFeeConfig: validatorfee.Config{
+			ValidatorFeeConfig: fee.Config{
 				Capacity:                 gas.Gas(v.GetUint64(ValidatorFeesCapacityKey)),
 				Target:                   gas.Gas(v.GetUint64(ValidatorFeesTargetKey)),
 				MinPrice:                 gas.Price(v.GetUint64(ValidatorFeesMinPriceKey)),

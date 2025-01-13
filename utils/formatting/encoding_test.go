@@ -17,7 +17,7 @@ func TestEncodingMarshalJSON(t *testing.T) {
 	enc := Hex
 	jsonBytes, err := enc.MarshalJSON()
 	require.NoError(err)
-	require.Equal(`"hex"`, string(jsonBytes))
+	require.JSONEq(`"hex"`, string(jsonBytes))
 }
 
 func TestEncodingUnmarshalJSON(t *testing.T) {

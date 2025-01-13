@@ -16,9 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
-	validatorfee "github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
 // Internal contains all of the parameters for the PlatformVM that are
@@ -35,15 +33,11 @@ type Internal struct {
 	//            calling VM.Initialize.
 	Validators validators.Manager
 
-	// Static fees are active before Etna
-	CreateAssetTxFee uint64 // Override for CreateSubnet and CreateChain before AP3
-	StaticFeeConfig  txfee.StaticConfig
-
 	// Dynamic fees are active after Etna
 	DynamicFeeConfig gas.Config
 
 	// ACP-77 validator fees are active after Etna
-	ValidatorFeeConfig validatorfee.Config
+	ValidatorFeeConfig fee.Config
 
 	// Provides access to the uptime manager as a thread safe data structure
 	UptimeLockedCalculator uptime.LockedCalculator
