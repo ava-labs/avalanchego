@@ -6,7 +6,6 @@ package params
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/coreth/predicate"
 )
 
@@ -16,8 +15,6 @@ const (
 	// transaction to be valid, measured in wei
 	LaunchMinGasPrice        int64 = 470 * GWei
 	ApricotPhase1MinGasPrice int64 = 225 * GWei
-
-	AvalancheAtomicTxFee = units.MilliAvax
 
 	ApricotPhase1GasLimit uint64 = 8_000_000
 	CortinaGasLimit       uint64 = 15_000_000
@@ -37,9 +34,6 @@ const (
 	// After Durango, the extra data past the dynamic fee rollup window represents predicate results.
 	DynamicFeeExtraDataSize        = predicate.DynamicFeeExtraDataSize
 	RollupWindow            uint64 = 10
-
-	// The base cost to charge per atomic transaction. Added in Apricot Phase 5.
-	AtomicTxBaseCost uint64 = 10_000
 )
 
 // The atomic gas limit specifies the maximum amount of gas that can be consumed by the atomic
