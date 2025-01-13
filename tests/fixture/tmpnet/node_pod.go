@@ -137,6 +137,8 @@ func (p *NodePod) getFlagsForPod() FlagsMap {
 
 // Start the node as a kubernetes statefulset.
 func (p *NodePod) Start(ctx context.Context) error {
+	// TODO(marun) Handle the case where the target namespace doesn't exist
+
 	// Create a statefulset for the pod and wait for it to become ready
 	runtimeConfig := p.runtimeConfig()
 	statefulSet := NewNodeStatefulSet(
