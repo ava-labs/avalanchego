@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"slices"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/holiman/uint256"
 
@@ -151,7 +150,7 @@ func (utx *UnsignedImportTx) GasUsed(fixedFee bool) (uint64, error) {
 		}
 	}
 	if fixedFee {
-		cost, err = math.Add64(cost, params.AtomicTxBaseCost)
+		cost, err = math.Add64(cost, AtomicTxBaseCost)
 		if err != nil {
 			return 0, err
 		}
@@ -216,7 +215,7 @@ func (utx *UnsignedImportTx) SemanticVerify(
 
 	// Apply fees to import transactions as of Apricot Phase 2
 	case rules.IsApricotPhase2:
-		fc.Produce(ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
+		fc.Produce(ctx.AVAXAssetID, AvalancheAtomicTxFee)
 	}
 	for _, out := range utx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
@@ -378,8 +377,8 @@ func NewImportTx(
 			return nil, err
 		}
 	case rules.IsApricotPhase2:
-		txFeeWithoutChange = params.AvalancheAtomicTxFee
-		txFeeWithChange = params.AvalancheAtomicTxFee
+		txFeeWithoutChange = AvalancheAtomicTxFee
+		txFeeWithChange = AvalancheAtomicTxFee
 	}
 
 	// AVAX output

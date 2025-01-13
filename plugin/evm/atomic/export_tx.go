@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/holiman/uint256"
 
@@ -143,7 +142,7 @@ func (utx *UnsignedExportTx) GasUsed(fixedFee bool) (uint64, error) {
 		return 0, err
 	}
 	if fixedFee {
-		cost, err = math.Add64(cost, params.AtomicTxBaseCost)
+		cost, err = math.Add64(cost, AtomicTxBaseCost)
 		if err != nil {
 			return 0, err
 		}
@@ -208,7 +207,7 @@ func (utx *UnsignedExportTx) SemanticVerify(
 		fc.Produce(ctx.AVAXAssetID, txFee)
 	// Apply fees to export transactions before Apricot Phase 3
 	default:
-		fc.Produce(ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
+		fc.Produce(ctx.AVAXAssetID, AvalancheAtomicTxFee)
 	}
 	for _, out := range utx.ExportedOutputs {
 		fc.Produce(out.AssetID(), out.Output().Amount())
@@ -347,7 +346,7 @@ func NewExportTx(
 		avaxIns, avaxSigners, err = GetSpendableAVAXWithFee(ctx, state, keys, avaxNeeded, cost, baseFee)
 	default:
 		var newAvaxNeeded uint64
-		newAvaxNeeded, err = math.Add64(avaxNeeded, params.AvalancheAtomicTxFee)
+		newAvaxNeeded, err = math.Add64(avaxNeeded, AvalancheAtomicTxFee)
 		if err != nil {
 			return nil, errOverflowExport
 		}

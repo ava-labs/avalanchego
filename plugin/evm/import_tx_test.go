@@ -105,7 +105,7 @@ func TestImportTxVerify(t *testing.T) {
 		Outs: []atomic.EVMOutput{
 			{
 				Address: testEthAddrs[0],
-				Amount:  importAmount - params.AvalancheAtomicTxFee,
+				Amount:  importAmount - atomic.AvalancheAtomicTxFee,
 				AssetID: ctx.AVAXAssetID,
 			},
 			{
