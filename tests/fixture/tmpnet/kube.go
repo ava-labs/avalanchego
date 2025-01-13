@@ -74,6 +74,10 @@ func NewNodeStatefulSet(
 		"app": name,
 	}
 	for label, value := range labels {
+		// TODO(marun) Avoid requiring this hack by using annotations instead of labels
+		if label == "repo" {
+			value = strings.ReplaceAll(value, "/", "_")
+		}
 		podLabels[label] = value
 	}
 
