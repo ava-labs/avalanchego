@@ -989,10 +989,10 @@ avm.getBlockByHeight({
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "avm.getBlockByHeight”,
+    "method": "avm.getBlockByHeight",
     "params": {
-        “height”: “275686313486”,
-        "encoding": “hex”
+        "height": "275686313486",
+        "encoding": "hex"
     },
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
@@ -1176,6 +1176,47 @@ Most outputs use the secp256k1 FX, look like this:
 
 The above output can be consumed after Unix time `locktime` by a transaction that has signatures
 from `threshold` of the addresses in `addresses`.
+
+### `avm.getTxFee`
+
+Get the fees of the network.
+
+**Signature**:
+
+```
+avm.getTxFee() ->
+{
+  txFee: uint64,
+  createAssetTxFee: uint64,
+}
+```
+
+- `txFee` is the default fee for making transactions.
+- `createAssetTxFee` is the fee for creating a new asset.
+
+All fees are denominated in nAVAX.
+
+**Example Call**:
+
+```sh
+curl -X POST --data '{
+    "jsonrpc":"2.0",
+    "id"     : 1,
+    "method" :"avm.getTxFee",
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/X
+```
+
+**Example Response**:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "txFee": "1000000",
+    "createAssetTxFee": "10000000"
+  }
+}
+```
 
 ### `avm.getTxStatus`
 
@@ -2197,123 +2238,4 @@ curl -X POST --data '{
     "changeAddr": "X-avax1turszjwn05lflpewurw96rfrd3h6x8flgs5uf8"
   }
 }
-```
-
-### Events
-
-Listen for transactions on a specified address.
-
-This call is made to the events API endpoint:
-
-`/ext/bc/X/events`
-
-:::caution
-
-Endpoint deprecated as of [**v1.9.12**](https://github.com/ava-labs/avalanchego/releases/tag/v1.9.12).
-
-:::
-
-#### **Golang Example**
-
-```go
-package main
-
-import (
-    "encoding/json"
-    "log"
-    "net"
-    "net/http"
-    "sync"
-
-    "github.com/ava-labs/avalanchego/api"
-    "github.com/ava-labs/avalanchego/pubsub"
-    "github.com/gorilla/websocket"
-)
-
-func main() {
-    dialer := websocket.Dialer{
-        NetDial: func(netw, addr string) (net.Conn, error) {
-            return net.Dial(netw, addr)
-        },
-    }
-
-    httpHeader := http.Header{}
-    conn, _, err := dialer.Dial("ws://localhost:9650/ext/bc/X/events", httpHeader)
-    if err != nil {
-        panic(err)
-    }
-
-    waitGroup := &sync.WaitGroup{}
-    waitGroup.Add(1)
-
-    readMsg := func() {
-        defer waitGroup.Done()
-
-        for {
-            mt, msg, err := conn.ReadMessage()
-            if err != nil {
-                log.Println(err)
-                return
-            }
-            switch mt {
-            case websocket.TextMessage:
-                log.Println(string(msg))
-            default:
-                log.Println(mt, string(msg))
-            }
-        }
-    }
-
-    go readMsg()
-
-    cmd := &pubsub.Command{NewSet: &pubsub.NewSet{}}
-    cmdmsg, err := json.Marshal(cmd)
-    if err != nil {
-        panic(err)
-    }
-    err = conn.WriteMessage(websocket.TextMessage, cmdmsg)
-    if err != nil {
-        panic(err)
-    }
-
-    var addresses []string
-    addresses = append(addresses, " X-fuji....")
-    cmd = &pubsub.Command{AddAddresses: &pubsub.AddAddresses{JSONAddresses: api.JSONAddresses{Addresses: addresses}}}
-    cmdmsg, err = json.Marshal(cmd)
-    if err != nil {
-        panic(err)
-    }
-
-    err = conn.WriteMessage(websocket.TextMessage, cmdmsg)
-    if err != nil {
-        panic(err)
-    }
-
-    waitGroup.Wait()
-}
-```
-
-**Operations:**
-
-| Command          | Description                  | Example                                                        | Arguments                                                                                                                              |
-| :--------------- | :--------------------------- | :------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
-| **NewSet**       | create a new address map set | `{"newSet":{}}`                                                |                                                                                                                                        |
-| **NewBloom**     | create a new bloom set.      | `{"newBloom":{"maxElements":"1000","collisionProb":"0.0100"}}` | `maxElements` - number of elements in filter must be &gt; 0 `collisionProb` - allowed collision probability must be &gt; 0 and &lt;= 1 |
-| **AddAddresses** | add an address to the set    | `{"addAddresses":{"addresses":\["X-fuji..."\]}}`               | addresses - list of addresses to match                                                                                                 |
-
-Calling **NewSet** or **NewBloom** resets the filter, and must be followed with **AddAddresses**.
-**AddAddresses** can be called multiple times.
-
-**Set details:**
-
-- **NewSet** performs absolute address matches, if the address is in the set you will be sent the
-  transaction.
-- **NewBloom** [Bloom filtering](https://en.wikipedia.org/wiki/Bloom_filter) can produce false
-  positives, but can allow a greater number of addresses to be filtered. If the addresses is in the
-  filter, you will be sent the transaction.
-
-**Example Response:**
-
-```json
-2021/05/11 15:59:35 {"txID":"22HWKHrREyXyAiDnVmGp3TQQ79tHSSVxA9h26VfDEzoxvwveyk"}
 ```

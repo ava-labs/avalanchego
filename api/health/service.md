@@ -1,62 +1,36 @@
----
-tags: [AvalancheGo APIs]
-description: This page is an overview of the Health API associated with AvalancheGo. This API can be used for measuring node health.
-sidebar_label: Health API
-pagination_label: Health API
----
+The Health API can be used for measuring node health.
 
-# Health API
-
-This API can be used for measuring node health.
-
-:::info
-
-This API set is for a specific node; it is unavailable on the [public server](/tooling/rpc-providers.md).
-
-:::
+<Callout title="Note">
+This API set is for a specific node; it is unavailable on the [public server](/tooling/rpc-providers).
+</Callout>
 
 ## Health Checks
 
 The node periodically runs all health checks, including health checks for each chain.
 
-The frequency at which health checks are run can be specified with the [--health-check-frequency](/nodes/configure/avalanchego-config-flags.md) flag.
+The frequency at which health checks are run can be specified with the [\--health-check-frequency](/nodes/configure/configs-flags) flag.
 
 ## Filterable Health Checks
 
-The health checks that are run by the node are filterable. You can specify which health checks
-you want to see by using `tags` filters. Returned results will only include health checks that
-match the specified tags and global health checks like `network`, `database` etc.
-When filtered, the returned results will not show the full node health,
-but only a subset of filtered health checks.
-This means the node can still be unhealthy in unfiltered checks, even if the returned results show that the node is healthy.
-AvalancheGo supports using subnetIDs as tags.
+The health checks that are run by the node are filterable. You can specify which health checks you want to see by using `tags` filters. Returned results will only include health checks that match the specified tags and global health checks like `network`, `database` etc. When filtered, the returned results will not show the full node health, but only a subset of filtered health checks. This means the node can still be unhealthy in unfiltered checks, even if the returned results show that the node is healthy. AvalancheGo supports using subnetIDs as tags.
 
 ## GET Request
 
-To get an HTTP status code response that indicates the node’s health, make a `GET` request.
-If the node is healthy, it will return a `200` status code.
-If the node is unhealthy, it will return a `503` status code.
-In-depth information about the node's health is included in the response body.
+To get an HTTP status code response that indicates the node's health, make a `GET` request. If the node is healthy, it will return a `200` status code. If the node is unhealthy, it will return a `503` status code. In-depth information about the node's health is included in the response body.
 
 ### Filtering
 
-To filter GET health checks, add a `tag` query parameter to the request.
-The `tag` parameter is a string.
-For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`,
-use the following query:
+To filter GET health checks, add a `tag` query parameter to the request. The `tag` parameter is a string. For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`, use the following query:
 
 ```sh
 curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL'
 ```
 
-In this example returned results will contain global health checks and health checks that are
-related to subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`.
+In this example returned results will contain global health checks and health checks that are related to subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL`.
 
-**Note:** This filtering can show healthy results even if the node is unhealthy in other Chains/Subnets.
+**Note**: This filtering can show healthy results even if the node is unhealthy in other Chains/Avalanche L1s.
 
-In order to filter results by multiple tags, use multiple `tag` query parameters.
-For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL` and
-`28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY` use the following query:
+In order to filter results by multiple tags, use multiple `tag` query parameters. For example, to filter health results by subnetID `29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL` and `28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY` use the following query:
 
 ```sh
 curl 'http://localhost:9650/ext/health?tag=29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL&tag=28nrH5T2BMvNrWecFcV3mfccjs6axM1TVyqe79MCv2Mhs8kxiY'
@@ -68,8 +42,7 @@ The returned results will include health checks for both subnetIDs as well as gl
 
 The available endpoints for GET requests are:
 
-- `/ext/health` returns a holistic report of the status of the node.
-  **Most operators should monitor this status.**
+- `/ext/health` returns a holistic report of the status of the node. **Most operators should monitor this status.**
 - `/ext/health/health` is the same as `/ext/health`.
 - `/ext/health/readiness` returns healthy once the node has finished initializing.
 - `/ext/health/liveness` returns healthy once the endpoint is available.
@@ -78,14 +51,9 @@ The available endpoints for GET requests are:
 
 ### Format
 
-This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see
-[here](/reference/standards/guides/issuing-api-calls.md).
+This API uses the `json 2.0` RPC format. For more information on making JSON RPC calls, see [here](/api-reference/standards/guides/issuing-api-calls).
 
 ### Endpoint
-
-```text
-/ext/health
-```
 
 ### Methods
 
@@ -93,7 +61,7 @@ This API uses the `json 2.0` RPC format. For more information on making JSON RPC
 
 This method returns the last set of health check results.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl  -H 'Content-Type: application/json' --data '{
@@ -106,7 +74,7 @@ curl  -H 'Content-Type: application/json' --data '{
 }' 'http://localhost:9650/ext/health'
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -210,22 +178,22 @@ curl  -H 'Content-Type: application/json' --data '{
 
 In this example response, every check has passed. So, the node is healthy.
 
-**Response Explanation:**
+**Response Explanation**:
 
 - `checks` is a list of health check responses.
-  - A check response may include a `message` with additional context.
-  - A check response may include an `error` describing why the check failed.
-  - `timestamp` is the timestamp of the last health check.
-  - `duration` is the execution duration of the last health check, in nanoseconds.
-  - `contiguousFailures` is the number of times in a row this check failed.
-  - `timeOfFirstFailure` is the time this check first failed.
+    - A check response may include a `message` with additional context.
+    - A check response may include an `error` describing why the check failed.
+    - `timestamp` is the timestamp of the last health check.
+    - `duration` is the execution duration of the last health check, in nanoseconds.
+    - `contiguousFailures` is the number of times in a row this check failed.
+    - `timeOfFirstFailure` is the time this check first failed.
 - `healthy` is true all the health checks are passing.
 
 #### `health.readiness`
 
 This method returns the last evaluation of the startup health check results.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl  -H 'Content-Type: application/json' --data '{
@@ -238,7 +206,7 @@ curl  -H 'Content-Type: application/json' --data '{
 }' 'http://localhost:9650/ext/health'
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -259,22 +227,22 @@ curl  -H 'Content-Type: application/json' --data '{
 
 In this example response, every check has passed. So, the node has finished the startup process.
 
-**Response Explanation:**
+**Response Explanation**:
 
 - `checks` is a list of health check responses.
-  - A check response may include a `message` with additional context.
-  - A check response may include an `error` describing why the check failed.
-  - `timestamp` is the timestamp of the last health check.
-  - `duration` is the execution duration of the last health check, in nanoseconds.
-  - `contiguousFailures` is the number of times in a row this check failed.
-  - `timeOfFirstFailure` is the time this check first failed.
+    - A check response may include a `message` with additional context.
+    - A check response may include an `error` describing why the check failed.
+    - `timestamp` is the timestamp of the last health check.
+    - `duration` is the execution duration of the last health check, in nanoseconds.
+    - `contiguousFailures` is the number of times in a row this check failed.
+    - `timeOfFirstFailure` is the time this check first failed.
 - `healthy` is true all the health checks are passing.
 
 #### `health.liveness`
 
 This method returns healthy.
 
-**Example Call:**
+**Example Call**:
 
 ```sh
 curl  -H 'Content-Type: application/json' --data '{
@@ -284,7 +252,7 @@ curl  -H 'Content-Type: application/json' --data '{
 }' 'http://localhost:9650/ext/health'
 ```
 
-**Example Response:**
+**Example Response**:
 
 ```json
 {
@@ -299,7 +267,7 @@ curl  -H 'Content-Type: application/json' --data '{
 
 In this example response, the node was able to handle the request and mark the service as healthy.
 
-**Response Explanation:**
+**Response Explanation**:
 
 - `checks` is an empty list.
 - `healthy` is true.

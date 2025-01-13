@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -57,8 +56,6 @@ import (
 const (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-
-	defaultTxFee = 100 * units.NanoAvax
 )
 
 var testSubnet1 *txs.Tx
@@ -75,7 +72,7 @@ type environment struct {
 	sender     *enginetest.Sender
 
 	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
+	config         *config.Internal
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
@@ -166,8 +163,11 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.mempool,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
+		&res.ctx.Lock,
+		res.state,
+		res.ctx.WarpSigner,
 		registerer,
-		network.DefaultConfig,
+		config.DefaultNetwork,
 	)
 	require.NoError(err)
 
@@ -218,6 +218,7 @@ func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
 		e.state,
 		secp256k1fx.NewKeychain(c.keys...),
 		c.subnetIDs,
+		nil, // validationIDs
 		[]ids.ID{e.ctx.CChainID, e.ctx.XChainID},
 	)
 }
@@ -247,20 +248,20 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-	executor := txexecutor.StandardTxExecutor{
-		Backend:       &env.backend,
-		State:         stateDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            testSubnet1,
-	}
-	require.NoError(testSubnet1.Unsigned.Visit(&executor))
+	_, _, _, err = txexecutor.StandardTx(
+		&env.backend,
+		feeCalculator,
+		testSubnet1,
+		stateDiff,
+	)
+	require.NoError(err)
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
 	require.NoError(env.state.Commit())
 }
 
-func defaultConfig(f upgradetest.Fork) *config.Config {
+func defaultConfig(f upgradetest.Fork) *config.Internal {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(f, time.Time{})
 	// This package neglects fork ordering
 	upgradetest.SetTimesTo(
@@ -269,20 +270,15 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 		genesistest.DefaultValidatorEndTime,
 	)
 
-	return &config.Config{
+	return &config.Internal{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
-		MinValidatorStake: 5 * units.MilliAvax,
-		MaxValidatorStake: 500 * units.MilliAvax,
-		MinDelegatorStake: 1 * units.MilliAvax,
-		MinStakeDuration:  defaultMinStakingDuration,
-		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinValidatorStake:      5 * units.MilliAvax,
+		MaxValidatorStake:      500 * units.MilliAvax,
+		MinDelegatorStake:      1 * units.MilliAvax,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,

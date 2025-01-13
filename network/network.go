@@ -525,12 +525,10 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 //
 // - Respond with all subnet IPs
 //   - The peer requests all peers
-//   - We believe the peer to be a primary network validator
 //   - We believe ourself to be a primary network validator
 //
 // - Respond with subnet IPs tracked by the peer
-//   - Either the peer does not request all peers or we don't consider them to
-//     be a primary network validator
+//   - The peer does not request all peers
 //   - We believe ourself to be a primary network validator
 //
 // The reason we allow the peer to request all peers is so that we can avoid
@@ -555,8 +553,7 @@ func (n *network) Peers(
 		}
 	}
 
-	_, areTheyAPrimaryNetworkValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, peerID)
-	if areWeAPrimaryNetworkValidator && requestAllPeers && areTheyAPrimaryNetworkValidator {
+	if areWeAPrimaryNetworkValidator && requestAllPeers {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
@@ -778,7 +775,7 @@ func (n *network) samplePeers(
 	// As an optimization, if there are fewer validators than
 	// [numValidatorsToSample], only attempt to sample [numValidatorsToSample]
 	// validators to potentially avoid iterating over the entire peer set.
-	numValidatorsToSample := min(config.Validators, n.config.Validators.Count(subnetID))
+	numValidatorsToSample := min(config.Validators, n.config.Validators.NumValidators(subnetID))
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()

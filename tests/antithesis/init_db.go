@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -32,7 +33,7 @@ func initBootstrapDB(network *tmpnet.Network, avalancheGoPath string, pluginDir 
 	defer cancel()
 	if err := tmpnet.BootstrapNewNetwork(
 		ctx,
-		os.Stdout,
+		tests.NewDefaultLogger(""),
 		network,
 		"",
 		avalancheGoPath,

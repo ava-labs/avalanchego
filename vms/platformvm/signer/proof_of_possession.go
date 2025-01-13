@@ -14,7 +14,7 @@ import (
 var (
 	_ Signer = (*ProofOfPossession)(nil)
 
-	errInvalidProofOfPossession = errors.New("invalid proof of possession")
+	ErrInvalidProofOfPossession = errors.New("invalid proof of possession")
 )
 
 type ProofOfPossession struct {
@@ -28,10 +28,10 @@ type ProofOfPossession struct {
 	publicKey *bls.PublicKey
 }
 
-func NewProofOfPossession(sk *bls.SecretKey) *ProofOfPossession {
-	pk := bls.PublicFromSecretKey(sk)
+func NewProofOfPossession(sk bls.Signer) *ProofOfPossession {
+	pk := sk.PublicKey()
 	pkBytes := bls.PublicKeyToCompressedBytes(pk)
-	sig := bls.SignProofOfPossession(sk, pkBytes)
+	sig := sk.SignProofOfPossession(pkBytes)
 	sigBytes := bls.SignatureToBytes(sig)
 
 	pop := &ProofOfPossession{
@@ -52,7 +52,7 @@ func (p *ProofOfPossession) Verify() error {
 		return err
 	}
 	if !bls.VerifyProofOfPossession(publicKey, signature, p.PublicKey[:]) {
-		return errInvalidProofOfPossession
+		return ErrInvalidProofOfPossession
 	}
 
 	p.publicKey = publicKey

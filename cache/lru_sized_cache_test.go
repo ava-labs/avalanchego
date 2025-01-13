@@ -53,3 +53,42 @@ func TestSizedLRUWrongKeyEvictionRegression(t *testing.T) {
 	_, ok = cache.Get("dd")
 	require.True(ok)
 }
+
+func TestSizedLRUSizeAlteringRegression(t *testing.T) {
+	require := require.New(t)
+
+	cache := NewSizedLRU[string, *string](
+		5,
+		func(key string, val *string) int {
+			if val != nil {
+				return len(key) + len(*val)
+			}
+
+			return len(key)
+		},
+	)
+
+	// put first value
+	expectedPortionFilled := 0.6
+	valueA := "ab"
+	cache.Put("a", &valueA)
+
+	require.Equal(expectedPortionFilled, cache.PortionFilled())
+
+	// mutate first value
+	valueA = "abcd"
+	require.Equal(expectedPortionFilled, cache.PortionFilled(), "after value A mutation, portion filled should be the same")
+
+	// put second value
+	expectedPortionFilled = 0.8
+	valueB := "bcd"
+	cache.Put("b", &valueB)
+
+	require.Equal(expectedPortionFilled, cache.PortionFilled())
+
+	_, ok := cache.Get("a")
+	require.False(ok, "key a shouldn't exist after b is put")
+
+	_, ok = cache.Get("b")
+	require.True(ok, "key b should exist")
+}

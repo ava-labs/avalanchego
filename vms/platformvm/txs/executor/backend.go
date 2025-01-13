@@ -15,7 +15,7 @@ import (
 )
 
 type Backend struct {
-	Config       *config.Config
+	Config       *config.Internal
 	Ctx          *snow.Context
 	Clk          *mockable.Clock
 	Fx           fx.Fx

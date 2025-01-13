@@ -331,7 +331,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	baseDB := memdb.New()
 	atomicDB := prefixdb.New([]byte{1}, baseDB)
 
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -525,7 +525,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			ID: vm.ctx.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.StaticFeeConfig.TxFee,
+			Amt:          1,
 			OutputOwners: secp256k1fx.OutputOwners{},
 		},
 	}
@@ -542,7 +542,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: vm.StaticFeeConfig.TxFee,
+					Amt: 1,
 				},
 			},
 		},
@@ -631,13 +631,13 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	vm.Config.Validators = validators.NewManager()
+	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
 		DB:         vm.db,
-		Validators: vm.Config.Validators,
-		Upgrades:   vm.Config.UpgradeConfig,
+		Validators: vm.Internal.Validators,
+		Upgrades:   vm.Internal.UpgradeConfig,
 		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.Config.RewardConfig),
+		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
 	})
 
 	// Verify that new validator is now in the current validator set.
@@ -757,7 +757,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			ID: vm.ctx.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.StaticFeeConfig.TxFee,
+			Amt:          1,
 			OutputOwners: secp256k1fx.OutputOwners{},
 		},
 	}
@@ -774,7 +774,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: vm.StaticFeeConfig.TxFee,
+					Amt: 1,
 				},
 			},
 		},
@@ -923,13 +923,13 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Force a reload of the state from the database.
-	vm.Config.Validators = validators.NewManager()
+	vm.Internal.Validators = validators.NewManager()
 	newState := statetest.New(t, statetest.Config{
 		DB:         vm.db,
-		Validators: vm.Config.Validators,
-		Upgrades:   vm.Config.UpgradeConfig,
+		Validators: vm.Internal.Validators,
+		Upgrades:   vm.Internal.UpgradeConfig,
 		Context:    vm.ctx,
-		Rewards:    reward.NewCalculator(vm.Config.RewardConfig),
+		Rewards:    reward.NewCalculator(vm.Internal.RewardConfig),
 	})
 
 	// Verify that validators are in the current validator set with the correct
@@ -1477,9 +1477,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 		}
 	)
-	sk1, err := bls.NewSecretKey()
+	sk1, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk1 := bls.PublicFromSecretKey(sk1)
+	pk1 := sk1.PublicKey()
 
 	// build primary network validator with BLS key
 	primaryTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1583,9 +1583,9 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	t.Logf("primaryEndHeight: %d", primaryEndHeight)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(t, err)
-	pk2 := bls.PublicFromSecretKey(sk2)
+	pk2 := sk2.PublicKey()
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{
@@ -1749,7 +1749,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1918,7 +1918,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	// reinsert primary validator with a different BLS key
-	sk2, err := bls.NewSecretKey()
+	sk2, err := bls.NewSigner()
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
@@ -1969,6 +1969,22 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nil,
 		))
 	}
+}
+
+func TestValidatorSetReturnsCopy(t *testing.T) {
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Latest)
+
+	validators1, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	require.NoError(err)
+
+	validators2, err := vm.GetValidatorSet(context.Background(), 1, constants.PrimaryNetworkID)
+	require.NoError(err)
+
+	require.NotNil(validators1[genesistest.DefaultNodeIDs[0]])
+	delete(validators1, genesistest.DefaultNodeIDs[0])
+	require.NotNil(validators2[genesistest.DefaultNodeIDs[0]])
 }
 
 func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {

@@ -214,10 +214,10 @@ func TestGet(t *testing.T) {
 	_, ok := m.GetValidator(subnetID, nodeID)
 	require.False(ok)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	require.NoError(m.AddStaker(subnetID, nodeID, pk, ids.Empty, 1))
 
 	vdr0, ok := m.GetValidator(subnetID, nodeID)
@@ -242,36 +242,57 @@ func TestGet(t *testing.T) {
 	require.False(ok)
 }
 
-func TestLen(t *testing.T) {
-	require := require.New(t)
+func TestNum(t *testing.T) {
+	var (
+		require = require.New(t)
 
-	m := NewManager()
-	subnetID := ids.GenerateTestID()
+		m = NewManager()
 
-	count := m.Count(subnetID)
-	require.Zero(count)
+		subnetID0 = ids.GenerateTestID()
+		subnetID1 = ids.GenerateTestID()
+		nodeID0   = ids.GenerateTestNodeID()
+		nodeID1   = ids.GenerateTestNodeID()
+	)
 
-	nodeID0 := ids.GenerateTestNodeID()
-	require.NoError(m.AddStaker(subnetID, nodeID0, nil, ids.Empty, 1))
+	require.Zero(m.NumSubnets())
+	require.Zero(m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Equal(1, count)
+	require.NoError(m.AddStaker(subnetID0, nodeID0, nil, ids.Empty, 1))
 
-	nodeID1 := ids.GenerateTestNodeID()
-	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
+	require.Equal(1, m.NumSubnets())
+	require.Equal(1, m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Equal(2, count)
+	require.NoError(m.AddStaker(subnetID0, nodeID1, nil, ids.Empty, 1))
 
-	require.NoError(m.RemoveWeight(subnetID, nodeID1, 1))
+	require.Equal(1, m.NumSubnets())
+	require.Equal(2, m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Equal(1, count)
+	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 2))
 
-	require.NoError(m.RemoveWeight(subnetID, nodeID0, 1))
+	require.Equal(2, m.NumSubnets())
+	require.Equal(2, m.NumValidators(subnetID0))
+	require.Equal(1, m.NumValidators(subnetID1))
 
-	count = m.Count(subnetID)
-	require.Zero(count)
+	require.NoError(m.RemoveWeight(subnetID0, nodeID1, 1))
+
+	require.Equal(2, m.NumSubnets())
+	require.Equal(1, m.NumValidators(subnetID0))
+	require.Equal(1, m.NumValidators(subnetID1))
+
+	require.NoError(m.RemoveWeight(subnetID0, nodeID0, 1))
+
+	require.Equal(1, m.NumSubnets())
+	require.Zero(m.NumValidators(subnetID0))
+	require.Equal(1, m.NumValidators(subnetID1))
+
+	require.NoError(m.RemoveWeight(subnetID1, nodeID1, 2))
+
+	require.Zero(m.NumSubnets())
+	require.Zero(m.NumValidators(subnetID0))
+	require.Zero(m.NumValidators(subnetID1))
 }
 
 func TestGetMap(t *testing.T) {
@@ -283,10 +304,10 @@ func TestGetMap(t *testing.T) {
 	mp := m.GetMap(subnetID)
 	require.Empty(mp)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID0, pk, ids.Empty, 2))
 
@@ -383,11 +404,11 @@ func TestSample(t *testing.T) {
 	require.NoError(err)
 	require.Empty(sampled)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	nodeID0 := ids.GenerateTestNodeID()
-	pk := bls.PublicFromSecretKey(sk)
+	pk := sk.PublicKey()
 	require.NoError(m.AddStaker(subnetID, nodeID0, pk, ids.Empty, 1))
 
 	sampled, err = m.Sample(subnetID, 1)
@@ -443,12 +464,12 @@ func TestString(t *testing.T) {
 func TestAddCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := bls.NewSigner()
 	require.NoError(err)
 
 	var (
 		expectedNodeID           = ids.GenerateTestNodeID()
-		expectedPK               = bls.PublicFromSecretKey(expectedSK)
+		expectedPK               = expectedSK.PublicKey()
 		expectedTxID             = ids.GenerateTestID()
 		expectedWeight    uint64 = 1
 		expectedSubnetID0        = ids.GenerateTestID()
@@ -491,12 +512,12 @@ func TestAddCallback(t *testing.T) {
 func TestAddWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := bls.NewSigner()
 	require.NoError(err)
 
 	var (
 		expectedNodeID             = ids.GenerateTestNodeID()
-		expectedPK                 = bls.PublicFromSecretKey(expectedSK)
+		expectedPK                 = expectedSK.PublicKey()
 		expectedTxID               = ids.GenerateTestID()
 		expectedOldWeight   uint64 = 1
 		expectedAddedWeight uint64 = 10
@@ -574,12 +595,12 @@ func TestAddWeightCallback(t *testing.T) {
 func TestRemoveWeightCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := bls.NewSigner()
 	require.NoError(err)
 
 	var (
 		expectedNodeID               = ids.GenerateTestNodeID()
-		expectedPK                   = bls.PublicFromSecretKey(expectedSK)
+		expectedPK                   = expectedSK.PublicKey()
 		expectedTxID                 = ids.GenerateTestID()
 		expectedNewWeight     uint64 = 1
 		expectedRemovedWeight uint64 = 10
@@ -657,12 +678,12 @@ func TestRemoveWeightCallback(t *testing.T) {
 func TestRemoveCallback(t *testing.T) {
 	require := require.New(t)
 
-	expectedSK, err := bls.NewSecretKey()
+	expectedSK, err := bls.NewSigner()
 	require.NoError(err)
 
 	var (
 		expectedNodeID           = ids.GenerateTestNodeID()
-		expectedPK               = bls.PublicFromSecretKey(expectedSK)
+		expectedPK               = expectedSK.PublicKey()
 		expectedTxID             = ids.GenerateTestID()
 		expectedWeight    uint64 = 1
 		expectedSubnetID0        = ids.GenerateTestID()

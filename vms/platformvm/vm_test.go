@@ -54,9 +54,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
@@ -80,8 +80,6 @@ const (
 
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-
-	defaultTxFee = 100 * units.NanoAvax
 )
 
 var (
@@ -94,12 +92,6 @@ var (
 
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
 
-	defaultStaticFeeConfig = fee.StaticConfig{
-		TxFee:                 defaultTxFee,
-		CreateSubnetTxFee:     100 * defaultTxFee,
-		TransformSubnetTxFee:  100 * defaultTxFee,
-		CreateBlockchainTxFee: 100 * defaultTxFee,
-	}
 	defaultDynamicFeeConfig = gas.Config{
 		Weights: gas.Dimensions{
 			gas.Bandwidth: 1,
@@ -128,12 +120,11 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 	// always reset latestForkTime (a package level variable)
 	// to ensure test independence
 	latestForkTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticFeeConfig:        defaultStaticFeeConfig,
 		DynamicFeeConfig:       defaultDynamicFeeConfig,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,
@@ -237,10 +228,11 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 	return txstest.NewWallet(
 		t,
 		vm.ctx,
-		&vm.Config,
+		&vm.Internal,
 		vm.state,
 		secp256k1fx.NewKeychain(c.keys...),
 		c.subnetIDs,
+		nil, // validationIDs
 		[]ids.ID{vm.ctx.CChainID, vm.ctx.XChainID},
 	)
 }
@@ -248,7 +240,7 @@ func newWallet(t testing.TB, vm *VM, c walletConfig) wallet.Wallet {
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgradetest.Etna)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -262,6 +254,10 @@ func TestGenesis(t *testing.T) {
 	require.NotNil(genesisBlock)
 
 	genesisState := genesistest.New(t, genesistest.Config{})
+	feeCalculator := state.PickFeeCalculator(&vm.Internal, vm.state)
+	createSubnetFee, err := feeCalculator.CalculateFee(testSubnet1.Unsigned)
+	require.NoError(err)
+
 	// Ensure all the genesis UTXOs are there
 	for _, utxo := range genesisState.UTXOs {
 		genesisOut := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -278,12 +274,12 @@ func TestGenesis(t *testing.T) {
 				[]ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
 				out.OutputOwners.Addrs,
 			)
-			require.Equal(genesisOut.Amt-vm.StaticFeeConfig.CreateSubnetTxFee, out.Amt)
+			require.Equal(genesisOut.Amt-createSubnetFee, out.Amt)
 		}
 	}
 
 	// Ensure current validator set of primary network is correct
-	require.Len(genesisState.Validators, vm.Validators.Count(constants.PrimaryNetworkID))
+	require.Len(genesisState.Validators, vm.Validators.NumValidators(constants.PrimaryNetworkID))
 
 	for _, nodeID := range genesistest.DefaultNodeIDs {
 		_, ok := vm.Validators.GetValidator(constants.PrimaryNetworkID, nodeID)
@@ -313,7 +309,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		}
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	// create valid tx
@@ -469,7 +465,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	startTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	endTime := startTime.Add(defaultMinStakingDuration)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -1018,7 +1014,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	db := memdb.New()
 
 	firstDB := prefixdb.New([]byte{}, db)
-	firstVM := &VM{Config: config.Config{
+	firstVM := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -1103,7 +1099,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(firstVM.Shutdown(context.Background()))
 	firstCtx.Lock.Unlock()
 
-	secondVM := &VM{Config: config.Config{
+	secondVM := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -1149,7 +1145,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vmDB := prefixdb.New(chains.VMDBPrefix, baseDB)
 	bootstrappingDB := prefixdb.New(chains.ChainBootstrappingDBPrefix, baseDB)
 
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -1326,7 +1322,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		AllGetsServer:                  snowGetHandler,
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
-		SampleK:                        beacons.Count(ctx.SubnetID),
+		SampleK:                        beacons.NumValidators(ctx.SubnetID),
 		StartupTracker:                 startup,
 		PeerTracker:                    peerTracker,
 		Sender:                         sender,
@@ -1386,6 +1382,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		engine.Start,
 	)
 	require.NoError(err)
+	bootstrapper.TimeoutRegistrar = &enginetest.Timer{}
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: &handler.Engine{
@@ -1496,7 +1493,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 func TestUnverifiedParent(t *testing.T) {
 	require := require.New(t)
 
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		Validators:             validators.NewManager(),
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -1653,7 +1650,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	firstDB := prefixdb.New([]byte{}, db)
 	const firstUptimePercentage = 20 // 20%
-	firstVM := &VM{Config: config.Config{
+	firstVM := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       firstUptimePercentage / 100.,
 		RewardConfig:           defaultRewardConfig,
@@ -1700,7 +1697,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	// Restart the VM with a larger uptime requirement
 	secondDB := prefixdb.New([]byte{}, db)
 	const secondUptimePercentage = 21 // 21% > firstUptimePercentage, so uptime for reward is not met now
-	secondVM := &VM{Config: config.Config{
+	secondVM := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       secondUptimePercentage / 100.,
 		Validators:             validators.NewManager(),
@@ -1796,7 +1793,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	db := memdb.New()
 
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
 		RewardConfig:           defaultRewardConfig,
@@ -1903,7 +1900,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	wallet := newWallet(t, vm, walletConfig{})
 
 	nodeID := ids.GenerateTestNodeID()
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 	rewardsOwner := &secp256k1fx.OutputOwners{
 		Threshold: 1,
@@ -2119,7 +2116,7 @@ func TestPruneMempool(t *testing.T) {
 		endTime   = startTime.Add(vm.MinStakeDuration)
 	)
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{

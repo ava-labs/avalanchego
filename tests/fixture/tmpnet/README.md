@@ -167,6 +167,7 @@ HOME
             │       └── config.json                      // Custom chain configuration for all nodes
             ├── config.json                              // Common configuration (including defaults and pre-funded keys)
             ├── genesis.json                             // Genesis for all nodes
+            ├── metrics.txt                              // Link for metrics and logs collected from the network (see: Monitoring)
             ├── network.env                              // Sets network dir env var to simplify network usage
             └── subnets                                  // Directory containing subnet config for both avalanchego and tmpnet
                 ├── subnet-a.json                        // tmpnet configuration for subnet-a and its chain(s)
@@ -198,7 +199,7 @@ The chain configuration for a temporary network is stored at
 by all nodes in the network. The C-Chain config will be generated with
 reasonable defaults if not supplied. X-Chain and P-Chain will use
 implicit defaults. The configuration for custom chains can be provided
-with subnet configuration and will be writen to the appropriate path.
+with subnet configuration and will be written to the appropriate path.
 
 Each node in the network can override network-level chain
 configuration by setting `--chain-config-dir` to an explicit value and
@@ -269,6 +270,11 @@ LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./build/tmpnetctl start-network
+
+# Configure metrics collection from a local node binding to the default API
+# port of 9650 and storing its logs in ~/.avalanchego/logs. The script will
+# also emit a link to grafana.
+./scripts/configure-local-metrics-collection.sh
 ```
 
 ### Metrics collection

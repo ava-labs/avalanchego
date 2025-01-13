@@ -65,7 +65,7 @@ func TestSampleableSetMarshalJSON(t *testing.T) {
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)
-		require.Equal("[]", string(asJSON))
+		require.JSONEq("[]", string(asJSON))
 	}
 	id1, id2 := 1, 2
 	id1JSON, err := json.Marshal(id1)
@@ -76,13 +76,13 @@ func TestSampleableSetMarshalJSON(t *testing.T) {
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)
-		require.Equal(fmt.Sprintf("[%s]", string(id1JSON)), string(asJSON))
+		require.JSONEq(fmt.Sprintf("[%s]", string(id1JSON)), string(asJSON))
 	}
 	set.Add(id2)
 	{
 		asJSON, err := set.MarshalJSON()
 		require.NoError(err)
-		require.Equal(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)), string(asJSON))
+		require.JSONEq(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)), string(asJSON))
 	}
 }
 

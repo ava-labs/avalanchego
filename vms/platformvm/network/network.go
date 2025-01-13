@@ -5,7 +5,7 @@ package network
 
 import (
 	"context"
-	"errors"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,21 +13,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
-
-var errMempoolDisabledWithPartialSync = errors.New("mempool is disabled partial syncing")
 
 type Network struct {
 	*p2p.Network
 
 	log                       logging.Logger
-	txVerifier                TxVerifier
 	mempool                   *gossipMempool
 	partialSyncPrimaryNetwork bool
 	appSender                 common.AppSender
@@ -47,8 +48,11 @@ func New(
 	mempool mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
+	stateLock sync.Locker,
+	state state.Chain,
+	signer warp.Signer,
 	registerer prometheus.Registerer,
-	config Config,
+	config config.Network,
 ) (*Network, error) {
 	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
 	if err != nil {
@@ -156,10 +160,20 @@ func New(
 		return nil, err
 	}
 
+	// We allow all peers to request warp messaging signatures
+	signatureRequestVerifier := signatureRequestVerifier{
+		stateLock: stateLock,
+		state:     state,
+	}
+	signatureRequestHandler := acp118.NewHandler(signatureRequestVerifier, signer)
+
+	if err := p2pNetwork.AddHandler(acp118.HandlerID, signatureRequestHandler); err != nil {
+		return nil, err
+	}
+
 	return &Network{
 		Network:                   p2pNetwork,
 		log:                       log,
-		txVerifier:                txVerifier,
 		mempool:                   gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		appSender:                 appSender,
@@ -171,18 +185,12 @@ func New(
 }
 
 func (n *Network) PushGossip(ctx context.Context) {
-	// TODO: Even though the node is running partial sync, we should support
-	// issuing transactions from the RPC.
-	if n.partialSyncPrimaryNetwork {
-		return
-	}
-
 	gossip.Every(ctx, n.log, n.txPushGossiper, n.txPushGossipFrequency)
 }
 
 func (n *Network) PullGossip(ctx context.Context) {
-	// If the node is running partial sync, we should not perform any pull
-	// gossip.
+	// If the node is running partial sync, we do not perform any pull gossip
+	// because we should never be a validator.
 	if n.partialSyncPrimaryNetwork {
 		return
 	}
@@ -202,15 +210,6 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 }
 
 func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
-	// If we are partially syncing the Primary Network, we should not be
-	// maintaining the transaction mempool locally.
-	//
-	// TODO: We should still push the transaction to some peers when partial
-	// syncing.
-	if n.partialSyncPrimaryNetwork {
-		return errMempoolDisabledWithPartialSync
-	}
-
 	if err := n.mempool.Add(tx); err != nil {
 		return err
 	}

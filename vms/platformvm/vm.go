@@ -52,13 +52,14 @@ import (
 )
 
 var (
-	_ snowmanblock.ChainVM = (*VM)(nil)
-	_ secp256k1fx.VM       = (*VM)(nil)
-	_ validators.State     = (*VM)(nil)
+	_ snowmanblock.ChainVM                      = (*VM)(nil)
+	_ snowmanblock.BuildBlockWithContextChainVM = (*VM)(nil)
+	_ secp256k1fx.VM                            = (*VM)(nil)
+	_ validators.State                          = (*VM)(nil)
 )
 
 type VM struct {
-	config.Config
+	config.Internal
 	blockbuilder.Builder
 	*network.Network
 	validators.State
@@ -105,7 +106,7 @@ func (vm *VM) Initialize(
 ) error {
 	chainCtx.Log.Verbo("initializing platform chain")
 
-	execConfig, err := config.GetExecutionConfig(configBytes)
+	execConfig, err := config.GetConfig(configBytes)
 	if err != nil {
 		return err
 	}
@@ -138,8 +139,8 @@ func (vm *VM) Initialize(
 		vm.db,
 		genesisBytes,
 		registerer,
-		vm.Config.Validators,
-		vm.Config.UpgradeConfig,
+		vm.Internal.Validators,
+		vm.Internal.UpgradeConfig,
 		execConfig,
 		vm.ctx,
 		vm.metrics,
@@ -149,14 +150,18 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	if currentTime := vm.state.GetTimestamp(); vm.Internal.UpgradeConfig.IsEtnaActivated(currentTime) {
+		blockexecutor.EtnaActivationWasLogged.Set(true)
+	}
+
+	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
 	vm.uptimeManager = uptime.NewManager(vm.state, &vm.clock)
 	vm.UptimeLockedCalculator.SetCalculator(&vm.bootstrapped, &chainCtx.Lock, vm.uptimeManager)
 
 	txExecutorBackend := &txexecutor.Backend{
-		Config:       &vm.Config,
+		Config:       &vm.Internal,
 		Ctx:          vm.ctx,
 		Clk:          &vm.clock,
 		Fx:           vm.fx,
@@ -192,6 +197,9 @@ func (vm *VM) Initialize(
 		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
+		chainCtx.Lock.RLocker(),
+		vm.state,
+		chainCtx.WarpSigner,
 		registerer,
 		execConfig.Network,
 	)
@@ -288,7 +296,7 @@ func (vm *VM) pruneMempool() error {
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	if vm.Config.PartialSyncPrimaryNetwork {
+	if vm.Internal.PartialSyncPrimaryNetwork {
 		vm.ctx.Log.Info("skipping primary network chain creation")
 	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
 		return err
@@ -325,7 +333,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		vm.Config.CreateChain(chain.ID(), tx)
+		vm.Internal.CreateChain(chain.ID(), tx)
 	}
 	return nil
 }

@@ -16,11 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -52,14 +50,13 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, errUnauthorizedSubnetModification)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		stateDiff,
+	)
+	require.ErrorIs(err, errUnauthorizedModification)
 }
 
 // Ensure Execute fails when an incorrect control signature is given
@@ -96,14 +93,13 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&executor)
-	require.ErrorIs(err, errUnauthorizedSubnetModification)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		stateDiff,
+	)
+	require.ErrorIs(err, errUnauthorizedModification)
 }
 
 // Ensure Execute fails when the Subnet the blockchain specifies as
@@ -137,13 +133,12 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&executor)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		stateDiff,
+	)
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -175,13 +170,13 @@ func TestCreateChainTxValid(t *testing.T) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&executor))
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		stateDiff,
+	)
+	require.NoError(err)
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
@@ -197,12 +192,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			time:          genesistest.DefaultValidatorStartTime,
 			fee:           0,
 			expectedError: nil,
-		},
-		{
-			name:          "post-fork - incorrectly priced",
-			time:          ap3Time,
-			fee:           100*defaultTxFee - 1*units.NanoAvax,
-			expectedError: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name:          "post-fork - correctly priced",
@@ -226,7 +215,6 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			env.state.SetTimestamp(test.time) // to duly set fee
 
 			config := *env.config
-			config.StaticFeeConfig.CreateBlockchainTxFee = test.fee
 			subnetID := testSubnet1.ID()
 			wallet := newWallet(t, env, walletConfig{
 				config:    &config,
@@ -248,13 +236,12 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 			stateDiff.SetTimestamp(test.time)
 
 			feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-			executor := StandardTxExecutor{
-				Backend:       &env.backend,
-				FeeCalculator: feeCalculator,
-				State:         stateDiff,
-				Tx:            tx,
-			}
-			err = tx.Unsigned.Visit(&executor)
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				stateDiff,
+			)
 			require.ErrorIs(err, test.expectedError)
 		})
 	}
@@ -286,9 +273,9 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	builderDiff, err := state.NewDiffOn(stateDiff)
 	require.NoError(err)
 
-	stateDiff.SetSubnetConversion(
+	stateDiff.SetSubnetToL1Conversion(
 		subnetID,
-		state.SubnetConversion{
+		state.SubnetToL1Conversion{
 			ConversionID: ids.GenerateTestID(),
 			ChainID:      ids.GenerateTestID(),
 			Addr:         []byte("address"),
@@ -296,12 +283,11 @@ func TestEtnaCreateChainTxInvalidWithManagedSubnet(t *testing.T) {
 	)
 
 	feeCalculator := state.PickFeeCalculator(env.config, builderDiff)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&executor)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		stateDiff,
+	)
 	require.ErrorIs(err, errIsImmutable)
 }

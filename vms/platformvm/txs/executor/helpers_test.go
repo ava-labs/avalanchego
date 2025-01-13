@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -64,7 +63,7 @@ type mutableSharedMemory struct {
 
 type environment struct {
 	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
+	config         *config.Internal
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
 	ctx            *snow.Context
@@ -172,7 +171,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 }
 
 type walletConfig struct {
-	config    *config.Config
+	config    *config.Internal
 	keys      []*secp256k1.PrivateKey
 	subnetIDs []ids.ID
 	chainIDs  []ids.ID
@@ -192,6 +191,7 @@ func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
 		e.state,
 		secp256k1fx.NewKeychain(c.keys...),
 		c.subnetIDs,
+		nil, // validationIDs
 		c.chainIDs,
 	)
 }
@@ -220,20 +220,20 @@ func addSubnet(t *testing.T, env *environment) {
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
-	executor := StandardTxExecutor{
-		Backend:       &env.backend,
-		FeeCalculator: feeCalculator,
-		State:         stateDiff,
-		Tx:            testSubnet1,
-	}
-	require.NoError(testSubnet1.Unsigned.Visit(&executor))
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		testSubnet1,
+		stateDiff,
+	)
+	require.NoError(err)
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
 	require.NoError(stateDiff.Apply(env.state))
 	require.NoError(env.state.Commit())
 }
 
-func defaultConfig(f upgradetest.Fork) *config.Config {
+func defaultConfig(f upgradetest.Fork) *config.Internal {
 	upgrades := upgradetest.GetConfigWithUpgradeTime(
 		f,
 		genesistest.DefaultValidatorStartTime.Add(-2*time.Second),
@@ -244,20 +244,15 @@ func defaultConfig(f upgradetest.Fork) *config.Config {
 		genesistest.DefaultValidatorEndTime,
 	)
 
-	return &config.Config{
+	return &config.Internal{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
-		MinValidatorStake: 5 * units.MilliAvax,
-		MaxValidatorStake: 500 * units.MilliAvax,
-		MinDelegatorStake: 1 * units.MilliAvax,
-		MinStakeDuration:  defaultMinStakingDuration,
-		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinValidatorStake:      5 * units.MilliAvax,
+		MaxValidatorStake:      500 * units.MilliAvax,
+		MinDelegatorStake:      1 * units.MilliAvax,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,

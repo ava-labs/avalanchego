@@ -101,7 +101,7 @@ func StartTestPeer(
 	}
 
 	tlsKey := tlsCert.PrivateKey.(crypto.Signer)
-	blsKey, err := bls.NewSecretKey()
+	blsKey, err := bls.NewSigner()
 	if err != nil {
 		return nil, err
 	}

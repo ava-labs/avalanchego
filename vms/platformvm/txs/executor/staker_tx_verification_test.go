@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -112,7 +111,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 				}
@@ -136,7 +135,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: &utils.Atomic[bool]{},
@@ -162,7 +161,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Cortina, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -188,7 +187,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -217,7 +216,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -246,7 +245,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -276,7 +275,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -309,7 +308,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -342,7 +341,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -377,7 +376,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -406,7 +405,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				bootstrapped.Set(true)
 				return &Backend{
 					Ctx: ctx,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 					},
 					Bootstrapped: bootstrapped,
@@ -451,11 +450,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 				return &Backend{
 					FlowChecker: flowChecker,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-						StaticFeeConfig: fee.StaticConfig{
-							AddSubnetValidatorFee: 1,
-						},
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -499,11 +495,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 				return &Backend{
 					FlowChecker: flowChecker,
-					Config: &config.Config{
+					Config: &config.Internal{
 						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-						StaticFeeConfig: fee.StaticConfig{
-							AddSubnetValidatorFee: 1,
-						},
 					},
 					Ctx:          ctx,
 					Bootstrapped: bootstrapped,
@@ -560,7 +553,7 @@ func TestGetValidatorRules(t *testing.T) {
 	}
 
 	var (
-		config = &config.Config{
+		config = &config.Internal{
 			MinValidatorStake: 1,
 			MaxValidatorStake: 2,
 			MinStakeDuration:  time.Second,
@@ -679,7 +672,7 @@ func TestGetDelegatorRules(t *testing.T) {
 		expectedErr   error
 	}
 	var (
-		config = &config.Config{
+		config = &config.Internal{
 			MinDelegatorStake: 1,
 			MaxValidatorStake: 2,
 			MinStakeDuration:  time.Second,

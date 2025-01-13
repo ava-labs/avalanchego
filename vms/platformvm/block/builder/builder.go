@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 
+	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
@@ -51,6 +52,7 @@ var (
 )
 
 type Builder interface {
+	smblock.BuildBlockWithContextChainVM
 	mempool.Mempool
 
 	// StartBlockTimer starts to issue block creation requests to advance the
@@ -182,7 +184,11 @@ func (b *builder) durationToSleep() (time.Duration, error) {
 
 	now := b.txExecutorBackend.Clk.Time()
 	maxTimeToAwake := now.Add(maxTimeToSleep)
-	nextStakerChangeTime, err := state.GetNextStakerChangeTime(preferredState, maxTimeToAwake)
+	nextStakerChangeTime, err := state.GetNextStakerChangeTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		maxTimeToAwake,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("%w of %s: %w", errCalculatingNextStakerTime, preferredID, err)
 	}
@@ -204,10 +210,19 @@ func (b *builder) ShutdownBlockTimer() {
 	})
 }
 
-// BuildBlock builds a block to be added to consensus.
-// This method removes the transactions from the returned
-// blocks from the mempool.
-func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
+func (b *builder) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	return b.BuildBlockWithContext(
+		ctx,
+		&smblock.Context{
+			PChainHeight: 0,
+		},
+	)
+}
+
+func (b *builder) BuildBlockWithContext(
+	ctx context.Context,
+	blockContext *smblock.Context,
+) (snowman.Block, error) {
 	// If there are still transactions in the mempool, then we need to
 	// re-trigger block building.
 	defer b.Mempool.RequestBuildBlock(false /*=emptyBlockPermitted*/)
@@ -226,18 +241,24 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, fmt.Errorf("%w: %s", state.ErrMissingParentState, preferredID)
 	}
 
-	timestamp, timeWasCapped, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, timeWasCapped, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
 	statelessBlk, err := buildBlock(
+		ctx,
 		b,
 		preferredID,
 		nextHeight,
 		timestamp,
 		timeWasCapped,
 		preferredState,
+		blockContext.PChainHeight,
 	)
 	if err != nil {
 		return nil, err
@@ -253,41 +274,56 @@ func (b *builder) PackAllBlockTxs() ([]*txs.Tx, error) {
 		return nil, fmt.Errorf("%w: %s", errMissingPreferredState, preferredID)
 	}
 
-	timestamp, _, err := state.NextBlockTime(preferredState, b.txExecutorBackend.Clk)
+	timestamp, _, err := state.NextBlockTime(
+		b.txExecutorBackend.Config.ValidatorFeeConfig,
+		preferredState,
+		b.txExecutorBackend.Clk,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not calculate next staker change time: %w", err)
 	}
 
+	recommendedPChainHeight, err := b.txExecutorBackend.Ctx.ValidatorState.GetMinimumHeight(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+
 	if !b.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
 		return packDurangoBlockTxs(
+			context.TODO(),
 			preferredID,
 			preferredState,
 			b.Mempool,
 			b.txExecutorBackend,
 			b.blkManager,
 			timestamp,
+			recommendedPChainHeight,
 			math.MaxInt,
 		)
 	}
 	return packEtnaBlockTxs(
+		context.TODO(),
 		preferredID,
 		preferredState,
 		b.Mempool,
 		b.txExecutorBackend,
 		b.blkManager,
 		timestamp,
+		recommendedPChainHeight,
 		math.MaxUint64,
 	)
 }
 
 // [timestamp] is min(max(now, parent timestamp), next staker change time)
 func buildBlock(
+	ctx context.Context,
 	builder *builder,
 	parentID ids.ID,
 	height uint64,
 	timestamp time.Time,
 	forceAdvanceTime bool,
 	parentState state.Chain,
+	pChainHeight uint64,
 ) (block.Block, error) {
 	var (
 		blockTxs []*txs.Tx
@@ -295,26 +331,33 @@ func buildBlock(
 	)
 	if builder.txExecutorBackend.Config.UpgradeConfig.IsEtnaActivated(timestamp) {
 		blockTxs, err = packEtnaBlockTxs(
+			ctx,
 			parentID,
 			parentState,
 			builder.Mempool,
 			builder.txExecutorBackend,
 			builder.blkManager,
 			timestamp,
+			pChainHeight,
 			0, // minCapacity is 0 as we want to honor the capacity in state.
 		)
 	} else {
 		blockTxs, err = packDurangoBlockTxs(
+			ctx,
 			parentID,
 			parentState,
 			builder.Mempool,
 			builder.txExecutorBackend,
 			builder.blkManager,
 			timestamp,
+			pChainHeight,
 			targetBlockSize,
 		)
 	}
 	if err != nil {
+		builder.txExecutorBackend.Ctx.Log.Warn("failed to pack block transactions",
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to pack block txs: %w", err)
 	}
 
@@ -356,12 +399,14 @@ func buildBlock(
 }
 
 func packDurangoBlockTxs(
+	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
 	mempool mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
+	pChainHeight uint64,
 	remainingSize int,
 ) ([]*txs.Tx, error) {
 	stateDiff, err := state.NewDiffOn(parentState)
@@ -389,11 +434,13 @@ func packDurangoBlockTxs(
 		}
 
 		shouldAdd, err := executeTx(
+			ctx,
 			parentID,
 			stateDiff,
 			mempool,
 			backend,
 			manager,
+			pChainHeight,
 			&inputs,
 			feeCalculator,
 			tx,
@@ -413,12 +460,14 @@ func packDurangoBlockTxs(
 }
 
 func packEtnaBlockTxs(
+	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
 	mempool mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
+	pChainHeight uint64,
 	minCapacity gas.Gas,
 ) ([]*txs.Tx, error) {
 	stateDiff, err := state.NewDiffOn(parentState)
@@ -439,9 +488,26 @@ func packEtnaBlockTxs(
 		blockComplexity gas.Dimensions
 		feeCalculator   = state.PickFeeCalculator(backend.Config, stateDiff)
 	)
+
+	backend.Ctx.Log.Debug("starting to pack block txs",
+		zap.Stringer("parentID", parentID),
+		zap.Time("blockTimestamp", timestamp),
+		zap.Uint64("capacity", uint64(capacity)),
+		zap.Int("mempoolLen", mempool.Len()),
+	)
 	for {
+		currentBlockGas, err := blockComplexity.ToGas(backend.Config.DynamicFeeConfig.Weights)
+		if err != nil {
+			return nil, err
+		}
+
 		tx, exists := mempool.Peek()
 		if !exists {
+			backend.Ctx.Log.Debug("mempool is empty",
+				zap.Uint64("capacity", uint64(capacity)),
+				zap.Uint64("blockGas", uint64(currentBlockGas)),
+				zap.Int("blockLen", len(blockTxs)),
+			)
 			break
 		}
 
@@ -458,15 +524,23 @@ func packEtnaBlockTxs(
 			return nil, err
 		}
 		if newBlockGas > capacity {
+			backend.Ctx.Log.Debug("block is full",
+				zap.Uint64("nextBlockGas", uint64(newBlockGas)),
+				zap.Uint64("capacity", uint64(capacity)),
+				zap.Uint64("blockGas", uint64(currentBlockGas)),
+				zap.Int("blockLen", len(blockTxs)),
+			)
 			break
 		}
 
 		shouldAdd, err := executeTx(
+			ctx,
 			parentID,
 			stateDiff,
 			mempool,
 			backend,
 			manager,
+			pChainHeight,
 			&inputs,
 			feeCalculator,
 			tx,
@@ -486,11 +560,13 @@ func packEtnaBlockTxs(
 }
 
 func executeTx(
+	ctx context.Context,
 	parentID ids.ID,
 	stateDiff state.Diff,
 	mempool mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
+	pChainHeight uint64,
 	inputs *set.Set[ids.ID],
 	feeCalculator fee.Calculator,
 	tx *txs.Tx,
@@ -499,38 +575,71 @@ func executeTx(
 
 	// Invariant: [tx] has already been syntactically verified.
 
+	txID := tx.ID()
+	err := txexecutor.VerifyWarpMessages(
+		ctx,
+		backend.Ctx.NetworkID,
+		backend.Ctx.ValidatorState,
+		pChainHeight,
+		tx.Unsigned,
+	)
+	if err != nil {
+		backend.Ctx.Log.Debug("transaction failed warp verification",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
+		mempool.MarkDropped(txID, err)
+		return false, nil
+	}
+
 	txDiff, err := state.NewDiffOn(stateDiff)
 	if err != nil {
 		return false, err
 	}
 
-	executor := &txexecutor.StandardTxExecutor{
-		Backend:       backend,
-		State:         txDiff,
-		FeeCalculator: feeCalculator,
-		Tx:            tx,
-	}
-
-	err = tx.Unsigned.Visit(executor)
+	txInputs, _, _, err := txexecutor.StandardTx(
+		backend,
+		feeCalculator,
+		tx,
+		txDiff,
+	)
 	if err != nil {
-		txID := tx.ID()
+		backend.Ctx.Log.Debug("transaction failed execution",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
 
-	if inputs.Overlaps(executor.Inputs) {
-		txID := tx.ID()
+	if inputs.Overlaps(txInputs) {
+		// This log is a warn because the mempool should not have allowed this
+		// transaction to be included.
+		backend.Ctx.Log.Warn("transaction conflicts with prior transaction",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, blockexecutor.ErrConflictingBlockTxs)
 		return false, nil
 	}
-	err = manager.VerifyUniqueInputs(parentID, executor.Inputs)
-	if err != nil {
-		txID := tx.ID()
+	if err := manager.VerifyUniqueInputs(parentID, txInputs); err != nil {
+		backend.Ctx.Log.Debug("transaction conflicts with ancestor's import transaction",
+			zap.Stringer("txID", txID),
+			zap.Error(err),
+		)
+
 		mempool.MarkDropped(txID, err)
 		return false, nil
 	}
-	inputs.Union(executor.Inputs)
+	inputs.Union(txInputs)
 
+	backend.Ctx.Log.Debug("successfully executed transaction",
+		zap.Stringer("txID", txID),
+		zap.Error(err),
+	)
 	txDiff.AddTx(tx, status.Committed)
 	return true, txDiff.Apply(stateDiff)
 }

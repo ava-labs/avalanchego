@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -259,7 +258,7 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.Config.MinValidatorStake,
+				Wght:   vm.Internal.MinValidatorStake,
 			},
 			Subnet: subnetID,
 		},
@@ -276,7 +275,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 
 	wallet := newWallet(t, vm, walletConfig{})
 
-	sk, err := bls.NewSecretKey()
+	sk, err := bls.NewSigner()
 	require.NoError(err)
 
 	rewardsOwner := &secp256k1fx.OutputOwners{
@@ -290,7 +289,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
-				Wght:   vm.Config.MinValidatorStake,
+				Wght:   vm.Internal.MinValidatorStake,
 			},
 			Subnet: constants.PrimaryNetworkID,
 		},
@@ -414,7 +413,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 	currentTime = currentTime.Add(txexecutor.SyncBound)
 	switch endTime := currentTime.Add(defaultMinStakingDuration); events[0] {
 	case startPrimaryWithBLS:
-		sk, err := bls.NewSecretKey()
+		sk, err := bls.NewSigner()
 		if err != nil {
 			return nil, fmt.Errorf("could not make private key: %w", err)
 		}
@@ -424,7 +423,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 			startTime: currentTime,
 			endTime:   endTime,
 			nodeID:    nodeID,
-			publicKey: bls.PublicFromSecretKey(sk),
+			publicKey: sk.PublicKey(),
 		})
 	default:
 		return nil, fmt.Errorf("unexpected initial event %d", events[0])
@@ -452,7 +451,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 
 		case startPrimaryWithBLS:
 			currentTime = currentPrimaryVal.endTime.Add(txexecutor.SyncBound)
-			sk, err := bls.NewSecretKey()
+			sk, err := bls.NewSigner()
 			if err != nil {
 				return nil, fmt.Errorf("could not make private key: %w", err)
 			}
@@ -463,7 +462,7 @@ func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeI
 				startTime: currentTime,
 				endTime:   endTime,
 				nodeID:    nodeID,
-				publicKey: bls.PublicFromSecretKey(sk),
+				publicKey: sk.PublicKey(),
 			}
 			res = append(res, val)
 			currentPrimaryVal = val
@@ -620,24 +619,18 @@ func TestTimestampListGenerator(t *testing.T) {
 // add a single validator at the end of times,
 // to make sure it won't pollute our tests
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
-	vm := &VM{Config: config.Config{
+	vm := &VM{Internal: config.Internal{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
-		StaticFeeConfig: fee.StaticConfig{
-			TxFee:                 defaultTxFee,
-			CreateSubnetTxFee:     100 * defaultTxFee,
-			TransformSubnetTxFee:  100 * defaultTxFee,
-			CreateBlockchainTxFee: 100 * defaultTxFee,
-		},
-		MinValidatorStake: defaultMinValidatorStake,
-		MaxValidatorStake: defaultMaxValidatorStake,
-		MinDelegatorStake: defaultMinDelegatorStake,
-		MinStakeDuration:  defaultMinStakingDuration,
-		MaxStakeDuration:  defaultMaxStakingDuration,
-		RewardConfig:      defaultRewardConfig,
-		UpgradeConfig:     upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.DefaultValidatorStartTime),
+		MinValidatorStake:      defaultMinValidatorStake,
+		MaxValidatorStake:      defaultMaxValidatorStake,
+		MinDelegatorStake:      defaultMinDelegatorStake,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, genesistest.DefaultValidatorStartTime),
 	}}
 	vm.clock.Set(genesistest.DefaultValidatorStartTime.Add(time.Second))
 

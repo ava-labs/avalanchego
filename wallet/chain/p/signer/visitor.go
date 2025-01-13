@@ -28,7 +28,7 @@ var (
 	ErrUnknownInputType      = errors.New("unknown input type")
 	ErrUnknownOutputType     = errors.New("unknown output type")
 	ErrInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
-	ErrUnknownSubnetAuthType = errors.New("unknown subnet auth type")
+	ErrUnknownAuthType       = errors.New("unknown auth type")
 	ErrUnknownOwnerType      = errors.New("unknown owner type")
 	ErrUnknownCredentialType = errors.New("unknown credential type")
 
@@ -51,14 +51,6 @@ func (*visitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
-func (s *visitor) BaseTx(tx *txs.BaseTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	return sign(s.tx, false, txSigners)
-}
-
 func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
@@ -72,7 +64,7 @@ func (s *visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 	if err != nil {
 		return err
 	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.SubnetValidator.Subnet, tx.SubnetAuth)
+	subnetAuthSigners, err := s.getAuthSigners(tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -93,7 +85,7 @@ func (s *visitor) CreateChainTx(tx *txs.CreateChainTx) error {
 	if err != nil {
 		return err
 	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.SubnetID, tx.SubnetAuth)
+	subnetAuthSigners, err := s.getAuthSigners(tx.SubnetID, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -135,33 +127,7 @@ func (s *visitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error
 	if err != nil {
 		return err
 	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, true, txSigners)
-}
-
-func (s *visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, true, txSigners)
-}
-
-func (s *visitor) ConvertSubnetTx(tx *txs.ConvertSubnetTx) error {
-	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
-	if err != nil {
-		return err
-	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -174,7 +140,7 @@ func (s *visitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
 	if err != nil {
 		return err
 	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
@@ -195,6 +161,77 @@ func (s *visitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegato
 	if err != nil {
 		return err
 	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) BaseTx(tx *txs.BaseTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
+func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getAuthSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	disableAuthSigners, err := s.getAuthSigners(tx.ValidationID, tx.DisableAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, disableAuthSigners)
 	return sign(s.tx, true, txSigners)
 }
 
@@ -253,17 +290,17 @@ func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput
 	return txSigners, nil
 }
 
-func (s *visitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable) ([]keychain.Signer, error) {
-	subnetInput, ok := subnetAuth.(*secp256k1fx.Input)
+func (s *visitor) getAuthSigners(ownerID ids.ID, auth verify.Verifiable) ([]keychain.Signer, error) {
+	input, ok := auth.(*secp256k1fx.Input)
 	if !ok {
-		return nil, ErrUnknownSubnetAuthType
+		return nil, ErrUnknownAuthType
 	}
 
-	ownerIntf, err := s.backend.GetSubnetOwner(s.ctx, subnetID)
+	ownerIntf, err := s.backend.GetOwner(s.ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to fetch subnet owner for %q: %w",
-			subnetID,
+			"failed to fetch owner for %q: %w",
+			ownerID,
 			err,
 		)
 	}
@@ -272,8 +309,8 @@ func (s *visitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable
 		return nil, ErrUnknownOwnerType
 	}
 
-	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))
-	for sigIndex, addrIndex := range subnetInput.SigIndices {
+	authSigners := make([]keychain.Signer, len(input.SigIndices))
+	for sigIndex, addrIndex := range input.SigIndices {
 		if addrIndex >= uint32(len(owner.Addrs)) {
 			return nil, ErrInvalidUTXOSigIndex
 		}

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -118,7 +119,7 @@ var (
 
 // New returns an instance of Node
 func New(
-	config *Config,
+	config *node.Config,
 	logFactory logging.Factory,
 	logger logging.Logger,
 ) (*Node, error) {
@@ -357,7 +358,7 @@ type Node struct {
 	APIServer server.Server
 
 	// This node's configuration
-	Config *Config
+	Config *node.Config
 
 	tracer trace.Tracer
 
@@ -583,7 +584,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
-			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
+			n.Config.StakingSigningKey.PublicKey(),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
 		)
@@ -600,7 +601,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	}
 
 	n.onSufficientlyConnected = make(chan struct{})
-	numBootstrappers := n.bootstrappers.Count(constants.PrimaryNetworkID)
+	numBootstrappers := n.bootstrappers.NumValidators(constants.PrimaryNetworkID)
 	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
@@ -632,7 +633,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.DurangoTime,
+		n.Config.UpgradeConfig.EtnaTime,
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -650,7 +651,7 @@ func (n *Node) writeProcessContext() error {
 	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
 
 	// Write the process context to disk
-	processContext := &ProcessContext{
+	processContext := &node.ProcessContext{
 		PID:            os.Getpid(),
 		URI:            n.apiURI,
 		StakingAddress: n.stakingAddress, // Set by network initialization
@@ -1207,15 +1208,13 @@ func (n *Node) initVMs() error {
 	// Register the VMs that Avalanche supports
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
-			Config: platformconfig.Config{
+			Internal: platformconfig.Internal{
 				Chains:                    n.chainManager,
 				Validators:                vdrs,
 				UptimeLockedCalculator:    n.uptimeCalculator,
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
-				StaticFeeConfig:           n.Config.StaticFeeConfig,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
@@ -1233,7 +1232,7 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				Upgrades:         n.Config.UpgradeConfig,
-				TxFee:            n.Config.StaticFeeConfig.TxFee,
+				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
@@ -1404,13 +1403,12 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:     version.CurrentApp,
-			NodeID:      n.ID,
-			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:   n.Config.NetworkID,
-			TxFeeConfig: n.Config.TxFeeConfig,
-			VMManager:   n.VMManager,
-			Upgrades:    n.Config.UpgradeConfig,
+			Version:   version.CurrentApp,
+			NodeID:    n.ID,
+			NodePOP:   signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NetworkID: n.Config.NetworkID,
+			VMManager: n.VMManager,
+			Upgrades:  n.Config.UpgradeConfig,
 		},
 		n.Log,
 		n.vdrs,
@@ -1493,6 +1491,32 @@ func (n *Node) initHealthAPI() error {
 	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
+	}
+
+	wrongBLSKeyCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+		vdr, ok := n.vdrs.GetValidator(constants.PrimaryNetworkID, n.ID)
+		if !ok {
+			return "node is not a validator", nil
+		}
+
+		vdrPK := vdr.PublicKey
+		if vdrPK == nil {
+			return "validator doesn't have a BLS key", nil
+		}
+
+		nodePK := n.Config.StakingSigningKey.PublicKey()
+		if nodePK.Equals(vdrPK) {
+			return "node has the correct BLS key", nil
+		}
+		return nil, fmt.Errorf("node has BLS key 0x%x, but is registered to the validator set with 0x%x",
+			bls.PublicKeyToCompressedBytes(nodePK),
+			bls.PublicKeyToCompressedBytes(vdrPK),
+		)
+	})
+
+	err = n.health.RegisterHealthCheck("bls", wrongBLSKeyCheck, health.ApplicationTag)
+	if err != nil {
+		return fmt.Errorf("couldn't register bls health check: %w", err)
 	}
 
 	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
