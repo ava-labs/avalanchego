@@ -1344,7 +1344,7 @@ func TestGetFeeConfig(t *testing.T) {
 }
 
 func FuzzGetFeeState(f *testing.F) {
-	f.Fuzz(func(t *testing.T, capacity, excess, l1ValidatorExcess uint64) {
+	f.Fuzz(func(t *testing.T, capacity, excess uint64) {
 		require := require.New(t)
 
 		service, _ := defaultService(t)

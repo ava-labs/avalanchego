@@ -695,14 +695,14 @@ platform.getCurrentValidators({
   - `delegators` is the list of delegators to this validator.
     Omitted if `subnetID` is not a PoS Subnet.
     Omitted unless `nodeIDs` specifies a single NodeID.
-    - `txID` is the delegator transaction.
-    - `startTime` is the Unix time when the delegator started.
-    - `endTime` is the Unix time when the delegator stops.
-    - `stakeAmount` is the amount of nAVAX this delegator staked.
-    - `nodeID` is the validating node’s node ID.
-    - `rewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and array of
+  - `txID` is the delegator transaction.
+  - `startTime` is the Unix time when the delegator started.
+  - `endTime` is the Unix time when the delegator stops.
+  - `stakeAmount` is the amount of nAVAX this delegator staked.
+  - `nodeID` is the validating node’s node ID.
+  - `rewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and array of
       `addresses`.
-    - `potentialReward` is the potential reward earned from staking
+  - `potentialReward` is the potential reward earned from staking
 
 **Example Call:**
 
