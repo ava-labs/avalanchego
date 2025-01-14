@@ -1,44 +1,23 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package blstest
+package bls
 
 import (
-	"crypto/rand"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-
-	blst "github.com/supranational/blst/bindings/go"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/blstest"
 )
-
-func newKey(require *require.Assertions) *blst.SecretKey {
-	var ikm [32]byte
-	_, err := rand.Read(ikm[:])
-	require.NoError(err)
-	sk := blst.KeyGen(ikm[:])
-	ikm = [32]byte{} // zero out the ikm
-
-	return sk
-}
-
-func sign(sk *blst.SecretKey, msg []byte) *bls.Signature {
-	return new(bls.Signature).Sign(sk, msg, bls.CiphersuiteSignature)
-}
-
-func publicKey(sk *blst.SecretKey) *bls.PublicKey {
-	return new(bls.PublicKey).From(sk)
-}
 
 func BenchmarkVerify(b *testing.B) {
 	privateKey := newKey(require.New(b))
 	publicKey := publicKey(privateKey)
 
-	for _, messageSize := range BenchmarkSizes {
+	for _, messageSize := range blstest.BenchmarkSizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
 
 			message := utils.RandomBytes(messageSize)
@@ -47,14 +26,14 @@ func BenchmarkVerify(b *testing.B) {
 			b.ResetTimer()
 
 			for n := 0; n < b.N; n++ {
-				require.True(b, bls.Verify(publicKey, signature, message))
+				require.True(b, Verify(publicKey, signature, message))
 			}
 		})
 	}
 }
 
 func BenchmarkAggregatePublicKeys(b *testing.B) {
-	keys := make([]*bls.PublicKey, BiggestBenchmarkSize)
+	keys := make([]*PublicKey, blstest.BiggestBenchmarkSize)
 
 	for i := range keys {
 		privateKey := newKey(require.New(b))
@@ -62,10 +41,10 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 		keys[i] = publicKey(privateKey)
 	}
 
-	for _, size := range BenchmarkSizes {
+	for _, size := range blstest.BenchmarkSizes {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				_, err := bls.AggregatePublicKeys(keys[:size])
+				_, err := AggregatePublicKeys(keys[:size])
 				require.NoError(b, err)
 			}
 		})
@@ -79,7 +58,7 @@ func BenchmarkPublicKeyToCompressedBytes(b *testing.B) {
 
 	b.ResetTimer()
 	for range b.N {
-		bls.PublicKeyToCompressedBytes(pk)
+		PublicKeyToCompressedBytes(pk)
 	}
 }
 
@@ -87,11 +66,11 @@ func BenchmarkPublicKeyFromCompressedBytes(b *testing.B) {
 	sk := newKey(require.New(b))
 
 	pk := publicKey(sk)
-	pkBytes := bls.PublicKeyToCompressedBytes(pk)
+	pkBytes := PublicKeyToCompressedBytes(pk)
 
 	b.ResetTimer()
 	for range b.N {
-		_, _ = bls.PublicKeyFromCompressedBytes(pkBytes)
+		_, _ = PublicKeyFromCompressedBytes(pkBytes)
 	}
 }
 
@@ -102,7 +81,7 @@ func BenchmarkPublicKeyToUncompressedBytes(b *testing.B) {
 
 	b.ResetTimer()
 	for range b.N {
-		bls.PublicKeyToUncompressedBytes(pk)
+		PublicKeyToUncompressedBytes(pk)
 	}
 }
 
@@ -110,11 +89,11 @@ func BenchmarkPublicKeyFromValidUncompressedBytes(b *testing.B) {
 	sk := newKey(require.New(b))
 
 	pk := publicKey(sk)
-	pkBytes := bls.PublicKeyToUncompressedBytes(pk)
+	pkBytes := PublicKeyToUncompressedBytes(pk)
 
 	b.ResetTimer()
 	for range b.N {
-		_ = bls.PublicKeyFromValidUncompressedBytes(pkBytes)
+		_ = PublicKeyFromValidUncompressedBytes(pkBytes)
 	}
 }
 
@@ -123,10 +102,10 @@ func BenchmarkSignatureFromBytes(b *testing.B) {
 
 	message := utils.RandomBytes(32)
 	signature := sign(sk, message)
-	signatureBytes := bls.SignatureToBytes(signature)
+	signatureBytes := SignatureToBytes(signature)
 
 	b.ResetTimer()
 	for range b.N {
-		_, _ = bls.SignatureFromBytes(signatureBytes)
+		_, _ = SignatureFromBytes(signatureBytes)
 	}
 }

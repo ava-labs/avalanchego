@@ -55,3 +55,16 @@ func AggregateSignatures(sigs []*Signature) (*Signature, error) {
 	}
 	return agg.ToAffine(), nil
 }
+
+func AggregateAndVerify(publicKeys []*PublicKey, signatures []*Signature, message []byte) (bool, error) {
+	aggSig, err := AggregateSignatures(signatures)
+	if err != nil {
+		return false, err
+	}
+	aggPK, err := AggregatePublicKeys(publicKeys)
+	if err != nil {
+		return false, err
+	}
+
+	return Verify(aggPK, aggSig, message), nil
+}

@@ -32,19 +32,6 @@ func sign(sk *blst.SecretKey, msg []byte) *Signature {
 	return new(Signature).Sign(sk, msg, CiphersuiteSignature)
 }
 
-func AggregateAndVerify(publicKeys []*PublicKey, signatures []*Signature, message []byte) (bool, error) {
-	aggSig, err := AggregateSignatures(signatures)
-	if err != nil {
-		return false, err
-	}
-	aggPK, err := AggregatePublicKeys(publicKeys)
-	if err != nil {
-		return false, err
-	}
-
-	return Verify(aggPK, aggSig, message), nil
-}
-
 func TestAggregationThreshold(t *testing.T) {
 	require := require.New(t)
 
