@@ -900,7 +900,6 @@ curl -X POST --data '{
     "result": {
         "capacity": 20000,
         "target": 10000,
-        "targetPerSecond": 50000,
         "minPrice": 512,
         "excessConversionConstant": 1246488515
     },
