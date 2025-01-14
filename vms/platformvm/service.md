@@ -770,7 +770,7 @@ curl -X POST --data '{
 
 ### `platform.getFeeConfig`
 
-Returns the dynamic fees configuration of the P-chain.
+Returns the dynamic fee configuration of the P-chain.
 
 **Signature:**
 
@@ -855,6 +855,92 @@ curl -X POST --data '{
 		    "capacity":973044,
 		    "excess":26956,
 		    "price":1,
+		    "timestamp":"2024-12-16T17:19:07Z"
+    },
+    "id": 1
+}
+```
+
+### `platform.getValidatorFeeConfig`
+
+Returns the validator fee configuration of the P-chain.
+
+**Signature:**
+
+```
+platform.getValidatorFeeConfig() -> {
+  capacity: uint64,
+  target: uint64,
+  minPrice: uint64,
+  excessConversionConstant: uint64
+}
+```
+
+- `capacity` is the maximum number of L1 validators the chain is allowed to have at any given time
+- `target` is the target number of L1 validators the chain should have to keep fees stable
+- `minPrice` is the minimum price per L1 validator
+- `excessConversionConstant` is used to convert excess L1 validators to a gas price
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getValidatorFeeConfig",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "capacity": 20000,
+        "target": 10000,
+        "targetPerSecond": 50000,
+        "minPrice": 512,
+        "excessConversionConstant": 1246488515
+    },
+    "id": 1
+}
+```
+
+### `platform.getValidatorFeeState`
+
+Returns the current validator fee state of the P-chain.
+
+**Signature:**
+
+```
+platform.getValidatorFeeState() -> {
+  excess: uint64,
+  price: uint64,
+  timestamp: string
+}
+```
+
+**Example Call:**
+
+```sh
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getValidatorFeeState",
+    "params": {},
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+		    "excess":26956,
+		    "price":512,
 		    "timestamp":"2024-12-16T17:19:07Z"
     },
     "id": 1

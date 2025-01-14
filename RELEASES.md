@@ -6,6 +6,15 @@ This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/av
 
 The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
 
+### APIs
+
+- Removed:
+  - `info.GetTxFee`
+- Added:
+  - `avm.GetTxFee`
+  - `platform.getValidatorFeeConfig`
+  - `platform.getValidatorFeeState`
+
 ### Configs
 
 - Removed static fee config flags
@@ -16,11 +25,6 @@ The plugin version is unchanged at `38` and is compatible with versions `v1.12.0
   - `--add-primary-network-delegator-fee`
   - `--add-subnet-validator-fee`
   - `--add-subnet-delegator-fee`
-
-### APIs
-
-- Removed `info.GetTxFee`
-- Added `avm.GetTxFee`
   
 ### What's Changed
 
