@@ -827,43 +827,6 @@ Transaction fee, in nAVAX, for transactions that create new assets. Defaults to
 `10000000` nAVAX (.01 AVAX) per transaction. This can only be changed on a local
 network.
 
-#### `--create-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local
-network.
-
-#### `--create-blockchain-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that create new blockchains.
-Defaults to `1000000000` nAVAX (1 AVAX) per transaction. This can only be
-changed on a local network.
-
-#### `--transform-subnet-tx-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that transform Subnets. Defaults to
-`1000000000` nAVAX (1 AVAX) per transaction. This can only be changed on a local network.
-
-#### `--add-primary-network-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network validators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-primary-network-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new primary network delegators. Defaults to 0.
-This can only be changed on a local network.
-
-#### `--add-subnet-validator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet validators.
-Defaults to `10000000` nAVAX (.01 AVAX).
-
-#### `--add-subnet-delegator-fee` (int)
-
-Transaction fee, in nAVAX, for transactions that add new Subnet delegators.
-Defaults to `10000000` nAVAX (.01 AVAX).
-
 #### `--min-delegator-stake` (int)
 
 The minimum stake, in nAVAX, that can be delegated to a validator of the Primary Network.

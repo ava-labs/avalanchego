@@ -1215,8 +1215,6 @@ func (n *Node) initVMs() error {
 				SybilProtectionEnabled:    n.Config.SybilProtectionEnabled,
 				PartialSyncPrimaryNetwork: n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:            n.Config.TrackedSubnets,
-				CreateAssetTxFee:          n.Config.CreateAssetTxFee,
-				StaticFeeConfig:           n.Config.StaticFeeConfig,
 				DynamicFeeConfig:          n.Config.DynamicFeeConfig,
 				ValidatorFeeConfig:        n.Config.ValidatorFeeConfig,
 				UptimePercentage:          n.Config.UptimeRequirement,
@@ -1234,7 +1232,7 @@ func (n *Node) initVMs() error {
 		n.VMManager.RegisterFactory(context.TODO(), constants.AVMID, &avm.Factory{
 			Config: avmconfig.Config{
 				Upgrades:         n.Config.UpgradeConfig,
-				TxFee:            n.Config.StaticFeeConfig.TxFee,
+				TxFee:            n.Config.TxFee,
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
@@ -1405,13 +1403,12 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:     version.CurrentApp,
-			NodeID:      n.ID,
-			NodePOP:     signer.NewProofOfPossession(n.Config.StakingSigningKey),
-			NetworkID:   n.Config.NetworkID,
-			TxFeeConfig: n.Config.TxFeeConfig,
-			VMManager:   n.VMManager,
-			Upgrades:    n.Config.UpgradeConfig,
+			Version:   version.CurrentApp,
+			NodeID:    n.ID,
+			NodePOP:   signer.NewProofOfPossession(n.Config.StakingSigningKey),
+			NetworkID: n.Config.NetworkID,
+			VMManager: n.VMManager,
+			Upgrades:  n.Config.UpgradeConfig,
 		},
 		n.Log,
 		n.vdrs,

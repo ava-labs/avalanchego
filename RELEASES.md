@@ -1,5 +1,31 @@
 # Release Notes
 
+## [v1.12.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2)
+
+This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `38` and is compatible with versions `v1.12.0-v1.12.1`.
+
+### Configs
+
+- Removed static fee config flags
+  - `--create-subnet-tx-fee`
+  - `--transform-subnet-tx-fee`
+  - `--create-blockchain-tx-fee`
+  - `--add-primary-network-validator-fee`
+  - `--add-primary-network-delegator-fee`
+  - `--add-subnet-validator-fee`
+  - `--add-subnet-delegator-fee`
+
+### APIs
+
+- Removed `info.GetTxFee`
+- Added `avm.GetTxFee`
+  
+### What's Changed
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.12.1...v1.12.2
+
 ## [v1.12.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.1)
 
 This version is backwards compatible to [v1.12.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0). It is optional, but encouraged.

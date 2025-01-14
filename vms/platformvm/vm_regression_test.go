@@ -526,7 +526,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			ID: vm.ctx.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.StaticFeeConfig.TxFee,
+			Amt:          1,
 			OutputOwners: secp256k1fx.OutputOwners{},
 		},
 	}
@@ -543,7 +543,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: vm.StaticFeeConfig.TxFee,
+					Amt: 1,
 				},
 			},
 		},
@@ -758,7 +758,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			ID: vm.ctx.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
-			Amt:          vm.StaticFeeConfig.TxFee,
+			Amt:          1,
 			OutputOwners: secp256k1fx.OutputOwners{},
 		},
 	}
@@ -775,7 +775,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 				UTXOID: utxo.UTXOID,
 				Asset:  utxo.Asset,
 				In: &secp256k1fx.TransferInput{
-					Amt: vm.StaticFeeConfig.TxFee,
+					Amt: 1,
 				},
 			},
 		},
