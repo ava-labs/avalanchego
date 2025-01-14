@@ -2003,7 +2003,7 @@ func (s *Service) GetFeeState(_ *http.Request, _ *struct{}, reply *GetFeeStateRe
 	return nil
 }
 
-// GetValidatorFeeConfig returns the dynamic fee config of the chain.
+// GetValidatorFeeConfig returns the validator fee config of the chain.
 func (s *Service) GetValidatorFeeConfig(_ *http.Request, _ *struct{}, reply *fee.Config) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
