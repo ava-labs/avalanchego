@@ -87,6 +87,7 @@ func TestVerifyWrongMessageSignedSignature(t *testing.T) {
 	isValid := bls.Verify(pk, wrongSig, msg)
 	require.False(isValid)
 }
+
 func TestValidAggregation(t *testing.T) {
 	require := require.New(t)
 	server, signer1, pk1 := NewSigner(require)

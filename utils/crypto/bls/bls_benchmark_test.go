@@ -19,7 +19,6 @@ func BenchmarkVerify(b *testing.B) {
 
 	for _, messageSize := range blstest.BenchmarkSizes {
 		b.Run(strconv.Itoa(messageSize), func(b *testing.B) {
-
 			message := utils.RandomBytes(messageSize)
 			signature := sign(privateKey, message)
 

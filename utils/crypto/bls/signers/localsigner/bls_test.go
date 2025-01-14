@@ -104,6 +104,7 @@ func TestSingleKeyAggregation(t *testing.T) {
 	require.NoError(err)
 	require.True(isValid)
 }
+
 func TestIncorrectMessageAggregation(t *testing.T) {
 	require := require.New(t)
 	sk1, pk1 := NewKeyPair(require)
