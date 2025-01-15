@@ -1412,8 +1412,8 @@ func FuzzGetValidatorFeeState(f *testing.F) {
 		service.vm.state.SetTimestamp(expectedTime)
 		service.vm.ctx.Lock.Unlock()
 
-		var reply GetFeeStateReply
-		require.NoError(service.GetFeeState(nil, nil, &reply))
+		var reply GetValidatorFeeStateReply
+		require.NoError(service.GetValidatorFeeState(nil, nil, &reply))
 		require.Equal(expectedReply, reply)
 	})
 }
