@@ -82,6 +82,8 @@ type Backend interface {
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
 	GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig, *big.Int, error)
 	BadBlocks() ([]*types.Block, []*core.BadBlockReason)
+	IsArchive() bool
+	HistoricalProofQueryWindow() uint64
 
 	// Transaction pool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
