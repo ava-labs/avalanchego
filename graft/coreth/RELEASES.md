@@ -1,5 +1,9 @@
 # Release Notes
 
+## Pending Release
+
+- Removed deprecated `ExportKey`, `ExportAVAX`, `Export`, `ImportKey`, `ImportAVAX`, `Import` APIs
+
 ## [v0.14.1](https://github.com/ava-labs/coreth/releases/tag/v0.14.1)
 
 - IMPORTANT: `eth_getProof` calls for historical state will be rejected by default.
