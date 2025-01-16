@@ -197,6 +197,7 @@ func ReadNetwork(dir string) (*Network, error) {
 func (n *Network) EnsureDefaultConfig(log logging.Logger, avalancheGoPath string, pluginDir string) error {
 	log.Info("preparing configuration for new network",
 		zap.String("avalanchegoPath", avalancheGoPath),
+		zap.String("pluginDir", pluginDir),
 	)
 
 	// A UUID supports centralized metrics collection
