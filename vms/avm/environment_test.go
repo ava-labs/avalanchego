@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -25,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	"github.com/ava-labs/avalanchego/vms/avm/config"
@@ -37,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
 const (
@@ -79,16 +76,9 @@ func init() {
 	}
 }
 
-type user struct {
-	username    string
-	password    string
-	initialKeys []*secp256k1.PrivateKey
-}
-
 type envConfig struct {
 	fork             upgradetest.Fork
 	isCustomFeeAsset bool
-	keystoreUsers    []*user
 	vmStaticConfig   *config.Config
 	vmDynamicConfig  *Config
 	additionalFxs    []*common.Fx
@@ -131,20 +121,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	// NB: this lock is intentionally left locked when this function returns.
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
-
-	userKeystore := keystore.New(logging.NoLog{}, memdb.New())
-	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
-
-	for _, user := range c.keystoreUsers {
-		require.NoError(userKeystore.CreateUser(user.username, user.password))
-
-		// Import the initially funded private keys
-		keystoreUser, err := keystoreutils.NewUserFromKeystore(ctx.Keystore, user.username, user.password)
-		require.NoError(err)
-
-		require.NoError(keystoreUser.PutKeys(user.initialKeys...))
-		require.NoError(keystoreUser.Close())
-	}
 
 	vmStaticConfig := config.Config{
 		Upgrades:         upgradetest.GetConfig(c.fork),

@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
@@ -110,8 +109,7 @@ var (
 	genesisHashKey     = []byte("genesisID")
 	ungracefulShutdown = []byte("ungracefulShutdown")
 
-	indexerDBPrefix  = []byte{0x00}
-	keystoreDBPrefix = []byte("keystore")
+	indexerDBPrefix = []byte{0x00}
 
 	errInvalidTLSKey = errors.New("invalid TLS key")
 	errShuttingDown  = errors.New("server shutting down")
@@ -190,10 +188,6 @@ func New(
 
 	if err := n.initDatabase(); err != nil { // Set up the node's database
 		return nil, fmt.Errorf("problem initializing database: %w", err)
-	}
-
-	if err := n.initKeystoreAPI(); err != nil { // Start the Keystore API
-		return nil, fmt.Errorf("couldn't initialize keystore API: %w", err)
 	}
 
 	n.initSharedMemory() // Initialize shared memory
@@ -305,9 +299,6 @@ type Node struct {
 
 	// Indexes blocks, transactions and blocks
 	indexer indexer.Indexer
-
-	// Handles calls to Keystore API
-	keystore keystore.Keystore
 
 	// Manages shared memory
 	sharedMemory *atomic.Memory
@@ -1155,7 +1146,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			NodeID:                                  n.ID,
 			NetworkID:                               n.Config.NetworkID,
 			Server:                                  n.APIServer,
-			Keystore:                                n.keystore,
 			AtomicMemory:                            n.sharedMemory,
 			AVAXAssetID:                             avaxAssetID,
 			XChainID:                                xChainID,
@@ -1279,23 +1269,6 @@ func (n *Node) initSharedMemory() {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)
 	n.sharedMemory = atomic.NewMemory(sharedMemoryDB)
-}
-
-// initKeystoreAPI initializes the keystore service, which is an on-node wallet.
-// Assumes n.APIServer is already set
-func (n *Node) initKeystoreAPI() error {
-	n.Log.Info("initializing keystore")
-	n.keystore = keystore.New(n.Log, prefixdb.New(keystoreDBPrefix, n.DB))
-	handler, err := n.keystore.CreateHandler()
-	if err != nil {
-		return err
-	}
-	if !n.Config.KeystoreAPIEnabled {
-		n.Log.Info("skipping keystore API initialization because it has been disabled")
-		return nil
-	}
-	n.Log.Warn("initializing deprecated keystore API")
-	return n.APIServer.AddRoute(handler, "keystore", "")
 }
 
 // initMetricsAPI initializes the Metrics API

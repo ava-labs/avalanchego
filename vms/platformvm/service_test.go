@@ -18,11 +18,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -51,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	vmkeystore "github.com/ava-labs/avalanchego/vms/components/keystore"
 	pchainapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -155,36 +152,6 @@ func TestGetProposedHeight(t *testing.T) {
 	// Confirm that the proposed height has updated to the latest block height
 	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
 	require.Equal(latestBlock.Height(), uint64(reply.Height))
-}
-
-func TestExportKey(t *testing.T) {
-	require := require.New(t)
-
-	service, _ := defaultService(t)
-	service.vm.ctx.Lock.Lock()
-
-	ks := keystore.New(logging.NoLog{}, memdb.New())
-	require.NoError(ks.CreateUser(testUsername, testPassword))
-	service.vm.ctx.Keystore = ks.NewBlockchainKeyStore(service.vm.ctx.ChainID)
-
-	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(err)
-
-	pk, err := secp256k1.ToPrivateKey(testPrivateKey)
-	require.NoError(err)
-
-	require.NoError(user.PutKeys(pk, genesistest.DefaultFundedKeys[0]))
-
-	service.vm.ctx.Lock.Unlock()
-
-	jsonString := `{"username":"` + testUsername + `","password":"` + testPassword + `","address":"` + testAddress + `"}`
-	args := ExportKeyArgs{}
-	require.NoError(json.Unmarshal([]byte(jsonString), &args))
-
-	reply := ExportKeyReply{}
-	require.NoError(service.ExportKey(nil, &args, &reply))
-
-	require.Equal(testPrivateKey, reply.PrivateKey.Bytes())
 }
 
 // Test issuing a tx and accepted
