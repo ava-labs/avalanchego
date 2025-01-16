@@ -1,6 +1,6 @@
 # Subnet EVM
 
-[![Build + Test + Release](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/lint-tests-release.yml)
+[![CI](https://github.com/ava-labs/subnet-evm/actions/workflows/ci.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ava-labs/subnet-evm/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/ava-labs/subnet-evm/actions/workflows/codeql-analysis.yml)
 
 [Avalanche](https://docs.avax.network/overview/getting-started/avalanche-platform) is a network composed of multiple blockchains.
