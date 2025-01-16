@@ -2015,7 +2015,7 @@ curl -X POST --data '{
 
 ### `platform.getValidatorFeeConfig`
 
-Returns the validator fee configuration of the P-chain.
+Returns the validator fee configuration of the P-Chain.
 
 **Signature:**
 
