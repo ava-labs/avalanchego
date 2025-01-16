@@ -13,7 +13,7 @@ set -euo pipefail
 #     $ kill -9 `cat ~/.tmpnet/promtail/run.pid` && rm ~/.tmpnet/promtail/run.pid
 
 # e.g.,
-# LOKI_ID=<id> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
+# LOKI_USERNAME=<username> LOKI_PASSWORD=<password> ./scripts/run_promtail.sh
 if ! [[ "$0" =~ scripts/run_promtail.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -35,9 +35,9 @@ if [[ -z "${LOKI_URL}" ]]; then
   exit 1
 fi
 
-LOKI_ID="${LOKI_ID:-}"
-if [[ -z "${LOKI_ID}" ]]; then
-  echo "Please provide a value for LOKI_ID"
+LOKI_USERNAME="${LOKI_USERNAME:-}"
+if [[ -z "${LOKI_USERNAME}" ]]; then
+  echo "Please provide a value for LOKI_USERNAME"
   exit 1
 fi
 
@@ -97,7 +97,7 @@ positions:
 client:
   url: "${LOKI_URL}/api/prom/push"
   basic_auth:
-    username: "${LOKI_ID}"
+    username: "${LOKI_USERNAME}"
     password: "${LOKI_PASSWORD}"
 
 scrape_configs:
