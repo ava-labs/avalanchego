@@ -1,14 +1,10 @@
 ---
-tags: [X-Chain, AvalancheGo APIs]
+title: X-Chain API
 description: This page is an overview of the Exchange Chain (X-Chain) API associated with AvalancheGo.
-sidebar_label: API
-pagination_label: X-Chain API
 ---
 
-# X-Chain API
-
 The [X-Chain](/learn/avalanche/avalanche-platform.md#x-chain),
-Avalanche’s native platform for creating and trading assets, is an instance of the Avalanche Virtual
+Avalanche's native platform for creating and trading assets, is an instance of the Avalanche Virtual
 Machine (AVM). This API allows clients to create and trade assets on the X-Chain and other instances
 of the AVM.
 
