@@ -12,10 +12,6 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel/attribute"
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
@@ -23,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
@@ -347,8 +345,9 @@ func newDatabase(
 		rootChange: change[maybe.Maybe[*node]]{
 			after: trieDB.root,
 		},
-		values: map[Key]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[Key]*change[*node]{},
+		values:           map[Key]*keyChange{},
+		nodes:            map[Key]*change[*node]{},
+		sortedKeyChanges: []*keyChange{},
 	})
 
 	// mark that the db has not yet been cleanly closed
@@ -747,29 +746,23 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
+	// [changes] contains a subset of the keys that were added or had their
+	// values modified between [startRootID] to [endRootID].
 	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
 	if err != nil {
 		return nil, err
 	}
 
-	// [changedKeys] are a subset of the keys that were added or had their
-	// values modified between [startRootID] to [endRootID] sorted in increasing
-	// order.
-	changedKeys := maps.Keys(changes.values)
-	utils.Sort(changedKeys)
-
 	result := &ChangeProof{
-		KeyChanges: make([]KeyChange, 0, len(changedKeys)),
+		KeyChanges: make([]KeyChange, len(changes)),
 	}
 
-	for _, key := range changedKeys {
-		change := changes.values[key]
-
-		result.KeyChanges = append(result.KeyChanges, KeyChange{
-			Key: key.Bytes(),
+	for i, keyChange := range changes {
+		result.KeyChanges[i] = KeyChange{
+			Key: keyChange.key.Bytes(),
 			// create a copy so edits of the []byte don't affect the db
-			Value: maybe.Bind(change.after, slices.Clone[[]byte]),
-		})
+			Value: maybe.Bind(keyChange.after, slices.Clone[[]byte]),
+		}
 	}
 
 	largestKey := end
@@ -1365,9 +1358,10 @@ func (db *merkleDB) Clear() error {
 	// Clear history
 	db.history = newTrieHistory(db.history.maxHistoryLen)
 	db.history.record(&changeSummary{
-		rootID: db.rootID,
-		values: map[Key]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[Key]*change[*node]{},
+		rootID:           db.rootID,
+		values:           map[Key]*keyChange{},
+		nodes:            map[Key]*change[*node]{},
+		sortedKeyChanges: make([]*keyChange, 0),
 	})
 	return nil
 }

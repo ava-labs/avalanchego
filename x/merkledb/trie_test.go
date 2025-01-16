@@ -69,6 +69,35 @@ func Test_GetValue_Safety(t *testing.T) {
 	require.Equal([]byte{0}, trieVal)
 }
 
+func Test_SortedKeys_State(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	view, err := newView(
+		db,
+		db,
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{Key: []byte("key5"), Value: []byte("value5")},
+				{Key: []byte("key3"), Value: []byte("value3")},
+				{Key: []byte("key2"), Value: []byte("value2")},
+				{Key: []byte("key1"), Value: []byte("value1")},
+				{Key: []byte("key4"), Value: []byte("value4")},
+			},
+		},
+	)
+	require.NoError(err)
+
+	keys := make([]string, len(view.changes.sortedKeyChanges))
+	for i, kc := range view.changes.sortedKeyChanges {
+		keys[i] = kc.key.value
+	}
+
+	require.Equal([]string{"key1", "key2", "key3", "key4", "key5"}, keys)
+}
+
 func Test_GetValues_Safety(t *testing.T) {
 	require := require.New(t)
 

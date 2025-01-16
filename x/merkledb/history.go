@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils/heap"
+	"golang.org/x/exp/maps"
+	"slices"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -52,22 +53,29 @@ type changeSummaryAndInsertNumber struct {
 	insertNumber uint64
 }
 
+type keyChange struct {
+	*change[maybe.Maybe[[]byte]]
+	key Key
+}
+
 // Tracks all the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	// The ID of the trie after these changes.
 	rootID ids.ID
 	// The root before/after this change.
 	// Set in [applyValueChanges].
-	rootChange change[maybe.Maybe[*node]]
-	nodes      map[Key]*change[*node]
-	values     map[Key]*change[maybe.Maybe[[]byte]]
+	rootChange       change[maybe.Maybe[*node]]
+	nodes            map[Key]*change[*node]
+	values           map[Key]*keyChange
+	sortedKeyChanges []*keyChange
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:      make(map[Key]*change[*node], estimatedSize),
-		values:     make(map[Key]*change[maybe.Maybe[[]byte]], estimatedSize),
-		rootChange: change[maybe.Maybe[*node]]{},
+		nodes:            make(map[Key]*change[*node], estimatedSize),
+		values:           make(map[Key]*keyChange, estimatedSize),
+		sortedKeyChanges: make([]*keyChange, 0, estimatedSize),
+		rootChange:       change[maybe.Maybe[*node]]{},
 	}
 }
 
@@ -79,7 +87,7 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 	}
 }
 
-// Returns up to [maxLength] key-value pair changes with keys in
+// Returns up to [maxLength] sorted changes with keys in
 // [start, end] that occurred between [startRoot] and [endRoot].
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
@@ -93,13 +101,13 @@ func (th *trieHistory) getValueChanges(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
-) (*changeSummary, error) {
+) ([]*keyChange, error) {
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
 
 	if startRoot == endRoot {
-		return newChangeSummary(maxLength), nil
+		return []*keyChange{}, nil
 	}
 
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
@@ -156,11 +164,23 @@ func (th *trieHistory) getValueChanges(
 		}
 	}
 
-	var (
-		// Keep track of changed keys so the largest can be removed
-		// in order to stay within the [maxLength] limit if necessary.
-		changedKeys = set.Set[Key]{}
+	// historyChangesIndex is used for tracking keyChanges index from each historical root.
+	type historyChangesIndex struct {
+		changes       *changeSummaryAndInsertNumber
+		kvChangeIndex int
+	}
 
+	// historyChangesIndexHeap is used to traverse the changes sorted by ASC [key] and ASC [insertNumber].
+	historyChangesIndexHeap := heap.NewQueue[*historyChangesIndex](func(a, b *historyChangesIndex) bool {
+		keyComparison := a.changes.sortedKeyChanges[a.kvChangeIndex].key.Compare(b.changes.sortedKeyChanges[b.kvChangeIndex].key)
+		if keyComparison != 0 {
+			return keyComparison < 0
+		}
+
+		return a.changes.insertNumber < b.changes.insertNumber
+	})
+
+	var (
 		startKey = maybe.Bind(start, ToKey)
 		endKey   = maybe.Bind(end, ToKey)
 
@@ -168,8 +188,6 @@ func (th *trieHistory) getValueChanges(
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 		// add the changes to keys in [start, end] to [combinedChanges].
 		// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-		combinedChanges = newChangeSummary(maxLength)
-
 		// The difference between the index of [startRootChanges] and [endRootChanges] in [th.history].
 		startToEndOffset = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
 
@@ -178,54 +196,96 @@ func (th *trieHistory) getValueChanges(
 		startRootIndex = endRootIndex - startToEndOffset
 	)
 
-	// For each change after [startRootChanges] up to and including
-	// [endRootChanges], record the change in [combinedChanges].
+	// Push in the heap first key in [startKey, endKey] for each historical root.
 	for i := startRootIndex + 1; i <= endRootIndex; i++ {
-		changes, _ := th.history.Index(i)
+		historyChanges, ok := th.history.Index(i)
+		if !ok {
+			return nil, fmt.Errorf("missing history changes at index %d", i)
+		}
 
-		// Add the changes from this commit to [combinedChanges].
-		for key, valueChange := range changes.values {
-			// The key is outside the range [start, end].
-			if (startKey.HasValue() && key.Less(startKey.Value())) ||
-				(end.HasValue() && key.Greater(endKey.Value())) {
+		startKeyIndex := 0
+		if startKey.HasValue() {
+			// Binary search for [startKey] index.
+			startKeyIndex, _ = slices.BinarySearchFunc(historyChanges.sortedKeyChanges, startKey, func(k *keyChange, m maybe.Maybe[Key]) int {
+				return k.key.Compare(m.Value())
+			})
+
+			if startKeyIndex >= len(historyChanges.sortedKeyChanges) {
+				// [startKey] is after last key of [sortedKeyChanges].
+				continue
+			}
+		}
+
+		keyChange := historyChanges.sortedKeyChanges[startKeyIndex]
+		if end.HasValue() && keyChange.key.Greater(endKey.Value()) {
+			// [keyChange] is after [endKey].
+			continue
+		}
+
+		// [startKeyIndex] is the index of the first key in [startKey, endKey] from [sortedKeyChanges].
+		historyChangesIndexHeap.Push(&historyChangesIndex{
+			changes:       historyChanges,
+			kvChangeIndex: startKeyIndex,
+		})
+	}
+
+	var (
+		combinedKeyChanges = make([]*keyChange, 0, maxLength)
+
+		// Used for combining the changes of all the historical changes, for the current smallest key.
+		currentKeyChange *keyChange
+	)
+
+	for historyChangesIndexHeap.Len() > 0 {
+		historyRootChanges, _ := historyChangesIndexHeap.Pop()
+		kvChange := historyRootChanges.changes.sortedKeyChanges[historyRootChanges.kvChangeIndex]
+
+		if end.HasValue() && kvChange.key.Greater(endKey.Value()) {
+			// Skip processing the current [historyRootChanges] if we are after [endKey].
+			continue
+		}
+
+		if len(historyRootChanges.changes.sortedKeyChanges) > 1+historyRootChanges.kvChangeIndex {
+			// If there are remaining changes in the current [historyRootChanges], push to minheap.
+			historyRootChanges.kvChangeIndex++
+			historyChangesIndexHeap.Push(historyRootChanges)
+		}
+
+		if currentKeyChange != nil {
+			if currentKeyChange.key.value == kvChange.key.value {
+				// Same key, update [after] value.
+				currentKeyChange.after = kvChange.after
+
 				continue
 			}
 
-			// A change to this key already exists in [combinedChanges]
-			// so update its before value with the earlier before value
-			if existing, ok := combinedChanges.values[key]; ok {
-				existing.after = valueChange.after
-				if existing.before.HasValue() == existing.after.HasValue() &&
-					bytes.Equal(existing.before.Value(), existing.after.Value()) {
-					// The change to this key is a no-op, so remove it from [combinedChanges].
-					delete(combinedChanges.values, key)
-					changedKeys.Remove(key)
+			// New key.
+			if !bytes.Equal(currentKeyChange.before.Value(), currentKeyChange.after.Value()) {
+				// If the value has changed, add [currentKeyChange] to [combinedKeyChanges].
+				combinedKeyChanges = append(combinedKeyChanges, currentKeyChange)
+
+				if len(combinedKeyChanges) >= maxLength {
+					// If we have [maxLength] changes, we can return the current [combinedKeyChanges].
+					return combinedKeyChanges, nil
 				}
-			} else {
-				combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
-					before: valueChange.before,
-					after:  valueChange.after,
-				}
-				changedKeys.Add(key)
 			}
+		}
+
+		currentKeyChange = &keyChange{
+			change: &change[maybe.Maybe[[]byte]]{
+				before: kvChange.before,
+				after:  kvChange.after,
+			},
+			key: kvChange.key,
 		}
 	}
 
-	// If we have <= [maxLength] elements, we're done.
-	if changedKeys.Len() <= maxLength {
-		return combinedChanges, nil
+	// Add the last [currentKeyChange] to [valueChanges] if needed.
+	if currentKeyChange != nil && !bytes.Equal(currentKeyChange.before.Value(), currentKeyChange.after.Value()) {
+		combinedKeyChanges = append(combinedKeyChanges, currentKeyChange)
 	}
 
-	// Keep only the smallest [maxLength] items in [combinedChanges.values].
-	sortedChangedKeys := changedKeys.List()
-	utils.Sort(sortedChangedKeys)
-	for len(sortedChangedKeys) > maxLength {
-		greatestKey := sortedChangedKeys[len(sortedChangedKeys)-1]
-		sortedChangedKeys = sortedChangedKeys[:len(sortedChangedKeys)-1]
-		delete(combinedChanges.values, greatestKey)
-	}
-
-	return combinedChanges, nil
+	return combinedKeyChanges, nil
 }
 
 // Returns the changes to go from the current trie state back to the requested [rootID]
@@ -233,7 +293,7 @@ func (th *trieHistory) getValueChanges(
 // If [start] is Nothing, all keys are considered > [start].
 // If [end] is Nothing, all keys are considered < [end].
 func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) (*changeSummary, error) {
-	// [lastRootChange] is the last change in the history resulting in [rootID].
+	// [lastRootChange] is the last change in the historyChanges resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
 		return nil, ErrInsufficientHistory
@@ -268,19 +328,42 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 			}
 		}
 
-		for key, valueChange := range changes.values {
-			if (startKey.IsNothing() || !key.Less(startKey.Value())) &&
-				(endKey.IsNothing() || !key.Greater(endKey.Value())) {
-				if existing, ok := combinedChanges.values[key]; ok {
-					existing.after = valueChange.before
-				} else {
-					combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
-						before: valueChange.after,
-						after:  valueChange.before,
-					}
+		startKeyIndex := 0
+		if startKey.HasValue() {
+			// Binary search for [startKey] index.
+			startKeyIndex, _ = slices.BinarySearchFunc(changes.sortedKeyChanges, startKey, func(k *keyChange, m maybe.Maybe[Key]) int {
+				return k.key.Compare(m.Value())
+			})
+		}
+
+		for _, kc := range changes.sortedKeyChanges[startKeyIndex:] {
+			if end.HasValue() && kc.key.Greater(endKey.Value()) {
+				break
+			}
+
+			if existing, ok := combinedChanges.values[kc.key]; ok {
+				existing.after = kc.before
+			} else {
+				keyChange := keyChange{
+					change: &change[maybe.Maybe[[]byte]]{
+						before: kc.after,
+						after:  kc.before,
+					},
+					key: kc.key,
 				}
+
+				combinedChanges.values[kc.key] = &keyChange
 			}
 		}
+	}
+
+	sortedKeys := maps.Keys(combinedChanges.values)
+	slices.SortFunc(sortedKeys, func(a, b Key) int {
+		return a.Compare(b)
+	})
+
+	for _, key := range sortedKeys {
+		combinedChanges.sortedKeyChanges = append(combinedChanges.sortedKeyChanges, combinedChanges.values[key])
 	}
 
 	return combinedChanges, nil
